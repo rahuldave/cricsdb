@@ -5,7 +5,6 @@ import PlayerSearch from '../components/PlayerSearch'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
-import LineChart from '../components/charts/LineChart'
 import ScatterChart from '../components/charts/ScatterChart'
 import DonutChart from '../components/charts/DonutChart'
 import {
@@ -123,9 +122,10 @@ export default function Bowling() {
                 <BarChart data={seasonData} categoryAccessor="season" valueAccessor={(d: Record<string, any>) => (d.dismissals as number) ?? 0}
                   title="Wickets by Season" categoryLabel="Season" valueLabel="Wickets"
                   width={600} height={350} colorScheme={['#ef4444']} />
-                <LineChart data={seasonData.map((s, i) => ({ x: i, y: s.strike_rate ?? 0 }))}
-                  xAccessor="x" yAccessor="y" title="Strike Rate by Season"
-                  xLabel="Season" yLabel="SR" width={600} height={350} showPoints />
+                <BarChart data={seasonData.filter(s => s.strike_rate != null)}
+                  categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
+                  title="Bowling Strike Rate by Season" categoryLabel="Season" valueLabel="SR"
+                  width={600} height={350} colorScheme={['#f59e0b']} />
               </div>
             )}
 
@@ -133,7 +133,7 @@ export default function Bowling() {
               <BarChart
                 data={overData.map(o => ({
                   ...o, over: `${o.over_number}`,
-                  phase: o.over_number <= 5 ? 'Powerplay' : o.over_number <= 14 ? 'Middle' : 'Death',
+                  phase: o.over_number <= 6 ? 'Powerplay' : o.over_number <= 15 ? 'Middle' : 'Death',
                 }))}
                 categoryAccessor="over"
                 valueAccessor={(d: Record<string, any>) => {

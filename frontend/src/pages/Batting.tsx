@@ -126,9 +126,10 @@ export default function Batting() {
                 <BarChart data={seasonData} categoryAccessor="season" valueAccessor="runs"
                   title="Runs by Season" categoryLabel="Season" valueLabel="Runs"
                   width={600} height={350} colorScheme={['#3b82f6']} />
-                <LineChart data={seasonData.map((s, i) => ({ x: i, y: s.strike_rate ?? 0, season: s.season }))}
-                  xAccessor="x" yAccessor="y" title="Strike Rate by Season"
-                  xLabel="Season" yLabel="Strike Rate" width={600} height={350} showPoints />
+                <BarChart data={seasonData.filter(s => s.strike_rate != null)}
+                  categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
+                  title="Strike Rate by Season" categoryLabel="Season" valueLabel="Strike Rate"
+                  width={600} height={350} colorScheme={['#10b981']} />
               </div>
             )}
 
@@ -136,7 +137,7 @@ export default function Batting() {
               <BarChart
                 data={overData.map(o => ({
                   ...o, over: `${o.over_number}`,
-                  phase: o.over_number <= 5 ? 'Powerplay' : o.over_number <= 14 ? 'Middle' : 'Death',
+                  phase: o.over_number <= 6 ? 'Powerplay' : o.over_number <= 15 ? 'Middle' : 'Death',
                 }))}
                 categoryAccessor="over" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
                 title="Strike Rate by Over" categoryLabel="Over" valueLabel="Strike Rate"

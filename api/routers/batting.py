@@ -464,7 +464,7 @@ async def batting_by_phase(
     )
     dismiss_map = {r["phase"]: r["dismissals"] for r in dismiss_rows}
 
-    phase_labels = {"powerplay": "0-5", "middle": "6-14", "death": "15-19"}
+    phase_labels = {"powerplay": "1-6", "middle": "7-15", "death": "16-20"}
     by_phase = []
     for r in rows:
         r["overs"] = phase_labels.get(r["phase"], "")

@@ -5,7 +5,6 @@ import PlayerSearch from '../components/PlayerSearch'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
-import LineChart from '../components/charts/LineChart'
 import DonutChart from '../components/charts/DonutChart'
 import { getHeadToHead } from '../api'
 import type { PlayerSearchResult, HeadToHeadResponse, HeadToHeadMatch } from '../types'
@@ -98,11 +97,11 @@ export default function HeadToHead() {
 
           {data.by_season.length > 0 && (
             <div className="bg-white rounded-lg border p-6 shadow-sm mb-6">
-              <LineChart
-                data={data.by_season.map((s, i) => ({ x: i, y: s.strike_rate ?? 0, season: s.season }))}
-                xAccessor="x" yAccessor="y"
-                title="Strike Rate by Season" xLabel="Season" yLabel="SR"
-                width={700} height={300} showPoints />
+              <BarChart
+                data={data.by_season.filter(s => s.strike_rate != null)}
+                categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
+                title="Strike Rate by Season" categoryLabel="Season" valueLabel="SR"
+                width={700} height={300} colorScheme={['#6366f1']} />
             </div>
           )}
 
