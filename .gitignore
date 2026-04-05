@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv
+
+# Database files (large — recreated via import_data.py)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Raw cricsheet data (large — downloaded via import_data.py)
+data/*_json/
+data/*.zip
+data/*.csv
+
+# Deploy staging
+build_plash/
+
+# DeeBase
+.deebase/.env
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,80 @@
+import type {
+  FilterParams, Tournament, TeamInfo, PlayerSearchResult,
+  TeamSummary, TeamResult, TeamSeasonRecord, TeamVsOpponent,
+  BattingSummary, BattingInnings, BowlerMatchup, OverStats, PhaseStats,
+  SeasonBattingStats, DismissalAnalysis, InterWicketStats,
+  BowlingSummary, BowlingInnings, BatterMatchup, WicketAnalysis,
+  HeadToHeadResponse,
+} from './types'
+
+async function fetchApi<T>(path: string, params?: Record<string, string | number | undefined | null>): Promise<T> {
+  const url = new URL(path, window.location.origin)
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value != null && value !== '') url.searchParams.set(key, String(value))
+    }
+  }
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  return res.json()
+}
+
+type F = FilterParams
+
+// Reference
+export const getTournaments = () =>
+  fetchApi<{ tournaments: Tournament[] }>('/api/v1/tournaments')
+export const getSeasons = () =>
+  fetchApi<{ seasons: string[] }>('/api/v1/seasons')
+export const getTeams = (filters?: F & { q?: string }) =>
+  fetchApi<{ teams: TeamInfo[] }>('/api/v1/teams', filters as Record<string, string>)
+export const searchPlayers = (q: string, role?: string, limit = 20) =>
+  fetchApi<{ players: PlayerSearchResult[] }>('/api/v1/players', { q, role, limit })
+
+// Teams
+export const getTeamSummary = (team: string, filters?: F) =>
+  fetchApi<TeamSummary>(`/api/v1/teams/${encodeURIComponent(team)}/summary`, filters as Record<string, string>)
+export const getTeamResults = (team: string, filters?: F & { limit?: number; offset?: number }) =>
+  fetchApi<{ results: TeamResult[]; total: number }>(`/api/v1/teams/${encodeURIComponent(team)}/results`, filters as Record<string, string>)
+export const getTeamVs = (team: string, opponent: string, filters?: F) =>
+  fetchApi<TeamVsOpponent>(`/api/v1/teams/${encodeURIComponent(team)}/vs/${encodeURIComponent(opponent)}`, filters as Record<string, string>)
+export const getTeamByseason = (team: string, filters?: F) =>
+  fetchApi<{ seasons: TeamSeasonRecord[] }>(`/api/v1/teams/${encodeURIComponent(team)}/by-season`, filters as Record<string, string>)
+
+// Batting
+export const getBatterSummary = (id: string, filters?: F) =>
+  fetchApi<BattingSummary>(`/api/v1/batters/${id}/summary`, filters as Record<string, string>)
+export const getBatterInnings = (id: string, filters?: F & { limit?: number; offset?: number; sort?: string }) =>
+  fetchApi<{ innings: BattingInnings[]; total: number }>(`/api/v1/batters/${id}/by-innings`, filters as Record<string, string>)
+export const getBatterVsBowlers = (id: string, filters?: F & { bowler_id?: string; min_balls?: number }) =>
+  fetchApi<{ matchups: BowlerMatchup[] }>(`/api/v1/batters/${id}/vs-bowlers`, filters as Record<string, string>)
+export const getBatterByOver = (id: string, filters?: F) =>
+  fetchApi<{ by_over: OverStats[] }>(`/api/v1/batters/${id}/by-over`, filters as Record<string, string>)
+export const getBatterByPhase = (id: string, filters?: F) =>
+  fetchApi<{ by_phase: PhaseStats[] }>(`/api/v1/batters/${id}/by-phase`, filters as Record<string, string>)
+export const getBatterBySeason = (id: string, filters?: F) =>
+  fetchApi<{ by_season: SeasonBattingStats[] }>(`/api/v1/batters/${id}/by-season`, filters as Record<string, string>)
+export const getBatterDismissals = (id: string, filters?: F) =>
+  fetchApi<DismissalAnalysis>(`/api/v1/batters/${id}/dismissals`, filters as Record<string, string>)
+export const getBatterInterWicket = (id: string, filters?: F) =>
+  fetchApi<{ inter_wicket: InterWicketStats[] }>(`/api/v1/batters/${id}/inter-wicket`, filters as Record<string, string>)
+
+// Bowling
+export const getBowlerSummary = (id: string, filters?: F) =>
+  fetchApi<BowlingSummary>(`/api/v1/bowlers/${id}/summary`, filters as Record<string, string>)
+export const getBowlerInnings = (id: string, filters?: F & { limit?: number; offset?: number }) =>
+  fetchApi<{ innings: BowlingInnings[]; total: number }>(`/api/v1/bowlers/${id}/by-innings`, filters as Record<string, string>)
+export const getBowlerVsBatters = (id: string, filters?: F & { batter_id?: string; min_balls?: number }) =>
+  fetchApi<{ matchups: BatterMatchup[] }>(`/api/v1/bowlers/${id}/vs-batters`, filters as Record<string, string>)
+export const getBowlerByOver = (id: string, filters?: F) =>
+  fetchApi<{ by_over: OverStats[] }>(`/api/v1/bowlers/${id}/by-over`, filters as Record<string, string>)
+export const getBowlerByPhase = (id: string, filters?: F) =>
+  fetchApi<{ by_phase: PhaseStats[] }>(`/api/v1/bowlers/${id}/by-phase`, filters as Record<string, string>)
+export const getBowlerBySeason = (id: string, filters?: F) =>
+  fetchApi<{ by_season: SeasonBattingStats[] }>(`/api/v1/bowlers/${id}/by-season`, filters as Record<string, string>)
+export const getBowlerWickets = (id: string, filters?: F) =>
+  fetchApi<WicketAnalysis>(`/api/v1/bowlers/${id}/wickets`, filters as Record<string, string>)
+
+// Head to Head
+export const getHeadToHead = (batterId: string, bowlerId: string, filters?: F) =>
+  fetchApi<HeadToHeadResponse>(`/api/v1/head-to-head/${batterId}/${bowlerId}`, filters as Record<string, string>)

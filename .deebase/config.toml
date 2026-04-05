@@ -1,0 +1,15 @@
+[project]
+name = "cricsdb"
+version = "0.1.0"
+
+[database]
+type = "sqlite"
+sqlite_path = "cricket.db"
+
+[models]
+output = "models/tables.py"
+module = "models.tables"
+
+[migrations]
+directory = "migrations"
+auto_seal = false
