@@ -20,3 +20,20 @@ export function useUrlParam(key: string, defaultValue = ''): [string, (v: string
 
   return [value, setValue]
 }
+
+/**
+ * Set multiple URL params atomically (avoids race conditions).
+ */
+export function useSetUrlParams(): (updates: Record<string, string>) => void {
+  const [, setParams] = useSearchParams()
+  return useCallback((updates: Record<string, string>) => {
+    setParams(prev => {
+      const next = new URLSearchParams(prev)
+      for (const [k, v] of Object.entries(updates)) {
+        if (v) next.set(k, v)
+        else next.delete(k)
+      }
+      return next
+    }, { replace: true })
+  }, [setParams])
+}

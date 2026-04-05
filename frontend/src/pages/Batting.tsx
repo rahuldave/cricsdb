@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useFilters } from '../components/FilterBar'
-import { useUrlParam } from '../hooks/useUrlState'
+import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import PlayerSearch from '../components/PlayerSearch'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
@@ -22,8 +22,9 @@ const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed
 
 export default function Batting() {
   const filters = useFilters()
-  const [playerId, setPlayerId] = useUrlParam('player')
+  const [playerId] = useUrlParam('player')
   const [activeTab, setActiveTab] = useUrlParam('tab', 'By Season')
+  const setUrlParams = useSetUrlParams()
 
   const [summary, setSummary] = useState<BattingSummary | null>(null)
   const [seasonData, setSeasonData] = useState<SeasonBattingStats[]>([])
@@ -37,7 +38,7 @@ export default function Batting() {
   const [inningsOffset, setInningsOffset] = useState(0)
 
   const handleSelect = (p: PlayerSearchResult) => {
-    setPlayerId(p.id); setActiveTab('By Season')
+    setUrlParams({ player: p.id, tab: 'By Season' })
   }
 
   useEffect(() => {
