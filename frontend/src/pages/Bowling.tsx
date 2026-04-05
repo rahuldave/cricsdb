@@ -13,7 +13,7 @@ import {
 } from '../api'
 import type {
   PlayerSearchResult, BowlingSummary, BowlingInnings, BatterMatchup,
-  OverStats, PhaseStats, SeasonBattingStats, WicketAnalysis,
+  OverStats, PhaseStats, WicketAnalysis,
 } from '../types'
 
 const tabs = ['By Season', 'By Over', 'By Phase', 'vs Batters', 'Wickets', 'Innings List'] as const
@@ -26,7 +26,8 @@ export default function Bowling() {
   const setUrlParams = useSetUrlParams()
 
   const [summary, setSummary] = useState<BowlingSummary | null>(null)
-  const [seasonData, setSeasonData] = useState<SeasonBattingStats[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [seasonData, setSeasonData] = useState<any[]>([])
   const [overData, setOverData] = useState<OverStats[]>([])
   const [phaseData, setPhaseData] = useState<PhaseStats[]>([])
   const [batterMatchups, setBatterMatchups] = useState<BatterMatchup[]>([])
@@ -119,7 +120,7 @@ export default function Bowling() {
           <div className="bg-white rounded-lg border p-6 shadow-sm">
             {activeTab === 'By Season' && seasonData.length > 0 && (
               <div className="flex gap-6 flex-wrap">
-                <BarChart data={seasonData} categoryAccessor="season" valueAccessor={(d: Record<string, any>) => (d.dismissals as number) ?? 0}
+                <BarChart data={seasonData} categoryAccessor="season" valueAccessor={(d: Record<string, any>) => (d.wickets as number) ?? (d.dismissals as number) ?? 0}
                   title="Wickets by Season" categoryLabel="Season" valueLabel="Wickets"
                   width={600} height={350} colorScheme={['#ef4444']} />
                 <BarChart data={seasonData.filter(s => s.strike_rate != null)}
@@ -136,11 +137,7 @@ export default function Bowling() {
                   phase: o.over_number <= 6 ? 'Powerplay' : o.over_number <= 15 ? 'Middle' : 'Death',
                 }))}
                 categoryAccessor="over"
-                valueAccessor={(d: Record<string, any>) => {
-                  const balls = d.balls as number
-                  const runs = d.runs as number
-                  return balls > 0 ? (runs / balls) * 6 : 0
-                }}
+                valueAccessor={(d: Record<string, any>) => (d.economy as number) ?? 0}
                 title="Economy by Over" categoryLabel="Over" valueLabel="Economy"
                 colorBy="phase" colorScheme={['#3b82f6', '#22c55e', '#ef4444']}
                 width={700} height={350} />

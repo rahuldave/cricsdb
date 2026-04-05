@@ -70,8 +70,9 @@ export const getBowlerByOver = (id: string, filters?: F) =>
   fetchApi<{ by_over: OverStats[] }>(`/api/v1/bowlers/${id}/by-over`, filters as Record<string, string>)
 export const getBowlerByPhase = (id: string, filters?: F) =>
   fetchApi<{ by_phase: PhaseStats[] }>(`/api/v1/bowlers/${id}/by-phase`, filters as Record<string, string>)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getBowlerBySeason = (id: string, filters?: F) =>
-  fetchApi<{ by_season: SeasonBattingStats[] }>(`/api/v1/bowlers/${id}/by-season`, filters as Record<string, string>)
+  fetchApi<{ by_season: any[] }>(`/api/v1/bowlers/${id}/by-season`, filters as Record<string, string>)
 export const getBowlerWickets = (id: string, filters?: F) =>
   fetchApi<WicketAnalysis>(`/api/v1/bowlers/${id}/wickets`, filters as Record<string, string>)
 
