@@ -81,7 +81,7 @@ export default function Batting() {
     { key: 'dismissals', label: 'Outs', sortable: true },
     { key: 'strike_rate', label: 'SR', sortable: true, format: (v: any) => fmt(v) },
     { key: 'average', label: 'Avg', sortable: true, format: (v: any) => fmt(v) },
-    { key: 'balls_per_boundary', label: 'B/Bnd', format: (v: any) => fmt(v) },
+    { key: 'balls_per_boundary', label: 'B/Bnd', sortable: true, format: (v: any) => fmt(v) },
   ]
 
   return (

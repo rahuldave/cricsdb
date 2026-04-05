@@ -77,7 +77,7 @@ export default function Bowling() {
     { key: 'wickets', label: 'Wkts', sortable: true },
     { key: 'economy', label: 'Econ', sortable: true, format: (v: any) => fmt(v) },
     { key: 'average', label: 'Avg', sortable: true, format: (v: any) => fmt(v) },
-    { key: 'balls_per_boundary', label: 'B/Bnd', format: (v: any) => fmt(v) },
+    { key: 'balls_per_boundary', label: 'B/Bnd', sortable: true, format: (v: any) => fmt(v) },
   ]
 
   return (
