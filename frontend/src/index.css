@@ -7,8 +7,8 @@
 :root {
   --bg:        #FAF7F0;  /* cream page */
   --bg-soft:   #F2EDE0;  /* faintly darker cream for hover/zebra */
-  --ink:       #1A1714;  /* near-black, warm */
-  --ink-soft:  #54493F;  /* body grey */
+  --ink:       #2E2823;  /* warm dark brown — softer than near-black */
+  --ink-soft:  #5C5048;  /* body grey */
   --ink-faint: #8A7D70;  /* labels, metadata */
   --rule:      #1A1714;  /* primary rule */
   --rule-soft: #E0D8CC;  /* hairline rule */
