@@ -20,10 +20,22 @@ export default function FilterBar() {
   const setUrlParams = useSetUrlParams()
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [seasons, setSeasons] = useState<string[]>([])
+  const [tournamentsError, setTournamentsError] = useState(false)
+  const [seasonsError, setSeasonsError] = useState(false)
 
   useEffect(() => {
-    getTournaments().then(d => setTournaments(d.tournaments)).catch(() => {})
-    getSeasons().then(d => setSeasons(d.seasons)).catch(() => {})
+    getTournaments()
+      .then(d => { setTournaments(d.tournaments); setTournamentsError(false) })
+      .catch(err => {
+        console.warn('Failed to load tournaments:', err)
+        setTournamentsError(true)
+      })
+    getSeasons()
+      .then(d => { setSeasons(d.seasons); setSeasonsError(false) })
+      .catch(err => {
+        console.warn('Failed to load seasons:', err)
+        setSeasonsError(true)
+      })
   }, [])
 
   const set = (key: string, value: string) => {
@@ -94,8 +106,9 @@ export default function FilterBar() {
 
       {/* Tournament */}
       <select value={tournament} onChange={e => setTournament(e.target.value)}
-        className="rounded-md border border-gray-300 px-2 py-1 bg-white text-gray-700">
-        <option value="">All Tournaments</option>
+        disabled={tournamentsError}
+        className="rounded-md border border-gray-300 px-2 py-1 bg-white text-gray-700 disabled:bg-red-50 disabled:border-red-300 disabled:text-red-600">
+        <option value="">{tournamentsError ? '⚠ Tournaments failed to load' : 'All Tournaments'}</option>
         {filteredTournaments.map(t => (
           <option key={t.event_name} value={t.event_name}>{t.event_name} ({t.matches})</option>
         ))}
@@ -103,14 +116,16 @@ export default function FilterBar() {
 
       {/* Season Range */}
       <select value={seasonFrom} onChange={e => set('season_from', e.target.value)}
-        className="rounded-md border border-gray-300 px-2 py-1 bg-white text-gray-700">
-        <option value="">From</option>
+        disabled={seasonsError}
+        className="rounded-md border border-gray-300 px-2 py-1 bg-white text-gray-700 disabled:bg-red-50 disabled:border-red-300 disabled:text-red-600">
+        <option value="">{seasonsError ? '⚠ failed' : 'From'}</option>
         {seasons.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
       <span className="text-gray-400">-</span>
       <select value={seasonTo} onChange={e => set('season_to', e.target.value)}
-        className="rounded-md border border-gray-300 px-2 py-1 bg-white text-gray-700">
-        <option value="">To</option>
+        disabled={seasonsError}
+        className="rounded-md border border-gray-300 px-2 py-1 bg-white text-gray-700 disabled:bg-red-50 disabled:border-red-300 disabled:text-red-600">
+        <option value="">{seasonsError ? '⚠ failed' : 'To'}</option>
         {seasons.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
     </div>
