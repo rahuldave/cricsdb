@@ -135,7 +135,13 @@ The Batting `vs Bowlers` and Bowling `vs Batters` tabs both render a scatter cha
 **Mechanics that make this work:**
 - `ScatterChart` wrapper passes through `tooltip`, `annotations`, and `pointIdAccessor` to Semiotic.
 - `DataTable` gained three optional, backwards-compatible props: `rowKey: (row) => string` for identity, `highlightKey: string | null` for which row to highlight, and `onRowClick: (row) => void`. Highlighted rows get a yellow background and `scrollIntoView({ behavior: 'smooth', block: 'nearest' })` via a ref.
-- The two annotation types in use: `react-annotation` (label with leader line) for the top-N labels, `enclose` (circle around the point with a label) for the selected row's dot.
+- The two annotation types in use are **`widget`** (a point-anchored label with arbitrary `content: ReactNode`) for the top-N name labels, and **`enclose`** (a circle drawn around one or more points with an optional label) for the selected row's dot.
+
+**Semiotic v3 annotation gotchas worth knowing.** The annotation API is *not* the same as react-annotation that v1/v2 used:
+- `type: "react-annotation"` does **not** exist in v3 — silently no-ops. Use `type: "widget"` for point-anchored labels and pass `content: <span>...</span>`.
+- Annotations look up coordinates via the **same field-name strings** as the chart's accessors. So if your `Scatterplot` uses `xAccessor={(d) => d.strike_rate}` (an accessor function), the annotation can't anchor itself — it doesn't know the field name. Use string accessors (`xAccessor="strike_rate"`) and write annotations as `{ type: "widget", strike_rate: 130, average: 22, dy: -10, content: <...> }` so the field names line up.
+- `enclose` takes `coordinates: [{...}]` (an array of points), not bare `x`/`y`. For a single-point highlight, pass an array of length 1: `coordinates: [{ strike_rate: m.strike_rate, average: m.average }]`. Optional `label`, `padding`, and `color`.
+- Other valid v3 types you may want: `y-threshold` (horizontal line with label), `category-highlight` (column highlight on ordinal charts), `note`, `callout`.
 
 **The reverse direction (clicking a chart dot to highlight a table row) is deliberately NOT implemented.** Semiotic v3's high-level `Scatterplot` component does not expose `onClick` or any per-point click handler. Adding that would require dropping below the high-level helper to `XYFrame` directly, which is a bigger refactor and would lose some of the convenience defaults the wrapper provides. The tooltip + top-N labels + reverse direction (table → chart) already cover the original "I can't tell who the big dots are" complaint, so the forward direction (chart → table) is left for later — see CLAUDE.md Future Enhancements item H.
 

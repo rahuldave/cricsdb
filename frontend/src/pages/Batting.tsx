@@ -240,23 +240,37 @@ export default function Batting() {
                 <TabState fetch={matchupsFetch as FetchState<unknown>} />
                 {!matchupsFetch.loading && !matchupsFetch.error && bowlerMatchups.length > 0 && (() => {
                   const valid = bowlerMatchups.filter(m => m.strike_rate != null && m.average != null)
-                  // Top 8 by balls faced get a name label directly on the chart
+                  // Top 8 by balls faced get a name label directly on the chart.
+                  // Semiotic v3 uses `widget` annotations anchored via the same field
+                  // names as the chart's accessors (here: strike_rate and average).
                   const topByBalls = [...valid].sort((a, b) => (b.balls ?? 0) - (a.balls ?? 0)).slice(0, 8)
                   const annotations: Record<string, any>[] = topByBalls.map(m => ({
-                    type: 'react-annotation',
-                    label: m.bowler_name,
-                    x: m.strike_rate, y: m.average, dx: 6, dy: -6,
+                    type: 'widget',
+                    strike_rate: m.strike_rate,
+                    average: m.average,
+                    dy: -12,
+                    content: (
+                      <span style={{
+                        fontSize: 11, fontWeight: 600, color: '#374151',
+                        background: 'rgba(255,255,255,0.85)', padding: '1px 4px',
+                        borderRadius: 3, whiteSpace: 'nowrap',
+                      }}>{m.bowler_name}</span>
+                    ),
                   }))
-                  // If a row is selected, add an extra highlight annotation
+                  // If a row is selected, draw an enclose annotation around it.
                   const selected = selectedBowlerId
                     ? valid.find(m => m.bowler_id === selectedBowlerId)
                     : null
                   if (selected) {
                     annotations.push({
                       type: 'enclose',
+                      coordinates: [{
+                        strike_rate: selected.strike_rate,
+                        average: selected.average,
+                      }],
                       label: selected.bowler_name,
-                      x: selected.strike_rate, y: selected.average,
-                      dx: 12, dy: -16, color: '#dc2626',
+                      padding: 14,
+                      color: '#dc2626',
                     })
                   }
                   return (
@@ -267,9 +281,9 @@ export default function Batting() {
                       </p>
                       <ScatterChart
                         data={valid}
-                        xAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
-                        yAccessor={(d: Record<string, any>) => (d.average as number) ?? 0}
-                        sizeBy={(d: Record<string, any>) => (d.balls as number) ?? 6}
+                        xAccessor="strike_rate"
+                        yAccessor="average"
+                        sizeBy="balls"
                         title="SR vs Average (dot size = balls faced)"
                         xLabel="Strike Rate" yLabel="Average" width={600} height={400}
                         tooltip={{

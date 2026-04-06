@@ -231,9 +231,17 @@ export default function Bowling() {
                   const valid = batterMatchups.filter(m => m.economy != null && m.strike_rate != null)
                   const topByBalls = [...valid].sort((a, b) => (b.balls ?? 0) - (a.balls ?? 0)).slice(0, 8)
                   const annotations: Record<string, any>[] = topByBalls.map(m => ({
-                    type: 'react-annotation',
-                    label: m.batter_name,
-                    x: m.economy, y: m.strike_rate, dx: 6, dy: -6,
+                    type: 'widget',
+                    economy: m.economy,
+                    strike_rate: m.strike_rate,
+                    dy: -12,
+                    content: (
+                      <span style={{
+                        fontSize: 11, fontWeight: 600, color: '#374151',
+                        background: 'rgba(255,255,255,0.85)', padding: '1px 4px',
+                        borderRadius: 3, whiteSpace: 'nowrap',
+                      }}>{m.batter_name}</span>
+                    ),
                   }))
                   const selected = selectedBatterId
                     ? valid.find(m => m.batter_id === selectedBatterId)
@@ -241,9 +249,13 @@ export default function Bowling() {
                   if (selected) {
                     annotations.push({
                       type: 'enclose',
+                      coordinates: [{
+                        economy: selected.economy,
+                        strike_rate: selected.strike_rate,
+                      }],
                       label: selected.batter_name,
-                      x: selected.economy, y: selected.strike_rate,
-                      dx: 12, dy: -16, color: '#dc2626',
+                      padding: 14,
+                      color: '#dc2626',
                     })
                   }
                   return (
@@ -254,9 +266,9 @@ export default function Bowling() {
                       </p>
                       <ScatterChart
                         data={valid}
-                        xAccessor={(d: Record<string, any>) => (d.economy as number) ?? 0}
-                        yAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
-                        sizeBy={(d: Record<string, any>) => (d.balls as number) ?? 6}
+                        xAccessor="economy"
+                        yAccessor="strike_rate"
+                        sizeBy="balls"
                         title="Economy vs SR (dot size = balls bowled)"
                         xLabel="Economy" yLabel="Strike Rate" width={600} height={400}
                         tooltip={{
