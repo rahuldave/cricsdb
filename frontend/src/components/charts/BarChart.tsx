@@ -41,19 +41,25 @@ export default function BarChart<T extends Record<string, any>>({
         && data.length > 0
         && (effectiveWidth / data.length) < 28)
 
-  // Returning a <text> element with a rotation transform replaces the
-  // default tick label. Anchor at "end" so text grows up-and-left from
-  // the rotation origin.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const categoryFormat = shouldRotate
-    ? (label: string) => (
+  // Semiotic v3's high-level `categoryFormat` puts its result inside a
+  // <foreignObject> + <div>, so SVG rotation transforms passed via
+  // <text> are ignored. Instead use `frameProps.oLabel` from the
+  // lower-level OrdinalFrame, which returns a real SVG element that
+  // becomes the tick label.
+  //
+  // The label sits below the chart baseline; we render an SVG <text>
+  // anchored at "end" with rotate(-60) so the end of the text touches
+  // the tick mark and the rest trails down-and-to-the-left.
+  const oLabel = shouldRotate
+    ? (labelValue: string) => (
         <text
-          transform="rotate(-60)"
           textAnchor="end"
+          transform="rotate(-60)"
           fontSize={11}
-          fill="var(--semiotic-text, #555)"
+          fill="#555"
+          dy="0.35em"
           style={{ userSelect: 'none' }}
-        >{label}</text>
+        >{labelValue}</text>
       )
     : undefined
 
@@ -68,14 +74,14 @@ export default function BarChart<T extends Record<string, any>>({
           width={effectiveWidth}
           // Add bottom padding when labels are rotated so they don't
           // get clipped or collide with the axis label.
-          height={shouldRotate ? height + 30 : height}
+          height={shouldRotate ? height + 40 : height}
           colorScheme={colorScheme}
           colorBy={colorBy}
           categoryLabel={categoryLabel}
           valueLabel={valueLabel}
           orientation={orientation}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          categoryFormat={categoryFormat as any}
+          frameProps={oLabel ? { oLabel: oLabel as any, margin: { top: 50, right: 10, bottom: 70, left: 70 } } : undefined}
           enableHover
         />
       )}
