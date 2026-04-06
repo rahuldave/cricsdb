@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch, type FetchState } from '../hooks/useFetch'
@@ -110,7 +111,10 @@ export default function Batting() {
   const inningsTotal = inningsFetch.data?.total ?? 0
 
   const inningsColumns: Column<BattingInnings>[] = [
-    { key: 'date', label: 'Date', sortable: true },
+    { key: 'date', label: 'Date', sortable: true, format: (v: any, r: any) => (
+      <Link to={`/matches/${r.match_id}?highlight_batter=${encodeURIComponent(playerId || '')}`}
+        className="comp-link" onClick={e => e.stopPropagation()}>{v || '-'}</Link>
+    ) as unknown as string },
     { key: 'opponent', label: 'Opponent', sortable: true },
     { key: 'tournament', label: 'Tournament' },
     { key: 'runs', label: 'Runs', sortable: true },

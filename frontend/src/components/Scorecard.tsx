@@ -6,9 +6,11 @@ interface Props {
   data: Scorecard
   /** Optional content rendered between the header card and the innings cards (e.g. charts). */
   children?: ReactNode
+  highlightBatterId?: string | null
+  highlightBowlerId?: string | null
 }
 
-export default function ScorecardView({ data, children }: Props) {
+export default function ScorecardView({ data, children, highlightBatterId, highlightBowlerId }: Props) {
   const { info, innings } = data
   const tossText = info.toss_winner && info.toss_decision
     ? `${info.toss_winner} won the toss and chose to ${info.toss_decision}`
@@ -60,7 +62,9 @@ export default function ScorecardView({ data, children }: Props) {
 
       {/* Innings cards */}
       {innings.map((inn, i) => (
-        <InningsCard key={i} innings={inn} linkParams={linkParams} />
+        <InningsCard key={i} innings={inn} linkParams={linkParams}
+          highlightBatterId={highlightBatterId}
+          highlightBowlerId={highlightBowlerId} />
       ))}
 
       {/* Officials (small footer) */}

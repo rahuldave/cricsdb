@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getMatchScorecard, getInningsGrid } from '../api'
 import ScorecardView from '../components/Scorecard'
 import WormChart from '../components/charts/WormChart'
@@ -11,6 +11,9 @@ import { useFetch } from '../hooks/useFetch'
 
 export default function MatchScorecard() {
   const { matchId } = useParams<{ matchId: string }>()
+  const [searchParams] = useSearchParams()
+  const highlightBatterId = searchParams.get('highlight_batter')
+  const highlightBowlerId = searchParams.get('highlight_bowler')
   const { data, loading, error, refetch } = useFetch(
     () => getMatchScorecard(Number(matchId)),
     [matchId],
@@ -50,7 +53,7 @@ export default function MatchScorecard() {
         })()
         return (
         <>
-          <ScorecardView data={data}>
+          <ScorecardView data={data} highlightBatterId={highlightBatterId} highlightBowlerId={highlightBowlerId}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
               <div className="bg-white rounded-lg border shadow-sm p-4">
                 <WormChart innings={data.innings} />

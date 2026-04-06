@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import type { ScorecardInnings } from '../types'
 
@@ -9,9 +10,19 @@ interface Props {
    * team_type, tournament). Should NOT start with `?` or `&`.
    */
   linkParams?: string
+  /** When set, the matching batter row gets highlighted and scrolled into view. */
+  highlightBatterId?: string | null
+  /** When set, the matching bowler row gets highlighted and scrolled into view. */
+  highlightBowlerId?: string | null
 }
 
-export default function InningsCard({ innings, linkParams = '' }: Props) {
+export default function InningsCard({ innings, linkParams = '', highlightBatterId, highlightBowlerId }: Props) {
+  const highlightedRowRef = useRef<HTMLTableRowElement | null>(null)
+  useEffect(() => {
+    if ((highlightBatterId || highlightBowlerId) && highlightedRowRef.current) {
+      highlightedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [highlightBatterId, highlightBowlerId])
   const batterHref = (id: string | null) =>
     id ? `/batting?player=${encodeURIComponent(id)}${linkParams ? '&' + linkParams : ''}` : null
   const bowlerHref = (id: string | null) =>
@@ -46,8 +57,12 @@ export default function InningsCard({ innings, linkParams = '' }: Props) {
             </tr>
           </thead>
           <tbody>
-            {innings.batting.map(b => (
-              <tr key={`${b.person_id}-${b.name}`} className="border-b border-gray-100 hover:bg-gray-50">
+            {innings.batting.map(b => {
+              const isHL = !!(highlightBatterId && b.person_id === highlightBatterId)
+              return (
+              <tr key={`${b.person_id}-${b.name}`}
+                ref={isHL ? highlightedRowRef : undefined}
+                className={`border-b border-gray-100 ${isHL ? 'bg-yellow-100' : 'hover:bg-gray-50'}`}>
                 <td className="px-4 py-1.5 font-medium text-gray-900">
                   {batterHref(b.person_id)
                     ? <Link to={batterHref(b.person_id)!} className={linkClass}>{b.name}</Link>
@@ -68,7 +83,8 @@ export default function InningsCard({ innings, linkParams = '' }: Props) {
                 <td className="px-2 py-1.5 text-right tabular-nums">{b.sixes}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{b.strike_rate.toFixed(2)}</td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -129,8 +145,12 @@ export default function InningsCard({ innings, linkParams = '' }: Props) {
             </tr>
           </thead>
           <tbody>
-            {innings.bowling.map(b => (
-              <tr key={`${b.person_id}-${b.name}`} className="border-b border-gray-100 hover:bg-gray-50">
+            {innings.bowling.map(b => {
+              const isHL = !!(highlightBowlerId && b.person_id === highlightBowlerId)
+              return (
+              <tr key={`${b.person_id}-${b.name}`}
+                ref={isHL ? highlightedRowRef : undefined}
+                className={`border-b border-gray-100 ${isHL ? 'bg-yellow-100' : 'hover:bg-gray-50'}`}>
                 <td className="px-4 py-1.5 font-medium text-gray-900">
                   {bowlerHref(b.person_id)
                     ? <Link to={bowlerHref(b.person_id)!} className={linkClass}>{b.name}</Link>
@@ -144,7 +164,8 @@ export default function InningsCard({ innings, linkParams = '' }: Props) {
                 <td className="px-2 py-1.5 text-right tabular-nums text-gray-500">{b.wides}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums text-gray-500">{b.noballs}</td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
