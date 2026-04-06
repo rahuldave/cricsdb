@@ -122,6 +122,23 @@ Semiotic v3 exports named chart components (`BarChart`, `LineChart`, `Scatterplo
 - Default dimensions (500x400 for most, 300x300 for donuts)
 - Phase-based color schemes (blue=powerplay, green=middle, red=death)
 
+### Linking scatter charts to their data tables
+
+The Batting `vs Bowlers` and Bowling `vs Batters` tabs both render a scatter chart with a related `DataTable` underneath. The chart uses dot size to encode "balls faced/bowled," which makes the prominent dots visually striking — but originally there was no way to know *who* a dot was, or how it related to the rows in the table below. Three layered techniques solve it:
+
+1. **Per-dot tooltip on hover.** `ScatterChart` passes Semiotic's `tooltip` prop through; the `vs-` tabs configure it with `{ title: 'bowler_name', fields: [...] }` so hovering any point shows the player's name and key stats.
+
+2. **Top-N labels via annotations.** The 8 dots with the largest `balls` count get a `react-annotation` label drawn directly on the chart with the player's name. This means the visually-prominent points are immediately identifiable without hovering.
+
+3. **Bidirectional row → dot link.** Clicking a row in the `DataTable` sets a selected id; the matching point gets an extra `enclose` annotation drawn on the chart, and the row itself is highlighted yellow + scrolled into view via a ref. So if the player you care about isn't one of the auto-labelled top 8, you can click their row to find them.
+
+**Mechanics that make this work:**
+- `ScatterChart` wrapper passes through `tooltip`, `annotations`, and `pointIdAccessor` to Semiotic.
+- `DataTable` gained three optional, backwards-compatible props: `rowKey: (row) => string` for identity, `highlightKey: string | null` for which row to highlight, and `onRowClick: (row) => void`. Highlighted rows get a yellow background and `scrollIntoView({ behavior: 'smooth', block: 'nearest' })` via a ref.
+- The two annotation types in use: `react-annotation` (label with leader line) for the top-N labels, `enclose` (circle around the point with a label) for the selected row's dot.
+
+**The reverse direction (clicking a chart dot to highlight a table row) is deliberately NOT implemented.** Semiotic v3's high-level `Scatterplot` component does not expose `onClick` or any per-point click handler. Adding that would require dropping below the high-level helper to `XYFrame` directly, which is a bigger refactor and would lose some of the convenience defaults the wrapper provides. The tooltip + top-N labels + reverse direction (table → chart) already cover the original "I can't tell who the big dots are" complaint, so the forward direction (chart → table) is left for later — see CLAUDE.md Future Enhancements item H.
+
 ### SPA routing and the catch-all
 
 React Router handles all navigation client-side. In production, FastAPI serves the built frontend:

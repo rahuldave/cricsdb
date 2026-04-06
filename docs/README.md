@@ -21,7 +21,7 @@ file matches your task.
 | `local-development.md` | Two-terminal dev setup, type-check, hitting the API directly, project layout cheat sheet |
 | `data-pipeline.md` | Cricsheet URLs, the 22 archives we use, full rebuild vs incremental update, dry-run output |
 | `deploying.md` | `bash deploy.sh` vs `--first`, what does/doesn't ship, deebase vendoring, the `.plash` identity file, troubleshooting |
-| `design-decisions.md` | Over numbering, phase boundaries, legal balls vs all deliveries, bowler-wicket exclusions, URL state |
+| `design-decisions.md` | Over numbering, phase boundaries, legal balls vs all deliveries, bowler-wicket exclusions, URL state, scatter↔table linking pattern |
 | `data-fetching.md` | `useFetch` hook, `Spinner` + `ErrorBanner`, gated fetches, the per-tab `<TabState>` helper, when NOT to use `useFetch`, where loading/error sit relative to data |
 | `frontend-build-pipeline.md` | Vite + Tailwind v4 + TypeScript build details |
 | `../SPEC.md` | Schema, all API endpoints with SQL, all page layouts |
