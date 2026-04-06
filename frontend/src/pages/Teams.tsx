@@ -116,7 +116,7 @@ export default function Teams() {
       {selected && summary && !summaryFetch.loading && (
         <>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">{selected}</h2>
-          <div className="grid grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <StatCard label="Matches" value={summary.matches} />
             <StatCard label="Wins" value={summary.wins} />
             <StatCard label="Losses" value={summary.losses} />
@@ -133,7 +133,7 @@ export default function Teams() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border p-6 shadow-sm">
+          <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto">
             {activeTab === 'By Season' && (
               <>
                 {seasonsFetch.loading && <Spinner label="Loading season records…" />}
@@ -182,7 +182,7 @@ export default function Teams() {
                 )}
                 {vsData && !vsFetch.loading && !vsFetch.error && (
                   <div>
-                    <div className="grid grid-cols-4 gap-3 mb-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                       <StatCard label="Matches" value={vsData.overall.matches} />
                       <StatCard label="Wins" value={vsData.overall.wins} />
                       <StatCard label="Losses" value={vsData.overall.losses} />

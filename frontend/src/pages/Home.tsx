@@ -101,7 +101,7 @@ export default function Home() {
 
       <div className="rounded-lg bg-gray-50 border border-gray-200 p-6">
         <h3 className="font-semibold text-gray-700 mb-3">Coverage</h3>
-        <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-gray-600">
           <div>
             <div className="font-medium text-gray-900">International</div>
             <div>Men's &amp; Women's T20Is</div>

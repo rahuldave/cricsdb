@@ -151,14 +151,14 @@ export default function Batting() {
       {playerId && summary && !summaryFetch.loading && (
         <>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">{summary.name}</h2>
-          <div className="grid grid-cols-5 gap-3 mb-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-2">
             <StatCard label="Runs" value={summary.runs} />
             <StatCard label="Average" value={fmt(summary.average)} />
             <StatCard label="Strike Rate" value={fmt(summary.strike_rate)} />
             <StatCard label="Innings" value={summary.innings} />
             <StatCard label="Boundaries" value={summary.boundaries} subtitle={`${summary.fours} 4s, ${summary.sixes} 6s`} />
           </div>
-          <div className="grid grid-cols-5 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
             <StatCard label="B/Four" value={fmt(summary.balls_per_four)} />
             <StatCard label="B/Six" value={fmt(summary.balls_per_six)} />
             <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary)} />
@@ -176,7 +176,7 @@ export default function Batting() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border p-6 shadow-sm">
+          <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto">
             {activeTab === 'By Season' && (
               <>
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
@@ -215,7 +215,7 @@ export default function Batting() {
               <>
                 <TabState fetch={phaseFetch as FetchState<unknown>} />
                 {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {phaseData.map(p => (
                       <div key={p.phase} className="text-center">
                         <h3 className="font-semibold text-gray-700 mb-2 capitalize">{p.phase}</h3>

@@ -134,9 +134,9 @@ export default function Matches() {
             <tr className="text-left text-xs uppercase text-gray-500 border-b border-gray-200 bg-gray-50">
               <th className="px-3 py-2 font-medium">Date</th>
               <th className="px-3 py-2 font-medium">Match</th>
-              <th className="px-3 py-2 font-medium">Tournament</th>
-              <th className="px-3 py-2 font-medium">Venue</th>
-              <th className="px-3 py-2 font-medium">Result</th>
+              <th className="px-3 py-2 font-medium hidden md:table-cell">Tournament</th>
+              <th className="px-3 py-2 font-medium hidden lg:table-cell">Venue</th>
+              <th className="px-3 py-2 font-medium hidden sm:table-cell">Result</th>
             </tr>
           </thead>
           <tbody>
@@ -145,7 +145,7 @@ export default function Matches() {
                 <tr key={m.match_id}
                   onClick={() => navigate(`/matches/${m.match_id}`)}
                   className="border-b border-gray-100 cursor-pointer hover:bg-blue-50">
-                  <td className="px-3 py-2 whitespace-nowrap text-gray-600">{m.date || '-'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-gray-600 align-top">{m.date || '-'}</td>
                   <td className="px-3 py-2">
                     <div className="font-medium text-gray-900">{m.team1} vs {m.team2}</div>
                     <div className="text-xs text-gray-500">
@@ -153,10 +153,13 @@ export default function Matches() {
                       {m.team1_score && m.team2_score && <>  ·  </>}
                       {m.team2_score && <>{m.team2}: {m.team2_score}</>}
                     </div>
+                    {/* On narrow screens, show tournament + result inline since the columns are hidden */}
+                    <div className="text-xs text-gray-600 mt-1 sm:hidden">{m.result_text}</div>
+                    <div className="text-xs text-gray-500 mt-0.5 md:hidden">{m.tournament || ''}</div>
                   </td>
-                  <td className="px-3 py-2 text-gray-600">{m.tournament || '-'}</td>
-                  <td className="px-3 py-2 text-gray-600">{m.city || m.venue || '-'}</td>
-                  <td className="px-3 py-2 text-gray-700">{m.result_text}</td>
+                  <td className="px-3 py-2 text-gray-600 hidden md:table-cell">{m.tournament || '-'}</td>
+                  <td className="px-3 py-2 text-gray-600 hidden lg:table-cell">{m.city || m.venue || '-'}</td>
+                  <td className="px-3 py-2 text-gray-700 hidden sm:table-cell">{m.result_text}</td>
                 </tr>
               )
             })}

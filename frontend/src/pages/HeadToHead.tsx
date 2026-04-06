@@ -74,22 +74,22 @@ export default function HeadToHead() {
             {data.batter.name} vs {data.bowler.name}
           </h2>
 
-          <div className="grid grid-cols-5 gap-3 mb-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-2">
             <StatCard label="Balls" value={data.summary.balls} />
             <StatCard label="Runs" value={data.summary.runs} />
             <StatCard label="Outs" value={data.summary.dismissals} />
             <StatCard label="Average" value={fmt(data.summary.average)} />
             <StatCard label="Strike Rate" value={fmt(data.summary.strike_rate)} />
           </div>
-          <div className="grid grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <StatCard label="Fours" value={data.summary.fours} />
             <StatCard label="Sixes" value={data.summary.sixes} />
             <StatCard label="Dots" value={data.summary.dots} />
             <StatCard label="Dot %" value={data.summary.dot_pct != null ? `${data.summary.dot_pct}%` : '-'} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-white rounded-lg border p-6 shadow-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto">
               {data.by_phase.length > 0 && (
                 <BarChart
                   data={data.by_phase}
@@ -98,7 +98,7 @@ export default function HeadToHead() {
                   width={400} height={280} colorScheme={['#3b82f6', '#22c55e', '#ef4444']} />
               )}
             </div>
-            <div className="bg-white rounded-lg border p-6 shadow-sm">
+            <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto">
               {Object.keys(data.dismissal_kinds).length > 0 && (
                 <DonutChart
                   data={Object.entries(data.dismissal_kinds).map(([label, value]) => ({ label, value }))}
@@ -109,7 +109,7 @@ export default function HeadToHead() {
           </div>
 
           {data.by_season.length > 0 && (
-            <div className="bg-white rounded-lg border p-6 shadow-sm mb-6">
+            <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto mb-6">
               <BarChart
                 data={data.by_season.filter(s => s.strike_rate != null)}
                 categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
@@ -119,7 +119,7 @@ export default function HeadToHead() {
           )}
 
           {data.by_over.length > 0 && (
-            <div className="bg-white rounded-lg border p-6 shadow-sm mb-6">
+            <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto mb-6">
               <BarChart
                 data={data.by_over.filter(o => o.balls > 0).map(o => ({ ...o, over: `${o.over_number}` }))}
                 categoryAccessor="over"
@@ -129,7 +129,7 @@ export default function HeadToHead() {
             </div>
           )}
 
-          <div className="bg-white rounded-lg border p-6 shadow-sm">
+          <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto">
             <h3 className="text-sm font-medium text-gray-600 mb-4">Match by Match</h3>
             <DataTable columns={matchColumns} data={data.by_match} />
           </div>
