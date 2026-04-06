@@ -52,29 +52,29 @@ export default function BarChart<T extends Record<string, any>>({
   const shouldRotate = (rotateCategoryLabels === true)
     || (rotateCategoryLabels === 'auto' && pxPerBar > 0 && pxPerBar < 28)
 
-  const categoryFormat = shouldRotate
-    ? (label: string) => (
-        // Safari's foreignObject content layout is fragile — both
-        // position:absolute and padding-right:50% trick fail in
-        // different ways. Most reliable cross-browser: just rotate
-        // an inline-block in its natural flow position (Semiotic's
-        // wrapper centers it horizontally with text-align:center).
-        // Rotation pivot is the bounding-box center, so the rotated
-        // text sits centered on each tick.
-        <span style={{
-          display: 'inline-block',
-          transform: 'rotate(-60deg)',
-          whiteSpace: 'nowrap',
-          fontSize: 11,
-          color: '#555',
-          lineHeight: 1,
-          userSelect: 'none',
-        }}>{label}</span>
-      )
-    : undefined
+  // When rotating, we suppress Semiotic's default labels (which live
+  // inside <foreignObject> and break in Safari with any positioning
+  // or transform tricks) and render our own as plain HTML elements
+  // overlaid OUTSIDE the SVG, where Safari handles transforms fine.
+  //
+  // Computing bar positions: Semiotic's chart area sits inside the
+  // chart's SVG with internal margins. We override those margins via
+  // frameProps so we know the exact left offset and inner width to
+  // use for the overlay. Each bar's center is then at
+  // (i + 0.5) / data.length of the inner width.
+  const ROT_MARGIN = { top: 50, right: 20, bottom: 90, left: 60 }
+  const NORMAL_MARGIN = undefined // let Semiotic use its defaults
+  const finalHeight = shouldRotate ? height + 60 : height
+
+  const getLabel = (d: T): string => {
+    const v = typeof categoryAccessor === 'function'
+      ? categoryAccessor(d)
+      : (d as Record<string, unknown>)[categoryAccessor as string]
+    return String(v ?? '')
+  }
 
   return (
-    <div ref={ref} className="w-full">
+    <div ref={ref} className="w-full" style={{ position: 'relative' }}>
       {effectiveWidth > 0 && (
         <SemioticBarChart
           data={data}
@@ -82,19 +82,56 @@ export default function BarChart<T extends Record<string, any>>({
           valueAccessor={valueAccessor}
           title={title}
           width={effectiveWidth}
-          // Rotated labels extend below the baseline; bump the chart
-          // height so the bars get the same vertical room and the
-          // labels aren't clipped at the bottom.
-          height={shouldRotate ? height + 50 : height}
+          height={finalHeight}
           colorScheme={colorScheme}
           colorBy={colorBy}
           categoryLabel={categoryLabel}
           valueLabel={valueLabel}
           orientation={orientation}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          categoryFormat={categoryFormat as any}
+          categoryFormat={shouldRotate ? ((() => '') as any) : undefined}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          frameProps={shouldRotate ? ({ margin: ROT_MARGIN } as any) : NORMAL_MARGIN}
           enableHover
         />
+      )}
+      {shouldRotate && effectiveWidth > 0 && data.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          left: ROT_MARGIN.left,
+          top: finalHeight - ROT_MARGIN.bottom + 6,
+          width: effectiveWidth - ROT_MARGIN.left - ROT_MARGIN.right,
+          height: 0,
+          pointerEvents: 'none',
+        }}>
+          {data.map((d, i) => {
+            const label = getLabel(d)
+            const xPct = ((i + 0.5) / data.length) * 100
+            return (
+              <div key={i} style={{
+                position: 'absolute',
+                left: `${xPct}%`,
+                top: 0,
+                width: 0,
+                height: 0,
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: 0,
+                  transformOrigin: '100% 0',
+                  transform: 'rotate(-60deg)',
+                  whiteSpace: 'nowrap',
+                  fontSize: 11,
+                  color: '#555',
+                  paddingRight: 4,
+                  lineHeight: 1,
+                  userSelect: 'none',
+                }}>{label}</div>
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )
