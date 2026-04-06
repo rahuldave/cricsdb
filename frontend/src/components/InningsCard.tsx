@@ -1,10 +1,22 @@
+import { Link } from 'react-router-dom'
 import type { ScorecardInnings } from '../types'
 
 interface Props {
   innings: ScorecardInnings
+  /**
+   * URL query string fragment to append to player page links so the
+   * destination opens pre-filtered to this match's context (gender,
+   * team_type, tournament). Should NOT start with `?` or `&`.
+   */
+  linkParams?: string
 }
 
-export default function InningsCard({ innings }: Props) {
+export default function InningsCard({ innings, linkParams = '' }: Props) {
+  const batterHref = (id: string | null) =>
+    id ? `/batting?player=${encodeURIComponent(id)}${linkParams ? '&' + linkParams : ''}` : null
+  const bowlerHref = (id: string | null) =>
+    id ? `/bowling?player=${encodeURIComponent(id)}${linkParams ? '&' + linkParams : ''}` : null
+  const linkClass = 'text-blue-600 hover:underline'
   return (
     <div className="bg-white rounded-lg border shadow-sm mb-4">
       <div className="flex items-baseline justify-between border-b border-gray-200 px-4 py-2 bg-gray-50 rounded-t-lg">
@@ -32,7 +44,11 @@ export default function InningsCard({ innings }: Props) {
           <tbody>
             {innings.batting.map(b => (
               <tr key={`${b.person_id}-${b.name}`} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="px-4 py-1.5 font-medium text-gray-900">{b.name}</td>
+                <td className="px-4 py-1.5 font-medium text-gray-900">
+                  {batterHref(b.person_id)
+                    ? <Link to={batterHref(b.person_id)!} className={linkClass}>{b.name}</Link>
+                    : b.name}
+                </td>
                 <td className="px-4 py-1.5 text-gray-600 italic">{b.dismissal}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{b.runs}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{b.balls}</td>
@@ -103,7 +119,11 @@ export default function InningsCard({ innings }: Props) {
           <tbody>
             {innings.bowling.map(b => (
               <tr key={`${b.person_id}-${b.name}`} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="px-4 py-1.5 font-medium text-gray-900">{b.name}</td>
+                <td className="px-4 py-1.5 font-medium text-gray-900">
+                  {bowlerHref(b.person_id)
+                    ? <Link to={bowlerHref(b.person_id)!} className={linkClass}>{b.name}</Link>
+                    : b.name}
+                </td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{b.overs}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{b.maidens}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{b.runs}</td>

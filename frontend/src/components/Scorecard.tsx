@@ -19,6 +19,17 @@ export default function ScorecardView({ data, children }: Props) {
   const venueText = [info.venue, info.city].filter(Boolean).join(', ')
   const stageText = info.stage || (info.match_number != null ? `Match ${info.match_number}` : null)
 
+  // Build URL fragment so player-name links from this scorecard land on
+  // the player page pre-filtered to this match's gender, team_type and
+  // tournament. The user can clear or change them on the destination page.
+  const linkParams = (() => {
+    const params = new URLSearchParams()
+    if (info.gender) params.set('gender', info.gender)
+    if (info.team_type) params.set('team_type', info.team_type)
+    if (info.tournament) params.set('tournament', info.tournament)
+    return params.toString()
+  })()
+
   return (
     <div className="mt-6">
       {/* Header */}
@@ -49,7 +60,7 @@ export default function ScorecardView({ data, children }: Props) {
 
       {/* Innings cards */}
       {innings.map((inn, i) => (
-        <InningsCard key={i} innings={inn} />
+        <InningsCard key={i} innings={inn} linkParams={linkParams} />
       ))}
 
       {/* Officials (small footer) */}
