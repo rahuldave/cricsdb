@@ -146,6 +146,59 @@ The Batting `vs Bowlers` and Bowling `vs Batters` tabs both render a scatter cha
 
 **The reverse direction (clicking a chart dot to highlight a table row) is deliberately NOT implemented.** Semiotic v3's high-level `Scatterplot` component does not expose `onClick` or any per-point click handler. Adding that would require dropping below the high-level helper to `XYFrame` directly, which is a bigger refactor and would lose some of the convenience defaults the wrapper provides. The tooltip + top-N labels + reverse direction (table → chart) already cover the original "I can't tell who the big dots are" complaint, so the forward direction (chart → table) is left for later — see CLAUDE.md Future Enhancements item H.
 
+### Rotated x-axis labels: HTML overlay outside the SVG
+
+When a `BarChart` has more categories than fit at the chart's pixel width (e.g. 30 seasons crammed into ~330px on iPhone 13), labels overlap. Standard fix is to rotate them ~60°. With Semiotic v3's high-level `BarChart`, that turns out to be much harder than expected. The journey through five failed attempts and one working approach is recorded here so the next person changing chart styling doesn't repeat it.
+
+**What didn't work and why:**
+
+1. **`categoryFormat` returning SVG `<text transform="rotate(-60)">`.** Semiotic puts the result inside `<foreignObject><div>`, so the SVG `<text>` element becomes unknown HTML inside HTML — the SVG `transform` attribute is silently ignored. Verified by inspecting the live DOM (parent of the rotated `<text>` is `DIV`, not `<g>`).
+
+2. **`frameProps.oLabel` (the lower-level OrdinalFrame API).** OrdinalFrame's `oLabel` accepts a function returning a real SVG `Element`. But the high-level `BarChart` wrapper builds its own `oLabel` from `categoryLabel` and passes that through, overriding anything in `frameProps.oLabel`. Verified by reading the minified bundle.
+
+3. **`categoryFormat` returning HTML `<div>` with `position: absolute`.** The wrapper Semiotic provides has no `position: relative`, so the absolute children escape to the SVG root and every label stacks in the upper-left corner of the chart. Visually verified.
+
+4. **`categoryFormat` with `padding-right: 50%` + `text-align: right` + transform.** Worked in Chrome. Broke in Safari — labels coalesced in two upper-left clusters. WebKit's `<foreignObject>` content layout has multiple known bugs around percentage padding and absolute positioning.
+
+5. **Bare `display: inline-block + transform: rotate(-60deg)`** (no positioning, no padding, no text-align). Still broke in Safari — all labels coalesced in the upper-left corner. The `transform` on a foreignObject child appears to disable the foreignObject's positional `x`/`y` propagation in WebKit.
+
+**What worked: HTML overlay outside the SVG.** The escape hatch is to abandon `<foreignObject>` entirely and render labels as plain HTML positioned over the chart container.
+
+```tsx
+const ROT_MARGIN = { top: 50, right: 20, bottom: 90, left: 60 }
+return (
+  <div style={{ position: 'relative' }}>
+    <SemioticBarChart
+      ...
+      categoryFormat={() => ''}                   // suppress default labels
+      frameProps={{ margin: ROT_MARGIN }}          // pin chart-area dims
+    />
+    <div style={{ position: 'absolute', left: ROT_MARGIN.left,
+                  top: finalHeight - ROT_MARGIN.bottom + 6,
+                  width: effectiveWidth - ROT_MARGIN.left - ROT_MARGIN.right }}>
+      {data.map((d, i) => {
+        const xPct = ((i + 0.5) / data.length) * 100
+        return (
+          <div style={{ position: 'absolute', left: `${xPct}%`, width: 0 }}>
+            <div style={{
+              position: 'absolute', right: 0, top: 0,
+              transformOrigin: '100% 0',
+              transform: 'rotate(-60deg)',
+            }}>{getLabel(d)}</div>
+          </div>
+        )
+      })}
+    </div>
+  </div>
+)
+```
+
+The mechanics: empty-string `categoryFormat` removes Semiotic's default labels (the empty foreignObjects render nothing — that part works in all browsers). `frameProps.margin` pins the chart area to known offsets so we know where the bars are. Each overlay label is a wrapper at `left: xPct%` with `width: 0`, with a child positioned `right: 0` so its right edge is at the bar center; `transform-origin: 100% 0` makes the rotation pivot at the top-right corner, and `rotate(-60deg)` makes the text trail down-and-to-the-left.
+
+**One related quirk:** `categoryLabel` (the axis-name label) gets positioned by Semiotic inside the bottom margin, where the rotated overlay also lives. They visually collide. When rotating, set `categoryLabel={undefined}` — the rotated tick labels themselves (years, over numbers) are self-evident enough that the axis name is redundant.
+
+**Generalizable lesson.** Anything more than plain text inside a `<foreignObject>` is a roll of the dice on WebKit. Position, padding percentages, transforms, even bare inline-blocks can all break. When you need rich content over an SVG chart in a way that has to work cross-browser, render it as a sibling HTML overlay positioned with absolute coordinates, and use `frameProps.margin` to pin the chart area so the overlay's coordinate system matches.
+
 ### SPA routing and the catch-all
 
 React Router handles all navigation client-side. In production, FastAPI serves the built frontend:
