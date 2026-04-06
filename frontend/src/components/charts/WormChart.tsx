@@ -108,11 +108,29 @@ export default function WormChart({ innings, width, height = 280 }: Props) {
         height={height}
         curve="monotoneX"
         annotations={annotations}
-        tooltip={{
-          // The hover tooltip surfaces wicket_batter for wicket points.
-          // For non-wicket points it stays blank, which is fine — those
-          // are just over-end markers.
-          fields: ['team', 'over', 'cumulative', 'wicket_batter', 'over_ball'],
+        // Function-form tooltip — returns null for non-wicket points
+        // (no tooltip shows at all) and a small custom card for wicket
+        // points with the dismissed batter, the over.ball, and the
+        // team score at fall.
+        tooltip={(d: Record<string, unknown>) => {
+          if (!d.is_wicket) return null
+          return (
+            <div style={{
+              background: '#fff',
+              border: '1px solid #d1d5db',
+              borderRadius: 4,
+              padding: '6px 8px',
+              fontSize: 12,
+              color: '#1f2937',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              whiteSpace: 'nowrap',
+            }}>
+              <div style={{ fontWeight: 600 }}>{String(d.wicket_batter)}</div>
+              <div style={{ color: '#6b7280', fontSize: 11 }}>
+                {String(d.team)} · {String(d.over_ball)} ov · {String(d.cumulative)} runs
+              </div>
+            </div>
+          )
         }}
       />
       {/* Wickets-fell footer per innings — kept as a sortable list
