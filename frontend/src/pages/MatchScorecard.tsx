@@ -8,6 +8,7 @@ import MatchupGridChart from '../components/charts/MatchupGridChart'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import { useFetch } from '../hooks/useFetch'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 export default function MatchScorecard() {
   const { matchId } = useParams<{ matchId: string }>()
@@ -21,6 +22,9 @@ export default function MatchScorecard() {
   const grid = useFetch(
     () => getInningsGrid(Number(matchId)),
     [matchId],
+  )
+  useDocumentTitle(
+    data ? `${data.info.teams[0]} v ${data.info.teams[1]}` : null
   )
 
   return (

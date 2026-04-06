@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch, type FetchState } from '../hooks/useFetch'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import PlayerSearch from '../components/PlayerSearch'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
@@ -56,6 +57,7 @@ export default function Batting() {
     filterDeps,
   )
   const summary = summaryFetch.data
+  useDocumentTitle(summary ? `${summary.name} — Batting` : playerId ? null : 'Batting')
 
   // Per-tab fetches: each is gated on `activeTab === '...'` so only the
   // visible tab does network work. Switching tabs re-runs the gated fetch.

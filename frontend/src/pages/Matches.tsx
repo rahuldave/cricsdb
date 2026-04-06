@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getMatches, getTeams } from '../api'
 import PlayerSearch from '../components/PlayerSearch'
 import Spinner from '../components/Spinner'
@@ -12,6 +13,7 @@ import type { TeamInfo } from '../types'
 const PAGE_SIZE = 50
 
 export default function Matches() {
+  useDocumentTitle('Matches')
   const navigate = useNavigate()
   const filters = useFilters()
   const [team, setTeam] = useUrlParam('team')

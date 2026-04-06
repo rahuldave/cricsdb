@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getTeams, getTeamSummary, getTeamByseason, getTeamVs, getTeamResults, getTeamOpponents } from '../api'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
@@ -17,6 +18,7 @@ export default function Teams() {
   const navigate = useNavigate()
   const filters = useFilters()
   const [selected, setSelected] = useUrlParam('team')
+  useDocumentTitle(selected || 'Teams')
   const [activeTab, setActiveTab] = useUrlParam('tab', 'By Season')
   const [opponent, setOpponent] = useUrlParam('vs')
 

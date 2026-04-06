@@ -2,6 +2,7 @@ import type React from 'react'
 import { Link } from 'react-router-dom'
 import { getMatches } from '../api'
 import { useFetch } from '../hooks/useFetch'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 
@@ -14,6 +15,7 @@ function CompLink({ event, children }: { event: string; children: React.ReactNod
 }
 
 export default function Home() {
+  useDocumentTitle('')
   const { data, loading, error, refetch } = useFetch(
     () => getMatches({ limit: 5, offset: 0 }),
     [],

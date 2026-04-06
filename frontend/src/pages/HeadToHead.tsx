@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import PlayerSearch from '../components/PlayerSearch'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
@@ -24,12 +25,16 @@ export default function HeadToHead() {
   const handleBowler = (p: PlayerSearchResult) => setBowlerId(p.id)
 
   const enabled = !!(batterId && bowlerId)
+  // Title set after fetch resolves; on first paint with no selection, show generic.
   const { data, loading, error, refetch } = useFetch<HeadToHeadResponse | null>(
     () => enabled
       ? getHeadToHead(batterId, bowlerId, filters)
       : Promise.resolve(null),
     [batterId, bowlerId, filters.gender, filters.team_type, filters.tournament,
      filters.season_from, filters.season_to],
+  )
+  useDocumentTitle(
+    data ? `${data.batter.name} v ${data.bowler.name}` : enabled ? null : 'Head to Head'
   )
 
   const matchColumns: Column<HeadToHeadMatch>[] = [

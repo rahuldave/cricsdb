@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch, type FetchState } from '../hooks/useFetch'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import PlayerSearch from '../components/PlayerSearch'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
@@ -53,6 +54,7 @@ export default function Bowling() {
     filterDeps,
   )
   const summary = summaryFetch.data
+  useDocumentTitle(summary ? `${summary.name} — Bowling` : playerId ? null : 'Bowling')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const seasonFetch = useFetch<{ by_season: any[] } | null>(
