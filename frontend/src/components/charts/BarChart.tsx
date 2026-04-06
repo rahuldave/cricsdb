@@ -33,28 +33,41 @@ export default function BarChart<T extends Record<string, any>>({
   const [ref, measuredWidth] = useContainerWidth()
   const effectiveWidth = width ?? measuredWidth
 
-  // True rotation isn't viable with Semiotic v3's high-level BarChart:
-  // the `categoryFormat` hook puts its result inside a <foreignObject>
-  // <div>, so SVG <text transform="rotate(...)"> is ignored, and the
-  // wrapper overrides anything passed via frameProps.oLabel. Instead
-  // we *thin* the labels — return empty string for indices that would
-  // overlap, so only every Nth tick prints a label. The bars
-  // themselves stay densely packed.
+  // Rotate the x-axis tick labels to vertical when bars get too dense
+  // for horizontal text.
+  //
+  // Semiotic v3 puts categoryFormat's result inside a <foreignObject>
+  // containing a <div> (overflow:visible). Returning an SVG <text>
+  // doesn't work — it becomes unknown HTML inside the div and the SVG
+  // `transform` attribute is ignored. The trick: return an HTML <div>
+  // with a CSS `transform: rotate(...)`, which works because divs DO
+  // honor CSS transforms, and the foreignObject's overflow:visible
+  // lets the rotated content extend beyond its 60×24 bounds.
+  //
+  // Anchor the rotation at the top-right of the inner div (which we
+  // position at the horizontal center of the foreignObject = the tick
+  // mark, slightly above the foreignObject top) so the END of the
+  // label touches the tick and the rest trails down-and-to-the-left.
   const pxPerBar = data.length > 0 ? effectiveWidth / data.length : 0
-  const dense = (rotateCategoryLabels === true)
+  const shouldRotate = (rotateCategoryLabels === true)
     || (rotateCategoryLabels === 'auto' && pxPerBar > 0 && pxPerBar < 28)
-  // Aim for at least ~32px between printed labels.
-  const stride = dense ? Math.max(1, Math.ceil(32 / Math.max(pxPerBar, 1))) : 1
-  // Always show the first and last label so the user can read the
-  // axis range. The first goes via index===0 in the modulo; for the
-  // last we add a fallback when (data.length-1) % stride !== 0.
-  const lastIndex = data.length - 1
-  const categoryFormat = stride > 1
-    ? (label: string, index?: number): string => {
-        if (index == null) return label
-        if (index === 0 || index === lastIndex) return label
-        return index % stride === 0 ? label : ''
-      }
+
+  const categoryFormat = shouldRotate
+    ? (label: string) => (
+        <div style={{
+          position: 'absolute',
+          right: '50%',
+          top: -2,
+          transformOrigin: '100% 0%',
+          transform: 'rotate(-60deg)',
+          whiteSpace: 'nowrap',
+          fontSize: 11,
+          color: '#555',
+          paddingRight: 4,
+          lineHeight: 1,
+          userSelect: 'none',
+        }}>{label}</div>
+      )
     : undefined
 
   return (
@@ -66,7 +79,10 @@ export default function BarChart<T extends Record<string, any>>({
           valueAccessor={valueAccessor}
           title={title}
           width={effectiveWidth}
-          height={height}
+          // Rotated labels extend below the baseline; bump the chart
+          // height so the bars get the same vertical room and the
+          // labels aren't clipped at the bottom.
+          height={shouldRotate ? height + 50 : height}
           colorScheme={colorScheme}
           colorBy={colorBy}
           categoryLabel={categoryLabel}
