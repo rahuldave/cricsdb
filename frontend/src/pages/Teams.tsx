@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
@@ -13,6 +14,7 @@ import type { TeamInfo, TeamSummary, TeamSeasonRecord, TeamVsOpponent, TeamResul
 const tabs = ['By Season', 'vs Opponent', 'Match List'] as const
 
 export default function Teams() {
+  const navigate = useNavigate()
   const filters = useFilters()
   const [selected, setSelected] = useUrlParam('team')
   const [activeTab, setActiveTab] = useUrlParam('tab', 'By Season')
@@ -207,6 +209,8 @@ export default function Teams() {
                 )}
                 {!resultsFetch.loading && !resultsFetch.error && (
                   <DataTable columns={resultColumns} data={results}
+                    rowKey={r => String(r.match_id)}
+                    onRowClick={r => navigate(`/matches/${r.match_id}`)}
                     pagination={{ total: resultsTotal, limit: 50, offset: resultsOffset, onPage: setResultsOffset }} />
                 )}
               </>
