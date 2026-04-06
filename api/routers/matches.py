@@ -384,7 +384,7 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
     # Dismissal lookup per batter
     dismissals = await db.q(
         """
-        SELECT w.player_out, w.kind, w.fielders, d.bowler
+        SELECT w.player_out, w.kind, w.fielders, d.bowler, d.bowler_id
         FROM wicket w
         JOIN delivery d ON d.id = w.delivery_id
         WHERE d.innings_id = :iid
@@ -396,12 +396,17 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
     batting = []
     for b in bat_rows:
         dismissal_row = dismissal_by_name.get(b["batter"])
+        bowler_id = None
         if dismissal_row:
             text = _build_dismissal_text(
                 dismissal_row["kind"],
                 dismissal_row["fielders"],
                 dismissal_row["bowler"],
             )
+            # Only attribute the bowler when the dismissal kind credits one
+            # — same exclusion list used in bowling figures.
+            if (dismissal_row["kind"] or "").lower() not in NON_BOWLER_WICKETS:
+                bowler_id = dismissal_row["bowler_id"]
         else:
             text = "not out"
         sr = round(b["runs"] * 100 / b["balls"], 2) if b["balls"] else 0.0
@@ -409,6 +414,7 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
             "person_id": b["batter_id"],
             "name": b["batter"],
             "dismissal": text,
+            "dismissal_bowler_id": bowler_id,
             "runs": b["runs"],
             "balls": b["balls"],
             "fours": b["fours"],

@@ -16,6 +16,10 @@ export default function InningsCard({ innings, linkParams = '' }: Props) {
     id ? `/batting?player=${encodeURIComponent(id)}${linkParams ? '&' + linkParams : ''}` : null
   const bowlerHref = (id: string | null) =>
     id ? `/bowling?player=${encodeURIComponent(id)}${linkParams ? '&' + linkParams : ''}` : null
+  const h2hHref = (batterId: string | null, bowlerId: string | null) =>
+    batterId && bowlerId
+      ? `/head-to-head?batter=${encodeURIComponent(batterId)}&bowler=${encodeURIComponent(bowlerId)}${linkParams ? '&' + linkParams : ''}`
+      : null
   const linkClass = 'text-blue-600 hover:underline'
   return (
     <div className="bg-white rounded-lg border shadow-sm mb-4">
@@ -49,7 +53,15 @@ export default function InningsCard({ innings, linkParams = '' }: Props) {
                     ? <Link to={batterHref(b.person_id)!} className={linkClass}>{b.name}</Link>
                     : b.name}
                 </td>
-                <td className="px-4 py-1.5 text-gray-600 italic">{b.dismissal}</td>
+                <td className="px-4 py-1.5 text-gray-600 italic">
+                  {h2hHref(b.person_id, b.dismissal_bowler_id)
+                    ? <Link
+                        to={h2hHref(b.person_id, b.dismissal_bowler_id)!}
+                        className="text-gray-600 hover:text-blue-600 hover:underline"
+                        title="View head-to-head"
+                      >{b.dismissal}</Link>
+                    : b.dismissal}
+                </td>
                 <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{b.runs}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{b.balls}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{b.fours}</td>
