@@ -54,19 +54,25 @@ export default function BarChart<T extends Record<string, any>>({
 
   const categoryFormat = shouldRotate
     ? (label: string) => (
-        <div style={{
-          position: 'absolute',
-          right: '50%',
-          top: -2,
-          transformOrigin: '100% 0%',
-          transform: 'rotate(-60deg)',
-          whiteSpace: 'nowrap',
-          fontSize: 11,
-          color: '#555',
-          paddingRight: 4,
-          lineHeight: 1,
-          userSelect: 'none',
-        }}>{label}</div>
+        // The outer div establishes a positioning context (Semiotic's
+        // wrapper div has no `position: relative`, so without this the
+        // inner absolute would escape to the SVG root and every label
+        // would stack in the upper-left corner).
+        <div style={{ position: 'relative', width: '100%', height: 0 }}>
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            right: '50%',
+            transformOrigin: '100% 0',
+            transform: 'rotate(-60deg)',
+            whiteSpace: 'nowrap',
+            fontSize: 11,
+            color: '#555',
+            paddingRight: 4,
+            lineHeight: 1,
+            userSelect: 'none',
+          }}>{label}</div>
+        </div>
       )
     : undefined
 
