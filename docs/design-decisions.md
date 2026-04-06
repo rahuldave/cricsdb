@@ -167,9 +167,15 @@ A novel chart on the scorecard page that renders an entire batting innings as a 
 
 #### Slot inheritance for the at-crease stripes
 
-Each batter is assigned one of two "slots" — A or B — and their stripe is rendered in slot A's color (`#eff6ff` blue-50) or slot B's color (`#f5f3ff` violet-50). The first ball's batter is A; the non-striker is B. On every wicket, the first not-yet-assigned batter to appear inherits the dismissed batter's slot. So at any moment the two at-crease batters always have one A and one B stripe, and a new batter walking in always takes the SAME shade as the one they replaced. Visually you can scan a column and see the partnership it belongs to without guessing.
+Each batter is assigned one of two "slots" — A or B — and their stripe is rendered in slot A's color (`#dbeafe` blue-100) or slot B's color (`#fce7f3` pink-100). The first ball's batter is A; the non-striker is B. On every wicket, the first not-yet-assigned batter to appear inherits the dismissed batter's slot. So at any moment the two at-crease batters always have one A and one B stripe, and a new batter walking in always takes the SAME shade as the one they replaced. Visually you can scan a column and see the partnership it belongs to without guessing.
 
-We picked blue + violet over blue + cyan after the cyan version was too close in hue to read at thumbnail scale. Both still in the cool family so they recede behind the warm semantic colors (green/yellow/orange/red). Rejected alternatives: blue + warm tint (e.g., amber) — risked visual confusion with the extras yellow/orange; pattern (cross-hatch) instead of fill — harder to read; full saturation — fought the foreground encoding too much.
+The colors went through three iterations:
+1. **Single tint** (`#dbeafe`) — confusing because both at-crease batters were the same color, no slot visual.
+2. **Blue-50 + cyan-50** — too close in hue, merged visually at thumbnail scale.
+3. **Blue-50 + violet-50** — clearer hue split but still too pale; the stripes barely registered against the white background.
+4. **Blue-100 + pink-100** _(current)_ — cool-warm hue split at a slightly stronger lightness. Both still recede behind the saturated semantic colors (greens, wicket red, extras yellow/orange) but are obviously different at any zoom.
+
+Rejected alternatives that came up along the way: blue + amber-100 — risked confusion with extras yellow/orange; cross-hatch / dot-pattern fills instead of solid color — harder to read; full saturation — fought the foreground encoding too much. Pink was OK against red-600 wicket because the lightness gap is huge — `#fce7f3` is almost white compared to `#dc2626`.
 
 #### Layout
 

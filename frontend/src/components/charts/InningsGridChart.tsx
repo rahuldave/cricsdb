@@ -33,16 +33,17 @@ const COLOR_NOBALL = '#facc15'  // slightly darker yellow
 const COLOR_BYE = '#fb923c'     // orange
 const COLOR_LEGBYE = '#fdba74'  // light orange
 const COLOR_WICKET = '#dc2626'  // red
-// Two alternating pale tints for the at-crease stripe — one per
-// partnership "slot". Both stay in the cool family so they read as
-// background; cool→warm pairs would clash with the warm semantic
-// colors (off-bat green, extras yellow/orange, wicket red). We use
-// blue + violet because cyan (the previous choice for slot B) was
-// too close to blue in hue and they merged visually at thumbnail
-// scale. When a batter gets out, the new batter inherits the slot
-// (and shade) of the partner they replaced.
-const COLOR_AT_CREASE_A = '#eff6ff'   // pale blue   (Tailwind blue-50)
-const COLOR_AT_CREASE_B = '#f5f3ff'   // pale violet (Tailwind violet-50)
+// Two alternating tints for the at-crease stripe — one per partnership
+// "slot". The earlier blue-50 + violet-50 pair was too pale to register
+// against white at any zoom level. Going for a clear cool-warm split:
+// blue-100 + pink-100. Both stay at the -100 level so they recede
+// behind the saturated semantic colors (greens, wicket red, extras
+// yellow/orange) but are OBVIOUSLY different from each other. Pink
+// avoided clashing with red-600 because the lightness gap is huge.
+// When a batter gets out, the new batter inherits the slot (and shade)
+// of the partner they replaced.
+const COLOR_AT_CREASE_A = '#dbeafe'   // pale blue (Tailwind blue-100)
+const COLOR_AT_CREASE_B = '#fce7f3'   // pale pink (Tailwind pink-100)
 const COLOR_AT_CREASE = COLOR_AT_CREASE_A  // for the legend swatch
 
 interface CellInfo {
