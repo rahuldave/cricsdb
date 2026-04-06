@@ -63,6 +63,150 @@ a { color: inherit; }
 }
 
 /* ─────────────────────────────────────────────────────────────
+   Layout chrome — navbar + filter bar
+   ───────────────────────────────────────────────────────────── */
+.wisden-nav {
+  background: var(--bg);
+  border-bottom: 1px solid var(--rule);
+}
+.wisden-nav-inner {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.wisden-wordmark {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: var(--ink);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+  font-variation-settings: "opsz" 36;
+  white-space: nowrap;
+}
+.wisden-amp {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+}
+.wisden-nav-links {
+  display: none;
+  gap: 1.75rem;
+  align-items: baseline;
+}
+@media (min-width: 768px) {
+  .wisden-nav-links { display: flex; }
+}
+.wisden-nav-link {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 0.25rem 0;
+  border-bottom: 2px solid transparent;
+  transition: color 120ms, border-color 120ms;
+}
+.wisden-nav-link:hover { color: var(--ink); }
+.wisden-nav-link.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.wisden-hamburger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+@media (min-width: 768px) {
+  .wisden-hamburger { display: none; }
+}
+.wisden-nav-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid var(--rule-soft);
+}
+@media (min-width: 768px) {
+  .wisden-nav-mobile { display: none; }
+}
+
+/* Filter bar */
+.wisden-filterbar {
+  background: var(--bg);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.wisden-filterbar-inner {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0.7rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.75rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+}
+.wisden-filter-group {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+.wisden-filter-label {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  font-variation-settings: "opsz" 14;
+}
+.wisden-seg {
+  background: transparent;
+  border: 0;
+  padding: 0.1rem 0;
+  margin-right: 0.1rem;
+  font: inherit;
+  color: var(--ink-soft);
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: color 120ms, border-color 120ms;
+}
+.wisden-seg:hover { color: var(--ink); }
+.wisden-seg.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.wisden-select {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  padding: 0.1rem 1.1rem 0.1rem 0.1rem;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M1 3l4 4 4-4' fill='none' stroke='%231A1714' stroke-width='1.2'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.1rem center;
+  max-width: 16rem;
+  text-overflow: ellipsis;
+}
+.wisden-select:hover { color: var(--accent); }
+.wisden-select:disabled { color: var(--accent); border-bottom-style: dashed; }
+.wisden-filter-dash { color: var(--ink-faint); }
+
+/* ─────────────────────────────────────────────────────────────
    Page shell — used by content pages that adopt the Wisden idiom
    ───────────────────────────────────────────────────────────── */
 .wisden-page { max-width: 42rem; margin: 0 auto; padding: 2rem 0 4rem; }

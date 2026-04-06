@@ -84,50 +84,67 @@ export default function FilterBar() {
     return true
   })
 
+  const segBtn = (active: boolean) => `wisden-seg${active ? ' is-active' : ''}`
+
   return (
-    <div className="flex flex-wrap items-center gap-3 bg-gray-50 border-b border-gray-200 px-4 py-2 text-sm">
-      {/* Gender */}
-      <div className="flex rounded-md border border-gray-300 overflow-hidden">
-        {['', 'male', 'female'].map(v => (
-          <button key={v} onClick={() => setGender(v)}
-            className={`px-3 py-1 ${gender === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
-          >{v === '' ? 'All' : v === 'male' ? 'Men' : 'Women'}</button>
-        ))}
+    <div className="wisden-filterbar">
+      <div className="wisden-filterbar-inner">
+        <div className="wisden-filter-group">
+          <span className="wisden-filter-label">Gender</span>
+          {['', 'male', 'female'].map(v => (
+            <button key={v} onClick={() => setGender(v)} className={segBtn(gender === v)}>
+              {v === '' ? 'All' : v === 'male' ? 'Men' : 'Women'}
+            </button>
+          ))}
+        </div>
+
+        <div className="wisden-filter-group">
+          <span className="wisden-filter-label">Type</span>
+          {['', 'international', 'club'].map(v => (
+            <button key={v} onClick={() => setTeamType(v)} className={segBtn(teamType === v)}>
+              {v === '' ? 'All' : v === 'international' ? 'Intl' : 'Club'}
+            </button>
+          ))}
+        </div>
+
+        <div className="wisden-filter-group">
+          <span className="wisden-filter-label">Tournament</span>
+          <select
+            value={tournament}
+            onChange={e => setTournament(e.target.value)}
+            disabled={tournamentsError}
+            className="wisden-select"
+          >
+            <option value="">{tournamentsError ? '⚠ failed to load' : 'All'}</option>
+            {filteredTournaments.map(t => (
+              <option key={t.event_name} value={t.event_name}>{t.event_name} ({t.matches})</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="wisden-filter-group">
+          <span className="wisden-filter-label">Seasons</span>
+          <select
+            value={seasonFrom}
+            onChange={e => set('season_from', e.target.value)}
+            disabled={seasonsError}
+            className="wisden-select"
+          >
+            <option value="">{seasonsError ? '⚠' : 'From'}</option>
+            {seasons.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <span className="wisden-filter-dash">–</span>
+          <select
+            value={seasonTo}
+            onChange={e => set('season_to', e.target.value)}
+            disabled={seasonsError}
+            className="wisden-select"
+          >
+            <option value="">{seasonsError ? '⚠' : 'To'}</option>
+            {seasons.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
       </div>
-
-      {/* Team Type */}
-      <div className="flex rounded-md border border-gray-300 overflow-hidden">
-        {['', 'international', 'club'].map(v => (
-          <button key={v} onClick={() => setTeamType(v)}
-            className={`px-3 py-1 ${teamType === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
-          >{v === '' ? 'All' : v === 'international' ? 'Intl' : 'Club'}</button>
-        ))}
-      </div>
-
-      {/* Tournament */}
-      <select value={tournament} onChange={e => setTournament(e.target.value)}
-        disabled={tournamentsError}
-        className="rounded-md border border-gray-300 px-2 py-1 bg-white text-gray-700 disabled:bg-red-50 disabled:border-red-300 disabled:text-red-600">
-        <option value="">{tournamentsError ? '⚠ Tournaments failed to load' : 'All Tournaments'}</option>
-        {filteredTournaments.map(t => (
-          <option key={t.event_name} value={t.event_name}>{t.event_name} ({t.matches})</option>
-        ))}
-      </select>
-
-      {/* Season Range */}
-      <select value={seasonFrom} onChange={e => set('season_from', e.target.value)}
-        disabled={seasonsError}
-        className="rounded-md border border-gray-300 px-2 py-1 bg-white text-gray-700 disabled:bg-red-50 disabled:border-red-300 disabled:text-red-600">
-        <option value="">{seasonsError ? '⚠ failed' : 'From'}</option>
-        {seasons.map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
-      <span className="text-gray-400">-</span>
-      <select value={seasonTo} onChange={e => set('season_to', e.target.value)}
-        disabled={seasonsError}
-        className="rounded-md border border-gray-300 px-2 py-1 bg-white text-gray-700 disabled:bg-red-50 disabled:border-red-300 disabled:text-red-600">
-        <option value="">{seasonsError ? '⚠ failed' : 'To'}</option>
-        {seasons.map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
     </div>
   )
 }
