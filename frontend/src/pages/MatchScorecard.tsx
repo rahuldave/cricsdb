@@ -1,8 +1,9 @@
 import { Link, useParams } from 'react-router-dom'
-import { getMatchScorecard } from '../api'
+import { getMatchScorecard, getInningsGrid } from '../api'
 import ScorecardView from '../components/Scorecard'
 import WormChart from '../components/charts/WormChart'
 import ManhattanChart from '../components/charts/ManhattanChart'
+import InningsGridChart from '../components/charts/InningsGridChart'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import { useFetch } from '../hooks/useFetch'
@@ -11,6 +12,10 @@ export default function MatchScorecard() {
   const { matchId } = useParams<{ matchId: string }>()
   const { data, loading, error, refetch } = useFetch(
     () => getMatchScorecard(Number(matchId)),
+    [matchId],
+  )
+  const grid = useFetch(
+    () => getInningsGrid(Number(matchId)),
     [matchId],
   )
 
@@ -41,6 +46,23 @@ export default function MatchScorecard() {
               <ManhattanChart innings={data.innings} />
             </div>
           </div>
+
+          {/* Innings grid prototype: per-delivery visualization, one
+              section per innings stacked vertically. */}
+          {grid.data && !grid.loading && (
+            <div className="space-y-4 mb-4">
+              {grid.data.innings.map(inn => (
+                <InningsGridChart key={inn.innings_number} innings={inn} />
+              ))}
+            </div>
+          )}
+          {grid.loading && <Spinner label="Loading innings grid…" />}
+          {grid.error && (
+            <ErrorBanner
+              message={`Could not load innings grid: ${grid.error}`}
+              onRetry={grid.refetch}
+            />
+          )}
         </ScorecardView>
       )}
     </div>

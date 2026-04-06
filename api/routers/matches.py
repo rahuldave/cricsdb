@@ -618,3 +618,114 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
         "bowling": bowling,
         "by_over": by_over,
     }
+
+
+@router.get("/{match_id}/innings-grid")
+async def innings_grid(match_id: int):
+    """
+    Per-delivery data for an innings, structured for the grid visualization
+    where each row is a ball and each column is a batter (in order of
+    appearance). The frontend uses this to render the InningsGridChart.
+    """
+    db = get_db()
+    inns = await db.q(
+        """
+        SELECT id, innings_number, team, super_over
+        FROM innings WHERE match_id = :mid
+        ORDER BY innings_number
+        """,
+        {"mid": match_id},
+    )
+    if not inns:
+        raise HTTPException(status_code=404, detail="match not found")
+
+    out_innings = []
+    for inn in inns:
+        if inn["super_over"]:
+            continue
+        iid = inn["id"]
+
+        deliveries = await db.q(
+            """
+            SELECT
+                d.id as delivery_id,
+                d.over_number,
+                d.delivery_index,
+                d.batter,
+                d.bowler,
+                d.non_striker,
+                d.runs_batter,
+                d.runs_extras,
+                d.runs_total,
+                d.extras_wides,
+                d.extras_noballs,
+                d.extras_byes,
+                d.extras_legbyes
+            FROM delivery d
+            WHERE d.innings_id = :iid
+            ORDER BY d.id
+            """,
+            {"iid": iid},
+        )
+
+        wickets = await db.q(
+            """
+            SELECT w.delivery_id, w.player_out, w.kind
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            WHERE d.innings_id = :iid
+            """,
+            {"iid": iid},
+        )
+        wkt_by_did = {w["delivery_id"]: w for w in wickets}
+
+        # Build the ordered list of batters as they first appear (either as
+        # batter or non-striker — non-striker covers the very first ball
+        # where both openers are at the crease but only one faces).
+        seen: list[str] = []
+        seen_set: set[str] = set()
+        for d in deliveries:
+            for name in (d["batter"], d["non_striker"]):
+                if name and name not in seen_set:
+                    seen.append(name)
+                    seen_set.add(name)
+
+        rows = []
+        cumulative = 0
+        wickets_so_far = 0
+        for d in deliveries:
+            cumulative += d["runs_total"] or 0
+            wkt = wkt_by_did.get(d["delivery_id"])
+            if wkt:
+                wickets_so_far += 1
+            rows.append({
+                "over_ball": f"{(d['over_number'] or 0) + 1}.{(d['delivery_index'] or 0) + 1}",
+                "bowler": d["bowler"],
+                "batter": d["batter"],
+                "batter_index": seen.index(d["batter"]),
+                "runs_batter": d["runs_batter"] or 0,
+                "runs_extras": d["runs_extras"] or 0,
+                "runs_total": d["runs_total"] or 0,
+                "extras_wides": d["extras_wides"] or 0,
+                "extras_noballs": d["extras_noballs"] or 0,
+                "extras_byes": d["extras_byes"] or 0,
+                "extras_legbyes": d["extras_legbyes"] or 0,
+                "cumulative_runs": cumulative,
+                "cumulative_wickets": wickets_so_far,
+                "wicket_kind": wkt["kind"] if wkt else None,
+                "wicket_player_out": wkt["player_out"] if wkt else None,
+                "wicket_player_out_index": seen.index(wkt["player_out"])
+                    if wkt and wkt["player_out"] in seen_set else None,
+            })
+
+        out_innings.append({
+            "innings_number": inn["innings_number"],
+            "team": inn["team"],
+            "batters": seen,
+            "deliveries": rows,
+            "total_balls": len(rows),
+            "total_runs": cumulative,
+            "total_wickets": wickets_so_far,
+        })
+
+    return {"match_id": match_id, "innings": out_innings}

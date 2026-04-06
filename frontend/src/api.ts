@@ -5,7 +5,7 @@ import type {
   SeasonBattingStats, DismissalAnalysis, InterWicketStats,
   BowlingSummary, BowlingInnings, BatterMatchup, WicketAnalysis,
   HeadToHeadResponse,
-  MatchListItem, Scorecard,
+  MatchListItem, Scorecard, InningsGridResponse,
 } from './types'
 
 async function fetchApi<T>(path: string, params?: Record<string, string | number | undefined | null>): Promise<T> {
@@ -84,6 +84,8 @@ export const getMatches = (filters?: F & { team?: string; player_id?: string; li
   fetchApi<{ matches: MatchListItem[]; total: number }>('/api/v1/matches', filters as Record<string, string>)
 export const getMatchScorecard = (matchId: number) =>
   fetchApi<Scorecard>(`/api/v1/matches/${matchId}/scorecard`)
+export const getInningsGrid = (matchId: number) =>
+  fetchApi<InningsGridResponse>(`/api/v1/matches/${matchId}/innings-grid`)
 
 // Head to Head
 export const getHeadToHead = (batterId: string, bowlerId: string, filters?: F) =>

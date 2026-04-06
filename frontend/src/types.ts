@@ -422,3 +422,38 @@ export interface Scorecard {
   info: ScorecardInfo
   innings: ScorecardInnings[]
 }
+
+// Innings grid (per-delivery visualization)
+export interface InningsGridDelivery {
+  over_ball: string
+  bowler: string
+  batter: string
+  batter_index: number
+  runs_batter: number
+  runs_extras: number
+  runs_total: number
+  extras_wides: number
+  extras_noballs: number
+  extras_byes: number
+  extras_legbyes: number
+  cumulative_runs: number
+  cumulative_wickets: number
+  wicket_kind: string | null
+  wicket_player_out: string | null
+  wicket_player_out_index: number | null
+}
+
+export interface InningsGridInnings {
+  innings_number: number
+  team: string
+  batters: string[]
+  deliveries: InningsGridDelivery[]
+  total_balls: number
+  total_runs: number
+  total_wickets: number
+}
+
+export interface InningsGridResponse {
+  match_id: number
+  innings: InningsGridInnings[]
+}
