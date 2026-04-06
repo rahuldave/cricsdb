@@ -65,6 +65,8 @@ export default function MatchScorecard() {
                     key={inn.innings_number}
                     innings={inn}
                     linkParams={linkParams}
+                    highlightBatterId={highlightBatterId}
+                    highlightBowlerId={highlightBowlerId}
                   />
                 ))}
               </div>

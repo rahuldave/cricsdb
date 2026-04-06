@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
@@ -31,7 +32,12 @@ export default function HeadToHead() {
   )
 
   const matchColumns: Column<HeadToHeadMatch>[] = [
-    { key: 'date', label: 'Date', sortable: true },
+    { key: 'date', label: 'Date', sortable: true, format: (v: any, r: any) => (
+      <Link
+        to={`/matches/${r.match_id}?highlight_batter=${encodeURIComponent(batterId || '')}&highlight_bowler=${encodeURIComponent(bowlerId || '')}`}
+        className="comp-link"
+        onClick={e => e.stopPropagation()}>{v || '-'}</Link>
+    ) as unknown as string },
     { key: 'tournament', label: 'Tournament' },
     { key: 'venue', label: 'Venue' },
     { key: 'balls', label: 'Balls', sortable: true },

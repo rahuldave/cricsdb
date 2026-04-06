@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import type { InningsGridInnings, InningsGridDelivery } from '../../types'
 
@@ -9,6 +10,9 @@ interface Props {
    * Should NOT start with `?` or `&`.
    */
   linkParams?: string
+  /** When both are set, the matching cell is outlined and scrolled into view. */
+  highlightBatterId?: string | null
+  highlightBowlerId?: string | null
 }
 
 // Wicket kinds that don't credit the bowler — must mirror the backend
@@ -73,10 +77,21 @@ function cellBg(cell: Cell): string | undefined {
   return '#ffffff'
 }
 
-export default function MatchupGridChart({ innings, linkParams = '' }: Props) {
+export default function MatchupGridChart({ innings, linkParams = '', highlightBatterId, highlightBowlerId }: Props) {
   const numBatters = innings.batters.length
   const numBowlers = innings.bowlers.length
   const matrix = buildMatrix(innings.deliveries, numBatters, numBowlers)
+
+  const hlBatterIdx = highlightBatterId ? innings.batter_ids.indexOf(highlightBatterId) : -1
+  const hlBowlerIdx = highlightBowlerId ? innings.bowler_ids.indexOf(highlightBowlerId) : -1
+  const hasHighlight = hlBatterIdx >= 0 && hlBowlerIdx >= 0
+
+  const highlightCellRef = useRef<HTMLTableCellElement | null>(null)
+  useEffect(() => {
+    if (hasHighlight && highlightCellRef.current) {
+      highlightCellRef.current.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+    }
+  }, [hasHighlight, hlBatterIdx, hlBowlerIdx])
 
   const h2hHref = (
     batterId: string | null,
@@ -191,16 +206,19 @@ export default function MatchupGridChart({ innings, linkParams = '' }: Props) {
                           )}
                         </span>
                       )
+                  const isHL = hasHighlight && i === hlBatterIdx && j === hlBowlerIdx
                   return (
                     <td
                       key={j}
+                      ref={isHL ? highlightCellRef : undefined}
                       style={{
-                        backgroundColor: cellBg(cell),
+                        backgroundColor: isHL ? '#F4E9C9' : cellBg(cell),
                         textAlign: 'center',
                         verticalAlign: 'middle',
                         height: '1.5rem',
                         borderRight: '1px solid #f3f4f6',
                         borderBottom: '1px solid #f3f4f6',
+                        boxShadow: isHL ? 'inset 0 0 0 2px var(--accent)' : undefined,
                       }}
                       title={
                         cell.balls === 0
