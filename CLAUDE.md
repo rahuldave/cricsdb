@@ -31,13 +31,18 @@ api/
     batting.py        — /api/v1/batters/{id}/summary|by-innings|vs-bowlers|by-over|by-phase|by-season|dismissals|inter-wicket
     bowling.py        — /api/v1/bowlers/{id}/summary|by-innings|vs-batters|by-over|by-phase|by-season|wickets
     head_to_head.py   — /api/v1/head-to-head/{batter_id}/{bowler_id}
+    matches.py        — /api/v1/matches list, /matches/{id}/scorecard, /matches/{id}/innings-grid
 models/tables.py      — deebase models: Person, Match, Innings, Delivery, Wicket, etc.
 import_data.py        — Downloads cricsheet JSON + imports into SQLite
 frontend/src/
-  App.tsx             — React Router: /, /teams, /batting, /bowling, /head-to-head
+  App.tsx             — React Router: /, /teams, /batting, /bowling, /head-to-head, /matches, /matches/:matchId
   hooks/useUrlState.ts — useUrlParam + useSetUrlParams (atomic URL state updates)
-  components/         — Layout, FilterBar, PlayerSearch, StatCard, DataTable, charts/
-  pages/              — Home, Teams, Batting, Bowling, HeadToHead
+  hooks/useFetch.ts    — { data, loading, error, refetch } wrapper around an async fn
+  hooks/useContainerWidth.ts — ResizeObserver wrapper used by responsive chart wrappers
+  components/         — Layout, FilterBar, PlayerSearch, StatCard, DataTable, Spinner, ErrorBanner, Scorecard, InningsCard, charts/
+    charts/           — BarChart, LineChart, ScatterChart, DonutChart wrappers (responsive),
+                        WormChart, ManhattanChart, InningsGridChart, MatchupGridChart
+  pages/              — Home, Teams, Batting, Bowling, HeadToHead, Matches, MatchScorecard
 deploy.sh             — Stages build_plash/ dir and runs plash_deploy
 SPEC.md               — Full specification with all API schemas and SQL queries
 docs/                 — frontend-build-pipeline.md, design-decisions.md

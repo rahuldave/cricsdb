@@ -146,6 +146,72 @@ The Batting `vs Bowlers` and Bowling `vs Batters` tabs both render a scatter cha
 
 **The reverse direction (clicking a chart dot to highlight a table row) is deliberately NOT implemented.** Semiotic v3's high-level `Scatterplot` component does not expose `onClick` or any per-point click handler. Adding that would require dropping below the high-level helper to `XYFrame` directly, which is a bigger refactor and would lose some of the convenience defaults the wrapper provides. The tooltip + top-N labels + reverse direction (table → chart) already cover the original "I can't tell who the big dots are" complaint, so the forward direction (chart → table) is left for later — see CLAUDE.md Future Enhancements item H.
 
+### Matchup grid: per-innings batter × bowler matrix
+
+A second new chart on the scorecard page (sibling to the innings grid). For each innings, renders the full set of batter-vs-bowler matchups that happened in that innings as an HTML table: batters as rows in batting order, bowlers as columns in order of first appearance, each cell shows that pair's `runs(balls)w` for the innings. Lives in `frontend/src/components/charts/MatchupGridChart.tsx`.
+
+**Why it exists.** The regular scorecard tells you each batter's total and each bowler's total but not how those totals decomposed between specific opponents. The matchup grid shows the cross-section: did a particular bowler get rinsed by a particular batter? Did a bowler dismiss multiple batters? Was the run-scoring concentrated against one bowler or distributed?
+
+#### Layout
+
+| | Bowler 1 | Bowler 2 | Bowler 3 | … |
+|---|---|---|---|---|
+| **Batter 1** | `25(11)¹w` | `8(7)` | `–` | … |
+| **Batter 2** | `13(8)` | `48(21)` | `1(1)` | … |
+| **Batter 3** | `–` | `14(8)¹w` | `…` | … |
+
+- **Batters as rows, bowlers as columns** — bowlers attack batters, so reading a single batter row left-to-right scans "what each bowler did to me."
+- **Sticky left column** for the batter name (`position: sticky; left: 0`) so the row label stays visible during horizontal scroll on mobile.
+- **Rotated bowler names** in the header (60°) so the columns can be narrow without truncating long bowler names.
+- **Cell content**: `runs` in bold black + `(balls)` in gray + a small red `Nw` superscript when wickets fell. Empty cells (no balls faced) show a faded `·`.
+- **Light heatmap**: red-100 background where the bowler took at least one wicket; light green where the batter scored at SR ≥ 150 (over ≥4 balls). White otherwise. Tints are subtle so the cell text stays readable.
+- **One grid per innings**, stacked vertically.
+
+#### Cell links
+
+Every non-empty cell is a `<Link>` to `/head-to-head?batter={bid}&bowler={pid}` carrying the same `gender` / `team_type` / `tournament` query params as the rest of the scorecard's player links. So clicking any cell takes you to the players' full career head-to-head pre-filtered to this match's tournament context. The `linkParams` string is computed once in `MatchScorecard.tsx` (mirroring the same computation that lives in `Scorecard.tsx`) and passed down as a prop.
+
+#### Wicket attribution
+
+A wicket counts toward a `(batter, bowler)` cell only if **both**:
+1. The dismissal kind is bowler-creditable (mirrors the backend `NON_BOWLER_WICKETS` exclusion list — run-out, retired, retired hurt, obstructing).
+2. The dismissed batter is the on-strike batter at that ball (handles the rare edge case where a non-striker is given out as part of an extras play).
+
+This keeps the matchup wicket counts in agreement with the bowling figures shown in the regular scorecard.
+
+#### Position on the page
+
+In `ScorecardView`'s children slot, **after** the worm/Manhattan charts but **before** the regular innings tables. Final order on the scorecard page:
+
+1. Back link
+2. Header card
+3. Worm + Manhattan charts
+4. **Matchup grids** (new)
+5. Regular innings tables (the per-batter / per-bowler scorecard)
+6. Innings grids (the per-delivery visualization)
+
+The user wanted the matchup grid "above the scoreboard" — the scoreboard means the per-innings tables at #5.
+
+#### Backend cost
+
+Zero new round-trip. The matchup matrix is computed entirely on the frontend from the deliveries that the existing `/api/v1/matches/{id}/innings-grid` endpoint already returns. The endpoint was extended to include:
+
+- `batter_id`, `bowler_id`, `bowler_index` on each delivery row
+- `bowlers: string[]` and `bowler_ids: (string|null)[]` arrays at the innings level (parallel to the existing `batters` / `batter_ids`)
+
+So both the innings grid AND the matchup grid share one network call.
+
+#### Responsiveness
+
+CSS table inside `overflow-x-auto`. Sized in `rem` units. The sticky left column means horizontal scroll on mobile keeps the batter name visible. At iPhone 13 width (390px), about 3-4 bowler columns fit on screen at once and the rest scroll into view. No mobile-specific reflow — the matrix structure is intrinsic to what's being shown.
+
+#### Things to revisit later
+
+- **Sort order toggle** — currently rows are batting order and columns are bowling-introduction order. Could add a button to sort rows by total runs, or columns by total wickets.
+- **Highlight a row/column on hover** — dim the others to make scanning easier in dense cases.
+- **Phase coloring** — subtly tint the column header by the phase the bowler bowled most balls in (powerplay/middle/death).
+- **A `dot %` micro-stat in each cell** — useful but might over-clutter the cell.
+
 ### Innings grid: per-delivery visualization
 
 A novel chart on the scorecard page that renders an entire batting innings as a grid: rows are deliveries top-to-bottom, columns are batters left-to-right in order of appearance. The on-strike batter's cell is colored to encode what happened on that ball. Lives in `frontend/src/components/charts/InningsGridChart.tsx`, backed by a new `/api/v1/matches/{id}/innings-grid` endpoint that returns ordered deliveries plus the ordered batters list.

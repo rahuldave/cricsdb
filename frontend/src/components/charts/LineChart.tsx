@@ -42,6 +42,10 @@ export default function LineChart<T extends Record<string, any>>({
           yLabel={yLabel}
           showPoints={showPoints}
           curve={curve}
+          // Default the legend below the chart so long category labels
+          // (e.g. team names like "Sunrisers Hyderabad") don't get
+          // clipped by the chart card on narrow screens.
+          legendPosition="bottom"
           enableHover
           showGrid
         />
