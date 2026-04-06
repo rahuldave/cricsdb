@@ -670,7 +670,7 @@ async def innings_grid(match_id: int):
 
         wickets = await db.q(
             """
-            SELECT w.delivery_id, w.player_out, w.kind
+            SELECT w.delivery_id, w.player_out, w.kind, w.fielders, d.bowler
             FROM wicket w
             JOIN delivery d ON d.id = w.delivery_id
             WHERE d.innings_id = :iid
@@ -716,6 +716,9 @@ async def innings_grid(match_id: int):
                 "wicket_player_out": wkt["player_out"] if wkt else None,
                 "wicket_player_out_index": seen.index(wkt["player_out"])
                     if wkt and wkt["player_out"] in seen_set else None,
+                "wicket_text": _build_dismissal_text(
+                    wkt["kind"], wkt["fielders"], wkt["bowler"]
+                ) if wkt else None,
             })
 
         out_innings.append({

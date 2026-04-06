@@ -441,6 +441,7 @@ export interface InningsGridDelivery {
   wicket_kind: string | null
   wicket_player_out: string | null
   wicket_player_out_index: number | null
+  wicket_text: string | null
 }
 
 export interface InningsGridInnings {
