@@ -4,15 +4,8 @@ import type { ScorecardInnings } from '../types'
 
 interface Props {
   innings: ScorecardInnings
-  /**
-   * URL query string fragment to append to player page links so the
-   * destination opens pre-filtered to this match's context (gender,
-   * team_type, tournament). Should NOT start with `?` or `&`.
-   */
   linkParams?: string
-  /** When set, the matching batter row gets highlighted and scrolled into view. */
   highlightBatterId?: string | null
-  /** When set, the matching bowler row gets highlighted and scrolled into view. */
   highlightBowlerId?: string | null
 }
 
@@ -23,6 +16,7 @@ export default function InningsCard({ innings, linkParams = '', highlightBatterI
       highlightedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }, [highlightBatterId, highlightBowlerId])
+
   const batterHref = (id: string | null) =>
     id ? `/batting?player=${encodeURIComponent(id)}${linkParams ? '&' + linkParams : ''}` : null
   const bowlerHref = (id: string | null) =>
@@ -31,144 +25,130 @@ export default function InningsCard({ innings, linkParams = '', highlightBatterI
     batterId && bowlerId
       ? `/head-to-head?batter=${encodeURIComponent(batterId)}&bowler=${encodeURIComponent(bowlerId)}${linkParams ? '&' + linkParams : ''}`
       : null
-  const linkClass = 'text-blue-600 hover:underline'
+
   return (
-    <div className="bg-white rounded-lg border shadow-sm mb-4">
-      <div className="flex items-baseline justify-between border-b border-gray-200 px-4 py-2 bg-gray-50 rounded-t-lg">
-        <h3 className="font-semibold text-gray-900">{innings.label}</h3>
-        <div className="text-sm text-gray-700">
-          <span className="font-bold text-gray-900">{innings.total_runs}/{innings.wickets}</span>
-          <span className="text-gray-500"> ({innings.overs} ov, RR {innings.run_rate.toFixed(2)})</span>
+    <div className="wisden-innings">
+      <div className="wisden-innings-head">
+        <h3>{innings.label}</h3>
+        <div className="wisden-innings-score">
+          <span className="big num">{innings.total_runs}/{innings.wickets}</span>
+          <span className="meta num">({innings.overs} ov, RR {innings.run_rate.toFixed(2)})</span>
         </div>
       </div>
 
       {/* Batting */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs uppercase text-gray-500 border-b border-gray-200">
-              <th className="px-4 py-2 font-medium">Batter</th>
-              <th className="px-4 py-2 font-medium">Dismissal</th>
-              <th className="px-2 py-2 font-medium text-right">R</th>
-              <th className="px-2 py-2 font-medium text-right">B</th>
-              <th className="px-2 py-2 font-medium text-right">4s</th>
-              <th className="px-2 py-2 font-medium text-right">6s</th>
-              <th className="px-2 py-2 font-medium text-right">SR</th>
-            </tr>
-          </thead>
-          <tbody>
-            {innings.batting.map(b => {
-              const isHL = !!(highlightBatterId && b.person_id === highlightBatterId)
-              return (
+      <table>
+        <thead>
+          <tr>
+            <th>Batter</th>
+            <th>Dismissal</th>
+            <th className="r">R</th>
+            <th className="r">B</th>
+            <th className="r">4s</th>
+            <th className="r">6s</th>
+            <th className="r">SR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {innings.batting.map(b => {
+            const isHL = !!(highlightBatterId && b.person_id === highlightBatterId)
+            return (
               <tr key={`${b.person_id}-${b.name}`}
                 ref={isHL ? highlightedRowRef : undefined}
-                className={`border-b border-gray-100 ${isHL ? 'bg-yellow-100' : 'hover:bg-gray-50'}`}>
-                <td className="px-4 py-1.5 font-medium text-gray-900">
+                className={isHL ? 'is-highlighted' : undefined}>
+                <td className="pname">
                   {batterHref(b.person_id)
-                    ? <Link to={batterHref(b.person_id)!} className={linkClass}>{b.name}</Link>
+                    ? <Link to={batterHref(b.person_id)!}>{b.name}</Link>
                     : b.name}
                 </td>
-                <td className="px-4 py-1.5 text-gray-600 italic">
+                <td className="dismissal">
                   {h2hHref(b.person_id, b.dismissal_bowler_id)
-                    ? <Link
-                        to={h2hHref(b.person_id, b.dismissal_bowler_id)!}
-                        className="text-gray-600 hover:text-blue-600 hover:underline"
-                        title="View head-to-head"
-                      >{b.dismissal}</Link>
+                    ? <Link to={h2hHref(b.person_id, b.dismissal_bowler_id)!} title="View head-to-head">{b.dismissal}</Link>
                     : b.dismissal}
                 </td>
-                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{b.runs}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums">{b.balls}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums">{b.fours}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums">{b.sixes}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{b.strike_rate.toFixed(2)}</td>
+                <td className="r" style={{ color: 'var(--ink)', fontWeight: 600 }}>{b.runs}</td>
+                <td className="r">{b.balls}</td>
+                <td className="r">{b.fours}</td>
+                <td className="r">{b.sixes}</td>
+                <td className="r">{b.strike_rate.toFixed(2)}</td>
               </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+            )
+          })}
+        </tbody>
+      </table>
 
       {/* Extras + Total */}
-      <div className="px-4 py-2 text-sm border-t border-gray-200 bg-gray-50">
-        <div className="flex justify-between text-gray-700">
-          <span>
-            <span className="font-medium">Extras</span>
-            <span className="text-gray-500 ml-2">
-              (b {innings.extras.byes}, lb {innings.extras.legbyes}, w {innings.extras.wides}, nb {innings.extras.noballs}
-              {innings.extras.penalty > 0 ? `, p ${innings.extras.penalty}` : ''})
-            </span>
+      <div className="wisden-innings-extras">
+        <span>
+          <span className="lbl">Extras</span>
+          <span className="num">{innings.extras.total}</span>
+          <span style={{ color: 'var(--ink-faint)', marginLeft: '0.4rem' }}>
+            (b {innings.extras.byes}, lb {innings.extras.legbyes}, w {innings.extras.wides}, nb {innings.extras.noballs}
+            {innings.extras.penalty > 0 ? `, p ${innings.extras.penalty}` : ''})
           </span>
-          <span className="font-semibold tabular-nums">{innings.extras.total}</span>
-        </div>
-        <div className="flex justify-between mt-1 text-gray-900 font-semibold">
-          <span>Total</span>
-          <span className="tabular-nums">
-            {innings.total_runs}/{innings.wickets} ({innings.overs} ov)
-          </span>
-        </div>
+        </span>
+      </div>
+      <div className="wisden-innings-extras total-row">
+        <span>Total</span>
+        <span className="num">{innings.total_runs}/{innings.wickets} ({innings.overs} ov)</span>
       </div>
 
-      {/* Did not bat */}
       {innings.did_not_bat.length > 0 && (
-        <div className="px-4 py-2 text-sm text-gray-600 border-t border-gray-200">
-          <span className="font-medium text-gray-700">Did not bat:</span> {innings.did_not_bat.join(', ')}
+        <div className="wisden-innings-aside">
+          <span className="lbl">Did not bat</span>{innings.did_not_bat.join(', ')}
         </div>
       )}
 
-      {/* Fall of wickets */}
       {innings.fall_of_wickets.length > 0 && (
-        <div className="px-4 py-2 text-sm text-gray-600 border-t border-gray-200">
-          <span className="font-medium text-gray-700">Fall of wickets:</span>{' '}
+        <div className="wisden-innings-aside">
+          <span className="lbl">Fall of wickets</span>
           {innings.fall_of_wickets.map((w, i) => (
-            <span key={w.wicket}>
-              {i > 0 ? ', ' : ''}
-              {w.score}-{w.wicket} ({w.batter}, {w.over_ball} ov)
+            <span key={w.wicket} className="num">
+              {i > 0 ? ', ' : ''}{w.score}-{w.wicket} ({w.batter}, {w.over_ball} ov)
             </span>
           ))}
         </div>
       )}
 
       {/* Bowling */}
-      <div className="overflow-x-auto border-t border-gray-200">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs uppercase text-gray-500 border-b border-gray-200">
-              <th className="px-4 py-2 font-medium">Bowler</th>
-              <th className="px-2 py-2 font-medium text-right">O</th>
-              <th className="px-2 py-2 font-medium text-right">M</th>
-              <th className="px-2 py-2 font-medium text-right">R</th>
-              <th className="px-2 py-2 font-medium text-right">W</th>
-              <th className="px-2 py-2 font-medium text-right">Econ</th>
-              <th className="px-2 py-2 font-medium text-right">wd</th>
-              <th className="px-2 py-2 font-medium text-right">nb</th>
-            </tr>
-          </thead>
-          <tbody>
-            {innings.bowling.map(b => {
-              const isHL = !!(highlightBowlerId && b.person_id === highlightBowlerId)
-              return (
+      <div className="wisden-innings-section-label">Bowling</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Bowler</th>
+            <th className="r">O</th>
+            <th className="r">M</th>
+            <th className="r">R</th>
+            <th className="r">W</th>
+            <th className="r">Econ</th>
+            <th className="r">wd</th>
+            <th className="r">nb</th>
+          </tr>
+        </thead>
+        <tbody>
+          {innings.bowling.map(b => {
+            const isHL = !!(highlightBowlerId && b.person_id === highlightBowlerId)
+            return (
               <tr key={`${b.person_id}-${b.name}`}
                 ref={isHL ? highlightedRowRef : undefined}
-                className={`border-b border-gray-100 ${isHL ? 'bg-yellow-100' : 'hover:bg-gray-50'}`}>
-                <td className="px-4 py-1.5 font-medium text-gray-900">
+                className={isHL ? 'is-highlighted' : undefined}>
+                <td className="pname">
                   {bowlerHref(b.person_id)
-                    ? <Link to={bowlerHref(b.person_id)!} className={linkClass}>{b.name}</Link>
+                    ? <Link to={bowlerHref(b.person_id)!}>{b.name}</Link>
                     : b.name}
                 </td>
-                <td className="px-2 py-1.5 text-right tabular-nums">{b.overs}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums">{b.maidens}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums">{b.runs}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{b.wickets}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{b.econ.toFixed(2)}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums text-gray-500">{b.wides}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums text-gray-500">{b.noballs}</td>
+                <td className="r">{b.overs}</td>
+                <td className="r">{b.maidens}</td>
+                <td className="r">{b.runs}</td>
+                <td className="r" style={{ color: 'var(--ink)', fontWeight: 600 }}>{b.wickets}</td>
+                <td className="r">{b.econ.toFixed(2)}</td>
+                <td className="r" style={{ color: 'var(--ink-faint)' }}>{b.wides}</td>
+                <td className="r" style={{ color: 'var(--ink-faint)' }}>{b.noballs}</td>
               </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }

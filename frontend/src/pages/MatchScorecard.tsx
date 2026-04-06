@@ -24,12 +24,8 @@ export default function MatchScorecard() {
   )
 
   return (
-    <div>
-      <div className="mb-4">
-        <Link to="/matches" className="text-sm text-blue-600 hover:underline">
-          ← Back to matches
-        </Link>
-      </div>
+    <div className="max-w-6xl mx-auto">
+      <Link to="/matches" className="wisden-back">← Back to matches</Link>
 
       {loading && <Spinner label="Loading scorecard…" size="lg" />}
 
@@ -54,13 +50,9 @@ export default function MatchScorecard() {
         return (
         <>
           <ScorecardView data={data} highlightBatterId={highlightBatterId} highlightBowlerId={highlightBowlerId}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-              <div className="bg-white rounded-lg border shadow-sm p-4">
-                <WormChart innings={data.innings} />
-              </div>
-              <div className="bg-white rounded-lg border shadow-sm p-4">
-                <ManhattanChart innings={data.innings} />
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div><WormChart innings={data.innings} /></div>
+              <div><ManhattanChart innings={data.innings} /></div>
             </div>
 
             {/* Matchup grid: per-innings batter × bowler matrix.

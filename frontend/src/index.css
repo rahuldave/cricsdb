@@ -527,6 +527,185 @@ a { color: inherit; }
   font-variation-settings: "opsz" 14;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Scorecard chrome — match header + innings cards
+   ───────────────────────────────────────────────────────────── */
+.wisden-back {
+  display: inline-block;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  text-decoration: none;
+  margin-bottom: 1.5rem;
+}
+.wisden-back:hover { text-decoration: underline; }
+
+.wisden-match-header { margin-bottom: 2rem; }
+.wisden-match-header h2 {
+  font-family: var(--serif);
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variation-settings: "opsz" 60;
+  letter-spacing: -0.015em;
+  margin: 0 0 0.5rem;
+  line-height: 1.1;
+}
+.wisden-match-header .vs {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+.wisden-match-meta {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  font-variation-settings: "opsz" 14;
+}
+.wisden-match-result {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--ink);
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--rule-soft);
+  font-variation-settings: "opsz" 14;
+}
+.wisden-match-extra {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-top: 0.35rem;
+  font-family: var(--sans);
+}
+.wisden-match-extra .lbl {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--ink-faint);
+  margin-right: 0.3rem;
+  font-variation-settings: "opsz" 14;
+}
+
+/* InningsCard */
+.wisden-innings { margin-bottom: 2.5rem; }
+.wisden-innings-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 0.6rem 0;
+  margin-bottom: 0;
+}
+.wisden-innings-head h3 {
+  font-family: var(--serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+  font-variation-settings: "opsz" 24;
+}
+.wisden-innings-score {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  color: var(--ink);
+  font-variation-settings: "opsz" 14;
+}
+.wisden-innings-score .big { font-weight: 600; font-size: 1.2rem; }
+.wisden-innings-score .meta { color: var(--ink-faint); font-style: italic; margin-left: 0.4rem; }
+
+.wisden-innings table { width: 100%; border-collapse: collapse; font-family: var(--sans); font-size: 0.85rem; }
+.wisden-innings thead tr { border-bottom: 1px solid var(--rule-soft); }
+.wisden-innings th {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--ink-faint);
+  font-variation-settings: "opsz" 14;
+  font-size: 0.78rem;
+}
+.wisden-innings th.r { text-align: right; }
+.wisden-innings tbody tr {
+  border-bottom: 1px solid var(--rule-soft);
+  transition: background 120ms;
+}
+.wisden-innings tbody tr:hover { background: var(--bg-soft); }
+.wisden-innings tbody tr.is-highlighted {
+  background: #F4E9C9;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.wisden-innings td { padding: 0.45rem 0.5rem; color: var(--ink-soft); vertical-align: top; }
+.wisden-innings td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.wisden-innings .pname {
+  font-family: var(--serif);
+  color: var(--ink);
+  font-variation-settings: "opsz" 14;
+  font-size: 0.95rem;
+}
+.wisden-innings .pname a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--rule-soft); }
+.wisden-innings .pname a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.wisden-innings .dismissal {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--ink-soft);
+  font-variation-settings: "opsz" 14;
+}
+.wisden-innings .dismissal a { color: var(--ink-soft); text-decoration: none; }
+.wisden-innings .dismissal a:hover { color: var(--accent); }
+
+.wisden-innings-extras {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  padding: 0.55rem 0.5rem;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.wisden-innings-extras .lbl { font-family: var(--serif); font-style: italic; color: var(--ink-faint); margin-right: 0.4rem; font-variation-settings: "opsz" 14; }
+.wisden-innings-extras .total-row { font-family: var(--serif); color: var(--ink); font-weight: 600; }
+
+.wisden-innings-aside {
+  font-size: 0.85rem;
+  padding: 0.55rem 0.5rem;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--rule-soft);
+  font-family: var(--sans);
+}
+.wisden-innings-aside .lbl { font-family: var(--serif); font-style: italic; color: var(--ink-faint); margin-right: 0.4rem; font-variation-settings: "opsz" 14; }
+
+.wisden-innings-section-label {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  margin: 1rem 0 0.25rem 0.5rem;
+  font-variation-settings: "opsz" 14;
+}
+
+/* HeadToHead label */
+.wisden-h2h-label {
+  display: block;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  margin-bottom: 0.25rem;
+  font-variation-settings: "opsz" 14;
+}
+.wisden-h2h-vs {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.5rem;
+  color: var(--accent);
+  margin-top: 1.4rem;
+}
+
 /* Tabs — text-only with oxblood underline on active */
 .wisden-tabs {
   display: flex;

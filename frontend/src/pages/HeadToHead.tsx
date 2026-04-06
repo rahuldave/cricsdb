@@ -42,21 +42,21 @@ export default function HeadToHead() {
   ]
 
   return (
-    <div>
-      <div className="flex gap-4 items-center mb-6">
+    <div className="max-w-6xl mx-auto">
+      <div className="flex gap-6 items-start mb-8">
         <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Batter</label>
-          <PlayerSearch role="batter" onSelect={handleBatter} placeholder="Search batter..." />
+          <label className="wisden-h2h-label">Batter</label>
+          <PlayerSearch role="batter" onSelect={handleBatter} placeholder="Search batter…" />
         </div>
-        <span className="text-gray-400 font-bold text-lg mt-5">vs</span>
+        <span className="wisden-h2h-vs">v</span>
         <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Bowler</label>
-          <PlayerSearch role="bowler" onSelect={handleBowler} placeholder="Search bowler..." />
+          <label className="wisden-h2h-label">Bowler</label>
+          <PlayerSearch role="bowler" onSelect={handleBowler} placeholder="Search bowler…" />
         </div>
       </div>
 
       {!enabled && (
-        <div className="text-center text-gray-400 py-16">Select both a batter and bowler to view head-to-head stats</div>
+        <div className="wisden-empty">Select both a batter and bowler to view head-to-head stats</div>
       )}
 
       {enabled && loading && <Spinner label="Loading head-to-head…" size="lg" />}
@@ -70,46 +70,42 @@ export default function HeadToHead() {
 
       {enabled && data && !loading && !error && (
         <>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            {data.batter.name} vs {data.bowler.name}
+          <h2 className="wisden-page-title">
+            {data.batter.name} <span style={{ fontStyle: 'italic', color: 'var(--accent)', fontWeight: 400 }}>v</span> {data.bowler.name}
           </h2>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-2">
+          <div className="wisden-statrow cols-5">
             <StatCard label="Balls" value={data.summary.balls} />
             <StatCard label="Runs" value={data.summary.runs} />
             <StatCard label="Outs" value={data.summary.dismissals} />
             <StatCard label="Average" value={fmt(data.summary.average)} />
             <StatCard label="Strike Rate" value={fmt(data.summary.strike_rate)} />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="wisden-statrow">
             <StatCard label="Fours" value={data.summary.fours} />
             <StatCard label="Sixes" value={data.summary.sixes} />
             <StatCard label="Dots" value={data.summary.dots} />
             <StatCard label="Dot %" value={data.summary.dot_pct != null ? `${data.summary.dot_pct}%` : '-'} />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            <div className="bg-white rounded-lg border p-6 shadow-sm">
-              {data.by_phase.length > 0 && (
-                <BarChart
-                  data={data.by_phase}
-                  categoryAccessor="phase" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
-                  title="Strike Rate by Phase" categoryLabel="Phase" valueLabel="SR"
-                  height={280} colorScheme={['#3b82f6', '#22c55e', '#ef4444']} />
-              )}
-            </div>
-            <div className="bg-white rounded-lg border p-6 shadow-sm">
-              {Object.keys(data.dismissal_kinds).length > 0 && (
-                <DonutChart
-                  data={Object.entries(data.dismissal_kinds).map(([label, value]) => ({ label, value }))}
-                  categoryAccessor="label" valueAccessor="value"
-                  title={`Dismissals (${data.summary.dismissals})`} width={300} height={280} />
-              )}
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {data.by_phase.length > 0 && (
+              <BarChart
+                data={data.by_phase}
+                categoryAccessor="phase" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
+                title="Strike Rate by Phase" categoryLabel="Phase" valueLabel="SR"
+                height={280} colorScheme={['#3b82f6', '#22c55e', '#ef4444']} />
+            )}
+            {Object.keys(data.dismissal_kinds).length > 0 && (
+              <DonutChart
+                data={Object.entries(data.dismissal_kinds).map(([label, value]) => ({ label, value }))}
+                categoryAccessor="label" valueAccessor="value"
+                title={`Dismissals (${data.summary.dismissals})`} width={300} height={280} />
+            )}
           </div>
 
           {data.by_season.length > 0 && (
-            <div className="bg-white rounded-lg border p-6 shadow-sm mb-6">
+            <div className="mb-8">
               <BarChart
                 data={data.by_season.filter(s => s.strike_rate != null)}
                 categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
@@ -119,7 +115,7 @@ export default function HeadToHead() {
           )}
 
           {data.by_over.length > 0 && (
-            <div className="bg-white rounded-lg border p-6 shadow-sm mb-6">
+            <div className="mb-8">
               <BarChart
                 data={data.by_over.filter(o => o.balls > 0).map(o => ({ ...o, over: `${o.over_number}` }))}
                 categoryAccessor="over"
@@ -129,8 +125,9 @@ export default function HeadToHead() {
             </div>
           )}
 
-          <div className="bg-white rounded-lg border p-6 shadow-sm">
-            <h3 className="text-sm font-medium text-gray-600 mb-4">Match by Match</h3>
+          <div>
+            <div className="section-head"><span className="section-label">Match by Match</span></div>
+            <div className="rule" />
             <DataTable columns={matchColumns} data={data.by_match} />
           </div>
         </>
