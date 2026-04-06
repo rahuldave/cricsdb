@@ -120,12 +120,12 @@ export default function Bowling() {
   ]
 
   return (
-    <div>
-      <div className="mb-6">
-        <PlayerSearch role="bowler" onSelect={handleSelect} placeholder="Search for a bowler..." />
+    <div className="max-w-6xl mx-auto">
+      <div className="mb-8">
+        <PlayerSearch role="bowler" onSelect={handleSelect} placeholder="Search for a bowler…" />
       </div>
 
-      {!playerId && <div className="text-center text-gray-400 py-16">Search for a bowler to view stats</div>}
+      {!playerId && <div className="wisden-empty">Search for a bowler to view stats</div>}
 
       {playerId && summaryFetch.loading && <Spinner label="Loading bowler…" size="lg" />}
 
@@ -138,15 +138,15 @@ export default function Bowling() {
 
       {playerId && summary && !summaryFetch.loading && (
         <>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">{summary.name}</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-2">
+          <h2 className="wisden-page-title">{summary.name}</h2>
+          <div className="wisden-statrow cols-5">
             <StatCard label="Wickets" value={summary.wickets} />
             <StatCard label="Average" value={fmt(summary.average)} />
             <StatCard label="Economy" value={fmt(summary.economy)} />
             <StatCard label="Overs" value={summary.overs} />
             <StatCard label="Strike Rate" value={fmt(summary.strike_rate)} />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+          <div className="wisden-statrow cols-5">
             <StatCard label="B/Four" value={fmt(summary.balls_per_four)} />
             <StatCard label="B/Six" value={fmt(summary.balls_per_six)} />
             <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary)} />
@@ -154,17 +154,15 @@ export default function Bowling() {
             <StatCard label="Best Figures" value={summary.best_figures || '-'} />
           </div>
 
-          <div className="border-b border-gray-200 mb-4">
-            <div className="flex gap-1 overflow-x-auto -mx-1 px-1">
-              {tabs.map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 ${activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >{tab}</button>
-              ))}
-            </div>
+          <div className="wisden-tabs">
+            {tabs.map(tab => (
+              <button key={tab} onClick={() => setActiveTab(tab)}
+                className={`wisden-tab${activeTab === tab ? ' is-active' : ''}`}
+              >{tab}</button>
+            ))}
           </div>
 
-          <div className="bg-white rounded-lg border p-6 shadow-sm">
+          <div>
             {activeTab === 'By Season' && (
               <>
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
@@ -204,18 +202,18 @@ export default function Bowling() {
               <>
                 <TabState fetch={phaseFetch as FetchState<unknown>} />
                 {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
                     {phaseData.map(p => (
-                      <div key={p.phase} className="text-center">
-                        <h3 className="font-semibold text-gray-700 mb-2 capitalize">{p.phase}</h3>
-                        <div className="text-sm text-gray-500">Overs {p.overs}</div>
-                        <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-                          <div><span className="text-gray-500">Balls:</span> {p.balls}</div>
-                          <div><span className="text-gray-500">Runs:</span> {p.runs}</div>
-                          <div><span className="text-gray-500">SR:</span> {fmt(p.strike_rate)}</div>
-                          <div><span className="text-gray-500">Dots:</span> {fmt(p.dot_pct)}%</div>
-                          <div><span className="text-gray-500">4s:</span> {p.fours}</div>
-                          <div><span className="text-gray-500">6s:</span> {p.sixes}</div>
+                      <div key={p.phase} className="wisden-phaseblock">
+                        <h3>{p.phase}</h3>
+                        <div className="wisden-phaseblock-overs">Overs {p.overs}</div>
+                        <div className="wisden-phaseblock-grid">
+                          <div><span className="lbl">Balls</span></div><div className="num">{p.balls}</div>
+                          <div><span className="lbl">Runs</span></div><div className="num">{p.runs}</div>
+                          <div><span className="lbl">SR</span></div><div className="num">{fmt(p.strike_rate)}</div>
+                          <div><span className="lbl">Dots</span></div><div className="num">{fmt(p.dot_pct)}%</div>
+                          <div><span className="lbl">4s</span></div><div className="num">{p.fours}</div>
+                          <div><span className="lbl">6s</span></div><div className="num">{p.sixes}</div>
                         </div>
                       </div>
                     ))}
@@ -279,10 +277,10 @@ export default function Bowling() {
                   }
                   return (
                     <div>
-                      <p className="text-xs text-gray-500 mb-2">
+                      <p className="wisden-tab-help">
                         Hover any dot to see the batter. Top 8 by balls bowled are labelled.
                         Click a row in the table to find that batter on the chart.
-                        <span className="text-gray-400"> Top-left corner = bowler dominated (low econ + low avg).</span>
+                        <span style={{ opacity: 0.7 }}> Top-left corner = bowler dominated (low econ + low avg).</span>
                       </p>
                       <ScatterChart
                         data={valid}

@@ -460,7 +460,9 @@ a { color: inherit; }
   margin: -0.5rem 0 1.25rem;
 }
 
-/* Stat row — strip of StatCards under a page title */
+/* Stat row frame — strip of StatCards under a page title.
+   Default is 4-up; add .cols-5 for player pages. The cells (StatCards)
+   each carry a top rule, and the row carries a bottom rule. */
 .wisden-statrow {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -470,6 +472,59 @@ a { color: inherit; }
 }
 @media (min-width: 640px) {
   .wisden-statrow { grid-template-columns: repeat(4, 1fr); }
+}
+@media (min-width: 1024px) {
+  .wisden-statrow.cols-5 { grid-template-columns: repeat(5, 1fr); }
+}
+
+/* Phase block — three-up summary used by Batting/Bowling "By Phase" */
+.wisden-phaseblock {
+  text-align: center;
+  padding: 1rem 0.75rem;
+  border-top: 1px solid var(--rule);
+}
+.wisden-phaseblock h3 {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0 0 0.15rem;
+  font-variation-settings: "opsz" 14;
+  text-transform: capitalize;
+}
+.wisden-phaseblock-overs {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  margin-bottom: 0.6rem;
+}
+.wisden-phaseblock-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem 0.6rem;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  text-align: left;
+  max-width: 12rem;
+  margin: 0 auto;
+}
+.wisden-phaseblock-grid .lbl {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--ink-faint);
+  font-variation-settings: "opsz" 14;
+}
+
+.wisden-tab-help {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  margin: 0 0 0.85rem;
+  font-variation-settings: "opsz" 14;
 }
 
 /* Tabs — text-only with oxblood underline on active */
