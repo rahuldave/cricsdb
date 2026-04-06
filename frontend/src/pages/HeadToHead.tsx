@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam } from '../hooks/useUrlState'
+import { useFetch } from '../hooks/useFetch'
 import PlayerSearch from '../components/PlayerSearch'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
 import DonutChart from '../components/charts/DonutChart'
+import Spinner from '../components/Spinner'
+import ErrorBanner from '../components/ErrorBanner'
 import { getHeadToHead } from '../api'
 import type { PlayerSearchResult, HeadToHeadResponse, HeadToHeadMatch } from '../types'
 
@@ -16,15 +18,17 @@ export default function HeadToHead() {
   const [batterId, setBatterId] = useUrlParam('batter')
   const [bowlerId, setBowlerId] = useUrlParam('bowler')
 
-  const [data, setData] = useState<HeadToHeadResponse | null>(null)
-
   const handleBatter = (p: PlayerSearchResult) => setBatterId(p.id)
   const handleBowler = (p: PlayerSearchResult) => setBowlerId(p.id)
 
-  useEffect(() => {
-    if (!batterId || !bowlerId) { setData(null); return }
-    getHeadToHead(batterId, bowlerId, filters).then(setData).catch(() => {})
-  }, [batterId, bowlerId, filters.gender, filters.team_type, filters.tournament, filters.season_from, filters.season_to])
+  const enabled = !!(batterId && bowlerId)
+  const { data, loading, error, refetch } = useFetch<HeadToHeadResponse | null>(
+    () => enabled
+      ? getHeadToHead(batterId, bowlerId, filters)
+      : Promise.resolve(null),
+    [batterId, bowlerId, filters.gender, filters.team_type, filters.tournament,
+     filters.season_from, filters.season_to],
+  )
 
   const matchColumns: Column<HeadToHeadMatch>[] = [
     { key: 'date', label: 'Date', sortable: true },
@@ -51,11 +55,20 @@ export default function HeadToHead() {
         </div>
       </div>
 
-      {(!batterId || !bowlerId) && (
+      {!enabled && (
         <div className="text-center text-gray-400 py-16">Select both a batter and bowler to view head-to-head stats</div>
       )}
 
-      {data && (
+      {enabled && loading && <Spinner label="Loading head-to-head…" size="lg" />}
+
+      {enabled && error && (
+        <ErrorBanner
+          message={`Could not load head-to-head: ${error}`}
+          onRetry={refetch}
+        />
+      )}
+
+      {enabled && data && !loading && !error && (
         <>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
             {data.batter.name} vs {data.bowler.name}
