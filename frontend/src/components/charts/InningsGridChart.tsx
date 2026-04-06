@@ -33,6 +33,7 @@ const COLOR_NOBALL = '#facc15'  // slightly darker yellow
 const COLOR_BYE = '#fb923c'     // orange
 const COLOR_LEGBYE = '#fdba74'  // light orange
 const COLOR_WICKET = '#dc2626'  // red
+const COLOR_AT_CREASE = '#dbeafe' // pale blue: batter is at the crease but not facing this ball
 
 interface CellInfo {
   bg: string
@@ -146,6 +147,7 @@ export default function InningsGridChart({ innings }: Props) {
 
       {/* Color legend */}
       <div className="flex flex-wrap gap-3 text-[10px] text-gray-600 mb-3">
+        <Legend color={COLOR_AT_CREASE} label="at crease (not facing)" />
         <Legend color={COLOR_OFFBAT(0)} label="dot" />
         <Legend color={COLOR_OFFBAT(1)} label="1" />
         <Legend color={COLOR_OFFBAT(2)} label="2" />
@@ -265,12 +267,18 @@ export default function InningsGridChart({ innings }: Props) {
                   {Array.from({ length: N }).map((_, b) => {
                     const isLastBatter = b === N - 1
                     if (b !== markerCol) {
+                      // Faint blue tint when this batter is at the crease
+                      // but not facing the current ball (i.e., they're the
+                      // non-striker). Renders a continuous "presence stripe"
+                      // for each batter from arrival to dismissal.
+                      const atCrease = b === d.non_striker_index
                       return (
                         <div
                           key={b}
                           style={{
                             width: CELL,
                             height: CELL,
+                            backgroundColor: atCrease ? COLOR_AT_CREASE : undefined,
                             borderRight: isLastBatter ? '2px solid #d1d5db' : undefined,
                           }}
                           className={isLastBatter ? '' : 'border-r border-gray-100'}

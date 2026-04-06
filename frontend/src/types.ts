@@ -429,6 +429,8 @@ export interface InningsGridDelivery {
   bowler: string
   batter: string
   batter_index: number
+  non_striker: string
+  non_striker_index: number | null
   runs_batter: number
   runs_extras: number
   runs_total: number

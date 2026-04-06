@@ -703,6 +703,9 @@ async def innings_grid(match_id: int):
                 "bowler": d["bowler"],
                 "batter": d["batter"],
                 "batter_index": seen.index(d["batter"]),
+                "non_striker": d["non_striker"],
+                "non_striker_index": seen.index(d["non_striker"])
+                    if d["non_striker"] in seen_set else None,
                 "runs_batter": d["runs_batter"] or 0,
                 "runs_extras": d["runs_extras"] or 0,
                 "runs_total": d["runs_total"] or 0,
