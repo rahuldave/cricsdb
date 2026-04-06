@@ -33,7 +33,9 @@ api/
     head_to_head.py   — /api/v1/head-to-head/{batter_id}/{bowler_id}
     matches.py        — /api/v1/matches list, /matches/{id}/scorecard, /matches/{id}/innings-grid
 models/tables.py      — deebase models: Person, Match, Innings, Delivery, Wicket, etc.
-import_data.py        — Downloads cricsheet JSON + imports into SQLite
+team_aliases.py       — Canonical team-name mapping (used by import + fix script)
+scripts/fix_team_names.py — One-time UPDATE pass to canonicalize old team names in cricket.db
+import_data.py        — Downloads cricsheet JSON + imports into SQLite (canonicalizes via team_aliases)
 frontend/src/
   App.tsx             — React Router: /, /teams, /batting, /bowling, /head-to-head, /matches, /matches/:matchId
   hooks/useUrlState.ts — useUrlParam + useSetUrlParams (atomic URL state updates)
@@ -138,6 +140,8 @@ that fits the available time.
 **G. Worm chart wicket markers as actual chart points** (not just a footer line). Currently the worm renders as two clean lines plus a "Wickets fell at: ..." text line beneath, because the existing Semiotic high-level wrappers don't expose per-point styling. To add markers we'd either drop down to `XYFrame` directly or layer a separate `Scatterplot` overlay. Worth doing for visual narrative but not critical.
 
 **I. Responsive chart sizing.** _Done._ `frontend/src/hooks/useContainerWidth.ts` wraps a `ResizeObserver`. `BarChart`, `LineChart`, and `ScatterChart` wrappers make `width` optional and use the hook to fill their container when omitted. `DonutChart` stays fixed-width (a circle doesn't usefully stretch). All chart call sites now omit `width`; the dual-chart layouts that used `flex gap-6 flex-wrap` were converted to `grid grid-cols-1 lg:grid-cols-2 gap-6` (or `grid-cols-[350px_minmax(0,1fr)]` for donut+bar layouts) so each chart cell has a definite container width. The previous mobile pass's `overflow-x-auto` workaround on chart cards was stripped.
+
+**K. Tournament-name canonicalization.** Same problem as team renames (which is now fixed — see `docs/design-decisions.md` "Team-name canonicalization across renames") but for `event_name`. Three competitions in the database appear under multiple sponsor names: NatWest T20 Blast / Vitality Blast / Vitality Blast Men (English domestic), CSA T20 Challenge / Ram Slam T20 Challenge / MiWAY T20 Challenge (South African domestic), and HRV Cup / HRV Twenty20 / Super Smash (New Zealand domestic). The teams within these are correct — only the tournament label differs by year. To fix: parallel `event_aliases.py` + `scripts/fix_event_names.py`, both modeled exactly on the team-aliases pattern. Touches `match.event_name` only. Should also patch `import_data.py` similarly so future imports stay clean.
 
 **J. Distinctive visual identity.** The site is functional but generically Tailwind — Inter-ish system font, blue/gray utility palette, default shadows. Not bad, but not memorable either. A bolder typographic identity (e.g., a display serif or characterful sans for player names + headers, monospace tabular numerals for stats) and a stronger color hierarchy would lift it from "competent dashboard" to "memorable cricket database." This is a redesign pass, not a fix — flagged after a mobile-audit pass surfaced it as the highest-impact aesthetic improvement that wasn't a bug. Inspirations to consider: Cricinfo's editorial typography, Edward Tufte's data-density principles, the FiveThirtyEight numerical aesthetic.
 

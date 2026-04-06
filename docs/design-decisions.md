@@ -146,6 +146,46 @@ The Batting `vs Bowlers` and Bowling `vs Batters` tabs both render a scatter cha
 
 **The reverse direction (clicking a chart dot to highlight a table row) is deliberately NOT implemented.** Semiotic v3's high-level `Scatterplot` component does not expose `onClick` or any per-point click handler. Adding that would require dropping below the high-level helper to `XYFrame` directly, which is a bigger refactor and would lose some of the convenience defaults the wrapper provides. The tooltip + top-N labels + reverse direction (table → chart) already cover the original "I can't tell who the big dots are" complaint, so the forward direction (chart → table) is left for later — see CLAUDE.md Future Enhancements item H.
 
+### Team-name canonicalization across renames
+
+Cricket franchises rename themselves periodically. Cricsheet records the team name that was current when each match was played, so the same franchise appears in the database under multiple strings depending on the season. Without merging, queries that group by team string treat (e.g.) "Kings XI Punjab" and "Punjab Kings" as separate teams — which makes the Teams page show two Punjabs, the Matches list filter show two RCBs, and breaks every cross-season aggregation.
+
+**Where the truth lives.** A single source-of-truth Python module at `team_aliases.py` (project root) holds a `dict[str, str]` mapping each old name to the canonical (most recent) name, plus a `canonicalize(name)` helper.
+
+**How it's applied.** Two paths:
+
+1. **One-time fix** for the existing database via `scripts/fix_team_names.py`. Walks every (table, column) tuple that holds a team string — `match.team1`, `match.team2`, `match.outcome_winner`, `match.toss_winner`, `innings.team`, `matchplayer.team` — and runs `UPDATE` statements per alias. Idempotent (safe to re-run; the second pass finds zero rows because canonical names aren't keys in the alias map). Has a `--dry-run` mode that reports row counts without writing. Calls `VACUUM` at the end.
+
+2. **At import time** via `import_data.py`. The `import_match_file()` function calls `canon_team()` on every team string before insert (`team1`, `team2`, `toss_winner`, `outcome_winner`, `matchplayer.team`, `innings.team`). Future imports — including incremental updates from `update_recent.py`, which reuses `import_match_file()` — are clean automatically.
+
+**Why this approach (and not the alternatives).**
+
+- **Aliases table + COALESCE in queries** — non-destructive but every existing query needs updating, easy to forget one, and joins/coalesce add per-query cost. Rejected.
+- **In-API canonicalization** — apply at the response layer instead of the storage layer. Same forgetting risk, plus `WHERE team = ?` queries from the frontend pass the canonical name and the storage layer wouldn't match unless the API also rewrote the query parameters. Rejected.
+- **Direct UPDATE in the existing DB only** (no import_data patch) — works once, breaks the next time you do a full DB rebuild. Rejected.
+- **Direct UPDATE + import_data patch** ← chosen. Cleanest because the DB itself is canonical (no query code knows or cares about the rename history) AND the cleanliness is preserved across rebuilds.
+
+**Choosing the canonical name.** For each franchise, pick the **most recent** name. The current name is what the user expects to see when they look at recent matches; old-name aggregations get attributed to the current branding.
+
+**Conservative principle: only merge confirmed renames.** A team is merged only when (a) the franchise has continuous ownership across the rename and (b) the rename is well-attested in cricket sources. Cases NOT merged:
+
+- **BPL franchises** — Bangladesh Premier League has had massive ownership churn, with new ownership groups frequently buying the franchise slot for a city. Same city, different team. Without specific knowledge of every franchise's ownership history, we can't confidently call any of them renames.
+- **St Lucia Stars** vs Zouks/Kings — Stars was a separate one-season ownership in 2017-2018, NOT the same franchise as the Zouks→Kings lineage.
+- **Antigua Hawksbills** (2013-2014) vs **Antigua and Barbuda Falcons** (2024+) — 10-year gap, new franchise, different ownership. Not merged.
+- **Deccan Chargers** (became defunct), **Gujarat Lions**, **Pune Warriors**, **Kochi Tuskers Kerala** — all dissolved franchises; their successors (in the case of Deccan, Sunrisers Hyderabad) are conventionally treated as new teams.
+
+**Tournaments NOT canonicalized (separate concern).** Three tournament name pairs/triples in the database are the same competition under different sponsors but show up as different `event_name` values:
+
+- **NatWest T20 Blast** / **Vitality Blast** / **Vitality Blast Men** — English domestic T20, sponsor changed in 2018
+- **CSA T20 Challenge** / **Ram Slam T20 Challenge** / **MiWAY T20 Challenge** — South African domestic T20
+- **HRV Cup** / **HRV Twenty20** / **Super Smash** — New Zealand domestic T20
+
+These are tournament-level renames (not team-level), and would need a separate `event_aliases.py` + parallel fix script. Logged as a follow-up — none of the team-name code in this section touches `event_name`.
+
+**Effect of running `fix_team_names.py` on the existing DB:** ~13,400 rows updated across the six (table, column) pairs, mostly in `matchplayer.team` (each match has ~22 player rows, and ~600 matches were affected by the IPL renames alone). After the fix, IPL drops from 19 distinct team strings to 15 (the four rename pairs collapse), LPL from 16 to 5 (massive consolidation due to LPL's per-season sponsor rebrands), CPL from 12 to 9 (three rename pairs collapsed, three deliberately-separate franchises kept).
+
+**One thing this doesn't fix.** A few pages currently use the team string in the URL path (`/teams?team=Kings+XI+Punjab`). Bookmarked links to old-name URLs will return empty data after the rename because the storage no longer has those strings. Could add a tiny redirect at the API layer that catches the four-or-so old IPL names and rewrites the query — not done because the affected URL count is small. Logged for later.
+
 ### Matchup grid: per-innings batter × bowler matrix
 
 A second new chart on the scorecard page (sibling to the innings grid). For each innings, renders the full set of batter-vs-bowler matchups that happened in that innings as an HTML table: batters as rows in batting order, bowlers as columns in order of first appearance, each cell shows that pair's `runs(balls)w` for the innings. Lives in `frontend/src/components/charts/MatchupGridChart.tsx`.

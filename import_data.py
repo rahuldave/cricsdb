@@ -14,6 +14,7 @@ from models import (
     Person, PersonName, Match, MatchDate, MatchPlayer,
     Innings, Delivery, Wicket,
 )
+from team_aliases import canonicalize as canon_team
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 DB_PATH = os.path.join(os.path.dirname(__file__), "cricket.db")
@@ -162,8 +163,8 @@ async def import_match_file(db, filepath, tables):
         "match_type": info["match_type"],
         "team_type": info.get("team_type", ""),
         "season": str(info.get("season", "")),
-        "team1": teams[0] if len(teams) > 0 else "",
-        "team2": teams[1] if len(teams) > 1 else "",
+        "team1": canon_team(teams[0]) if len(teams) > 0 else "",
+        "team2": canon_team(teams[1]) if len(teams) > 1 else "",
         "venue": info.get("venue"),
         "city": info.get("city"),
         "event_name": event.get("name"),
@@ -173,10 +174,10 @@ async def import_match_file(db, filepath, tables):
         "match_type_number": info.get("match_type_number"),
         "overs": info.get("overs"),
         "balls_per_over": info.get("balls_per_over", 6),
-        "toss_winner": toss.get("winner"),
+        "toss_winner": canon_team(toss.get("winner")),
         "toss_decision": toss.get("decision"),
         "toss_uncontested": toss.get("uncontested", False),
-        "outcome_winner": outcome.get("winner"),
+        "outcome_winner": canon_team(outcome.get("winner")),
         "outcome_by_runs": by.get("runs"),
         "outcome_by_wickets": by.get("wickets"),
         "outcome_by_innings": by.get("innings"),
@@ -198,10 +199,11 @@ async def import_match_file(db, filepath, tables):
     players = info.get("players", {})
     player_rows = []
     for team, player_list in players.items():
+        canonical_team = canon_team(team)
         for pname in player_list:
             player_rows.append({
                 "match_id": match_id,
-                "team": team,
+                "team": canonical_team,
                 "player_name": pname,
                 "person_id": registry.get(pname),
             })
@@ -215,7 +217,7 @@ async def import_match_file(db, filepath, tables):
         innings = await innings_table.insert({
             "match_id": match_id,
             "innings_number": inn_num,
-            "team": inn_data["team"],
+            "team": canon_team(inn_data["team"]),
             "declared": inn_data.get("declared", False),
             "forfeited": inn_data.get("forfeited", False),
             "super_over": inn_data.get("super_over", False),
