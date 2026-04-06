@@ -37,33 +37,37 @@ export default function MatchScorecard() {
       )}
 
       {data && !loading && (
-        <ScorecardView data={data}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            <div className="bg-white rounded-lg border shadow-sm p-4">
-              <WormChart innings={data.innings} />
+        <>
+          <ScorecardView data={data}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <div className="bg-white rounded-lg border shadow-sm p-4">
+                <WormChart innings={data.innings} />
+              </div>
+              <div className="bg-white rounded-lg border shadow-sm p-4">
+                <ManhattanChart innings={data.innings} />
+              </div>
             </div>
-            <div className="bg-white rounded-lg border shadow-sm p-4">
-              <ManhattanChart innings={data.innings} />
-            </div>
-          </div>
+          </ScorecardView>
 
-          {/* Innings grid prototype: per-delivery visualization, one
-              section per innings stacked vertically. */}
+          {/* Innings grid prototype: per-delivery visualization,
+              rendered BELOW the regular scorecard, one card per innings. */}
           {grid.data && !grid.loading && (
-            <div className="space-y-4 mb-4">
+            <div className="space-y-4 mt-6">
               {grid.data.innings.map(inn => (
                 <InningsGridChart key={inn.innings_number} innings={inn} />
               ))}
             </div>
           )}
-          {grid.loading && <Spinner label="Loading innings grid…" />}
+          {grid.loading && <div className="mt-6"><Spinner label="Loading innings grid…" /></div>}
           {grid.error && (
-            <ErrorBanner
-              message={`Could not load innings grid: ${grid.error}`}
-              onRetry={grid.refetch}
-            />
+            <div className="mt-6">
+              <ErrorBanner
+                message={`Could not load innings grid: ${grid.error}`}
+                onRetry={grid.refetch}
+              />
+            </div>
           )}
-        </ScorecardView>
+        </>
       )}
     </div>
   )
