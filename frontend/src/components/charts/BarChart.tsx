@@ -85,7 +85,11 @@ export default function BarChart<T extends Record<string, any>>({
           height={finalHeight}
           colorScheme={colorScheme}
           colorBy={colorBy}
-          categoryLabel={categoryLabel}
+          // When rotating, drop the axis label — Semiotic positions it
+          // inside the bottom margin where our rotated overlay lives,
+          // so the two visually collide. The rotated labels themselves
+          // tell the user what's on the x-axis.
+          categoryLabel={shouldRotate ? undefined : categoryLabel}
           valueLabel={valueLabel}
           orientation={orientation}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
