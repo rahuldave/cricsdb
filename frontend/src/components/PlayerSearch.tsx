@@ -16,8 +16,18 @@ export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSear
   const [error, setError] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const containerRef = useRef<HTMLDivElement>(null)
+  // After a user picks a result we set the input value to the picked
+  // name. The query effect would otherwise re-fetch and re-open the
+  // dropdown 300ms later. This ref names the query value whose next
+  // effect run should be skipped — when the user types something else
+  // the ref no longer matches and search resumes normally.
+  const suppressedQuery = useRef<string | null>(null)
 
   useEffect(() => {
+    if (suppressedQuery.current === query) {
+      suppressedQuery.current = null
+      return
+    }
     if (query.length < 2) {
       setResults([]); setOpen(false); setError(null); return
     }
@@ -63,7 +73,13 @@ export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSear
             <li
               key={p.id}
               className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex justify-between"
-              onClick={() => { onSelect(p); setQuery(p.name); setOpen(false) }}
+              onClick={() => {
+                clearTimeout(timerRef.current)
+                suppressedQuery.current = p.name
+                onSelect(p)
+                setQuery(p.name)
+                setOpen(false)
+              }}
             >
               <span className="font-medium text-sm">{p.name}</span>
               <span className="text-xs text-gray-400">{p.innings} inn</span>
