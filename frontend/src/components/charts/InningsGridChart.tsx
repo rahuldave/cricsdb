@@ -129,10 +129,46 @@ function summarizeOvers(deliveries: InningsGridDelivery[]): Map<number, OverSumm
   return m
 }
 
+interface Partnership {
+  endIndex: number
+  number: number
+  runs: number
+  balls: number
+}
+
+/**
+ * Walk through deliveries and identify partnership boundaries.
+ * A partnership ends on a wicket OR at the final ball of the innings.
+ * Returned map: delivery index → the partnership that ended at that index.
+ */
+function summarizePartnerships(
+  deliveries: InningsGridDelivery[],
+): Map<number, Partnership> {
+  const result = new Map<number, Partnership>()
+  let runs = 0
+  let balls = 0
+  let n = 1
+  for (let i = 0; i < deliveries.length; i++) {
+    const d = deliveries[i]
+    runs += d.runs_total
+    balls++
+    const isLast = i === deliveries.length - 1
+    if (d.wicket_kind || isLast) {
+      result.set(i, { endIndex: i, number: n, runs, balls })
+      n++
+      runs = 0
+      balls = 0
+    }
+  }
+  return result
+}
+
 export default function InningsGridChart({ innings }: Props) {
   const N = innings.batters.length
   const headerHeight = '4.5rem'
   const overSummaries = summarizeOvers(innings.deliveries)
+  const partnerships = summarizePartnerships(innings.deliveries)
+  const SUMMARY_H = '0.875rem'
 
   return (
     <div className="bg-white rounded-lg border shadow-sm p-4">
@@ -377,39 +413,44 @@ export default function InningsGridChart({ innings }: Props) {
                   </div>
                 </div>
 
-                {/* Over summary row, after the last ball of each over */}
+                {/* Over summary row, after the last ball of each over.
+                    Renders the same cell layout so the at-crease stripes
+                    pass through it without breaking. */}
                 {summary && (
-                  <div
-                    className="flex items-center bg-gray-50 border-t border-b border-gray-200"
-                    style={{ height: '0.875rem' }}
-                  >
-                    <div style={{ width: OVER_W }} />
-                    <div
-                      style={{ width: BOWLER_W }}
-                      className="text-[9px] text-gray-500 pr-2 text-right italic"
-                    >
-                      end of over {summary.over}
-                    </div>
-                    <div
-                      style={{
-                        width: `calc(${CELL} * ${N})`,
-                        borderRight: '2px solid #d1d5db',
-                      }}
-                      className="text-[9px] text-gray-500 px-2 tabular-nums truncate"
-                    >
-                      {summary.runs} run{summary.runs === 1 ? '' : 's'}
-                      {summary.wickets > 0 ? `, ${summary.wickets} wkt${summary.wickets === 1 ? '' : 's'}` : ''}
-                    </div>
-                    <div style={{ width: HIST_W, borderRight: '2px solid #d1d5db' }} />
-                    <div
-                      style={{ width: SCORE_W, borderRight: '2px solid #d1d5db' }}
-                      className="text-[9px] tabular-nums pl-2 text-gray-600 font-semibold"
-                    >
-                      {d.cumulative_runs}/{d.cumulative_wickets}
-                    </div>
-                    <div style={{ width: WKT_W }} className="hidden md:block" />
-                  </div>
+                  <SummaryRow
+                    label={`end of over ${summary.over}`}
+                    detail={`${summary.runs} run${summary.runs === 1 ? '' : 's'}${summary.wickets > 0 ? `, ${summary.wickets} wkt${summary.wickets === 1 ? '' : 's'}` : ''}`}
+                    score={`${d.cumulative_runs}/${d.cumulative_wickets}`}
+                    striperBatterIdx={d.batter_index}
+                    striperNonStrikerIdx={d.non_striker_index}
+                    N={N}
+                    height={SUMMARY_H}
+                    accent="gray"
+                  />
                 )}
+
+                {/* Partnership summary row, after a wicket OR after the
+                    final ball of the innings. */}
+                {partnerships.has(i) && (() => {
+                  const p = partnerships.get(i)!
+                  // For the partnership-end row, the stripes are for the
+                  // two batters who just FINISHED the partnership. After a
+                  // wicket the player_out is no longer at crease, but the
+                  // partnership *ended* with both still in our visualization
+                  // — show their stripe one last time.
+                  return (
+                    <SummaryRow
+                      label={`partnership ${p.number}`}
+                      detail={`${p.runs} run${p.runs === 1 ? '' : 's'} (${p.balls} ball${p.balls === 1 ? '' : 's'})`}
+                      score={`${d.cumulative_runs}/${d.cumulative_wickets}`}
+                      striperBatterIdx={d.batter_index}
+                      striperNonStrikerIdx={d.non_striker_index}
+                      N={N}
+                      height={SUMMARY_H}
+                      accent="blue"
+                    />
+                  )
+                })()}
               </div>
             )
           })}
@@ -423,6 +464,75 @@ export default function InningsGridChart({ innings }: Props) {
         runs by source: green for off the bat, yellow for wides/no-balls,
         orange for byes/leg-byes. Over summary rows mark each over's end.
       </div>
+    </div>
+  )
+}
+
+/**
+ * A slim summary row that preserves the per-batter cell layout (so the
+ * at-crease stripes pass through continuously) and overlays a label,
+ * detail, and the cumulative score.
+ */
+function SummaryRow({
+  label, detail, score,
+  striperBatterIdx, striperNonStrikerIdx,
+  N, height, accent,
+}: {
+  label: string
+  detail: string
+  score: string
+  striperBatterIdx: number | null
+  striperNonStrikerIdx: number | null
+  N: number
+  height: string
+  accent: 'gray' | 'blue'
+}) {
+  const labelClass = accent === 'blue' ? 'text-blue-700' : 'text-gray-500'
+  const borderTop = accent === 'blue' ? '1px solid #bfdbfe' : '1px solid #e5e7eb'
+  return (
+    <div
+      className="flex items-center"
+      style={{ height, borderTop, borderBottom: borderTop }}
+    >
+      <div style={{ width: OVER_W }} />
+      <div
+        style={{ width: BOWLER_W }}
+        className={`text-[9px] italic pr-2 text-right truncate ${labelClass}`}
+        title={`${label} — ${detail}`}
+      >
+        {label}
+      </div>
+      {/* batter cells: preserve the at-crease tint so the stripe stays continuous */}
+      {Array.from({ length: N }).map((_, b) => {
+        const isLastBatter = b === N - 1
+        const atCrease = b === striperBatterIdx || b === striperNonStrikerIdx
+        return (
+          <div
+            key={b}
+            style={{
+              width: CELL,
+              height,
+              backgroundColor: atCrease ? COLOR_AT_CREASE : undefined,
+              borderRight: isLastBatter ? '2px solid #d1d5db' : undefined,
+            }}
+            className={isLastBatter ? '' : 'border-r border-gray-100'}
+          />
+        )
+      })}
+      {/* histogram column: empty but bordered */}
+      <div
+        style={{ width: HIST_W, borderRight: '2px solid #d1d5db', height }}
+        className={`text-[9px] italic pl-1 flex items-center truncate ${labelClass}`}
+      >
+        {detail}
+      </div>
+      <div
+        style={{ width: SCORE_W, borderRight: '2px solid #d1d5db', height }}
+        className="text-[9px] tabular-nums pl-2 text-gray-700 font-semibold flex items-center"
+      >
+        {score}
+      </div>
+      <div style={{ width: WKT_W, height }} className="hidden md:block" />
     </div>
   )
 }
