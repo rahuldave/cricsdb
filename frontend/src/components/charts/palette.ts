@@ -23,3 +23,12 @@ export const WISDEN_PALETTE: string[] = [
 
 /** Phase trio for powerplay / middle / death over breakdowns. */
 export const WISDEN_PHASES: string[] = [WISDEN.slate, WISDEN.ochre, WISDEN.oxblood]
+
+/**
+ * High-contrast pair for two-innings charts (Worm, Manhattan) where the
+ * default categorical palette runs ink+slate, which read too similarly
+ * on cream. Pure ink against a saturated indigo gives a clear value
+ * AND hue difference. Avoids oxblood so it doesn't clash with the
+ * oxblood wicket markers on the worm.
+ */
+export const WISDEN_PAIR: string[] = ['#1A1714', '#1E5A8A']

@@ -1,5 +1,5 @@
 import BarChart from './BarChart'
-import { WISDEN } from './palette'
+import { WISDEN_PAIR } from './palette'
 import type { ScorecardInnings } from '../../types'
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
   height?: number
 }
 
-const COLORS = [WISDEN.ink, WISDEN.slate, WISDEN.ochre, WISDEN.forest]
+const COLORS = WISDEN_PAIR
 
 /**
  * Manhattan chart — runs scored in each over.

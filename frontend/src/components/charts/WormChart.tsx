@@ -1,5 +1,5 @@
 import LineChart from './LineChart'
-import { WISDEN, WISDEN_PALETTE } from './palette'
+import { WISDEN, WISDEN_PAIR } from './palette'
 import type { ScorecardInnings } from '../../types'
 
 interface Props {
@@ -103,7 +103,7 @@ export default function WormChart({ innings, width, height = 280 }: Props) {
         yAccessor="cumulative"
         lineBy="team"
         colorBy="team"
-        colorScheme={WISDEN_PALETTE}
+        colorScheme={WISDEN_PAIR}
         xLabel="Over"
         yLabel="Runs"
         width={width}
