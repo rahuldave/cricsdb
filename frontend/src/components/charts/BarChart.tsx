@@ -54,33 +54,22 @@ export default function BarChart<T extends Record<string, any>>({
 
   const categoryFormat = shouldRotate
     ? (label: string) => (
-        // No `position: absolute` — Safari's foreignObject + abs-pos
-        // is buggy and the labels end up stacked in the SVG corner.
-        // Instead use document flow: a block container with
-        // padding-right:50% reserves the right half of the
-        // foreignObject as empty space, and text-align:right pushes
-        // an inline-block child right up against the LEFT edge of
-        // that empty space — i.e. at the horizontal center of the
-        // foreignObject (which is the tick mark). The rotation pivot
-        // is the top-right corner of that inline-block, so the END of
-        // the label sits at the tick and the rest trails down-left.
-        <div style={{
-          paddingRight: '50%',
-          textAlign: 'right',
-          lineHeight: 0,
-        }}>
-          <span style={{
-            display: 'inline-block',
-            transformOrigin: '100% 0',
-            transform: 'rotate(-60deg)',
-            whiteSpace: 'nowrap',
-            fontSize: 11,
-            color: '#555',
-            paddingRight: 4,
-            lineHeight: 1,
-            userSelect: 'none',
-          }}>{label}</span>
-        </div>
+        // Safari's foreignObject content layout is fragile — both
+        // position:absolute and padding-right:50% trick fail in
+        // different ways. Most reliable cross-browser: just rotate
+        // an inline-block in its natural flow position (Semiotic's
+        // wrapper centers it horizontally with text-align:center).
+        // Rotation pivot is the bounding-box center, so the rotated
+        // text sits centered on each tick.
+        <span style={{
+          display: 'inline-block',
+          transform: 'rotate(-60deg)',
+          whiteSpace: 'nowrap',
+          fontSize: 11,
+          color: '#555',
+          lineHeight: 1,
+          userSelect: 'none',
+        }}>{label}</span>
       )
     : undefined
 
