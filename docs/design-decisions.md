@@ -146,6 +146,90 @@ The Batting `vs Bowlers` and Bowling `vs Batters` tabs both render a scatter cha
 
 **The reverse direction (clicking a chart dot to highlight a table row) is deliberately NOT implemented.** Semiotic v3's high-level `Scatterplot` component does not expose `onClick` or any per-point click handler. Adding that would require dropping below the high-level helper to `XYFrame` directly, which is a bigger refactor and would lose some of the convenience defaults the wrapper provides. The tooltip + top-N labels + reverse direction (table → chart) already cover the original "I can't tell who the big dots are" complaint, so the forward direction (chart → table) is left for later — see CLAUDE.md Future Enhancements item H.
 
+### Innings grid: per-delivery visualization
+
+A novel chart on the scorecard page that renders an entire batting innings as a grid: rows are deliveries top-to-bottom, columns are batters left-to-right in order of appearance. The on-strike batter's cell is colored to encode what happened on that ball. Lives in `frontend/src/components/charts/InningsGridChart.tsx`, backed by a new `/api/v1/matches/{id}/innings-grid` endpoint that returns ordered deliveries plus the ordered batters list.
+
+**Why it's interesting.** Traditional scorecards show aggregate stats per batter. The grid shows the *time-series structure* of the innings — when each batter came in, who was their partner, when they faced sustained pressure, where the boundaries clustered. Vertical extent of a column = how long that batter was at the crease. Horizontal gap between two columns = how far apart in the order they came in.
+
+#### Visual encoding
+
+| Element | Color / shape | Notes |
+|---|---|---|
+| Off-bat runs | Greens, light → dark by run count | 0 → light gray (dot ball), 1 → mint, 4 → bright green, 6 → dark green |
+| Wide (extras only) | Yellow `#fde047` | Text `w` or `w(N-1)` for wide+ran |
+| No-ball (extras only) | Slightly darker yellow `#facc15` | Text `n` |
+| No-ball + off-bat runs | Off-bat color (green) with small orange `n` overlay | Honest about the off-bat runs without losing the no-ball flag |
+| Bye | Orange `#fb923c` | Text `b` or `b{n}` |
+| Leg-bye | Lighter orange `#fdba74` | Text `lb` or `lb{n}` |
+| Wicket | Red `#dc2626` | Text `W`, drawn in the *dismissed* batter's column (handles non-striker run-outs correctly) |
+| At crease, not facing | Pale blue (slot A) or pale violet (slot B) | See "Slot inheritance" below |
+
+#### Slot inheritance for the at-crease stripes
+
+Each batter is assigned one of two "slots" — A or B — and their stripe is rendered in slot A's color (`#eff6ff` blue-50) or slot B's color (`#f5f3ff` violet-50). The first ball's batter is A; the non-striker is B. On every wicket, the first not-yet-assigned batter to appear inherits the dismissed batter's slot. So at any moment the two at-crease batters always have one A and one B stripe, and a new batter walking in always takes the SAME shade as the one they replaced. Visually you can scan a column and see the partnership it belongs to without guessing.
+
+We picked blue + violet over blue + cyan after the cyan version was too close in hue to read at thumbnail scale. Both still in the cool family so they recede behind the warm semantic colors (green/yellow/orange/red). Rejected alternatives: blue + warm tint (e.g., amber) — risked visual confusion with the extras yellow/orange; pattern (cross-hatch) instead of fill — harder to read; full saturation — fought the foreground encoding too much.
+
+#### Layout
+
+```
+[over.ball] [bowler] [batter cells × N] | [run histogram] | [score] | [wicket text]
+```
+
+- **Over column** prints `over.ball` (e.g., `6.5`) only on the first ball of each over; other balls get a faded `·` placeholder.
+- **Bowler column** prints the bowler name only on bowler change (handles mid-over substitutions automatically — same logic as the over column, just on bowler equality).
+- **Batter cells** is the main grid. Most cells in any given row are empty/striped; only the on-strike batter's column has a colored cell (or the dismissed batter's column for a wicket).
+- **Histogram column** decomposes the ball's runs by source. Each "run unit" gets its own small cell, colored by source: green for off-bat, yellow for no-ball penalty, more yellow for wides, orange for byes, lighter orange for leg-byes. So `noball + 4 off the bat` shows as 4 green cells + 1 yellow cell. The total count is shown in small black text in the leftmost cell.
+- **Score column** shows the cumulative team score after this ball as `runs/wickets`.
+- **Wicket text column** is populated only on wicket balls and shows the standard scorecard dismissal format (e.g., `c Rohit b Bumrah`). Hidden below the `md` breakpoint to keep the grid fitting on phones.
+- **Vertical 2px dividers** separate the four conceptual sections (batter cells, histogram, score, wicket text).
+
+#### Summary rows
+
+Two kinds of slim summary rows are interleaved between ball rows:
+
+- **Over summary** — gray-accented, after the last ball of each over: `end of over N · X runs[, Y wkts]`
+- **Partnership summary** — blue-accented, after every wicket and after the final ball of the innings: `partnership N · R runs (B balls)`
+
+Both summary rows preserve the full per-batter cell layout and render the at-crease tints with the same slot colors as ball rows. This is critical: without it the stripes would be broken by the gray over-summary band, and a batter's "presence stripe" wouldn't read as one continuous vertical band from arrival to dismissal. Both summary types use a shared `SummaryRow` helper component.
+
+#### Sizing and responsiveness
+
+All sizing in `rem` (not raw pixels) so the grid respects the user's root font scale. The grid is wrapped in `overflow-x-auto` because at iPhone 13 width (390px), 11 batter columns plus the sidebars exceed the available width and must scroll horizontally. The wicket-text column is hidden via `hidden md:flex` on viewports below 768px so the grid stays compact on phones; the wicket text is still accessible via the cell's title tooltip.
+
+#### Position on the page
+
+The grid is rendered as a sibling AFTER `<ScorecardView>`, NOT in its `children` slot. Order on the scorecard page: header → charts (worm + Manhattan) → innings tables → innings grids. This was a deliberate revision — the original prototype rendered the grid via `children`, putting it between the header and the innings tables, but the user found that the grid's height and visual density buried the more familiar scorecard tables.
+
+#### Things considered but not built
+
+- **SVG-based rendering** — rejected, HTML divs are easier to align with the rest of the page and don't need a custom layout engine. Performance is fine for ~120 rows × ~17 columns per innings.
+- **Cross-hatch / dot-pattern fills** for the at-crease stripe instead of solid color — rejected, less readable and still requires a color choice.
+- **A vertical "partnership lane"** showing partnership runs as a growing bar to the right of the batter columns — rejected in favor of summary rows after each partnership end, which are simpler and read more like cricket scorecards.
+- **Click-to-expand cell** for full delivery details — could be added later, currently only the cell `title` tooltip shows the info on hover.
+- **Hover sync** with the worm and Manhattan charts (hovering a ball in one would highlight the same ball in the others) — would be a nice polish but requires shared selection state between three components.
+- **Replay animation** — render the innings ball-by-ball over time, like a cricket simulator — fun but not core.
+- **Two innings side by side** instead of stacked — would need narrower cells to fit two grids horizontally; stacked is fine for now.
+- **Mobile-first reflow** — at iPhone 13 width the user has to scroll horizontally. A truly mobile-friendly variant would be a stacked-card view with one batter per card, but that loses the time-series structure that makes the grid interesting in the first place.
+
+#### Things to revisit
+
+- **Color accessibility.** The stripes are differentiated by hue + lightness, but I haven't tested with color-blindness simulators. The dot ball gray vs the at-crease blues could blur for some color profiles. Worth running through Coblis or similar.
+- **Histogram cap.** The histogram has 7 cells, which covers the realistic max (boundary off no-ball = 5) plus headroom. A pathological wide that goes for 7+ runs would clip silently. Add an overflow indicator if it ever matters.
+- **Partnership numbering** restarts at 1 for each innings. When showing both innings, that's slightly confusing. Consider prefixing with the team or innings number.
+- **DOM size.** Each innings is ~120 rows × (4 sidebar cells + N batter cells + 7 histogram cells + 3 column dividers) ≈ 25 elements per row × 120 rows = 3,000 nodes per innings, ~6,000 per match. Renders fine on desktop and on iPhone 13 in my testing, but if we ever support test cricket (~600 balls per innings), virtualization would be worth considering.
+- **Bowler change visualization.** Currently the bowler name appears on the row of the new bowler's first ball. Could add a small marker or thicker top-border on bowler-change rows for emphasis.
+- **Phase coloring on the over column.** The current chart has powerplay/middle/death color schemes; could subtly tint the over-number column background by phase.
+
+#### Features worth adding later
+
+- **Ball-by-ball commentary feed** as a sibling tab — render each delivery as a sentence (`19.6  Bumrah to Kohli — 1 run`) using the same data. Pairs naturally with the grid: click a row in the grid to scroll the feed to the same ball, and vice versa.
+- **Per-batter highlight on hover** — hover a batter's column header and dim everything except that batter's cells. Same on the row dimension for bowlers.
+- **Filter toggles** above the grid: "show only boundaries", "show only wickets", "show only powerplay", "extras only" — selectively dim non-matching cells.
+- **Comparison mode** — overlay two innings grids (e.g., chase vs target) with the second innings shown semi-transparent.
+- **Click a cell → modal with full delivery details**, including any commentary text and the wagon-wheel position if cricsheet ever exposes it.
+
 ### Rotated x-axis labels: HTML overlay outside the SVG
 
 When a `BarChart` has more categories than fit at the chart's pixel width (e.g. 30 seasons crammed into ~330px on iPhone 13), labels overlap. Standard fix is to rotate them ~60°. With Semiotic v3's high-level `BarChart`, that turns out to be much harder than expected. The journey through five failed attempts and one working approach is recorded here so the next person changing chart styling doesn't repeat it.

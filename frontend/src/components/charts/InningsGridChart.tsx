@@ -34,12 +34,16 @@ const COLOR_BYE = '#fb923c'     // orange
 const COLOR_LEGBYE = '#fdba74'  // light orange
 const COLOR_WICKET = '#dc2626'  // red
 // Two alternating pale tints for the at-crease stripe — one per
-// partnership "slot". When a batter gets out, the new batter inherits
-// the same slot (and thus the same shade) as the one they replaced,
-// so the two at-crease batters always have the two distinct shades.
-const COLOR_AT_CREASE_A = '#eff6ff'   // pale blue (Tailwind blue-50)
-const COLOR_AT_CREASE_B = '#ecfeff'   // pale cyan (Tailwind cyan-50)
-const COLOR_AT_CREASE = COLOR_AT_CREASE_A  // for legend swatch
+// partnership "slot". Both stay in the cool family so they read as
+// background; cool→warm pairs would clash with the warm semantic
+// colors (off-bat green, extras yellow/orange, wicket red). We use
+// blue + violet because cyan (the previous choice for slot B) was
+// too close to blue in hue and they merged visually at thumbnail
+// scale. When a batter gets out, the new batter inherits the slot
+// (and shade) of the partner they replaced.
+const COLOR_AT_CREASE_A = '#eff6ff'   // pale blue   (Tailwind blue-50)
+const COLOR_AT_CREASE_B = '#f5f3ff'   // pale violet (Tailwind violet-50)
+const COLOR_AT_CREASE = COLOR_AT_CREASE_A  // for the legend swatch
 
 interface CellInfo {
   bg: string
