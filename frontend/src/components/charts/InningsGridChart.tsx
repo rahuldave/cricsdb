@@ -458,13 +458,39 @@ export default function InningsGridChart({ innings }: Props) {
                     {d.cumulative_runs}/{d.cumulative_wickets}
                   </div>
                   <div
-                    style={{ width: WKT_W, height: CELL }}
-                    className="text-[10px] pl-2 text-red-700 font-medium truncate hidden md:flex items-center"
-                    title={d.wicket_text || ''}
+                    style={{ width: WKT_W, height: CELL, color: 'var(--accent)' }}
+                    className="text-[10px] pl-2 font-medium truncate hidden md:flex items-center"
+                    title={(() => {
+                      const p = partnerships.get(i)
+                      const wkt = d.wicket_text ? `${d.wicket_player_out}: ${d.wicket_text}` : ''
+                      const pship = p ? `partnership ${p.number}: ${p.runs} runs (${p.balls} balls)` : ''
+                      return [wkt, pship].filter(Boolean).join(' · ')
+                    })()}
                   >
-                    {d.wicket_text
-                      ? `${d.wicket_player_out}: ${d.wicket_text}`
-                      : ''}
+                    {(() => {
+                      const p = partnerships.get(i)
+                      if (d.wicket_text && p) {
+                        return (
+                          <>
+                            {d.wicket_player_out}: {d.wicket_text}
+                            <span style={{ color: 'var(--ink-faint)', fontStyle: 'italic', marginLeft: 4 }}>
+                              · p{p.number} {p.runs}({p.balls})
+                            </span>
+                          </>
+                        )
+                      }
+                      if (d.wicket_text) {
+                        return <>{d.wicket_player_out}: {d.wicket_text}</>
+                      }
+                      if (p) {
+                        return (
+                          <span style={{ color: 'var(--ink-faint)', fontStyle: 'italic' }}>
+                            p{p.number} {p.runs}({p.balls})
+                          </span>
+                        )
+                      }
+                      return ''
+                    })()}
                   </div>
                 </div>
 
@@ -484,30 +510,6 @@ export default function InningsGridChart({ innings }: Props) {
                     accent="gray"
                   />
                 )}
-
-                {/* Partnership summary row, after a wicket OR after the
-                    final ball of the innings. */}
-                {partnerships.has(i) && (() => {
-                  const p = partnerships.get(i)!
-                  // For the partnership-end row, the stripes are for the
-                  // two batters who just FINISHED the partnership. After a
-                  // wicket the player_out is no longer at crease, but the
-                  // partnership *ended* with both still in our visualization
-                  // — show their stripe one last time.
-                  return (
-                    <SummaryRow
-                      label={`partnership ${p.number}`}
-                      detail={`${p.runs} run${p.runs === 1 ? '' : 's'} (${p.balls} ball${p.balls === 1 ? '' : 's'})`}
-                      score={`${d.cumulative_runs}/${d.cumulative_wickets}`}
-                      striperBatterIdx={d.batter_index}
-                      striperNonStrikerIdx={d.non_striker_index}
-                      slotColor={slotColor}
-                      N={N}
-                      height={SUMMARY_H}
-                      accent="blue"
-                    />
-                  )
-                })()}
               </div>
             )
           })}
