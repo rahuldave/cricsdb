@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import FilterBar from './FilterBar'
 
 const navItems = [
@@ -10,6 +10,8 @@ const navItems = [
 ]
 
 export default function Layout() {
+  const { pathname } = useLocation()
+  const showFilters = pathname !== '/'
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-gray-900 text-white">
@@ -30,7 +32,7 @@ export default function Layout() {
           </div>
         </div>
       </nav>
-      <FilterBar />
+      {showFilters && <FilterBar />}
       <main className="max-w-7xl mx-auto px-4 py-6">
         <Outlet />
       </main>
