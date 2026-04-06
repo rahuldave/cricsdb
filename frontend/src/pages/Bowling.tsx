@@ -228,12 +228,25 @@ export default function Bowling() {
               <>
                 <TabState fetch={matchupsFetch as FetchState<unknown>} />
                 {!matchupsFetch.loading && !matchupsFetch.error && batterMatchups.length > 0 && (() => {
-                  const valid = batterMatchups.filter(m => m.economy != null && m.strike_rate != null)
+                  // Switched Y axis from strike_rate (balls/wicket) to average
+                  // (runs/wicket) — average is the more familiar bowling stat
+                  // and "balls per wicket" was confusingly framed.
+                  //
+                  // Also FLIPPED the Y axis via frameProps.yExtent so low
+                  // values appear at the TOP of the chart. With the flip,
+                  // both axes have "good for bowler" toward the top-left:
+                  //   left  = low economy = cheap
+                  //   top   = low average = wickets cost few runs
+                  // The visually prominent top-left corner is now the
+                  // "dominant bowler" zone, fixing the previous problem
+                  // where high values (bad for bowler) were on top.
+                  const valid = batterMatchups.filter(m => m.economy != null && m.average != null)
+                  const maxAvg = Math.max(...valid.map(m => m.average ?? 0), 30)
                   const topByBalls = [...valid].sort((a, b) => (b.balls ?? 0) - (a.balls ?? 0)).slice(0, 8)
                   const annotations: Record<string, any>[] = topByBalls.map(m => ({
                     type: 'widget',
                     economy: m.economy,
-                    strike_rate: m.strike_rate,
+                    average: m.average,
                     dy: -12,
                     content: (
                       <span style={{
@@ -258,7 +271,7 @@ export default function Bowling() {
                     annotations.push({
                       type: 'label',
                       economy: selected.economy,
-                      strike_rate: selected.strike_rate,
+                      average: selected.average,
                       label: selected.batter_name,
                       dx: 24, dy: -28,
                       color: '#dc2626',
@@ -269,20 +282,23 @@ export default function Bowling() {
                       <p className="text-xs text-gray-500 mb-2">
                         Hover any dot to see the batter. Top 8 by balls bowled are labelled.
                         Click a row in the table to find that batter on the chart.
+                        <span className="text-gray-400"> Top-left corner = bowler dominated (low econ + low avg).</span>
                       </p>
                       <ScatterChart
                         data={valid}
                         xAccessor="economy"
-                        yAccessor="strike_rate"
+                        yAccessor="average"
                         sizeBy="balls"
-                        title="Economy vs SR (dot size = balls bowled)"
-                        xLabel="Economy" yLabel="Strike Rate" height={400}
+                        title="Economy vs Average (dot size = balls bowled)"
+                        xLabel="Economy" yLabel="Average (runs / wicket)" height={400}
                         tooltip={{
                           title: 'batter_name',
-                          fields: ['balls', 'runs_conceded', 'wickets', 'economy', 'strike_rate'],
+                          fields: ['balls', 'runs_conceded', 'wickets', 'economy', 'average'],
                         }}
                         annotations={annotations}
                         pointIdAccessor="batter_id"
+                        // Reverse Y so low average (good for bowler) sits at the top.
+                        frameProps={{ yExtent: [maxAvg * 1.05, 0] }}
                       />
                       <div className="mt-4">
                         <DataTable

@@ -22,13 +22,16 @@ interface ScatterChartProps<T extends Record<string, any>> {
   annotations?: any[]
   /** Field/function returning a stable id for each point — used by point-anchored annotations. */
   pointIdAccessor?: string | ((d: T) => string)
+  /** Pass-through to Semiotic — used for things like yExtent (axis flip). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  frameProps?: any
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function ScatterChart<T extends Record<string, any>>({
   data, xAccessor = 'x', yAccessor = 'y', sizeBy, colorBy, title,
   width, height = 400, xLabel, yLabel,
-  tooltip, annotations, pointIdAccessor,
+  tooltip, annotations, pointIdAccessor, frameProps,
 }: ScatterChartProps<T>) {
   const [ref, measuredWidth] = useContainerWidth()
   const effectiveWidth = width ?? measuredWidth
@@ -50,6 +53,7 @@ export default function ScatterChart<T extends Record<string, any>>({
           tooltip={tooltip}
           annotations={annotations}
           pointIdAccessor={pointIdAccessor}
+          frameProps={frameProps}
           enableHover
           showGrid
         />
