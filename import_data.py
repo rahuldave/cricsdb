@@ -15,6 +15,7 @@ from models import (
     Innings, Delivery, Wicket,
 )
 from team_aliases import canonicalize as canon_team
+from event_aliases import canonicalize as canon_event
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 DB_PATH = os.path.join(os.path.dirname(__file__), "cricket.db")
@@ -167,7 +168,7 @@ async def import_match_file(db, filepath, tables):
         "team2": canon_team(teams[1]) if len(teams) > 1 else "",
         "venue": info.get("venue"),
         "city": info.get("city"),
-        "event_name": event.get("name"),
+        "event_name": canon_event(event.get("name")),
         "event_match_number": event.get("match_number"),
         "event_group": str(event["group"]) if "group" in event else None,
         "event_stage": event.get("stage"),

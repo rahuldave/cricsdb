@@ -174,13 +174,13 @@ Cricket franchises rename themselves periodically. Cricsheet records the team na
 - **Antigua Hawksbills** (2013-2014) vs **Antigua and Barbuda Falcons** (2024+) — 10-year gap, new franchise, different ownership. Not merged.
 - **Deccan Chargers** (became defunct), **Gujarat Lions**, **Pune Warriors**, **Kochi Tuskers Kerala** — all dissolved franchises; their successors (in the case of Deccan, Sunrisers Hyderabad) are conventionally treated as new teams.
 
-**Tournaments NOT canonicalized (separate concern).** Three tournament name pairs/triples in the database are the same competition under different sponsors but show up as different `event_name` values:
+**Tournament-name canonicalization** (done in a follow-up pass) — uses the exact same pattern at `event_aliases.py` + `scripts/fix_event_names.py`. Three competitions had multiple sponsor brand names in the data:
 
-- **NatWest T20 Blast** / **Vitality Blast** / **Vitality Blast Men** — English domestic T20, sponsor changed in 2018
-- **CSA T20 Challenge** / **Ram Slam T20 Challenge** / **MiWAY T20 Challenge** — South African domestic T20
-- **HRV Cup** / **HRV Twenty20** / **Super Smash** — New Zealand domestic T20
+- **NatWest T20 Blast** / **Vitality Blast Men** → **Vitality Blast** (English domestic men's T20, NatWest 2014-2017, then Vitality from 2018+; cricsheet added "Men" disambiguator in 2025 which we collapse back since there's no women's Vitality Blast)
+- **MiWAY T20 Challenge** / **Ram Slam T20 Challenge** → **CSA T20 Challenge** (South African domestic men's T20, three sponsor eras)
+- **HRV Cup** / **HRV Twenty20** → **Super Smash** (New Zealand domestic men's T20)
 
-These are tournament-level renames (not team-level), and would need a separate `event_aliases.py` + parallel fix script. Logged as a follow-up — none of the team-name code in this section touches `event_name`.
+The `import_data.py` patch covers both `canon_team()` and `canon_event()` calls so future imports stay clean. Effect on local DB: 784 `match.event_name` rows updated, club-tournament count drops from 27 to 21. The single exception to the "latest wins" rule lives in `event_aliases.py`: we collapse `Vitality Blast Men` back to `Vitality Blast` because the disambiguator is unnecessary in our data and the cleaner name reads better in the UI.
 
 **Effect of running `fix_team_names.py` on the existing DB:** ~13,400 rows updated across the six (table, column) pairs, mostly in `matchplayer.team` (each match has ~22 player rows, and ~600 matches were affected by the IPL renames alone). After the fix, IPL drops from 19 distinct team strings to 15 (the four rename pairs collapse), LPL from 16 to 5 (massive consolidation due to LPL's per-season sponsor rebrands), CPL from 12 to 9 (three rename pairs collapsed, three deliberately-separate franchises kept).
 
