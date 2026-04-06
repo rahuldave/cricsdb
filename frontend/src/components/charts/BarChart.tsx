@@ -96,6 +96,10 @@ export default function BarChart<T extends Record<string, any>>({
           categoryFormat={shouldRotate ? ((() => '') as any) : undefined}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           frameProps={shouldRotate ? ({ margin: ROT_MARGIN } as any) : NORMAL_MARGIN}
+          // Default legend below the chart so long phase/category
+          // labels (e.g. "Powerplay") don't get clipped by the card
+          // on narrow screens.
+          legendPosition="bottom"
           enableHover
         />
       )}

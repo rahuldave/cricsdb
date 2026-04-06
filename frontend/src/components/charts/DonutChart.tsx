@@ -27,6 +27,10 @@ export default function DonutChart<T extends Record<string, any>>({
       centerContent={centerContent}
       enableHover
       showLegend
+      // Default legend below the donut so the long category strings
+      // (e.g. "caught and bowled") don't get clipped by the chart card
+      // on narrow screens.
+      legendPosition="bottom"
     />
   )
 }
