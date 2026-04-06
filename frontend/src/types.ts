@@ -427,7 +427,10 @@ export interface Scorecard {
 export interface InningsGridDelivery {
   over_ball: string
   bowler: string
+  bowler_id: string | null
+  bowler_index: number | null
   batter: string
+  batter_id: string | null
   batter_index: number
   non_striker: string
   non_striker_index: number | null
@@ -450,6 +453,9 @@ export interface InningsGridInnings {
   innings_number: number
   team: string
   batters: string[]
+  batter_ids: (string | null)[]
+  bowlers: string[]
+  bowler_ids: (string | null)[]
   deliveries: InningsGridDelivery[]
   total_balls: number
   total_runs: number

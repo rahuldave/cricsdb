@@ -654,6 +654,9 @@ async def innings_grid(match_id: int):
                 d.batter,
                 d.bowler,
                 d.non_striker,
+                d.batter_id,
+                d.bowler_id,
+                d.non_striker_id,
                 d.runs_batter,
                 d.runs_extras,
                 d.runs_total,
@@ -684,11 +687,31 @@ async def innings_grid(match_id: int):
         # where both openers are at the crease but only one faces).
         seen: list[str] = []
         seen_set: set[str] = set()
+        # Parallel id lookup: for each batter name, the first batter_id /
+        # non_striker_id we see for that name. (Same person can appear in
+        # both roles across deliveries; we just need any one id.)
+        batter_id_by_name: dict[str, str | None] = {}
         for d in deliveries:
-            for name in (d["batter"], d["non_striker"]):
+            for name, pid_key in (
+                (d["batter"], "batter_id"),
+                (d["non_striker"], "non_striker_id"),
+            ):
                 if name and name not in seen_set:
                     seen.append(name)
                     seen_set.add(name)
+                if name and name not in batter_id_by_name:
+                    batter_id_by_name[name] = d.get(pid_key)
+
+        # Same idea for bowlers — ordered by first appearance.
+        bowlers_seen: list[str] = []
+        bowlers_set: set[str] = set()
+        bowler_id_by_name: dict[str, str | None] = {}
+        for d in deliveries:
+            name = d["bowler"]
+            if name and name not in bowlers_set:
+                bowlers_seen.append(name)
+                bowlers_set.add(name)
+                bowler_id_by_name[name] = d.get("bowler_id")
 
         rows = []
         cumulative = 0
@@ -702,10 +725,14 @@ async def innings_grid(match_id: int):
                 "over_ball": f"{(d['over_number'] or 0) + 1}.{(d['delivery_index'] or 0) + 1}",
                 "bowler": d["bowler"],
                 "batter": d["batter"],
+                "batter_id": d.get("batter_id"),
                 "batter_index": seen.index(d["batter"]),
                 "non_striker": d["non_striker"],
                 "non_striker_index": seen.index(d["non_striker"])
                     if d["non_striker"] in seen_set else None,
+                "bowler_id": d.get("bowler_id"),
+                "bowler_index": bowlers_seen.index(d["bowler"])
+                    if d["bowler"] in bowlers_set else None,
                 "runs_batter": d["runs_batter"] or 0,
                 "runs_extras": d["runs_extras"] or 0,
                 "runs_total": d["runs_total"] or 0,
@@ -728,6 +755,9 @@ async def innings_grid(match_id: int):
             "innings_number": inn["innings_number"],
             "team": inn["team"],
             "batters": seen,
+            "batter_ids": [batter_id_by_name.get(name) for name in seen],
+            "bowlers": bowlers_seen,
+            "bowler_ids": [bowler_id_by_name.get(name) for name in bowlers_seen],
             "deliveries": rows,
             "total_balls": len(rows),
             "total_runs": cumulative,

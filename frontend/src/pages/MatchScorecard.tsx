@@ -4,6 +4,7 @@ import ScorecardView from '../components/Scorecard'
 import WormChart from '../components/charts/WormChart'
 import ManhattanChart from '../components/charts/ManhattanChart'
 import InningsGridChart from '../components/charts/InningsGridChart'
+import MatchupGridChart from '../components/charts/MatchupGridChart'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import { useFetch } from '../hooks/useFetch'
@@ -36,7 +37,18 @@ export default function MatchScorecard() {
         />
       )}
 
-      {data && !loading && (
+      {data && !loading && (() => {
+        // Compute linkParams the same way Scorecard.tsx does, so the
+        // matchup-grid head-to-head links carry the same gender,
+        // team_type, tournament context as the rest of the page.
+        const linkParams = (() => {
+          const params = new URLSearchParams()
+          if (data.info.gender) params.set('gender', data.info.gender)
+          if (data.info.team_type) params.set('team_type', data.info.team_type)
+          if (data.info.tournament) params.set('tournament', data.info.tournament)
+          return params.toString()
+        })()
+        return (
         <>
           <ScorecardView data={data}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
@@ -47,6 +59,21 @@ export default function MatchScorecard() {
                 <ManhattanChart innings={data.innings} />
               </div>
             </div>
+
+            {/* Matchup grid: per-innings batter × bowler matrix.
+                Sits between the charts row and the regular innings
+                tables (the user wanted it 'above the scoreboard'). */}
+            {grid.data && !grid.loading && (
+              <div className="space-y-4 mb-4">
+                {grid.data.innings.map(inn => (
+                  <MatchupGridChart
+                    key={inn.innings_number}
+                    innings={inn}
+                    linkParams={linkParams}
+                  />
+                ))}
+              </div>
+            )}
           </ScorecardView>
 
           {/* Innings grid prototype: per-delivery visualization,
@@ -68,7 +95,8 @@ export default function MatchScorecard() {
             </div>
           )}
         </>
-      )}
+        )
+      })()}
     </div>
   )
 }
