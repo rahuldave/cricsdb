@@ -316,3 +316,99 @@ export interface HeadToHeadResponse {
   by_season: { season: string; balls: number; runs: number; wickets: number; strike_rate: number | null }[]
   by_match: HeadToHeadMatch[]
 }
+
+// Matches & scorecards
+export interface MatchListItem {
+  match_id: number
+  date: string | null
+  team1: string
+  team2: string
+  venue: string | null
+  city: string | null
+  tournament: string | null
+  season: string | null
+  winner: string | null
+  result_text: string
+  team1_score: string | null
+  team2_score: string | null
+}
+
+export interface ScorecardBatter {
+  person_id: string | null
+  name: string
+  dismissal: string
+  runs: number
+  balls: number
+  fours: number
+  sixes: number
+  strike_rate: number
+}
+
+export interface ScorecardBowler {
+  person_id: string | null
+  name: string
+  overs: string
+  maidens: number
+  runs: number
+  wickets: number
+  econ: number
+  wides: number
+  noballs: number
+}
+
+export interface ScorecardExtras {
+  byes: number
+  legbyes: number
+  wides: number
+  noballs: number
+  penalty: number
+  total: number
+}
+
+export interface ScorecardFallOfWicket {
+  wicket: number
+  score: number
+  batter: string
+  over_ball: string
+}
+
+export interface ScorecardInnings {
+  innings_number: number
+  team: string
+  is_super_over: boolean
+  label: string
+  total_runs: number
+  wickets: number
+  overs: string
+  run_rate: number
+  batting: ScorecardBatter[]
+  did_not_bat: string[]
+  extras: ScorecardExtras
+  fall_of_wickets: ScorecardFallOfWicket[]
+  bowling: ScorecardBowler[]
+}
+
+export interface ScorecardInfo {
+  match_id: number
+  teams: string[]
+  venue: string | null
+  city: string | null
+  dates: string[]
+  tournament: string | null
+  season: string | null
+  match_number: number | null
+  stage: string | null
+  toss_winner: string | null
+  toss_decision: string | null
+  result_text: string
+  method: string | null
+  player_of_match: string[]
+  officials: Record<string, string[]> | null
+  gender: string | null
+  team_type: string | null
+}
+
+export interface Scorecard {
+  info: ScorecardInfo
+  innings: ScorecardInnings[]
+}

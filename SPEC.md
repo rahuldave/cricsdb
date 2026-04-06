@@ -1093,6 +1093,270 @@ WHERE d.batter_id = :batter_id
 
 ---
 
+### 3.6 Matches & Scorecards
+
+A new endpoint family backing the Matches tab. Two endpoints: a paginated
+match list (with the standard global filters plus optional team and
+player filters) and a full Cricinfo-style scorecard for one match.
+
+#### `GET /api/v1/matches`
+
+List matches matching the filters. Used by the Matches page list view.
+
+Query params: global filters + `team` (optional, name) + `player_id`
+(optional, person.id) + `limit` (default 50, max 200) + `offset`.
+
+```json
+{
+  "matches": [
+    {
+      "match_id": 1234567,
+      "date": "2024-05-26",
+      "team1": "Mumbai Indians",
+      "team2": "Chennai Super Kings",
+      "venue": "Wankhede Stadium",
+      "city": "Mumbai",
+      "tournament": "Indian Premier League",
+      "season": "2024",
+      "winner": "Mumbai Indians",
+      "result_text": "Mumbai Indians won by 5 wickets",
+      "team1_score": "187/4 (20)",
+      "team2_score": "184/9 (20)"
+    },
+    ...
+  ],
+  "total": 1234
+}
+```
+
+The two `*_score` summary strings come from a per-innings rollup
+(`SUM(runs_total)`, wicket count, max over) — same logic the scorecard
+endpoint uses, just truncated to one line per innings.
+
+**Filter logic:**
+- Global filters (gender, team_type, tournament, season range) apply
+  to `match` columns directly.
+- `team` → `(m.team1 = :team OR m.team2 = :team)`.
+- `player_id` → `EXISTS (SELECT 1 FROM matchplayer mp WHERE
+  mp.match_id = m.id AND mp.person_id = :player_id)`.
+
+**SQL (sketch):**
+```sql
+SELECT m.id as match_id, ..., m.team1, m.team2, m.venue, m.city,
+       m.event_name as tournament, m.season,
+       m.outcome_winner as winner,
+       (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) as date
+FROM match m
+WHERE 1=1
+  {global_filter_clauses}
+  {team_clause}
+  {player_exists_clause}
+ORDER BY date DESC
+LIMIT :limit OFFSET :offset
+```
+
+After fetching match rows, a second pass aggregates the two innings
+totals per match (one query, `IN (...)` over the page's match_ids) and
+attaches them as `team1_score` / `team2_score`. The result line is
+built in Python from `outcome_winner`, `outcome_by_runs`,
+`outcome_by_wickets`, `outcome_result`, `outcome_method`,
+`outcome_eliminator`, `outcome_bowl_out`.
+
+#### `GET /api/v1/matches/{match_id}/scorecard`
+
+Return everything needed to render a full scorecard for one match.
+
+```json
+{
+  "info": {
+    "match_id": 1234567,
+    "teams": ["Mumbai Indians", "Chennai Super Kings"],
+    "venue": "Wankhede Stadium",
+    "city": "Mumbai",
+    "dates": ["2024-05-26"],
+    "tournament": "Indian Premier League",
+    "season": "2024",
+    "match_number": 70,
+    "stage": "Final",
+    "toss_winner": "Chennai Super Kings",
+    "toss_decision": "field",
+    "result_text": "Mumbai Indians won by 5 wickets",
+    "method": null,
+    "player_of_match": ["JJ Bumrah"],
+    "officials": { "umpires": [...], "tv_umpires": [...], "match_referees": [...] }
+  },
+  "innings": [
+    {
+      "innings_number": 0,
+      "team": "Chennai Super Kings",
+      "is_super_over": false,
+      "label": "Chennai Super Kings Innings",
+      "total_runs": 184,
+      "wickets": 9,
+      "overs": "20.0",
+      "run_rate": 9.20,
+      "batting": [
+        {
+          "person_id": "abc123",
+          "name": "RD Gaikwad",
+          "dismissal": "c Rohit b Bumrah",
+          "runs": 53,
+          "balls": 38,
+          "fours": 5,
+          "sixes": 2,
+          "strike_rate": 139.47
+        },
+        ...
+      ],
+      "did_not_bat": ["MM Ali", "DL Chahar"],
+      "extras": { "byes": 0, "legbyes": 4, "wides": 6, "noballs": 1, "penalty": 0, "total": 11 },
+      "fall_of_wickets": [
+        { "wicket": 1, "score": 23, "batter": "RD Gaikwad", "over_ball": "2.4", "team_runs": 23 },
+        ...
+      ],
+      "bowling": [
+        {
+          "person_id": "def456",
+          "name": "JJ Bumrah",
+          "overs": "4.0",
+          "maidens": 1,
+          "runs": 18,
+          "wickets": 3,
+          "econ": 4.50,
+          "wides": 0,
+          "noballs": 0
+        },
+        ...
+      ]
+    },
+    ... (innings 2)
+    ... (super over innings if any, with is_super_over=true and label "Super Over (Team)")
+  ]
+}
+```
+
+**Per-innings SQL building blocks:**
+
+*Total + overs + wickets:*
+```sql
+SELECT SUM(d.runs_total) as total,
+       MAX(d.over_number) + 1 as max_over_index,  -- 0-indexed in DB
+       (SELECT COUNT(*) FROM wicket w
+        JOIN delivery dd ON dd.id = w.delivery_id
+        WHERE dd.innings_id = :innings_id) as wickets
+FROM delivery d
+WHERE d.innings_id = :innings_id
+```
+The displayed "overs" is computed in Python from total legal balls
+(`COUNT(*) WHERE extras_wides=0 AND extras_noballs=0`) → `f"{balls//6}.{balls%6}"`.
+
+*Batting rows:* group by `batter_id`, joined to person for the name,
+left-joined to wicket-of-the-batter for the dismissal:
+```sql
+SELECT
+    d.batter_id, d.batter,
+    SUM(d.runs_batter) as runs,
+    SUM(CASE WHEN d.extras_wides = 0 THEN 1 ELSE 0 END) as balls,
+    SUM(CASE WHEN d.runs_batter = 4 AND COALESCE(d.runs_non_boundary,0)=0 THEN 1 ELSE 0 END) as fours,
+    SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes,
+    MIN(d.id) as first_delivery_id  -- for batting order
+FROM delivery d
+WHERE d.innings_id = :innings_id
+GROUP BY d.batter_id, d.batter
+ORDER BY first_delivery_id
+```
+Then for each batter, look up the dismissal:
+```sql
+SELECT w.kind, w.fielders, dd.bowler
+FROM wicket w
+JOIN delivery dd ON dd.id = w.delivery_id
+WHERE dd.innings_id = :innings_id
+  AND w.player_out = :batter_name
+LIMIT 1
+```
+Dismissal text is constructed in Python:
+- `bowled` → "b {bowler}"
+- `caught` → "c {fielder} b {bowler}" (or "c & b {bowler}" if fielder == bowler)
+- `lbw` → "lbw b {bowler}"
+- `stumped` → "st {fielder} b {bowler}"
+- `run out` → "run out ({fielders})"
+- `caught and bowled` → "c & b {bowler}"
+- `hit wicket` → "hit wicket b {bowler}"
+- `retired hurt` / `retired out` → as-is
+- `obstructing the field` → "obstructing the field"
+- not dismissed → `"not out"`
+
+*Did not bat:* `matchplayer.player_name` for the batting team, minus
+every name that appeared as `delivery.batter` or `delivery.non_striker`
+in this innings.
+
+*Extras totals:*
+```sql
+SELECT SUM(extras_byes) b, SUM(extras_legbyes) lb,
+       SUM(extras_wides) w, SUM(extras_noballs) nb,
+       SUM(extras_penalty) p
+FROM delivery WHERE innings_id = :innings_id
+```
+
+*Fall of wickets:* one row per wicket, in delivery order, with
+running team total (computed in Python over the deliveries in order):
+```sql
+SELECT w.player_out, dd.over_number, dd.delivery_index, dd.id as delivery_id
+FROM wicket w JOIN delivery dd ON dd.id = w.delivery_id
+WHERE dd.innings_id = :innings_id
+ORDER BY dd.id
+```
+Combined with a cumulative running total over `delivery.runs_total`.
+
+*Bowling rows:* group by `bowler_id`. Wickets exclude `run out`,
+`retired hurt`, `retired out`, `obstructing the field`. Maidens
+computed via subquery grouped by `(bowler_id, over_number)` where
+`SUM(runs_batter + extras_wides + extras_noballs) = 0`:
+```sql
+SELECT
+    d.bowler_id, d.bowler,
+    SUM(CASE WHEN d.extras_wides=0 AND d.extras_noballs=0 THEN 1 ELSE 0 END) as legal_balls,
+    SUM(d.runs_total) as runs,  -- bowling runs include all deliveries
+    SUM(d.extras_wides) as wides,
+    SUM(d.extras_noballs) as noballs,
+    (SELECT COUNT(*) FROM wicket w
+     JOIN delivery dd ON dd.id = w.delivery_id
+     WHERE dd.innings_id = :innings_id
+       AND dd.bowler_id = d.bowler_id
+       AND w.kind NOT IN ('run out','retired hurt','retired out','obstructing the field')) as wickets,
+    (SELECT COUNT(*) FROM (
+        SELECT 1 FROM delivery dm
+        WHERE dm.innings_id = :innings_id AND dm.bowler_id = d.bowler_id
+        GROUP BY dm.over_number
+        HAVING SUM(dm.runs_batter + dm.extras_wides + dm.extras_noballs) = 0
+    )) as maidens,
+    MIN(d.id) as first_delivery_id
+FROM delivery d
+WHERE d.innings_id = :innings_id
+GROUP BY d.bowler_id, d.bowler
+ORDER BY first_delivery_id
+```
+Overs displayed as `f"{legal_balls//6}.{legal_balls%6}"`. Econ is
+`runs / (legal_balls/6)`.
+
+#### Decisions captured
+
+These choices were agreed up front and govern the implementation:
+
+1. **Same-page list + scorecard**, with the selected match on a URL
+   query param (`?match=1234567`) so links are shareable. No separate
+   route.
+2. **Single-player filter** (not multi-player intersection). 95% of
+   the use case is "show me Kohli's matches"; multi-player can be
+   added later if needed.
+3. **Super overs** are returned as additional `innings` entries with
+   `is_super_over: true` and a label like `"Super Over (Mumbai Indians)"`.
+4. **DLS / rain-affected matches**: `outcome_method` is shown in the
+   result line if present (e.g. "Mumbai Indians won by 12 runs (D/L)").
+   No further special-casing.
+
+---
+
 ## 4. Frontend Pages
 
 ### 4.1 Navigation
@@ -1300,6 +1564,90 @@ Filters sync to URL query params so pages are shareable/bookmarkable.
 │  date, tournament, venue, balls, runs, 4s, 6s, out   │
 └──────────────────────────────────────────────────────┘
 ```
+
+### 4.6 Page: Matches (`/matches`)
+
+A scorecard browser. Combines the global filter bar with a team picker
+and a player picker, lists matching matches, and renders a full
+Cricinfo-style scorecard for the selected match underneath.
+
+**Layout:**
+
+```
+┌──────────────────────────────────────────────────────┐
+│  [Global FilterBar]  Men/Women  Intl/Club  Tournament │
+│                       Season-from  Season-to          │
+├──────────────────────────────────────────────────────┤
+│  [Team search: e.g. "SRH"]  [Player search: "Kohli"]  │
+├──────────────────────────────────────────────────────┤
+│  Match list (paginated, 50/page)                     │
+│  ┌─────────────────────────────────────────────────┐ │
+│  │ 2024-05-26 | MI vs CSK | Wankhede | IPL Final   │ │
+│  │            | MI 187/4 (20)  CSK 184/9 (20)      │ │
+│  │            | MI won by 5 wickets                │ │
+│  └─────────────────────────────────────────────────┘ │
+│  ...                                                 │
+├──────────────────────────────────────────────────────┤
+│  [Scorecard (when ?match= is set in URL)]            │
+│                                                      │
+│  Match header                                        │
+│  ┌─────────────────────────────────────────────────┐ │
+│  │ MI vs CSK · IPL Final · Wankhede · 2024-05-26   │ │
+│  │ Toss: CSK chose to field                        │ │
+│  │ Result: Mumbai Indians won by 5 wickets          │ │
+│  │ Player of the Match: JJ Bumrah                  │ │
+│  └─────────────────────────────────────────────────┘ │
+│                                                      │
+│  CSK Innings — 184/9 (20.0)                          │
+│  ┌─────────────────────────────────────────────────┐ │
+│  │ Batter         Dismissal           R   B  4 6 SR│ │
+│  │ Gaikwad        c Rohit b Bumrah    53 38  5 2.. │ │
+│  │ ...                                              │ │
+│  │ Extras  (b 0, lb 4, w 6, nb 1)               11 │ │
+│  │ Total                              184/9 (20.0) │ │
+│  │ Did not bat: Ali, Chahar                        │ │
+│  │                                                  │ │
+│  │ Fall of wickets: 1-23 (Gaikwad, 2.4 ov), ...    │ │
+│  │                                                  │ │
+│  │ Bowler       O    M  R  W  Econ  wd nb          │ │
+│  │ Bumrah       4.0  1 18  3  4.50   0  0          │ │
+│  │ ...                                              │ │
+│  └─────────────────────────────────────────────────┘ │
+│                                                      │
+│  MI Innings — 187/4 (19.2)                           │
+│  ┌─────────────────────────────────────────────────┐ │
+│  │ ... same structure ...                          │ │
+│  └─────────────────────────────────────────────────┘ │
+│                                                      │
+│  [Super Over innings cards if applicable]            │
+└──────────────────────────────────────────────────────┘
+```
+
+**URL state:**
+- `?team=`, `?player=`, `?match=` (the selected match for the scorecard)
+- Standard global filter params
+
+**Data flow:**
+1. Filters/team/player change → `GET /api/v1/matches?...&limit=50&offset=...`
+   re-fetches the list. Pagination controls underneath.
+2. User clicks a match row → set `?match={id}` in URL.
+3. `?match=` change → `GET /api/v1/matches/{id}/scorecard` → render
+   header + N innings cards.
+
+**Components (new):**
+- `pages/Matches.tsx` — page wiring (filters, list fetch, scorecard fetch).
+- `components/Scorecard.tsx` — top-level scorecard renderer (header + N innings).
+- `components/InningsCard.tsx` — one innings: batting table, extras line,
+  total, did-not-bat, fall-of-wickets, bowling table.
+- `components/TeamSearch.tsx` — small reusable team-name search input
+  (also used elsewhere if needed).
+
+**Reuses:**
+- `FilterBar` and `useFilters` (no changes needed).
+- `PlayerSearch` for the player filter input.
+- `DataTable` for batting/bowling tables (already supports
+  sortable columns).
+- `useUrlParam` / `useSetUrlParams` for URL state.
 
 ---
 

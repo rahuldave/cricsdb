@@ -1,0 +1,195 @@
+import { useState, useEffect } from 'react'
+import { useFilters } from '../components/FilterBar'
+import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
+import { getMatches, getMatchScorecard, getTeams } from '../api'
+import PlayerSearch from '../components/PlayerSearch'
+import ScorecardView from '../components/Scorecard'
+import type { MatchListItem, Scorecard, TeamInfo } from '../types'
+
+const PAGE_SIZE = 50
+
+export default function Matches() {
+  const filters = useFilters()
+  const [team, setTeam] = useUrlParam('team')
+  const [playerId] = useUrlParam('player')
+  const [playerName] = useUrlParam('player_name')
+  const [matchId, setMatchId] = useUrlParam('match')
+  const setUrlParams = useSetUrlParams()
+
+  const [teamQuery, setTeamQuery] = useState(team || '')
+  const [teamSuggest, setTeamSuggest] = useState<TeamInfo[]>([])
+  const [showTeamDropdown, setShowTeamDropdown] = useState(false)
+
+  const [matches, setMatches] = useState<MatchListItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [offset, setOffset] = useState(0)
+
+  const [scorecard, setScorecard] = useState<Scorecard | null>(null)
+
+  // Reset pagination when filters change
+  useEffect(() => { setOffset(0) }, [
+    filters.gender, filters.team_type, filters.tournament,
+    filters.season_from, filters.season_to, team, playerId,
+  ])
+
+  // Fetch match list
+  useEffect(() => {
+    const params = {
+      ...filters,
+      team: team || undefined,
+      player_id: playerId || undefined,
+      limit: PAGE_SIZE,
+      offset,
+    }
+    getMatches(params).then(d => {
+      setMatches(d.matches)
+      setTotal(d.total)
+    }).catch(() => { setMatches([]); setTotal(0) })
+  }, [filters.gender, filters.team_type, filters.tournament,
+      filters.season_from, filters.season_to, team, playerId, offset])
+
+  // Fetch scorecard when matchId in URL changes
+  useEffect(() => {
+    if (!matchId) { setScorecard(null); return }
+    getMatchScorecard(Number(matchId))
+      .then(setScorecard)
+      .catch(() => setScorecard(null))
+  }, [matchId])
+
+  // Team autocomplete
+  useEffect(() => {
+    if (!teamQuery || teamQuery === team) { setTeamSuggest([]); return }
+    getTeams({ ...filters, q: teamQuery })
+      .then(d => { setTeamSuggest(d.teams.slice(0, 10)); setShowTeamDropdown(true) })
+      .catch(() => {})
+  }, [teamQuery, filters.gender, filters.team_type, filters.tournament])
+
+  const selectTeam = (name: string) => {
+    setTeam(name)
+    setTeamQuery(name)
+    setShowTeamDropdown(false)
+  }
+
+  const clearTeam = () => { setTeam(''); setTeamQuery(''); setTeamSuggest([]) }
+
+  const clearPlayer = () => {
+    setUrlParams({ player: '', player_name: '' })
+  }
+
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1
+
+  return (
+    <div>
+      {/* Filter row: team + player */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="relative w-64">
+          <input
+            type="text"
+            value={teamQuery}
+            onChange={e => { setTeamQuery(e.target.value); setShowTeamDropdown(true) }}
+            placeholder="Filter by team..."
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          />
+          {team && (
+            <button onClick={clearTeam}
+              className="absolute right-2 top-2 text-gray-400 hover:text-gray-700 text-sm">×</button>
+          )}
+          {showTeamDropdown && teamSuggest.length > 0 && (
+            <ul className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-y-auto">
+              {teamSuggest.map(t => (
+                <li key={t.name}
+                  className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm flex justify-between"
+                  onClick={() => selectTeam(t.name)}>
+                  <span>{t.name}</span>
+                  <span className="text-gray-400">{t.matches}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="w-64 flex items-center gap-2">
+          <PlayerSearch
+            role="batter"
+            placeholder="Filter by player..."
+            onSelect={p => setUrlParams({ player: p.id, player_name: p.name })}
+          />
+          {playerId && playerName && (
+            <button onClick={clearPlayer}
+              className="text-xs text-gray-500 hover:text-gray-800 whitespace-nowrap">
+              ×&nbsp;{playerName}
+            </button>
+          )}
+        </div>
+
+        <div className="ml-auto text-sm text-gray-600">
+          {total.toLocaleString()} matches
+        </div>
+      </div>
+
+      {/* Match list */}
+      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase text-gray-500 border-b border-gray-200 bg-gray-50">
+              <th className="px-3 py-2 font-medium">Date</th>
+              <th className="px-3 py-2 font-medium">Match</th>
+              <th className="px-3 py-2 font-medium">Tournament</th>
+              <th className="px-3 py-2 font-medium">Venue</th>
+              <th className="px-3 py-2 font-medium">Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matches.map(m => {
+              const selected = matchId === String(m.match_id)
+              return (
+                <tr key={m.match_id}
+                  onClick={() => setMatchId(String(m.match_id))}
+                  className={`border-b border-gray-100 cursor-pointer ${selected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                  <td className="px-3 py-2 whitespace-nowrap text-gray-600">{m.date || '-'}</td>
+                  <td className="px-3 py-2">
+                    <div className="font-medium text-gray-900">{m.team1} vs {m.team2}</div>
+                    <div className="text-xs text-gray-500">
+                      {m.team1_score && <>{m.team1}: {m.team1_score}</>}
+                      {m.team1_score && m.team2_score && <>  ·  </>}
+                      {m.team2_score && <>{m.team2}: {m.team2_score}</>}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-gray-600">{m.tournament || '-'}</td>
+                  <td className="px-3 py-2 text-gray-600">{m.city || m.venue || '-'}</td>
+                  <td className="px-3 py-2 text-gray-700">{m.result_text}</td>
+                </tr>
+              )
+            })}
+            {matches.length === 0 && (
+              <tr><td colSpan={5} className="px-3 py-8 text-center text-gray-400">No matches</td></tr>
+            )}
+          </tbody>
+        </table>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-3 py-2 border-t border-gray-200 bg-gray-50 text-sm">
+            <button
+              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+              disabled={offset === 0}
+              className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
+              Previous
+            </button>
+            <span className="text-gray-600">Page {currentPage} of {totalPages}</span>
+            <button
+              onClick={() => setOffset(offset + PAGE_SIZE)}
+              disabled={offset + PAGE_SIZE >= total}
+              className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Scorecard */}
+      {scorecard && <ScorecardView data={scorecard} />}
+    </div>
+  )
+}

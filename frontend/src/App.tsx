@@ -5,6 +5,7 @@ import Teams from './pages/Teams'
 import Batting from './pages/Batting'
 import Bowling from './pages/Bowling'
 import HeadToHead from './pages/HeadToHead'
+import Matches from './pages/Matches'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/batting" element={<Batting />} />
           <Route path="/bowling" element={<Bowling />} />
           <Route path="/head-to-head" element={<HeadToHead />} />
+          <Route path="/matches" element={<Matches />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -6,6 +6,7 @@ const navItems = [
   { to: '/batting', label: 'Batting' },
   { to: '/bowling', label: 'Bowling' },
   { to: '/head-to-head', label: 'Head to Head' },
+  { to: '/matches', label: 'Matches' },
 ]
 
 export default function Layout() {

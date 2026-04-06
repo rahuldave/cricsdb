@@ -5,6 +5,7 @@ import type {
   SeasonBattingStats, DismissalAnalysis, InterWicketStats,
   BowlingSummary, BowlingInnings, BatterMatchup, WicketAnalysis,
   HeadToHeadResponse,
+  MatchListItem, Scorecard,
 } from './types'
 
 async function fetchApi<T>(path: string, params?: Record<string, string | number | undefined | null>): Promise<T> {
@@ -77,6 +78,12 @@ export const getBowlerBySeason = (id: string, filters?: F) =>
   fetchApi<{ by_season: any[] }>(`/api/v1/bowlers/${id}/by-season`, filters as Record<string, string>)
 export const getBowlerWickets = (id: string, filters?: F) =>
   fetchApi<WicketAnalysis>(`/api/v1/bowlers/${id}/wickets`, filters as Record<string, string>)
+
+// Matches
+export const getMatches = (filters?: F & { team?: string; player_id?: string; limit?: number; offset?: number }) =>
+  fetchApi<{ matches: MatchListItem[]; total: number }>('/api/v1/matches', filters as Record<string, string>)
+export const getMatchScorecard = (matchId: number) =>
+  fetchApi<Scorecard>(`/api/v1/matches/${matchId}/scorecard`)
 
 // Head to Head
 export const getHeadToHead = (batterId: string, bowlerId: string, filters?: F) =>
