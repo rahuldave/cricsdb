@@ -272,7 +272,7 @@ export default function Batting() {
                       type: 'highlight',
                       field: 'bowler_id',
                       value: selectedBowlerId,
-                      color: '#dc2626',
+                      color: '#7A1F1F',
                       r: 14,
                     })
                     // Use `label` (pure SVG text via d3-annotation) rather
@@ -287,7 +287,7 @@ export default function Batting() {
                       average: selected.average,
                       label: selected.bowler_name,
                       dx: 24, dy: -28,
-                      color: '#dc2626',
+                      color: '#7A1F1F',
                     })
                   }
                   return (
