@@ -780,6 +780,49 @@ a { color: inherit; }
   font-size: 11px;
 }
 
+/* Innings + matchup grid helpers */
+.wisden-grid-cell-bottom { border-bottom: 1px solid var(--rule-soft); }
+.wisden-grid-cell-right  { border-right:  1px solid var(--rule-soft); }
+.wisden-grid-label       { color: var(--ink-faint); font-family: var(--serif); font-style: italic; font-variation-settings: "opsz" 14; }
+.wisden-grid-label-blue  { color: var(--accent); font-family: var(--serif); font-style: italic; }
+.wisden-chart-help {
+  margin-top: 0.75rem;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  font-variation-settings: "opsz" 14;
+  line-height: 1.5;
+}
+
+.wisden-matchup-grid { font-size: 10px; font-family: var(--sans); font-variant-numeric: tabular-nums; }
+.wisden-matchup-grid .corner {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--ink-faint);
+  font-size: 11px;
+  font-variation-settings: "opsz" 14;
+  text-align: left;
+  font-weight: 400;
+}
+.wisden-matchup-grid .bowler-head,
+.wisden-matchup-grid .batter-head {
+  font-family: var(--serif);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 500;
+  font-variation-settings: "opsz" 14;
+}
+.wisden-matchup-grid .matchup-cell-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0 4px;
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+.wisden-matchup-grid a.matchup-cell-link:hover { color: var(--accent); }
+
 /* Tabs — text-only with oxblood underline on active */
 .wisden-tabs {
   display: flex;

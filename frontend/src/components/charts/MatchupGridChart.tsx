@@ -64,17 +64,18 @@ function buildMatrix(
   return matrix
 }
 
-// Light heatmap: subtle green for high SR, light red for wickets.
+// Heatmap tints harmonized with the Wisden palette: oxblood-tinted
+// for wickets, ochre-tinted for high strike rate. Empty cells fade to
+// the soft cream so they recede behind active cells.
 function cellBg(cell: Cell): string | undefined {
-  if (cell.balls === 0) return '#fafafa'
-  if (cell.wickets > 0) return '#fee2e2' // red-100 — bowler dominated
-  // SR-based green for cells with at least 4 balls
+  if (cell.balls === 0) return 'var(--bg-soft)'
+  if (cell.wickets > 0) return '#E8C8C8' // oxblood-tinted
   if (cell.balls >= 4) {
     const sr = (cell.runs / cell.balls) * 100
-    if (sr >= 200) return '#bbf7d0'
-    if (sr >= 150) return '#dcfce7'
+    if (sr >= 200) return '#E8D4A8' // strong ochre
+    if (sr >= 150) return '#F0E2BE' // light ochre
   }
-  return '#ffffff'
+  return 'var(--bg)'
 }
 
 export default function MatchupGridChart({ innings, linkParams = '', highlightBatterId, highlightBowlerId }: Props) {
@@ -102,34 +103,31 @@ export default function MatchupGridChart({ innings, linkParams = '', highlightBa
   }
 
   return (
-    <div className="bg-white rounded-lg border shadow-sm p-4">
-      <div className="flex items-baseline justify-between mb-3">
-        <h3 className="font-semibold text-gray-900">
-          {innings.team} — matchup grid
-        </h3>
-        <div className="text-xs text-gray-500">
-          batters × bowlers · click any cell for the head-to-head
-        </div>
+    <div>
+      <div className="section-head">
+        <span className="section-label">{innings.team} — matchup grid</span>
+        <span className="wisden-chart-sub">batters × bowlers · click any cell for the head-to-head</span>
       </div>
+      <div className="rule" />
 
       <div className="overflow-x-auto">
         <table
-          className="text-[10px] tabular-nums"
+          className="wisden-matchup-grid"
           style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '100%' }}
         >
           <thead>
             <tr>
               <th
-                className="text-left font-medium text-gray-500 align-bottom"
+                className="corner"
                 style={{
                   position: 'sticky',
                   left: 0,
-                  background: '#fff',
+                  background: 'var(--bg)',
                   minWidth: '7rem',
                   paddingRight: '0.5rem',
                   paddingBottom: '0.25rem',
-                  borderBottom: '1px solid #e5e7eb',
-                  borderRight: '2px solid #d1d5db',
+                  borderBottom: '1px solid var(--rule)',
+                  borderRight: '1px solid var(--rule)',
                   zIndex: 1,
                 }}
               >
@@ -138,14 +136,14 @@ export default function MatchupGridChart({ innings, linkParams = '', highlightBa
               {innings.bowlers.map((b, j) => (
                 <th
                   key={j}
-                  className="font-medium text-gray-700"
+                  className="bowler-head"
                   style={{
                     width: '3.5rem',
                     height: '4rem',
                     minWidth: '3.5rem',
                     verticalAlign: 'bottom',
                     paddingBottom: '0.25rem',
-                    borderBottom: '1px solid #e5e7eb',
+                    borderBottom: '1px solid var(--rule)',
                     position: 'relative',
                   }}
                   title={b}
@@ -171,16 +169,16 @@ export default function MatchupGridChart({ innings, linkParams = '', highlightBa
             {innings.batters.map((batter, i) => (
               <tr key={i}>
                 <th
-                  className="text-left font-medium text-gray-700"
+                  className="batter-head"
                   style={{
                     position: 'sticky',
                     left: 0,
-                    background: '#fff',
+                    background: 'var(--bg)',
                     paddingRight: '0.5rem',
                     paddingTop: '0.25rem',
                     paddingBottom: '0.25rem',
-                    borderRight: '2px solid #d1d5db',
-                    borderBottom: '1px solid #f3f4f6',
+                    borderRight: '1px solid var(--rule)',
+                    borderBottom: '1px solid var(--rule-soft)',
                     minWidth: '7rem',
                     whiteSpace: 'nowrap',
                   }}
@@ -194,13 +192,13 @@ export default function MatchupGridChart({ innings, linkParams = '', highlightBa
                     ? h2hHref(innings.batter_ids[i], innings.bowler_ids[j])
                     : null
                   const content = cell.balls === 0
-                    ? <span className="text-gray-300">·</span>
+                    ? <span style={{ color: 'var(--ink-faint)', opacity: 0.4 }}>·</span>
                     : (
                         <span>
-                          <span className="font-semibold text-gray-900">{cell.runs}</span>
-                          <span className="text-gray-500">({cell.balls})</span>
+                          <span style={{ color: 'var(--ink)', fontWeight: 600 }}>{cell.runs}</span>
+                          <span style={{ color: 'var(--ink-faint)' }}>({cell.balls})</span>
                           {cell.wickets > 0 && (
-                            <sup className="text-red-600 font-bold ml-0.5">
+                            <sup style={{ color: 'var(--accent)', fontWeight: 700, marginLeft: 1 }}>
                               {cell.wickets}w
                             </sup>
                           )}
@@ -216,8 +214,8 @@ export default function MatchupGridChart({ innings, linkParams = '', highlightBa
                         textAlign: 'center',
                         verticalAlign: 'middle',
                         height: '1.5rem',
-                        borderRight: '1px solid #f3f4f6',
-                        borderBottom: '1px solid #f3f4f6',
+                        borderRight: '1px solid var(--rule-soft)',
+                        borderBottom: '1px solid var(--rule-soft)',
                         boxShadow: isHL ? 'inset 0 0 0 2px var(--accent)' : undefined,
                       }}
                       title={
@@ -227,11 +225,11 @@ export default function MatchupGridChart({ innings, linkParams = '', highlightBa
                       }
                     >
                       {href ? (
-                        <Link to={href} className="block w-full h-full px-1 text-gray-700 hover:text-blue-600 hover:underline">
+                        <Link to={href} className="matchup-cell-link">
                           {content}
                         </Link>
                       ) : (
-                        <span className="block w-full h-full px-1">{content}</span>
+                        <span className="matchup-cell-link">{content}</span>
                       )}
                     </td>
                   )
@@ -242,8 +240,8 @@ export default function MatchupGridChart({ innings, linkParams = '', highlightBa
         </table>
       </div>
 
-      <div className="mt-3 text-xs text-gray-500">
-        Each cell shows <span className="font-semibold text-gray-900">runs</span><span className="text-gray-500">(balls)</span><sup className="text-red-600 font-bold">w</sup> for that batter vs that bowler in this innings. Cells with at least 4 balls and SR ≥ 150 are tinted green; cells with a wicket are tinted red. Click any cell to view the full career head-to-head.
+      <div className="wisden-chart-help">
+        Each cell shows <span style={{ color: 'var(--ink)', fontWeight: 600 }}>runs</span><span style={{ color: 'var(--ink-faint)' }}>(balls)</span><sup style={{ color: 'var(--accent)' }}>w</sup> for that batter vs that bowler. Cells with SR ≥ 150 are tinted ochre; cells with a wicket are tinted oxblood. Click any cell for the full career head-to-head.
       </div>
     </div>
   )

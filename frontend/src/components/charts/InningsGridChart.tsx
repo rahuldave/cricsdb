@@ -224,18 +224,17 @@ export default function InningsGridChart({ innings }: Props) {
   const SUMMARY_H = '0.875rem'
 
   return (
-    <div className="bg-white rounded-lg border shadow-sm p-4">
-      <div className="flex items-baseline justify-between mb-2">
-        <h3 className="font-semibold text-gray-900">
-          {innings.team} — innings grid
-        </h3>
-        <div className="text-sm text-gray-600 tabular-nums">
+    <div>
+      <div className="section-head">
+        <span className="section-label">{innings.team} — innings grid</span>
+        <span className="wisden-chart-sub num">
           {innings.total_runs}/{innings.total_wickets} · {innings.total_balls} balls
-        </div>
+        </span>
       </div>
+      <div className="rule" />
 
       {/* Color legend */}
-      <div className="flex flex-wrap gap-3 text-[10px] text-gray-600 mb-3">
+      <div className="flex flex-wrap gap-3 text-[10px] mb-3" style={{ color: 'var(--ink-faint)', fontFamily: 'var(--sans)' }}>
         <Legend color={COLOR_AT_CREASE} label="at crease (not facing)" />
         <Legend color={COLOR_OFFBAT(0)} label="dot" />
         <Legend color={COLOR_OFFBAT(1)} label="1" />
@@ -247,8 +246,8 @@ export default function InningsGridChart({ innings }: Props) {
         <Legend color={COLOR_WIDE} label="wide" />
         <Legend color={COLOR_NOBALL} label="no-ball" />
         <Legend color={COLOR_WICKET} label="wicket" />
-        <span className="text-gray-500">
-          (small <span className="font-bold text-orange-600">n</span> on a green
+        <span style={{ color: 'var(--ink-faint)' }}>
+          (small <span style={{ color: '#C9871F', fontWeight: 700 }}>n</span> on a green
           cell = no-ball with off-bat runs)
         </span>
       </div>
@@ -267,9 +266,9 @@ export default function InningsGridChart({ innings }: Props) {
                   height: headerHeight,
                   position: 'relative',
                   // Subtle vertical separator between batter columns
-                  borderRight: i === N - 1 ? '2px solid #d1d5db' : undefined,
+                  borderRight: i === N - 1 ? '1px solid var(--rule)' : undefined,
                 }}
-                className="border-b border-gray-200"
+                className="wisden-grid-cell-bottom"
               >
                 <div
                   style={{
@@ -280,7 +279,9 @@ export default function InningsGridChart({ innings }: Props) {
                     transform: 'rotate(-60deg)',
                     whiteSpace: 'nowrap',
                     fontSize: '0.625rem',
-                    color: '#374151',
+                    color: 'var(--ink-soft)',
+                    fontFamily: 'var(--serif)',
+                    fontStyle: 'italic',
                   }}
                   title={name}
                 >
@@ -290,22 +291,22 @@ export default function InningsGridChart({ innings }: Props) {
             ))}
             {/* histogram column header */}
             <div
-              style={{ width: HIST_W, borderRight: '2px solid #d1d5db' }}
-              className="text-[9px] text-gray-400 self-end border-b border-gray-200 px-1 pb-1 text-right"
+              style={{ width: HIST_W, borderRight: '1px solid var(--rule)' }}
+              className="text-[9px] wisden-grid-label self-end wisden-grid-cell-bottom px-1 pb-1 text-right"
             >
               runs
             </div>
             {/* score column header */}
             <div
-              style={{ width: SCORE_W, borderRight: '2px solid #d1d5db' }}
-              className="text-[9px] text-gray-400 self-end border-b border-gray-200 pl-2 pb-1"
+              style={{ width: SCORE_W, borderRight: '1px solid var(--rule)' }}
+              className="text-[9px] wisden-grid-label self-end wisden-grid-cell-bottom pl-2 pb-1"
             >
               score
             </div>
             {/* wicket text header — hidden on small viewports */}
             <div
               style={{ width: WKT_W }}
-              className="text-[9px] text-gray-400 self-end border-b border-gray-200 pl-2 pb-1 hidden md:block"
+              className="text-[9px] wisden-grid-label self-end wisden-grid-cell-bottom pl-2 pb-1 hidden md:block"
             >
               wicket
             </div>
@@ -332,7 +333,7 @@ export default function InningsGridChart({ innings }: Props) {
                   className="flex items-center"
                   style={{
                     height: CELL,
-                    borderTop: newOver ? '1px solid #d1d5db' : '1px solid #f9fafb',
+                    borderTop: newOver ? '1px solid var(--rule-soft)' : '1px solid transparent',
                   }}
                 >
                   <div
@@ -369,9 +370,9 @@ export default function InningsGridChart({ innings }: Props) {
                             width: CELL,
                             height: CELL,
                             backgroundColor: atCrease ? slotColor(b) : undefined,
-                            borderRight: isLastBatter ? '2px solid #d1d5db' : undefined,
+                            borderRight: isLastBatter ? '1px solid var(--rule)' : undefined,
                           }}
-                          className={isLastBatter ? '' : 'border-r border-gray-100'}
+                          className={isLastBatter ? '' : 'wisden-grid-cell-right'}
                         />
                       )
                     }
@@ -385,9 +386,9 @@ export default function InningsGridChart({ innings }: Props) {
                           backgroundColor: cellData.bg,
                           color: cellData.color,
                           position: 'relative',
-                          borderRight: isLastBatter ? '2px solid #d1d5db' : undefined,
+                          borderRight: isLastBatter ? '1px solid var(--rule)' : undefined,
                         }}
-                        className={`${isLastBatter ? '' : 'border-r border-gray-100'} flex items-center justify-center text-[9px] font-semibold`}
+                        className={`${isLastBatter ? '' : 'wisden-grid-cell-right'} flex items-center justify-center text-[9px] font-semibold`}
                         title={`${d.over_ball}  ${d.bowler} to ${d.batter}: ${
                           d.wicket_text ? `OUT — ${d.wicket_text}` :
                           d.runs_total === 0 ? 'dot' :
@@ -415,7 +416,7 @@ export default function InningsGridChart({ innings }: Props) {
                   })}
                   {/* per-ball runs histogram with breakdown coloring */}
                   <div
-                    style={{ width: HIST_W, display: 'flex', alignItems: 'center', borderRight: '2px solid #d1d5db', height: CELL }}
+                    style={{ width: HIST_W, display: 'flex', alignItems: 'center', borderRight: '1px solid var(--rule)', height: CELL }}
                     className="pl-1"
                   >
                     {Array.from({ length: HIST_CELLS }).map((_, k) => {
@@ -451,7 +452,7 @@ export default function InningsGridChart({ innings }: Props) {
                     })}
                   </div>
                   <div
-                    style={{ width: SCORE_W, borderRight: '2px solid #d1d5db', height: CELL }}
+                    style={{ width: SCORE_W, borderRight: '1px solid var(--rule)', height: CELL }}
                     className="text-[10px] tabular-nums pl-2 text-gray-600 flex items-center"
                   >
                     {d.cumulative_runs}/{d.cumulative_wickets}
@@ -513,7 +514,7 @@ export default function InningsGridChart({ innings }: Props) {
         </div>
       </div>
 
-      <div className="mt-3 text-xs text-gray-500">
+      <div className="wisden-chart-help">
         Each row is one delivery. The colored cell sits in the on-strike batter's
         column (or the dismissed batter's column for a wicket — including
         non-striker run-outs). The histogram to the right decomposes the ball's
@@ -545,7 +546,7 @@ function SummaryRow({
   height: string
   accent: 'gray' | 'blue'
 }) {
-  const labelClass = accent === 'blue' ? 'text-blue-700' : 'text-gray-500'
+  const labelClass = accent === 'blue' ? 'wisden-grid-label-blue' : 'wisden-grid-label'
   const borderTop = accent === 'blue' ? '1px solid #bfdbfe' : '1px solid #e5e7eb'
   return (
     <div
@@ -572,21 +573,21 @@ function SummaryRow({
               width: CELL,
               height,
               backgroundColor: atCrease ? slotColor(b) : undefined,
-              borderRight: isLastBatter ? '2px solid #d1d5db' : undefined,
+              borderRight: isLastBatter ? '1px solid var(--rule)' : undefined,
             }}
-            className={isLastBatter ? '' : 'border-r border-gray-100'}
+            className={isLastBatter ? '' : 'wisden-grid-cell-right'}
           />
         )
       })}
       {/* histogram column: empty but bordered */}
       <div
-        style={{ width: HIST_W, borderRight: '2px solid #d1d5db', height }}
+        style={{ width: HIST_W, borderRight: '1px solid var(--rule)', height }}
         className={`text-[9px] italic pl-1 flex items-center truncate ${labelClass}`}
       >
         {detail}
       </div>
       <div
-        style={{ width: SCORE_W, borderRight: '2px solid #d1d5db', height }}
+        style={{ width: SCORE_W, borderRight: '1px solid var(--rule)', height }}
         className="text-[9px] tabular-nums pl-2 text-gray-700 font-semibold flex items-center"
       >
         {score}
