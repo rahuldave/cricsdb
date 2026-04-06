@@ -60,6 +60,7 @@ common edits:
 | Add a new page | `frontend/src/pages/Foo.tsx`, route in `frontend/src/App.tsx`, nav link in `frontend/src/components/Layout.tsx` |
 | Add an API client function | `frontend/src/api.ts` and corresponding types in `frontend/src/types.ts` |
 | Change URL state on a page | Use `useUrlParam` / `useSetUrlParams` from `frontend/src/hooks/useUrlState.ts` (see `design-decisions.md` for the race-condition reason) |
+| Fetch data with proper loading/error UI | Use `useFetch` from `frontend/src/hooks/useFetch.ts` plus `Spinner` and `ErrorBanner` components — see `data-fetching.md` for the full pattern |
 
 ## Verifying changes before committing
 

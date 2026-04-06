@@ -118,7 +118,7 @@ Read `docs/design-decisions.md` for full details. Key points:
 The list below is roughly ordered by value/effort. Pick the highest one
 that fits the available time.
 
-**A. Loading + error states across all pages.** _Done._ Primitives at `frontend/src/hooks/useFetch.ts`, `components/Spinner.tsx`, `components/ErrorBanner.tsx`. Rolled out to Home, Matches list, MatchScorecard, Teams, Batting, Bowling, Head to Head, PlayerSearch dropdown, FilterBar dropdowns. Pattern: page-level spinner+banner around the fetch that drives the page header, per-tab spinners+banners inside tab bodies, gated `useFetch` (returns `Promise.resolve(null)` when its tab isn't active) so tab fetches only run when visible.
+**A. Loading + error states across all pages.** _Done._ See `docs/data-fetching.md` for the full pattern (useFetch hook, Spinner, ErrorBanner, gated fetches, per-tab `<TabState>` helper, when NOT to use useFetch, where loading/error sit relative to data). Rolled out to Home, Matches list, MatchScorecard, Teams, Batting, Bowling, Head to Head, PlayerSearch dropdown, FilterBar dropdowns.
 
 **B. Mechanically-generated ball-by-ball commentary tab on the scorecard page.** Cricsheet does NOT ship natural-language commentary like Cricinfo's editorial feed — what we have is structured ball data. So this would render each delivery as a feed line: `19.6 — Bumrah to Kohli — 4 runs (FOUR)` or `19.4 — Bumrah to Sharma — OUT! caught Rohit b Bumrah`. Useful and conventional, but be honest with users that it's generated from data, not a writer's prose.
 
