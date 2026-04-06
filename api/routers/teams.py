@@ -214,6 +214,31 @@ async def team_vs_opponent(
     }
 
 
+@router.get("/{team}/opponents")
+async def team_opponents(
+    team: str,
+    filters: FilterParams = Depends(),
+):
+    """Return opponents the team has actually played (non-zero matches), respecting filters."""
+    db = get_db()
+    filt, params = _team_filter_clause(filters)
+    params["team"] = team
+
+    rows = await db.q(
+        f"""
+        SELECT
+            CASE WHEN m.team1 = :team THEN m.team2 ELSE m.team1 END as name,
+            COUNT(*) as matches
+        FROM match m
+        WHERE {filt}
+        GROUP BY name
+        ORDER BY matches DESC, name
+        """,
+        params,
+    )
+    return {"opponents": rows}
+
+
 @router.get("/{team}/by-season")
 async def team_by_season(
     team: str,

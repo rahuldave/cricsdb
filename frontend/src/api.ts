@@ -38,6 +38,8 @@ export const getTeamResults = (team: string, filters?: F & { limit?: number; off
   fetchApi<{ results: TeamResult[]; total: number }>(`/api/v1/teams/${encodeURIComponent(team)}/results`, filters as Record<string, string>)
 export const getTeamVs = (team: string, opponent: string, filters?: F) =>
   fetchApi<TeamVsOpponent>(`/api/v1/teams/${encodeURIComponent(team)}/vs/${encodeURIComponent(opponent)}`, filters as Record<string, string>)
+export const getTeamOpponents = (team: string, filters?: F) =>
+  fetchApi<{ opponents: { name: string; matches: number }[] }>(`/api/v1/teams/${encodeURIComponent(team)}/opponents`, filters as Record<string, string>)
 export const getTeamByseason = (team: string, filters?: F) =>
   fetchApi<{ seasons: TeamSeasonRecord[] }>(`/api/v1/teams/${encodeURIComponent(team)}/by-season`, filters as Record<string, string>)
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getTournaments, getSeasons } from '../api'
+import { useSetUrlParams } from '../hooks/useUrlState'
 import type { FilterParams, Tournament } from '../types'
 
 export function useFilters(): FilterParams {
@@ -15,7 +16,8 @@ export function useFilters(): FilterParams {
 }
 
 export default function FilterBar() {
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
+  const setUrlParams = useSetUrlParams()
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [seasons, setSeasons] = useState<string[]>([])
 
@@ -25,15 +27,42 @@ export default function FilterBar() {
   }, [])
 
   const set = (key: string, value: string) => {
-    const next = new URLSearchParams(params)
-    if (value) next.set(key, value)
-    else next.delete(key)
-    setParams(next, { replace: true })
+    setUrlParams({ [key]: value })
   }
 
   const gender = params.get('gender') || ''
   const teamType = params.get('team_type') || ''
   const tournament = params.get('tournament') || ''
+
+  const setGender = (v: string) => {
+    const updates: Record<string, string> = { gender: v }
+    if (tournament) {
+      const t = tournaments.find(x => x.event_name === tournament)
+      if (t && v && t.gender !== v) updates.tournament = ''
+    }
+    setUrlParams(updates)
+  }
+
+  const setTeamType = (v: string) => {
+    const updates: Record<string, string> = { team_type: v }
+    if (tournament) {
+      const t = tournaments.find(x => x.event_name === tournament)
+      if (t && v && t.team_type !== v) updates.tournament = ''
+    }
+    setUrlParams(updates)
+  }
+
+  const setTournament = (v: string) => {
+    const updates: Record<string, string> = { tournament: v }
+    if (v) {
+      const t = tournaments.find(x => x.event_name === v)
+      if (t) {
+        updates.gender = t.gender
+        updates.team_type = t.team_type
+      }
+    }
+    setUrlParams(updates)
+  }
   const seasonFrom = params.get('season_from') || ''
   const seasonTo = params.get('season_to') || ''
 
@@ -48,7 +77,7 @@ export default function FilterBar() {
       {/* Gender */}
       <div className="flex rounded-md border border-gray-300 overflow-hidden">
         {['', 'male', 'female'].map(v => (
-          <button key={v} onClick={() => set('gender', v)}
+          <button key={v} onClick={() => setGender(v)}
             className={`px-3 py-1 ${gender === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
           >{v === '' ? 'All' : v === 'male' ? 'Men' : 'Women'}</button>
         ))}
@@ -57,14 +86,14 @@ export default function FilterBar() {
       {/* Team Type */}
       <div className="flex rounded-md border border-gray-300 overflow-hidden">
         {['', 'international', 'club'].map(v => (
-          <button key={v} onClick={() => set('team_type', v)}
+          <button key={v} onClick={() => setTeamType(v)}
             className={`px-3 py-1 ${teamType === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
           >{v === '' ? 'All' : v === 'international' ? 'Intl' : 'Club'}</button>
         ))}
       </div>
 
       {/* Tournament */}
-      <select value={tournament} onChange={e => set('tournament', e.target.value)}
+      <select value={tournament} onChange={e => setTournament(e.target.value)}
         className="rounded-md border border-gray-300 px-2 py-1 bg-white text-gray-700">
         <option value="">All Tournaments</option>
         {filteredTournaments.map(t => (

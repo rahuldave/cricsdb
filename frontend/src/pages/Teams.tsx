@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam } from '../hooks/useUrlState'
-import { getTeams, getTeamSummary, getTeamByseason, getTeamVs, getTeamResults } from '../api'
+import { getTeams, getTeamSummary, getTeamByseason, getTeamVs, getTeamResults, getTeamOpponents } from '../api'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
@@ -16,7 +16,7 @@ export default function Teams() {
   const [opponent, setOpponent] = useUrlParam('vs')
 
   const [teams, setTeams] = useState<TeamInfo[]>([])
-  const [allTeams, setAllTeams] = useState<TeamInfo[]>([])
+  const [opponents, setOpponents] = useState<{ name: string; matches: number }[]>([])
   const [query, setQuery] = useState(selected || '')
   const [showDropdown, setShowDropdown] = useState(false)
   const [summary, setSummary] = useState<TeamSummary | null>(null)
@@ -32,8 +32,9 @@ export default function Teams() {
   }, [filters.gender, filters.team_type, filters.tournament, query, selected])
 
   useEffect(() => {
-    getTeams(filters).then(d => setAllTeams(d.teams)).catch(() => {})
-  }, [filters.gender, filters.team_type, filters.tournament])
+    if (!selected) { setOpponents([]); return }
+    getTeamOpponents(selected, filters).then(d => setOpponents(d.opponents)).catch(() => {})
+  }, [selected, filters.gender, filters.team_type, filters.tournament, filters.season_from, filters.season_to])
 
   useEffect(() => {
     if (!selected) { setSummary(null); return }
@@ -121,8 +122,8 @@ export default function Teams() {
                   <select value={opponent} onChange={e => setOpponent(e.target.value)}
                     className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white">
                     <option value="">Select opponent...</option>
-                    {allTeams.filter(t => t.name !== selected).map(t => (
-                      <option key={t.name} value={t.name}>{t.name}</option>
+                    {opponents.map(t => (
+                      <option key={t.name} value={t.name}>{t.name} ({t.matches})</option>
                     ))}
                   </select>
                 </div>
