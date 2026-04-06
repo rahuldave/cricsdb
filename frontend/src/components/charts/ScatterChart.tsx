@@ -1,4 +1,5 @@
 import { Scatterplot } from 'semiotic'
+import { useContainerWidth } from '../../hooks/useContainerWidth'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface ScatterChartProps<T extends Record<string, any>> {
@@ -8,6 +9,7 @@ interface ScatterChartProps<T extends Record<string, any>> {
   sizeBy?: string | ((d: T) => number)
   colorBy?: string
   title?: string
+  /** When omitted, the chart fills its container via ResizeObserver. */
   width?: number
   height?: number
   xLabel?: string
@@ -25,26 +27,33 @@ interface ScatterChartProps<T extends Record<string, any>> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function ScatterChart<T extends Record<string, any>>({
   data, xAccessor = 'x', yAccessor = 'y', sizeBy, colorBy, title,
-  width = 500, height = 400, xLabel, yLabel,
+  width, height = 400, xLabel, yLabel,
   tooltip, annotations, pointIdAccessor,
 }: ScatterChartProps<T>) {
+  const [ref, measuredWidth] = useContainerWidth()
+  const effectiveWidth = width ?? measuredWidth
+
   return (
-    <Scatterplot
-      data={data}
-      xAccessor={xAccessor}
-      yAccessor={yAccessor}
-      sizeBy={sizeBy}
-      colorBy={colorBy}
-      title={title}
-      width={width}
-      height={height}
-      xLabel={xLabel}
-      yLabel={yLabel}
-      tooltip={tooltip}
-      annotations={annotations}
-      pointIdAccessor={pointIdAccessor}
-      enableHover
-      showGrid
-    />
+    <div ref={ref} className="w-full">
+      {effectiveWidth > 0 && (
+        <Scatterplot
+          data={data}
+          xAccessor={xAccessor}
+          yAccessor={yAccessor}
+          sizeBy={sizeBy}
+          colorBy={colorBy}
+          title={title}
+          width={effectiveWidth}
+          height={height}
+          xLabel={xLabel}
+          yLabel={yLabel}
+          tooltip={tooltip}
+          annotations={annotations}
+          pointIdAccessor={pointIdAccessor}
+          enableHover
+          showGrid
+        />
+      )}
+    </div>
   )
 }

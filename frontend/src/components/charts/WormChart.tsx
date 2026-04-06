@@ -3,6 +3,7 @@ import type { ScorecardInnings } from '../../types'
 
 interface Props {
   innings: ScorecardInnings[]
+  /** When omitted, the inner LineChart fills its container. */
   width?: number
   height?: number
 }
@@ -15,7 +16,7 @@ interface Props {
  * so wickets-fell summary lines are rendered beneath the chart
  * instead. See CLAUDE.md "Future Enhancements" item G.
  */
-export default function WormChart({ innings, width = 480, height = 280 }: Props) {
+export default function WormChart({ innings, width, height = 280 }: Props) {
   // Filter out super-over innings — they don't fit on the same axes.
   const main = innings.filter(i => !i.is_super_over)
   if (main.length === 0) return null

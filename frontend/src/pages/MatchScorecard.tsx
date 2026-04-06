@@ -34,10 +34,10 @@ export default function MatchScorecard() {
       {data && !loading && (
         <ScorecardView data={data}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            <div className="bg-white rounded-lg border shadow-sm p-4 overflow-x-auto">
+            <div className="bg-white rounded-lg border shadow-sm p-4">
               <WormChart innings={data.innings} />
             </div>
-            <div className="bg-white rounded-lg border shadow-sm p-4 overflow-x-auto">
+            <div className="bg-white rounded-lg border shadow-sm p-4">
               <ManhattanChart innings={data.innings} />
             </div>
           </div>

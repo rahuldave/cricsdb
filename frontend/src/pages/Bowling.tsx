@@ -155,7 +155,7 @@ export default function Bowling() {
           </div>
 
           <div className="border-b border-gray-200 mb-4">
-            <div className="flex gap-1 overflow-x-auto">
+            <div className="flex gap-1">
               {tabs.map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)}
                   className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 ${activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
@@ -164,19 +164,19 @@ export default function Bowling() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto">
+          <div className="bg-white rounded-lg border p-6 shadow-sm">
             {activeTab === 'By Season' && (
               <>
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
                 {!seasonFetch.loading && !seasonFetch.error && seasonData.length > 0 && (
-                  <div className="flex gap-6 flex-wrap">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <BarChart data={seasonData} categoryAccessor="season" valueAccessor={(d: Record<string, any>) => (d.wickets as number) ?? (d.dismissals as number) ?? 0}
                       title="Wickets by Season" categoryLabel="Season" valueLabel="Wickets"
-                      width={600} height={350} colorScheme={['#ef4444']} />
+                      height={350} colorScheme={['#ef4444']} />
                     <BarChart data={seasonData.filter(s => s.strike_rate != null)}
                       categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
                       title="Bowling Strike Rate by Season" categoryLabel="Season" valueLabel="SR"
-                      width={600} height={350} colorScheme={['#f59e0b']} />
+                      height={350} colorScheme={['#f59e0b']} />
                   </div>
                 )}
               </>
@@ -195,7 +195,7 @@ export default function Bowling() {
                     valueAccessor={(d: Record<string, any>) => (d.economy as number) ?? 0}
                     title="Economy by Over" categoryLabel="Over" valueLabel="Economy"
                     colorBy="phase" colorScheme={['#3b82f6', '#22c55e', '#ef4444']}
-                    width={700} height={350} />
+                    height={350} />
                 )}
               </>
             )}
@@ -276,7 +276,7 @@ export default function Bowling() {
                         yAccessor="strike_rate"
                         sizeBy="balls"
                         title="Economy vs SR (dot size = balls bowled)"
-                        xLabel="Economy" yLabel="Strike Rate" width={600} height={400}
+                        xLabel="Economy" yLabel="Strike Rate" height={400}
                         tooltip={{
                           title: 'batter_name',
                           fields: ['balls', 'runs_conceded', 'wickets', 'economy', 'strike_rate'],
@@ -303,7 +303,7 @@ export default function Bowling() {
               <>
                 <TabState fetch={wicketsFetch as FetchState<unknown>} />
                 {!wicketsFetch.loading && !wicketsFetch.error && wicketData && (
-                  <div className="flex gap-6 flex-wrap">
+                  <div className="grid grid-cols-1 lg:grid-cols-[350px_minmax(0,1fr)] gap-6 items-start">
                     <DonutChart
                       data={Object.entries(wicketData.by_kind).map(([label, value]) => ({ label, value }))}
                       categoryAccessor="label" valueAccessor="value"
@@ -312,7 +312,7 @@ export default function Bowling() {
                       data={Object.entries(wicketData.by_phase).map(([phase, wkts]) => ({ phase, wickets: wkts }))}
                       categoryAccessor="phase" valueAccessor="wickets"
                       title="Wickets by Phase" categoryLabel="Phase" valueLabel="Wickets"
-                      width={400} height={300} colorScheme={['#f59e0b']} />
+                      height={300} colorScheme={['#f59e0b']} />
                   </div>
                 )}
               </>

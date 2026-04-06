@@ -89,16 +89,16 @@ export default function HeadToHead() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto">
+            <div className="bg-white rounded-lg border p-6 shadow-sm">
               {data.by_phase.length > 0 && (
                 <BarChart
                   data={data.by_phase}
                   categoryAccessor="phase" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
                   title="Strike Rate by Phase" categoryLabel="Phase" valueLabel="SR"
-                  width={400} height={280} colorScheme={['#3b82f6', '#22c55e', '#ef4444']} />
+                  height={280} colorScheme={['#3b82f6', '#22c55e', '#ef4444']} />
               )}
             </div>
-            <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto">
+            <div className="bg-white rounded-lg border p-6 shadow-sm">
               {Object.keys(data.dismissal_kinds).length > 0 && (
                 <DonutChart
                   data={Object.entries(data.dismissal_kinds).map(([label, value]) => ({ label, value }))}
@@ -109,27 +109,27 @@ export default function HeadToHead() {
           </div>
 
           {data.by_season.length > 0 && (
-            <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto mb-6">
+            <div className="bg-white rounded-lg border p-6 shadow-sm mb-6">
               <BarChart
                 data={data.by_season.filter(s => s.strike_rate != null)}
                 categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
                 title="Strike Rate by Season" categoryLabel="Season" valueLabel="SR"
-                width={700} height={300} colorScheme={['#6366f1']} />
+                height={300} colorScheme={['#6366f1']} />
             </div>
           )}
 
           {data.by_over.length > 0 && (
-            <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto mb-6">
+            <div className="bg-white rounded-lg border p-6 shadow-sm mb-6">
               <BarChart
                 data={data.by_over.filter(o => o.balls > 0).map(o => ({ ...o, over: `${o.over_number}` }))}
                 categoryAccessor="over"
                 valueAccessor="runs"
                 title="Runs by Over" categoryLabel="Over" valueLabel="Runs"
-                width={700} height={300} colorScheme={['#8b5cf6']} />
+                height={300} colorScheme={['#8b5cf6']} />
             </div>
           )}
 
-          <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto">
+          <div className="bg-white rounded-lg border p-6 shadow-sm">
             <h3 className="text-sm font-medium text-gray-600 mb-4">Match by Match</h3>
             <DataTable columns={matchColumns} data={data.by_match} />
           </div>

@@ -167,7 +167,7 @@ export default function Batting() {
           </div>
 
           <div className="border-b border-gray-200 mb-4">
-            <div className="flex gap-1 overflow-x-auto">
+            <div className="flex gap-1">
               {tabs.map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)}
                   className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 ${activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
@@ -176,19 +176,19 @@ export default function Batting() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto">
+          <div className="bg-white rounded-lg border p-6 shadow-sm">
             {activeTab === 'By Season' && (
               <>
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
                 {!seasonFetch.loading && !seasonFetch.error && seasonData.length > 0 && (
-                  <div className="flex gap-6 flex-wrap">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <BarChart data={seasonData} categoryAccessor="season" valueAccessor="runs"
                       title="Runs by Season" categoryLabel="Season" valueLabel="Runs"
-                      width={600} height={350} colorScheme={['#3b82f6']} />
+                      height={350} colorScheme={['#3b82f6']} />
                     <BarChart data={seasonData.filter(s => s.strike_rate != null)}
                       categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
                       title="Strike Rate by Season" categoryLabel="Season" valueLabel="Strike Rate"
-                      width={600} height={350} colorScheme={['#10b981']} />
+                      height={350} colorScheme={['#10b981']} />
                   </div>
                 )}
               </>
@@ -206,7 +206,7 @@ export default function Batting() {
                     categoryAccessor="over" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
                     title="Strike Rate by Over" categoryLabel="Over" valueLabel="Strike Rate"
                     colorBy="phase" colorScheme={['#3b82f6', '#22c55e', '#ef4444']}
-                    width={700} height={350} />
+                    height={350} />
                 )}
               </>
             )}
@@ -300,7 +300,7 @@ export default function Batting() {
                         yAccessor="average"
                         sizeBy="balls"
                         title="SR vs Average (dot size = balls faced)"
-                        xLabel="Strike Rate" yLabel="Average" width={600} height={400}
+                        xLabel="Strike Rate" yLabel="Average" height={400}
                         tooltip={{
                           title: 'bowler_name',
                           fields: ['balls', 'runs', 'dismissals', 'strike_rate', 'average'],
@@ -327,7 +327,7 @@ export default function Batting() {
               <>
                 <TabState fetch={dismissalsFetch as FetchState<unknown>} />
                 {!dismissalsFetch.loading && !dismissalsFetch.error && dismissals && (
-                  <div className="flex gap-6 flex-wrap">
+                  <div className="grid grid-cols-1 lg:grid-cols-[350px_minmax(0,1fr)] gap-6 items-start">
                     <DonutChart
                       data={Object.entries(dismissals.by_kind).map(([label, value]) => ({ label, value }))}
                       categoryAccessor="label" valueAccessor="value"
@@ -337,7 +337,7 @@ export default function Batting() {
                       categoryAccessor={(d: Record<string, any>) => String(d.over_number)}
                       valueAccessor="dismissals"
                       title="Dismissals by Over" categoryLabel="Over" valueLabel="Dismissals"
-                      width={500} height={300} colorScheme={['#ef4444']} />
+                      height={300} colorScheme={['#ef4444']} />
                   </div>
                 )}
               </>
@@ -347,17 +347,17 @@ export default function Batting() {
               <>
                 <TabState fetch={interWicketFetch as FetchState<unknown>} />
                 {!interWicketFetch.loading && !interWicketFetch.error && interWicket.length > 0 && (
-                  <div className="flex gap-6 flex-wrap">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <LineChart
                       data={interWicket.map(iw => ({ x: iw.wickets_down, y: iw.strike_rate ?? 0 }))}
                       xAccessor="x" yAccessor="y"
                       title="Strike Rate by Wickets Down" xLabel="Wickets Down" yLabel="Strike Rate"
-                      width={500} height={350} showPoints />
+                      height={350} showPoints />
                     <BarChart
                       data={interWicket} categoryAccessor={(d: Record<string, any>) => String(d.wickets_down)}
                       valueAccessor="runs"
                       title="Total Runs by Wickets Down" categoryLabel="Wickets Down" valueLabel="Runs"
-                      width={500} height={350} colorScheme={['#8b5cf6']} />
+                      height={350} colorScheme={['#8b5cf6']} />
                   </div>
                 )}
               </>

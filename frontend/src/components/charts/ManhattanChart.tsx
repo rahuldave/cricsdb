@@ -16,7 +16,7 @@ const COLORS = ['#3b82f6', '#22c55e', '#f97316', '#a855f7']
  * inside the container. Color cycles through a small palette so the
  * two innings are visually distinct from the worm.
  */
-export default function ManhattanChart({ innings, width = 480, height = 140 }: Props) {
+export default function ManhattanChart({ innings, width, height = 140 }: Props) {
   const main = innings.filter(i => !i.is_super_over)
   if (main.length === 0) return null
 

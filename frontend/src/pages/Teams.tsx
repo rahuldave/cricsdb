@@ -133,7 +133,7 @@ export default function Teams() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border p-6 shadow-sm overflow-x-auto">
+          <div className="bg-white rounded-lg border p-6 shadow-sm">
             {activeTab === 'By Season' && (
               <>
                 {seasonsFetch.loading && <Spinner label="Loading season records…" />}
@@ -146,7 +146,7 @@ export default function Teams() {
                 {!seasonsFetch.loading && !seasonsFetch.error && seasons.length > 0 && (
                   <BarChart data={seasons} categoryAccessor="season" valueAccessor="wins"
                     title="Wins by Season" categoryLabel="Season" valueLabel="Wins"
-                    width={700} height={350} colorScheme={['#22c55e']} />
+                    height={350} colorScheme={['#22c55e']} />
                 )}
               </>
             )}
@@ -191,7 +191,7 @@ export default function Teams() {
                     {vsData.by_season.length > 0 && (
                       <BarChart data={vsData.by_season} categoryAccessor="season" valueAccessor="wins"
                         title={`Wins vs ${opponent} by Season`} categoryLabel="Season" valueLabel="Wins"
-                        width={700} height={300} colorScheme={['#3b82f6']} />
+                        height={300} colorScheme={['#3b82f6']} />
                     )}
                   </div>
                 )}
