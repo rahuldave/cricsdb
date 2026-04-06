@@ -67,13 +67,27 @@ bash deploy.sh
 
 The deploy script stages a clean `build_plash/` directory with only the needed files. deebase is vendored (plash runs Python 3.12, deebase needs 3.13+).
 
-## Rebuilding the Database
+## Rebuilding / Updating the Database
+
+See `docs/data-pipeline.md` for the full pipeline and dry-run output format.
 
 ```bash
-uv run python import_data.py
+# Full rebuild (~15 min):
+uv run python download_data.py        # fetches zips + people/names CSVs
+uv run python import_data.py          # drops cricket.db and reimports
+
+# Incremental update (just new T20 matches):
+uv run python update_recent.py --dry-run --days 7   # check status
+uv run python update_recent.py --days 7              # import
 ```
 
-Downloads all T20 JSON data from cricsheet.org into `data/`, imports into `cricket.db`. Takes ~15 minutes.
+`update_recent.py --dry-run` reports today's date, latest match in DB,
+latest in cricsheet's bundle, plus `Last-Modified` for `people.csv` and
+`names.csv`, so you can tell whether *you* are behind or whether
+*cricsheet* hasn't published yet.
+
+After a DB update, push it to plash with `bash deploy.sh --first`
+(plain `deploy.sh` skips the DB upload).
 
 ## Critical Design Decisions
 
