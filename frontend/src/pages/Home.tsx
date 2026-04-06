@@ -1,8 +1,17 @@
+import type React from 'react'
 import { Link } from 'react-router-dom'
 import { getMatches } from '../api'
 import { useFetch } from '../hooks/useFetch'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
+
+function CompLink({ event, children }: { event: string; children: React.ReactNode }) {
+  return (
+    <Link to={`/matches?tournament=${encodeURIComponent(event)}`} className="comp-link">
+      {children}
+    </Link>
+  )
+}
 
 export default function Home() {
   const { data, loading, error, refetch } = useFetch(
@@ -138,14 +147,29 @@ export default function Home() {
           <div className="coverage-col">
             <div className="coverage-head">International</div>
             <div>Men's &amp; Women's T20Is</div>
-            <div>T20 World Cups, Asia Cups</div>
+            <div>
+              <CompLink event="ICC Men's T20 World Cup">T20 World Cup</CompLink>,{' '}
+              <CompLink event="Men's T20 Asia Cup">Asia Cup</CompLink>
+            </div>
             <div>Bilateral series</div>
           </div>
           <div className="coverage-col">
             <div className="coverage-head">Major Leagues</div>
-            <div>IPL, BBL, PSL, CPL</div>
-            <div>The Hundred, T20 Blast</div>
-            <div>WPL, WBBL, and others</div>
+            <div>
+              <CompLink event="Indian Premier League">IPL</CompLink>,{' '}
+              <CompLink event="Big Bash League">BBL</CompLink>,{' '}
+              <CompLink event="Pakistan Super League">PSL</CompLink>,{' '}
+              <CompLink event="Caribbean Premier League">CPL</CompLink>
+            </div>
+            <div>
+              <CompLink event="The Hundred Men's Competition">The Hundred</CompLink>,{' '}
+              <CompLink event="Vitality Blast">Vitality Blast</CompLink>
+            </div>
+            <div>
+              <CompLink event="Women's Premier League">WPL</CompLink>,{' '}
+              <CompLink event="Women's Big Bash League">WBBL</CompLink>, and{' '}
+              <Link to="/matches" className="comp-link">others</Link>
+            </div>
           </div>
           <div className="coverage-col coverage-stats">
             <div className="coverage-head">The Record</div>

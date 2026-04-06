@@ -183,6 +183,13 @@ a { color: inherit; }
   border-bottom: 1px solid var(--rule);
 }
 .coverage-col > div { margin-bottom: 0.25rem; }
+.comp-link {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule-soft);
+  transition: color 120ms, border-color 120ms;
+}
+.comp-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .coverage-stats > div { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.4rem; }
 .big-num {
   font-family: var(--serif);
