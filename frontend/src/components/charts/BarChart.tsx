@@ -33,34 +33,28 @@ export default function BarChart<T extends Record<string, any>>({
   const [ref, measuredWidth] = useContainerWidth()
   const effectiveWidth = width ?? measuredWidth
 
-  // Decide whether to rotate. Auto: when each category gets less than
-  // ~28px, the labels are likely to overlap.
-  const shouldRotate = rotateCategoryLabels === true
-    || (rotateCategoryLabels === 'auto'
-        && effectiveWidth > 0
-        && data.length > 0
-        && (effectiveWidth / data.length) < 28)
-
-  // Semiotic v3's high-level `categoryFormat` puts its result inside a
-  // <foreignObject> + <div>, so SVG rotation transforms passed via
-  // <text> are ignored. Instead use `frameProps.oLabel` from the
-  // lower-level OrdinalFrame, which returns a real SVG element that
-  // becomes the tick label.
-  //
-  // The label sits below the chart baseline; we render an SVG <text>
-  // anchored at "end" with rotate(-60) so the end of the text touches
-  // the tick mark and the rest trails down-and-to-the-left.
-  const oLabel = shouldRotate
-    ? (labelValue: string) => (
-        <text
-          textAnchor="end"
-          transform="rotate(-60)"
-          fontSize={11}
-          fill="#555"
-          dy="0.35em"
-          style={{ userSelect: 'none' }}
-        >{labelValue}</text>
-      )
+  // True rotation isn't viable with Semiotic v3's high-level BarChart:
+  // the `categoryFormat` hook puts its result inside a <foreignObject>
+  // <div>, so SVG <text transform="rotate(...)"> is ignored, and the
+  // wrapper overrides anything passed via frameProps.oLabel. Instead
+  // we *thin* the labels — return empty string for indices that would
+  // overlap, so only every Nth tick prints a label. The bars
+  // themselves stay densely packed.
+  const pxPerBar = data.length > 0 ? effectiveWidth / data.length : 0
+  const dense = (rotateCategoryLabels === true)
+    || (rotateCategoryLabels === 'auto' && pxPerBar > 0 && pxPerBar < 28)
+  // Aim for at least ~32px between printed labels.
+  const stride = dense ? Math.max(1, Math.ceil(32 / Math.max(pxPerBar, 1))) : 1
+  // Always show the first and last label so the user can read the
+  // axis range. The first goes via index===0 in the modulo; for the
+  // last we add a fallback when (data.length-1) % stride !== 0.
+  const lastIndex = data.length - 1
+  const categoryFormat = stride > 1
+    ? (label: string, index?: number): string => {
+        if (index == null) return label
+        if (index === 0 || index === lastIndex) return label
+        return index % stride === 0 ? label : ''
+      }
     : undefined
 
   return (
@@ -72,16 +66,14 @@ export default function BarChart<T extends Record<string, any>>({
           valueAccessor={valueAccessor}
           title={title}
           width={effectiveWidth}
-          // Add bottom padding when labels are rotated so they don't
-          // get clipped or collide with the axis label.
-          height={shouldRotate ? height + 40 : height}
+          height={height}
           colorScheme={colorScheme}
           colorBy={colorBy}
           categoryLabel={categoryLabel}
           valueLabel={valueLabel}
           orientation={orientation}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          frameProps={oLabel ? { oLabel: oLabel as any, margin: { top: 50, right: 10, bottom: 70, left: 70 } } : undefined}
+          categoryFormat={categoryFormat as any}
           enableHover
         />
       )}
