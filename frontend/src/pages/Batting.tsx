@@ -273,19 +273,19 @@ export default function Batting() {
                       color: '#dc2626',
                       r: 14,
                     })
+                    // Use `label` (pure SVG text via d3-annotation) rather
+                    // than `widget` (foreignObject + HTML span). Safari has
+                    // long-standing bugs reusing foreignObject contents
+                    // when React props change with the same key, so the
+                    // selected name pill stays stale. The top-N labels
+                    // above don't change, so they can stay as widgets.
                     annotations.push({
-                      type: 'widget',
+                      type: 'label',
                       strike_rate: selected.strike_rate,
                       average: selected.average,
-                      dy: -22,
-                      content: (
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, color: '#dc2626',
-                          background: 'rgba(255,255,255,0.85)', padding: '1px 5px',
-                          borderRadius: 3, whiteSpace: 'nowrap',
-                          border: '1px solid #dc2626',
-                        }}>{selected.bowler_name}</span>
-                      ),
+                      label: selected.bowler_name,
+                      dx: 24, dy: -28,
+                      color: '#dc2626',
                     })
                   }
                   return (

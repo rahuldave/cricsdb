@@ -256,18 +256,12 @@ export default function Bowling() {
                       r: 14,
                     })
                     annotations.push({
-                      type: 'widget',
+                      type: 'label',
                       economy: selected.economy,
                       strike_rate: selected.strike_rate,
-                      dy: -22,
-                      content: (
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, color: '#dc2626',
-                          background: 'rgba(255,255,255,0.85)', padding: '1px 5px',
-                          borderRadius: 3, whiteSpace: 'nowrap',
-                          border: '1px solid #dc2626',
-                        }}>{selected.batter_name}</span>
-                      ),
+                      label: selected.batter_name,
+                      dx: 24, dy: -28,
+                      color: '#dc2626',
                     })
                   }
                   return (
