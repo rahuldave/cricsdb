@@ -251,26 +251,41 @@ export default function Batting() {
                     dy: -12,
                     content: (
                       <span style={{
-                        fontSize: 11, fontWeight: 600, color: '#374151',
-                        background: 'rgba(255,255,255,0.85)', padding: '1px 4px',
-                        borderRadius: 3, whiteSpace: 'nowrap',
+                        fontSize: 11, fontWeight: 600, color: '#1f2937',
+                        background: 'rgba(255,255,255,0.45)', padding: '0 3px',
+                        borderRadius: 2, whiteSpace: 'nowrap',
+                        textShadow: '0 0 2px rgba(255,255,255,0.9)',
                       }}>{m.bowler_name}</span>
                     ),
                   }))
-                  // If a row is selected, draw an enclose annotation around it.
+                  // If a row is selected, draw a highlight ring around it.
+                  // Semiotic v3's `enclose` needs >= 2 coordinates (it uses
+                  // d3.packEnclose for a hull), so for a single-point ring
+                  // use `highlight` which filters chart data by field/value.
                   const selected = selectedBowlerId
                     ? valid.find(m => m.bowler_id === selectedBowlerId)
                     : null
                   if (selected) {
                     annotations.push({
-                      type: 'enclose',
-                      coordinates: [{
-                        strike_rate: selected.strike_rate,
-                        average: selected.average,
-                      }],
-                      label: selected.bowler_name,
-                      padding: 14,
+                      type: 'highlight',
+                      field: 'bowler_id',
+                      value: selectedBowlerId,
                       color: '#dc2626',
+                      r: 14,
+                    })
+                    annotations.push({
+                      type: 'widget',
+                      strike_rate: selected.strike_rate,
+                      average: selected.average,
+                      dy: -22,
+                      content: (
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, color: '#dc2626',
+                          background: 'rgba(255,255,255,0.85)', padding: '1px 5px',
+                          borderRadius: 3, whiteSpace: 'nowrap',
+                          border: '1px solid #dc2626',
+                        }}>{selected.bowler_name}</span>
+                      ),
                     })
                   }
                   return (

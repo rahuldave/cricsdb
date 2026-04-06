@@ -237,9 +237,10 @@ export default function Bowling() {
                     dy: -12,
                     content: (
                       <span style={{
-                        fontSize: 11, fontWeight: 600, color: '#374151',
-                        background: 'rgba(255,255,255,0.85)', padding: '1px 4px',
-                        borderRadius: 3, whiteSpace: 'nowrap',
+                        fontSize: 11, fontWeight: 600, color: '#1f2937',
+                        background: 'rgba(255,255,255,0.45)', padding: '0 3px',
+                        borderRadius: 2, whiteSpace: 'nowrap',
+                        textShadow: '0 0 2px rgba(255,255,255,0.9)',
                       }}>{m.batter_name}</span>
                     ),
                   }))
@@ -248,14 +249,25 @@ export default function Bowling() {
                     : null
                   if (selected) {
                     annotations.push({
-                      type: 'enclose',
-                      coordinates: [{
-                        economy: selected.economy,
-                        strike_rate: selected.strike_rate,
-                      }],
-                      label: selected.batter_name,
-                      padding: 14,
+                      type: 'highlight',
+                      field: 'batter_id',
+                      value: selectedBatterId,
                       color: '#dc2626',
+                      r: 14,
+                    })
+                    annotations.push({
+                      type: 'widget',
+                      economy: selected.economy,
+                      strike_rate: selected.strike_rate,
+                      dy: -22,
+                      content: (
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, color: '#dc2626',
+                          background: 'rgba(255,255,255,0.85)', padding: '1px 5px',
+                          borderRadius: 3, whiteSpace: 'nowrap',
+                          border: '1px solid #dc2626',
+                        }}>{selected.batter_name}</span>
+                      ),
                     })
                   }
                   return (
