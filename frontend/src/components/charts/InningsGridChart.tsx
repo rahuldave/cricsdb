@@ -33,7 +33,13 @@ const COLOR_NOBALL = '#facc15'  // slightly darker yellow
 const COLOR_BYE = '#fb923c'     // orange
 const COLOR_LEGBYE = '#fdba74'  // light orange
 const COLOR_WICKET = '#dc2626'  // red
-const COLOR_AT_CREASE = '#dbeafe' // pale blue: batter is at the crease but not facing this ball
+// Two alternating pale tints for the at-crease stripe — one per
+// partnership "slot". When a batter gets out, the new batter inherits
+// the same slot (and thus the same shade) as the one they replaced,
+// so the two at-crease batters always have the two distinct shades.
+const COLOR_AT_CREASE_A = '#eff6ff'   // pale blue (Tailwind blue-50)
+const COLOR_AT_CREASE_B = '#ecfeff'   // pale cyan (Tailwind cyan-50)
+const COLOR_AT_CREASE = COLOR_AT_CREASE_A  // for legend swatch
 
 interface CellInfo {
   bg: string
@@ -137,6 +143,43 @@ interface Partnership {
 }
 
 /**
+ * Assign a "slot" (A or B) to each batter index. Initial: first ball's
+ * batter is A, non-striker is B. On every wicket, find the next batter
+ * index that hasn't been assigned a slot yet, and give them the
+ * dismissed batter's slot. Result: at any moment, the two at-crease
+ * batters always have one A and one B — and a batter inherits the
+ * shade of the partner they replaced.
+ */
+function assignBatterSlots(
+  deliveries: InningsGridDelivery[],
+): Map<number, 'A' | 'B'> {
+  const slots = new Map<number, 'A' | 'B'>()
+  if (deliveries.length === 0) return slots
+  const first = deliveries[0]
+  slots.set(first.batter_index, 'A')
+  if (first.non_striker_index != null) slots.set(first.non_striker_index, 'B')
+  for (let i = 0; i < deliveries.length; i++) {
+    const d = deliveries[i]
+    if (!d.wicket_kind || d.wicket_player_out_index == null) continue
+    const dismissedSlot = slots.get(d.wicket_player_out_index)
+    if (!dismissedSlot) continue
+    // Find the next not-yet-assigned batter, looking forward
+    for (let j = i + 1; j < deliveries.length; j++) {
+      const dj = deliveries[j]
+      if (!slots.has(dj.batter_index)) {
+        slots.set(dj.batter_index, dismissedSlot)
+        break
+      }
+      if (dj.non_striker_index != null && !slots.has(dj.non_striker_index)) {
+        slots.set(dj.non_striker_index, dismissedSlot)
+        break
+      }
+    }
+  }
+  return slots
+}
+
+/**
  * Walk through deliveries and identify partnership boundaries.
  * A partnership ends on a wicket OR at the final ball of the innings.
  * Returned map: delivery index → the partnership that ended at that index.
@@ -168,6 +211,11 @@ export default function InningsGridChart({ innings }: Props) {
   const headerHeight = '4.5rem'
   const overSummaries = summarizeOvers(innings.deliveries)
   const partnerships = summarizePartnerships(innings.deliveries)
+  const slots = assignBatterSlots(innings.deliveries)
+  const slotColor = (b: number): string | undefined => {
+    const s = slots.get(b)
+    return s === 'A' ? COLOR_AT_CREASE_A : s === 'B' ? COLOR_AT_CREASE_B : undefined
+  }
   const SUMMARY_H = '0.875rem'
 
   return (
@@ -303,10 +351,11 @@ export default function InningsGridChart({ innings }: Props) {
                   {Array.from({ length: N }).map((_, b) => {
                     const isLastBatter = b === N - 1
                     if (b !== markerCol) {
-                      // Faint blue tint when this batter is at the crease
-                      // but not facing the current ball (i.e., they're the
-                      // non-striker). Renders a continuous "presence stripe"
-                      // for each batter from arrival to dismissal.
+                      // Tint cells where this batter is at the crease but
+                      // not facing this ball. Each batter has a "slot"
+                      // (A or B), giving them one of two pale shades —
+                      // alternating per partnership so adjacent batters
+                      // are always distinguishable.
                       const atCrease = b === d.non_striker_index
                       return (
                         <div
@@ -314,7 +363,7 @@ export default function InningsGridChart({ innings }: Props) {
                           style={{
                             width: CELL,
                             height: CELL,
-                            backgroundColor: atCrease ? COLOR_AT_CREASE : undefined,
+                            backgroundColor: atCrease ? slotColor(b) : undefined,
                             borderRight: isLastBatter ? '2px solid #d1d5db' : undefined,
                           }}
                           className={isLastBatter ? '' : 'border-r border-gray-100'}
@@ -423,6 +472,7 @@ export default function InningsGridChart({ innings }: Props) {
                     score={`${d.cumulative_runs}/${d.cumulative_wickets}`}
                     striperBatterIdx={d.batter_index}
                     striperNonStrikerIdx={d.non_striker_index}
+                    slotColor={slotColor}
                     N={N}
                     height={SUMMARY_H}
                     accent="gray"
@@ -445,6 +495,7 @@ export default function InningsGridChart({ innings }: Props) {
                       score={`${d.cumulative_runs}/${d.cumulative_wickets}`}
                       striperBatterIdx={d.batter_index}
                       striperNonStrikerIdx={d.non_striker_index}
+                      slotColor={slotColor}
                       N={N}
                       height={SUMMARY_H}
                       accent="blue"
@@ -476,6 +527,7 @@ export default function InningsGridChart({ innings }: Props) {
 function SummaryRow({
   label, detail, score,
   striperBatterIdx, striperNonStrikerIdx,
+  slotColor,
   N, height, accent,
 }: {
   label: string
@@ -483,6 +535,7 @@ function SummaryRow({
   score: string
   striperBatterIdx: number | null
   striperNonStrikerIdx: number | null
+  slotColor: (b: number) => string | undefined
   N: number
   height: string
   accent: 'gray' | 'blue'
@@ -502,7 +555,8 @@ function SummaryRow({
       >
         {label}
       </div>
-      {/* batter cells: preserve the at-crease tint so the stripe stays continuous */}
+      {/* batter cells: preserve the per-slot at-crease tint so each
+          stripe stays continuous through the summary row. */}
       {Array.from({ length: N }).map((_, b) => {
         const isLastBatter = b === N - 1
         const atCrease = b === striperBatterIdx || b === striperNonStrikerIdx
@@ -512,7 +566,7 @@ function SummaryRow({
             style={{
               width: CELL,
               height,
-              backgroundColor: atCrease ? COLOR_AT_CREASE : undefined,
+              backgroundColor: atCrease ? slotColor(b) : undefined,
               borderRight: isLastBatter ? '2px solid #d1d5db' : undefined,
             }}
             className={isLastBatter ? '' : 'border-r border-gray-100'}
