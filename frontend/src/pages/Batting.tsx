@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
+import { useFetch, type FetchState } from '../hooks/useFetch'
 import PlayerSearch from '../components/PlayerSearch'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
@@ -8,6 +9,8 @@ import BarChart from '../components/charts/BarChart'
 import LineChart from '../components/charts/LineChart'
 import ScatterChart from '../components/charts/ScatterChart'
 import DonutChart from '../components/charts/DonutChart'
+import Spinner from '../components/Spinner'
+import ErrorBanner from '../components/ErrorBanner'
 import {
   getBatterSummary, getBatterInnings, getBatterVsBowlers, getBatterByOver,
   getBatterByPhase, getBatterBySeason, getBatterDismissals, getBatterInterWicket,
@@ -16,6 +19,13 @@ import type {
   PlayerSearchResult, BattingSummary, BattingInnings, BowlerMatchup,
   OverStats, PhaseStats, SeasonBattingStats, DismissalAnalysis, InterWicketStats,
 } from '../types'
+
+// Small helper for the consistent loading/error pattern in each tab.
+function TabState({ fetch }: { fetch: FetchState<unknown> }) {
+  if (fetch.loading) return <Spinner label="Loading…" />
+  if (fetch.error) return <ErrorBanner message={fetch.error} onRetry={fetch.refetch} />
+  return null
+}
 
 const tabs = ['By Season', 'By Over', 'By Phase', 'vs Bowlers', 'Dismissals', 'Inter-Wicket', 'Innings List'] as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
@@ -26,41 +36,77 @@ export default function Batting() {
   const [activeTab, setActiveTab] = useUrlParam('tab', 'By Season')
   const setUrlParams = useSetUrlParams()
 
-  const [summary, setSummary] = useState<BattingSummary | null>(null)
-  const [seasonData, setSeasonData] = useState<SeasonBattingStats[]>([])
-  const [overData, setOverData] = useState<OverStats[]>([])
-  const [phaseData, setPhaseData] = useState<PhaseStats[]>([])
-  const [bowlerMatchups, setBowlerMatchups] = useState<BowlerMatchup[]>([])
-  const [dismissals, setDismissals] = useState<DismissalAnalysis | null>(null)
-  const [interWicket, setInterWicket] = useState<InterWicketStats[]>([])
-  const [innings, setInnings] = useState<BattingInnings[]>([])
-  const [inningsTotal, setInningsTotal] = useState(0)
   const [inningsOffset, setInningsOffset] = useState(0)
 
   const handleSelect = (p: PlayerSearchResult) => {
     setUrlParams({ player: p.id, tab: 'By Season' })
   }
 
-  useEffect(() => {
-    if (!playerId) return
-    setSummary(null)
-    getBatterSummary(playerId, filters).then(setSummary).catch(() => {})
-  }, [playerId, filters.gender, filters.team_type, filters.tournament, filters.season_from, filters.season_to])
+  const filterDeps = [
+    playerId, filters.gender, filters.team_type, filters.tournament,
+    filters.season_from, filters.season_to,
+  ]
 
-  useEffect(() => {
-    if (!playerId) return
-    if (activeTab === 'By Season') getBatterBySeason(playerId, filters).then(d => setSeasonData(d.by_season)).catch(() => {})
-    if (activeTab === 'By Over') getBatterByOver(playerId, filters).then(d => setOverData(d.by_over)).catch(() => {})
-    if (activeTab === 'By Phase') getBatterByPhase(playerId, filters).then(d => setPhaseData(d.by_phase)).catch(() => {})
-    if (activeTab === 'vs Bowlers') getBatterVsBowlers(playerId, { ...filters, min_balls: 6 }).then(d => setBowlerMatchups(d.matchups)).catch(() => {})
-    if (activeTab === 'Dismissals') getBatterDismissals(playerId, filters).then(setDismissals).catch(() => {})
-    if (activeTab === 'Inter-Wicket') getBatterInterWicket(playerId, filters).then(d => setInterWicket(d.inter_wicket)).catch(() => {})
-    if (activeTab === 'Innings List') {
-      getBatterInnings(playerId, { ...filters, limit: 50, offset: inningsOffset }).then(d => {
-        setInnings(d.innings); setInningsTotal(d.total)
-      }).catch(() => {})
-    }
-  }, [playerId, activeTab, inningsOffset, filters.gender, filters.team_type, filters.tournament, filters.season_from, filters.season_to])
+  // Summary drives the page header — page-level state
+  const summaryFetch = useFetch<BattingSummary | null>(
+    () => playerId ? getBatterSummary(playerId, filters) : Promise.resolve(null),
+    filterDeps,
+  )
+  const summary = summaryFetch.data
+
+  // Per-tab fetches: each is gated on `activeTab === '...'` so only the
+  // visible tab does network work. Switching tabs re-runs the gated fetch.
+  const seasonFetch = useFetch<{ by_season: SeasonBattingStats[] } | null>(
+    () => playerId && activeTab === 'By Season'
+      ? getBatterBySeason(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const seasonData = seasonFetch.data?.by_season ?? []
+
+  const overFetch = useFetch<{ by_over: OverStats[] } | null>(
+    () => playerId && activeTab === 'By Over'
+      ? getBatterByOver(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const overData = overFetch.data?.by_over ?? []
+
+  const phaseFetch = useFetch<{ by_phase: PhaseStats[] } | null>(
+    () => playerId && activeTab === 'By Phase'
+      ? getBatterByPhase(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const phaseData = phaseFetch.data?.by_phase ?? []
+
+  const matchupsFetch = useFetch<{ matchups: BowlerMatchup[] } | null>(
+    () => playerId && activeTab === 'vs Bowlers'
+      ? getBatterVsBowlers(playerId, { ...filters, min_balls: 6 })
+      : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const bowlerMatchups = matchupsFetch.data?.matchups ?? []
+
+  const dismissalsFetch = useFetch<DismissalAnalysis | null>(
+    () => playerId && activeTab === 'Dismissals'
+      ? getBatterDismissals(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const dismissals = dismissalsFetch.data
+
+  const interWicketFetch = useFetch<{ inter_wicket: InterWicketStats[] } | null>(
+    () => playerId && activeTab === 'Inter-Wicket'
+      ? getBatterInterWicket(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const interWicket = interWicketFetch.data?.inter_wicket ?? []
+
+  const inningsFetch = useFetch<{ innings: BattingInnings[]; total: number } | null>(
+    () => playerId && activeTab === 'Innings List'
+      ? getBatterInnings(playerId, { ...filters, limit: 50, offset: inningsOffset })
+      : Promise.resolve(null),
+    [...filterDeps, activeTab, inningsOffset],
+  )
+  const innings = inningsFetch.data?.innings ?? []
+  const inningsTotal = inningsFetch.data?.total ?? 0
 
   const inningsColumns: Column<BattingInnings>[] = [
     { key: 'date', label: 'Date', sortable: true },
@@ -92,7 +138,16 @@ export default function Batting() {
 
       {!playerId && <div className="text-center text-gray-400 py-16">Search for a batter to view stats</div>}
 
-      {playerId && summary && (
+      {playerId && summaryFetch.loading && <Spinner label="Loading batter…" size="lg" />}
+
+      {playerId && summaryFetch.error && (
+        <ErrorBanner
+          message={`Could not load batter: ${summaryFetch.error}`}
+          onRetry={summaryFetch.refetch}
+        />
+      )}
+
+      {playerId && summary && !summaryFetch.loading && (
         <>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">{summary.name}</h2>
           <div className="grid grid-cols-5 gap-3 mb-2">
@@ -121,97 +176,132 @@ export default function Batting() {
           </div>
 
           <div className="bg-white rounded-lg border p-6 shadow-sm">
-            {activeTab === 'By Season' && seasonData.length > 0 && (
-              <div className="flex gap-6 flex-wrap">
-                <BarChart data={seasonData} categoryAccessor="season" valueAccessor="runs"
-                  title="Runs by Season" categoryLabel="Season" valueLabel="Runs"
-                  width={600} height={350} colorScheme={['#3b82f6']} />
-                <BarChart data={seasonData.filter(s => s.strike_rate != null)}
-                  categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
-                  title="Strike Rate by Season" categoryLabel="Season" valueLabel="Strike Rate"
-                  width={600} height={350} colorScheme={['#10b981']} />
-              </div>
+            {activeTab === 'By Season' && (
+              <>
+                <TabState fetch={seasonFetch as FetchState<unknown>} />
+                {!seasonFetch.loading && !seasonFetch.error && seasonData.length > 0 && (
+                  <div className="flex gap-6 flex-wrap">
+                    <BarChart data={seasonData} categoryAccessor="season" valueAccessor="runs"
+                      title="Runs by Season" categoryLabel="Season" valueLabel="Runs"
+                      width={600} height={350} colorScheme={['#3b82f6']} />
+                    <BarChart data={seasonData.filter(s => s.strike_rate != null)}
+                      categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
+                      title="Strike Rate by Season" categoryLabel="Season" valueLabel="Strike Rate"
+                      width={600} height={350} colorScheme={['#10b981']} />
+                  </div>
+                )}
+              </>
             )}
 
-            {activeTab === 'By Over' && overData.length > 0 && (
-              <BarChart
-                data={overData.map(o => ({
-                  ...o, over: `${o.over_number}`,
-                  phase: o.over_number <= 6 ? 'Powerplay' : o.over_number <= 15 ? 'Middle' : 'Death',
-                }))}
-                categoryAccessor="over" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
-                title="Strike Rate by Over" categoryLabel="Over" valueLabel="Strike Rate"
-                colorBy="phase" colorScheme={['#3b82f6', '#22c55e', '#ef4444']}
-                width={700} height={350} />
+            {activeTab === 'By Over' && (
+              <>
+                <TabState fetch={overFetch as FetchState<unknown>} />
+                {!overFetch.loading && !overFetch.error && overData.length > 0 && (
+                  <BarChart
+                    data={overData.map(o => ({
+                      ...o, over: `${o.over_number}`,
+                      phase: o.over_number <= 6 ? 'Powerplay' : o.over_number <= 15 ? 'Middle' : 'Death',
+                    }))}
+                    categoryAccessor="over" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
+                    title="Strike Rate by Over" categoryLabel="Over" valueLabel="Strike Rate"
+                    colorBy="phase" colorScheme={['#3b82f6', '#22c55e', '#ef4444']}
+                    width={700} height={350} />
+                )}
+              </>
             )}
 
-            {activeTab === 'By Phase' && phaseData.length > 0 && (
-              <div className="grid grid-cols-3 gap-4">
-                {phaseData.map(p => (
-                  <div key={p.phase} className="text-center">
-                    <h3 className="font-semibold text-gray-700 mb-2 capitalize">{p.phase}</h3>
-                    <div className="text-sm text-gray-500">Overs {p.overs}</div>
-                    <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-                      <div><span className="text-gray-500">Runs:</span> {p.runs}</div>
-                      <div><span className="text-gray-500">Balls:</span> {p.balls}</div>
-                      <div><span className="text-gray-500">SR:</span> {fmt(p.strike_rate)}</div>
-                      <div><span className="text-gray-500">Dots:</span> {fmt(p.dot_pct)}%</div>
-                      <div><span className="text-gray-500">4s:</span> {p.fours}</div>
-                      <div><span className="text-gray-500">6s:</span> {p.sixes}</div>
+            {activeTab === 'By Phase' && (
+              <>
+                <TabState fetch={phaseFetch as FetchState<unknown>} />
+                {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (
+                  <div className="grid grid-cols-3 gap-4">
+                    {phaseData.map(p => (
+                      <div key={p.phase} className="text-center">
+                        <h3 className="font-semibold text-gray-700 mb-2 capitalize">{p.phase}</h3>
+                        <div className="text-sm text-gray-500">Overs {p.overs}</div>
+                        <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                          <div><span className="text-gray-500">Runs:</span> {p.runs}</div>
+                          <div><span className="text-gray-500">Balls:</span> {p.balls}</div>
+                          <div><span className="text-gray-500">SR:</span> {fmt(p.strike_rate)}</div>
+                          <div><span className="text-gray-500">Dots:</span> {fmt(p.dot_pct)}%</div>
+                          <div><span className="text-gray-500">4s:</span> {p.fours}</div>
+                          <div><span className="text-gray-500">6s:</span> {p.sixes}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === 'vs Bowlers' && (
+              <>
+                <TabState fetch={matchupsFetch as FetchState<unknown>} />
+                {!matchupsFetch.loading && !matchupsFetch.error && bowlerMatchups.length > 0 && (
+                  <div>
+                    <ScatterChart
+                      data={bowlerMatchups.filter(m => m.strike_rate != null && m.average != null)}
+                      xAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
+                      yAccessor={(d: Record<string, any>) => (d.average as number) ?? 0}
+                      sizeBy={(d: Record<string, any>) => (d.balls as number) ?? 6}
+                      title="SR vs Average (dot size = balls faced)"
+                      xLabel="Strike Rate" yLabel="Average" width={600} height={400} />
+                    <div className="mt-4">
+                      <DataTable columns={bowlerColumns} data={bowlerMatchups} />
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
 
-            {activeTab === 'vs Bowlers' && bowlerMatchups.length > 0 && (
-              <div>
-                <ScatterChart
-                  data={bowlerMatchups.filter(m => m.strike_rate != null && m.average != null)}
-                  xAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
-                  yAccessor={(d: Record<string, any>) => (d.average as number) ?? 0}
-                  sizeBy={(d: Record<string, any>) => (d.balls as number) ?? 6}
-                  title="SR vs Average (dot size = balls faced)"
-                  xLabel="Strike Rate" yLabel="Average" width={600} height={400} />
-                <div className="mt-4">
-                  <DataTable columns={bowlerColumns} data={bowlerMatchups} />
-                </div>
-              </div>
+            {activeTab === 'Dismissals' && (
+              <>
+                <TabState fetch={dismissalsFetch as FetchState<unknown>} />
+                {!dismissalsFetch.loading && !dismissalsFetch.error && dismissals && (
+                  <div className="flex gap-6 flex-wrap">
+                    <DonutChart
+                      data={Object.entries(dismissals.by_kind).map(([label, value]) => ({ label, value }))}
+                      categoryAccessor="label" valueAccessor="value"
+                      title={`Dismissals (${dismissals.total_dismissals})`} width={350} height={350} />
+                    <BarChart
+                      data={dismissals.by_over.filter(o => o.dismissals > 0)}
+                      categoryAccessor={(d: Record<string, any>) => String(d.over_number)}
+                      valueAccessor="dismissals"
+                      title="Dismissals by Over" categoryLabel="Over" valueLabel="Dismissals"
+                      width={500} height={300} colorScheme={['#ef4444']} />
+                  </div>
+                )}
+              </>
             )}
 
-            {activeTab === 'Dismissals' && dismissals && (
-              <div className="flex gap-6 flex-wrap">
-                <DonutChart
-                  data={Object.entries(dismissals.by_kind).map(([label, value]) => ({ label, value }))}
-                  categoryAccessor="label" valueAccessor="value"
-                  title={`Dismissals (${dismissals.total_dismissals})`} width={350} height={350} />
-                <BarChart
-                  data={dismissals.by_over.filter(o => o.dismissals > 0)}
-                  categoryAccessor={(d: Record<string, any>) => String(d.over_number)}
-                  valueAccessor="dismissals"
-                  title="Dismissals by Over" categoryLabel="Over" valueLabel="Dismissals"
-                  width={500} height={300} colorScheme={['#ef4444']} />
-              </div>
-            )}
-
-            {activeTab === 'Inter-Wicket' && interWicket.length > 0 && (
-              <div className="flex gap-6 flex-wrap">
-                <LineChart
-                  data={interWicket.map(iw => ({ x: iw.wickets_down, y: iw.strike_rate ?? 0 }))}
-                  xAccessor="x" yAccessor="y"
-                  title="Strike Rate by Wickets Down" xLabel="Wickets Down" yLabel="Strike Rate"
-                  width={500} height={350} showPoints />
-                <BarChart
-                  data={interWicket} categoryAccessor={(d: Record<string, any>) => String(d.wickets_down)}
-                  valueAccessor="runs"
-                  title="Total Runs by Wickets Down" categoryLabel="Wickets Down" valueLabel="Runs"
-                  width={500} height={350} colorScheme={['#8b5cf6']} />
-              </div>
+            {activeTab === 'Inter-Wicket' && (
+              <>
+                <TabState fetch={interWicketFetch as FetchState<unknown>} />
+                {!interWicketFetch.loading && !interWicketFetch.error && interWicket.length > 0 && (
+                  <div className="flex gap-6 flex-wrap">
+                    <LineChart
+                      data={interWicket.map(iw => ({ x: iw.wickets_down, y: iw.strike_rate ?? 0 }))}
+                      xAccessor="x" yAccessor="y"
+                      title="Strike Rate by Wickets Down" xLabel="Wickets Down" yLabel="Strike Rate"
+                      width={500} height={350} showPoints />
+                    <BarChart
+                      data={interWicket} categoryAccessor={(d: Record<string, any>) => String(d.wickets_down)}
+                      valueAccessor="runs"
+                      title="Total Runs by Wickets Down" categoryLabel="Wickets Down" valueLabel="Runs"
+                      width={500} height={350} colorScheme={['#8b5cf6']} />
+                  </div>
+                )}
+              </>
             )}
 
             {activeTab === 'Innings List' && (
-              <DataTable columns={inningsColumns} data={innings}
-                pagination={{ total: inningsTotal, limit: 50, offset: inningsOffset, onPage: setInningsOffset }} />
+              <>
+                <TabState fetch={inningsFetch as FetchState<unknown>} />
+                {!inningsFetch.loading && !inningsFetch.error && (
+                  <DataTable columns={inningsColumns} data={innings}
+                    pagination={{ total: inningsTotal, limit: 50, offset: inningsOffset, onPage: setInningsOffset }} />
+                )}
+              </>
             )}
           </div>
         </>
