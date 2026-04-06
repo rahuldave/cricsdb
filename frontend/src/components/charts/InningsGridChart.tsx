@@ -13,7 +13,7 @@ const HIST_CELL = '0.625rem'  // each histogram cell (10px)
 const HIST_CELLS = 7          // up to 7 runs (covers boundary off no-ball = 5)
 const HIST_W = `calc(${HIST_CELL} * ${HIST_CELLS} + 0.25rem)`
 const SCORE_W = '3rem'        // cum-score column
-const WKT_W = '12rem'         // wicket-text column
+const WKT_W = '18rem'         // wicket-text + partnership column
 
 // Source colors
 const COLOR_OFFBAT = (runs: number): string => {
@@ -458,8 +458,8 @@ export default function InningsGridChart({ innings }: Props) {
                     {d.cumulative_runs}/{d.cumulative_wickets}
                   </div>
                   <div
-                    style={{ width: WKT_W, height: CELL, color: 'var(--accent)' }}
-                    className="text-[10px] pl-2 font-medium truncate hidden md:flex items-center"
+                    style={{ height: CELL, color: 'var(--accent)', whiteSpace: 'nowrap', flex: '0 0 auto' }}
+                    className="text-[10px] pl-2 pr-3 font-medium hidden md:flex items-center"
                     title={(() => {
                       const p = partnerships.get(i)
                       const wkt = d.wicket_text ? `${d.wicket_player_out}: ${d.wicket_text}` : ''
