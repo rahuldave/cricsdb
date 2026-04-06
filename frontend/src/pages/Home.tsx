@@ -1,16 +1,15 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getMatches } from '../api'
-import type { MatchListItem } from '../types'
+import { useFetch } from '../hooks/useFetch'
+import Spinner from '../components/Spinner'
+import ErrorBanner from '../components/ErrorBanner'
 
 export default function Home() {
-  const [recent, setRecent] = useState<MatchListItem[]>([])
-
-  useEffect(() => {
-    getMatches({ limit: 5, offset: 0 })
-      .then(d => setRecent(d.matches))
-      .catch(() => setRecent([]))
-  }, [])
+  const { data, loading, error, refetch } = useFetch(
+    () => getMatches({ limit: 5, offset: 0 }),
+    [],
+  )
+  const recent = data?.matches ?? []
 
   return (
     <div className="max-w-3xl mx-auto py-12">
@@ -21,11 +20,18 @@ export default function Home() {
       </p>
 
       {/* Last 5 matches */}
-      {recent.length > 0 && (
-        <div className="mb-10">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">
-            Most recent matches
-          </h2>
+      <div className="mb-10">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">
+          Most recent matches
+        </h2>
+        {loading && <Spinner label="Loading recent matches…" />}
+        {error && !loading && (
+          <ErrorBanner
+            message={`Could not load recent matches: ${error}`}
+            onRetry={refetch}
+          />
+        )}
+        {!loading && !error && recent.length > 0 && (
           <ul className="bg-white rounded-lg border border-gray-200 shadow-sm divide-y divide-gray-100">
             {recent.map(m => (
               <li key={m.match_id}>
@@ -59,8 +65,8 @@ export default function Home() {
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-6 mb-12">
         <Link to="/batting" className="block rounded-lg border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">

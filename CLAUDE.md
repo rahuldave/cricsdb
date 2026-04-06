@@ -118,7 +118,7 @@ Read `docs/design-decisions.md` for full details. Key points:
 The list below is roughly ordered by value/effort. Pick the highest one
 that fits the available time.
 
-**A. Loading + error states across all pages.** Right now failed fetches silently render empty content and in-flight fetches show nothing. The Matches list and player-search dropdowns are the most visible offenders. Small change, big polish win — likely a single `useFetch` hook + a tiny `<Spinner />` and `<ErrorBanner />` and roll it out page by page.
+**A. Loading + error states across all pages.** _Partially done._ The primitives are in place: `frontend/src/hooks/useFetch.ts`, `components/Spinner.tsx`, `components/ErrorBanner.tsx`. Rolled out to **Home**, **Matches list**, and **MatchScorecard**. Still TODO: **Teams**, **Batting**, **Bowling**, **Head to Head**, **PlayerSearch dropdown**, **FilterBar dropdowns** (tournament/season). Each is mechanical: replace the raw `useEffect`+`.then`+`.catch` pattern with `useFetch`, then render `<Spinner />` while loading and `<ErrorBanner onRetry={refetch} />` on error. Most analytics pages have multiple fetches per page so use `useFetch` per fetch and decide where each spinner sits.
 
 **B. Mechanically-generated ball-by-ball commentary tab on the scorecard page.** Cricsheet does NOT ship natural-language commentary like Cricinfo's editorial feed — what we have is structured ball data. So this would render each delivery as a feed line: `19.6 — Bumrah to Kohli — 4 runs (FOUR)` or `19.4 — Bumrah to Sharma — OUT! caught Rohit b Bumrah`. Useful and conventional, but be honest with users that it's generated from data, not a writer's prose.
 

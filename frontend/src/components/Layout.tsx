@@ -11,7 +11,9 @@ const navItems = [
 
 export default function Layout() {
   const { pathname } = useLocation()
-  const showFilters = pathname !== '/'
+  // Hide FilterBar on pages where global filters are meaningless:
+  // home (static landing) and the dedicated scorecard for one match.
+  const showFilters = pathname !== '/' && !/^\/matches\/[^/]+$/.test(pathname)
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-gray-900 text-white">

@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
+import { useFetch } from '../hooks/useFetch'
 import { getMatches, getTeams } from '../api'
 import PlayerSearch from '../components/PlayerSearch'
-import type { MatchListItem, TeamInfo } from '../types'
+import Spinner from '../components/Spinner'
+import ErrorBanner from '../components/ErrorBanner'
+import type { TeamInfo } from '../types'
 
 const PAGE_SIZE = 50
 
@@ -20,8 +23,6 @@ export default function Matches() {
   const [teamSuggest, setTeamSuggest] = useState<TeamInfo[]>([])
   const [showTeamDropdown, setShowTeamDropdown] = useState(false)
 
-  const [matches, setMatches] = useState<MatchListItem[]>([])
-  const [total, setTotal] = useState(0)
   const [offset, setOffset] = useState(0)
 
   // Reset pagination when filters change
@@ -31,20 +32,19 @@ export default function Matches() {
   ])
 
   // Fetch match list
-  useEffect(() => {
-    const params = {
+  const { data: listData, loading, error, refetch } = useFetch(
+    () => getMatches({
       ...filters,
       team: team || undefined,
       player_id: playerId || undefined,
       limit: PAGE_SIZE,
       offset,
-    }
-    getMatches(params).then(d => {
-      setMatches(d.matches)
-      setTotal(d.total)
-    }).catch(() => { setMatches([]); setTotal(0) })
-  }, [filters.gender, filters.team_type, filters.tournament,
-      filters.season_from, filters.season_to, team, playerId, offset])
+    }),
+    [filters.gender, filters.team_type, filters.tournament,
+     filters.season_from, filters.season_to, team, playerId, offset],
+  )
+  const matches = listData?.matches ?? []
+  const total = listData?.total ?? 0
 
   // Team autocomplete
   useEffect(() => {
@@ -114,9 +114,18 @@ export default function Matches() {
         </div>
 
         <div className="ml-auto text-sm text-gray-600">
-          {total.toLocaleString()} matches
+          {loading ? '…' : `${total.toLocaleString()} matches`}
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4">
+          <ErrorBanner
+            message={`Could not load matches: ${error}`}
+            onRetry={refetch}
+          />
+        </div>
+      )}
 
       {/* Match list */}
       <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
@@ -151,7 +160,10 @@ export default function Matches() {
                 </tr>
               )
             })}
-            {matches.length === 0 && (
+            {loading && matches.length === 0 && (
+              <tr><td colSpan={5} className="p-0"><Spinner label="Loading matches…" /></td></tr>
+            )}
+            {!loading && !error && matches.length === 0 && (
               <tr><td colSpan={5} className="px-3 py-8 text-center text-gray-400">No matches</td></tr>
             )}
           </tbody>
