@@ -83,26 +83,25 @@ export default function Teams() {
   ]
 
   return (
-    <div>
-      <div className="mb-6 relative">
+    <div className="max-w-6xl mx-auto">
+      <div className="mb-8 relative max-w-md wisden-playersearch">
         <input type="text" value={query}
           onChange={e => { setQuery(e.target.value); setSelected(''); setShowDropdown(true) }}
-          placeholder="Search teams..."
-          className="w-full max-w-md rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+          placeholder="Search teams…"
+          className="wisden-playersearch-input" />
         {showDropdown && teams.length > 0 && !selected && (
-          <ul className="absolute z-10 mt-1 max-w-md rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-y-auto">
+          <ul className="wisden-playersearch-list">
             {teams.slice(0, 20).map(t => (
-              <li key={t.name} className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex justify-between text-sm"
-                onClick={() => selectTeam(t.name)}>
-                <span className="font-medium">{t.name}</span>
-                <span className="text-gray-400">{t.matches} matches</span>
+              <li key={t.name} onClick={() => selectTeam(t.name)}>
+                <span className="wisden-playersearch-name">{t.name}</span>
+                <span className="wisden-playersearch-meta num">{t.matches} matches</span>
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      {!selected && <div className="text-center text-gray-400 py-16">Search for a team to view stats</div>}
+      {!selected && <div className="wisden-empty">Search for a team to view stats</div>}
 
       {selected && summaryFetch.loading && <Spinner label="Loading team…" size="lg" />}
 
@@ -115,25 +114,23 @@ export default function Teams() {
 
       {selected && summary && !summaryFetch.loading && (
         <>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">{selected}</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <h2 className="wisden-page-title">{selected}</h2>
+          <div className="wisden-statrow">
             <StatCard label="Matches" value={summary.matches} />
             <StatCard label="Wins" value={summary.wins} />
             <StatCard label="Losses" value={summary.losses} />
             <StatCard label="Win %" value={summary.win_pct != null ? `${summary.win_pct}%` : '-'} />
           </div>
 
-          <div className="border-b border-gray-200 mb-4">
-            <div className="flex gap-1 overflow-x-auto -mx-1 px-1">
-              {tabs.map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 ${activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >{tab}</button>
-              ))}
-            </div>
+          <div className="wisden-tabs">
+            {tabs.map(tab => (
+              <button key={tab} onClick={() => setActiveTab(tab)}
+                className={`wisden-tab${activeTab === tab ? ' is-active' : ''}`}
+              >{tab}</button>
+            ))}
           </div>
 
-          <div className="bg-white rounded-lg border p-6 shadow-sm">
+          <div>
             {activeTab === 'By Season' && (
               <>
                 {seasonsFetch.loading && <Spinner label="Loading season records…" />}
@@ -153,14 +150,15 @@ export default function Teams() {
 
             {activeTab === 'vs Opponent' && (
               <div>
-                <div className="mb-4">
+                <div className="mb-4 wisden-filter-group">
+                  <span className="wisden-filter-label">Opponent</span>
                   <select value={opponent} onChange={e => setOpponent(e.target.value)}
                     disabled={opponentsFetch.error !== null}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white disabled:bg-red-50 disabled:border-red-300 disabled:text-red-600">
+                    className="wisden-select">
                     <option value="">
-                      {opponentsFetch.loading ? 'Loading opponents…'
-                        : opponentsFetch.error ? '⚠ failed to load opponents'
-                        : 'Select opponent...'}
+                      {opponentsFetch.loading ? 'Loading…'
+                        : opponentsFetch.error ? '⚠ failed'
+                        : 'Select opponent…'}
                     </option>
                     {opponents.map(t => (
                       <option key={t.name} value={t.name}>{t.name} ({t.matches})</option>
@@ -182,7 +180,7 @@ export default function Teams() {
                 )}
                 {vsData && !vsFetch.loading && !vsFetch.error && (
                   <div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                    <div className="wisden-statrow">
                       <StatCard label="Matches" value={vsData.overall.matches} />
                       <StatCard label="Wins" value={vsData.overall.wins} />
                       <StatCard label="Losses" value={vsData.overall.losses} />

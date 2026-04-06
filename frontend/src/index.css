@@ -440,6 +440,105 @@ a { color: inherit; }
 .wisden-playersearch-error { border-color: var(--accent); color: var(--accent); }
 
 /* ─────────────────────────────────────────────────────────────
+   Page primitives — title, tabs, generic input
+   ───────────────────────────────────────────────────────────── */
+.wisden-page-title {
+  font-family: var(--serif);
+  font-size: 2.25rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variation-settings: "opsz" 60;
+  letter-spacing: -0.015em;
+  margin: 0 0 1rem;
+  line-height: 1.1;
+}
+.wisden-page-subtitle {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--ink-faint);
+  margin: -0.5rem 0 1.25rem;
+}
+
+/* Stat row — strip of StatCards under a page title */
+.wisden-statrow {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0;
+  margin: 1.5rem 0 2rem;
+  border-bottom: 1px solid var(--rule);
+}
+@media (min-width: 640px) {
+  .wisden-statrow { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* Tabs — text-only with oxblood underline on active */
+.wisden-tabs {
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+}
+.wisden-tab {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 0.55rem 0.1rem;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 120ms, border-color 120ms;
+}
+.wisden-tab:hover { color: var(--ink); }
+.wisden-tab.is-active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Generic small input — borderless serif with hairline rule */
+.wisden-input {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  padding: 0.4rem 0.25rem;
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  color: var(--ink);
+  font-variation-settings: "opsz" 14;
+  width: 100%;
+}
+.wisden-input::placeholder { color: var(--ink-faint); font-style: italic; }
+.wisden-input:focus { outline: none; border-bottom-color: var(--accent); }
+
+.wisden-empty {
+  text-align: center;
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--ink-faint);
+  padding: 4rem 1rem;
+}
+.wisden-meta-count {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+}
+.wisden-clear {
+  background: transparent;
+  border: 0;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.wisden-clear:hover { color: var(--accent); }
+
+/* ─────────────────────────────────────────────────────────────
    Page shell — used by content pages that adopt the Wisden idiom
    ───────────────────────────────────────────────────────────── */
 .wisden-page { max-width: 42rem; margin: 0 auto; padding: 2rem 0 4rem; }
