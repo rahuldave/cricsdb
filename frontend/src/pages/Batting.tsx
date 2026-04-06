@@ -37,6 +37,7 @@ export default function Batting() {
   const setUrlParams = useSetUrlParams()
 
   const [inningsOffset, setInningsOffset] = useState(0)
+  const [selectedBowlerId, setSelectedBowlerId] = useState<string | null>(null)
 
   const handleSelect = (p: PlayerSearchResult) => {
     setUrlParams({ player: p.id, tab: 'By Season' })
@@ -237,20 +238,59 @@ export default function Batting() {
             {activeTab === 'vs Bowlers' && (
               <>
                 <TabState fetch={matchupsFetch as FetchState<unknown>} />
-                {!matchupsFetch.loading && !matchupsFetch.error && bowlerMatchups.length > 0 && (
-                  <div>
-                    <ScatterChart
-                      data={bowlerMatchups.filter(m => m.strike_rate != null && m.average != null)}
-                      xAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
-                      yAccessor={(d: Record<string, any>) => (d.average as number) ?? 0}
-                      sizeBy={(d: Record<string, any>) => (d.balls as number) ?? 6}
-                      title="SR vs Average (dot size = balls faced)"
-                      xLabel="Strike Rate" yLabel="Average" width={600} height={400} />
-                    <div className="mt-4">
-                      <DataTable columns={bowlerColumns} data={bowlerMatchups} />
+                {!matchupsFetch.loading && !matchupsFetch.error && bowlerMatchups.length > 0 && (() => {
+                  const valid = bowlerMatchups.filter(m => m.strike_rate != null && m.average != null)
+                  // Top 8 by balls faced get a name label directly on the chart
+                  const topByBalls = [...valid].sort((a, b) => (b.balls ?? 0) - (a.balls ?? 0)).slice(0, 8)
+                  const annotations: Record<string, any>[] = topByBalls.map(m => ({
+                    type: 'react-annotation',
+                    label: m.bowler_name,
+                    x: m.strike_rate, y: m.average, dx: 6, dy: -6,
+                  }))
+                  // If a row is selected, add an extra highlight annotation
+                  const selected = selectedBowlerId
+                    ? valid.find(m => m.bowler_id === selectedBowlerId)
+                    : null
+                  if (selected) {
+                    annotations.push({
+                      type: 'enclose',
+                      label: selected.bowler_name,
+                      x: selected.strike_rate, y: selected.average,
+                      dx: 12, dy: -16, color: '#dc2626',
+                    })
+                  }
+                  return (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-2">
+                        Hover any dot to see the bowler. Top 8 by balls faced are labelled.
+                        Click a row in the table to find that bowler on the chart.
+                      </p>
+                      <ScatterChart
+                        data={valid}
+                        xAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
+                        yAccessor={(d: Record<string, any>) => (d.average as number) ?? 0}
+                        sizeBy={(d: Record<string, any>) => (d.balls as number) ?? 6}
+                        title="SR vs Average (dot size = balls faced)"
+                        xLabel="Strike Rate" yLabel="Average" width={600} height={400}
+                        tooltip={{
+                          title: 'bowler_name',
+                          fields: ['balls', 'runs', 'dismissals', 'strike_rate', 'average'],
+                        }}
+                        annotations={annotations}
+                        pointIdAccessor="bowler_id"
+                      />
+                      <div className="mt-4">
+                        <DataTable
+                          columns={bowlerColumns}
+                          data={bowlerMatchups}
+                          rowKey={(r: Record<string, any>) => r.bowler_id}
+                          highlightKey={selectedBowlerId}
+                          onRowClick={(r: Record<string, any>) => setSelectedBowlerId(r.bowler_id)}
+                        />
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
               </>
             )}
 

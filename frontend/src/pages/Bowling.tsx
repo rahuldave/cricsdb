@@ -35,6 +35,7 @@ export default function Bowling() {
   const setUrlParams = useSetUrlParams()
 
   const [inningsOffset, setInningsOffset] = useState(0)
+  const [selectedBatterId, setSelectedBatterId] = useState<string | null>(null)
 
   const handleSelect = (p: PlayerSearchResult) => {
     setUrlParams({ player: p.id, tab: 'By Season' })
@@ -226,20 +227,57 @@ export default function Bowling() {
             {activeTab === 'vs Batters' && (
               <>
                 <TabState fetch={matchupsFetch as FetchState<unknown>} />
-                {!matchupsFetch.loading && !matchupsFetch.error && batterMatchups.length > 0 && (
-                  <div>
-                    <ScatterChart
-                      data={batterMatchups.filter(m => m.economy != null && m.strike_rate != null)}
-                      xAccessor={(d: Record<string, any>) => (d.economy as number) ?? 0}
-                      yAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
-                      sizeBy={(d: Record<string, any>) => (d.balls as number) ?? 6}
-                      title="Economy vs SR (dot size = balls bowled)"
-                      xLabel="Economy" yLabel="Strike Rate" width={600} height={400} />
-                    <div className="mt-4">
-                      <DataTable columns={batterColumns} data={batterMatchups} />
+                {!matchupsFetch.loading && !matchupsFetch.error && batterMatchups.length > 0 && (() => {
+                  const valid = batterMatchups.filter(m => m.economy != null && m.strike_rate != null)
+                  const topByBalls = [...valid].sort((a, b) => (b.balls ?? 0) - (a.balls ?? 0)).slice(0, 8)
+                  const annotations: Record<string, any>[] = topByBalls.map(m => ({
+                    type: 'react-annotation',
+                    label: m.batter_name,
+                    x: m.economy, y: m.strike_rate, dx: 6, dy: -6,
+                  }))
+                  const selected = selectedBatterId
+                    ? valid.find(m => m.batter_id === selectedBatterId)
+                    : null
+                  if (selected) {
+                    annotations.push({
+                      type: 'enclose',
+                      label: selected.batter_name,
+                      x: selected.economy, y: selected.strike_rate,
+                      dx: 12, dy: -16, color: '#dc2626',
+                    })
+                  }
+                  return (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-2">
+                        Hover any dot to see the batter. Top 8 by balls bowled are labelled.
+                        Click a row in the table to find that batter on the chart.
+                      </p>
+                      <ScatterChart
+                        data={valid}
+                        xAccessor={(d: Record<string, any>) => (d.economy as number) ?? 0}
+                        yAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
+                        sizeBy={(d: Record<string, any>) => (d.balls as number) ?? 6}
+                        title="Economy vs SR (dot size = balls bowled)"
+                        xLabel="Economy" yLabel="Strike Rate" width={600} height={400}
+                        tooltip={{
+                          title: 'batter_name',
+                          fields: ['balls', 'runs_conceded', 'wickets', 'economy', 'strike_rate'],
+                        }}
+                        annotations={annotations}
+                        pointIdAccessor="batter_id"
+                      />
+                      <div className="mt-4">
+                        <DataTable
+                          columns={batterColumns}
+                          data={batterMatchups}
+                          rowKey={(r: Record<string, any>) => r.batter_id}
+                          highlightKey={selectedBatterId}
+                          onRowClick={(r: Record<string, any>) => setSelectedBatterId(r.batter_id)}
+                        />
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
               </>
             )}
 
