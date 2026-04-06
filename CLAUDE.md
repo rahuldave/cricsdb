@@ -133,7 +133,7 @@ that fits the available time.
 
 **C. Fix `wicket.fielders` double-encoding at the source.** Currently `import_data.py` calls `json.dumps(w_data.get("fielders"))` redundantly — deebase's JSON column type also serializes, so the stored value is a JSON string of a JSON string. The matches scorecard router parses twice as a workaround (`api/routers/matches.py:_build_dismissal_text`). Fix: drop the `json.dumps(...)` wrapper in `import_data.py`, rebuild the DB with `import_data.py`, then remove the double-decode branch. ~5-line code change + 15-min DB rebuild.
 
-**D. Bowling-vs-Batters scatter Y axis is counterintuitive.** Currently shows "balls per wicket" which is high=bad but visually prominent. Either flip the Y axis or switch to bowling average (runs per wicket). See `pages/Bowling.tsx` and the Known Issues note above.
+**D. Bowling-vs-Batters scatter Y axis is counterintuitive.** _Done._ Switched the Y metric from bowling strike rate (balls/wicket) to bowling average (runs/wicket), then flipped the Y axis via `frameProps.yExtent = [maxAvg * 1.05, 0]` so low values (good for bowler) sit at the TOP. The visually prominent top-left corner is now where the bowler dominated. `ScatterChart` wrapper gained a `frameProps` pass-through so any scatter can be axis-flipped.
 
 **E. Player search returns abbreviated cricsheet names** ("V Kohli" not "Virat Kohli"). The `personname` table has alias variants — search ranking should prefer alias matches that include a longer/more familiar form when one exists. Backend change in `api/routers/reference.py` (`/api/v1/players`) plus possibly a small ranking heuristic.
 
