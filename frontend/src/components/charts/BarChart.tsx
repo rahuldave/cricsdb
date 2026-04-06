@@ -54,15 +54,23 @@ export default function BarChart<T extends Record<string, any>>({
 
   const categoryFormat = shouldRotate
     ? (label: string) => (
-        // The outer div establishes a positioning context (Semiotic's
-        // wrapper div has no `position: relative`, so without this the
-        // inner absolute would escape to the SVG root and every label
-        // would stack in the upper-left corner).
-        <div style={{ position: 'relative', width: '100%', height: 0 }}>
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            right: '50%',
+        // No `position: absolute` — Safari's foreignObject + abs-pos
+        // is buggy and the labels end up stacked in the SVG corner.
+        // Instead use document flow: a block container with
+        // padding-right:50% reserves the right half of the
+        // foreignObject as empty space, and text-align:right pushes
+        // an inline-block child right up against the LEFT edge of
+        // that empty space — i.e. at the horizontal center of the
+        // foreignObject (which is the tick mark). The rotation pivot
+        // is the top-right corner of that inline-block, so the END of
+        // the label sits at the tick and the rest trails down-left.
+        <div style={{
+          paddingRight: '50%',
+          textAlign: 'right',
+          lineHeight: 0,
+        }}>
+          <span style={{
+            display: 'inline-block',
             transformOrigin: '100% 0',
             transform: 'rotate(-60deg)',
             whiteSpace: 'nowrap',
@@ -71,7 +79,7 @@ export default function BarChart<T extends Record<string, any>>({
             paddingRight: 4,
             lineHeight: 1,
             userSelect: 'none',
-          }}>{label}</div>
+          }}>{label}</span>
         </div>
       )
     : undefined
