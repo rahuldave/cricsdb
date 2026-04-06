@@ -7,6 +7,7 @@ import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
 import DonutChart from '../components/charts/DonutChart'
+import { WISDEN_PHASES } from '../components/charts/palette'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import { getHeadToHead } from '../api'
@@ -100,7 +101,7 @@ export default function HeadToHead() {
                 data={data.by_phase}
                 categoryAccessor="phase" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
                 title="Strike Rate by Phase" categoryLabel="Phase" valueLabel="SR"
-                height={280} colorScheme={['#3b82f6', '#22c55e', '#ef4444']} />
+                height={280} colorScheme={WISDEN_PHASES} />
             )}
             {Object.keys(data.dismissal_kinds).length > 0 && (
               <DonutChart
@@ -116,7 +117,7 @@ export default function HeadToHead() {
                 data={data.by_season.filter(s => s.strike_rate != null)}
                 categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
                 title="Strike Rate by Season" categoryLabel="Season" valueLabel="SR"
-                height={300} colorScheme={['#6366f1']} />
+                height={300} />
             </div>
           )}
 
@@ -127,7 +128,7 @@ export default function HeadToHead() {
                 categoryAccessor="over"
                 valueAccessor="runs"
                 title="Runs by Over" categoryLabel="Over" valueLabel="Runs"
-                height={300} colorScheme={['#8b5cf6']} />
+                height={300} />
             </div>
           )}
 

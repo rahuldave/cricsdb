@@ -706,6 +706,79 @@ a { color: inherit; }
   margin-top: 1.4rem;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Chart styling — Semiotic SVG overrides + chart helpers
+   ───────────────────────────────────────────────────────────── */
+
+/* Chart titles when components render their own (Worm, Manhattan) */
+.wisden-chart-title {
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 0.4rem;
+  font-variation-settings: "opsz" 14;
+}
+.wisden-chart-sub {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  font-weight: 400;
+  margin-left: 0.3rem;
+}
+
+.wisden-wickets-footer {
+  margin-top: 0.5rem;
+  font-family: var(--serif);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  font-variation-settings: "opsz" 14;
+}
+.wisden-wickets-footer .lbl {
+  font-style: italic;
+  color: var(--ink-faint);
+}
+.wisden-wickets-footer > div { margin-bottom: 0.15rem; }
+
+/* Semiotic SVG: axis labels, tick text, frame title.
+   Semiotic v3 emits classes on its axis groups; these selectors
+   match the standard structure. */
+.frame-title,
+.axis-label,
+.title-label {
+  fill: var(--ink) !important;
+  font-family: var(--serif) !important;
+  font-style: italic;
+  font-variation-settings: "opsz" 14;
+}
+.axis text,
+.axis-tick-label,
+.tick text {
+  fill: var(--ink-soft) !important;
+  font-family: var(--sans) !important;
+  font-variant-numeric: tabular-nums;
+}
+.axis path,
+.axis line,
+.axis-baseline,
+.tick line {
+  stroke: var(--rule-soft) !important;
+}
+/* Gridlines, when present, should be hairline */
+.background-graphics line,
+.gridlines line {
+  stroke: var(--rule-soft) !important;
+  stroke-opacity: 0.7;
+}
+/* Legend text */
+.legend-item text,
+.legend text {
+  fill: var(--ink-soft) !important;
+  font-family: var(--sans) !important;
+  font-size: 11px;
+}
+
 /* Tabs — text-only with oxblood underline on active */
 .wisden-tabs {
   display: flex;

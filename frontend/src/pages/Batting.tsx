@@ -10,6 +10,7 @@ import BarChart from '../components/charts/BarChart'
 import LineChart from '../components/charts/LineChart'
 import ScatterChart from '../components/charts/ScatterChart'
 import DonutChart from '../components/charts/DonutChart'
+import { WISDEN, WISDEN_PHASES } from '../components/charts/palette'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import {
@@ -186,11 +187,11 @@ export default function Batting() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <BarChart data={seasonData} categoryAccessor="season" valueAccessor="runs"
                       title="Runs by Season" categoryLabel="Season" valueLabel="Runs"
-                      height={350} colorScheme={['#3b82f6']} />
+                      height={350} />
                     <BarChart data={seasonData.filter(s => s.strike_rate != null)}
                       categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
                       title="Strike Rate by Season" categoryLabel="Season" valueLabel="Strike Rate"
-                      height={350} colorScheme={['#10b981']} />
+                      height={350} />
                   </div>
                 )}
               </>
@@ -207,7 +208,7 @@ export default function Batting() {
                     }))}
                     categoryAccessor="over" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
                     title="Strike Rate by Over" categoryLabel="Over" valueLabel="Strike Rate"
-                    colorBy="phase" colorScheme={['#3b82f6', '#22c55e', '#ef4444']}
+                    colorBy="phase" colorScheme={WISDEN_PHASES}
                     height={350} />
                 )}
               </>
@@ -253,10 +254,11 @@ export default function Batting() {
                     dy: -12,
                     content: (
                       <span style={{
-                        fontSize: 11, fontWeight: 600, color: '#1f2937',
-                        background: 'rgba(255,255,255,0.45)', padding: '0 3px',
-                        borderRadius: 2, whiteSpace: 'nowrap',
-                        textShadow: '0 0 2px rgba(255,255,255,0.9)',
+                        fontSize: 11, fontFamily: 'var(--serif)', fontStyle: 'italic',
+                        color: 'var(--ink)',
+                        background: 'rgba(250,247,240,0.7)', padding: '0 3px',
+                        whiteSpace: 'nowrap',
+                        textShadow: '0 0 2px rgba(250,247,240,0.95)',
                       }}>{m.bowler_name}</span>
                     ),
                   }))
@@ -339,7 +341,7 @@ export default function Batting() {
                       categoryAccessor={(d: Record<string, any>) => String(d.over_number)}
                       valueAccessor="dismissals"
                       title="Dismissals by Over" categoryLabel="Over" valueLabel="Dismissals"
-                      height={300} colorScheme={['#ef4444']} />
+                      height={300} colorScheme={[WISDEN.oxblood]} />
                   </div>
                 )}
               </>
@@ -359,7 +361,7 @@ export default function Batting() {
                       data={interWicket} categoryAccessor={(d: Record<string, any>) => String(d.wickets_down)}
                       valueAccessor="runs"
                       title="Total Runs by Wickets Down" categoryLabel="Wickets Down" valueLabel="Runs"
-                      height={350} colorScheme={['#8b5cf6']} />
+                      height={350} />
                   </div>
                 )}
               </>

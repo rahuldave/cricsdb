@@ -1,5 +1,6 @@
 import { LineChart as SemioticLineChart } from 'semiotic'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
+import { WISDEN_PALETTE } from './palette'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface LineChartProps<T extends Record<string, any>> {
@@ -8,6 +9,7 @@ interface LineChartProps<T extends Record<string, any>> {
   yAccessor?: string | ((d: T) => number)
   lineBy?: string
   colorBy?: string
+  colorScheme?: string[]
   title?: string
   /** When omitted, the chart fills its container via ResizeObserver. */
   width?: number
@@ -26,7 +28,8 @@ interface LineChartProps<T extends Record<string, any>> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function LineChart<T extends Record<string, any>>({
-  data, xAccessor = 'x', yAccessor = 'y', lineBy, colorBy, title,
+  data, xAccessor = 'x', yAccessor = 'y', lineBy, colorBy,
+  colorScheme = WISDEN_PALETTE, title,
   width, height = 400, xLabel, yLabel, showPoints, curve,
   annotations, tooltip,
 }: LineChartProps<T>) {
@@ -42,6 +45,7 @@ export default function LineChart<T extends Record<string, any>>({
           yAccessor={yAccessor}
           lineBy={lineBy}
           colorBy={colorBy}
+          colorScheme={colorScheme}
           title={title}
           width={effectiveWidth}
           height={height}

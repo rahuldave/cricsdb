@@ -1,4 +1,5 @@
 import LineChart from './LineChart'
+import { WISDEN, WISDEN_PALETTE } from './palette'
 import type { ScorecardInnings } from '../../types'
 
 interface Props {
@@ -86,15 +87,15 @@ export default function WormChart({ innings, width, height = 280 }: Props) {
       type: 'highlight',
       field: 'is_wicket',
       value: true,
-      color: '#dc2626',
+      color: WISDEN.oxblood,
       r: 5,
     },
   ]
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-700 mb-2">
-        Worm — cumulative runs <span className="text-xs font-normal text-gray-500">(red dots = wickets)</span>
+      <h3 className="wisden-chart-title">
+        Worm — cumulative runs <span className="wisden-chart-sub">(oxblood dots = wickets)</span>
       </h3>
       <LineChart
         data={data}
@@ -102,6 +103,7 @@ export default function WormChart({ innings, width, height = 280 }: Props) {
         yAccessor="cumulative"
         lineBy="team"
         colorBy="team"
+        colorScheme={WISDEN_PALETTE}
         xLabel="Over"
         yLabel="Runs"
         width={width}
@@ -116,30 +118,28 @@ export default function WormChart({ innings, width, height = 280 }: Props) {
           if (!d.is_wicket) return null
           return (
             <div style={{
-              background: '#fff',
-              border: '1px solid #d1d5db',
-              borderRadius: 4,
-              padding: '6px 8px',
+              background: 'var(--bg)',
+              border: '1px solid var(--rule)',
+              borderTop: '2px solid var(--accent)',
+              padding: '6px 10px',
               fontSize: 12,
-              color: '#1f2937',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              fontFamily: 'var(--serif)',
+              color: 'var(--ink)',
               whiteSpace: 'nowrap',
             }}>
               <div style={{ fontWeight: 600 }}>{String(d.wicket_batter)}</div>
-              <div style={{ color: '#6b7280', fontSize: 11 }}>
+              <div style={{ color: 'var(--ink-faint)', fontStyle: 'italic', fontSize: 11 }}>
                 {String(d.team)} · {String(d.over_ball)} ov · {String(d.cumulative)} runs
               </div>
             </div>
           )
         }}
       />
-      {/* Wickets-fell footer per innings — kept as a sortable list
-          for users who want to scan the wickets without hovering. */}
-      <div className="mt-2 text-xs text-gray-600 space-y-0.5">
+      <div className="wisden-wickets-footer">
         {main.map(inn => (
           inn.fall_of_wickets.length > 0 && (
             <div key={inn.team}>
-              <span className="font-medium text-gray-700">{inn.team} wickets:</span>{' '}
+              <span className="lbl">{inn.team} wickets</span>{' '}
               {inn.fall_of_wickets.map((w, i) => (
                 <span key={w.wicket}>
                   {i > 0 ? ', ' : ''}

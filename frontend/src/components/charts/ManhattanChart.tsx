@@ -1,4 +1,5 @@
 import BarChart from './BarChart'
+import { WISDEN } from './palette'
 import type { ScorecardInnings } from '../../types'
 
 interface Props {
@@ -7,7 +8,7 @@ interface Props {
   height?: number
 }
 
-const COLORS = ['#3b82f6', '#22c55e', '#f97316', '#a855f7']
+const COLORS = [WISDEN.ink, WISDEN.slate, WISDEN.ochre, WISDEN.forest]
 
 /**
  * Manhattan chart — runs scored in each over.
@@ -22,11 +23,11 @@ export default function ManhattanChart({ innings, width, height = 140 }: Props) 
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-700 mb-2">Manhattan — runs per over</h3>
+      <h3 className="wisden-chart-title">Manhattan — runs per over</h3>
       <div className="space-y-3">
         {main.map((inn, idx) => (
           <div key={inn.innings_number}>
-            <div className="text-xs text-gray-600 mb-1">{inn.team}</div>
+            <div className="wisden-chart-sub" style={{ marginBottom: '0.25rem' }}>{inn.team}</div>
             <BarChart
               data={inn.by_over.map(o => ({
                 over: String(o.over),

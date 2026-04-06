@@ -145,7 +145,7 @@ export default function Teams() {
                 {!seasonsFetch.loading && !seasonsFetch.error && seasons.length > 0 && (
                   <BarChart data={seasons} categoryAccessor="season" valueAccessor="wins"
                     title="Wins by Season" categoryLabel="Season" valueLabel="Wins"
-                    height={350} colorScheme={['#22c55e']} />
+                    height={350} />
                 )}
               </>
             )}
@@ -191,7 +191,7 @@ export default function Teams() {
                     {vsData.by_season.length > 0 && (
                       <BarChart data={vsData.by_season} categoryAccessor="season" valueAccessor="wins"
                         title={`Wins vs ${opponent} by Season`} categoryLabel="Season" valueLabel="Wins"
-                        height={300} colorScheme={['#3b82f6']} />
+                        height={300} />
                     )}
                   </div>
                 )}

@@ -1,5 +1,6 @@
 import { Scatterplot } from 'semiotic'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
+import { WISDEN_PALETTE, WISDEN } from './palette'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface ScatterChartProps<T extends Record<string, any>> {
@@ -8,6 +9,8 @@ interface ScatterChartProps<T extends Record<string, any>> {
   yAccessor?: string | ((d: T) => number)
   sizeBy?: string | ((d: T) => number)
   colorBy?: string
+  colorScheme?: string[]
+  pointColor?: string
   title?: string
   /** When omitted, the chart fills its container via ResizeObserver. */
   width?: number
@@ -29,7 +32,8 @@ interface ScatterChartProps<T extends Record<string, any>> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function ScatterChart<T extends Record<string, any>>({
-  data, xAccessor = 'x', yAccessor = 'y', sizeBy, colorBy, title,
+  data, xAccessor = 'x', yAccessor = 'y', sizeBy, colorBy,
+  colorScheme = WISDEN_PALETTE, pointColor = WISDEN.ink, title,
   width, height = 400, xLabel, yLabel,
   tooltip, annotations, pointIdAccessor, frameProps,
 }: ScatterChartProps<T>) {
@@ -45,6 +49,8 @@ export default function ScatterChart<T extends Record<string, any>>({
           yAccessor={yAccessor}
           sizeBy={sizeBy}
           colorBy={colorBy}
+          colorScheme={colorScheme}
+          style={colorBy ? undefined : { fill: pointColor, fillOpacity: 0.55, stroke: pointColor, strokeWidth: 0.5 }}
           title={title}
           width={effectiveWidth}
           height={height}

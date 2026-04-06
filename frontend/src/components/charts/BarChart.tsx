@@ -1,5 +1,6 @@
 import { BarChart as SemioticBarChart } from 'semiotic'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
+import { WISDEN_PALETTE } from './palette'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface BarChartProps<T extends Record<string, any>> {
@@ -27,7 +28,7 @@ interface BarChartProps<T extends Record<string, any>> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function BarChart<T extends Record<string, any>>({
   data, categoryAccessor, valueAccessor, title, width, height = 400,
-  colorScheme, colorBy, categoryLabel, valueLabel, orientation,
+  colorScheme = WISDEN_PALETTE, colorBy, categoryLabel, valueLabel, orientation,
   rotateCategoryLabels = 'auto',
 }: BarChartProps<T>) {
   const [ref, measuredWidth] = useContainerWidth()
@@ -131,7 +132,9 @@ export default function BarChart<T extends Record<string, any>>({
                   transform: 'rotate(-60deg)',
                   whiteSpace: 'nowrap',
                   fontSize: 11,
-                  color: '#555',
+                  fontFamily: 'var(--serif)',
+                  fontStyle: 'italic',
+                  color: 'var(--ink-faint)',
                   paddingRight: 4,
                   lineHeight: 1,
                   userSelect: 'none',

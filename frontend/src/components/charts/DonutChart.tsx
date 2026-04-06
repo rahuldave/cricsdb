@@ -1,4 +1,5 @@
 import { DonutChart as SemioticDonutChart } from 'semiotic'
+import { WISDEN_PALETTE } from './palette'
 
 interface DonutChartProps<T extends Record<string, any>> {
   data: T[]
@@ -13,7 +14,7 @@ interface DonutChartProps<T extends Record<string, any>> {
 
 export default function DonutChart<T extends Record<string, any>>({
   data, categoryAccessor = 'label', valueAccessor = 'value', title,
-  width = 300, height = 300, colorScheme, centerContent,
+  width = 300, height = 300, colorScheme = WISDEN_PALETTE, centerContent,
 }: DonutChartProps<T>) {
   return (
     <SemioticDonutChart

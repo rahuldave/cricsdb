@@ -9,6 +9,7 @@ import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
 import ScatterChart from '../components/charts/ScatterChart'
 import DonutChart from '../components/charts/DonutChart'
+import { WISDEN, WISDEN_PHASES } from '../components/charts/palette'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import {
@@ -174,11 +175,11 @@ export default function Bowling() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <BarChart data={seasonData} categoryAccessor="season" valueAccessor={(d: Record<string, any>) => (d.wickets as number) ?? (d.dismissals as number) ?? 0}
                       title="Wickets by Season" categoryLabel="Season" valueLabel="Wickets"
-                      height={350} colorScheme={['#ef4444']} />
+                      height={350} colorScheme={[WISDEN.oxblood]} />
                     <BarChart data={seasonData.filter(s => s.strike_rate != null)}
                       categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
                       title="Bowling Strike Rate by Season" categoryLabel="Season" valueLabel="SR"
-                      height={350} colorScheme={['#f59e0b']} />
+                      height={350} />
                   </div>
                 )}
               </>
@@ -196,7 +197,7 @@ export default function Bowling() {
                     categoryAccessor="over"
                     valueAccessor={(d: Record<string, any>) => (d.economy as number) ?? 0}
                     title="Economy by Over" categoryLabel="Over" valueLabel="Economy"
-                    colorBy="phase" colorScheme={['#3b82f6', '#22c55e', '#ef4444']}
+                    colorBy="phase" colorScheme={WISDEN_PHASES}
                     height={350} />
                 )}
               </>
@@ -252,10 +253,11 @@ export default function Bowling() {
                     dy: -12,
                     content: (
                       <span style={{
-                        fontSize: 11, fontWeight: 600, color: '#1f2937',
-                        background: 'rgba(255,255,255,0.45)', padding: '0 3px',
-                        borderRadius: 2, whiteSpace: 'nowrap',
-                        textShadow: '0 0 2px rgba(255,255,255,0.9)',
+                        fontSize: 11, fontFamily: 'var(--serif)', fontStyle: 'italic',
+                        color: 'var(--ink)',
+                        background: 'rgba(250,247,240,0.7)', padding: '0 3px',
+                        whiteSpace: 'nowrap',
+                        textShadow: '0 0 2px rgba(250,247,240,0.95)',
                       }}>{m.batter_name}</span>
                     ),
                   }))
@@ -330,7 +332,7 @@ export default function Bowling() {
                       data={Object.entries(wicketData.by_phase).map(([phase, wkts]) => ({ phase, wickets: wkts }))}
                       categoryAccessor="phase" valueAccessor="wickets"
                       title="Wickets by Phase" categoryLabel="Phase" valueLabel="Wickets"
-                      height={300} colorScheme={['#f59e0b']} />
+                      height={300} colorScheme={[WISDEN.oxblood]} />
                   </div>
                 )}
               </>
