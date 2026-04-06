@@ -30,7 +30,7 @@ export default function Home() {
             {recent.map(m => (
               <li key={m.match_id}>
                 <Link
-                  to={`/matches?match=${m.match_id}`}
+                  to={`/matches/${m.match_id}`}
                   className="block px-4 py-3 hover:bg-blue-50 transition-colors"
                 >
                   <div className="flex items-baseline justify-between">

@@ -115,7 +115,19 @@ Read `docs/design-decisions.md` for full details. Key points:
 
 ## Future Enhancements
 
-- **Worm / Manhattan charts on the scorecard.** Per-over runs and cumulative-runs line charts on the Matches page, similar to Cricinfo's innings progression view. Data is in `delivery`; just needs another endpoint and a chart.
-- **Ball-by-ball commentary log.** Render the deliveries of an innings as a scrollable feed (over.ball, batter, bowler, runs/wicket text). Possible directly from `delivery` + `wicket`.
-- **Multi-player intersection filter on Matches.** Currently single player only ("Kohli's matches"). Extend to "matches where Kohli AND Bumrah both played".
-- **Fix `wicket.fielders` double-encoding at the source.** See Known Issues above for details. The current workaround in `api/routers/matches.py` parses JSON twice. To fix: drop the `json.dumps(...)` wrapper in `import_data.py` (deebase serializes JSON columns automatically), rebuild the DB with `import_data.py`, then remove the double-decode branch in `_build_dismissal_text`.
+The list below is roughly ordered by value/effort. Pick the highest one
+that fits the available time.
+
+**A. Loading + error states across all pages.** Right now failed fetches silently render empty content and in-flight fetches show nothing. The Matches list and player-search dropdowns are the most visible offenders. Small change, big polish win — likely a single `useFetch` hook + a tiny `<Spinner />` and `<ErrorBanner />` and roll it out page by page.
+
+**B. Mechanically-generated ball-by-ball commentary tab on the scorecard page.** Cricsheet does NOT ship natural-language commentary like Cricinfo's editorial feed — what we have is structured ball data. So this would render each delivery as a feed line: `19.6 — Bumrah to Kohli — 4 runs (FOUR)` or `19.4 — Bumrah to Sharma — OUT! caught Rohit b Bumrah`. Useful and conventional, but be honest with users that it's generated from data, not a writer's prose.
+
+**C. Fix `wicket.fielders` double-encoding at the source.** Currently `import_data.py` calls `json.dumps(w_data.get("fielders"))` redundantly — deebase's JSON column type also serializes, so the stored value is a JSON string of a JSON string. The matches scorecard router parses twice as a workaround (`api/routers/matches.py:_build_dismissal_text`). Fix: drop the `json.dumps(...)` wrapper in `import_data.py`, rebuild the DB with `import_data.py`, then remove the double-decode branch. ~5-line code change + 15-min DB rebuild.
+
+**D. Bowling-vs-Batters scatter Y axis is counterintuitive.** Currently shows "balls per wicket" which is high=bad but visually prominent. Either flip the Y axis or switch to bowling average (runs per wicket). See `pages/Bowling.tsx` and the Known Issues note above.
+
+**E. Player search returns abbreviated cricsheet names** ("V Kohli" not "Virat Kohli"). The `personname` table has alias variants — search ranking should prefer alias matches that include a longer/more familiar form when one exists. Backend change in `api/routers/reference.py` (`/api/v1/players`) plus possibly a small ranking heuristic.
+
+**F. Multi-player intersection filter on `/matches`.** Currently single player only. Extend `player_id` to `player_ids` and `AND` the EXISTS clauses. UI needs a multi-pill input. Useful but niche.
+
+**G. Worm chart wicket markers as actual chart points** (not just a footer line). Currently the worm renders as two clean lines plus a "Wickets fell at: ..." text line beneath, because the existing Semiotic high-level wrappers don't expose per-point styling. To add markers we'd either drop down to `XYFrame` directly or layer a separate `Scatterplot` overlay. Worth doing for visual narrative but not critical.

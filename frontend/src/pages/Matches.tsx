@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
-import { getMatches, getMatchScorecard, getTeams } from '../api'
+import { getMatches, getTeams } from '../api'
 import PlayerSearch from '../components/PlayerSearch'
-import ScorecardView from '../components/Scorecard'
-import type { MatchListItem, Scorecard, TeamInfo } from '../types'
+import type { MatchListItem, TeamInfo } from '../types'
 
 const PAGE_SIZE = 50
 
 export default function Matches() {
+  const navigate = useNavigate()
   const filters = useFilters()
   const [team, setTeam] = useUrlParam('team')
   const [playerId] = useUrlParam('player')
   const [playerName] = useUrlParam('player_name')
-  const [matchId, setMatchId] = useUrlParam('match')
   const setUrlParams = useSetUrlParams()
 
   const [teamQuery, setTeamQuery] = useState(team || '')
@@ -23,8 +23,6 @@ export default function Matches() {
   const [matches, setMatches] = useState<MatchListItem[]>([])
   const [total, setTotal] = useState(0)
   const [offset, setOffset] = useState(0)
-
-  const [scorecard, setScorecard] = useState<Scorecard | null>(null)
 
   // Reset pagination when filters change
   useEffect(() => { setOffset(0) }, [
@@ -47,14 +45,6 @@ export default function Matches() {
     }).catch(() => { setMatches([]); setTotal(0) })
   }, [filters.gender, filters.team_type, filters.tournament,
       filters.season_from, filters.season_to, team, playerId, offset])
-
-  // Fetch scorecard when matchId in URL changes
-  useEffect(() => {
-    if (!matchId) { setScorecard(null); return }
-    getMatchScorecard(Number(matchId))
-      .then(setScorecard)
-      .catch(() => setScorecard(null))
-  }, [matchId])
 
   // Team autocomplete
   useEffect(() => {
@@ -142,11 +132,10 @@ export default function Matches() {
           </thead>
           <tbody>
             {matches.map(m => {
-              const selected = matchId === String(m.match_id)
               return (
                 <tr key={m.match_id}
-                  onClick={() => setMatchId(String(m.match_id))}
-                  className={`border-b border-gray-100 cursor-pointer ${selected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                  onClick={() => navigate(`/matches/${m.match_id}`)}
+                  className="border-b border-gray-100 cursor-pointer hover:bg-blue-50">
                   <td className="px-3 py-2 whitespace-nowrap text-gray-600">{m.date || '-'}</td>
                   <td className="px-3 py-2">
                     <div className="font-medium text-gray-900">{m.team1} vs {m.team2}</div>
@@ -189,7 +178,6 @@ export default function Matches() {
       </div>
 
       {/* Scorecard */}
-      {scorecard && <ScorecardView data={scorecard} />}
     </div>
   )
 }

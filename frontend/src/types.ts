@@ -372,6 +372,13 @@ export interface ScorecardFallOfWicket {
   over_ball: string
 }
 
+export interface OverProgression {
+  over: number
+  runs: number
+  wickets: number
+  cumulative: number
+}
+
 export interface ScorecardInnings {
   innings_number: number
   team: string
@@ -386,6 +393,7 @@ export interface ScorecardInnings {
   extras: ScorecardExtras
   fall_of_wickets: ScorecardFallOfWicket[]
   bowling: ScorecardBowler[]
+  by_over: OverProgression[]
 }
 
 export interface ScorecardInfo {

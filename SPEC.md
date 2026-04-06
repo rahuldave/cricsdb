@@ -1227,6 +1227,11 @@ Return everything needed to render a full scorecard for one match.
           "noballs": 0
         },
         ...
+      ],
+      "by_over": [
+        { "over": 1, "runs": 8, "wickets": 0, "cumulative": 8 },
+        { "over": 2, "runs": 12, "wickets": 1, "cumulative": 20 },
+        ...
       ]
     },
     ... (innings 2)
@@ -1339,13 +1344,32 @@ ORDER BY first_delivery_id
 Overs displayed as `f"{legal_balls//6}.{legal_balls%6}"`. Econ is
 `runs / (legal_balls/6)`.
 
+*Per-over progression* (used by the worm + Manhattan charts):
+```sql
+SELECT over_number,
+       SUM(runs_total) as runs,
+       SUM(CASE WHEN d.id IN (SELECT delivery_id FROM wicket) THEN 1 ELSE 0 END) as wickets
+FROM delivery d
+WHERE innings_id = :iid
+GROUP BY over_number
+ORDER BY over_number
+```
+Wickets per over use `IN (SELECT delivery_id FROM wicket)` rather than
+the bowler-credit exclusions, because the worm/Manhattan show the
+*team's* wickets falling, not just bowler-credited ones. Cumulative is
+computed in Python with a running sum. Over numbers in the response
+are 1-indexed for display.
+
 #### Decisions captured
 
 These choices were agreed up front and govern the implementation:
 
-1. **Same-page list + scorecard**, with the selected match on a URL
-   query param (`?match=1234567`) so links are shareable. No separate
-   route.
+1. **Dedicated scorecard route** at `/matches/:matchId`. The match
+   list at `/matches` was originally on the same page as the
+   scorecard via a `?match=` query param, but the long list above the
+   scorecard made the latter hard to read. Each row in the list is
+   now a `<Link>` to the dedicated page. (Decision revised after the
+   first cut shipped.)
 2. **Single-player filter** (not multi-player intersection). 95% of
    the use case is "show me Kohli's matches"; multi-player can be
    added later if needed.
@@ -1565,31 +1589,38 @@ Filters sync to URL query params so pages are shareable/bookmarkable.
 └──────────────────────────────────────────────────────┘
 ```
 
-### 4.6 Page: Matches (`/matches`)
+### 4.6 Pages: Matches (`/matches`) and Match Scorecard (`/matches/:matchId`)
 
-A scorecard browser. Combines the global filter bar with a team picker
-and a player picker, lists matching matches, and renders a full
-Cricinfo-style scorecard for the selected match underneath.
+A two-page scorecard browser. The list page at `/matches` combines
+the global filter bar with a team picker and a player picker and
+shows matching matches. Clicking a match navigates to a dedicated
+scorecard page at `/matches/:matchId` with the full Cricinfo-style
+view plus worm and Manhattan charts.
 
-**Layout:**
+**`/matches` (list page):**
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  [Global FilterBar]  Men/Women  Intl/Club  Tournament │
-│                       Season-from  Season-to          │
+│  [Global FilterBar]                                   │
 ├──────────────────────────────────────────────────────┤
-│  [Team search: e.g. "SRH"]  [Player search: "Kohli"]  │
+│  [Team search]  [Player search]            12,940 ⓘ  │
 ├──────────────────────────────────────────────────────┤
-│  Match list (paginated, 50/page)                     │
+│  Match list (paginated, 50/page) — each row is a Link │
 │  ┌─────────────────────────────────────────────────┐ │
 │  │ 2024-05-26 | MI vs CSK | Wankhede | IPL Final   │ │
 │  │            | MI 187/4 (20)  CSK 184/9 (20)      │ │
 │  │            | MI won by 5 wickets                │ │
 │  └─────────────────────────────────────────────────┘ │
 │  ...                                                 │
+└──────────────────────────────────────────────────────┘
+```
+
+**`/matches/:matchId` (scorecard page):**
+
+```
+┌──────────────────────────────────────────────────────┐
+│  ← Back to matches                                   │
 ├──────────────────────────────────────────────────────┤
-│  [Scorecard (when ?match= is set in URL)]            │
-│                                                      │
 │  Match header                                        │
 │  ┌─────────────────────────────────────────────────┐ │
 │  │ MI vs CSK · IPL Final · Wankhede · 2024-05-26   │ │
@@ -1598,56 +1629,53 @@ Cricinfo-style scorecard for the selected match underneath.
 │  │ Player of the Match: JJ Bumrah                  │ │
 │  └─────────────────────────────────────────────────┘ │
 │                                                      │
+│  Charts row (stack on narrow screens)                 │
+│  ┌──────────────────────┐ ┌──────────────────────┐  │
+│  │ Worm                 │ │ Manhattan            │  │
+│  │ Cumulative runs vs   │ │ Runs per over per    │  │
+│  │ over (line per       │ │ innings (bars,       │  │
+│  │ innings)             │ │ side-by-side)        │  │
+│  │ Wickets fell at:     │ │                      │  │
+│  │ 23/1 (2.4), 45/2...  │ │                      │  │
+│  └──────────────────────┘ └──────────────────────┘  │
+│                                                      │
 │  CSK Innings — 184/9 (20.0)                          │
 │  ┌─────────────────────────────────────────────────┐ │
-│  │ Batter         Dismissal           R   B  4 6 SR│ │
-│  │ Gaikwad        c Rohit b Bumrah    53 38  5 2.. │ │
-│  │ ...                                              │ │
-│  │ Extras  (b 0, lb 4, w 6, nb 1)               11 │ │
-│  │ Total                              184/9 (20.0) │ │
-│  │ Did not bat: Ali, Chahar                        │ │
-│  │                                                  │ │
-│  │ Fall of wickets: 1-23 (Gaikwad, 2.4 ov), ...    │ │
-│  │                                                  │ │
-│  │ Bowler       O    M  R  W  Econ  wd nb          │ │
-│  │ Bumrah       4.0  1 18  3  4.50   0  0          │ │
-│  │ ...                                              │ │
+│  │ Batting / Extras / Total / DNB / FoW / Bowling  │ │
 │  └─────────────────────────────────────────────────┘ │
 │                                                      │
 │  MI Innings — 187/4 (19.2)                           │
-│  ┌─────────────────────────────────────────────────┐ │
-│  │ ... same structure ...                          │ │
-│  └─────────────────────────────────────────────────┘ │
+│  ...                                                  │
 │                                                      │
 │  [Super Over innings cards if applicable]            │
 └──────────────────────────────────────────────────────┘
 ```
 
 **URL state:**
-- `?team=`, `?player=`, `?match=` (the selected match for the scorecard)
-- Standard global filter params
+- List page: `?team=`, `?player=`, `?player_name=`, plus global filters.
+- Scorecard page: `:matchId` is the only state — fully shareable URL.
 
 **Data flow:**
-1. Filters/team/player change → `GET /api/v1/matches?...&limit=50&offset=...`
-   re-fetches the list. Pagination controls underneath.
-2. User clicks a match row → set `?match={id}` in URL.
-3. `?match=` change → `GET /api/v1/matches/{id}/scorecard` → render
-   header + N innings cards.
+1. List page mounts → `GET /api/v1/matches?...&limit=50&offset=...`.
+2. User clicks a match row → `<Link to="/matches/{id}">` navigates.
+3. Scorecard page mounts → `GET /api/v1/matches/{id}/scorecard`,
+   renders header → charts → innings.
 
 **Components (new):**
-- `pages/Matches.tsx` — page wiring (filters, list fetch, scorecard fetch).
-- `components/Scorecard.tsx` — top-level scorecard renderer (header + N innings).
-- `components/InningsCard.tsx` — one innings: batting table, extras line,
-  total, did-not-bat, fall-of-wickets, bowling table.
-- `components/TeamSearch.tsx` — small reusable team-name search input
-  (also used elsewhere if needed).
+- `pages/Matches.tsx` — list page (filters, list fetch).
+- `pages/MatchScorecard.tsx` — scorecard page (fetch by `:matchId`).
+- `components/Scorecard.tsx` — header + innings + officials renderer.
+- `components/InningsCard.tsx` — one innings card.
+- `components/charts/WormChart.tsx` — multi-line cumulative-runs chart
+  (uses the existing `LineChart` wrapper around Semiotic).
+- `components/charts/ManhattanChart.tsx` — runs-per-over bars; renders
+  one chart per innings stacked vertically inside its container.
 
 **Reuses:**
-- `FilterBar` and `useFilters` (no changes needed).
+- `FilterBar` and `useFilters` (no changes).
 - `PlayerSearch` for the player filter input.
-- `DataTable` for batting/bowling tables (already supports
-  sortable columns).
-- `useUrlParam` / `useSetUrlParams` for URL state.
+- `useUrlParam` / `useSetUrlParams` for URL state on the list page.
+- `useParams` from react-router for `:matchId` on the scorecard page.
 
 ---
 

@@ -1,11 +1,14 @@
+import type { ReactNode } from 'react'
 import type { Scorecard } from '../types'
 import InningsCard from './InningsCard'
 
 interface Props {
   data: Scorecard
+  /** Optional content rendered between the header card and the innings cards (e.g. charts). */
+  children?: ReactNode
 }
 
-export default function ScorecardView({ data }: Props) {
+export default function ScorecardView({ data, children }: Props) {
   const { info, innings } = data
   const tossText = info.toss_winner && info.toss_decision
     ? `${info.toss_winner} won the toss and chose to ${info.toss_decision}`
@@ -40,6 +43,9 @@ export default function ScorecardView({ data }: Props) {
           </div>
         )}
       </div>
+
+      {/* Optional middle slot (charts) */}
+      {children}
 
       {/* Innings cards */}
       {innings.map((inn, i) => (

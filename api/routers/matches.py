@@ -568,6 +568,32 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
             "noballs": b["noballs"] or 0,
         })
 
+    # ---- By-over progression (for worm + Manhattan) ----
+    over_rows = await db.q(
+        """
+        SELECT
+            d.over_number,
+            SUM(d.runs_total) as runs,
+            SUM(CASE WHEN EXISTS (SELECT 1 FROM wicket w WHERE w.delivery_id = d.id)
+                     THEN 1 ELSE 0 END) as wickets
+        FROM delivery d
+        WHERE d.innings_id = :iid
+        GROUP BY d.over_number
+        ORDER BY d.over_number
+        """,
+        {"iid": iid},
+    )
+    cum = 0
+    by_over = []
+    for r in over_rows:
+        cum += r["runs"] or 0
+        by_over.append({
+            "over": (r["over_number"] or 0) + 1,  # display as 1-indexed
+            "runs": r["runs"] or 0,
+            "wickets": r["wickets"] or 0,
+            "cumulative": cum,
+        })
+
     label = f"Super Over ({team})" if is_super else f"{team} Innings"
 
     return {
@@ -584,4 +610,5 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
         "extras": extras,
         "fall_of_wickets": fall_of_wickets,
         "bowling": bowling,
+        "by_over": by_over,
     }
