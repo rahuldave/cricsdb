@@ -78,7 +78,7 @@ export default function HeadToHead() {
       {enabled && data && !loading && !error && (
         <>
           <h2 className="wisden-page-title">
-            {data.batter.name} <span style={{ fontStyle: 'italic', color: 'var(--accent)', fontWeight: 400 }}>v</span> {data.bowler.name}
+            {data.batter.name} <span style={{ fontStyle: 'italic', color: 'var(--ink)', fontWeight: 400 }}>v</span> {data.bowler.name}
           </h2>
 
           <div className="wisden-statrow cols-5">

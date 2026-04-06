@@ -82,7 +82,7 @@ a { color: inherit; }
   font-family: var(--serif);
   font-weight: 600;
   font-size: 1.5rem;
-  color: var(--ink);
+  color: var(--accent);  /* subject = oxblood */
   text-decoration: none;
   letter-spacing: -0.01em;
   font-variation-settings: "opsz" 36;
@@ -91,7 +91,7 @@ a { color: inherit; }
 .wisden-amp {
   font-style: italic;
   font-weight: 400;
-  color: var(--accent);
+  color: var(--ink);  /* connective = ink italic */
 }
 .wisden-nav-links {
   display: none;
@@ -547,7 +547,7 @@ a { color: inherit; }
   font-family: var(--serif);
   font-size: 2rem;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--accent);  /* subject = oxblood */
   font-variation-settings: "opsz" 60;
   letter-spacing: -0.015em;
   margin: 0 0 0.5rem;
@@ -556,7 +556,7 @@ a { color: inherit; }
 .wisden-match-header .vs {
   font-style: italic;
   font-weight: 400;
-  color: var(--ink-faint);
+  color: var(--ink);  /* connective = ink italic */
 }
 .wisden-match-meta {
   font-family: var(--serif);
@@ -919,11 +919,12 @@ a { color: inherit; }
   letter-spacing: -0.02em;
   margin: 0.5rem 0 1rem;
   font-variation-settings: "opsz" 144;
+  color: var(--accent);  /* subject = oxblood */
 }
 .title-amp {
   font-style: italic;
   font-weight: 400;
-  color: var(--accent);
+  color: var(--ink);  /* connective = ink italic */
   font-variation-settings: "opsz" 144;
 }
 .standfirst {
