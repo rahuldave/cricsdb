@@ -46,26 +46,25 @@ docs/                 — frontend-build-pipeline.md, design-decisions.md
 ## Running Locally
 
 ```bash
-# Backend (port 8000)
-uv run uvicorn api.app:app --port 8000
+# Terminal 1 — backend
+uv run uvicorn api.app:app --reload --port 8000
 
-# Frontend dev server (port 5173, proxies /api → 8000)
+# Terminal 2 — frontend
 cd frontend && npm run dev
 ```
 
-Open http://localhost:5173
+Open http://localhost:5173. Vite proxies `/api/*` → port 8000.
+
+See `docs/local-development.md` for prerequisites, the project-layout cheat sheet, type-check / build commands, troubleshooting, and how to query the DB from a Python REPL.
 
 ## Deploying
 
 ```bash
-# First deploy (uploads 435MB database):
-bash deploy.sh --first
-
-# Subsequent deploys (code only, DB persists in plash's data/):
-bash deploy.sh
+bash deploy.sh           # code-only (DB persists on plash)
+bash deploy.sh --first   # uploads cricket.db (~435 MB)
 ```
 
-The deploy script stages a clean `build_plash/` directory with only the needed files. deebase is vendored (plash runs Python 3.12, deebase needs 3.13+).
+See `docs/deploying.md` for what does/doesn't ship, the deebase vendoring quirk, the `.plash` identity file, and troubleshooting.
 
 ## Rebuilding / Updating the Database
 
@@ -112,3 +111,11 @@ Read `docs/design-decisions.md` for full details. Key points:
 - The deebase admin at /admin/ doesn't load on plash (deebase[api] extras not installed in vendored setup).
 - Inter-wicket analysis is Python-side processing (~200ms for top players) — could be slow under load.
 - Consider adding indexes on `(delivery.bowler_id, delivery.innings_id)` compound index for bowling queries.
+- **`wicket.fielders` is double-JSON-encoded in the DB.** The import path in `import_data.py` does `json.dumps(w_data.get("fielders"))`, but deebase's JSON column type also serializes the value, so the stored string is e.g. `'"[{\"name\": \"SL Malinga\"}]"'` — a JSON string whose contents are themselves a JSON-encoded list. The matches scorecard router (`api/routers/matches.py:_build_dismissal_text`) works around this by calling `json.loads` twice. To fix at the source: in `import_data.py` pass the raw list (`w_data.get("fielders")`) instead of `json.dumps(...)` and rebuild the DB. Other JSON-typed columns (`match.dates`, `match.officials`, `match.player_of_match`, `innings.powerplays`) store correctly already — only `wicket.fielders` has the double-encode bug because it's the only one wrapped in `json.dumps` before insert.
+
+## Future Enhancements
+
+- **Worm / Manhattan charts on the scorecard.** Per-over runs and cumulative-runs line charts on the Matches page, similar to Cricinfo's innings progression view. Data is in `delivery`; just needs another endpoint and a chart.
+- **Ball-by-ball commentary log.** Render the deliveries of an innings as a scrollable feed (over.ball, batter, bowler, runs/wicket text). Possible directly from `delivery` + `wicket`.
+- **Multi-player intersection filter on Matches.** Currently single player only ("Kohli's matches"). Extend to "matches where Kohli AND Bumrah both played".
+- **Fix `wicket.fielders` double-encoding at the source.** See Known Issues above for details. The current workaround in `api/routers/matches.py` parses JSON twice. To fix: drop the `json.dumps(...)` wrapper in `import_data.py` (deebase serializes JSON columns automatically), rebuild the DB with `import_data.py`, then remove the double-decode branch in `_build_dismissal_text`.
