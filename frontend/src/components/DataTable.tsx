@@ -51,13 +51,13 @@ export default function DataTable<T extends Record<string, any> = Record<string,
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full text-sm">
+      <table className="wisden-table">
         <thead>
-          <tr className="border-b border-gray-200 bg-gray-50">
+          <tr>
             {columns.map(col => (
               <th
                 key={col.key}
-                className={`px-3 py-2 text-left font-medium text-gray-600 ${col.sortable ? 'cursor-pointer hover:text-gray-900 select-none' : ''}`}
+                className={col.sortable ? 'is-sortable' : undefined}
                 onClick={col.sortable ? () => handleSort(col.key) : undefined}
               >
                 {col.label}
@@ -70,18 +70,19 @@ export default function DataTable<T extends Record<string, any> = Record<string,
           {sorted.map((row, i) => {
             const key = rowKey ? rowKey(row) : null
             const isHighlighted = !!(key && highlightKey && key === highlightKey)
+            const cls = [
+              isHighlighted ? 'is-highlighted' : '',
+              onRowClick ? 'is-clickable' : '',
+            ].filter(Boolean).join(' ')
             return (
               <tr
                 key={key ?? i}
                 ref={isHighlighted ? highlightedRowRef : undefined}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={`border-b border-gray-100 ${
-                  isHighlighted ? 'bg-yellow-100' :
-                  onRowClick ? 'cursor-pointer hover:bg-blue-50' : 'hover:bg-gray-50'
-                }`}
+                className={cls || undefined}
               >
                 {columns.map(col => (
-                  <td key={col.key} className="px-3 py-2 text-gray-700">
+                  <td key={col.key}>
                     {col.format ? col.format(row[col.key], row) : String(row[col.key] ?? '-')}
                   </td>
                 ))}
@@ -89,16 +90,16 @@ export default function DataTable<T extends Record<string, any> = Record<string,
             )
           })}
           {sorted.length === 0 && (
-            <tr><td colSpan={columns.length} className="px-3 py-8 text-center text-gray-400">No data</td></tr>
+            <tr><td colSpan={columns.length} className="wisden-table-empty">No data</td></tr>
           )}
         </tbody>
       </table>
       {pagination && (
-        <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-500">
-          <span>Showing {pagination.offset + 1}-{Math.min(pagination.offset + pagination.limit, pagination.total)} of {pagination.total}</span>
-          <div className="flex gap-2">
-            <button disabled={pagination.offset === 0} onClick={() => pagination.onPage(Math.max(0, pagination.offset - pagination.limit))} className="px-3 py-1 rounded border disabled:opacity-40">Prev</button>
-            <button disabled={pagination.offset + pagination.limit >= pagination.total} onClick={() => pagination.onPage(pagination.offset + pagination.limit)} className="px-3 py-1 rounded border disabled:opacity-40">Next</button>
+        <div className="wisden-pagination">
+          <span>Showing <span className="num">{pagination.offset + 1}</span>–<span className="num">{Math.min(pagination.offset + pagination.limit, pagination.total)}</span> of <span className="num">{pagination.total}</span></span>
+          <div className="wisden-pagination-buttons">
+            <button disabled={pagination.offset === 0} onClick={() => pagination.onPage(Math.max(0, pagination.offset - pagination.limit))}>← Prev</button>
+            <button disabled={pagination.offset + pagination.limit >= pagination.total} onClick={() => pagination.onPage(pagination.offset + pagination.limit)}>Next →</button>
           </div>
         </div>
       )}

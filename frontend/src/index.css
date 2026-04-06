@@ -207,6 +207,239 @@ a { color: inherit; }
 .wisden-filter-dash { color: var(--ink-faint); }
 
 /* ─────────────────────────────────────────────────────────────
+   Shared components — StatCard, DataTable, Spinner, ErrorBanner, PlayerSearch
+   ───────────────────────────────────────────────────────────── */
+
+/* StatCard — no card chrome, just a labeled stat block */
+.wisden-stat {
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+  border-top: 1px solid var(--rule);
+}
+.wisden-stat-label {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  font-variation-settings: "opsz" 14;
+}
+.wisden-stat-value {
+  font-family: var(--serif);
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variation-settings: "opsz" 36;
+  line-height: 1.15;
+  margin-top: 0.15rem;
+}
+.wisden-stat-sub {
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 0.15rem;
+}
+
+/* DataTable */
+.wisden-table {
+  min-width: 100%;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  border-collapse: collapse;
+}
+.wisden-table thead tr {
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.wisden-table th {
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--ink);
+  font-variation-settings: "opsz" 14;
+  white-space: nowrap;
+}
+.wisden-table th.is-sortable { cursor: pointer; user-select: none; }
+.wisden-table th.is-sortable:hover { color: var(--accent); }
+.wisden-table tbody tr {
+  border-bottom: 1px solid var(--rule-soft);
+  transition: background 120ms;
+}
+.wisden-table tbody tr:hover { background: var(--bg-soft); }
+.wisden-table tbody tr.is-clickable { cursor: pointer; }
+.wisden-table tbody tr.is-highlighted { background: #F4E9C9; }
+.wisden-table tbody tr.is-highlighted:hover { background: #EFE0B0; }
+.wisden-table td {
+  padding: 0.55rem 0.75rem;
+  color: var(--ink-soft);
+  vertical-align: top;
+}
+.wisden-table-empty {
+  text-align: center;
+  padding: 2rem 0.75rem !important;
+  color: var(--ink-faint);
+  font-style: italic;
+  font-family: var(--serif);
+}
+.wisden-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  font-family: var(--sans);
+}
+.wisden-pagination-buttons { display: flex; gap: 0.5rem; }
+.wisden-pagination-buttons button {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  padding: 0.15rem 0.4rem;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+.wisden-pagination-buttons button:hover:not(:disabled) {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.wisden-pagination-buttons button:disabled { opacity: 0.35; cursor: default; }
+
+/* Spinner */
+.wisden-spinner-wrap { color: var(--ink-faint); font-family: var(--serif); font-style: italic; }
+.wisden-spinner {
+  border-color: var(--rule-soft);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ErrorBanner — restrained: hairline border, no filled background */
+.wisden-errorbanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  border-top: 2px solid var(--accent);
+  border-bottom: 1px solid var(--rule-soft);
+  background: var(--bg-soft);
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.wisden-errorbanner-mark {
+  flex-shrink: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--accent);
+  line-height: 1;
+  margin-top: 0.1rem;
+}
+.wisden-errorbanner-body { flex: 1; }
+.wisden-errorbanner-title {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--ink);
+  font-variation-settings: "opsz" 14;
+}
+.wisden-errorbanner-msg { color: var(--ink-soft); margin-top: 0.15rem; }
+.wisden-errorbanner-retry {
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--accent);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.1rem 0.2rem;
+  cursor: pointer;
+}
+.wisden-errorbanner-retry:hover { color: var(--ink); border-bottom-color: var(--ink); }
+
+/* PlayerSearch */
+.wisden-playersearch { position: relative; width: 100%; max-width: 28rem; }
+.wisden-playersearch-input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  padding: 0.5rem 0.25rem;
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  color: var(--ink);
+  font-variation-settings: "opsz" 14;
+}
+.wisden-playersearch-input::placeholder { color: var(--ink-faint); font-style: italic; }
+.wisden-playersearch-input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+.wisden-playersearch-loading {
+  position: absolute;
+  right: 0.4rem;
+  top: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+}
+.wisden-playersearch-list {
+  position: absolute;
+  z-index: 10;
+  margin-top: 0.25rem;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  list-style: none;
+  padding: 0;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+.wisden-playersearch-list li {
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.wisden-playersearch-list li:last-child { border-bottom: 0; }
+.wisden-playersearch-list li:hover { background: var(--bg-soft); }
+.wisden-playersearch-name {
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  color: var(--ink);
+  font-variation-settings: "opsz" 14;
+}
+.wisden-playersearch-meta {
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.wisden-playersearch-empty,
+.wisden-playersearch-error {
+  position: absolute;
+  z-index: 10;
+  margin-top: 0.25rem;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  padding: 0.7rem 0.85rem;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--ink-faint);
+}
+.wisden-playersearch-error { border-color: var(--accent); color: var(--accent); }
+
+/* ─────────────────────────────────────────────────────────────
    Page shell — used by content pages that adopt the Wisden idiom
    ───────────────────────────────────────────────────────────── */
 .wisden-page { max-width: 42rem; margin: 0 auto; padding: 2rem 0 4rem; }

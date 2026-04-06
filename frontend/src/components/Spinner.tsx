@@ -11,9 +11,9 @@ const SIZE_CLASSES = {
 
 export default function Spinner({ label, size = 'md' }: SpinnerProps) {
   return (
-    <div className="flex items-center justify-center gap-3 py-8 text-gray-500">
+    <div className="flex items-center justify-center gap-3 py-8 wisden-spinner-wrap">
       <span
-        className={`inline-block rounded-full border-gray-300 border-t-blue-500 animate-spin ${SIZE_CLASSES[size]}`}
+        className={`inline-block rounded-full wisden-spinner ${SIZE_CLASSES[size]}`}
         role="status"
         aria-label={label || 'Loading'}
       />

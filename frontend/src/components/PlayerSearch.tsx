@@ -58,21 +58,20 @@ export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSear
   }, [])
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-md">
+    <div ref={containerRef} className="wisden-playersearch">
       <input
         type="text"
         value={query}
         onChange={e => setQuery(e.target.value)}
-        placeholder={placeholder || `Search ${role}s...`}
-        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        placeholder={placeholder || `Search ${role}s…`}
+        className="wisden-playersearch-input"
       />
-      {loading && <div className="absolute right-3 top-2.5 text-xs text-gray-400">...</div>}
+      {loading && <div className="wisden-playersearch-loading">…</div>}
       {open && results.length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-y-auto">
+        <ul className="wisden-playersearch-list">
           {results.map(p => (
             <li
               key={p.id}
-              className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex justify-between"
               onClick={() => {
                 clearTimeout(timerRef.current)
                 suppressedQuery.current = p.name
@@ -81,21 +80,17 @@ export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSear
                 setOpen(false)
               }}
             >
-              <span className="font-medium text-sm">{p.name}</span>
-              <span className="text-xs text-gray-400">{p.innings} inn</span>
+              <span className="wisden-playersearch-name">{p.name}</span>
+              <span className="wisden-playersearch-meta num">{p.innings} inn</span>
             </li>
           ))}
         </ul>
       )}
       {open && results.length === 0 && !loading && query.length >= 2 && !error && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg px-4 py-3 text-sm text-gray-400">
-          No players found
-        </div>
+        <div className="wisden-playersearch-empty">No players found</div>
       )}
       {open && error && !loading && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border border-red-200 bg-red-50 shadow-lg px-4 py-3 text-sm text-red-700">
-          Search failed: {error}
-        </div>
+        <div className="wisden-playersearch-error">Search failed: {error}</div>
       )}
     </div>
   )
