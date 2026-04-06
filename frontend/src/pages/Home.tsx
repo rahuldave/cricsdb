@@ -12,18 +12,29 @@ export default function Home() {
   const recent = data?.matches ?? []
 
   return (
-    <div className="max-w-3xl mx-auto py-12">
-      <h1 className="text-4xl font-bold text-gray-900 mb-4">T20 CricsDB</h1>
-      <p className="text-lg text-gray-600 mb-8">
-        A T20 cricket analytics platform covering 12,940 matches across international and club cricket,
-        with ball-by-ball data for 2.95 million deliveries.
-      </p>
+    <div className="wisden-page">
+      {/* Masthead */}
+      <header className="masthead">
+        <div className="kicker">Est. 2024 · A T20 Almanack</div>
+        <h1 className="title">
+          T20 <span className="title-amp">&amp;</span> CricsDB
+        </h1>
+        <div className="rule-double" />
+        <p className="standfirst">
+          An almanack of Twenty20 cricket — twelve thousand nine hundred and forty matches,
+          two million nine hundred and fifty thousand deliveries, one hundred and sixty
+          thousand wickets — drawn from international and club competition the world over.
+        </p>
+      </header>
 
-      {/* Last 5 matches */}
-      <div className="mb-10">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">
-          Most recent matches
-        </h2>
+      {/* Recent fixtures */}
+      <section className="wisden-section">
+        <div className="section-head">
+          <span className="section-label">From the Recent Fixtures</span>
+          <Link to="/matches" className="section-more">All matches →</Link>
+        </div>
+        <div className="rule" />
+
         {loading && <Spinner label="Loading recent matches…" />}
         {error && !loading && (
           <ErrorBanner
@@ -32,101 +43,133 @@ export default function Home() {
           />
         )}
         {!loading && !error && recent.length > 0 && (
-          <ul className="bg-white rounded-lg border border-gray-200 shadow-sm divide-y divide-gray-100">
-            {recent.map(m => (
-              <li key={m.match_id}>
-                <Link
-                  to={`/matches/${m.match_id}`}
-                  className="block px-4 py-3 hover:bg-blue-50 transition-colors"
-                >
-                  <div className="flex items-baseline justify-between">
-                    <div className="font-medium text-gray-900">
-                      {m.team1} vs {m.team2}
+          <ol className="fixtures">
+            {recent.map((m) => (
+              <li key={m.match_id} className="fixture">
+                <Link to={`/matches/${m.match_id}`} className="fixture-link">
+                  <div className="fixture-row">
+                    <div className="fixture-teams">
+                      <span className="team">{m.team1}</span>
+                      <span className="versus"> v </span>
+                      <span className="team">{m.team2}</span>
                     </div>
-                    <div className="text-xs text-gray-500 whitespace-nowrap ml-3">
-                      {m.date}
-                    </div>
+                    <div className="fixture-date num">{m.date}</div>
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {m.tournament}{m.city ? ` · ${m.city}` : ''}
+                  <div className="fixture-meta">
+                    {m.tournament}
+                    {m.city ? ` · ${m.city}` : ''}
                   </div>
-                  <div className="text-sm text-gray-700 mt-1">
+                  <div className="fixture-result">
                     {m.result_text}
                     {(m.team1_score || m.team2_score) && (
-                      <span className="text-gray-500">
+                      <span className="fixture-scores">
                         {' — '}
-                        {m.team1_score && `${m.team1} ${m.team1_score}`}
+                        {m.team1_score && (
+                          <>
+                            {m.team1} <span className="num">{m.team1_score}</span>
+                          </>
+                        )}
                         {m.team1_score && m.team2_score && ', '}
-                        {m.team2_score && `${m.team2} ${m.team2_score}`}
+                        {m.team2_score && (
+                          <>
+                            {m.team2} <span className="num">{m.team2_score}</span>
+                          </>
+                        )}
                       </span>
                     )}
                   </div>
                 </Link>
               </li>
             ))}
-          </ul>
+          </ol>
         )}
-      </div>
+      </section>
 
-      <div className="grid grid-cols-2 gap-6 mb-12">
-        <Link to="/batting" className="block rounded-lg border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Batting</h2>
-          <p className="text-sm text-gray-500">
-            Career stats, strike rates by over and phase, bowler matchups,
-            dismissal analysis, and inter-wicket performance for 10,000+ batters.
-          </p>
-        </Link>
-        <Link to="/bowling" className="block rounded-lg border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Bowling</h2>
-          <p className="text-sm text-gray-500">
-            Economy, wickets, batter matchups, wicket types, and over-by-over
-            analysis for 7,400+ bowlers.
-          </p>
-        </Link>
-        <Link to="/teams" className="block rounded-lg border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Teams</h2>
-          <p className="text-sm text-gray-500">
-            Win/loss records, head-to-head matchups, and season-by-season results
-            for 322 teams across international and club cricket.
-          </p>
-        </Link>
-        <Link to="/head-to-head" className="block rounded-lg border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Head to Head</h2>
-          <p className="text-sm text-gray-500">
-            Deep dive into any batter vs bowler matchup: phase breakdowns,
-            season trends, and match-by-match history.
-          </p>
-        </Link>
-      </div>
+      {/* Departments */}
+      <section className="wisden-section">
+        <div className="section-head">
+          <span className="section-label">The Departments</span>
+        </div>
+        <div className="rule" />
+        <dl className="departments">
+          <Link to="/batting" className="dept">
+            <dt>Batting</dt>
+            <dd>
+              Career records, strike rates by over and phase, bowler matchups,
+              dismissal analysis, and inter-wicket performance for upwards of ten
+              thousand batters.
+            </dd>
+          </Link>
+          <div className="rule-thin" />
+          <Link to="/bowling" className="dept">
+            <dt>Bowling</dt>
+            <dd>
+              Economy, wickets, batter matchups, modes of dismissal, and over-by-over
+              analysis for seven thousand four hundred bowlers.
+            </dd>
+          </Link>
+          <div className="rule-thin" />
+          <Link to="/teams" className="dept">
+            <dt>Teams</dt>
+            <dd>
+              Win and loss records, head-to-head encounters, and season-by-season
+              results for three hundred and twenty-two sides across international and
+              club cricket.
+            </dd>
+          </Link>
+          <div className="rule-thin" />
+          <Link to="/head-to-head" className="dept">
+            <dt>Head to Head</dt>
+            <dd>
+              A close reading of any batter against any bowler: phase breakdowns,
+              season trends, and a complete match-by-match record.
+            </dd>
+          </Link>
+        </dl>
+      </section>
 
-      <div className="rounded-lg bg-gray-50 border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-700 mb-3">Coverage</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-gray-600">
-          <div>
-            <div className="font-medium text-gray-900">International</div>
+      {/* Coverage */}
+      <section className="wisden-section">
+        <div className="section-head">
+          <span className="section-label">In the Volume</span>
+        </div>
+        <div className="rule" />
+        <div className="coverage">
+          <div className="coverage-col">
+            <div className="coverage-head">International</div>
             <div>Men's &amp; Women's T20Is</div>
             <div>T20 World Cups, Asia Cups</div>
             <div>Bilateral series</div>
           </div>
-          <div>
-            <div className="font-medium text-gray-900">Major Leagues</div>
+          <div className="coverage-col">
+            <div className="coverage-head">Major Leagues</div>
             <div>IPL, BBL, PSL, CPL</div>
             <div>The Hundred, T20 Blast</div>
-            <div>WPL, WBBL, and more</div>
+            <div>WPL, WBBL, and others</div>
           </div>
-          <div>
-            <div className="font-medium text-gray-900">Data</div>
-            <div>12,940 matches</div>
-            <div>2.95M deliveries</div>
-            <div>160K wickets</div>
+          <div className="coverage-col coverage-stats">
+            <div className="coverage-head">The Record</div>
+            <div>
+              <span className="big-num num">12,940</span>
+              <span className="big-num-label">matches</span>
+            </div>
+            <div>
+              <span className="big-num num">2.95M</span>
+              <span className="big-num-label">deliveries</span>
+            </div>
+            <div>
+              <span className="big-num num">160K</span>
+              <span className="big-num-label">wickets</span>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <p className="text-xs text-gray-400 mt-8 text-center">
-        Data sourced from <a href="https://cricsheet.org" className="underline" target="_blank" rel="noopener">Cricsheet</a> (ODC-BY 1.0 license).
-        Built with deebase, FastAPI, React, and Semiotic.
-      </p>
+      <div className="rule-double" />
+      <footer className="colophon">
+        Compiled from <a href="https://cricsheet.org" target="_blank" rel="noopener">Cricsheet</a>{' '}
+        under the ODC-BY 1.0 licence. Built with deebase, FastAPI, React, and Semiotic.
+      </footer>
     </div>
   )
 }
