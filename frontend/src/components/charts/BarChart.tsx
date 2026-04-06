@@ -50,8 +50,11 @@ export default function BarChart<T extends Record<string, any>>({
   // mark, slightly above the foreignObject top) so the END of the
   // label touches the tick and the rest trails down-and-to-the-left.
   const pxPerBar = data.length > 0 ? effectiveWidth / data.length : 0
+  // Auto-rotate when each bar gets less than ~45px of horizontal space.
+  // Earlier 28px threshold was too tight for season-year labels (e.g.
+  // "2009/10") on charts that had ~50px per bar.
   const shouldRotate = (rotateCategoryLabels === true)
-    || (rotateCategoryLabels === 'auto' && pxPerBar > 0 && pxPerBar < 28)
+    || (rotateCategoryLabels === 'auto' && pxPerBar > 0 && pxPerBar < 45)
 
   // When rotating, we suppress Semiotic's default labels (which live
   // inside <foreignObject> and break in Safari with any positioning

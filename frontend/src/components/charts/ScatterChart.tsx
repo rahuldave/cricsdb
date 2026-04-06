@@ -1,6 +1,7 @@
 import { Scatterplot } from 'semiotic'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
 import { WISDEN_PALETTE, WISDEN } from './palette'
+const DEFAULT_POINT = WISDEN.indigo
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface ScatterChartProps<T extends Record<string, any>> {
@@ -33,7 +34,7 @@ interface ScatterChartProps<T extends Record<string, any>> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function ScatterChart<T extends Record<string, any>>({
   data, xAccessor = 'x', yAccessor = 'y', sizeBy, colorBy,
-  colorScheme = WISDEN_PALETTE, pointColor = WISDEN.ink, title,
+  colorScheme = WISDEN_PALETTE, pointColor = DEFAULT_POINT, title,
   width, height = 400, xLabel, yLabel,
   tooltip, annotations, pointIdAccessor, frameProps,
 }: ScatterChartProps<T>) {
