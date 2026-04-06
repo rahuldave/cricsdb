@@ -64,16 +64,16 @@ function buildMatrix(
   return matrix
 }
 
-// Heatmap tints harmonized with the Wisden palette: oxblood-tinted
-// for wickets, ochre-tinted for high strike rate. Empty cells fade to
+// Heatmap tints — all from the palette tokens defined in index.css
+// (--tint-wicket, --tint-strong, --tint-soft). Empty cells fade to
 // the soft cream so they recede behind active cells.
 function cellBg(cell: Cell): string | undefined {
   if (cell.balls === 0) return 'var(--bg-soft)'
-  if (cell.wickets > 0) return '#E8C8C8' // oxblood-tinted
+  if (cell.wickets > 0) return 'var(--tint-wicket)'
   if (cell.balls >= 4) {
     const sr = (cell.runs / cell.balls) * 100
-    if (sr >= 200) return '#E8D4A8' // strong ochre
-    if (sr >= 150) return '#F0E2BE' // light ochre
+    if (sr >= 200) return 'var(--tint-strong)'
+    if (sr >= 150) return 'var(--tint-soft)'
   }
   return 'var(--bg)'
 }
@@ -109,6 +109,7 @@ export default function MatchupGridChart({ innings, linkParams = '', highlightBa
         <span className="wisden-chart-sub">batters × bowlers · click any cell for the head-to-head</span>
       </div>
       <div className="rule" />
+      <div className="wisden-scroll-hint">← swipe to scroll →</div>
 
       <div className="overflow-x-auto">
         <table
@@ -210,7 +211,7 @@ export default function MatchupGridChart({ innings, linkParams = '', highlightBa
                       key={j}
                       ref={isHL ? highlightCellRef : undefined}
                       style={{
-                        backgroundColor: isHL ? '#F4E9C9' : cellBg(cell),
+                        backgroundColor: isHL ? 'var(--highlight)' : cellBg(cell),
                         textAlign: 'center',
                         verticalAlign: 'middle',
                         height: '1.5rem',

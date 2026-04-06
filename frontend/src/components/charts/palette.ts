@@ -33,3 +33,57 @@ export const WISDEN_PHASES: string[] = [WISDEN.indigo, WISDEN.ochre, WISDEN.oxbl
  * oxblood wicket markers on the worm.
  */
 export const WISDEN_PAIR: string[] = [WISDEN.indigo, WISDEN.ochre]
+
+/**
+ * Semantic delivery palette for the per-ball innings grid. Each
+ * category has its own hue family so a viewer can scan a wall of
+ * cells and read the rhythm of the innings at a glance.
+ *
+ * Hue families:
+ *   - Off-bat runs: forest green ramp (low → high saturation)
+ *   - Wides / no-balls: ochre (extras off the bat)
+ *   - Byes / leg-byes: slate (extras off the body / pad)
+ *   - Wickets: oxblood (the brand wicket color)
+ *   - At-crease stripes: faint cream tints, one slate-leaning, one ochre-leaning
+ *
+ * All harmonized with the cream page background — no Tailwind primaries.
+ */
+export const DELIVERY = {
+  // Off-bat runs ramp. Index = runs scored.
+  // The 0 cell is the cream-soft so dots fade into the page.
+  run0: '#F2EDE0',
+  run1: '#D5E0CC',
+  run2: '#A8C29B',
+  run3: '#7AA56B',
+  run4: '#5C8D49',
+  run5: '#447030',
+  run6: '#2D5520',
+
+  // Extras — ochre family (off-bat) and slate family (off-pad).
+  wide:    '#E8D4A8',  // pale ochre
+  noball:  '#D9B870',  // stronger ochre
+  bye:     '#B8C7D5',  // pale slate
+  legbye:  '#8FA5BC',  // medium slate
+
+  // Wicket — always oxblood.
+  wicket:  WISDEN.oxblood,
+
+  // At-crease alternating stripes. Both faint cream tints — they
+  // recede behind the saturated semantic colors but are clearly
+  // distinct from each other.
+  atCreaseA: '#EAE3D2',  // warm cream
+  atCreaseB: '#E3E5DE',  // cool cream
+} as const
+
+/** Off-bat run color by runs scored. */
+export const deliveryRunColor = (runs: number): string => {
+  switch (runs) {
+    case 0: return DELIVERY.run0
+    case 1: return DELIVERY.run1
+    case 2: return DELIVERY.run2
+    case 3: return DELIVERY.run3
+    case 4: return DELIVERY.run4
+    case 5: return DELIVERY.run5
+    default: return DELIVERY.run6  // 6+
+  }
+}

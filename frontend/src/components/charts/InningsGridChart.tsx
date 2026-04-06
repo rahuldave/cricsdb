@@ -1,4 +1,5 @@
 import type { InningsGridInnings, InningsGridDelivery } from '../../types'
+import { DELIVERY, deliveryRunColor } from './palette'
 
 interface Props {
   innings: InningsGridInnings
@@ -15,35 +16,20 @@ const HIST_W = `calc(${HIST_CELL} * ${HIST_CELLS} + 0.25rem)`
 const SCORE_W = '3rem'        // cum-score column
 const WKT_W = '18rem'         // wicket-text + partnership column
 
-// Source colors
-const COLOR_OFFBAT = (runs: number): string => {
-  switch (runs) {
-    case 0: return '#f3f4f6'
-    case 1: return '#bbf7d0'
-    case 2: return '#86efac'
-    case 3: return '#4ade80'
-    case 4: return '#22c55e'
-    case 5: return '#16a34a'
-    case 6: return '#15803d'
-    default: return '#166534'
-  }
-}
-const COLOR_WIDE = '#fde047'    // yellow
-const COLOR_NOBALL = '#facc15'  // slightly darker yellow
-const COLOR_BYE = '#fb923c'     // orange
-const COLOR_LEGBYE = '#fdba74'  // light orange
-const COLOR_WICKET = '#dc2626'  // red
+// Source colors — all from the semantic DELIVERY palette in palette.ts.
+const COLOR_OFFBAT = deliveryRunColor
+const COLOR_WIDE   = DELIVERY.wide
+const COLOR_NOBALL = DELIVERY.noball
+const COLOR_BYE    = DELIVERY.bye
+const COLOR_LEGBYE = DELIVERY.legbye
+const COLOR_WICKET = DELIVERY.wicket
 // Two alternating tints for the at-crease stripe — one per partnership
-// "slot". The earlier blue-50 + violet-50 pair was too pale to register
-// against white at any zoom level. Going for a clear cool-warm split:
-// blue-100 + pink-100. Both stay at the -100 level so they recede
-// behind the saturated semantic colors (greens, wicket red, extras
-// yellow/orange) but are OBVIOUSLY different from each other. Pink
-// avoided clashing with red-600 because the lightness gap is huge.
-// When a batter gets out, the new batter inherits the slot (and shade)
-// of the partner they replaced.
-const COLOR_AT_CREASE_A = '#dbeafe'   // pale blue (Tailwind blue-100)
-const COLOR_AT_CREASE_B = '#fce7f3'   // pale pink (Tailwind pink-100)
+// "slot". When a batter gets out, the new batter inherits the slot (and
+// shade) of the partner they replaced. Both are faint cream tints so
+// they recede behind the saturated run/extras/wicket colors but stay
+// distinct from each other.
+const COLOR_AT_CREASE_A = DELIVERY.atCreaseA
+const COLOR_AT_CREASE_B = DELIVERY.atCreaseB
 const COLOR_AT_CREASE = COLOR_AT_CREASE_A  // for the legend swatch
 
 interface CellInfo {
@@ -55,13 +41,13 @@ interface CellInfo {
 
 function cellInfo(d: InningsGridDelivery, isDismissedColumn: boolean): CellInfo {
   if (isDismissedColumn) {
-    return { bg: COLOR_WICKET, text: 'W', color: '#fff', noBallMark: false }
+    return { bg: COLOR_WICKET, text: 'W', color: 'var(--bg)', noBallMark: false }
   }
   if (d.runs_batter > 0) {
     return {
       bg: COLOR_OFFBAT(d.runs_batter),
       text: String(d.runs_batter),
-      color: d.runs_batter >= 4 ? '#fff' : '#1f2937',
+      color: d.runs_batter >= 4 ? 'var(--bg)' : 'var(--ink)',
       noBallMark: d.extras_noballs > 0,
     }
   }
@@ -70,7 +56,7 @@ function cellInfo(d: InningsGridDelivery, isDismissedColumn: boolean): CellInfo 
     return {
       bg: COLOR_WIDE,
       text: extra > 0 ? `w${extra}` : 'w',
-      color: '#1f2937',
+      color: 'var(--ink)',
       noBallMark: false,
     }
   }
@@ -79,7 +65,7 @@ function cellInfo(d: InningsGridDelivery, isDismissedColumn: boolean): CellInfo 
     return {
       bg: COLOR_NOBALL,
       text: 'n',
-      color: '#1f2937',
+      color: 'var(--ink)',
       noBallMark: false,
     }
   }
@@ -89,11 +75,11 @@ function cellInfo(d: InningsGridDelivery, isDismissedColumn: boolean): CellInfo 
     return {
       bg: d.extras_byes > 0 ? COLOR_BYE : COLOR_LEGBYE,
       text: total > 0 ? `${tag}${total}` : tag,
-      color: '#1f2937',
+      color: 'var(--ink)',
       noBallMark: false,
     }
   }
-  return { bg: '#f3f4f6', text: '·', color: '#9ca3af', noBallMark: false }
+  return { bg: 'var(--bg-soft)', text: '·', color: 'var(--ink-faint)', noBallMark: false }
 }
 
 /**
@@ -247,11 +233,12 @@ export default function InningsGridChart({ innings }: Props) {
         <Legend color={COLOR_NOBALL} label="no-ball" />
         <Legend color={COLOR_WICKET} label="wicket" />
         <span style={{ color: 'var(--ink-faint)' }}>
-          (small <span style={{ color: '#C9871F', fontWeight: 700 }}>n</span> on a green
+          (small <span style={{ color: 'var(--accent)', fontWeight: 700 }}>n</span> on a green
           cell = no-ball with off-bat runs)
         </span>
       </div>
 
+      <div className="wisden-scroll-hint">← swipe to scroll →</div>
       <div className="overflow-x-auto">
         <div style={{ display: 'inline-block', minWidth: '100%' }}>
           {/* Header row */}
@@ -339,7 +326,7 @@ export default function InningsGridChart({ innings }: Props) {
                   <div
                     style={{ width: OVER_W }}
                     className={`text-[9px] tabular-nums pr-1 text-right ${
-                      newOver ? 'text-gray-600 font-medium' : 'text-gray-300'
+                      newOver ? 'wisden-grid-meta font-medium' : 'wisden-grid-faint'
                     }`}
                   >
                     {d.over_ball}
@@ -347,7 +334,7 @@ export default function InningsGridChart({ innings }: Props) {
                   <div
                     style={{ width: BOWLER_W }}
                     className={`text-[10px] truncate pr-2 text-right ${
-                      newBowler ? 'text-gray-700 font-medium' : 'text-gray-300'
+                      newBowler ? 'wisden-grid-strong font-medium' : 'wisden-grid-faint'
                     }`}
                     title={d.bowler}
                   >
@@ -403,7 +390,7 @@ export default function InningsGridChart({ innings }: Props) {
                               top: '-0.0625rem',
                               right: '0.0625rem',
                               fontSize: '0.5rem',
-                              color: '#ea580c',
+                              color: 'var(--accent)',
                               fontWeight: 700,
                               lineHeight: 1,
                             }}
@@ -428,7 +415,7 @@ export default function InningsGridChart({ innings }: Props) {
                             width: `calc(${HIST_CELL} - 1px)`,
                             height: `calc(${CELL} - 0.25rem)`,
                             backgroundColor: unitColor || 'transparent',
-                            borderRight: '1px solid #f3f4f6',
+                            borderRight: '1px solid var(--rule-soft)',
                             position: 'relative',
                           }}
                         >
@@ -439,7 +426,7 @@ export default function InningsGridChart({ innings }: Props) {
                                 left: '0.0625rem',
                                 top: '-0.0625rem',
                                 fontSize: '0.5625rem',
-                                color: '#000',
+                                color: 'var(--ink)',
                                 fontWeight: 700,
                                 lineHeight: 1,
                               }}
@@ -453,7 +440,7 @@ export default function InningsGridChart({ innings }: Props) {
                   </div>
                   <div
                     style={{ width: SCORE_W, borderRight: '1px solid var(--rule)', height: CELL }}
-                    className="text-[10px] tabular-nums pl-2 text-gray-600 flex items-center"
+                    className="text-[10px] tabular-nums pl-2 wisden-grid-meta flex items-center"
                   >
                     {d.cumulative_runs}/{d.cumulative_wickets}
                   </div>
@@ -549,7 +536,7 @@ function SummaryRow({
   accent: 'gray' | 'blue'
 }) {
   const labelClass = accent === 'blue' ? 'wisden-grid-label-blue' : 'wisden-grid-label'
-  const borderTop = accent === 'blue' ? '1px solid #bfdbfe' : '1px solid #e5e7eb'
+  const borderTop = accent === 'blue' ? '1px solid var(--accent-soft)' : '1px solid var(--rule-soft)'
   return (
     <div
       className="flex items-center"
@@ -590,7 +577,7 @@ function SummaryRow({
       </div>
       <div
         style={{ width: SCORE_W, borderRight: '1px solid var(--rule)', height }}
-        className="text-[9px] tabular-nums pl-2 text-gray-700 font-semibold flex items-center"
+        className="text-[9px] tabular-nums pl-2 wisden-grid-strong font-semibold flex items-center"
       >
         {score}
       </div>
@@ -608,7 +595,7 @@ function Legend({ color, label }: { color: string; label: string }) {
           width: '0.75rem',
           height: '0.75rem',
           display: 'inline-block',
-          border: '1px solid #e5e7eb',
+          border: '1px solid var(--rule-soft)',
         }}
       />
       {label}

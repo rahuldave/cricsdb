@@ -271,7 +271,7 @@ export default function Bowling() {
                       type: 'highlight',
                       field: 'batter_id',
                       value: selectedBatterId,
-                      color: '#7A1F1F',
+                      color: 'var(--accent)',
                       r: 14,
                     })
                     annotations.push({
@@ -280,7 +280,7 @@ export default function Bowling() {
                       average: selected.average,
                       label: selected.batter_name,
                       dx: 24, dy: -28,
-                      color: '#7A1F1F',
+                      color: 'var(--accent)',
                     })
                   }
                   return (

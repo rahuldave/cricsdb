@@ -12,8 +12,17 @@
   --ink-faint: #8A7D70;  /* labels, metadata */
   --rule:      #1A1714;  /* primary rule */
   --rule-soft: #E0D8CC;  /* hairline rule */
-  --accent:    #7A1F1F;  /* oxblood */
+  --accent:      #7A1F1F;  /* oxblood */
   --accent-soft: #A84545;
+
+  /* Semantic state tints — used by row/cell highlights and the
+     matchup-grid heatmap. All derived from the cream/oxblood/ochre
+     family so they harmonize with the page. */
+  --highlight:        #F4E9C9;  /* scrolled-into-view highlight */
+  --highlight-hover:  #EFE0B0;
+  --tint-wicket:      #E8C8C8;  /* oxblood-tinted, for matchup grid */
+  --tint-strong:      #E8D4A8;  /* strong ochre, for high SR */
+  --tint-soft:        #F0E2BE;  /* light ochre, for medium SR */
 
   --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
   --sans:  'Inter Tight', -apple-system, system-ui, sans-serif;
@@ -269,8 +278,8 @@ a { color: inherit; }
 }
 .wisden-table tbody tr:hover { background: var(--bg-soft); }
 .wisden-table tbody tr.is-clickable { cursor: pointer; }
-.wisden-table tbody tr.is-highlighted { background: #F4E9C9; }
-.wisden-table tbody tr.is-highlighted:hover { background: #EFE0B0; }
+.wisden-table tbody tr.is-highlighted { background: var(--highlight); }
+.wisden-table tbody tr.is-highlighted:hover { background: var(--highlight-hover); }
 .wisden-table td {
   padding: 0.55rem 0.75rem;
   color: var(--ink-soft);
@@ -473,6 +482,9 @@ a { color: inherit; }
 @media (min-width: 640px) {
   .wisden-statrow { grid-template-columns: repeat(4, 1fr); }
 }
+/* 5-card variant: use 3 cols on mobile so we get a clean 3+2 split
+   instead of 2+2+1 with an orphan, then 5 cols at lg. */
+.wisden-statrow.cols-5 { grid-template-columns: repeat(3, 1fr); }
 @media (min-width: 1024px) {
   .wisden-statrow.cols-5 { grid-template-columns: repeat(5, 1fr); }
 }
@@ -636,7 +648,7 @@ a { color: inherit; }
 }
 .wisden-innings tbody tr:hover { background: var(--bg-soft); }
 .wisden-innings tbody tr.is-highlighted {
-  background: #F4E9C9;
+  background: var(--highlight);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 .wisden-innings td { padding: 0.45rem 0.5rem; color: var(--ink-soft); vertical-align: top; }
@@ -822,6 +834,26 @@ a { color: inherit; }
   text-decoration: none;
 }
 .wisden-matchup-grid a.matchup-cell-link:hover { color: var(--accent); }
+
+/* InningsGrid text helper classes (replace raw Tailwind grays). */
+.wisden-grid-faint  { color: var(--ink-faint); opacity: 0.5; }
+.wisden-grid-meta   { color: var(--ink-faint); }
+.wisden-grid-strong { color: var(--ink-soft); }
+
+/* Mobile scroll affordance for wide grids (matchup, innings).
+   A small italic-serif hint shown only on narrow viewports. */
+.wisden-scroll-hint {
+  display: none;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  text-align: right;
+  padding: 0.2rem 0.5rem 0.4rem;
+}
+@media (max-width: 767px) {
+  .wisden-scroll-hint { display: block; }
+}
 
 /* Tabs — text-only with oxblood underline on active */
 .wisden-tabs {
