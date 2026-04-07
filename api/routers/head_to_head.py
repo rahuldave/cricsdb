@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from ..dependencies import get_db
 from ..filters import FilterParams
@@ -37,15 +37,21 @@ async def head_to_head(
         base_parts.append(where)
     base_clause = " AND ".join(base_parts)
 
-    # Person names
+    # Person names — 404 on either side if the id doesn't resolve, so
+    # an invalid id never silently renders a fake H2H page with the raw
+    # id as the name.
     batter_rows = await db.q(
         "SELECT name FROM person WHERE id = :batter_id", {"batter_id": batter_id}
     )
+    if not batter_rows:
+        raise HTTPException(status_code=404, detail=f"Batter not found: {batter_id}")
     bowler_rows = await db.q(
         "SELECT name FROM person WHERE id = :bowler_id", {"bowler_id": bowler_id}
     )
-    batter_name = batter_rows[0]["name"] if batter_rows else batter_id
-    bowler_name = bowler_rows[0]["name"] if bowler_rows else bowler_id
+    if not bowler_rows:
+        raise HTTPException(status_code=404, detail=f"Bowler not found: {bowler_id}")
+    batter_name = batter_rows[0]["name"]
+    bowler_name = bowler_rows[0]["name"]
 
     # Summary
     summary_rows = await db.q(

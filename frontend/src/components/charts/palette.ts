@@ -51,13 +51,16 @@ export const WISDEN_PAIR: string[] = [WISDEN.indigo, WISDEN.ochre]
 export const DELIVERY = {
   // Off-bat runs ramp. Index = runs scored.
   // The 0 cell is the cream-soft so dots fade into the page.
+  // Muted compared to bright Tailwind greens; the gap between 4 and
+  // 6 was widened (4 is a soft sage, 6 is a deeper sage with more
+  // saturation) so the boundary cells stay distinguishable on cream.
   run0: '#F2EDE0',
-  run1: '#D5E0CC',
-  run2: '#A8C29B',
-  run3: '#7AA56B',
-  run4: '#5C8D49',
-  run5: '#447030',
-  run6: '#2D5520',
+  run1: '#E1E6D2',
+  run2: '#C2D1AF',
+  run3: '#9DBA82',
+  run4: '#7AA063',
+  run5: '#557A40',
+  run6: '#3A5926',
 
   // Extras — ochre family (off-bat) and slate family (off-pad).
   wide:    '#E8D4A8',  // pale ochre

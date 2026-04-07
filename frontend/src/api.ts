@@ -16,7 +16,17 @@ async function fetchApi<T>(path: string, params?: Record<string, string | number
     }
   }
   const res = await fetch(url.toString())
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  if (!res.ok) {
+    // FastAPI HTTPException puts the message under `detail`. Surface it
+    // so the UI can show "Bowler not found: 14ba0d6a" instead of just
+    // "API error: 404".
+    let detail: string | null = null
+    try {
+      const body = await res.json()
+      if (body && typeof body.detail === 'string') detail = body.detail
+    } catch { /* ignore — body wasn't JSON */ }
+    throw new Error(detail ?? `API error: ${res.status}`)
+  }
   return res.json()
 }
 
