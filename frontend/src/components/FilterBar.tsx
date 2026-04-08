@@ -46,6 +46,23 @@ export default function FilterBar() {
   const teamType = params.get('team_type') || ''
   const tournament = params.get('tournament') || ''
 
+  // Self-correcting deep links: when a URL has ?tournament=X but no
+  // gender or team_type (e.g. clicking the IPL link on the home page),
+  // fill them in from the tournament's metadata as soon as the
+  // tournaments list loads. Without this, /matches?tournament=IPL
+  // would aggregate IPL men + WPL women for any team that exists in
+  // both — see docs/design-decisions.md "Tournament deep links".
+  useEffect(() => {
+    if (tournaments.length === 0 || !tournament) return
+    if (gender && teamType) return
+    const t = tournaments.find(x => x.event_name === tournament)
+    if (!t) return
+    const updates: Record<string, string> = {}
+    if (!gender && t.gender) updates.gender = t.gender
+    if (!teamType && t.team_type) updates.team_type = t.team_type
+    if (Object.keys(updates).length > 0) setUrlParams(updates)
+  }, [tournaments, tournament, gender, teamType])
+
   const setGender = (v: string) => {
     const updates: Record<string, string> = { gender: v }
     if (tournament) {
