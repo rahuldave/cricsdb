@@ -331,6 +331,15 @@ async def main():
     print(f"\nDatabase saved to {DB_PATH}")
     print(f"Size: {os.path.getsize(DB_PATH) / 1024 / 1024:.1f} MB")
 
+    # Refresh frontend/src/generated/site-stats.json so the home page
+    # masthead and Featured section pick up the new totals.
+    print("\nRegenerating site stats…")
+    import subprocess
+    subprocess.run(
+        ["python", "scripts/generate_site_stats.py"],
+        check=False,
+    )
+
 
 if __name__ == "__main__":
     asyncio.run(main())

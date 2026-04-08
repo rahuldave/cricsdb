@@ -1,0 +1,73 @@
+{
+  "totals": {
+    "matches": 12940,
+    "deliveries": 2954405,
+    "wickets": 160418
+  },
+  "featured_teams": [
+    {
+      "name": "Royal Challengers Bengaluru",
+      "blurb": "IPL & WPL",
+      "matches": 306
+    },
+    {
+      "name": "Chennai Super Kings",
+      "blurb": "IPL",
+      "matches": 253
+    },
+    {
+      "name": "India",
+      "blurb": "International",
+      "matches": 427
+    },
+    {
+      "name": "Australia",
+      "blurb": "International",
+      "matches": 375
+    }
+  ],
+  "featured_players": [
+    {
+      "id": "ba607b88",
+      "name": "V Kohli",
+      "role": "batter",
+      "gender": "male",
+      "stat": "12,661 runs"
+    },
+    {
+      "id": "462411b3",
+      "name": "JJ Bumrah",
+      "role": "bowler",
+      "gender": "male",
+      "stat": "318 wkts"
+    },
+    {
+      "id": "5d2eda89",
+      "name": "S Mandhana",
+      "role": "batter",
+      "gender": "female",
+      "stat": "7,224 runs"
+    },
+    {
+      "id": "be150fc8",
+      "name": "EA Perry",
+      "role": "bowler",
+      "gender": "female",
+      "stat": "183 wkts"
+    }
+  ],
+  "featured_matchups": [
+    {
+      "batter_id": "740742ef",
+      "bowler_id": "ce820073",
+      "label": "RG Sharma vs Sandeep Sharma",
+      "stat": "38 off 44"
+    },
+    {
+      "batter_id": "d32cf49a",
+      "bowler_id": "63e3b6b3",
+      "label": "HK Matthews vs M Kapp",
+      "stat": "235 off 226"
+    }
+  ]
+}

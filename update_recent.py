@@ -261,6 +261,14 @@ async def main():
 
         print(f"\nImported {imported} matches ({failed} failed)")
 
+        if imported > 0:
+            print("\nRegenerating site stats…")
+            import subprocess
+            subprocess.run(
+                ["python", "scripts/generate_site_stats.py"],
+                check=False,
+            )
+
     finally:
         if args.keep:
             print(f"Kept workdir: {workdir}")

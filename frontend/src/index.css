@@ -1103,3 +1103,24 @@ a { color: inherit; }
 @media (max-width: 640px) {
   .coverage { grid-template-columns: 1fr; gap: 1.5rem; }
 }
+
+/* Featured grid — Teams / Players / Matchups */
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem 2rem;
+  margin-top: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+.featured-grid > div > div { margin-bottom: 0.35rem; }
+.featured-meta {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  font-variation-settings: "opsz" 14;
+}
+@media (max-width: 640px) {
+  .featured-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+}

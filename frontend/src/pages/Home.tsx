@@ -3,12 +3,34 @@ import { Link } from 'react-router-dom'
 import { getMatches } from '../api'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import siteStats from '../generated/site-stats.json'
+
+const fmt = (n: number) => n.toLocaleString()
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 
 function CompLink({ event, children }: { event: string; children: React.ReactNode }) {
   return (
     <Link to={`/matches?tournament=${encodeURIComponent(event)}`} className="comp-link">
+      {children}
+    </Link>
+  )
+}
+
+function TeamLink({ name, gender, children }: { name: string; gender?: 'male' | 'female'; children?: React.ReactNode }) {
+  const params = new URLSearchParams({ team: name })
+  if (gender) params.set('gender', gender)
+  return (
+    <Link to={`/teams?${params}`} className="comp-link">
+      {children ?? name}
+    </Link>
+  )
+}
+
+function PlayerLink({ id, role, gender, children }: { id: string; role: 'batter' | 'bowler'; gender: 'male' | 'female'; children: React.ReactNode }) {
+  const path = role === 'batter' ? '/batting' : '/bowling'
+  return (
+    <Link to={`${path}?player=${id}&gender=${gender}`} className="comp-link">
       {children}
     </Link>
   )
@@ -32,9 +54,10 @@ export default function Home() {
         </h1>
         <div className="rule-double" />
         <p className="standfirst">
-          An almanack of Twenty20 cricket — twelve thousand nine hundred and forty matches,
-          two million nine hundred and fifty thousand deliveries, one hundred and sixty
-          thousand wickets — drawn from international and club competition the world over.
+          An almanack of Twenty20 cricket — <span className="num">{fmt(siteStats.totals.matches)}</span> matches,{' '}
+          <span className="num">{fmt(siteStats.totals.deliveries)}</span> deliveries,{' '}
+          <span className="num">{fmt(siteStats.totals.wickets)}</span> wickets — drawn from
+          international and club competition the world over.
         </p>
       </header>
 
@@ -53,7 +76,9 @@ export default function Home() {
               <CompLink event="ICC Men's T20 World Cup">T20 World Cup</CompLink>,{' '}
               <CompLink event="Men's T20 Asia Cup">Asia Cup</CompLink>
             </div>
-            <div>Bilateral series</div>
+            <div>
+              Bilateral series — <TeamLink name="India" /> · <TeamLink name="Australia" />
+            </div>
           </div>
           <div className="coverage-col">
             <div className="coverage-head">Major Leagues</div>
@@ -72,20 +97,31 @@ export default function Home() {
               <CompLink event="Women's Big Bash League">WBBL</CompLink>, and{' '}
               <Link to="/matches" className="comp-link">others</Link>
             </div>
+            <div>
+              Sides — <TeamLink name="Chennai Super Kings">CSK</TeamLink>
+            </div>
           </div>
-          <div className="coverage-col coverage-stats">
-            <div className="coverage-head">The Record</div>
+          <div className="coverage-col">
+            <div className="coverage-head">In Focus</div>
             <div>
-              <span className="big-num num">12,940</span>
-              <span className="big-num-label">matches</span>
+              RCB —{' '}
+              <TeamLink name="Royal Challengers Bengaluru" gender="male">men</TeamLink> ·{' '}
+              <TeamLink name="Royal Challengers Bengaluru" gender="female">women</TeamLink>
             </div>
             <div>
-              <span className="big-num num">2.95M</span>
-              <span className="big-num-label">deliveries</span>
+              Batters —{' '}
+              <PlayerLink id="ba607b88" role="batter" gender="male">V Kohli</PlayerLink>,{' '}
+              <PlayerLink id="5d2eda89" role="batter" gender="female">S Mandhana</PlayerLink>
             </div>
             <div>
-              <span className="big-num num">160K</span>
-              <span className="big-num-label">wickets</span>
+              Bowlers —{' '}
+              <PlayerLink id="462411b3" role="bowler" gender="male">JJ Bumrah</PlayerLink>,{' '}
+              <PlayerLink id="be150fc8" role="bowler" gender="female">EA Perry</PlayerLink>
+            </div>
+            <div>
+              Matchups —{' '}
+              <Link to="/head-to-head?batter=740742ef&bowler=ce820073" className="comp-link">RG Sharma v Sandeep Sharma</Link> ·{' '}
+              <Link to="/head-to-head?batter=d32cf49a&bowler=63e3b6b3" className="comp-link">HK Matthews v M Kapp</Link>
             </div>
           </div>
         </div>
