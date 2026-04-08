@@ -197,6 +197,59 @@ function summarizePartnerships(
   return result
 }
 
+interface PartialSpell {
+  bowler: string
+  legalBalls: number  // 0..5 — partial over count
+  runs: number
+  wickets: number
+}
+
+/**
+ * Detect mid-over bowler changes. For each delivery index where the
+ * bowler changes from the previous delivery WITHIN the same over,
+ * snapshots the OUTGOING bowler's partial-spell figures (legal balls
+ * bowled in the over so far, runs conceded, wickets taken). The note
+ * is rendered on the row where the change happens, since that's the
+ * first row showing the NEW bowler.
+ */
+function summarizePartialSpells(
+  deliveries: InningsGridDelivery[],
+): Map<number, PartialSpell> {
+  const result = new Map<number, PartialSpell>()
+  let curBowler: string | null = null
+  let curOverNum = -1
+  let legalBalls = 0
+  let runs = 0
+  let wickets = 0
+  const NON_BOWLER = new Set([
+    'run out', 'retired hurt', 'retired out', 'obstructing the field',
+  ])
+  for (let i = 0; i < deliveries.length; i++) {
+    const d = deliveries[i]
+    const overNum = parseInt(d.over_ball.split('.')[0], 10)
+    if (overNum !== curOverNum) {
+      curOverNum = overNum
+      curBowler = d.bowler
+      legalBalls = 0; runs = 0; wickets = 0
+    } else if (d.bowler !== curBowler) {
+      result.set(i, {
+        bowler: curBowler!,
+        legalBalls,
+        runs,
+        wickets,
+      })
+      curBowler = d.bowler
+      legalBalls = 0; runs = 0; wickets = 0
+    }
+    if (d.extras_wides === 0 && d.extras_noballs === 0) legalBalls++
+    runs += d.runs_total
+    if (d.wicket_kind && !NON_BOWLER.has(d.wicket_kind.toLowerCase())) {
+      wickets++
+    }
+  }
+  return result
+}
+
 /**
  * Per-batter running tally up to the moment of dismissal.
  * Returns map: delivery index → { runs, balls } for the batter who
@@ -235,12 +288,12 @@ export default function InningsGridChart({ innings }: Props) {
   const overSummaries = summarizeOvers(innings.deliveries)
   const partnerships = summarizePartnerships(innings.deliveries)
   const dismissalScores = summarizeDismissalScores(innings.deliveries)
+  const partialSpells = summarizePartialSpells(innings.deliveries)
   const slots = assignBatterSlots(innings.deliveries)
   const slotColor = (b: number): string | undefined => {
     const s = slots.get(b)
     return s === 'A' ? COLOR_AT_CREASE_A : s === 'B' ? COLOR_AT_CREASE_B : undefined
   }
-  const SUMMARY_H = '0.875rem'
 
   return (
     <div>
@@ -323,12 +376,13 @@ export default function InningsGridChart({ innings }: Props) {
             >
               score
             </div>
-            {/* wicket text header — hidden on small viewports */}
+            {/* details column header — hidden on small viewports */}
             <div
               style={{ width: WKT_W }}
               className="text-[9px] wisden-grid-label self-end wisden-grid-cell-bottom pl-2 pb-1 hidden md:block"
+              title="Each over: 6 slots × 6 runs (max 36 shown). Green = runs scored, red dots = wickets fallen. Beyond 36, all 6 slots stay full."
             >
-              wicket
+              details · 6 × 6 runs
             </div>
           </div>
 
@@ -344,20 +398,21 @@ export default function InningsGridChart({ innings }: Props) {
               ? d.wicket_player_out_index
               : d.batter_index
             const summary = lastOfOver ? overSummaries.get(overNum) : null
+            const partial = partialSpells.get(i)
             const units = runUnits(d)
 
             return (
               <div key={i}>
                 {/* Ball row */}
                 <div
-                  className="flex items-center"
+                  className="flex items-stretch"
                   style={{
-                    height: CELL,
-                    borderTop: newOver ? '1px solid var(--rule-soft)' : '1px solid transparent',
+                    minHeight: CELL,
+                    borderTop: newOver ? '1px solid var(--ink)' : '1px solid var(--rule-soft)',
                   }}
                 >
                   <div
-                    style={{ width: OVER_W }}
+                    style={{ width: OVER_W, paddingTop: '0.0625rem' }}
                     className={`text-[9px] tabular-nums pr-1 text-right ${
                       newOver ? 'wisden-grid-meta font-medium' : 'wisden-grid-faint'
                     }`}
@@ -366,12 +421,36 @@ export default function InningsGridChart({ innings }: Props) {
                   </div>
                   <div
                     style={{ width: BOWLER_W }}
-                    className={`text-[10px] truncate pr-2 text-right ${
-                      newBowler ? 'wisden-grid-strong font-medium' : 'wisden-grid-faint'
-                    }`}
+                    className="text-[10px] pr-2 text-right flex flex-col justify-center"
                     title={d.bowler}
                   >
-                    {newBowler ? d.bowler : '·'}
+                    {newBowler ? (
+                      <div className="truncate wisden-grid-strong font-medium">
+                        {d.bowler}
+                      </div>
+                    ) : (!summary && !partial) ? (
+                      <div className="truncate wisden-grid-faint">·</div>
+                    ) : null}
+                    {partial && (
+                      <div
+                        className="wisden-grid-faint truncate"
+                        style={{ fontStyle: 'italic', fontSize: '0.5625rem', lineHeight: 1.1 }}
+                        title={`previous bowler this over: ${partial.bowler}`}
+                      >
+                        prev: {partial.bowler} <span className="num">0.{partial.legalBalls}-0-{partial.runs}-{partial.wickets}</span>
+                      </div>
+                    )}
+                    {summary && (
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          color: 'var(--ink)',
+                          lineHeight: 1.15,
+                        }}
+                      >
+                        Over {summary.over} — <span className="num">{summary.runs}/{summary.wickets}</span>
+                      </div>
+                    )}
                   </div>
                   {/* batter cells */}
                   {Array.from({ length: N }).map((_, b) => {
@@ -388,22 +467,30 @@ export default function InningsGridChart({ innings }: Props) {
                           key={b}
                           style={{
                             width: CELL,
-                            height: CELL,
+                            minHeight: CELL,
                             backgroundColor: atCrease ? slotColor(b) : undefined,
                             borderRight: isLastBatter ? '1px solid var(--rule)' : undefined,
+                            alignSelf: 'stretch',
                           }}
                           className={isLastBatter ? '' : 'wisden-grid-cell-right'}
                         />
                       )
                     }
                     const cellData = cellInfo(d, b === d.wicket_player_out_index)
+                    // Striker (or dismissed batter) is always at the crease,
+                    // so apply the slot tint as the BASE layer and overlay
+                    // the run/wicket color with alpha so the slot bleeds
+                    // through. Keeps the at-crease story intact across the
+                    // batter's whole at-crease tenure including event balls.
+                    const baseSlot = slotColor(b)
                     return (
                       <div
                         key={b}
                         style={{
                           width: CELL,
-                          height: CELL,
-                          backgroundColor: cellData.bg,
+                          minHeight: CELL,
+                          alignSelf: 'stretch',
+                          backgroundColor: baseSlot,
                           color: cellData.color,
                           position: 'relative',
                           borderRight: isLastBatter ? '1px solid var(--rule)' : undefined,
@@ -415,7 +502,19 @@ export default function InningsGridChart({ innings }: Props) {
                           `${d.runs_total} run${d.runs_total === 1 ? '' : 's'}`
                         }`}
                       >
-                        {cellData.text}
+                        <span
+                          aria-hidden
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            backgroundColor: cellData.bg,
+                            opacity: 0.55,
+                            pointerEvents: 'none',
+                          }}
+                        />
+                        <span style={{ position: 'relative', zIndex: 1 }}>
+                          {cellData.text}
+                        </span>
                         {cellData.noBallMark && (
                           <span
                             style={{
@@ -426,6 +525,7 @@ export default function InningsGridChart({ innings }: Props) {
                               color: 'var(--accent)',
                               fontWeight: 700,
                               lineHeight: 1,
+                              zIndex: 2,
                             }}
                           >
                             n
@@ -436,7 +536,7 @@ export default function InningsGridChart({ innings }: Props) {
                   })}
                   {/* per-ball runs histogram with breakdown coloring */}
                   <div
-                    style={{ width: HIST_W, display: 'flex', alignItems: 'center', borderRight: '1px solid var(--rule)', height: CELL }}
+                    style={{ width: HIST_W, display: 'flex', alignItems: 'flex-start', paddingTop: '0.0625rem', borderRight: '1px solid var(--rule)', minHeight: CELL, alignSelf: 'stretch' }}
                     className="pl-1"
                   >
                     {Array.from({ length: HIST_CELLS }).map((_, k) => {
@@ -472,14 +572,21 @@ export default function InningsGridChart({ innings }: Props) {
                     })}
                   </div>
                   <div
-                    style={{ width: SCORE_W, borderRight: '1px solid var(--rule)', height: CELL }}
-                    className="text-[10px] tabular-nums pl-2 wisden-grid-meta flex items-center"
+                    className={`text-[10px] tabular-nums pl-2 flex items-start ${lastOfOver ? 'font-bold' : 'wisden-grid-meta'}`}
+                    style={{
+                      width: SCORE_W,
+                      borderRight: '1px solid var(--rule)',
+                      minHeight: CELL,
+                      alignSelf: 'stretch',
+                      paddingTop: '0.0625rem',
+                      color: lastOfOver ? 'var(--ink)' : undefined,
+                    }}
                   >
                     {d.cumulative_runs}/{d.cumulative_wickets}
                   </div>
                   <div
-                    style={{ height: CELL, color: 'var(--accent)', whiteSpace: 'nowrap', flex: '0 0 auto' }}
-                    className="text-[10px] pl-2 pr-3 font-medium hidden md:flex items-center"
+                    style={{ minHeight: CELL, alignSelf: 'stretch', paddingTop: '0.0625rem', color: 'var(--accent)', whiteSpace: 'nowrap', flex: '0 0 auto' }}
+                    className="text-[10px] pl-2 pr-3 font-medium hidden md:flex items-start"
                     title={(() => {
                       const p = partnerships.get(i)
                       const ds = dismissalScores.get(i)
@@ -489,6 +596,9 @@ export default function InningsGridChart({ innings }: Props) {
                       return [wkt, pship].filter(Boolean).join(' · ')
                     })()}
                   >
+                    {summary && (
+                      <OverGraphic runs={summary.runs} wickets={summary.wickets} />
+                    )}
                     {(() => {
                       const p = partnerships.get(i)
                       const ds = dismissalScores.get(i)
@@ -533,22 +643,6 @@ export default function InningsGridChart({ innings }: Props) {
                   </div>
                 </div>
 
-                {/* Over summary row, after the last ball of each over.
-                    Renders the same cell layout so the at-crease stripes
-                    pass through it without breaking. */}
-                {summary && (
-                  <SummaryRow
-                    label={`end of over ${summary.over}`}
-                    detail={`${summary.runs} run${summary.runs === 1 ? '' : 's'}${summary.wickets > 0 ? `, ${summary.wickets} wkt${summary.wickets === 1 ? '' : 's'}` : ''}`}
-                    score={`${d.cumulative_runs}/${d.cumulative_wickets}`}
-                    striperBatterIdx={d.batter_index}
-                    striperNonStrikerIdx={d.non_striker_index}
-                    slotColor={slotColor}
-                    N={N}
-                    height={SUMMARY_H}
-                    accent="gray"
-                  />
-                )}
               </div>
             )
           })}
@@ -567,74 +661,72 @@ export default function InningsGridChart({ innings }: Props) {
 }
 
 /**
- * A slim summary row that preserves the per-batter cell layout (so the
- * at-crease stripes pass through continuously) and overlays a label,
- * detail, and the cumulative score.
+ * Six-slot graphic showing the over's runs (green fill, low alpha)
+ * and wickets (red dots, one per slot from left). Each slot represents
+ * 8 runs; the graphic caps at 48 runs and 6 wickets.
  */
-function SummaryRow({
-  label, detail, score,
-  striperBatterIdx, striperNonStrikerIdx,
-  slotColor,
-  N, height, accent,
-}: {
-  label: string
-  detail: string
-  score: string
-  striperBatterIdx: number | null
-  striperNonStrikerIdx: number | null
-  slotColor: (b: number) => string | undefined
-  N: number
-  height: string
-  accent: 'gray' | 'blue'
-}) {
-  const labelClass = accent === 'blue' ? 'wisden-grid-label-blue' : 'wisden-grid-label'
-  const borderTop = accent === 'blue' ? '1px solid var(--accent-soft)' : '1px solid var(--rule-soft)'
+function OverGraphic({ runs, wickets }: { runs: number; wickets: number }) {
+  const slots = 6
+  const runsPerSlot = 6
+  const w = Math.min(wickets, slots)
   return (
-    <div
-      className="flex items-center"
-      style={{ height, borderTop, borderBottom: borderTop }}
+    <span
+      style={{
+        display: 'inline-flex',
+        gap: '1px',
+        marginRight: '6px',
+        verticalAlign: 'middle',
+      }}
+      title={`${runs} run${runs === 1 ? '' : 's'}, ${wickets} wicket${wickets === 1 ? '' : 's'}`}
     >
-      <div style={{ width: OVER_W }} />
-      <div
-        style={{ width: BOWLER_W }}
-        className={`text-[9px] italic pr-2 text-right truncate ${labelClass}`}
-        title={`${label} — ${detail}`}
-      >
-        {label}
-      </div>
-      {/* batter cells: preserve the per-slot at-crease tint so each
-          stripe stays continuous through the summary row. */}
-      {Array.from({ length: N }).map((_, b) => {
-        const isLastBatter = b === N - 1
-        const atCrease = b === striperBatterIdx || b === striperNonStrikerIdx
+      {Array.from({ length: slots }).map((_, i) => {
+        const slotMin = i * runsPerSlot
+        const slotRuns = Math.max(0, Math.min(runsPerSlot, runs - slotMin))
+        const fillPct = (slotRuns / runsPerSlot) * 100
+        const hasWicket = i < w
         return (
-          <div
-            key={b}
+          <span
+            key={i}
             style={{
-              width: CELL,
-              height,
-              backgroundColor: atCrease ? slotColor(b) : undefined,
-              borderRight: isLastBatter ? '1px solid var(--rule)' : undefined,
+              position: 'relative',
+              display: 'inline-block',
+              width: '11px',
+              height: '11px',
+              backgroundColor: 'var(--bg-soft)',
+              border: '1px solid var(--rule-soft)',
             }}
-            className={isLastBatter ? '' : 'wisden-grid-cell-right'}
-          />
+          >
+            {fillPct > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: `${fillPct}%`,
+                  backgroundColor: 'rgba(63, 122, 77, 0.55)',
+                }}
+              />
+            )}
+            {hasWicket && (
+              <span
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  width: '5px',
+                  height: '5px',
+                  marginLeft: '-2.5px',
+                  marginTop: '-2.5px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--accent)',
+                }}
+              />
+            )}
+          </span>
         )
       })}
-      {/* histogram column: empty but bordered */}
-      <div
-        style={{ width: HIST_W, borderRight: '1px solid var(--rule)', height }}
-        className={`text-[9px] italic pl-1 flex items-center truncate ${labelClass}`}
-      >
-        {detail}
-      </div>
-      <div
-        style={{ width: SCORE_W, borderRight: '1px solid var(--rule)', height }}
-        className="text-[9px] tabular-nums pl-2 wisden-grid-strong font-semibold flex items-center"
-      >
-        {score}
-      </div>
-      <div style={{ width: WKT_W, height }} className="hidden md:block" />
-    </div>
+    </span>
   )
 }
 

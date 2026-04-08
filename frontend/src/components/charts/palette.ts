@@ -71,11 +71,11 @@ export const DELIVERY = {
   // Wicket — always oxblood.
   wicket:  WISDEN.oxblood,
 
-  // At-crease alternating stripes. Both faint cream tints — they
-  // recede behind the saturated semantic colors but are clearly
-  // distinct from each other.
-  atCreaseA: '#EAE3D2',  // warm cream
-  atCreaseB: '#E3E5DE',  // cool cream
+  // At-crease alternating stripes. Aged-manuscript pair — warm tan
+  // and antique sage. Distinct enough to read at a glance, muted
+  // enough to recede behind the saturated run/extras/wicket cells.
+  atCreaseA: '#D9C5A0',  // warm tan / aged buff
+  atCreaseB: '#B8C5C2',  // antique sage / blue-grey
 } as const
 
 /** Off-bat run color by runs scored. */

@@ -127,8 +127,8 @@ matchup grid wicket tint).
 ### At-crease stripes
 | Key         | Value     | Meaning |
 |-------------|-----------|---------|
-| `atCreaseA` | `#EAE3D2` | Warm cream — partnership slot A. |
-| `atCreaseB` | `#E3E5DE` | Cool cream — partnership slot B. |
+| `atCreaseA` | `#D9C5A0` | Warm tan / aged buff — partnership slot A. |
+| `atCreaseB` | `#B8C5C2` | Antique sage / blue-grey — partnership slot B. |
 
 Both faint cream tints. They recede behind the saturated semantic
 colors but are clearly distinct from each other. When a batter gets
