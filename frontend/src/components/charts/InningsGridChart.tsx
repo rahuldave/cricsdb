@@ -197,11 +197,44 @@ function summarizePartnerships(
   return result
 }
 
+/**
+ * Per-batter running tally up to the moment of dismissal.
+ * Returns map: delivery index → { runs, balls } for the batter who
+ * was dismissed on that delivery. Used to surface the dismissed
+ * batter's individual score in the wicket text column.
+ *
+ * Tracks each batter_index's accumulating runs (off the bat) and
+ * legal balls faced (excluding wides + no-balls per the project's
+ * legal-balls convention).
+ */
+function summarizeDismissalScores(
+  deliveries: InningsGridDelivery[],
+): Map<number, { runs: number; balls: number }> {
+  const result = new Map<number, { runs: number; balls: number }>()
+  const tally = new Map<number, { runs: number; balls: number }>()
+  for (let i = 0; i < deliveries.length; i++) {
+    const d = deliveries[i]
+    // Accrue to the striker.
+    let t = tally.get(d.batter_index)
+    if (!t) { t = { runs: 0, balls: 0 }; tally.set(d.batter_index, t) }
+    t.runs += d.runs_batter
+    if (d.extras_wides === 0 && d.extras_noballs === 0) t.balls += 1
+    // On a wicket, snapshot the dismissed batter's totals (which may
+    // be the non-striker on a run-out).
+    if (d.wicket_kind && d.wicket_player_out_index != null) {
+      const dt = tally.get(d.wicket_player_out_index)
+      if (dt) result.set(i, { runs: dt.runs, balls: dt.balls })
+    }
+  }
+  return result
+}
+
 export default function InningsGridChart({ innings }: Props) {
   const N = innings.batters.length
   const headerHeight = '4.5rem'
   const overSummaries = summarizeOvers(innings.deliveries)
   const partnerships = summarizePartnerships(innings.deliveries)
+  const dismissalScores = summarizeDismissalScores(innings.deliveries)
   const slots = assignBatterSlots(innings.deliveries)
   const slotColor = (b: number): string | undefined => {
     const s = slots.get(b)
@@ -449,17 +482,26 @@ export default function InningsGridChart({ innings }: Props) {
                     className="text-[10px] pl-2 pr-3 font-medium hidden md:flex items-center"
                     title={(() => {
                       const p = partnerships.get(i)
-                      const wkt = d.wicket_text ? `${d.wicket_player_out}: ${d.wicket_text}` : ''
+                      const ds = dismissalScores.get(i)
+                      const score = ds ? ` ${ds.runs}(${ds.balls})` : ''
+                      const wkt = d.wicket_text ? `${d.wicket_player_out}${score}: ${d.wicket_text}` : ''
                       const pship = p ? `partnership ${p.number}: ${p.runs} runs (${p.balls} balls)` : ''
                       return [wkt, pship].filter(Boolean).join(' · ')
                     })()}
                   >
                     {(() => {
                       const p = partnerships.get(i)
+                      const ds = dismissalScores.get(i)
                       if (d.wicket_text && p) {
                         return (
                           <>
-                            {d.wicket_player_out}: {d.wicket_text}
+                            {d.wicket_player_out}
+                            {ds && (
+                              <span className="num" style={{ color: 'var(--ink)', marginLeft: 3 }}>
+                                {ds.runs}({ds.balls})
+                              </span>
+                            )}
+                            : {d.wicket_text}
                             <span style={{ color: 'var(--ink-faint)', fontStyle: 'italic', marginLeft: 4 }}>
                               · p{p.number} {p.runs}({p.balls})
                             </span>
@@ -467,7 +509,17 @@ export default function InningsGridChart({ innings }: Props) {
                         )
                       }
                       if (d.wicket_text) {
-                        return <>{d.wicket_player_out}: {d.wicket_text}</>
+                        return (
+                          <>
+                            {d.wicket_player_out}
+                            {ds && (
+                              <span className="num" style={{ color: 'var(--ink)', marginLeft: 3 }}>
+                                {ds.runs}({ds.balls})
+                              </span>
+                            )}
+                            : {d.wicket_text}
+                          </>
+                        )
                       }
                       if (p) {
                         return (
