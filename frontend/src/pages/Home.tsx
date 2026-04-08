@@ -38,6 +38,59 @@ export default function Home() {
         </p>
       </header>
 
+      {/* Coverage — surfaces the league links high so users can jump
+          straight to IPL / BBL / etc. without scrolling past fixtures. */}
+      <section className="wisden-section">
+        <div className="section-head">
+          <span className="section-label">In the Volume</span>
+        </div>
+        <div className="rule" />
+        <div className="coverage">
+          <div className="coverage-col">
+            <div className="coverage-head">International</div>
+            <div>Men's &amp; Women's T20Is</div>
+            <div>
+              <CompLink event="ICC Men's T20 World Cup">T20 World Cup</CompLink>,{' '}
+              <CompLink event="Men's T20 Asia Cup">Asia Cup</CompLink>
+            </div>
+            <div>Bilateral series</div>
+          </div>
+          <div className="coverage-col">
+            <div className="coverage-head">Major Leagues</div>
+            <div>
+              <CompLink event="Indian Premier League">IPL</CompLink>,{' '}
+              <CompLink event="Big Bash League">BBL</CompLink>,{' '}
+              <CompLink event="Pakistan Super League">PSL</CompLink>,{' '}
+              <CompLink event="Caribbean Premier League">CPL</CompLink>
+            </div>
+            <div>
+              <CompLink event="The Hundred Men's Competition">The Hundred</CompLink>,{' '}
+              <CompLink event="Vitality Blast">Vitality Blast</CompLink>
+            </div>
+            <div>
+              <CompLink event="Women's Premier League">WPL</CompLink>,{' '}
+              <CompLink event="Women's Big Bash League">WBBL</CompLink>, and{' '}
+              <Link to="/matches" className="comp-link">others</Link>
+            </div>
+          </div>
+          <div className="coverage-col coverage-stats">
+            <div className="coverage-head">The Record</div>
+            <div>
+              <span className="big-num num">12,940</span>
+              <span className="big-num-label">matches</span>
+            </div>
+            <div>
+              <span className="big-num num">2.95M</span>
+              <span className="big-num-label">deliveries</span>
+            </div>
+            <div>
+              <span className="big-num num">160K</span>
+              <span className="big-num-label">wickets</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Recent fixtures */}
       <section className="wisden-section">
         <div className="section-head">
@@ -137,58 +190,6 @@ export default function Home() {
             </dd>
           </Link>
         </dl>
-      </section>
-
-      {/* Coverage */}
-      <section className="wisden-section">
-        <div className="section-head">
-          <span className="section-label">In the Volume</span>
-        </div>
-        <div className="rule" />
-        <div className="coverage">
-          <div className="coverage-col">
-            <div className="coverage-head">International</div>
-            <div>Men's &amp; Women's T20Is</div>
-            <div>
-              <CompLink event="ICC Men's T20 World Cup">T20 World Cup</CompLink>,{' '}
-              <CompLink event="Men's T20 Asia Cup">Asia Cup</CompLink>
-            </div>
-            <div>Bilateral series</div>
-          </div>
-          <div className="coverage-col">
-            <div className="coverage-head">Major Leagues</div>
-            <div>
-              <CompLink event="Indian Premier League">IPL</CompLink>,{' '}
-              <CompLink event="Big Bash League">BBL</CompLink>,{' '}
-              <CompLink event="Pakistan Super League">PSL</CompLink>,{' '}
-              <CompLink event="Caribbean Premier League">CPL</CompLink>
-            </div>
-            <div>
-              <CompLink event="The Hundred Men's Competition">The Hundred</CompLink>,{' '}
-              <CompLink event="Vitality Blast">Vitality Blast</CompLink>
-            </div>
-            <div>
-              <CompLink event="Women's Premier League">WPL</CompLink>,{' '}
-              <CompLink event="Women's Big Bash League">WBBL</CompLink>, and{' '}
-              <Link to="/matches" className="comp-link">others</Link>
-            </div>
-          </div>
-          <div className="coverage-col coverage-stats">
-            <div className="coverage-head">The Record</div>
-            <div>
-              <span className="big-num num">12,940</span>
-              <span className="big-num-label">matches</span>
-            </div>
-            <div>
-              <span className="big-num num">2.95M</span>
-              <span className="big-num-label">deliveries</span>
-            </div>
-            <div>
-              <span className="big-num num">160K</span>
-              <span className="big-num-label">wickets</span>
-            </div>
-          </div>
-        </div>
       </section>
 
       <div className="rule-double" />
