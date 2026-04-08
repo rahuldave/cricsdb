@@ -17,14 +17,14 @@ const COLORS = WISDEN_PAIR
  * inside the container. Color cycles through a small palette so the
  * two innings are visually distinct from the worm.
  */
-export default function ManhattanChart({ innings, width, height = 140 }: Props) {
+export default function ManhattanChart({ innings, width, height = 260 }: Props) {
   const main = innings.filter(i => !i.is_super_over)
   if (main.length === 0) return null
 
   return (
     <div>
       <h3 className="wisden-chart-title">Manhattan — runs per over</h3>
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {main.map((inn, idx) => (
           <div key={inn.innings_number}>
             <div className="wisden-chart-sub" style={{ marginBottom: '0.25rem' }}>{inn.team}</div>

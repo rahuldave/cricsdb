@@ -54,9 +54,11 @@ export default function MatchScorecard() {
         return (
         <>
           <ScorecardView data={data} highlightBatterId={highlightBatterId} highlightBowlerId={highlightBowlerId}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <div><WormChart innings={data.innings} /></div>
-              <div><ManhattanChart innings={data.innings} /></div>
+            <div className="mb-6">
+              <WormChart innings={data.innings} />
+            </div>
+            <div className="mb-6">
+              <ManhattanChart innings={data.innings} />
             </div>
 
             {/* Matchup grid: per-innings batter × bowler matrix.
