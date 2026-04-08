@@ -1104,23 +1104,18 @@ a { color: inherit; }
   .coverage { grid-template-columns: 1fr; gap: 1.5rem; }
 }
 
-/* Featured grid — Teams / Players / Matchups */
-.featured-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem 2rem;
-  margin-top: 1.25rem;
+/* Matchups row — full-width band below the 3-col coverage grid */
+.coverage-matchups {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--rule-soft);
   font-size: 0.9rem;
   color: var(--ink-soft);
 }
-.featured-grid > div > div { margin-bottom: 0.35rem; }
-.featured-meta {
+.coverage-head-inline {
   font-family: var(--serif);
   font-style: italic;
-  font-size: 0.78rem;
-  color: var(--ink-faint);
-  font-variation-settings: "opsz" 14;
-}
-@media (max-width: 640px) {
-  .featured-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+  font-size: 0.85rem;
+  color: var(--ink);
+  margin-right: 0.25rem;
 }

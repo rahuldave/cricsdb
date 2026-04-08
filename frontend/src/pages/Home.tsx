@@ -109,21 +109,17 @@ export default function Home() {
               <TeamLink name="Royal Challengers Bengaluru" gender="female">women</TeamLink>
             </div>
             <div>
-              Batters —{' '}
               <PlayerLink id="ba607b88" role="batter" gender="male">V Kohli</PlayerLink>,{' '}
-              <PlayerLink id="5d2eda89" role="batter" gender="female">S Mandhana</PlayerLink>
-            </div>
-            <div>
-              Bowlers —{' '}
+              <PlayerLink id="5d2eda89" role="batter" gender="female">S Mandhana</PlayerLink>,{' '}
               <PlayerLink id="462411b3" role="bowler" gender="male">JJ Bumrah</PlayerLink>,{' '}
               <PlayerLink id="be150fc8" role="bowler" gender="female">EA Perry</PlayerLink>
             </div>
-            <div>
-              Matchups —{' '}
-              <Link to="/head-to-head?batter=740742ef&bowler=ce820073" className="comp-link">RG Sharma v Sandeep Sharma</Link> ·{' '}
-              <Link to="/head-to-head?batter=d32cf49a&bowler=63e3b6b3" className="comp-link">HK Matthews v M Kapp</Link>
-            </div>
           </div>
+        </div>
+        <div className="coverage-matchups">
+          <span className="coverage-head-inline">Matchups —</span>{' '}
+          <Link to="/head-to-head?batter=740742ef&bowler=ce820073" className="comp-link">RG Sharma v Sandeep Sharma</Link>{' · '}
+          <Link to="/head-to-head?batter=d32cf49a&bowler=63e3b6b3" className="comp-link">HK Matthews v M Kapp</Link>
         </div>
       </section>
 
