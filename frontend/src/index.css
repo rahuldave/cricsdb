@@ -710,6 +710,31 @@ a { color: inherit; }
   margin-bottom: 0.25rem;
   font-variation-settings: "opsz" 14;
 }
+.wisden-gender-notice {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  margin: 0.25rem 0 0;
+  padding: 0.5rem 0.85rem;
+  border-left: 2px solid var(--accent);
+  background: var(--bg-soft);
+  font-variation-settings: "opsz" 14;
+}
+.wisden-gender-notice .num { color: var(--ink); font-weight: 500; }
+.wisden-gender-notice button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-style: italic;
+  color: var(--accent);
+  cursor: pointer;
+  border-bottom: 1px solid var(--rule-soft);
+  transition: border-color 120ms;
+}
+.wisden-gender-notice button:hover { border-bottom-color: var(--accent); }
+
 .wisden-h2h-vs {
   font-family: var(--serif);
   font-style: italic;

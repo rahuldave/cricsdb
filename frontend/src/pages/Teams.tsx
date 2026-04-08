@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
-import { useUrlParam } from '../hooks/useUrlState'
+import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getTeams, getTeamSummary, getTeamByseason, getTeamVs, getTeamResults, getTeamOpponents } from '../api'
@@ -17,6 +17,7 @@ const tabs = ['By Season', 'vs Opponent', 'Match List'] as const
 export default function Teams() {
   const navigate = useNavigate()
   const filters = useFilters()
+  const setUrlParams = useSetUrlParams()
   const [selected, setSelected] = useUrlParam('team')
   useDocumentTitle(selected || 'Teams')
   const [activeTab, setActiveTab] = useUrlParam('tab', 'By Season')
@@ -119,6 +120,18 @@ export default function Teams() {
       {selected && summary && !summaryFetch.loading && (
         <>
           <h2 className="wisden-page-title">{selected}</h2>
+          {summary.gender_breakdown && (
+            <div className="wisden-gender-notice">
+              Showing combined men's &amp; women's. —{' '}
+              <button onClick={() => setUrlParams({ gender: 'male' })}>
+                Men (<span className="num">{summary.gender_breakdown.male}</span>)
+              </button>
+              {' · '}
+              <button onClick={() => setUrlParams({ gender: 'female' })}>
+                Women (<span className="num">{summary.gender_breakdown.female}</span>)
+              </button>
+            </div>
+          )}
           <div className="wisden-statrow">
             <StatCard label="Matches" value={summary.matches} />
             <StatCard label="Wins" value={summary.wins} />

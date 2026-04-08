@@ -41,6 +41,9 @@ export interface TeamSummary {
   toss_wins: number
   bat_first_wins: number
   field_first_wins: number
+  /** Present only when no gender filter is active AND the team has
+   *  matches in BOTH genders within the current filter scope. */
+  gender_breakdown: { male: number; female: number } | null
 }
 
 export interface TeamResult {

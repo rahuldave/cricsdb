@@ -59,6 +59,29 @@ async def team_summary(
     wins = row.get("wins", 0) or 0
     win_pct = round(wins * 100 / matches, 1) if matches > 0 else 0
 
+    # Gender breakdown — only when no gender filter is active. Lets the
+    # frontend warn the user when a team has matches in both men's and
+    # women's cricket and they're seeing combined stats. Identical
+    # filter scope to the main query, just grouped by gender.
+    gender_breakdown = None
+    if filters.gender is None:
+        gb_rows = await db.q(
+            f"""
+            SELECT m.gender as gender, COUNT(*) as n
+            FROM match m
+            WHERE {filt}
+            GROUP BY m.gender
+            """,
+            params,
+        )
+        gb = {r["gender"]: r["n"] for r in gb_rows if r["gender"]}
+        male = gb.get("male", 0)
+        female = gb.get("female", 0)
+        # Only surface when BOTH sides have matches in the current
+        # filter scope — otherwise there's nothing to disambiguate.
+        if male > 0 and female > 0:
+            gender_breakdown = {"male": male, "female": female}
+
     return {
         "team": team,
         "matches": matches,
@@ -70,6 +93,7 @@ async def team_summary(
         "toss_wins": row.get("toss_wins", 0) or 0,
         "bat_first_wins": row.get("bat_first_wins", 0) or 0,
         "field_first_wins": row.get("field_first_wins", 0) or 0,
+        "gender_breakdown": gender_breakdown,
     }
 
 
