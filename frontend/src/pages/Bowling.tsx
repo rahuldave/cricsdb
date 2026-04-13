@@ -117,7 +117,18 @@ export default function Bowling() {
   ]
 
   const batterColumns: Column<BatterMatchup>[] = [
-    { key: 'batter_name', label: 'Batter', sortable: true },
+    { key: 'batter_name', label: 'Batter', sortable: true, format: (_v: any, r: any) => (
+      <span>
+        {r.batter_name}{' '}
+        <Link to={`/batting?player=${encodeURIComponent(r.batter_id)}`}
+          className="comp-link" style={{ fontSize: '0.75rem' }}
+          onClick={e => e.stopPropagation()}>stats</Link>
+        {' · '}
+        <Link to={`/head-to-head?batter=${encodeURIComponent(r.batter_id)}&bowler=${encodeURIComponent(playerId || '')}`}
+          className="comp-link" style={{ fontSize: '0.75rem' }}
+          onClick={e => e.stopPropagation()}>h2h</Link>
+      </span>
+    ) as unknown as string },
     { key: 'balls', label: 'Balls', sortable: true },
     { key: 'runs_conceded', label: 'Runs', sortable: true },
     { key: 'wickets', label: 'Wkts', sortable: true },
