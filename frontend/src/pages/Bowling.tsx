@@ -215,9 +215,9 @@ export default function Bowling() {
                   const middle = phaseData.find((p: any) => p.phase === 'middle')
                   const death = phaseData.find((p: any) => p.phase === 'death')
 
-                  const PhaseBlock = ({ p, label, hideSubtitle }: { p: any; label?: string; hideSubtitle?: boolean }) => (
-                    <div className="wisden-phaseblock">
-                      <h3>{label || p.phase}</h3>
+                  const PhaseBlock = ({ p, label, hideSubtitle, small }: { p: any; label?: string; hideSubtitle?: boolean; small?: boolean }) => (
+                    <div className="wisden-phaseblock" style={small ? { padding: '0.6rem 0.4rem' } : undefined}>
+                      <h3 style={small ? { fontSize: '0.95rem' } : undefined}>{label || p.phase}</h3>
                       {!hideSubtitle && <div className="wisden-phaseblock-overs">Overs {p.overs_range || p.overs}</div>}
                       <div className="wisden-phaseblock-grid">
                         <div><span className="lbl">Balls</span></div><div className="num">{p.balls}</div>
@@ -231,19 +231,20 @@ export default function Bowling() {
                   )
 
                   return (
-                    <>
-                      {/* Row 1: Powerplay + its sub-phases */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
+                      {/* Powerplay column: main block + nested sub-phase splits */}
+                      <div>
                         {pp && <PhaseBlock p={pp} label="Powerplay" />}
-                        {ppEarly && <PhaseBlock p={ppEarly} label="Overs 1–3" hideSubtitle />}
-                        {ppLate && <PhaseBlock p={ppLate} label="Overs 4–6" hideSubtitle />}
+                        {(ppEarly || ppLate) && (
+                          <div className="grid grid-cols-2 gap-0" style={{ borderTop: '1px solid var(--rule-soft)' }}>
+                            {ppEarly && <PhaseBlock p={ppEarly} label="1–3" hideSubtitle small />}
+                            {ppLate && <PhaseBlock p={ppLate} label="4–6" hideSubtitle small />}
+                          </div>
+                        )}
                       </div>
-                      {/* Row 2: Middle + Death — same 3-col grid, third slot empty */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
-                        {middle && <PhaseBlock p={middle} label="Middle" />}
-                        {death && <PhaseBlock p={death} label="Death" />}
-                      </div>
-                    </>
+                      {middle && <PhaseBlock p={middle} label="Middle" />}
+                      {death && <PhaseBlock p={death} label="Death" />}
+                    </div>
                   )
                 })()}
               </>
