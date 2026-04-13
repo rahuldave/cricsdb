@@ -186,6 +186,28 @@ The `import_data.py` patch covers both `canon_team()` and `canon_event()` calls 
 
 **One thing this doesn't fix.** A few pages currently use the team string in the URL path (`/teams?team=Kings+XI+Punjab`). Bookmarked links to old-name URLs will return empty data after the rename because the storage no longer has those strings. Could add a tiny redirect at the API layer that catches the four-or-so old IPL names and rewrites the query — not done because the affected URL count is small. Logged for later.
 
+### Season labels: split-year formats and what they mean
+
+Cricsheet's `season` field uses the **cricket board's own season designation**, not the calendar year the matches were played. This produces three formats:
+
+- **Plain year** (`2023`): the season falls within one calendar year.
+- **Split year** (`2022/23`): the season crosses a year boundary.
+- **Both for the same tournament** (e.g. IPL has `2007/08`, `2009/10`, `2020/21` alongside plain `2011`–`2019`, `2021`–`2026`).
+
+**Southern Hemisphere leagues** (BBL, WBBL, Super Smash, CSA T20 Challenge) genuinely cross the calendar year boundary (Dec–Feb), so `2022/23` is correct and meaningful — matches span both calendar years.
+
+**Indian domestic cricket** (Syed Mushtaq Ali Trophy) similarly runs Oct–Jan, so split seasons are expected.
+
+**IPL split seasons are historical artifacts:**
+- `2007/08` — IPL was conceived as part of the 2007/08 Indian cricket season; all matches were in April 2008.
+- `2009/10` — same pattern; matches were in March 2010.
+- `2020/21` — COVID-disrupted IPL played Sep 2020 – Oct 2021 (genuinely split).
+- From 2011 onward (except 2020/21), IPL uses plain years because it settled into a Mar–May window.
+
+**Effect on the season filter:** The `season_from` and `season_to` filters use lexicographic comparison. This means `2009/10` sorts after `2009` but before `2010`. A filter of `2009`–`2009` would NOT include IPL 2009/10 (which was really the 2010 tournament). This is technically correct per the season label but can be surprising to users who think in calendar years.
+
+**Why we don't normalize:** Mapping split seasons to their end year would work for IPL (where the matches all fall in one calendar year) but break BBL/WBBL (where matches genuinely span both years). The inconsistency is in the source data and any normalization would be lossy for some tournaments. We pass through cricsheet's labels as-is.
+
 ### Matchup grid: per-innings batter × bowler matrix
 
 A second new chart on the scorecard page (sibling to the innings grid). For each innings, renders the full set of batter-vs-bowler matchups that happened in that innings as an HTML table: batters as rows in batting order, bowlers as columns in order of first appearance, each cell shows that pair's `runs(balls)w` for the innings. Lives in `frontend/src/components/charts/MatchupGridChart.tsx`.
