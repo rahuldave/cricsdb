@@ -544,6 +544,56 @@ async def bowling_by_phase(
         _enrich_bowling_row(r)
         by_phase.append(r)
 
+    # Sub-phase splits for powerplay: overs 1-3 (0-2) and overs 4-6 (3-5).
+    # Returned as extra entries so the frontend can lay them out alongside
+    # the full powerplay.
+    sub_rows = await db.q(
+        f"""
+        SELECT
+            CASE
+                WHEN d.over_number BETWEEN 0 AND 2 THEN 'pp_early'
+                WHEN d.over_number BETWEEN 3 AND 5 THEN 'pp_late'
+            END as phase,
+            COUNT(*) as balls,
+            SUM(d.runs_batter) as runs_conceded,
+            SUM(CASE WHEN d.runs_batter = 4
+                     AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
+            SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes,
+            SUM(CASE WHEN d.runs_total = 0 THEN 1 ELSE 0 END) as dots
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {legal_where} AND d.over_number BETWEEN 0 AND 5
+        GROUP BY phase
+        ORDER BY MIN(d.over_number)
+        """,
+        legal_params,
+    )
+    sub_wkt_rows = await db.q(
+        f"""
+        SELECT
+            CASE
+                WHEN d.over_number BETWEEN 0 AND 2 THEN 'pp_early'
+                WHEN d.over_number BETWEEN 3 AND 5 THEN 'pp_late'
+            END as phase,
+            COUNT(*) as wickets
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {wkt_where} AND d.over_number BETWEEN 0 AND 5
+        GROUP BY phase
+        """,
+        wkt_params,
+    )
+    sub_wkt_map = {r["phase"]: r["wickets"] for r in sub_wkt_rows}
+    sub_labels = {"pp_early": "1-3", "pp_late": "4-6"}
+    for r in sub_rows:
+        r["overs_range"] = sub_labels.get(r["phase"], "")
+        r["wickets"] = sub_wkt_map.get(r["phase"], 0)
+        _enrich_bowling_row(r)
+        by_phase.append(r)
+
     return {"by_phase": by_phase}
 
 

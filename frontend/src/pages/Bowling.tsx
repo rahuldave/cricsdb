@@ -208,24 +208,44 @@ export default function Bowling() {
             {activeTab === 'By Phase' && (
               <>
                 <TabState fetch={phaseFetch as FetchState<unknown>} />
-                {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
-                    {phaseData.map(p => (
-                      <div key={p.phase} className="wisden-phaseblock">
-                        <h3>{p.phase}</h3>
-                        <div className="wisden-phaseblock-overs">Overs {p.overs}</div>
-                        <div className="wisden-phaseblock-grid">
-                          <div><span className="lbl">Balls</span></div><div className="num">{p.balls}</div>
-                          <div><span className="lbl">Runs</span></div><div className="num">{p.runs}</div>
-                          <div><span className="lbl">SR</span></div><div className="num">{fmt(p.strike_rate)}</div>
-                          <div><span className="lbl">Dots</span></div><div className="num">{fmt(p.dot_pct)}%</div>
-                          <div><span className="lbl">4s</span></div><div className="num">{p.fours}</div>
-                          <div><span className="lbl">6s</span></div><div className="num">{p.sixes}</div>
-                        </div>
+                {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (() => {
+                  const pp = phaseData.find((p: any) => p.phase === 'powerplay')
+                  const ppEarly = phaseData.find((p: any) => p.phase === 'pp_early')
+                  const ppLate = phaseData.find((p: any) => p.phase === 'pp_late')
+                  const middle = phaseData.find((p: any) => p.phase === 'middle')
+                  const death = phaseData.find((p: any) => p.phase === 'death')
+
+                  const PhaseBlock = ({ p, label }: { p: any; label?: string }) => (
+                    <div className="wisden-phaseblock">
+                      <h3>{label || p.phase}</h3>
+                      <div className="wisden-phaseblock-overs">Overs {p.overs_range || p.overs}</div>
+                      <div className="wisden-phaseblock-grid">
+                        <div><span className="lbl">Balls</span></div><div className="num">{p.balls}</div>
+                        <div><span className="lbl">Runs</span></div><div className="num">{p.runs_conceded ?? p.runs}</div>
+                        <div><span className="lbl">Wkts</span></div><div className="num">{p.wickets ?? 0}</div>
+                        <div><span className="lbl">Econ</span></div><div className="num">{fmt(p.economy)}</div>
+                        <div><span className="lbl">SR</span></div><div className="num">{fmt(p.strike_rate)}</div>
+                        <div><span className="lbl">Dots</span></div><div className="num">{fmt(p.dot_pct)}%</div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  )
+
+                  return (
+                    <>
+                      {/* Row 1: Powerplay + its sub-phases */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
+                        {pp && <PhaseBlock p={pp} label="Powerplay" />}
+                        {ppEarly && <PhaseBlock p={ppEarly} label="Overs 1–3" />}
+                        {ppLate && <PhaseBlock p={ppLate} label="Overs 4–6" />}
+                      </div>
+                      {/* Row 2: Middle + Death */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-0" style={{ maxWidth: '66.67%' }}>
+                        {middle && <PhaseBlock p={middle} label="Middle" />}
+                        {death && <PhaseBlock p={death} label="Death" />}
+                      </div>
+                    </>
+                  )
+                })()}
               </>
             )}
 

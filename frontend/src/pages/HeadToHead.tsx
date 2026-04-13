@@ -83,7 +83,13 @@ export default function HeadToHead() {
       {enabled && data && !loading && !error && (
         <>
           <h2 className="wisden-page-title">
-            {data.batter.name} <span style={{ fontStyle: 'italic', color: 'var(--accent)', fontWeight: 400 }}>v</span> {data.bowler.name}
+            <Link to={`/batting?player=${encodeURIComponent(batterId)}`} className="comp-link" style={{ fontSize: 'inherit', fontWeight: 'inherit' }}>
+              {data.batter.name}
+            </Link>
+            {' '}<span style={{ fontStyle: 'italic', color: 'var(--accent)', fontWeight: 400 }}>v</span>{' '}
+            <Link to={`/bowling?player=${encodeURIComponent(bowlerId)}`} className="comp-link" style={{ fontSize: 'inherit', fontWeight: 'inherit' }}>
+              {data.bowler.name}
+            </Link>
           </h2>
 
           <div className="wisden-statrow cols-5">
