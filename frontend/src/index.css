@@ -490,6 +490,12 @@ a { color: inherit; }
 }
 
 /* Phase block — three-up summary used by Batting/Bowling "By Phase" */
+.wisden-phase-first > .wisden-phaseblock:first-child,
+.wisden-phase-first > div:first-child > .wisden-phaseblock:first-child,
+.wisden-phase-first > .wisden-phaseblock:nth-child(2),
+.wisden-phase-first > .wisden-phaseblock:nth-child(3) {
+  border-top: none;
+}
 .wisden-phaseblock {
   text-align: center;
   padding: 1rem 0.75rem;

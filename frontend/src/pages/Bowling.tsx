@@ -231,7 +231,7 @@ export default function Bowling() {
                   )
 
                   return (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 wisden-phase-first">
                       {/* Powerplay column: main block + nested sub-phase splits */}
                       <div>
                         {pp && <PhaseBlock p={pp} label="Powerplay" />}
