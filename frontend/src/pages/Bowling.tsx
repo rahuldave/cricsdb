@@ -215,10 +215,10 @@ export default function Bowling() {
                   const middle = phaseData.find((p: any) => p.phase === 'middle')
                   const death = phaseData.find((p: any) => p.phase === 'death')
 
-                  const PhaseBlock = ({ p, label }: { p: any; label?: string }) => (
+                  const PhaseBlock = ({ p, label, hideSubtitle }: { p: any; label?: string; hideSubtitle?: boolean }) => (
                     <div className="wisden-phaseblock">
                       <h3>{label || p.phase}</h3>
-                      <div className="wisden-phaseblock-overs">Overs {p.overs_range || p.overs}</div>
+                      {!hideSubtitle && <div className="wisden-phaseblock-overs">Overs {p.overs_range || p.overs}</div>}
                       <div className="wisden-phaseblock-grid">
                         <div><span className="lbl">Balls</span></div><div className="num">{p.balls}</div>
                         <div><span className="lbl">Runs</span></div><div className="num">{p.runs_conceded ?? p.runs}</div>
@@ -235,11 +235,11 @@ export default function Bowling() {
                       {/* Row 1: Powerplay + its sub-phases */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
                         {pp && <PhaseBlock p={pp} label="Powerplay" />}
-                        {ppEarly && <PhaseBlock p={ppEarly} label="Overs 1–3" />}
-                        {ppLate && <PhaseBlock p={ppLate} label="Overs 4–6" />}
+                        {ppEarly && <PhaseBlock p={ppEarly} label="Overs 1–3" hideSubtitle />}
+                        {ppLate && <PhaseBlock p={ppLate} label="Overs 4–6" hideSubtitle />}
                       </div>
-                      {/* Row 2: Middle + Death */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-0" style={{ maxWidth: '66.67%' }}>
+                      {/* Row 2: Middle + Death — same 3-col grid, third slot empty */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
                         {middle && <PhaseBlock p={middle} label="Middle" />}
                         {death && <PhaseBlock p={death} label="Death" />}
                       </div>
