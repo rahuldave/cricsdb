@@ -220,7 +220,7 @@ export default function Batting() {
               <>
                 <TabState fetch={phaseFetch as FetchState<unknown>} />
                 {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 wisden-phase-first">
                     {phaseData.map(p => (
                       <div key={p.phase} className="wisden-phaseblock">
                         <h3>{p.phase}</h3>
