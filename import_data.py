@@ -111,23 +111,36 @@ async def import_people(db):
         print(f"  Imported {result[0]['c']} name variants")
 
 
-async def get_match_tables(db):
-    """Create (if needed) and return all match-related tables."""
+async def get_match_tables(db, incremental=False):
+    """Create (if needed) and return all match-related tables.
+
+    In incremental mode (update_recent.py), the tables and indexes
+    already exist — skip the indexes arg so deebase doesn't try to
+    CREATE INDEX on existing indexes. In full-rebuild mode
+    (import_data.py), the DB is freshly created so indexes are needed.
+    """
+    idx = {} if incremental else {
+        "matches_idx": ["match_type", "gender", "season",
+                        "team1", "team2", "event_name"],
+        "dates_idx": ["match_id"],
+        "players_idx": ["match_id", "person_id"],
+        "innings_idx": ["match_id"],
+        "deliveries_idx": ["innings_id", "batter_id", "bowler_id"],
+        "wickets_idx": ["delivery_id", "player_out_id"],
+    }
     return {
         "matches": await db.create(Match, pk="id", if_not_exists=True,
-                                   indexes=["match_type", "gender", "season",
-                                            "team1", "team2", "event_name"]),
+                                   **({} if incremental else {"indexes": idx["matches_idx"]})),
         "dates": await db.create(MatchDate, pk="id", if_not_exists=True,
-                                 indexes=["match_id"]),
+                                 **({} if incremental else {"indexes": idx["dates_idx"]})),
         "players": await db.create(MatchPlayer, pk="id", if_not_exists=True,
-                                   indexes=["match_id", "person_id"]),
+                                   **({} if incremental else {"indexes": idx["players_idx"]})),
         "innings": await db.create(Innings, pk="id", if_not_exists=True,
-                                   indexes=["match_id"]),
+                                   **({} if incremental else {"indexes": idx["innings_idx"]})),
         "deliveries": await db.create(Delivery, pk="id", if_not_exists=True,
-                                      indexes=["innings_id", "batter_id",
-                                                "bowler_id"]),
+                                      **({} if incremental else {"indexes": idx["deliveries_idx"]})),
         "wickets": await db.create(Wicket, pk="id", if_not_exists=True,
-                                   indexes=["delivery_id", "player_out_id"]),
+                                   **({} if incremental else {"indexes": idx["wickets_idx"]})),
     }
 
 

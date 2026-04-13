@@ -247,7 +247,7 @@ async def main():
             print("Database is up to date.")
             return
 
-        tables = await get_match_tables(db)
+        tables = await get_match_tables(db, incremental=True)
         imported = 0
         failed = 0
         for fp in new_files:

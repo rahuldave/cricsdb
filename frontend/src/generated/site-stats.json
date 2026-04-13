@@ -1,19 +1,19 @@
 {
   "totals": {
-    "matches": 12940,
-    "deliveries": 2954405,
-    "wickets": 160418
+    "matches": 13017,
+    "deliveries": 2971480,
+    "wickets": 161440
   },
   "featured_teams": [
     {
       "name": "Royal Challengers Bengaluru",
       "blurb": "IPL & WPL",
-      "matches": 306
+      "matches": 309
     },
     {
       "name": "Chennai Super Kings",
       "blurb": "IPL",
-      "matches": 253
+      "matches": 256
     },
     {
       "name": "India",
@@ -32,7 +32,7 @@
       "name": "V Kohli",
       "role": "batter",
       "gender": "male",
-      "stat": "12,661 runs"
+      "stat": "12,771 runs"
     },
     {
       "id": "462411b3",
@@ -61,7 +61,7 @@
       "batter_id": "740742ef",
       "bowler_id": "ce820073",
       "label": "RG Sharma vs Sandeep Sharma",
-      "stat": "38 off 44"
+      "stat": "38 off 47"
     },
     {
       "batter_id": "d32cf49a",
