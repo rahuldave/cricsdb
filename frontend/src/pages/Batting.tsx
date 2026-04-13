@@ -130,15 +130,15 @@ export default function Batting() {
 
   const bowlerColumns: Column<BowlerMatchup>[] = [
     { key: 'bowler_name', label: 'Bowler', sortable: true, format: (_v: any, r: any) => (
-      <span>
-        {r.bowler_name}{' '}
-        <Link to={`/bowling?player=${encodeURIComponent(r.bowler_id)}`}
-          className="comp-link" style={{ fontSize: '0.75rem' }}
-          onClick={e => e.stopPropagation()}>stats</Link>
-        {' · '}
-        <Link to={`/head-to-head?batter=${encodeURIComponent(playerId || '')}&bowler=${encodeURIComponent(r.bowler_id)}`}
-          className="comp-link" style={{ fontSize: '0.75rem' }}
-          onClick={e => e.stopPropagation()}>h2h</Link>
+      <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: '0.5em' }}>
+        <span>{r.bowler_name}</span>
+        <span style={{ fontSize: '0.7rem', color: 'var(--ink-faint)' }}>
+          (<Link to={`/bowling?player=${encodeURIComponent(r.bowler_id)}`}
+            className="comp-link" onClick={e => e.stopPropagation()}>stats</Link>
+          {' · '}
+          <Link to={`/head-to-head?batter=${encodeURIComponent(playerId || '')}&bowler=${encodeURIComponent(r.bowler_id)}`}
+            className="comp-link" onClick={e => e.stopPropagation()}>h2h</Link>)
+        </span>
       </span>
     ) as unknown as string },
     { key: 'balls', label: 'Balls', sortable: true },
