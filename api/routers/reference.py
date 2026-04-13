@@ -99,6 +99,28 @@ async def search_players(
     db = get_db()
     params: dict = {"q": q, "limit": limit}
 
+    if role == "fielder":
+        # Fielder search: ranked by total dismissals from fielding_credit
+        rows = await db.q(
+            """
+            SELECT p.id, p.name, p.unique_name,
+                   COUNT(*) as innings
+            FROM person p
+            JOIN fieldingcredit fc ON fc.fielder_id = p.id
+            WHERE p.name LIKE :q || '%'
+               OR p.unique_name LIKE '%' || :q || '%'
+               OR p.id IN (
+                   SELECT pn.person_id FROM personname pn
+                   WHERE pn.name LIKE '%' || :q || '%'
+               )
+            GROUP BY p.id
+            ORDER BY innings DESC
+            LIMIT :limit
+            """,
+            params,
+        )
+        return {"players": rows}
+
     if role == "batter":
         join_col = "d.batter_id"
     elif role == "bowler":

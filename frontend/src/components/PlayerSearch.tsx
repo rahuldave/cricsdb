@@ -3,7 +3,7 @@ import { searchPlayers } from '../api'
 import type { PlayerSearchResult } from '../types'
 
 interface PlayerSearchProps {
-  role: 'batter' | 'bowler'
+  role: 'batter' | 'bowler' | 'fielder'
   onSelect: (player: PlayerSearchResult) => void
   placeholder?: string
 }

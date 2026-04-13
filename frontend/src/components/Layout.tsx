@@ -6,6 +6,7 @@ const navItems = [
   { to: '/teams', label: 'Teams' },
   { to: '/batting', label: 'Batting' },
   { to: '/bowling', label: 'Bowling' },
+  { to: '/fielding', label: 'Fielding' },
   { to: '/head-to-head', label: 'Head to Head' },
   { to: '/matches', label: 'Matches' },
 ]

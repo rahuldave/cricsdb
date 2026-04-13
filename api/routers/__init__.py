@@ -6,6 +6,7 @@ from .reference import router as reference_router
 from .teams import router as teams_router
 from .batting import router as batting_router
 from .bowling import router as bowling_router
+from .fielding import router as fielding_router
 from .head_to_head import router as head_to_head_router
 from .matches import router as matches_router
 
@@ -16,5 +17,6 @@ def register_routers(app: FastAPI):
     app.include_router(teams_router)
     app.include_router(batting_router)
     app.include_router(bowling_router)
+    app.include_router(fielding_router)
     app.include_router(head_to_head_router)
     app.include_router(matches_router)

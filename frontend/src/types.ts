@@ -320,6 +320,59 @@ export interface HeadToHeadResponse {
   by_match: HeadToHeadMatch[]
 }
 
+// Fielding
+export interface FieldingSummary {
+  person_id: string
+  name: string
+  matches: number
+  catches: number
+  stumpings: number
+  run_outs: number
+  caught_and_bowled: number
+  total_dismissals: number
+  dismissals_per_match: number | null
+  substitute_catches: number
+}
+
+export interface FieldingSeason {
+  season: string
+  catches: number
+  stumpings: number
+  run_outs: number
+  caught_and_bowled: number
+  total: number
+}
+
+export interface FieldingPhase {
+  phase: string
+  overs: string
+  catches: number
+  stumpings: number
+  run_outs: number
+  caught_and_bowled: number
+  total: number
+}
+
+export interface FieldingVictim {
+  batter_id: string
+  batter_name: string
+  catches: number
+  stumpings: number
+  run_outs: number
+  total: number
+}
+
+export interface FieldingInnings {
+  match_id: number
+  date: string
+  opponent: string | null
+  tournament: string | null
+  catches: number
+  stumpings: number
+  run_outs: number
+  total: number
+}
+
 // Matches & scorecards
 export interface MatchListItem {
   match_id: number

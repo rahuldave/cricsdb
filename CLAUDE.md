@@ -30,23 +30,26 @@ api/
     teams.py          — /api/v1/teams/{team}/summary|results|vs/{opponent}|by-season
     batting.py        — /api/v1/batters/{id}/summary|by-innings|vs-bowlers|by-over|by-phase|by-season|dismissals|inter-wicket
     bowling.py        — /api/v1/bowlers/{id}/summary|by-innings|vs-batters|by-over|by-phase|by-season|wickets
+    fielding.py       — /api/v1/fielders/{id}/summary|by-season|by-phase|by-over|dismissal-types|victims|by-innings
     head_to_head.py   — /api/v1/head-to-head/{batter_id}/{bowler_id}
     matches.py        — /api/v1/matches list, /matches/{id}/scorecard, /matches/{id}/innings-grid
-models/tables.py      — deebase models: Person, Match, Innings, Delivery, Wicket, etc.
+models/tables.py      — deebase models: Person, Match, Innings, Delivery, Wicket, FieldingCredit, etc.
 team_aliases.py       — Canonical team-name mapping (used by import + fix script)
 event_aliases.py      — Canonical tournament-name mapping (same pattern as team_aliases)
+fielder_aliases.py    — Canonical fielder-name mapping (married names, disambiguated names)
 scripts/fix_team_names.py  — One-time UPDATE pass to canonicalize old team names in cricket.db
 scripts/fix_event_names.py — Same for tournament names (match.event_name)
-import_data.py        — Downloads cricsheet JSON + imports into SQLite (canonicalizes via team_aliases + event_aliases)
+scripts/populate_fielding_credits.py — Builds fielding_credit table (called automatically by import + update pipelines)
+import_data.py        — Downloads cricsheet JSON + imports into SQLite (canonicalizes via team_aliases + event_aliases, populates fielding_credit)
 frontend/src/
-  App.tsx             — React Router: /, /teams, /batting, /bowling, /head-to-head, /matches, /matches/:matchId
+  App.tsx             — React Router: /, /teams, /batting, /bowling, /fielding, /head-to-head, /matches, /matches/:matchId
   hooks/useUrlState.ts — useUrlParam + useSetUrlParams (atomic URL state updates)
   hooks/useFetch.ts    — { data, loading, error, refetch } wrapper around an async fn
   hooks/useContainerWidth.ts — ResizeObserver wrapper used by responsive chart wrappers
   components/         — Layout, FilterBar, PlayerSearch, StatCard, DataTable, Spinner, ErrorBanner, Scorecard, InningsCard, charts/
     charts/           — BarChart, LineChart, ScatterChart, DonutChart wrappers (responsive),
                         WormChart, ManhattanChart, InningsGridChart, MatchupGridChart
-  pages/              — Home, Teams, Batting, Bowling, HeadToHead, Matches, MatchScorecard
+  pages/              — Home, Teams, Batting, Bowling, Fielding, HeadToHead, Matches, MatchScorecard
 deploy.sh             — Stages build_plash/ dir and runs plash_deploy
 SPEC.md               — Full specification with all API schemas and SQL queries
 docs/                 — frontend-build-pipeline.md, design-decisions.md
@@ -82,12 +85,20 @@ See `docs/data-pipeline.md` for the full pipeline and dry-run output format.
 ```bash
 # Full rebuild (~15 min):
 uv run python download_data.py        # fetches zips + people/names CSVs
-uv run python import_data.py          # drops cricket.db and reimports
+uv run python import_data.py          # drops cricket.db and reimports + populates fielding_credit
 
 # Incremental update (just new T20 matches):
 uv run python update_recent.py --dry-run --days 7   # check status
-uv run python update_recent.py --days 7              # import
+uv run python update_recent.py --days 7              # import + incremental fielding_credit
+
+# One-time: populate fielding_credit on an existing DB that doesn't have it yet:
+uv run python scripts/populate_fielding_credits.py
 ```
+
+Both `import_data.py` (full rebuild) and `update_recent.py` (incremental)
+automatically populate the `fielding_credit` table — no separate step needed.
+The full rebuild truncates and repopulates all ~118K rows; incremental adds
+credits only for newly imported matches.
 
 `update_recent.py --dry-run` reports today's date, latest match in DB,
 latest in cricsheet's bundle, plus `Last-Modified` for `people.csv` and
@@ -155,8 +166,7 @@ that fits the available time.
 
 **H. Reverse direction of the scatter↔table linking on Batting/Bowling vs-tabs.** The forward direction (click a row → highlight the matching dot on the chart with an `enclose` annotation, scroll the row into view) is shipped — see `docs/design-decisions.md` "Linking scatter charts to their data tables." The reverse direction (click a dot → highlight the row, scroll the table to it) is missing because Semiotic v3's high-level `Scatterplot` component does not expose `onClick` or any per-point click handler.
 
-**L. Fielding analytics page.** New `/fielding` page at the same level as Batting and Bowling. Spec at `docs/spec-fielding.md`. Two tiers:
-   - **Tier 1** (specced, ready to build): `fielding_credit` denormalized table (~122K rows), `fielder_aliases.py` for 56 unmatched names, fix `wicket.fielders` double-encoding, 7 API endpoints, frontend page with 6 tabs. No keeper distinction — all fielding treated equally.
+**L. Fielding analytics page.** _Tier 1 done._ `/fielding` page with `fielding_credit` denormalized table (~118K rows), `fielder_aliases.py`, `wicket.fielders` double-encoding fix in `import_data.py`, 7 API endpoints (`api/routers/fielding.py`), frontend page with 6 tabs (By Season, By Over, By Phase, Dismissal Types, Victims, Innings List). Fielder search via `role=fielder` in `/api/v1/players`. Both `import_data.py` and `update_recent.py` auto-populate fielding credits — no separate script needed. Spec at `docs/spec-fielding.md`.
    - **Tier 2** (proto-spec at `docs/spec-fielding-tier2.md`): wicketkeeper identification for ~59% of innings via stumpings + single-keeper-in-XI inference. "Keeping" sub-tab with keeper-specific stats.
 
 **M. Tournament analytics page.** New `/tournaments` page with three route levels: tournament listing, per-tournament overview (cross-season stats, records, teams), and per-season detail (standings, top performers, matches). 687 distinct tournaments in the DB; practical scope is ~21 club leagues + major ICC events. All data is feasible to compute from existing tables. No spec written yet — research findings from the tournament feasibility study inform the design.

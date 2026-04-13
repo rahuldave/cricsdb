@@ -132,3 +132,14 @@ class Wicket:
     player_out_id: Optional[ForeignKey[str, "person"]] = None
     kind: str  # bowled, caught, lbw, stumped, run out, etc.
     fielders: Optional[dict] = None  # JSON list of fielder objects
+
+
+class FieldingCredit:
+    """One row per fielder per wicket — denormalized from wicket.fielders."""
+    id: int
+    wicket_id: ForeignKey[int, "wicket"]
+    delivery_id: ForeignKey[int, "delivery"]
+    fielder_name: str
+    fielder_id: Optional[ForeignKey[str, "person"]] = None
+    kind: str  # caught, stumped, run_out, caught_and_bowled
+    is_substitute: bool = False

@@ -250,10 +250,12 @@ async def main():
         tables = await get_match_tables(db, incremental=True)
         imported = 0
         failed = 0
+        imported_filenames = []
         for fp in new_files:
             try:
                 await import_match_file(db, fp, tables)
                 imported += 1
+                imported_filenames.append(os.path.basename(fp))
                 print(f"  + {os.path.basename(fp)}")
             except Exception as e:
                 failed += 1
@@ -262,6 +264,16 @@ async def main():
         print(f"\nImported {imported} matches ({failed} failed)")
 
         if imported > 0:
+            # Populate fielding credits for the new matches
+            placeholders = ",".join(f"'{fn}'" for fn in imported_filenames)
+            id_rows = await db.q(
+                f"SELECT id FROM match WHERE filename IN ({placeholders})"
+            )
+            new_match_ids = [r["id"] for r in id_rows]
+            if new_match_ids:
+                from scripts.populate_fielding_credits import populate_incremental
+                await populate_incremental(db, new_match_ids)
+
             print("\nRegenerating site stats…")
             import subprocess
             subprocess.run(

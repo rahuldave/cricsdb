@@ -89,6 +89,22 @@ export const getBowlerBySeason = (id: string, filters?: F) =>
 export const getBowlerWickets = (id: string, filters?: F) =>
   fetchApi<WicketAnalysis>(`/api/v1/bowlers/${id}/wickets`, filters as Record<string, string>)
 
+// Fielding
+export const getFielderSummary = (id: string, filters?: F) =>
+  fetchApi<import('./types').FieldingSummary>(`/api/v1/fielders/${id}/summary`, filters as Record<string, string>)
+export const getFielderBySeason = (id: string, filters?: F) =>
+  fetchApi<{ by_season: import('./types').FieldingSeason[] }>(`/api/v1/fielders/${id}/by-season`, filters as Record<string, string>)
+export const getFielderByPhase = (id: string, filters?: F) =>
+  fetchApi<{ by_phase: import('./types').FieldingPhase[] }>(`/api/v1/fielders/${id}/by-phase`, filters as Record<string, string>)
+export const getFielderByOver = (id: string, filters?: F) =>
+  fetchApi<{ by_over: { over_number: number; dismissals: number }[] }>(`/api/v1/fielders/${id}/by-over`, filters as Record<string, string>)
+export const getFielderDismissalTypes = (id: string, filters?: F) =>
+  fetchApi<{ total: number; by_kind: Record<string, number> }>(`/api/v1/fielders/${id}/dismissal-types`, filters as Record<string, string>)
+export const getFielderVictims = (id: string, filters?: F & { limit?: number }) =>
+  fetchApi<{ victims: import('./types').FieldingVictim[] }>(`/api/v1/fielders/${id}/victims`, filters as Record<string, string>)
+export const getFielderInnings = (id: string, filters?: F & { limit?: number; offset?: number }) =>
+  fetchApi<{ innings: import('./types').FieldingInnings[]; total: number }>(`/api/v1/fielders/${id}/by-innings`, filters as Record<string, string>)
+
 // Matches
 export const getMatches = (filters?: F & { team?: string; player_id?: string; limit?: number; offset?: number }) =>
   fetchApi<{ matches: MatchListItem[]; total: number }>('/api/v1/matches', filters as Record<string, string>)

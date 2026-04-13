@@ -71,13 +71,17 @@ uv run python import_data.py
 
 `import_data.py` deletes any existing `cricket.db`, recreates the
 schema, and imports everything in `data/`. The schema is created from
-`models.py` via deebase.
+`models.py` via deebase. At the end of the import, it automatically
+populates the `fielding_credit` denormalized table (~118K rows) by
+calling `scripts/populate_fielding_credits.py:populate_full()`.
 
 ### Incremental updates
 
 `update_recent.py` pulls cricsheet's "recently added" bulk zip,
 filters to T20/IT20 (international + club), dedupes against
-`match.filename`, and imports only what's new.
+`match.filename`, and imports only what's new. After importing, it
+automatically adds fielding credits for the new matches only (via
+`populate_incremental()`) — no separate step needed.
 
 ```bash
 uv run python update_recent.py --dry-run --days 7   # check status

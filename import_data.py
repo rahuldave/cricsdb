@@ -289,8 +289,7 @@ async def import_match_file(db, filepath, tables):
                         "player_out": w_data["player_out"],
                         "player_out_id": registry.get(w_data["player_out"]),
                         "kind": w_data["kind"],
-                        "fielders": json.dumps(w_data.get("fielders"))
-                            if w_data.get("fielders") else None,
+                        "fielders": w_data.get("fielders"),
                     })
                 await bulk_insert(db, wickets_table, wicket_rows)
 
@@ -340,6 +339,11 @@ async def main():
 
     await import_people(db)
     await import_matches(db)
+
+    # Populate the fielding_credit denormalized table
+    print("\nPopulating fielding credits…")
+    from scripts.populate_fielding_credits import populate_full
+    await populate_full(db)
 
     print(f"\nDatabase saved to {DB_PATH}")
     print(f"Size: {os.path.getsize(DB_PATH) / 1024 / 1024:.1f} MB")
