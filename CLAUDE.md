@@ -2,7 +2,7 @@
 
 ## Project Status
 
-Live at: https://t20-cricket-db.pla.sh
+Live at: https://t20.rahuldave.com
 Repo: https://github.com/rahuldave/cricsdb
 deebase PR: https://github.com/rahulcredcore/deebase/pull/8 (adds params to db.q())
 
@@ -151,6 +151,12 @@ that fits the available time.
 
 **K. Tournament-name canonicalization.** _Done._ Implemented in `event_aliases.py` + `scripts/fix_event_names.py`, mirroring the team-aliases pattern. Three competitions merged: NatWest T20 Blast / Vitality Blast Men → Vitality Blast (English), MiWAY / Ram Slam → CSA T20 Challenge (SA), HRV Cup / HRV Twenty20 → Super Smash (NZ). 784 rows updated; club-tournament count went from 27 to 21. See `docs/design-decisions.md` "Team-name canonicalization across renames" for the shared writeup.
 
-**J. Distinctive visual identity.** The site is functional but generically Tailwind — Inter-ish system font, blue/gray utility palette, default shadows. Not bad, but not memorable either. A bolder typographic identity (e.g., a display serif or characterful sans for player names + headers, monospace tabular numerals for stats) and a stronger color hierarchy would lift it from "competent dashboard" to "memorable cricket database." This is a redesign pass, not a fix — flagged after a mobile-audit pass surfaced it as the highest-impact aesthetic improvement that wasn't a bug. Inspirations to consider: Cricinfo's editorial typography, Edward Tufte's data-density principles, the FiveThirtyEight numerical aesthetic.
+**J. Distinctive visual identity.** _Done._ Wisden editorial redesign shipped. Cream background, Fraunces display serif + Inter Tight sans, oxblood accent, rule-based layouts instead of card chrome. Full documentation in `docs/visual-identity.md`. Consistency rule: subject in ink, connective in oxblood, hover to oxblood.
 
-**H. Reverse direction of the scatter↔table linking on Batting/Bowling vs-tabs.** The forward direction (click a row → highlight the matching dot on the chart with an `enclose` annotation, scroll the row into view) is shipped — see `docs/design-decisions.md` "Linking scatter charts to their data tables." The reverse direction (click a dot → highlight the row, scroll the table to it) is missing because Semiotic v3's high-level `Scatterplot` component does not expose `onClick` or any per-point click handler. Adding it requires dropping below the high-level helper to `XYFrame` directly: build a custom XY chart that wires `customClickBehavior` through to a callback, then plumb that callback up to the page state already managed for the table highlight. The wrapper at `frontend/src/components/charts/ScatterChart.tsx` is a good place to encapsulate this — add an `onPointClick?: (d: T) => void` prop and switch the implementation from `Scatterplot` to `XYFrame` only when that prop is set, so other callers don't pay the complexity. Once done, the page-level `selectedBowlerId` / `selectedBatterId` state in `Batting.tsx` and `Bowling.tsx` already drives row highlighting — just call the setter from the new click handler.
+**H. Reverse direction of the scatter↔table linking on Batting/Bowling vs-tabs.** The forward direction (click a row → highlight the matching dot on the chart with an `enclose` annotation, scroll the row into view) is shipped — see `docs/design-decisions.md` "Linking scatter charts to their data tables." The reverse direction (click a dot → highlight the row, scroll the table to it) is missing because Semiotic v3's high-level `Scatterplot` component does not expose `onClick` or any per-point click handler.
+
+**L. Fielding analytics page.** New `/fielding` page at the same level as Batting and Bowling. Spec at `docs/spec-fielding.md`. Two tiers:
+   - **Tier 1** (specced, ready to build): `fielding_credit` denormalized table (~122K rows), `fielder_aliases.py` for 56 unmatched names, fix `wicket.fielders` double-encoding, 7 API endpoints, frontend page with 6 tabs. No keeper distinction — all fielding treated equally.
+   - **Tier 2** (proto-spec at `docs/spec-fielding-tier2.md`): wicketkeeper identification for ~59% of innings via stumpings + single-keeper-in-XI inference. "Keeping" sub-tab with keeper-specific stats.
+
+**M. Tournament analytics page.** New `/tournaments` page with three route levels: tournament listing, per-tournament overview (cross-season stats, records, teams), and per-season detail (standings, top performers, matches). 687 distinct tournaments in the DB; practical scope is ~21 club leagues + major ICC events. All data is feasible to compute from existing tables. No spec written yet — research findings from the tournament feasibility study inform the design.
