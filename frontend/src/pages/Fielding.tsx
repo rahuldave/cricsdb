@@ -179,9 +179,19 @@ export default function Fielding() {
               <>
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
                 {!seasonFetch.loading && !seasonFetch.error && seasonData.length > 0 && (
-                  <BarChart data={seasonData} categoryAccessor="season" valueAccessor="total"
-                    title="Dismissals by Season" categoryLabel="Season" valueLabel="Dismissals"
-                    height={350} />
+                  <>
+                    <BarChart data={seasonData} categoryAccessor="season" valueAccessor="total"
+                      title="Dismissals by Season" categoryLabel="Season" valueLabel="Dismissals"
+                      height={350} />
+                    {seasonData.some(s => s.season.includes('/')) && (
+                      <p className="wisden-tab-help">
+                        Seasons like 2025/26 are Oct–Mar tournaments (BBL, Super Smash, SA20,
+                        internationals, T20 World Cups). Plain years like 2025 are tournaments
+                        within one calendar year (e.g. IPL, which runs Mar–May and never spans
+                        two calendar years except the COVID-disrupted 2020/21).
+                      </p>
+                    )}
+                  </>
                 )}
               </>
             )}

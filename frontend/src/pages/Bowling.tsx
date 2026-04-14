@@ -185,15 +185,25 @@ export default function Bowling() {
               <>
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
                 {!seasonFetch.loading && !seasonFetch.error && seasonData.length > 0 && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <BarChart data={seasonData} categoryAccessor="season" valueAccessor={(d: Record<string, any>) => (d.wickets as number) ?? (d.dismissals as number) ?? 0}
-                      title="Wickets by Season" categoryLabel="Season" valueLabel="Wickets"
-                      height={350} colorScheme={[WISDEN.oxblood]} />
-                    <BarChart data={seasonData.filter(s => s.strike_rate != null)}
-                      categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
-                      title="Bowling Strike Rate by Season" categoryLabel="Season" valueLabel="SR"
-                      height={350} />
-                  </div>
+                  <>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <BarChart data={seasonData} categoryAccessor="season" valueAccessor={(d: Record<string, any>) => (d.wickets as number) ?? (d.dismissals as number) ?? 0}
+                        title="Wickets by Season" categoryLabel="Season" valueLabel="Wickets"
+                        height={350} colorScheme={[WISDEN.oxblood]} />
+                      <BarChart data={seasonData.filter(s => s.strike_rate != null)}
+                        categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
+                        title="Bowling Strike Rate by Season" categoryLabel="Season" valueLabel="SR"
+                        height={350} />
+                    </div>
+                    {seasonData.some((s: Record<string, any>) => String(s.season).includes('/')) && (
+                      <p className="wisden-tab-help">
+                        Seasons like 2025/26 are Oct–Mar tournaments (BBL, Super Smash, SA20,
+                        internationals, T20 World Cups). Plain years like 2025 are tournaments
+                        within one calendar year (e.g. IPL, which runs Mar–May and never spans
+                        two calendar years except the COVID-disrupted 2020/21).
+                      </p>
+                    )}
+                  </>
                 )}
               </>
             )}
