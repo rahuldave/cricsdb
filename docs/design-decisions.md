@@ -146,6 +146,18 @@ The Batting `vs Bowlers` and Bowling `vs Batters` tabs both render a scatter cha
 
 **The reverse direction (clicking a chart dot to highlight a table row) is deliberately NOT implemented.** Semiotic v3's high-level `Scatterplot` component does not expose `onClick` or any per-point click handler. Adding that would require dropping below the high-level helper to `XYFrame` directly, which is a bigger refactor and would lose some of the convenience defaults the wrapper provides. The tooltip + top-N labels + reverse direction (table → chart) already cover the original "I can't tell who the big dots are" complaint, so the forward direction (chart → table) is left for later — see CLAUDE.md Future Enhancements item H.
 
+### Scorecard auto-scroll to highlighted row
+
+Clicking a date in the Batting, Bowling, or Fielding innings-list opens the match scorecard with a query param (`?highlight_batter=`, `?highlight_bowler=`, or `?highlight_fielder=`, each carrying a person ID). Matching rows get a greenish `.is-highlighted` class and the page auto-scrolls to center the first one.
+
+**Three highlight modes, one selector.** The shared CSS class lets a single `document.querySelector('.is-highlighted')` serve all three modes. `querySelector` returns the first match in document order, which is exactly the behavior we want — for a fielder who has multiple catches, we scroll to their first dismissal; for a batter, to their row in their team's innings; for a bowler, to their row in the bowling table of the opposing innings.
+
+**Fielder attribution goes through `fieldingcredit`, not the dismissal text.** The scorecard API adds `dismissal_fielder_ids: string[]` to each batting row, populated by joining `fieldingcredit` for the innings. That means the frontend never has to parse "c Dhoni b Bumrah" strings to decide whether a row involves the highlighted fielder — it just checks `row.dismissal_fielder_ids.includes(id)`. Run-outs with multiple fielders are covered naturally (each fielder appears in the array).
+
+**Scroll is page-level, not per-InningsCard.** Earlier, each `InningsCard` ran its own `useEffect` → `scrollIntoView` when its ref resolved. That fired *before* sibling async sections (`WormChart`, `ManhattanChart`, `MatchupGridChart`, `InningsGridChart`) had fetched and sized, so the target row was displaced once layout settled. The fix moves the scroll to `MatchScorecard.tsx`, gated on **both** fetches (`data` and `grid.data`) completing, inside a double `requestAnimationFrame` — the first rAF lets the current commit paint, the second lets layout settle. Then `querySelector` finds the first highlighted row and `scrollIntoView({ block: 'center' })` centers it.
+
+**Why not anchor hashes?** `scrollIntoView` operates on a DOM element reference and doesn't require anchors. Hashes would pollute the URL and break when the highlighted element's ID isn't stable (e.g. when data reloads). Direct DOM selection keeps the URL clean and always targets the current first-highlighted element.
+
 ### Team-name canonicalization across renames
 
 Cricket franchises rename themselves periodically. Cricsheet records the team name that was current when each match was played, so the same franchise appears in the database under multiple strings depending on the season. Without merging, queries that group by team string treat (e.g.) "Kings XI Punjab" and "Punjab Kings" as separate teams — which makes the Teams page show two Punjabs, the Matches list filter show two RCBs, and breaks every cross-season aggregation.

@@ -71,8 +71,24 @@ wicket (160,418 rows)
   player_out_id: FK(person)?
   kind: str (caught, bowled, lbw, run out, stumped, caught and bowled,
              hit wicket, retired hurt, retired out, obstructing the field)
-  fielders: JSON list of {name: str} objects
+  fielders: JSON list of {name: str, substitute?: bool} objects
+
+fieldingcredit (~118K rows)
+  id: int (PK) → wicket_id: FK(wicket), delivery_id: FK(delivery)
+  fielder_name: str (as it appears in cricsheet)
+  fielder_id: FK(person)? (resolved via person.name →
+                           person.unique_name → personname → fielder_aliases.py)
+  kind: str ("caught" | "stumped" | "run_out" | "caught_and_bowled")
+  is_substitute: bool
+  Indexes: fielder_id, delivery_id, kind
 ```
+
+The `fieldingcredit` table is denormalized from `wicket.fielders` + the
+bowler on `caught and bowled` deliveries. One row per fielder per wicket
+(run outs may produce 2+ rows for relay throws). Populated automatically
+by both `import_data.py` (full rebuild) and `update_recent.py`
+(incremental, new matches only) — no separate script needed. See
+`scripts/populate_fielding_credits.py` for the implementation.
 
 ### 1.2 Key Data Characteristics
 
@@ -1093,6 +1109,97 @@ WHERE d.batter_id = :batter_id
 
 ---
 
+### 3.5 Fielding
+
+All endpoints read from the denormalized `fieldingcredit` table joined
+through `delivery → innings → match` for filter support. Standard global
+filters (gender, team_type, tournament, season_from, season_to) apply.
+
+**Player search:** `GET /api/v1/players?q=...&role=fielder` returns
+people ranked by total dismissals in `fieldingcredit`. Same endpoint as
+batter/bowler search — `role` switches the ranking source.
+
+#### `GET /api/v1/fielders/{person_id}/summary`
+
+```json
+{
+  "person_id": "4a8a2e3b",
+  "name": "MS Dhoni",
+  "matches": 372,
+  "catches": 210,
+  "stumpings": 81,
+  "run_outs": 74,
+  "caught_and_bowled": 0,
+  "total_dismissals": 365,
+  "dismissals_per_match": 0.98,
+  "substitute_catches": 0
+}
+```
+
+`matches` comes from `matchplayer` (not `fieldingcredit`), so it counts
+all matches the person appeared in — including ones where they didn't
+effect a dismissal. `substitute_catches` counts rows where
+`fieldingcredit.is_substitute = true`.
+
+#### `GET /api/v1/fielders/{person_id}/by-season`
+
+```json
+{
+  "by_season": [
+    { "season": "2023", "catches": 12, "stumpings": 4, "run_outs": 3,
+      "caught_and_bowled": 0, "total": 19 }
+  ]
+}
+```
+
+#### `GET /api/v1/fielders/{person_id}/by-phase`
+
+Powerplay / middle / death breakdown using `delivery.over_number`. Same
+phase boundaries as batting/bowling (0-5, 6-14, 15-19 in DB; returned as
+"1-6", "7-15", "16-20"). Each phase row has catches / stumpings /
+run_outs / caught_and_bowled / total.
+
+#### `GET /api/v1/fielders/{person_id}/by-over`
+
+One row per over (1-20 after +1 transform), `dismissals` count.
+
+#### `GET /api/v1/fielders/{person_id}/dismissal-types`
+
+Donut chart data — `{ total, by_kind: { caught, stumped, run_out, caught_and_bowled } }`.
+
+#### `GET /api/v1/fielders/{person_id}/victims`
+
+Top batters dismissed by this fielder:
+```json
+{
+  "victims": [
+    { "batter_id": "ba607b88", "batter_name": "V Kohli",
+      "catches": 3, "stumpings": 0, "run_outs": 1, "total": 4 }
+  ]
+}
+```
+`caught_and_bowled` rows are folded into `catches` for the victim count
+so the user sees one number for "dismissed by catching/c&b".
+
+#### `GET /api/v1/fielders/{person_id}/by-innings`
+
+Paginated match-by-match fielding log (limit default 50, max 200):
+```json
+{
+  "innings": [
+    { "match_id": 5975, "date": "2025-04-14",
+      "opponent": "Lucknow Super Giants",
+      "tournament": "Indian Premier League",
+      "catches": 1, "stumpings": 1, "run_outs": 1, "total": 3 }
+  ],
+  "total": 222
+}
+```
+The `opponent` is looked up per row from `matchplayer` (to find which
+team the fielder was on) then inverted against `match.team1`/`team2`.
+
+---
+
 ### 3.6 Matches & Scorecards
 
 A new endpoint family backing the Matches tab. Two endpoints: a paginated
@@ -1200,6 +1307,8 @@ Return everything needed to render a full scorecard for one match.
           "person_id": "abc123",
           "name": "RD Gaikwad",
           "dismissal": "c Rohit b Bumrah",
+          "dismissal_bowler_id": "def456",
+          "dismissal_fielder_ids": ["ghi789"],
           "runs": 53,
           "balls": 38,
           "fours": 5,
@@ -1389,7 +1498,9 @@ Top nav bar with:
 - **Teams** — team results, head-to-head
 - **Batting** — batter profiles, matchups
 - **Bowling** — bowler profiles, matchups
+- **Fielding** — fielder profiles, victims, dismissal types
 - **Head to Head** — batter vs bowler deep dive
+- **Matches** — paginated match list + shareable scorecard pages
 
 Global filter bar (sticky, below nav):
 - Gender toggle (Male / Female / All)
@@ -1554,7 +1665,58 @@ Filters sync to URL query params so pages are shareable/bookmarkable.
 └──────────────────────────────────────────────────────┘
 ```
 
-### 4.5 Page: Head to Head (`/head-to-head`)
+### 4.5 Page: Fielding (`/fielding`)
+
+**Layout:** Same structure as batting/bowling — player search, stat
+row, tabs. No sub-player filter (no `vs` tab equivalent — "Victims" is
+a table of batters dismissed, not a drill-down filter).
+
+```
+┌──────────────────────────────────────────────────────┐
+│  [Player Search Autocomplete]                        │
+│  (hits /api/v1/players?role=fielder&q=...)            │
+├──────────────────────────────────────────────────────┤
+│  Player Header: Name                                 │
+├──────────────────────────────────────────────────────┤
+│  Summary Cards Row (6 columns)                       │
+│  ┌────────┬──────────┬────────┬───────┬───────┬──────┐│
+│  │Catches │Stumpings │Run Outs│ Total │Matches│Dis/M ││
+│  │  210   │    81    │   74   │  365  │  372  │ 0.98 ││
+│  └────────┴──────────┴────────┴───────┴───────┴──────┘│
+├──────────────────────────────────────────────────────┤
+│  Tabs: [By Season] [By Over] [By Phase]              │
+│        [Dismissal Types] [Victims] [Innings List]    │
+├──────────────────────────────────────────────────────┤
+│  [By Season]                                         │
+│  Bar: total dismissals by season                     │
+│                                                      │
+│  [By Over]                                           │
+│  Bar: dismissals by over 1-20, colored by phase      │
+│                                                      │
+│  [By Phase]                                          │
+│  Three phase blocks (powerplay/middle/death) with    │
+│  catches / stumpings / run_outs / c&b / total        │
+│                                                      │
+│  [Dismissal Types]                                   │
+│  Donut: catches vs stumpings vs run_outs vs c&b      │
+│                                                      │
+│  [Victims]                                           │
+│  Table: batter, catches, stumpings, run_outs, total  │
+│  Name column carries (stats · h2h) links.            │
+│                                                      │
+│  [Innings List]                                      │
+│  Table: date → scorecard (w/ highlight_fielder),     │
+│  opponent, tournament, catches, stumpings, run_outs, │
+│  total. Paginated (50/page).                         │
+└──────────────────────────────────────────────────────┘
+```
+
+**No keeper/non-keeper distinction** in Tier 1 — all fielding is treated
+equally. Tier 2 spec (`docs/spec-fielding-tier2.md`) proposes wicketkeeper
+identification via stumpings + single-keeper-in-XI inference and a
+"Keeping" sub-tab.
+
+### 4.6 Page: Head to Head (`/head-to-head`)
 
 **Layout:**
 
@@ -1589,7 +1751,7 @@ Filters sync to URL query params so pages are shareable/bookmarkable.
 └──────────────────────────────────────────────────────┘
 ```
 
-### 4.6 Pages: Matches (`/matches`) and Match Scorecard (`/matches/:matchId`)
+### 4.7 Pages: Matches (`/matches`) and Match Scorecard (`/matches/:matchId`)
 
 A two-page scorecard browser. The list page at `/matches` combines
 the global filter bar with a team picker and a player picker and
@@ -1653,7 +1815,25 @@ view plus worm and Manhattan charts.
 
 **URL state:**
 - List page: `?team=`, `?player=`, `?player_name=`, plus global filters.
-- Scorecard page: `:matchId` is the only state — fully shareable URL.
+- Scorecard page: `:matchId` in the path, plus optional
+  `?highlight_batter=`, `?highlight_bowler=`, or `?highlight_fielder=`
+  (person ID) that tints the matching row(s) green (`.is-highlighted`)
+  and auto-scrolls to the first match. Batting/bowling innings-list
+  date links carry these params automatically. For `highlight_fielder`,
+  the scorecard API returns a `dismissal_fielder_ids` array per batting
+  row, sourced from `fieldingcredit` — any batter whose dismissal
+  involved the highlighted fielder (catch, stumping, or run out) is
+  tinted.
+
+**Scroll behavior (highlight auto-scroll):** Page-level — a `useEffect`
+in `MatchScorecard.tsx` waits for both the scorecard fetch *and* the
+innings-grid fetch to resolve, then in a double `requestAnimationFrame`
+queries `document.querySelector('.is-highlighted')` and calls
+`scrollIntoView({ block: 'center' })` on the first match. This single
+selector serves all three highlight modes. Per-card scrolling was
+tried earlier and abandoned because sibling async sections (charts,
+matchup grid, innings grid) hadn't sized when the scroll fired, so the
+target row got displaced once layout settled.
 
 **Data flow:**
 1. List page mounts → `GET /api/v1/matches?...&limit=50&offset=...`.
@@ -1970,7 +2150,7 @@ Set up the React project with shared components, ready for page-specific work.
 - Handles query param serialization from filter state
 
 **Step 2.4: Layout and navigation (`src/components/Layout.tsx`)**
-- Top nav: Teams | Batting | Bowling | Head to Head
+- Top nav: Teams | Batting | Bowling | Fielding | Head to Head | Matches
 - Active route highlighting with React Router
 - Responsive (hamburger menu on mobile)
 
