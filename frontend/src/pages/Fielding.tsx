@@ -126,7 +126,7 @@ export default function Fielding() {
 
   const inningsColumns: Column<FieldingInnings>[] = [
     { key: 'date', label: 'Date', sortable: true, format: (v: any, r: any) => (
-      <Link to={`/matches/${r.match_id}`}
+      <Link to={`/matches/${r.match_id}?highlight_fielder=${encodeURIComponent(playerId || '')}`}
         className="comp-link" onClick={e => e.stopPropagation()}>{v || '-'}</Link>
     ) as unknown as string },
     { key: 'opponent', label: 'Opponent', sortable: true },

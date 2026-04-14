@@ -384,7 +384,8 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
     # Dismissal lookup per batter
     dismissals = await db.q(
         """
-        SELECT w.player_out, w.kind, w.fielders, d.bowler, d.bowler_id
+        SELECT w.id as wicket_id, w.player_out, w.kind, w.fielders,
+               d.bowler, d.bowler_id
         FROM wicket w
         JOIN delivery d ON d.id = w.delivery_id
         WHERE d.innings_id = :iid
@@ -393,10 +394,26 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
     )
     dismissal_by_name = {d["player_out"]: d for d in dismissals}
 
+    # Fielder IDs per wicket (for highlight_fielder support)
+    fc_rows = await db.q(
+        """
+        SELECT fc.wicket_id, fc.fielder_id
+        FROM fieldingcredit fc
+        JOIN delivery d ON d.id = fc.delivery_id
+        WHERE d.innings_id = :iid AND fc.fielder_id IS NOT NULL
+        """,
+        {"iid": iid},
+    )
+    from collections import defaultdict
+    fielder_ids_by_wicket: dict[int, list[str]] = defaultdict(list)
+    for fc in fc_rows:
+        fielder_ids_by_wicket[fc["wicket_id"]].append(fc["fielder_id"])
+
     batting = []
     for b in bat_rows:
         dismissal_row = dismissal_by_name.get(b["batter"])
         bowler_id = None
+        fielder_ids: list[str] = []
         if dismissal_row:
             text = _build_dismissal_text(
                 dismissal_row["kind"],
@@ -407,6 +424,7 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
             # — same exclusion list used in bowling figures.
             if (dismissal_row["kind"] or "").lower() not in NON_BOWLER_WICKETS:
                 bowler_id = dismissal_row["bowler_id"]
+            fielder_ids = fielder_ids_by_wicket.get(dismissal_row["wicket_id"], [])
         else:
             text = "not out"
         sr = round(b["runs"] * 100 / b["balls"], 2) if b["balls"] else 0.0
@@ -415,6 +433,7 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
             "name": b["batter"],
             "dismissal": text,
             "dismissal_bowler_id": bowler_id,
+            "dismissal_fielder_ids": fielder_ids,
             "runs": b["runs"],
             "balls": b["balls"],
             "fours": b["fours"],

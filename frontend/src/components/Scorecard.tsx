@@ -8,9 +8,10 @@ interface Props {
   children?: ReactNode
   highlightBatterId?: string | null
   highlightBowlerId?: string | null
+  highlightFielderId?: string | null
 }
 
-export default function ScorecardView({ data, children, highlightBatterId, highlightBowlerId }: Props) {
+export default function ScorecardView({ data, children, highlightBatterId, highlightBowlerId, highlightFielderId }: Props) {
   const { info, innings } = data
   const tossText = info.toss_winner && info.toss_decision
     ? `${info.toss_winner} won the toss and chose to ${info.toss_decision}`
@@ -56,7 +57,8 @@ export default function ScorecardView({ data, children, highlightBatterId, highl
       {innings.map((inn, i) => (
         <InningsCard key={i} innings={inn} linkParams={linkParams}
           highlightBatterId={highlightBatterId}
-          highlightBowlerId={highlightBowlerId} />
+          highlightBowlerId={highlightBowlerId}
+          highlightFielderId={highlightFielderId} />
       ))}
 
       {info.officials && (

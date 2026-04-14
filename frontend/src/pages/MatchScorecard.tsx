@@ -15,6 +15,7 @@ export default function MatchScorecard() {
   const [searchParams] = useSearchParams()
   const highlightBatterId = searchParams.get('highlight_batter')
   const highlightBowlerId = searchParams.get('highlight_bowler')
+  const highlightFielderId = searchParams.get('highlight_fielder')
   const { data, loading, error, refetch } = useFetch(
     () => getMatchScorecard(Number(matchId)),
     [matchId],
@@ -53,7 +54,7 @@ export default function MatchScorecard() {
         })()
         return (
         <>
-          <ScorecardView data={data} highlightBatterId={highlightBatterId} highlightBowlerId={highlightBowlerId}>
+          <ScorecardView data={data} highlightBatterId={highlightBatterId} highlightBowlerId={highlightBowlerId} highlightFielderId={highlightFielderId}>
             <div className="mb-6">
               <WormChart innings={data.innings} />
             </div>

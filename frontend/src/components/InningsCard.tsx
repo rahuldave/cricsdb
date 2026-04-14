@@ -7,15 +7,16 @@ interface Props {
   linkParams?: string
   highlightBatterId?: string | null
   highlightBowlerId?: string | null
+  highlightFielderId?: string | null
 }
 
-export default function InningsCard({ innings, linkParams = '', highlightBatterId, highlightBowlerId }: Props) {
+export default function InningsCard({ innings, linkParams = '', highlightBatterId, highlightBowlerId, highlightFielderId }: Props) {
   const highlightedRowRef = useRef<HTMLTableRowElement | null>(null)
   useEffect(() => {
-    if ((highlightBatterId || highlightBowlerId) && highlightedRowRef.current) {
+    if ((highlightBatterId || highlightBowlerId || highlightFielderId) && highlightedRowRef.current) {
       highlightedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
-  }, [highlightBatterId, highlightBowlerId])
+  }, [highlightBatterId, highlightBowlerId, highlightFielderId])
 
   const batterHref = (id: string | null) =>
     id ? `/batting?player=${encodeURIComponent(id)}${linkParams ? '&' + linkParams : ''}` : null
@@ -52,6 +53,7 @@ export default function InningsCard({ innings, linkParams = '', highlightBatterI
         <tbody>
           {innings.batting.map(b => {
             const isHL = !!(highlightBatterId && b.person_id === highlightBatterId)
+              || !!(highlightFielderId && b.dismissal_fielder_ids?.includes(highlightFielderId))
             return (
               <tr key={`${b.person_id}-${b.name}`}
                 ref={isHL ? highlightedRowRef : undefined}

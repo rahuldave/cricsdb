@@ -395,6 +395,8 @@ export interface ScorecardBatter {
   dismissal: string
   /** Bowler credited with the wicket — null for not-out, run-out, retired, etc. */
   dismissal_bowler_id: string | null
+  /** Fielder(s) involved in the dismissal (from fielding_credit). */
+  dismissal_fielder_ids: string[]
   runs: number
   balls: number
   fours: number
