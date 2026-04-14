@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import type { ScorecardInnings } from '../types'
 
@@ -11,12 +10,11 @@ interface Props {
 }
 
 export default function InningsCard({ innings, linkParams = '', highlightBatterId, highlightBowlerId, highlightFielderId }: Props) {
-  const highlightedRowRef = useRef<HTMLTableRowElement | null>(null)
-  useEffect(() => {
-    if ((highlightBatterId || highlightBowlerId || highlightFielderId) && highlightedRowRef.current) {
-      highlightedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }, [highlightBatterId, highlightBowlerId, highlightFielderId])
+  // Scroll is handled at the page level in MatchScorecard — see the
+  // useEffect there that queries the first `.is-highlighted` after all
+  // async data (scorecard + innings grid) has loaded. Scrolling per-card
+  // fires before sibling sections (charts, innings-grid) have sized, so
+  // the target row ends up displaced once layout settles.
 
   const batterHref = (id: string | null) =>
     id ? `/batting?player=${encodeURIComponent(id)}${linkParams ? '&' + linkParams : ''}` : null
@@ -56,7 +54,6 @@ export default function InningsCard({ innings, linkParams = '', highlightBatterI
               || !!(highlightFielderId && b.dismissal_fielder_ids?.includes(highlightFielderId))
             return (
               <tr key={`${b.person_id}-${b.name}`}
-                ref={isHL ? highlightedRowRef : undefined}
                 className={isHL ? 'is-highlighted' : undefined}>
                 <td className="pname">
                   {batterHref(b.person_id)
@@ -132,7 +129,6 @@ export default function InningsCard({ innings, linkParams = '', highlightBatterI
             const isHL = !!(highlightBowlerId && b.person_id === highlightBowlerId)
             return (
               <tr key={`${b.person_id}-${b.name}`}
-                ref={isHL ? highlightedRowRef : undefined}
                 className={isHL ? 'is-highlighted' : undefined}>
                 <td className="pname">
                   {bowlerHref(b.person_id)

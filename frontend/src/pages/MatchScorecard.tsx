@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getMatchScorecard, getInningsGrid } from '../api'
 import ScorecardView from '../components/Scorecard'
@@ -27,6 +28,29 @@ export default function MatchScorecard() {
   useDocumentTitle(
     data ? `${data.info.teams[0]} v ${data.info.teams[1]}` : null
   )
+
+  // Scroll to the first highlighted row in DOM order, AFTER both the
+  // scorecard data and the innings-grid data have finished loading.
+  // Doing this per-InningsCard (the previous approach) fired the scroll
+  // before the async InningsGridChart + MatchupGridChart siblings had
+  // sized, so the target row was displaced once layout settled. Here we
+  // wait for both fetches, then query the DOM in a rAF callback to pick
+  // whatever `.is-highlighted` row appears first (batting, bowling, or
+  // fielding — same selector serves all three).
+  const hasHighlight = !!(highlightBatterId || highlightBowlerId || highlightFielderId)
+  const bothReady = !!(data && grid.data && !grid.loading)
+  useEffect(() => {
+    if (!hasHighlight || !bothReady) return
+    // Two rAFs: first lets the current commit paint, second lets layout
+    // settle (charts resize, etc.) before we measure scroll position.
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.querySelector('.is-highlighted')
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [hasHighlight, bothReady, highlightBatterId, highlightBowlerId, highlightFielderId])
 
   return (
     <div className="max-w-6xl mx-auto">
