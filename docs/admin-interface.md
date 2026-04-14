@@ -10,7 +10,7 @@ database. Useful for inspecting rows, debugging, and one-off edits.
 |---|---|---|
 | Local (Python 3.14, `uv run uvicorn …`) | Yes | Needs `jinja2` and `starlette<1.0.0` (both pinned in `pyproject.toml`). |
 | Plash production | Yes after the fix committed with this doc | `deploy.sh` requirements now pin `starlette>=0.46.0,<1.0.0` for the same reason. Previously returned 500. |
-| **Auth** | **No — open to the world** | **Must be added before anyone starts using it to edit sensitive tables.** See "Authentication" below. |
+| **Auth** | **HTTP Basic, fail-closed** | `/admin/*` requires `ADMIN_USERNAME` / `ADMIN_PASSWORD` from env — see "Authentication" below. Returns 503 if either is unset. |
 
 ## Tables exposed
 
@@ -92,51 +92,80 @@ Root cause: `jinja2` is pulled in transitively by starlette on plash
 (because `deploy.sh` lists it), but local `pyproject.toml` didn't have
 it. Fix: `jinja2>=3.1` pinned in `pyproject.toml`.
 
-## Authentication (TODO — currently open)
+## Authentication
 
-**The admin has no authentication.** Any request to `/admin/*` is
-served to anyone. Every table supports GET, POST, and delete — this
-is a real exposure once we have sensitive data or edit targets.
+`/admin/*` is gated behind HTTP Basic Auth via a `require_admin`
+dependency applied to the admin router in `api/app.py`. Credentials
+come from env vars `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
 
-### Recommended fix (HTTP Basic Auth)
+### Setup
 
-Simplest path — a single FastAPI dependency wrapping the admin router:
+**1. Local development.** Copy `.env.example` to `.env` and fill in:
+
+```bash
+cp .env.example .env
+$EDITOR .env     # set ADMIN_USERNAME and ADMIN_PASSWORD
+```
+
+`.env` is gitignored. `api/app.py` loads it at import time (a tiny
+parser, no external dep), so it works with either entry point:
+
+```bash
+uv run uvicorn api.app:app --reload --port 8000   # same as before
+# or
+uv run python main.py
+```
+
+**2. Plash production.** No native env-var command exists on plash.
+`deploy.sh` stages the local `.env` into `build_plash/` so it ships
+with the deploy:
+
+```bash
+# In deploy.sh:
+if [ -f .env ]; then
+    cp .env "$BUILD_DIR/.env"
+fi
+```
+
+On plash startup, `main.py` runs `_load_dotenv()` which picks up
+`./\.env` from the working dir. Credentials are never committed to
+git (both `.env` and `build_plash/` are gitignored).
+
+If `.env` is missing at deploy time, `deploy.sh` prints a warning and
+plash's `/admin/*` will return 503 fail-closed — the site itself
+keeps working.
+
+### Behavior
+
+| Request | Response |
+|---|---|
+| No `Authorization` header | 401 with `WWW-Authenticate: Basic` → browser prompts |
+| Wrong username or password | 401 |
+| Env vars unset | 503 "Admin is not configured" |
+| Correct credentials | 200 (or whatever the admin endpoint returns) |
+
+Implementation in `api/app.py`:
 
 ```python
-# api/app.py
-import os, secrets
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-
 _admin_security = HTTPBasic()
 
 def require_admin(creds: HTTPBasicCredentials = Depends(_admin_security)):
     user = os.environ.get("ADMIN_USERNAME")
     pw = os.environ.get("ADMIN_PASSWORD")
     if not user or not pw:
-        raise HTTPException(503, "Admin not configured")
+        raise HTTPException(503, "Admin is not configured …")
     ok = (secrets.compare_digest(creds.username, user)
           and secrets.compare_digest(creds.password, pw))
     if not ok:
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
-            headers={"WWW-Authenticate": "Basic"},
-        )
+        raise HTTPException(401, headers={"WWW-Authenticate": "Basic"})
 
-# When mounting the admin router:
 app.include_router(
     create_admin_router(db),
     dependencies=[Depends(require_admin)],
 )
 ```
 
-**Credentials via env vars** — `ADMIN_USERNAME` and `ADMIN_PASSWORD`:
-
-- Local: `.env` (gitignored) + `uv run --env-file .env …`
-- Plash: `plash env set ADMIN_USERNAME=…` and `plash env set ADMIN_PASSWORD=…`
-
-**Fail-closed default.** If either env var is missing, the dependency
-returns 503. A misconfigured deploy never silently leaves the door open.
+Uses `secrets.compare_digest` to avoid timing attacks on the comparison.
 
 **What Basic Auth does and doesn't give us:**
 

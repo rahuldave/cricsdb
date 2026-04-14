@@ -3,6 +3,9 @@
 import os
 import uvicorn
 
+# api.app loads .env at import time (see _load_dotenv there), so whether
+# we enter via `python main.py` or `uvicorn api.app:app`, credentials are
+# available to the require_admin guard.
 from api.app import app
 
 # Mount static assets (this is fine at import time — it's a mount, not a route)

@@ -25,6 +25,17 @@ mkdir -p "$BUILD_DIR/models"
 # Main entry point
 cp main.py "$BUILD_DIR/"
 
+# Stage the local .env (admin credentials etc) into the build.
+# The file is gitignored so credentials never land in source control,
+# but we need them on the plash runtime. Fail loudly if missing so a
+# deploy doesn't silently ship an unauthenticated admin.
+if [ -f .env ]; then
+    cp .env "$BUILD_DIR/.env"
+    echo "Staged .env into $BUILD_DIR/ (admin credentials etc)"
+else
+    echo "WARNING: no .env file found — admin will return 503 on plash" >&2
+fi
+
 # Requirements (deebase deps only — deebase itself is vendored)
 cat > "$BUILD_DIR/requirements.txt" <<'EOF'
 aiosqlite>=0.22.0
