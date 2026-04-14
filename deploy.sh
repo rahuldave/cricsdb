@@ -33,6 +33,10 @@ greenlet>=3.3.0
 click>=8.3.1
 toml>=0.10.2
 fastapi>=0.115.0
+# Pin starlette below 1.0 — vendored deebase admin uses the pre-1.0
+# TemplateResponse signature (name first, not request first). Upgrade
+# this constraint once deebase is patched upstream.
+starlette>=0.46.0,<1.0.0
 pydantic>=2.10.0
 fastcore>=1.7.0
 uvicorn>=0.34.0

@@ -77,6 +77,7 @@ keeper_assignment
 | `season_single` | Layer B — exactly one season-candidate was in the XI |
 | `career_single` | Layer C — exactly one career N≥3 keeper was in the XI |
 | `team_ever_single` | Layer D — exactly one player who's ever stumped for this team was in the XI |
+| `manual` | Resolved via a partition CSV (Cricinfo scrape or hand-edit) — always overrides algorithmic assignment |
 
 **`confidence` enum** (nullable):
 
@@ -100,45 +101,222 @@ keeper_assignment
 
 ### Population logic (`scripts/populate_keeper_assignments.py`)
 
-Mirrors `populate_fielding_credits.py`:
+Mirrors `populate_fielding_credits.py` in shape, with two additions
+unique to keeper assignment: (1) a **partitioned ambiguous worklist**
+and (2) a **resolution-reload step**.
 
 ```python
 async def populate_full(db):
-    # 1. Build the candidate sets (cheap, mostly in-memory aggregations):
-    #    - career_stumpings[person_id] = count
-    #    - career_N3 = {pid: count >= 3}
-    #    - season_candidates[(fielding_team, tournament, season)] = {person_id, ...}
-    #    - team_ever_keeper[fielding_team] = {person_id, ...}
-    #    - stumpers_by_innings[innings_id] = {person_id or None, ...}
-    #    - xi[match_id][team] = {person_id, ...}  (from matchplayer)
+    # 1. Build the candidate sets in-memory:
+    #    - career_N3 = {pid : stumping_count >= 3}
+    #    - season_candidates[(fielding_team, tournament, season)]
+    #    - team_ever_keeper[fielding_team]
+    #    - stumpers_by_innings[innings_id]
+    #    - xi[match_id][team]
 
     # 2. Truncate keeper_assignment.
-    # 3. For each regular innings:
-    #    - Determine fielding_team (team NOT batting this innings)
-    #    - Apply layers A, B, C, D in order
-    #    - Insert one row: either (keeper_id, method, confidence) or
-    #      (NULL, NULL, NULL, ambiguous_reason, candidate_ids_json)
-    # 4. Export docs/keeper-ambiguous.csv with one row per NULL.
+
+    # 3. For each regular innings: apply layers A-D; insert one row
+    #    — either assigned (keeper_id, method, confidence set) or
+    #    ambiguous (all NULL except ambiguous_reason, candidate_ids_json).
+
+    # 4. Load all existing resolutions from docs/keeper-ambiguous/*.csv
+    #    (see "Partitioned worklist" below). For each row with a non-empty
+    #    `resolved_keeper_id`, UPDATE the corresponding keeper_assignment
+    #    row: set keeper_id, method='manual', confidence='definitive',
+    #    clear ambiguous_reason. Manual resolutions always override
+    #    algorithmic assignments — they represent external authority.
+
+    # 5. Find all innings that are STILL ambiguous (NULL keeper_id) and
+    #    are NOT already listed in any existing partition CSV. Write
+    #    them to a fresh partition file docs/keeper-ambiguous/YYYY-MM-DD.csv
+    #    where YYYY-MM-DD is today's date (the run date). If today's file
+    #    already exists, append (with innings_id dedup).
 
 async def populate_incremental(db, new_match_ids):
-    # Only recompute assignments for innings in new_match_ids.
-    # NOTE: this is subtler than populate_fielding_credits — a new match
-    # can change `season_candidates` for an existing (team, tournament,
-    # season), which could retroactively resolve ambiguous older innings.
-    # For simplicity, incremental does NOT retrofit; a full rebuild is
-    # needed to take advantage of new signals. Document this limitation.
+    # 1. Same candidate-set build, but scoped enough to cover the new
+    #    matches. In practice we rebuild the full in-memory structures
+    #    — they're cheap (<1s), and matches span seasons so a scoped
+    #    build is only marginally faster.
+
+    # 2. Run the 4-layer algorithm ONLY for innings in new_match_ids.
+    #    Insert new keeper_assignment rows; do not touch existing ones.
+
+    # 3. Load resolutions from all partition CSVs (same as full). Apply
+    #    any that match new_match_ids' innings.
+
+    # 4. Any newly-ambiguous innings from the new matches get written to
+    #    today's partition file (docs/keeper-ambiguous/YYYY-MM-DD.csv).
+    #    Append if the file already exists; dedup on innings_id.
+
+    # NOTE: incremental does NOT retrofit older ambiguous innings when
+    # new matches introduce new candidates. A full rebuild is the
+    # authoritative path for retroactive improvements.
 ```
 
-**Why the incremental path is simpler than full**: incremental adds new
-matches' innings with whatever signals are available *at that point*.
-A match played today that introduces a new keeper candidate for
-(Team, 2025) doesn't back-fill older 2025 innings where we already
-wrote an assignment. In practice the full-rebuild path runs ~15 min
-and is the authoritative one; incremental is just to keep the site
-responsive for daily updates.
+**Why the incremental path is less powerful than full**: a match played
+today might introduce a new season keeper-candidate for `(Team, 2025)`
+that would retroactively resolve some older 2025 innings previously
+marked ambiguous. The incremental path doesn't chase that — full rebuild
+does. In practice the full rebuild runs as part of `import_data.py`
+(~15 min) and is authoritative; incremental keeps the site current
+for daily updates.
 
-Both paths are called automatically — no separate script invocation
-needed, same pattern as `fielding_credit`.
+Both paths are called automatically from `import_data.py` and
+`update_recent.py` — no separate script invocation needed, same
+pattern as `fielding_credit`.
+
+### Partitioned ambiguous worklist
+
+The ambiguous list lives as a set of date-partitioned CSV files under
+`docs/keeper-ambiguous/`, Hive-style:
+
+```
+docs/keeper-ambiguous/
+  README.md          — format + how to resolve
+  2026-04-13.csv     — first full rebuild: all ambiguous innings at that point
+  2026-04-20.csv     — incremental on 4/20: new ambiguous discovered then
+  2026-04-27.csv     — further incremental
+  ...
+```
+
+**Partition invariants:**
+
+- Each `innings_id` appears in **exactly one** partition — the file
+  written by the run that first discovered it as ambiguous. It does
+  NOT migrate to a newer partition on later full rebuilds.
+- Partition files are **append-only in practice**: once a row is
+  written, only its `resolved_keeper_id`/`resolved_source`/`notes`
+  columns ever change (when someone resolves it).
+- A full rebuild on `2026-05-01` creates (or appends to)
+  `docs/keeper-ambiguous/2026-05-01.csv`, but only for innings that
+  were not already listed in an earlier partition. Older partitions
+  are untouched — their existing rows and resolutions persist.
+
+**Partition file format (CSV):**
+
+```
+innings_id,match_id,date,tournament,season,fielding_team,innings_number,
+ambiguous_reason,candidate_ids,candidate_names,
+resolved_keeper_id,resolved_source,notes
+```
+
+| Column | Populated by system? | Editable? |
+|---|---|---|
+| `innings_id`, `match_id`, `date`, `tournament`, `season`, `fielding_team`, `innings_number` | Yes | No |
+| `ambiguous_reason` | Yes | No |
+| `candidate_ids` (comma-separated person IDs) | Yes | No |
+| `candidate_names` (comma-separated names, parallel to IDs) | Yes | No |
+| `resolved_keeper_id` | Empty on creation | Yes — fill with a person_id |
+| `resolved_source` | Empty | Yes — `cricinfo` \| `manual` \| `scraper:<date>` |
+| `notes` | Empty | Yes — free text |
+
+The first 10 columns are the system's output (do not edit). The last 3
+are the resolution — populated either by a human editing the CSV in
+Excel/VS Code or by a Cricinfo scraping script (see below).
+
+### Resolution application (`scripts/apply_keeper_resolutions.py`)
+
+Standalone, idempotent:
+
+```
+uv run python scripts/apply_keeper_resolutions.py
+```
+
+**Two use cases, one mechanism:**
+
+1. **Filling in an ambiguous row** — edit an existing row in a
+   partition CSV, set `resolved_keeper_id` to the person_id of the
+   actual keeper. On apply, the matching `keeper_assignment` row
+   flips from NULL to that person with `method='manual'`,
+   `confidence='definitive'`.
+
+2. **Overriding a high-confidence (or any) existing assignment** —
+   the algorithm assigned Kishan via Layer B but we've since learned
+   Arora actually kept. **Append a row** to any partition CSV
+   (simplest: today's) with the `innings_id` and `resolved_keeper_id`
+   filled in. `resolved_source` should be e.g. `manual`, `cricinfo`,
+   or `scraper:2026-05-12`. The system columns (`ambiguous_reason`,
+   `candidate_ids`, etc.) can be left blank — they'll be re-denormalized
+   from the DB at apply time. On apply, the `keeper_assignment` row's
+   existing `keeper_id` is overwritten, `method='manual'`,
+   `confidence='definitive'`, and `ambiguous_reason` cleared.
+
+**Manual overrides always win.** The apply step runs AFTER the 4-layer
+algorithm in both `populate_full` and `populate_incremental`, so even a
+full rebuild preserves every manual correction (as long as the row
+stays in the CSV). Git history of the partition CSVs is the audit
+trail — no separate `previous_keeper_id` column is tracked.
+
+**Apply script behavior:**
+1. Reads every `docs/keeper-ambiguous/*.csv`.
+2. For each row where `resolved_keeper_id` is non-empty:
+   - Verifies the person_id exists in `person`.
+   - Verifies the innings_id exists in `keeper_assignment`.
+   - Updates the matching row: set `keeper_id`, `method='manual'`,
+     `confidence='definitive'`, clear `ambiguous_reason` and
+     `candidate_ids_json`.
+3. Reports: X new resolutions, Y high-confidence overrides, Z skipped
+   (invalid person_id, innings no longer in DB, no change needed).
+
+**Called automatically** at the end of `populate_full` and
+`populate_incremental` so all manual corrections persist across DB
+rebuilds. Also **runnable standalone** — if you edit a partition CSV
+between full rebuilds, run this script and the live DB picks up the
+changes without a full 15-min rebuild.
+
+### Admin interface for per-innings corrections
+
+CricsDB has a deebase-provided admin at `/admin/` that exposes every
+table (including the new `keeper_assignment`) as CRUD views. Full
+details — including how to find a specific innings, the Python 3.14
+compatibility fix, and the authentication story — are in
+[`docs/admin-interface.md`](admin-interface.md).
+
+**Relevant for Tier 2:** once `keeper_assignment` exists, the admin
+lets you list, filter, and edit any row (change `keeper_id`, save).
+But **admin edits are NOT auto-mirrored into the partition CSVs** —
+they'll be overwritten by the algorithm on the next full rebuild.
+
+**Recommended workflow:** use the admin to find an `innings_id` and
+explore context (who was in the XI via `matchplayer`), then commit the
+correction to a partition CSV so it persists through rebuilds.
+
+**Prerequisite:** admin must be authenticated before Tier 2 ships
+(`keeper_assignment` becomes a write target). See the admin doc for
+the Basic Auth setup.
+
+### Cricinfo resolution scraper (optional, future)
+
+`scripts/scrape_cricinfo_keepers.py` can run in two modes:
+
+- **Resolve-ambiguous** (default): iterate rows in a partition CSV
+  where `resolved_keeper_id` is empty, fetch the corresponding
+  Cricinfo scorecard, extract the wicketkeeper designation (Cricinfo
+  marks keepers with a dagger `†` next to their name in the batting
+  card, or `(wk)` in some templates), map the name back to a
+  `person.id` via `person.name` + `personname`, and write
+  `resolved_keeper_id` + `resolved_source='cricinfo'` back to the CSV.
+  Conservative mode: writes only when the scraped keeper is ONE of
+  the `candidate_ids` on that row.
+
+- **Audit-and-correct**: a later pass over the full DB (all 25K
+  innings, not just ambiguous). For each innings, scrape Cricinfo,
+  and if the Cricinfo keeper differs from `keeper_assignment.keeper_id`,
+  append a new row to today's partition CSV with
+  `resolved_keeper_id=<cricinfo keeper>`,
+  `resolved_source='cricinfo:audit:<date>'`, and `notes='was <old
+  keeper>, method <old method>'`. Next run of
+  `apply_keeper_resolutions.py` then overrides the algorithm's guess.
+
+The audit mode is what lets us correct high-confidence assignments
+that turn out to have been wrong — e.g. the Kishan+Arora case where
+Layer B confidently picked Kishan but Arora actually kept. No change
+to the storage model is needed; the same override mechanism handles
+both filling ambiguous rows and correcting assigned ones.
+
+Not part of v1 build — the partition CSVs work fine for hand-editing
+in Excel. Adding this is a follow-on project.
 
 ### Algorithm (detailed)
 
@@ -197,20 +375,6 @@ clear answer (or an ambiguity) terminates the search. A player who
 would be the single N≥3 keeper at Layer C but is in a team where
 someone else stumped more this season is still assigned via Layer B
 (so the context matters).
-
-### Ambiguous worklist (`docs/keeper-ambiguous.csv`)
-
-Generated at the end of `populate_full`. Columns:
-
-```
-match_id,date,tournament,season,fielding_team,ambiguous_reason,candidate_names,candidate_ids
-1234567,2024-05-26,Indian Premier League,2024,Chennai Super Kings,multi_season,"MS Dhoni,WP Saha","4a8a2e3b,..."
-```
-
-One row per ambiguous innings. Sorted by `(ambiguous_reason, date DESC)`
-so the highest-value targets (recent `multi_season` cases in major
-leagues) float to the top. Committed to the repo so progress on
-manual / Cricinfo-sourced disambiguation is visible in diffs.
 
 ## API layer
 
@@ -393,21 +557,27 @@ has any `low` confidence innings or any ambiguous innings:
 
 1. **`keeper_assignment` model** in `models/tables.py` (~15 lines).
 2. **`scripts/populate_keeper_assignments.py`** — the 4-layer
-   algorithm, plus the ambiguous CSV export. Full + incremental.
-3. **Hook into `import_data.py` and `update_recent.py`** — one line
-   each, after `populate_full` / `populate_incremental` for
-   fielding_credit.
-4. **Run full populate on the existing DB** — verify counts match
-   this spec's expected ~82.2% assigned, 17.8% null.
-5. **`api/routers/keeping.py`** — the four keeping endpoints.
-6. **Changes to scorecard and teams endpoints** — add keeper info.
-7. **Frontend types + API client additions.**
-8. **"Keeping" sub-tab** on `/fielding`.
-9. **Scorecard keeper label** on `/matches/:id`.
-10. **Team-page "Keepers used" section.**
-11. **Generate `docs/keeper-ambiguous.csv`** — commit the first
-    authoritative copy.
-12. **Deploy + verify** with known test cases.
+   algorithm with `populate_full` and `populate_incremental`. Includes
+   partition-CSV reading/writing and resolution application.
+3. **`scripts/apply_keeper_resolutions.py`** — standalone resolution
+   applier. Also used internally at the end of `populate_full` and
+   `populate_incremental`.
+4. **Hook into `import_data.py` and `update_recent.py`** — one line
+   each, after the `fielding_credit` populate call.
+5. **Run full populate on the existing DB** — verify counts match
+   this spec's expected ~82.2% assigned, 17.8% null. Commit the
+   resulting first partition file
+   `docs/keeper-ambiguous/YYYY-MM-DD.csv`.
+6. **`docs/keeper-ambiguous/README.md`** — partition format,
+   how to resolve a row (edit `resolved_keeper_id`, `resolved_source`,
+   then run `apply_keeper_resolutions.py`).
+7. **`api/routers/keeping.py`** — the four keeping endpoints.
+8. **Changes to scorecard and teams endpoints** — add keeper info.
+9. **Frontend types + API client additions.**
+10. **"Keeping" sub-tab** on `/fielding`.
+11. **Scorecard keeper label** on `/matches/:id`.
+12. **Team-page "Keepers used" section.**
+13. **Deploy + verify** with known test cases.
 
 ## Test cases
 
@@ -433,7 +603,22 @@ has any `low` confidence innings or any ambiguous innings:
   renders, both names clickable.
 - **Incremental update** — import one new match, verify the new
   innings get assignments (or NULL) without crashing; existing
-  assignments aren't touched.
+  assignments aren't touched. If the new match has ambiguous innings,
+  they appear in today's partition CSV file (appending if one
+  already exists today).
+- **Partition persistence** — run a full rebuild twice on consecutive
+  days without any new data. Second day's partition CSV should NOT
+  contain any of the same innings as day-1's (each `innings_id`
+  appears in exactly one partition).
+- **Resolution roundtrip** — pick a `multi_season` row from a
+  partition CSV, fill in `resolved_keeper_id` with a valid person_id,
+  run `apply_keeper_resolutions.py`, verify the matching
+  `keeper_assignment` row is now (keeper_id=X, method='manual',
+  confidence='definitive', ambiguous_reason=NULL). Run a full rebuild;
+  verify the resolution persists (and is re-applied from the CSV).
+- **Bad resolution rejected** — put an invalid person_id in a
+  partition CSV, run `apply_keeper_resolutions.py`, verify that row
+  is skipped with a warning and the keeper_assignment stays NULL.
 
 ## Out of scope (for Tier 2)
 

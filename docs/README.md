@@ -8,6 +8,7 @@ file matches your task.
 - **Run the app on my laptop** → [`local-development.md`](local-development.md)
 - **Update the database with new matches from cricsheet** → [`data-pipeline.md`](data-pipeline.md)
 - **Push code or a refreshed DB to production** → [`deploying.md`](deploying.md)
+- **Use the deebase admin UI to inspect or edit tables** → [`admin-interface.md`](admin-interface.md)
 - **Understand a non-obvious design choice** → [`design-decisions.md`](design-decisions.md)
 - **Add a new fetch / page that loads data** → [`data-fetching.md`](data-fetching.md)
 - **Tweak the Vite/Tailwind/TypeScript build** → [`frontend-build-pipeline.md`](frontend-build-pipeline.md)
@@ -21,6 +22,7 @@ file matches your task.
 | `local-development.md` | Two-terminal dev setup, type-check, hitting the API directly, project layout cheat sheet |
 | `data-pipeline.md` | Cricsheet URLs, the 22 archives we use, full rebuild vs incremental update, dry-run output |
 | `deploying.md` | `bash deploy.sh` vs `--first`, what does/doesn't ship, deebase vendoring, the `.plash` identity file, troubleshooting |
+| `admin-interface.md` | `/admin/` deebase UI, table map, jinja2 + starlette version pins, authentication (TODO), per-innings edit workflow |
 | `design-decisions.md` | Over numbering, phase boundaries, legal balls vs all deliveries, bowler-wicket exclusions, URL state, scatter↔table linking pattern |
 | `data-fetching.md` | `useFetch` hook, `Spinner` + `ErrorBanner`, gated fetches, the per-tab `<TabState>` helper, when NOT to use `useFetch`, where loading/error sit relative to data |
 | `frontend-build-pipeline.md` | Vite + Tailwind v4 + TypeScript build details |

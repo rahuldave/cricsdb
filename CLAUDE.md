@@ -130,7 +130,7 @@ Read `docs/design-decisions.md` for full details. Key points:
 - Player search matches cricsheet names (e.g., "V Kohli" not "Virat Kohli"). The personname table alternate name search works but users may not expect abbreviated names in results.
 - No loading spinners — data fetches show nothing while in flight.
 - No error states — failed API calls silently show empty content.
-- The deebase admin at /admin/ doesn't load on plash (deebase[api] extras not installed in vendored setup).
+- The deebase admin at /admin/ is unauthenticated — open to anyone. Must add Basic Auth before using it for sensitive edits. See `docs/admin-interface.md` for the full doc (tables exposed, compat fixes, auth plan).
 - Inter-wicket analysis is Python-side processing (~200ms for top players) — could be slow under load.
 - Consider adding indexes on `(delivery.bowler_id, delivery.innings_id)` compound index for bowling queries.
 - **`wicket.fielders` is double-JSON-encoded in the DB.** The import path in `import_data.py` does `json.dumps(w_data.get("fielders"))`, but deebase's JSON column type also serializes the value, so the stored string is e.g. `'"[{\"name\": \"SL Malinga\"}]"'` — a JSON string whose contents are themselves a JSON-encoded list. The matches scorecard router (`api/routers/matches.py:_build_dismissal_text`) works around this by calling `json.loads` twice. To fix at the source: in `import_data.py` pass the raw list (`w_data.get("fielders")`) instead of `json.dumps(...)` and rebuild the DB. Other JSON-typed columns (`match.dates`, `match.officials`, `match.player_of_match`, `innings.powerplays`) store correctly already — only `wicket.fielders` has the double-encode bug because it's the only one wrapped in `json.dumps` before insert.
