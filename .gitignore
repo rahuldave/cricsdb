@@ -39,3 +39,8 @@ frontend/dist/
 # IDE
 .vscode/
 .idea/
+
+# Claude Code local config + agent/skill state (per-developer, not project)
+.claude/
+.agents/
+skills-lock.json

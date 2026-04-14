@@ -23,20 +23,30 @@ export default function FilterBar() {
   const [tournamentsError, setTournamentsError] = useState(false)
   const [seasonsError, setSeasonsError] = useState(false)
 
+  // Narrow the dropdowns to the active context. A tournament isn't a
+  // filter on the tournaments endpoint (self-referential), but it
+  // absolutely narrows seasons — picking IPL should remove
+  // CLT20/WPL/rare years MI played elsewhere from the From/To pickers.
+  const team = params.get('team') || undefined
+  const genderParam = params.get('gender') || undefined
+  const teamTypeParam = params.get('team_type') || undefined
+  const tournamentParam = params.get('tournament') || undefined
   useEffect(() => {
-    getTournaments()
+    getTournaments({ team, gender: genderParam, team_type: teamTypeParam })
       .then(d => { setTournaments(d.tournaments); setTournamentsError(false) })
       .catch(err => {
         console.warn('Failed to load tournaments:', err)
         setTournamentsError(true)
       })
-    getSeasons()
+  }, [team, genderParam, teamTypeParam])
+  useEffect(() => {
+    getSeasons({ team, gender: genderParam, team_type: teamTypeParam, tournament: tournamentParam })
       .then(d => { setSeasons(d.seasons); setSeasonsError(false) })
       .catch(err => {
         console.warn('Failed to load seasons:', err)
         setSeasonsError(true)
       })
-  }, [])
+  }, [team, genderParam, teamTypeParam, tournamentParam])
 
   const set = (key: string, value: string) => {
     setUrlParams({ [key]: value })
@@ -62,6 +72,21 @@ export default function FilterBar() {
     if (!teamType && t.team_type) updates.team_type = t.team_type
     if (Object.keys(updates).length > 0) setUrlParams(updates)
   }, [tournaments, tournament, gender, teamType])
+
+  // When a team is selected (Teams page) AND no team_type / gender is
+  // set yet AND the team's tournaments are unambiguous (one type, one
+  // gender), auto-fill the filter so MI doesn't aggregate WPL women's
+  // numbers etc. Driven by the team-scoped tournaments list above.
+  useEffect(() => {
+    if (!team || tournaments.length === 0) return
+    if (gender && teamType) return
+    const types = new Set(tournaments.map(t => t.team_type).filter(Boolean))
+    const genders = new Set(tournaments.map(t => t.gender).filter(Boolean))
+    const updates: Record<string, string> = {}
+    if (!teamType && types.size === 1) updates.team_type = [...types][0] as string
+    if (!gender && genders.size === 1) updates.gender = [...genders][0] as string
+    if (Object.keys(updates).length > 0) setUrlParams(updates)
+  }, [team, tournaments, gender, teamType])
 
   const setGender = (v: string) => {
     const updates: Record<string, string> = { gender: v }

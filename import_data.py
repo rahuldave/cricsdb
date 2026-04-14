@@ -350,6 +350,11 @@ async def main():
     from scripts.populate_keeper_assignments import populate_full as keeper_full
     await keeper_full(db)
 
+    # Populate the partnership table (team-stats)
+    print("\nPopulating partnerships…")
+    from scripts.populate_partnerships import populate_full as partnerships_full
+    await partnerships_full(db)
+
     print(f"\nDatabase saved to {DB_PATH}")
     print(f"Size: {os.path.getsize(DB_PATH) / 1024 / 1024:.1f} MB")
 

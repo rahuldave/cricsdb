@@ -93,6 +93,33 @@ export interface TeamVsOpponent {
   matches: TeamResult[]
 }
 
+export interface OpponentRollup {
+  name: string
+  matches: number
+  wins: number
+  losses: number
+  ties: number
+  no_results: number
+  win_pct: number | null
+}
+
+export interface OpponentMatrixCell {
+  season: string
+  opponent: string
+  matches: number
+  wins: number
+  losses: number
+  ties: number
+  win_pct: number | null
+}
+
+export interface OpponentsMatrix {
+  team: string
+  seasons: string[]
+  opponents: OpponentRollup[]
+  cells: OpponentMatrixCell[]
+}
+
 export interface BattingSummary {
   person_id: string
   name: string
@@ -604,4 +631,285 @@ export interface InningsGridInnings {
 export interface InningsGridResponse {
   match_id: number
   innings: InningsGridInnings[]
+}
+
+// ============================================================
+// Team stats — batting / bowling / fielding / partnerships
+// (see docs/spec-team-stats.md)
+// ============================================================
+
+export interface TeamInningsTotal {
+  runs: number
+  match_id: number
+  innings_number: number
+}
+
+export interface TeamBattingSummary {
+  team: string
+  innings_batted: number
+  total_runs: number
+  legal_balls: number
+  run_rate: number | null
+  boundary_pct: number | null
+  dot_pct: number | null
+  fours: number
+  sixes: number
+  fifties: number
+  hundreds: number
+  avg_1st_innings_total: number | null
+  avg_2nd_innings_total: number | null
+  highest_total: TeamInningsTotal | null
+  lowest_all_out_total: TeamInningsTotal | null
+}
+
+export interface TeamBattingSeason {
+  season: string
+  innings_batted: number
+  total_runs: number
+  legal_balls: number
+  avg_innings_total: number | null
+  run_rate: number | null
+  boundary_pct: number | null
+  dot_pct: number | null
+  fours: number
+  sixes: number
+  highest_total: number
+  lowest_all_out_total: number | null
+}
+
+export interface TeamBattingPhase {
+  phase: string
+  overs_range: number[]
+  runs: number
+  balls: number
+  run_rate: number | null
+  wickets_lost: number
+  boundary_pct: number | null
+  dot_pct: number | null
+  fours: number
+  sixes: number
+}
+
+export interface TeamTopBatter {
+  person_id: string
+  name: string
+  runs: number
+  balls: number
+  strike_rate: number | null
+  fours: number
+  sixes: number
+  innings: number
+}
+
+export interface TeamBowlingSummary {
+  team: string
+  innings_bowled: number
+  matches: number
+  runs_conceded: number
+  legal_balls: number
+  overs: number
+  wickets: number
+  economy: number | null
+  strike_rate: number | null
+  average: number | null
+  dot_pct: number | null
+  fours_conceded: number
+  sixes_conceded: number
+  wides: number
+  noballs: number
+  wides_per_match: number | null
+  noballs_per_match: number | null
+  avg_opposition_total: number | null
+  worst_conceded: TeamInningsTotal | null
+  best_defence: { runs: number; match_id: number } | null
+}
+
+export interface TeamBowlingSeason {
+  season: string
+  innings_bowled: number
+  runs_conceded: number
+  legal_balls: number
+  overs: number
+  wickets: number
+  economy: number | null
+  avg_opposition_total: number | null
+  dot_pct: number | null
+  boundaries_conceded: number
+  worst_conceded: number
+}
+
+export interface TeamBowlingPhase {
+  phase: string
+  overs_range: number[]
+  runs_conceded: number
+  balls: number
+  economy: number | null
+  wickets: number
+  boundary_pct: number | null
+  dot_pct: number | null
+  fours_conceded: number
+  sixes_conceded: number
+}
+
+export interface TeamTopBowler {
+  person_id: string
+  name: string
+  wickets: number
+  runs_conceded: number
+  balls: number
+  overs: number
+  economy: number | null
+  average: number | null
+  strike_rate: number | null
+  innings: number
+}
+
+export interface TeamFieldingSummary {
+  team: string
+  matches: number
+  catches: number
+  caught_and_bowled: number
+  stumpings: number
+  run_outs: number
+  total_dismissals_contributed: number
+  catches_per_match: number | null
+  stumpings_per_match: number | null
+  run_outs_per_match: number | null
+}
+
+export interface TeamFieldingSeason {
+  season: string
+  catches: number
+  caught_and_bowled: number
+  stumpings: number
+  run_outs: number
+  matches: number
+  catches_per_match: number | null
+  stumpings_per_match: number | null
+  run_outs_per_match: number | null
+  total_dismissals_contributed: number
+}
+
+export interface TeamTopFielder {
+  person_id: string
+  name: string
+  catches: number
+  caught_and_bowled: number
+  stumpings: number
+  run_outs: number
+  total: number
+}
+
+export interface PartnershipBatterInfo {
+  person_id: string | null
+  name: string
+  runs: number
+  balls: number
+}
+
+export interface PartnershipRefInfo {
+  partnership_id: number
+  match_id: number
+  date: string | null
+  season: string
+  tournament: string | null
+  opponent: string
+  runs: number
+  balls: number
+  batter1: PartnershipBatterInfo
+  batter2: PartnershipBatterInfo
+}
+
+export interface PartnershipByWicket {
+  wicket_number: number
+  n: number
+  avg_runs: number | null
+  avg_balls: number | null
+  best_runs: number
+  best_partnership: PartnershipRefInfo | null
+}
+
+export interface PartnershipHeatmapCell {
+  season: string
+  wicket_number: number
+  avg_runs: number
+  n: number
+}
+
+export interface PartnershipHeatmap {
+  team: string
+  side: 'batting' | 'bowling'
+  seasons: string[]
+  wickets: number[]
+  cells: PartnershipHeatmapCell[]
+}
+
+export interface BattingPhaseSeasonHeatmap {
+  team: string
+  seasons: string[]
+  phases: string[]
+  cells: {
+    season: string
+    phase: string
+    run_rate: number | null
+    wickets_lost: number
+    wickets_per_innings: number | null
+    innings: number
+    balls: number
+  }[]
+}
+
+export interface BowlingPhaseSeasonHeatmap {
+  team: string
+  seasons: string[]
+  phases: string[]
+  cells: {
+    season: string
+    phase: string
+    economy: number | null
+    wickets: number
+    wickets_per_innings: number | null
+    innings: number
+    balls: number
+  }[]
+}
+
+export interface PartnershipPairEntry {
+  rank: number
+  batter1: { person_id: string; name: string }
+  batter2: { person_id: string; name: string }
+  n: number
+  avg_runs: number
+  avg_balls: number
+  best_runs: number
+  total_runs: number
+}
+
+export interface PartnershipBestPairsByWicket {
+  wicket_number: number
+  pairs: PartnershipPairEntry[]
+}
+
+export interface PartnershipBestPairsResponse {
+  team: string
+  side: 'batting' | 'bowling'
+  min_n: number
+  top_n: number
+  by_wicket: PartnershipBestPairsByWicket[]
+}
+
+export interface PartnershipTopEntry {
+  partnership_id: number
+  match_id: number
+  date: string | null
+  season: string
+  tournament: string | null
+  opponent: string
+  wicket_number: number | null
+  runs: number
+  balls: number
+  unbroken: boolean
+  ended_by_kind: string | null
+  batter1: PartnershipBatterInfo
+  batter2: PartnershipBatterInfo
 }

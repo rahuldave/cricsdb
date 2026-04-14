@@ -438,6 +438,169 @@ React Router handles all navigation client-side. In production, FastAPI serves t
 
 The catch-all is registered inside the lifespan handler, AFTER API routers, to ensure API routes take priority.
 
+### Run rate: concatenated, not per-innings averaged (revisit)
+
+Every team-level rate metric (`run_rate`, `economy`, by-season, by-phase,
+phase × season heatmaps) is the **concatenated rate**:
+
+```
+run_rate = SUM(runs in scope) × 6 / SUM(legal balls in scope)
+```
+
+NOT the mean of per-innings rates. So MI's 2023 powerplay RR is the
+total PP runs across all 16 IPL 2023 powerplays divided by the total PP
+legal balls × 6 — every ball gets equal weight.
+
+**Why this matters:** the two methods only diverge when innings have
+materially different lengths in the bucket. For the powerplay this is
+mostly a non-issue — every innings spends ~30 legal balls in the PP
+unless the team is bowled out inside it (rare). But in the middle and
+death phases, length variance is huge: a chase finishing in 14 overs
+contributes 0 death-phase balls, a collapse can compress the middle to
+20 balls, etc. Concatenated weights long completed innings more (which
+is usually correct — they show what tempo the team actually settled
+into), but it understates "we typically open at X" when only a few
+innings dominate the sample.
+
+**Revisit if/when:**
+- A user asks "how does the team typically pace itself" — that's the
+  per-innings-mean metric, not the concatenated one.
+- We add a "average innings RR" companion column to the run-rate
+  heatmaps so users can compare "what we usually did" vs. "the
+  weighted-average tempo".
+- Phase-level cells with tiny `n` (low ball count) start influencing
+  comparisons unduly — at that point either filter cells with `balls <
+  threshold` or surface both views side-by-side.
+
+For now: keep concatenated everywhere, label tooltips with `balls=N`
+and `innings=N` so the reader can judge sample size themselves.
+
+### Team metrics need tournament baselines (revisit when /tournaments ships)
+
+Most team-tab charts currently show **absolute values**: "MI hit 410 4s
+in 2024", "MI's 2023 boundary % was 21.9%", "MI's PP economy in 2022
+was 8.5". These are uninformative on their own — they answer "what
+happened" but not "was that good?"
+
+A boundary % of 21.9% looks great until you learn the IPL 2023 league
+average was 19.4% (above average) or 24% (below). 4s/season totals are
+even more misleading because they scale with games played (10-team
+league + playoffs = many games).
+
+**The fix (planned for after the Tournaments tab ships):** every
+team-level rate metric should optionally render the **tournament-and-
+season-scoped average** as a horizontal reference line on bars / a
+pale comparison line on time-series / a contour band on the heatmap.
+
+Backend: a `/api/v1/tournaments/{event}/{season}/baselines` endpoint
+returning the season's averages for every metric we display. Frontend:
+a "vs tournament average" toggle on each chart card.
+
+Concrete examples of where this matters:
+- Boundary % time-series — show the league average % each season as a
+  pale dashed line. MI above the line = better-than-average tempo.
+- 4s/6s by season — convert to "4s per innings" first (so the bars are
+  comparable to the league mean), then overlay the league mean.
+- Phase × season heatmap — colour by **delta from league average** in a
+  toggle mode (oxblood = above league mean; indigo = below; cream =
+  near).
+- Top-N batter SR — append a "league SR for that season" column.
+
+This is a follow-on for enhancement M (Tournaments page) — once we
+have per-tournament-per-season aggregates, we get baselines for free.
+Until then, team charts are absolute-only and the user has to remember
+that "9.5 RR in death" is good for 2014 but only OK for 2024.
+
+### Win-% overlay on discipline tabs (revisit)
+
+The team By Season tab and the vs-Opponent drill-in chart already
+overlay win % above each wins bar (oxblood text via BarChart's
+`topLabelFormat`). Same idea wants to extend to the Batting / Bowling
+/ Fielding / Partnerships tabs:
+
+- A pale "team won that match"-marker (oxblood dot, indigo dot) on
+  every per-season chart, so the reader can see at a glance whether
+  the team's elevated boundary % in 2024 came from won games or lost
+  games.
+- On phase × season heatmaps, an optional "filter to wins only / losses
+  only" toggle so you can see "what we did in our wins" vs "what
+  failed in our losses".
+- On batter / bowler leaderboards within a team tab, a "win
+  contribution" indicator (% of player's runs/wickets that came in
+  team wins).
+
+Goal: surface visual correlation between performance metrics
+(boundary %, RR, econ, catches/match, partnership averages) and
+**winning**. By itself "MI's death-phase RR is 10.5 in 2024" is just
+a number; coloured by win/loss it answers "is this how we won, or
+did the death-phase RR collapse in losses?"
+
+This pairs naturally with the tournament-baselines work — together
+they let the user see "performance vs tournament average, weighted by
+whether we won". Postponed until both pieces are in place.
+
+### Batter consistency metrics — median / 30+ rate / dispersion (revisit)
+
+A batter who scores two 150s + ten single-digit innings has a
+respectable mean, but the median tells you the player only really
+helped the team in 2 of 12 games. The current Batting page shows mean
+(`average`), strike rate, 50s/100s — but no measure of **consistency**.
+
+Stats to consider (defer until a separate "batter shape" pass):
+- **Median** alongside mean — when median ≪ mean, the player's value
+  is concentrated in a few innings.
+- **% of innings ≥ 30** (or ≥ team-context threshold) — proportion of
+  innings where they made a "useful" contribution.
+- **Standard deviation** of innings score — lower SD = more reliable.
+- **Coefficient of variation** (SD/mean) — normalised dispersion.
+- A small box-and-whiskers (or strip-plot) per season showing the
+  spread of innings scores rather than just the mean.
+
+Tied conceptually to the win-% overlay above: a player who scores big
+only in losses (mean-inflated) is materially less valuable than one
+who scores big in wins (mean × win-contribution).
+
+Same applies to bowlers (a 4-for and three 0-for vs a steady 1-for
+each game) — wickets-per-innings dispersion + economy SD per match.
+
+Postponed.
+
+### Player splits — batter × bowler-type and bowler × batter-handedness (revisit)
+
+Two player-page splits we want but don't have:
+
+**Batter splits (on /batting):** SR / avg / boundary % broken down by
+bowler type — left-arm spin (LAS), right-arm spin (RAS), left-arm pace
+(LAP), right-arm pace (RAP). Helpful for "which match-up does this
+batter exploit / struggle against" reads. Cricsheet records bowling
+style per delivery's bowler (via `person.key_*` cross-references and
+external sources), so the join needs an enrichment pass first — bowler
+style is NOT in the cricsheet match JSON we currently import.
+
+**Bowler splits (on /bowling):** wickets / econ / SR broken down by
+batter handedness (LHB vs RHB). Same enrichment problem: handedness
+isn't in cricsheet's match data.
+
+Both require extending the `person` table with two columns:
+`batting_hand` (LHB/RHB) and `bowling_style` (LAS/RAS/LAP/RAP/none).
+Population can come from Cricinfo / Cricbuzz (we already have their
+keys on `person`) — a separate scraper script, similar to the
+`scrape_cricinfo_keepers.py` pattern we sketched for keeper resolution.
+
+**Threshold cut-off for "useful sample":** the user suggested grouping
+by averages "below ~15 or so" to flag genuine-tail vs proper-batter
+match-ups, but 15 is too low even for T20 (ball-faced threshold is
+more meaningful). Tentative defaults:
+- Batter splits: include only opponents the batter has faced ≥ 30
+  legal balls of (otherwise the SR is dominated by 1-2 deliveries).
+- Bowler splits: include only batters the bowler has bowled ≥ 12
+  balls to.
+
+The actual thresholds want experimentation — surface as tunable query
+params on the endpoint, default to the above.
+
+Postponed. Tied to the broader player-detail enrichment work.
+
 ## Deployment
 
 ### Vendored deebase

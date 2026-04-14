@@ -160,3 +160,34 @@ class KeeperAssignment:
     confidence: Optional[str] = None  # definitive|high|medium|low
     ambiguous_reason: Optional[str] = None
     candidate_ids_json: Optional[dict] = None  # JSON list of competing person_ids when ambiguous
+
+
+class Partnership:
+    """One row per on-field batting partnership.
+
+    See docs/spec-team-stats.md. `partnership_runs` includes ALL extras
+    (matches innings total math); `partnership_balls` is legal balls only.
+    Per-batter `batter{1,2}_runs` are off-the-bat only. `batter1` is the
+    earlier-arriver (= survivor of previous partnership; = striker on
+    first delivery for the opening stand). `wicket_number` follows
+    cricsheet's running wicket count (retired hurt increments it too);
+    queries needing "before Nth real dismissal" filter on
+    `ended_by_kind NOT IN ('retired hurt', 'retired not out')`.
+    """
+    id: int
+    innings_id: ForeignKey[int, "innings"]
+    wicket_number: Optional[int] = None  # NULL iff unbroken
+    batter1_id: Optional[ForeignKey[str, "person"]] = None
+    batter2_id: Optional[ForeignKey[str, "person"]] = None
+    batter1_name: str = ""
+    batter2_name: str = ""
+    batter1_runs: int = 0
+    batter1_balls: int = 0  # legal balls faced
+    batter2_runs: int = 0
+    batter2_balls: int = 0
+    partnership_runs: int = 0  # SUM(delivery.runs_total) — includes extras
+    partnership_balls: int = 0  # legal balls only
+    start_delivery_id: ForeignKey[int, "delivery"] = 0
+    end_delivery_id: ForeignKey[int, "delivery"] = 0
+    unbroken: bool = False
+    ended_by_kind: Optional[str] = None  # wicket.kind of the terminating wicket

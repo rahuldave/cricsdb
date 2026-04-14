@@ -23,6 +23,13 @@ interface BarChartProps<T extends Record<string, any>> {
    * width divided by the number of categories drops below ~28px.
    */
   rotateCategoryLabels?: boolean | 'auto'
+  /**
+   * Annotation rendered ABOVE each bar at the top of the chart's plot
+   * area. Useful for "win % above the wins-by-season bars" where the
+   * chart shows raw counts but the reader needs context. Return null
+   * to skip a label for a given row.
+   */
+  topLabelFormat?: (d: T, i: number) => string | null
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +37,7 @@ export default function BarChart<T extends Record<string, any>>({
   data, categoryAccessor, valueAccessor, title, width, height = 400,
   colorScheme = WISDEN_PALETTE, colorBy, categoryLabel, valueLabel, orientation,
   rotateCategoryLabels = 'auto',
+  topLabelFormat,
 }: BarChartProps<T>) {
   const [ref, measuredWidth] = useContainerWidth()
   const effectiveWidth = width ?? measuredWidth
@@ -67,8 +75,22 @@ export default function BarChart<T extends Record<string, any>>({
   // use for the overlay. Each bar's center is then at
   // (i + 0.5) / data.length of the inner width.
   const ROT_MARGIN = { top: 50, right: 20, bottom: 90, left: 60 }
-  const NORMAL_MARGIN = undefined // let Semiotic use its defaults
+  // When we need precise per-bar overlays (top labels), pin Semiotic's
+  // margins explicitly — Semiotic's defaults vary with axis label width,
+  // so without pinning our pixel math for the label overlay drifts.
+  // Note: frameProps must wrap the margin in `{ margin: ... }` (passing
+  // the bare object did NOT take effect; Semiotic kept its defaults of
+  // ~{ top: 50, left: 70, bottom: 60 } which threw the labels off by
+  // ~20px vertically and ~10px horizontally).
+  const PINNED_NORMAL_MARGIN = { top: 30, right: 20, bottom: 50, left: 60 }
   const finalHeight = shouldRotate ? height + 60 : height
+  const activeMargin = shouldRotate ? ROT_MARGIN : PINNED_NORMAL_MARGIN
+  const innerHeight = finalHeight - activeMargin.top - activeMargin.bottom
+  // Always pass the margin via frameProps so the overlay math matches
+  // what Semiotic actually renders.
+  const FRAME_PROPS = topLabelFormat || shouldRotate
+    ? { margin: activeMargin }
+    : undefined
 
   const getLabel = (d: T): string => {
     const v = typeof categoryAccessor === 'function'
@@ -76,6 +98,14 @@ export default function BarChart<T extends Record<string, any>>({
       : (d as Record<string, unknown>)[categoryAccessor as string]
     return String(v ?? '')
   }
+
+  const getValue = (d: T): number => {
+    const v = typeof valueAccessor === 'function'
+      ? valueAccessor(d)
+      : (d as Record<string, unknown>)[valueAccessor as string]
+    return typeof v === 'number' ? v : 0
+  }
+  const maxValue = data.reduce((m, d) => Math.max(m, getValue(d) || 0), 0)
 
   return (
     <div ref={ref} className="w-full" style={{ position: 'relative' }}>
@@ -99,7 +129,7 @@ export default function BarChart<T extends Record<string, any>>({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           categoryFormat={shouldRotate ? ((() => '') as any) : undefined}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          frameProps={shouldRotate ? ({ margin: ROT_MARGIN } as any) : NORMAL_MARGIN}
+          frameProps={FRAME_PROPS as any}
           // Default legend below the chart so long phase/category
           // labels (e.g. "Powerplay") don't get clipped by the card
           // on narrow screens.
@@ -143,6 +173,43 @@ export default function BarChart<T extends Record<string, any>>({
                   userSelect: 'none',
                 }}>{label}</div>
               </div>
+            )
+          })}
+        </div>
+      )}
+      {/* Top-label annotation: small labels positioned just above each
+          bar's actual top. Bar height = (value/max) × innerHeight, so
+          the label's y = topMargin + (innerHeight - barHeight) − offset.
+          Pinning Semiotic's margins (PINNED_NORMAL_MARGIN above) keeps
+          this math accurate. */}
+      {topLabelFormat && effectiveWidth > 0 && data.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          left: activeMargin.left,
+          top: 0,
+          width: effectiveWidth - activeMargin.left - activeMargin.right,
+          height: finalHeight,
+          pointerEvents: 'none',
+        }}>
+          {data.map((d, i) => {
+            const label = topLabelFormat(d, i)
+            if (label == null) return null
+            const v = getValue(d)
+            const barH = maxValue > 0 ? (v / maxValue) * innerHeight : 0
+            const labelTop = activeMargin.top + (innerHeight - barH) - 14
+            const xPct = ((i + 0.5) / data.length) * 100
+            return (
+              <div key={i} style={{
+                position: 'absolute',
+                left: `${xPct}%`,
+                top: labelTop,
+                transform: 'translateX(-50%)',
+                fontSize: 11,
+                fontFamily: 'var(--sans)',
+                color: 'var(--oxblood, #7A1F1F)',
+                whiteSpace: 'nowrap',
+                lineHeight: 1,
+              }}>{label}</div>
             )
           })}
         </div>

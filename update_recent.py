@@ -280,6 +280,12 @@ async def main():
                 )
                 await keeper_incr(db, new_match_ids)
 
+                # Partnerships follow keeper assignments
+                from scripts.populate_partnerships import (
+                    populate_incremental as partnerships_incr,
+                )
+                await partnerships_incr(db, new_match_ids)
+
             print("\nRegenerating site stats…")
             import subprocess
             subprocess.run(

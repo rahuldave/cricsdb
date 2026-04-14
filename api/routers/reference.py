@@ -11,19 +11,60 @@ from ..filters import FilterParams
 router = APIRouter(prefix="/api/v1", tags=["Reference"])
 
 
+def _reference_clauses(
+    team: Optional[str],
+    gender: Optional[str],
+    team_type: Optional[str],
+    tournament: Optional[str],
+) -> tuple[list[str], dict]:
+    """Build WHERE fragments for /tournaments and /seasons.
+
+    All four dimensions narrow the result set — so picking
+    tournament=IPL on the Teams page makes the seasons dropdown show
+    just IPL seasons. Path team wins over any filter_team in the URL.
+    """
+    parts: list[str] = []
+    params: dict = {}
+    if team:
+        parts.append("(m.team1 = :team OR m.team2 = :team)")
+        params["team"] = team
+    if gender:
+        parts.append("m.gender = :gender")
+        params["gender"] = gender
+    if team_type:
+        parts.append("m.team_type = :team_type")
+        params["team_type"] = team_type
+    if tournament:
+        parts.append("m.event_name = :tournament")
+        params["tournament"] = tournament
+    return parts, params
+
+
 @router.get("/tournaments")
-async def list_tournaments():
+async def list_tournaments(
+    team: Optional[str] = Query(None),
+    gender: Optional[str] = Query(None),
+    team_type: Optional[str] = Query(None),
+):
+    """List tournaments, narrowed by team / gender / team_type so the
+    dropdown reflects what's reachable from the current filter state.
+    Tournament itself is intentionally not a filter here (that would
+    make the list self-referential — you're picking from this list)."""
     db = get_db()
+    parts, params = _reference_clauses(team, gender, team_type, None)
+    parts.append("m.event_name IS NOT NULL")
+    where = " AND ".join(parts)
     rows = await db.q(
-        """
-        SELECT event_name, team_type, gender,
+        f"""
+        SELECT m.event_name, m.team_type, m.gender,
                COUNT(*) as matches,
-               GROUP_CONCAT(DISTINCT season) as seasons
-        FROM match
-        WHERE event_name IS NOT NULL
-        GROUP BY event_name, team_type, gender
+               GROUP_CONCAT(DISTINCT m.season) as seasons
+        FROM match m
+        WHERE {where}
+        GROUP BY m.event_name, m.team_type, m.gender
         ORDER BY matches DESC
-        """
+        """,
+        params,
     )
     tournaments = []
     for r in rows:
@@ -40,9 +81,27 @@ async def list_tournaments():
 
 
 @router.get("/seasons")
-async def list_seasons():
+async def list_seasons(
+    team: Optional[str] = Query(None),
+    gender: Optional[str] = Query(None),
+    team_type: Optional[str] = Query(None),
+    tournament: Optional[str] = Query(None),
+):
+    """Seasons narrowed by team / gender / team_type / tournament. When
+    tournament=IPL, only IPL seasons are returned — so the From/To
+    pickers can't offer 2009/10 (a Champions League season) or 2026 (a
+    season MI has played but IPL hasn't entered yet)."""
     db = get_db()
-    rows = await db.q("SELECT DISTINCT season FROM match ORDER BY season")
+    parts, params = _reference_clauses(team, gender, team_type, tournament)
+    where = " AND ".join(parts) if parts else "1=1"
+    rows = await db.q(
+        f"""
+        SELECT DISTINCT m.season FROM match m
+        WHERE {where}
+        ORDER BY m.season
+        """,
+        params,
+    )
     return {"seasons": [r["season"] for r in rows]}
 
 

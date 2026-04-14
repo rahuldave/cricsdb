@@ -471,13 +471,25 @@ a { color: inherit; }
 
 /* Stat row frame — strip of StatCards under a page title.
    Default is 4-up; add .cols-5 for player pages. The cells (StatCards)
-   each carry a top rule, and the row carries a bottom rule. */
+   each carry a top rule, and the row carries a bottom rule.
+   When two `.wisden-statrow`s stack (multi-row stat grids on the team
+   batting/bowling/fielding tabs), the row's bottom rule + the next
+   row's cell top rule were drawing as a doubled line. Suppress the
+   bottom rule + the gap when a statrow is followed by another statrow
+   so the divider stays a single 1px line. */
 .wisden-statrow {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0;
   margin: 1.5rem 0 2rem;
   border-bottom: 1px solid var(--rule);
+}
+.wisden-statrow:has(+ .wisden-statrow) {
+  border-bottom: 0;
+  margin-bottom: 0;
+}
+.wisden-statrow + .wisden-statrow {
+  margin-top: 0;
 }
 @media (min-width: 640px) {
   .wisden-statrow { grid-template-columns: repeat(4, 1fr); }
@@ -534,6 +546,20 @@ a { color: inherit; }
   font-style: italic;
   color: var(--ink-faint);
   font-variation-settings: "opsz" 14;
+}
+
+/* Section heading used above charts when we render the title as its
+   own DOM element (rather than passing `title=` to Semiotic). Keeping
+   the title outside the chart avoids the title text colliding with
+   above-bar percentage labels in the chart's top margin. Centered to
+   match where Semiotic's in-chart title used to sit. */
+.wisden-section-title {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 1.05rem;
+  text-align: center;
+  margin: 1.5rem 0 0.5rem;
+  color: var(--ink);
 }
 
 .wisden-tab-help {

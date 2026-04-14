@@ -17,9 +17,24 @@ function CompLink({ event, children }: { event: string; children: React.ReactNod
   )
 }
 
-function TeamLink({ name, gender, children }: { name: string; gender?: 'male' | 'female'; children?: React.ReactNode }) {
+function TeamLink({
+  name, gender, season, tournament, teamType, children,
+}: {
+  name: string
+  gender?: 'male' | 'female'
+  season?: string
+  tournament?: string
+  teamType?: 'club' | 'international'
+  children?: React.ReactNode
+}) {
   const params = new URLSearchParams({ team: name })
   if (gender) params.set('gender', gender)
+  if (teamType) params.set('team_type', teamType)
+  if (tournament) params.set('tournament', tournament)
+  if (season) {
+    params.set('season_from', season)
+    params.set('season_to', season)
+  }
   return (
     <Link to={`/teams?${params}`} className="comp-link">
       {children ?? name}
@@ -27,8 +42,15 @@ function TeamLink({ name, gender, children }: { name: string; gender?: 'male' | 
   )
 }
 
-function PlayerLink({ id, role, gender, children }: { id: string; role: 'batter' | 'bowler'; gender: 'male' | 'female'; children: React.ReactNode }) {
-  const path = role === 'batter' ? '/batting' : '/bowling'
+function PlayerLink({
+  id, role, gender, children,
+}: {
+  id: string
+  role: 'batter' | 'bowler' | 'fielder'
+  gender: 'male' | 'female'
+  children: React.ReactNode
+}) {
+  const path = role === 'batter' ? '/batting' : role === 'bowler' ? '/bowling' : '/fielding'
   return (
     <Link to={`${path}?player=${id}&gender=${gender}`} className="comp-link">
       {children}
@@ -77,7 +99,16 @@ export default function Home() {
               <CompLink event="Men's T20 Asia Cup">Asia Cup</CompLink>
             </div>
             <div>
-              Bilateral series — <TeamLink name="India" /> · <TeamLink name="Australia" />
+              Bilateral series —{' '}
+              <TeamLink name="India" gender="male" teamType="international">India (men)</TeamLink> ·{' '}
+              <TeamLink name="Australia" gender="female" teamType="international">Australia (women)</TeamLink>
+            </div>
+            <div>
+              Champions —{' '}
+              <TeamLink name="West Indies" gender="male" teamType="international"
+                tournament="World T20" season="2015/16">
+                West Indies · T20 WC 2016
+              </TeamLink>
             </div>
           </div>
           <div className="coverage-col">
@@ -98,7 +129,27 @@ export default function Home() {
               <Link to="/matches" className="comp-link">others</Link>
             </div>
             <div>
-              Sides — <TeamLink name="Chennai Super Kings">CSK</TeamLink>
+              Champions —{' '}
+              <TeamLink name="Royal Challengers Bengaluru" gender="male"
+                tournament="Indian Premier League" season="2025" teamType="club">
+                RCB · IPL 2025
+              </TeamLink>{', '}
+              <TeamLink name="Royal Challengers Bengaluru" gender="female"
+                tournament="Women's Premier League" season="2025/26" teamType="club">
+                RCB Women · WPL 2025/26
+              </TeamLink>
+            </div>
+            <div>
+              All-time —{' '}
+              <TeamLink name="Perth Scorchers" gender="male"
+                tournament="Big Bash League" teamType="club">
+                Perth Scorchers · BBL
+              </TeamLink>{', '}
+              <TeamLink name="Mumbai Indians" gender="female"
+                tournament="Women's Premier League" teamType="club">
+                MI Women · WPL
+              </TeamLink>{', '}
+              <TeamLink name="Chennai Super Kings">CSK</TeamLink>
             </div>
           </div>
           <div className="coverage-col">
@@ -109,10 +160,19 @@ export default function Home() {
               <TeamLink name="Royal Challengers Bengaluru" gender="female">women</TeamLink>
             </div>
             <div>
+              Bat —{' '}
               <PlayerLink id="ba607b88" role="batter" gender="male">V Kohli</PlayerLink>,{' '}
-              <PlayerLink id="5d2eda89" role="batter" gender="female">S Mandhana</PlayerLink>,{' '}
+              <PlayerLink id="5d2eda89" role="batter" gender="female">S Mandhana</PlayerLink>
+            </div>
+            <div>
+              Ball —{' '}
               <PlayerLink id="462411b3" role="bowler" gender="male">JJ Bumrah</PlayerLink>,{' '}
               <PlayerLink id="be150fc8" role="bowler" gender="female">EA Perry</PlayerLink>
+            </div>
+            <div>
+              Field —{' '}
+              <PlayerLink id="a757b0d8" role="fielder" gender="male">KA Pollard</PlayerLink>,{' '}
+              <PlayerLink id="52d1dbc8" role="fielder" gender="female">BL Mooney</PlayerLink>
             </div>
           </div>
         </div>
