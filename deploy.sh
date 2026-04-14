@@ -27,11 +27,18 @@ cp main.py "$BUILD_DIR/"
 
 # Stage the local .env (admin credentials etc) into the build.
 # The file is gitignored so credentials never land in source control,
-# but we need them on the plash runtime. Fail loudly if missing so a
-# deploy doesn't silently ship an unauthenticated admin.
+# but we need them on the plash runtime. Plash's Docker ENTRYPOINT
+# does `. ./plash.env` (bash source) before running main.py, which sets
+# shell vars but does NOT auto-export them to child processes. So we
+# transform `KEY=VALUE` -> `export KEY=VALUE` on the way in. Locally,
+# api/app.py reads .env directly via its own _load_dotenv parser.
 if [ -f .env ]; then
-    cp .env "$BUILD_DIR/.env"
-    echo "Staged .env into $BUILD_DIR/ (admin credentials etc)"
+    awk '
+        /^[[:space:]]*(#|$)/ { print; next }                      # comment or blank
+        /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=/ { print "export " $0; next }
+        { print }                                                  # anything else, pass through
+    ' .env > "$BUILD_DIR/plash.env"
+    echo "Staged .env -> $BUILD_DIR/plash.env (with export prefix for Dockerfile ENTRYPOINT)"
 else
     echo "WARNING: no .env file found — admin will return 503 on plash" >&2
 fi

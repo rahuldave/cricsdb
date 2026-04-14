@@ -116,24 +116,44 @@ uv run uvicorn api.app:app --reload --port 8000   # same as before
 uv run python main.py
 ```
 
-**2. Plash production.** No native env-var command exists on plash.
-`deploy.sh` stages the local `.env` into `build_plash/` so it ships
-with the deploy:
+**2. Plash production.** Plash's container Dockerfile ENTRYPOINT
+does `bash -c ". ./plash.env && python main.py"`, i.e. it
+*dot-sources* a file named `plash.env` before launching Python.
+That's the hook we use to ship credentials.
+
+**Gotcha: `.env` files are normally `KEY=VALUE`, but bash `.` sourcing
+sets shell vars only — NOT environment vars — so the Python subprocess
+would not inherit them.** `deploy.sh` transforms on the way in,
+prefixing every `KEY=VALUE` line with `export`:
 
 ```bash
-# In deploy.sh:
-if [ -f .env ]; then
-    cp .env "$BUILD_DIR/.env"
-fi
+# In deploy.sh (simplified):
+awk '
+    /^[[:space:]]*(#|$)/ { print; next }
+    /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=/ { print "export " $0; next }
+    { print }
+' .env > "$BUILD_DIR/plash.env"
 ```
 
-On plash startup, `main.py` runs `_load_dotenv()` which picks up
-`./\.env` from the working dir. Credentials are never committed to
-git (both `.env` and `build_plash/` are gitignored).
+Locally the same `.env` file is read directly by `api/app.py`'s
+`_load_dotenv` (which doesn't care whether lines start with `export`).
 
 If `.env` is missing at deploy time, `deploy.sh` prints a warning and
-plash's `/admin/*` will return 503 fail-closed — the site itself
-keeps working.
+plash's `/admin/*` returns 503 fail-closed — the site itself keeps
+working.
+
+**Verification after a deploy:**
+
+```bash
+# Should be 401, not 503 — means plash has the env vars
+curl -s -o /dev/null -w '%{http_code}\n' -u "x:y" https://t20.rahuldave.com/admin/
+```
+
+If you see 503: check `plash_logs --mode build` for the Dockerfile
+ENTRYPOINT line (to confirm it still sources `plash.env`), then
+`plash_download --save_path /tmp/dl` to inspect what's actually on
+plash — the file should be there and its contents should have
+`export` prefixes on the `KEY=VALUE` lines.
 
 ### Behavior
 
