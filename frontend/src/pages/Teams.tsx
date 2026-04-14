@@ -139,6 +139,30 @@ export default function Teams() {
             <StatCard label="Win %" value={summary.win_pct != null ? `${summary.win_pct}%` : '-'} />
           </div>
 
+          {/* Tier 2 — keepers used by this team, if any identified. */}
+          {summary.keepers && summary.keepers.length > 0 && (
+            <p className="wisden-tab-help" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>
+              <span style={{ fontStyle: 'italic' }}>Keepers used:</span>{' '}
+              {summary.keepers.slice(0, 6).map((k, i) => (
+                <span key={k.person_id}>
+                  {i > 0 && ', '}
+                  <a href={`/fielding?player=${encodeURIComponent(k.person_id)}&tab=Keeping`}
+                     className="comp-link">{k.name}</a>
+                  {' '}
+                  <span style={{ color: 'var(--ink-faint)' }}>({k.innings_kept})</span>
+                </span>
+              ))}
+              {summary.keepers.length > 6 && (
+                <span style={{ color: 'var(--ink-faint)' }}>, +{summary.keepers.length - 6} more</span>
+              )}
+              {summary.keeper_ambiguous_innings > 0 && (
+                <span style={{ color: 'var(--ink-faint)' }}>
+                  {' · '}{summary.keeper_ambiguous_innings} innings ambiguous
+                </span>
+              )}
+            </p>
+          )}
+
           <div className="wisden-tabs">
             {tabs.map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}

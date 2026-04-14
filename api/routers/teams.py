@@ -82,6 +82,52 @@ async def team_summary(
         if male > 0 and female > 0:
             gender_breakdown = {"male": male, "female": female}
 
+    # Tier 2 — keepers used by this team (fielding innings where
+    # keeper_assignment picked someone, grouped by that someone).
+    # Match-level filters apply via params (already include :team).
+    k_filt, k_params = filters.build(has_innings_join=True)
+    k_params["team"] = team
+    # The FIELDING team = NOT the batting team; team_filt ensures the
+    # match involves this side, and i.team != :team means we're looking
+    # at innings where the OTHER side was batting (i.e. our team fielding).
+    k_parts = [
+        "(m.team1 = :team OR m.team2 = :team)",
+        "i.team != :team",
+    ]
+    if k_filt:
+        k_parts.append(k_filt)
+    k_clause = " AND ".join(k_parts)
+
+    keepers_rows = await db.q(
+        f"""
+        SELECT ka.keeper_id, p.name, COUNT(*) as innings_kept
+        FROM keeperassignment ka
+        JOIN innings i ON i.id = ka.innings_id
+        JOIN match m ON m.id = i.match_id
+        JOIN person p ON p.id = ka.keeper_id
+        WHERE ka.keeper_id IS NOT NULL AND {k_clause}
+        GROUP BY ka.keeper_id, p.name
+        ORDER BY innings_kept DESC
+        """,
+        k_params,
+    )
+    keepers = [
+        {"person_id": r["keeper_id"], "name": r["name"], "innings_kept": r["innings_kept"]}
+        for r in keepers_rows
+    ]
+
+    ambig_rows = await db.q(
+        f"""
+        SELECT COUNT(*) as c
+        FROM keeperassignment ka
+        JOIN innings i ON i.id = ka.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE ka.keeper_id IS NULL AND {k_clause}
+        """,
+        k_params,
+    )
+    keeper_ambiguous = ambig_rows[0]["c"] if ambig_rows else 0
+
     return {
         "team": team,
         "matches": matches,
@@ -94,6 +140,8 @@ async def team_summary(
         "bat_first_wins": row.get("bat_first_wins", 0) or 0,
         "field_first_wins": row.get("field_first_wins", 0) or 0,
         "gender_breakdown": gender_breakdown,
+        "keepers": keepers,
+        "keeper_ambiguous_innings": keeper_ambiguous,
     }
 
 

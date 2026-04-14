@@ -274,6 +274,12 @@ async def main():
                 from scripts.populate_fielding_credits import populate_incremental
                 await populate_incremental(db, new_match_ids)
 
+                # Keeper assignments follow fielding credits
+                from scripts.populate_keeper_assignments import (
+                    populate_incremental as keeper_incr,
+                )
+                await keeper_incr(db, new_match_ids)
+
             print("\nRegenerating site stats…")
             import subprocess
             subprocess.run(

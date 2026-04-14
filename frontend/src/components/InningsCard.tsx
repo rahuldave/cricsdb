@@ -25,6 +25,10 @@ export default function InningsCard({ innings, linkParams = '', highlightBatterI
       ? `/head-to-head?batter=${encodeURIComponent(batterId)}&bowler=${encodeURIComponent(bowlerId)}${linkParams ? '&' + linkParams : ''}`
       : null
 
+  const keeper = innings.keeper
+  const keeperHref = (id: string | null) =>
+    id ? `/fielding?player=${encodeURIComponent(id)}&tab=Keeping${linkParams ? '&' + linkParams : ''}` : null
+
   return (
     <div className="wisden-innings">
       <div className="wisden-innings-head">
@@ -34,6 +38,34 @@ export default function InningsCard({ innings, linkParams = '', highlightBatterI
           <span className="meta num">({innings.overs} ov, RR {innings.run_rate.toFixed(2)})</span>
         </div>
       </div>
+
+      {/* Keeper label (Tier 2) — above the batting table */}
+      {keeper && (
+        <div className="wisden-innings-aside" style={{ marginBottom: '0.5rem' }}>
+          <span className="lbl">Keeper</span>
+          {keeper.person_id ? (
+            <>
+              <Link to={keeperHref(keeper.person_id)!} className="comp-link">{keeper.name}</Link>
+              <span style={{ color: 'var(--ink-faint)', fontSize: '0.75rem', marginLeft: '0.4rem', fontStyle: 'italic' }}>
+                ({keeper.confidence})
+              </span>
+            </>
+          ) : (
+            <span style={{ fontStyle: 'italic' }}>
+              ambiguous —{' '}
+              {(keeper.candidate_ids || []).map((id, i) => {
+                const name = keeper.candidate_names?.[i] || id
+                return (
+                  <span key={id}>
+                    {i > 0 && ' or '}
+                    <Link to={keeperHref(id)!} className="comp-link">{name}</Link>
+                  </span>
+                )
+              })}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Batting */}
       <table>

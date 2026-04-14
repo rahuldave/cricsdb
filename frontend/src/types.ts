@@ -44,6 +44,21 @@ export interface TeamSummary {
   /** Present only when no gender filter is active AND the team has
    *  matches in BOTH genders within the current filter scope. */
   gender_breakdown: { male: number; female: number } | null
+  /** Tier 2 — keepers used by this team (sorted by innings kept desc). */
+  keepers: { person_id: string; name: string; innings_kept: number }[]
+  /** Count of this team's fielding innings with no identified keeper. */
+  keeper_ambiguous_innings: number
+}
+
+/** Keeper info attached to each innings on the scorecard endpoint. */
+export interface ScorecardKeeper {
+  person_id: string | null
+  name: string | null
+  method: string | null
+  confidence: 'definitive' | 'high' | 'medium' | 'low' | null
+  ambiguous_reason?: string
+  candidate_ids?: string[]
+  candidate_names?: string[]
 }
 
 export interface TeamResult {
@@ -332,6 +347,68 @@ export interface FieldingSummary {
   total_dismissals: number
   dismissals_per_match: number | null
   substitute_catches: number
+  /** Tier 2 — innings where this person was assigned keeper. Used to gate the "Keeping" tab. */
+  innings_kept: number
+}
+
+// Keeping (Tier 2 fielding — wicketkeeper-specific stats)
+export interface KeepingSummary {
+  person_id: string
+  name: string
+  innings_kept: number
+  innings_kept_by_confidence: {
+    definitive: number
+    high: number
+    medium: number
+    low: number
+  }
+  stumpings: number
+  keeping_catches: number
+  run_outs_while_keeping: number
+  byes_conceded: number
+  byes_per_innings: number | null
+  dismissals_while_keeping: number
+  keeping_dismissals_per_innings: number | null
+  ambiguous_innings: number
+}
+
+export interface KeepingSeason {
+  season: string
+  innings_kept: number
+  stumpings: number
+  keeping_catches: number
+  run_outs_while_keeping: number
+  byes_conceded: number
+  total_dismissals: number
+}
+
+export interface KeepingInnings {
+  match_id: number
+  innings_number: number
+  date: string | null
+  opponent: string
+  tournament: string | null
+  confidence: 'definitive' | 'high' | 'medium' | 'low'
+  method: string
+  stumpings: number
+  catches: number
+  run_outs: number
+  byes: number
+  total_dismissals: number
+}
+
+export interface KeepingAmbiguousInnings {
+  match_id: number
+  innings_id: number
+  innings_number: number
+  date: string | null
+  tournament: string | null
+  season: string
+  fielding_team: string
+  opponent: string
+  ambiguous_reason: string
+  candidate_ids: string[]
+  candidate_names: string[]
 }
 
 export interface FieldingSeason {
@@ -454,6 +531,10 @@ export interface ScorecardInnings {
   fall_of_wickets: ScorecardFallOfWicket[]
   bowling: ScorecardBowler[]
   by_over: OverProgression[]
+  /** Tier 2 — the wicketkeeper for this innings (of the FIELDING team).
+   *  Null for super-overs; ambiguous innings have person_id=null plus
+   *  candidate_ids/names + ambiguous_reason. */
+  keeper: ScorecardKeeper | null
 }
 
 export interface ScorecardInfo {

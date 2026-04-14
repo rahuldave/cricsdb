@@ -143,3 +143,20 @@ class FieldingCredit:
     fielder_id: Optional[ForeignKey[str, "person"]] = None
     kind: str  # caught, stumped, run_out, caught_and_bowled
     is_substitute: bool = False
+
+
+class KeeperAssignment:
+    """One row per regular innings — who kept, at what confidence.
+
+    See docs/spec-fielding-tier2.md for the 4-layer algorithm that
+    populates this table and the ambiguous_reason / confidence enums.
+    NULL keeper_id means the innings was ambiguous; details in
+    ambiguous_reason + candidate_ids_json.
+    """
+    id: int
+    innings_id: ForeignKey[int, "innings"]
+    keeper_id: Optional[ForeignKey[str, "person"]] = None
+    method: Optional[str] = None  # stumping|season_single|career_single|team_ever_single|manual
+    confidence: Optional[str] = None  # definitive|high|medium|low
+    ambiguous_reason: Optional[str] = None
+    candidate_ids_json: Optional[dict] = None  # JSON list of competing person_ids when ambiguous

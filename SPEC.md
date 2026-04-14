@@ -81,6 +81,19 @@ fieldingcredit (~118K rows)
   kind: str ("caught" | "stumped" | "run_out" | "caught_and_bowled")
   is_substitute: bool
   Indexes: fielder_id, delivery_id, kind
+
+keeperassignment (~25.8K rows, one per regular innings)
+  id: int (PK) → innings_id: FK(innings) (unique)
+  keeper_id: FK(person)?  (NULL when ambiguous — 17.8% of rows)
+  method: str? ("stumping" | "season_single" | "career_single"
+                | "team_ever_single" | "manual")
+  confidence: str? ("definitive" | "high" | "medium" | "low")
+  ambiguous_reason: str? (set when keeper_id is NULL;
+                          "multi_season" | "multi_career" | "multi_team_ever"
+                          | "no_candidate" | "multi_stumpers_same_innings"
+                          | "stump_fielder_unresolved")
+  candidate_ids_json: list?  (for ambiguous rows — competing person IDs)
+  Indexes: keeper_id, innings_id, confidence, ambiguous_reason
 ```
 
 The `fieldingcredit` table is denormalized from `wicket.fielders` + the
@@ -89,6 +102,14 @@ bowler on `caught and bowled` deliveries. One row per fielder per wicket
 by both `import_data.py` (full rebuild) and `update_recent.py`
 (incremental, new matches only) — no separate script needed. See
 `scripts/populate_fielding_credits.py` for the implementation.
+
+The `keeperassignment` table identifies the wicketkeeper per regular
+innings via a 4-layer algorithm (cricsheet has no keeper designation).
+Full spec: `docs/spec-fielding-tier2.md`. Populated automatically in
+the same pipeline as `fieldingcredit`. When no single keeper can be
+inferred, the row stays NULL and the innings is exported to a
+partitioned CSV under `docs/keeper-ambiguous/` for manual or
+Cricinfo-sourced resolution.
 
 ### 1.2 Key Data Characteristics
 
@@ -1198,6 +1219,41 @@ Paginated match-by-match fielding log (limit default 50, max 200):
 The `opponent` is looked up per row from `matchplayer` (to find which
 team the fielder was on) then inverted against `match.team1`/`team2`.
 
+#### Tier 2 — Keeping endpoints
+
+Four additional endpoints live on the same prefix (`/api/v1/fielders/{id}/`)
+under a `keeping/` sub-namespace. All read from the `keeperassignment`
+table (populated by the 4-layer algorithm in
+`scripts/populate_keeper_assignments.py` — see
+`docs/spec-fielding-tier2.md` for the algorithm).
+
+- `GET /api/v1/fielders/{id}/keeping/summary` — `innings_kept`,
+  `innings_kept_by_confidence: {definitive, high, medium, low}`,
+  `stumpings`, `keeping_catches`, `run_outs_while_keeping`,
+  `byes_conceded` (sum of `delivery.extras_byes` over innings this
+  person kept), `byes_per_innings`, `dismissals_while_keeping`,
+  `keeping_dismissals_per_innings`, `ambiguous_innings` (innings
+  where this person is in `candidate_ids_json` but the row is NULL).
+- `GET /api/v1/fielders/{id}/keeping/by-season` — same shape as
+  fielding/by-season but keeper-scoped, with `byes_conceded` per season.
+- `GET /api/v1/fielders/{id}/keeping/by-innings` — paginated
+  match-by-match log of assigned-keeper innings, with per-innings
+  stumpings / catches / run_outs / byes and the `confidence` label.
+- `GET /api/v1/fielders/{id}/keeping/ambiguous` — innings where this
+  person is one of the competing candidates. Used to show a worklist
+  link on the frontend.
+
+Additions to existing endpoints:
+
+- `GET /api/v1/fielders/{id}/summary` now includes `innings_kept` — the
+  frontend uses this to decide whether to render the Keeping sub-tab.
+- `GET /api/v1/matches/{id}/scorecard` now includes a `keeper` object
+  per innings: `{person_id, name, method, confidence}` for assigned
+  rows, or `{person_id: null, ambiguous_reason, candidate_ids,
+  candidate_names}` for ambiguous ones.
+- `GET /api/v1/teams/{team}/summary` now includes a `keepers` array
+  (ranked by innings kept) and `keeper_ambiguous_innings` count.
+
 ---
 
 ### 3.6 Matches & Scorecards
@@ -1523,6 +1579,8 @@ Filters sync to URL query params so pages are shareable/bookmarkable.
 │  │ Matches │  Wins   │ Losses  │ Win %   │          │
 │  │   230   │   155   │   65    │  67.4%  │          │
 │  └─────────┴─────────┴─────────┴─────────┘          │
+│  Keepers used (Tier 2): MS Dhoni (215), Samson (4),   │
+│    PA Patel (3), KM Jadhav (1) · 33 innings ambiguous │
 ├──────────────────────────────────────────────────────┤
 │  Tabs: [By Season] [vs Opponent] [Match List]        │
 ├──────────────────────────────────────────────────────┤
@@ -1686,6 +1744,7 @@ a table of batters dismissed, not a drill-down filter).
 ├──────────────────────────────────────────────────────┤
 │  Tabs: [By Season] [By Over] [By Phase]              │
 │        [Dismissal Types] [Victims] [Innings List]    │
+│        [Keeping] ← only if innings_kept > 0 (Tier 2) │
 ├──────────────────────────────────────────────────────┤
 │  [By Season]                                         │
 │  Bar: total dismissals by season                     │
@@ -1708,13 +1767,25 @@ a table of batters dismissed, not a drill-down filter).
 │  Table: date → scorecard (w/ highlight_fielder),     │
 │  opponent, tournament, catches, stumpings, run_outs, │
 │  total. Paginated (50/page).                         │
+│                                                      │
+│  [Keeping]  ← Tier 2, only when innings_kept > 0     │
+│  4-card stat row: Stumpings / Keep Catches /          │
+│    Byes Conceded / Innings Kept                       │
+│  Confidence breakdown paragraph: "Of N keeping        │
+│    innings: X definitive, Y high, Z medium, W low."   │
+│  Two BarCharts: dismissals by season / byes by season │
+│  DataTable: keeping innings list with confidence      │
+│    badge column. Paginated.                           │
 └──────────────────────────────────────────────────────┘
 ```
 
-**No keeper/non-keeper distinction** in Tier 1 — all fielding is treated
-equally. Tier 2 spec (`docs/spec-fielding-tier2.md`) proposes wicketkeeper
-identification via stumpings + single-keeper-in-XI inference and a
-"Keeping" sub-tab.
+**Tier 2 — keeper identification**: Full details in
+`docs/spec-fielding-tier2.md`. The 4-layer algorithm (stumping →
+season-candidate in XI → career N≥3 → team-ever-keeper) populates
+`keeperassignment` with a `confidence` enum (`definitive/high/medium/low/NULL`).
+The Keeping sub-tab shows only when `summary.innings_kept > 0`.
+Per-innings keeper info also surfaces on the match scorecard (§4.7)
+and the Teams page (§4.2).
 
 ### 4.6 Page: Head to Head (`/head-to-head`)
 
@@ -1834,6 +1905,12 @@ selector serves all three highlight modes. Per-card scrolling was
 tried earlier and abandoned because sibling async sections (charts,
 matchup grid, innings grid) hadn't sized when the scroll fired, so the
 target row got displaced once layout settled.
+
+**Keeper label (Tier 2):** Each `InningsCard` renders a small
+"Keeper: X (confidence)" line above the batting table, sourced from
+`scorecard.innings[i].keeper`. When the innings is ambiguous, the
+label reads *"Keeper: ambiguous — X or Y"* with both candidates as
+clickable links to their `/fielding?player=<id>&tab=Keeping` pages.
 
 **Data flow:**
 1. List page mounts → `GET /api/v1/matches?...&limit=50&offset=...`.

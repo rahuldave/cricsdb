@@ -345,6 +345,11 @@ async def main():
     from scripts.populate_fielding_credits import populate_full
     await populate_full(db)
 
+    # Populate the keeper_assignment table (Tier 2 fielding)
+    print("\nPopulating keeper assignments…")
+    from scripts.populate_keeper_assignments import populate_full as keeper_full
+    await keeper_full(db)
+
     print(f"\nDatabase saved to {DB_PATH}")
     print(f"Size: {os.path.getsize(DB_PATH) / 1024 / 1024:.1f} MB")
 

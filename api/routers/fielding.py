@@ -94,6 +94,25 @@ async def fielding_summary(
     )
     matches = match_rows[0]["matches"] if match_rows else 0
 
+    # Tier 2: innings where this person was identified as the keeper.
+    # Used by the frontend to decide whether to render the "Keeping" tab.
+    keeping_where, keeping_params = filters.build(has_innings_join=True)
+    keeping_params["person_id"] = person_id
+    keeping_parts = ["ka.keeper_id = :person_id"]
+    if keeping_where:
+        keeping_parts.append(keeping_where)
+    keeping_clause = " AND ".join(keeping_parts)
+    keeping_rows = await db.q(
+        f"""
+        SELECT COUNT(*) as c FROM keeperassignment ka
+        JOIN innings i ON i.id = ka.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {keeping_clause}
+        """,
+        keeping_params,
+    )
+    innings_kept = keeping_rows[0]["c"] if keeping_rows else 0
+
     return {
         "person_id": person_id,
         "name": name,
@@ -105,6 +124,7 @@ async def fielding_summary(
         "total_dismissals": total,
         "dismissals_per_match": _safe_div(total, matches),
         "substitute_catches": substitute_catches,
+        "innings_kept": innings_kept,
     }
 
 

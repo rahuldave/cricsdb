@@ -9,16 +9,18 @@ import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
 import DonutChart from '../components/charts/DonutChart'
-import { WISDEN_PHASES } from '../components/charts/palette'
+import { WISDEN, WISDEN_PHASES } from '../components/charts/palette'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import {
   getFielderSummary, getFielderBySeason, getFielderByPhase, getFielderByOver,
   getFielderDismissalTypes, getFielderVictims, getFielderInnings,
+  getFielderKeepingSummary, getFielderKeepingBySeason, getFielderKeepingInnings,
 } from '../api'
 import type {
   PlayerSearchResult, FieldingSummary, FieldingSeason, FieldingPhase,
   FieldingVictim, FieldingInnings,
+  KeepingSummary, KeepingSeason, KeepingInnings,
 } from '../types'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
@@ -27,7 +29,9 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   return null
 }
 
-const tabs = ['By Season', 'By Over', 'By Phase', 'Dismissal Types', 'Victims', 'Innings List'] as const
+// Tabs are filtered at render based on innings_kept (Keeping hidden when 0)
+const BASE_TABS = ['By Season', 'By Over', 'By Phase', 'Dismissal Types', 'Victims', 'Innings List'] as const
+const KEEPING_TAB = 'Keeping' as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
 export default function Fielding() {
@@ -98,6 +102,31 @@ export default function Fielding() {
   const innings = inningsFetch.data?.innings ?? []
   const inningsTotal = inningsFetch.data?.total ?? 0
 
+  // --- Keeping (Tier 2) ---
+  const [keepOffset, setKeepOffset] = useState(0)
+  const keepSummaryFetch = useFetch<KeepingSummary | null>(
+    () => playerId && activeTab === 'Keeping'
+      ? getFielderKeepingSummary(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const keepSummary = keepSummaryFetch.data
+
+  const keepSeasonFetch = useFetch<{ by_season: KeepingSeason[] } | null>(
+    () => playerId && activeTab === 'Keeping'
+      ? getFielderKeepingBySeason(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const keepSeasonData = keepSeasonFetch.data?.by_season ?? []
+
+  const keepInningsFetch = useFetch<{ innings: KeepingInnings[]; total: number } | null>(
+    () => playerId && activeTab === 'Keeping'
+      ? getFielderKeepingInnings(playerId, { ...filters, limit: 50, offset: keepOffset })
+      : Promise.resolve(null),
+    [...filterDeps, activeTab, keepOffset],
+  )
+  const keepInnings = keepInningsFetch.data?.innings ?? []
+  const keepInningsTotal = keepInningsFetch.data?.total ?? 0
+
   const KIND_LABELS: Record<string, string> = {
     caught: 'Catches',
     stumped: 'Stumpings',
@@ -122,6 +151,28 @@ export default function Fielding() {
     { key: 'stumpings', label: 'Stumpings', sortable: true },
     { key: 'run_outs', label: 'Run Outs', sortable: true },
     { key: 'total', label: 'Total', sortable: true },
+  ]
+
+  const keepingInningsColumns: Column<KeepingInnings>[] = [
+    { key: 'date', label: 'Date', sortable: true, format: (v: any, r: any) => (
+      <Link to={`/matches/${r.match_id}?highlight_fielder=${encodeURIComponent(playerId || '')}`}
+        className="comp-link" onClick={e => e.stopPropagation()}>{v || '-'}</Link>
+    ) as unknown as string },
+    { key: 'opponent', label: 'Opponent', sortable: true },
+    { key: 'tournament', label: 'Tournament' },
+    { key: 'stumpings', label: 'St', sortable: true },
+    { key: 'catches', label: 'Ct', sortable: true },
+    { key: 'run_outs', label: 'RO', sortable: true },
+    { key: 'byes', label: 'B' },
+    { key: 'total_dismissals', label: 'Total', sortable: true },
+    { key: 'confidence', label: 'Conf', format: (v: any) => (
+      <span style={{
+        fontSize: '0.7rem', fontStyle: 'italic',
+        color: v === 'definitive' ? 'var(--ink)'
+             : v === 'high' ? 'var(--accent)'
+             : 'var(--ink-faint)',
+      }}>{v}</span>
+    ) as unknown as string },
   ]
 
   const inningsColumns: Column<FieldingInnings>[] = [
@@ -167,7 +218,10 @@ export default function Fielding() {
           </div>
 
           <div className="wisden-tabs">
-            {tabs.map(tab => (
+            {(summary.innings_kept > 0
+              ? [...BASE_TABS, KEEPING_TAB] as const
+              : BASE_TABS
+            ).map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`wisden-tab${activeTab === tab ? ' is-active' : ''}`}
               >{tab}</button>
@@ -269,6 +323,65 @@ export default function Fielding() {
                 {!inningsFetch.loading && !inningsFetch.error && (
                   <DataTable columns={inningsColumns} data={innings}
                     pagination={{ total: inningsTotal, limit: 50, offset: inningsOffset, onPage: setInningsOffset }} />
+                )}
+              </>
+            )}
+
+            {activeTab === 'Keeping' && (
+              <>
+                <TabState fetch={keepSummaryFetch as FetchState<unknown>} />
+                {!keepSummaryFetch.loading && !keepSummaryFetch.error && keepSummary && (
+                  <>
+                    <div className="wisden-statrow cols-4">
+                      <StatCard label="Stumpings" value={keepSummary.stumpings} />
+                      <StatCard label="Keep Catches" value={keepSummary.keeping_catches} />
+                      <StatCard label="Byes Conceded" value={keepSummary.byes_conceded}
+                        subtitle={keepSummary.byes_per_innings != null ? `${fmt(keepSummary.byes_per_innings)}/inn` : undefined} />
+                      <StatCard label="Innings Kept" value={keepSummary.innings_kept} />
+                    </div>
+
+                    {/* Confidence breakdown — transparency about how we identified the keeper */}
+                    <p className="wisden-tab-help">
+                      Of {keepSummary.innings_kept} keeping innings:{' '}
+                      <span style={{ color: 'var(--ink)' }}>{keepSummary.innings_kept_by_confidence.definitive} definitive</span>
+                      {' · '}
+                      {keepSummary.innings_kept_by_confidence.high} high
+                      {' · '}
+                      {keepSummary.innings_kept_by_confidence.medium} medium
+                      {' · '}
+                      {keepSummary.innings_kept_by_confidence.low} low confidence
+                      {keepSummary.ambiguous_innings > 0 && (
+                        <>. {keepSummary.ambiguous_innings} additional innings ambiguous.</>
+                      )}
+                      {' '}
+                      <span style={{ opacity: 0.7 }}>
+                        Cricsheet has no keeper designation — identification via stumpings + XI inference.
+                      </span>
+                    </p>
+
+                    <TabState fetch={keepSeasonFetch as FetchState<unknown>} />
+                    {!keepSeasonFetch.loading && !keepSeasonFetch.error && keepSeasonData.length > 0 && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <BarChart data={keepSeasonData} categoryAccessor="season" valueAccessor="total_dismissals"
+                          title="Dismissals by Season (as keeper)" categoryLabel="Season" valueLabel="Dismissals"
+                          height={350} />
+                        <BarChart data={keepSeasonData} categoryAccessor="season" valueAccessor="byes_conceded"
+                          title="Byes Conceded by Season" categoryLabel="Season" valueLabel="Byes"
+                          height={350} colorScheme={[WISDEN.oxblood]} />
+                      </div>
+                    )}
+
+                    <TabState fetch={keepInningsFetch as FetchState<unknown>} />
+                    {!keepInningsFetch.loading && !keepInningsFetch.error && (
+                      <div className="mt-6">
+                        <DataTable
+                          columns={keepingInningsColumns}
+                          data={keepInnings}
+                          pagination={{ total: keepInningsTotal, limit: 50, offset: keepOffset, onPage: setKeepOffset }}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}

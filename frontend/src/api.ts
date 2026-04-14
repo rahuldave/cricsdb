@@ -105,6 +105,16 @@ export const getFielderVictims = (id: string, filters?: F & { limit?: number }) 
 export const getFielderInnings = (id: string, filters?: F & { limit?: number; offset?: number }) =>
   fetchApi<{ innings: import('./types').FieldingInnings[]; total: number }>(`/api/v1/fielders/${id}/by-innings`, filters as Record<string, string>)
 
+// Keeping (Tier 2 fielding)
+export const getFielderKeepingSummary = (id: string, filters?: F) =>
+  fetchApi<import('./types').KeepingSummary>(`/api/v1/fielders/${id}/keeping/summary`, filters as Record<string, string>)
+export const getFielderKeepingBySeason = (id: string, filters?: F) =>
+  fetchApi<{ by_season: import('./types').KeepingSeason[] }>(`/api/v1/fielders/${id}/keeping/by-season`, filters as Record<string, string>)
+export const getFielderKeepingInnings = (id: string, filters?: F & { limit?: number; offset?: number }) =>
+  fetchApi<{ innings: import('./types').KeepingInnings[]; total: number }>(`/api/v1/fielders/${id}/keeping/by-innings`, filters as Record<string, string>)
+export const getFielderKeepingAmbiguous = (id: string, filters?: F & { limit?: number }) =>
+  fetchApi<{ innings: import('./types').KeepingAmbiguousInnings[]; total: number }>(`/api/v1/fielders/${id}/keeping/ambiguous`, filters as Record<string, string>)
+
 // Matches
 export const getMatches = (filters?: F & { team?: string; player_id?: string; limit?: number; offset?: number }) =>
   fetchApi<{ matches: MatchListItem[]; total: number }>('/api/v1/matches', filters as Record<string, string>)

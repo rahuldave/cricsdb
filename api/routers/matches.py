@@ -621,6 +621,60 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
 
     label = f"Super Over ({team})" if is_super else f"{team} Innings"
 
+    # Keeper assignment for this innings (Tier 2). May be None for
+    # super-overs (not populated) or ambiguous innings.
+    keeper_info = None
+    ka_rows = await db.q(
+        """
+        SELECT ka.keeper_id, ka.method, ka.confidence,
+               ka.ambiguous_reason, ka.candidate_ids_json,
+               p.name as keeper_name
+        FROM keeperassignment ka
+        LEFT JOIN person p ON p.id = ka.keeper_id
+        WHERE ka.innings_id = :iid
+        """,
+        {"iid": iid},
+    )
+    if ka_rows:
+        ka = ka_rows[0]
+        if ka["keeper_id"]:
+            keeper_info = {
+                "person_id": ka["keeper_id"],
+                "name": ka["keeper_name"],
+                "method": ka["method"],
+                "confidence": ka["confidence"],
+            }
+        else:
+            # Ambiguous: resolve candidate names in one lookup
+            cands_raw = ka["candidate_ids_json"]
+            cand_ids: list[str] = []
+            if isinstance(cands_raw, list):
+                cand_ids = [str(x) for x in cands_raw]
+            elif isinstance(cands_raw, str):
+                try:
+                    parsed = json.loads(cands_raw)
+                    if isinstance(parsed, list):
+                        cand_ids = [str(x) for x in parsed]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            cand_names: list[str] = []
+            if cand_ids:
+                ids_sql = ",".join(f"'{x}'" for x in cand_ids)
+                name_rows = await db.q(
+                    f"SELECT id, name FROM person WHERE id IN ({ids_sql})"
+                )
+                nm = {r["id"]: r["name"] for r in name_rows}
+                cand_names = [nm.get(cid, cid) for cid in cand_ids]
+            keeper_info = {
+                "person_id": None,
+                "name": None,
+                "method": None,
+                "confidence": None,
+                "ambiguous_reason": ka["ambiguous_reason"],
+                "candidate_ids": cand_ids,
+                "candidate_names": cand_names,
+            }
+
     return {
         "innings_number": inn["innings_number"],
         "team": team,
@@ -636,6 +690,7 @@ async def _build_innings(db, match_id: int, inn: dict) -> dict:
         "fall_of_wickets": fall_of_wickets,
         "bowling": bowling,
         "by_over": by_over,
+        "keeper": keeper_info,
     }
 
 
