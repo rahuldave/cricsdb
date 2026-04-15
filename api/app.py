@@ -111,6 +111,13 @@ app = FastAPI(
     title="CricsDB API",
     description="T20 Cricket Analytics Platform",
     lifespan=lifespan,
+    # Serve the auto-docs under /api so they're reachable via the
+    # Vite dev proxy in local dev (which forwards /api/* to the
+    # backend) and directly by FastAPI in prod. The legacy /docs
+    # path in dev would be swallowed by the Vite SPA fallback.
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 app.add_middleware(

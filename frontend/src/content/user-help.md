@@ -1,8 +1,5 @@
 # Using CricsDB
 
-_First pass — rough. Edit `frontend/src/content/user-help.md` to
-polish. Markdown is picked up on the next build._
-
 ## The shape of the site
 
 Six top-level tabs across the nav:

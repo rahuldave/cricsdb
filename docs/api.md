@@ -1,12 +1,19 @@
 # CricsDB API Reference
 
 > **Also useful:**
-> [Interactive Swagger UI](https://t20.rahuldave.com/docs) (prod) or
-> [`http://localhost:8000/docs`](http://localhost:8000/docs) (local)
+> [Interactive Swagger UI](https://t20.rahuldave.com/api/docs) (prod) or
+> [`http://localhost:5173/api/docs`](http://localhost:5173/api/docs) (local via Vite proxy) /
+> [`http://localhost:8000/api/docs`](http://localhost:8000/api/docs) (local direct)
 > — FastAPI auto-generates this from the route decorators. Every
 > endpoint is clickable with a "Try it out" button. If you want to
 > poke at something live, start there; come back here for narrative
 > + the specific example responses that justify the section text.
+>
+> The docs live under `/api/docs` (not the FastAPI default `/docs`)
+> so the Vite dev-server proxy forwards the request to the backend.
+> In prod both frontend and backend share an origin, so either path
+> would work, but keeping it on `/api/*` matches the rest of the
+> routes and avoids a special case.
 
 Practical one-page reference for every endpoint. Pair this with
 [`../SPEC.md`](../SPEC.md) when you need the underlying SQL or the

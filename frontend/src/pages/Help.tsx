@@ -85,7 +85,7 @@ export default function Help() {
             — filter bar, landing defaults, what each tab means.
           </li>
           <li>
-            <a href="/docs" target="_blank" rel="noopener" className="comp-link">
+            <a href="/api/docs" target="_blank" rel="noopener" className="comp-link">
               Interactive API docs
             </a>{' '}
             — Swagger UI auto-generated from the FastAPI routes. Click
