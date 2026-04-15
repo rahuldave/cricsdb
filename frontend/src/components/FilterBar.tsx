@@ -128,7 +128,6 @@ export default function FilterBar() {
 
   const segBtn = (active: boolean) => `wisden-seg${active ? ' is-active' : ''}`
 
-  const seasonsSet = Boolean(seasonFrom || seasonTo)
   const anyFilterSet = Boolean(gender || teamType || tournament || seasonFrom || seasonTo)
   const latestInScope = seasons.length > 0 && !seasonsError ? seasons[seasons.length - 1] : null
   const clearSeasons = () => setUrlParams({ season_from: '', season_to: '' })
@@ -201,12 +200,10 @@ export default function FilterBar() {
             <option value="">{seasonsError ? '⚠' : 'To'}</option>
             {seasons.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          {seasonsSet && (
-            <button type="button" onClick={clearSeasons} className="wisden-reset"
-              title="Clear season range — show all-time">
-              all-time
-            </button>
-          )}
+          <button type="button" onClick={clearSeasons} className="wisden-reset"
+            title="Clear season range — show all-time">
+            all-time
+          </button>
           {latestInScope && (
             <button type="button" onClick={setLatest} className="wisden-reset"
               title={`Jump to latest season in scope (${latestInScope})`}>

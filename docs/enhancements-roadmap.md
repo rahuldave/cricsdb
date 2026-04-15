@@ -225,10 +225,11 @@ thresholded to 60 balls + 3 wickets), `/api/v1/fielders/leaders`
 volume-based). Batting/Bowling/Fielding landings auto-scope to the
 last 3 seasons via `hooks/useDefaultSeasonWindow.ts` (one-shot per
 mount, writes to URL so FilterBar reflects it). FilterBar gained
-three subtle text buttons — "all-time" clears just the season range,
+three subtle text buttons — "all-time" clears the season range
+(always visible, for consistency as a time reset on every page),
 "latest" pins both ends to the latest season in the current filter
 scope (respects gender/team_type/tournament), and "reset all" clears
-every filter.
+every filter (shown when anything is set).
 Teams landing stays all-time so defunct teams like Pune Supergiants
 remain visible. Players tab on `/teams` gives per-season roster with
 batting average / bowling SR / turnover-vs-previous-season; name

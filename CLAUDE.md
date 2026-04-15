@@ -92,7 +92,7 @@ Every search-bar tab — `/teams`, `/batting`, `/bowling`, `/fielding` — has a
 
 All four are filter-sensitive (gender, team_type, tournament, season_from/to) and all landing-row links carry the current filter scope through to the selected-entity page via `URLSearchParams`.
 
-Batting/Bowling/Fielding landings additionally default `season_from`/`season_to` to the last 3 seasons in scope via `hooks/useDefaultSeasonWindow` — one-shot per mount, writes to URL so FilterBar reflects it. FilterBar has three inline text buttons: `all-time` clears the season range only (shown when any season is set), `latest` pins both ends to the single latest season in the current filter scope (always shown when seasons have loaded — respects gender/team_type/tournament via the FilterBar's scoped seasons fetch), and `reset all` clears every filter (shown when anything is set). Teams landing is NOT auto-defaulted — it stays all-time so defunct teams remain visible.
+Batting/Bowling/Fielding landings additionally default `season_from`/`season_to` to the last 3 seasons in scope via `hooks/useDefaultSeasonWindow` — one-shot per mount, writes to URL so FilterBar reflects it. FilterBar has three inline text buttons: `all-time` clears the season range (always visible, for consistency as a time reset on every page), `latest` pins both ends to the single latest season in the current filter scope (always shown when seasons have loaded — respects gender/team_type/tournament via the FilterBar's scoped seasons fetch), and `reset all` clears every filter (shown when anything is set). Teams landing is NOT auto-defaulted — it stays all-time so defunct teams remain visible.
 
 ## API reference
 
