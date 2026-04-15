@@ -161,18 +161,18 @@ export default function Bowling() {
         <>
           <h2 className="wisden-page-title">{summary.name}</h2>
           <div className="wisden-statrow cols-5">
+            <StatCard label="Matches" value={summary.matches} />
+            <StatCard label="Innings" value={summary.innings} />
             <StatCard label="Wickets" value={summary.wickets} />
             <StatCard label="Average" value={fmt(summary.average)} />
             <StatCard label="Economy" value={fmt(summary.economy)} />
-            <StatCard label="Overs" value={summary.overs} />
-            <StatCard label="Strike Rate" value={fmt(summary.strike_rate)} />
           </div>
           <div className="wisden-statrow cols-5">
-            <StatCard label="B/Four" value={fmt(summary.balls_per_four)} />
-            <StatCard label="B/Six" value={fmt(summary.balls_per_six)} />
-            <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary)} />
-            <StatCard label="Dot %" value={summary.dot_pct != null ? `${summary.dot_pct}%` : '-'} />
+            <StatCard label="Overs" value={summary.overs} />
+            <StatCard label="Strike Rate" value={fmt(summary.strike_rate)} />
             <StatCard label="Best Figures" value={summary.best_figures || '-'} />
+            <StatCard label="Dot %" value={summary.dot_pct != null ? `${summary.dot_pct}%` : '-'} />
+            <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary)} />
           </div>
 
           <div className="wisden-tabs">

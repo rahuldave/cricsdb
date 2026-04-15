@@ -275,10 +275,11 @@ async def bowling_summary(
     )
     wickets = wkt_rows[0]["wickets"] if wkt_rows else 0
 
-    # Innings count
+    # Innings + matches count (distinct match_ids the bowler appeared in)
     innings_rows = await db.q(
         f"""
-        SELECT COUNT(DISTINCT d.innings_id) as innings
+        SELECT COUNT(DISTINCT d.innings_id) as innings,
+               COUNT(DISTINCT i.match_id) as matches
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
@@ -287,6 +288,7 @@ async def bowling_summary(
         all_params,
     )
     innings_count = innings_rows[0]["innings"] if innings_rows else 0
+    matches_count = innings_rows[0]["matches"] if innings_rows else 0
 
     # Best figures (per innings)
     best_rows = await db.q(
@@ -357,6 +359,7 @@ async def bowling_summary(
     return {
         "person_id": person_id,
         "name": name,
+        "matches": matches_count,
         "innings": innings_count,
         "balls": balls,
         "overs": _format_overs(balls),

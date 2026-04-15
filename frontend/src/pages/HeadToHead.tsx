@@ -22,11 +22,15 @@ import type {
 // Curated player matchups for the Player-vs-Player canned suggestions.
 // These are the ones we link from the Home page already, plus a few more.
 // Hardcoded since "popular matchup" isn't a stat we compute.
+// Curated list — bias toward cross-country matchups since those ARE
+// the head-to-heads users usually come looking for (a domestic IPL
+// pair is one click away via PlayerSearch). Mixed-country pairs first.
 const POPULAR_MATCHUPS_MEN: { batter: string; bowler: string; batterName: string; bowlerName: string }[] = [
-  { batter: 'ba607b88', bowler: '462411b3', batterName: 'V Kohli',     bowlerName: 'JJ Bumrah' },
-  { batter: '740742ef', bowler: 'ce820073', batterName: 'RG Sharma',   bowlerName: 'Sandeep Sharma' },
-  { batter: 'ba607b88', bowler: '57ee1fde', batterName: 'V Kohli',     bowlerName: 'YS Chahal' },
-  { batter: 'c4487b84', bowler: '462411b3', batterName: 'AB de Villiers', bowlerName: 'JJ Bumrah' },
+  { batter: 'c4487b84', bowler: '462411b3', batterName: 'AB de Villiers', bowlerName: 'JJ Bumrah' },     // SA v IND
+  { batter: '8a75e999', bowler: '462411b3', batterName: 'Babar Azam',     bowlerName: 'JJ Bumrah' },     // PAK v IND
+  { batter: '99b75528', bowler: '45a7e761', batterName: 'JC Buttler',     bowlerName: 'Shaheen Shah Afridi' }, // ENG v PAK
+  { batter: '740742ef', bowler: 'a818c1be', batterName: 'RG Sharma',      bowlerName: 'TA Boult' },      // IND v NZ
+  { batter: 'ba607b88', bowler: '462411b3', batterName: 'V Kohli',        bowlerName: 'JJ Bumrah' },     // IND (club-only meetings)
 ]
 const POPULAR_MATCHUPS_WOMEN: { batter: string; bowler: string; batterName: string; bowlerName: string }[] = [
   { batter: 'd32cf49a', bowler: '63e3b6b3', batterName: 'HK Matthews', bowlerName: 'M Kapp' },
@@ -124,34 +128,47 @@ function PlayerVsPlayer() {
         </div>
       </div>
 
-      {/* Series-type pill — four mutually-exclusive categories so the
-          three "where do these two meet" questions have separate
-          answers. Composes with FilterBar (gender / team_type /
-          tournament / season). For Kohli + Bumrah (India teammates),
-          bilateral and icc both return 0; club returns their full
-          IPL record. */}
-      {enabled && (
-        <div className="mb-4 flex items-center gap-2 wisden-tab-help flex-wrap">
-          <span>Show:</span>
-          {(['all', 'bilateral', 'icc', 'club'] as const).map(s => (
-            <button
-              key={s}
-              type="button"
-              className="wisden-clear"
-              onClick={() => setSeriesType(s === 'all' ? '' : s)}
-              style={{
-                color: seriesType === s ? 'var(--accent)' : 'var(--ink-faint)',
-                fontWeight: seriesType === s ? 600 : 400,
-              }}
-            >
-              {s === 'all' ? 'All meetings'
-                : s === 'bilateral' ? 'Bilateral T20Is'
-                : s === 'icc' ? 'ICC events'
-                : 'Club tournaments'}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Series-type pill — four mutually-exclusive categories. Options
+          that contradict the current FilterBar team_type are hidden
+          (e.g. Club hidden under team_type=international) since they'd
+          return 0 by definition. If the currently-active option becomes
+          invalid (user switches team_type), reset to 'all'. */}
+      {enabled && (() => {
+        const allowBilateral = filters.team_type !== 'club'
+        const allowIcc = filters.team_type !== 'club'
+        const allowClub = filters.team_type !== 'international'
+        const opts = (['all', 'bilateral', 'icc', 'club'] as const).filter(s =>
+          s === 'all'
+            || (s === 'bilateral' && allowBilateral)
+            || (s === 'icc' && allowIcc)
+            || (s === 'club' && allowClub))
+        // Reset if the active option got hidden by a FilterBar change.
+        if (seriesType && !opts.includes(seriesType as typeof opts[number])) {
+          setSeriesType('')
+        }
+        return (
+          <div className="mb-4 flex items-center gap-2 wisden-tab-help flex-wrap">
+            <span>Show:</span>
+            {opts.map(s => (
+              <button
+                key={s}
+                type="button"
+                className="wisden-clear"
+                onClick={() => setSeriesType(s === 'all' ? '' : s)}
+                style={{
+                  color: seriesType === s ? 'var(--accent)' : 'var(--ink-faint)',
+                  fontWeight: seriesType === s ? 600 : 400,
+                }}
+              >
+                {s === 'all' ? 'All meetings'
+                  : s === 'bilateral' ? 'Bilateral T20Is'
+                  : s === 'icc' ? 'ICC events'
+                  : 'Club tournaments'}
+              </button>
+            ))}
+          </div>
+        )
+      })()}
 
       {!enabled && (
         <>
@@ -217,13 +234,14 @@ function PlayerVsPlayer() {
           </h2>
 
           <div className="wisden-statrow cols-5">
+            <StatCard label="Matches" value={data.summary.matches} />
             <StatCard label="Balls" value={data.summary.balls} />
             <StatCard label="Runs" value={data.summary.runs} />
             <StatCard label="Outs" value={data.summary.dismissals} />
             <StatCard label="Average" value={fmt(data.summary.average)} />
-            <StatCard label="Strike Rate" value={fmt(data.summary.strike_rate)} />
           </div>
-          <div className="wisden-statrow">
+          <div className="wisden-statrow cols-5">
+            <StatCard label="Strike Rate" value={fmt(data.summary.strike_rate)} />
             <StatCard label="Fours" value={data.summary.fours} />
             <StatCard label="Sixes" value={data.summary.sixes} />
             <StatCard label="Dots" value={data.summary.dots} />

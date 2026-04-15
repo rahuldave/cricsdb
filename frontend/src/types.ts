@@ -218,6 +218,7 @@ export interface OpponentsMatrix {
 export interface BattingSummary {
   person_id: string
   name: string
+  matches: number
   innings: number
   runs: number
   balls_faced: number
@@ -347,6 +348,7 @@ export interface InterWicketStats {
 export interface BowlingSummary {
   person_id: string
   name: string
+  matches: number
   innings: number
   balls: number
   overs: string
@@ -421,6 +423,7 @@ export interface WicketAnalysis {
 }
 
 export interface HeadToHeadSummary {
+  matches: number
   balls: number
   runs: number
   dismissals: number

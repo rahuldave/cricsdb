@@ -263,9 +263,12 @@ async def batting_summary(
         if (r["innings_runs"] or 0) == 0 and r["was_dismissed"]
     )
 
+    matches_count = len({r["match_id"] for r in innings_rows})
+
     return {
         "person_id": person_id,
         "name": name,
+        "matches": matches_count,
         "innings": innings_count,
         "runs": runs,
         "balls_faced": balls,

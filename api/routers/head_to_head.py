@@ -33,6 +33,10 @@ async def head_to_head(
     params["batter_id"] = batter_id
     params["bowler_id"] = bowler_id
 
+    # series_type clause must apply to every aggregate (balls, dismissals,
+    # by_over, by_phase, by_season) — missing it on dismissals was why
+    # a Club-only filter used to show 0 balls but 9 dismissals.
+    st = series_type_clause(series_type)
     base_parts = [
         "d.batter_id = :batter_id",
         "d.bowler_id = :bowler_id",
@@ -41,7 +45,6 @@ async def head_to_head(
     ]
     if where:
         base_parts.append(where)
-    st = series_type_clause(series_type)
     if st:
         base_parts.append(st)
     base_clause = " AND ".join(base_parts)
@@ -62,10 +65,13 @@ async def head_to_head(
     batter_name = batter_rows[0]["name"]
     bowler_name = bowler_rows[0]["name"]
 
-    # Summary
+    # Summary — includes matches count (distinct match_ids where the
+    # pair met) so the page can show "N matches, X balls" as the lead
+    # stats before the detailed breakdown.
     summary_rows = await db.q(
         f"""
         SELECT
+            COUNT(DISTINCT i.match_id) as matches,
             COUNT(*) as balls,
             SUM(d.runs_batter) as runs,
             SUM(CASE WHEN d.runs_batter = 4
@@ -80,6 +86,7 @@ async def head_to_head(
         params,
     )
     s = summary_rows[0] if summary_rows else {}
+    matches = s.get("matches") or 0
     balls = s.get("balls") or 0
     runs = s.get("runs") or 0
     fours = s.get("fours") or 0
@@ -87,7 +94,8 @@ async def head_to_head(
     dots = s.get("dots") or 0
     boundaries = fours + sixes
 
-    # Dismissals
+    # Dismissals — apply the same series_type clause as the balls query
+    # so the two counts stay in sync under a Club-only / ICC-only pill.
     dismiss_parts = [
         "d.batter_id = :batter_id",
         "d.bowler_id = :bowler_id",
@@ -96,6 +104,8 @@ async def head_to_head(
     ]
     if where:
         dismiss_parts.append(where)
+    if st:
+        dismiss_parts.append(st)
     dismiss_clause = " AND ".join(dismiss_parts)
 
     dismiss_rows = await db.q(
@@ -114,6 +124,7 @@ async def head_to_head(
     dismissals = sum(dismissal_kinds.values())
 
     summary = {
+        "matches": matches,
         "balls": balls,
         "runs": runs,
         "dismissals": dismissals,
