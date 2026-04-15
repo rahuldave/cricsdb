@@ -7,7 +7,9 @@ lives in `CLAUDE.md`; this file is the long version.
 
 ```
 api/
-  app.py              — FastAPI app, CORS, admin, SPA fallback (registered in lifespan after routers)
+  app.py              — FastAPI app, CORS, admin, SPA fallback (registered in lifespan after routers).
+                         docs_url/redoc_url/openapi_url overridden to /api/docs, /api/redoc, /api/openapi.json
+                         so the Vite dev-server proxy forwards them.
   dependencies.py     — Database init (WAL mode, PLASH_PRODUCTION-aware path)
   filters.py          — FilterParams class (Depends), builds WHERE clauses with :param bind syntax
   routers/
