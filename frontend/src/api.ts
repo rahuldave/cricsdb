@@ -55,6 +55,8 @@ export const getTeamOpponentsMatrix = (team: string, filters?: F & { top_n?: num
   fetchApi<import('./types').OpponentsMatrix>(`/api/v1/teams/${encodeURIComponent(team)}/opponents-matrix`, filters as Record<string, string>)
 export const getTeamByseason = (team: string, filters?: F) =>
   fetchApi<{ seasons: TeamSeasonRecord[] }>(`/api/v1/teams/${encodeURIComponent(team)}/by-season`, filters as Record<string, string>)
+export const getTeamPlayersBySeason = (team: string, filters?: F) =>
+  fetchApi<import('./types').TeamPlayersBySeason>(`/api/v1/teams/${encodeURIComponent(team)}/players-by-season`, filters as Record<string, string>)
 
 // Batting
 export const getBatterSummary = (id: string, filters?: F) =>

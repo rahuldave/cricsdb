@@ -6,7 +6,7 @@ import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import {
   getTeams, getTeamSummary, getTeamByseason, getTeamVs, getTeamResults,
-  getTeamOpponentsMatrix,
+  getTeamOpponentsMatrix, getTeamPlayersBySeason,
   getTeamBattingSummary, getTeamBattingBySeason, getTeamBattingByPhase, getTeamTopBatters,
   getTeamBattingPhaseSeasonHeatmap,
   getTeamBowlingSummary, getTeamBowlingBySeason, getTeamBowlingByPhase, getTeamTopBowlers,
@@ -24,7 +24,7 @@ import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import type {
   TeamInfo, TeamSummary, TeamSeasonRecord, TeamVsOpponent, TeamResult,
-  OpponentRollup, OpponentsMatrix,
+  OpponentRollup, OpponentsMatrix, TeamPlayersBySeason,
   TeamBattingSummary, TeamBattingSeason, TeamBattingPhase, TeamTopBatter,
   BattingPhaseSeasonHeatmap, BowlingPhaseSeasonHeatmap,
   TeamBowlingSummary, TeamBowlingSeason, TeamBowlingPhase, TeamTopBowler,
@@ -40,7 +40,7 @@ import type {
 const tabs = [
   'By Season', 'vs Opponent',
   'Batting', 'Bowling', 'Fielding', 'Partnerships',
-  'Match List',
+  'Players', 'Match List',
 ] as const
 
 export default function Teams() {
@@ -276,6 +276,9 @@ export default function Teams() {
             )}
             {activeTab === 'Partnerships' && selected && (
               <PartnershipsTab team={selected} filters={filters} filterDeps={filterDeps} />
+            )}
+            {activeTab === 'Players' && selected && (
+              <PlayersTab team={selected} filters={filters} filterDeps={filterDeps} />
             )}
           </div>
         </>
@@ -1142,6 +1145,104 @@ function PartnershipsTab({ team, filters, filterDeps }: TabProps) {
           />
         </div>
       )}
+    </div>
+  )
+}
+
+// ============================================================
+// Players tab — all players per season, 3 per row, alphabetical.
+// Each row: name (→ lifetime), bat avg (→ season batting),
+// bowl SR (→ season bowling). Turnover printed beside each season
+// heading from the second listed season onward.
+// ============================================================
+
+function PlayersTab({ team, filters, filterDeps }: TabProps) {
+  const fetch = useFetch<TeamPlayersBySeason | null>(
+    () => getTeamPlayersBySeason(team, filters),
+    filterDeps,
+  )
+  if (fetch.loading && !fetch.data) return <Spinner label="Loading players…" />
+  if (fetch.error) {
+    return <ErrorBanner message={`Could not load players: ${fetch.error}`} onRetry={fetch.refetch} />
+  }
+  const seasons = fetch.data?.seasons ?? []
+  if (seasons.length === 0) {
+    return <div className="wisden-empty">No players found for the current filters.</div>
+  }
+
+  // Carry the current non-season filters through on stat links so
+  // clicking into a player's season respects gender / team_type /
+  // tournament.
+  const carryFilters: Record<string, string> = {}
+  if (filters.gender) carryFilters.gender = filters.gender
+  if (filters.team_type) carryFilters.team_type = filters.team_type
+  if (filters.tournament) carryFilters.tournament = filters.tournament
+
+  const seasonLink = (path: string, personId: string, season: string) => {
+    const qs = new URLSearchParams({
+      player: personId,
+      season_from: season,
+      season_to: season,
+      ...carryFilters,
+    })
+    return `${path}?${qs.toString()}`
+  }
+
+  return (
+    <div>
+      <div className="wisden-tab-help" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>
+        Players who appeared in the XI each season, alphabetical. A player who played in
+        multiple seasons is listed under each.
+        <div style={{ marginTop: '0.4rem', fontSize: '0.85em' }}>
+          Format: <b>Name</b> <span className="num">avg</span> / <span className="num">SR</span> —
+          {' '}<b>Name</b> links to lifetime stats;
+          {' '}<span className="num">avg</span> = batting average that season (→ batting page for that season),
+          {' '}<span className="num">SR</span> = bowling strike rate that season (→ bowling page for that season).
+          <b> NA</b> means didn't bat / never out, or didn't bowl / took no wicket.
+        </div>
+      </div>
+      {seasons.map(bucket => (
+        <div key={bucket.season} style={{ marginBottom: '2rem' }}>
+          <h3 className="wisden-section-title">
+            {bucket.season}{' '}
+            <span style={{ color: 'var(--ink-faint)', fontSize: '0.85em', fontWeight: 'normal' }}>
+              ({bucket.players.length})
+            </span>
+            {bucket.turnover && (
+              <span style={{ color: 'var(--ink-faint)', fontSize: '0.75em', fontWeight: 'normal', marginLeft: '0.75rem' }}>
+                vs {bucket.turnover.prev_season} · +{bucket.turnover.new_count} new · −{bucket.turnover.left_count} left
+              </span>
+            )}
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gap: '0.4rem 1.5rem',
+          }}>
+            {bucket.players.map(p => (
+              <div key={p.person_id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <Link
+                  to={`/batting?player=${encodeURIComponent(p.person_id)}`}
+                  className="comp-link"
+                >{p.name}</Link>
+                <span className="num" style={{ color: 'var(--ink-faint)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
+                  {p.bat_avg != null ? (
+                    <Link to={seasonLink('/batting', p.person_id, bucket.season)} className="comp-link">
+                      {p.bat_avg.toFixed(p.bat_avg % 1 === 0 ? 0 : 1)}
+                    </Link>
+                  ) : 'NA'}
+                  {' / '}
+                  {p.bowl_sr != null ? (
+                    <Link to={seasonLink('/bowling', p.person_id, bucket.season)} className="comp-link">
+                      {p.bowl_sr.toFixed(p.bowl_sr % 1 === 0 ? 0 : 1)}
+                    </Link>
+                  ) : 'NA'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

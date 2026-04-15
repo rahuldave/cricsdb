@@ -18,13 +18,14 @@ function CompLink({ event, children }: { event: string; children: React.ReactNod
 }
 
 function TeamLink({
-  name, gender, season, tournament, teamType, children,
+  name, gender, season, tournament, teamType, tab, children,
 }: {
   name: string
   gender?: 'male' | 'female'
   season?: string
   tournament?: string
   teamType?: 'club' | 'international'
+  tab?: string
   children?: React.ReactNode
 }) {
   const params = new URLSearchParams({ team: name })
@@ -35,6 +36,7 @@ function TeamLink({
     params.set('season_from', season)
     params.set('season_to', season)
   }
+  if (tab) params.set('tab', tab)
   return (
     <Link to={`/teams?${params}`} className="comp-link">
       {children ?? name}
@@ -109,6 +111,12 @@ export default function Home() {
                 tournament="World T20" season="2015/16">
                 West Indies · T20 WC 2016
               </TeamLink>
+              {' ('}
+              <TeamLink name="West Indies" gender="male" teamType="international"
+                tournament="World T20" season="2015/16" tab="Players">
+                players
+              </TeamLink>
+              {')'}
             </div>
           </div>
           <div className="coverage-col">
@@ -158,6 +166,12 @@ export default function Home() {
               RCB —{' '}
               <TeamLink name="Royal Challengers Bengaluru" gender="male">men</TeamLink> ·{' '}
               <TeamLink name="Royal Challengers Bengaluru" gender="female">women</TeamLink>
+            </div>
+            <div>
+              MI men —{' '}
+              <TeamLink name="Mumbai Indians" gender="male" teamType="club" tab="Players">
+                players over the years
+              </TeamLink>
             </div>
             <div>
               Bat —{' '}

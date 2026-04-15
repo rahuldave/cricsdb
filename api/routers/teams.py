@@ -448,6 +448,168 @@ async def team_by_season(
     return {"seasons": seasons}
 
 
+@router.get("/{team}/players-by-season")
+async def team_players_by_season(
+    team: str,
+    filters: FilterParams = Depends(),
+):
+    """Distinct players per season who appeared in the team's XI,
+    with that season's batting average and bowling strike rate, and
+    roster turnover (new / departed) vs the previous listed season.
+
+    Batting stats are scoped to innings where :team was batting;
+    bowling stats to innings where :team was in the field. Filters
+    (gender, team_type, tournament, season range) apply to all four
+    ball-level queries so numbers line up with the /batting and
+    /bowling pages when clicked through.
+
+    Full name resolution: cricsheet's person.name is abbreviated
+    ("V Kohli"). personname holds variants (e.g. "Virat Kohli"). We
+    pick the longest personname entry strictly longer than
+    person.name, else fall back to person.name.
+    """
+    db = get_db()
+
+    # Roster: who was in the XI each season. Match-level filter.
+    roster_filt, roster_params = _team_filter_clause(filters)
+    roster_params["team"] = team
+
+    roster_rows = await db.q(
+        f"""
+        SELECT DISTINCT
+            m.season AS season,
+            p.id AS person_id,
+            p.name AS short_name,
+            (
+                SELECT pn.name FROM personname pn
+                WHERE pn.person_id = p.id
+                  AND LENGTH(pn.name) > LENGTH(p.name)
+                ORDER BY LENGTH(pn.name) DESC
+                LIMIT 1
+            ) AS full_name
+        FROM matchplayer mp
+        JOIN match m ON m.id = mp.match_id
+        JOIN person p ON p.id = mp.person_id
+        WHERE mp.team = :team
+          AND mp.person_id IS NOT NULL
+          AND {roster_filt}
+        """,
+        roster_params,
+    )
+
+    # Batting / bowling stats reuse _team_innings_clause so the same
+    # filter scope as the team batting/bowling tabs applies.
+    bat_where, bat_params = _team_innings_clause(filters, team, side="batting")
+    bowl_where, bowl_params = _team_innings_clause(filters, team, side="fielding")
+
+    bat_runs_rows = await db.q(
+        f"""
+        SELECT m.season AS season, d.batter_id AS person_id,
+               SUM(d.runs_batter) AS runs
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {bat_where} AND d.batter_id IS NOT NULL
+        GROUP BY m.season, d.batter_id
+        """,
+        bat_params,
+    )
+    bat_dism_rows = await db.q(
+        f"""
+        SELECT m.season AS season, w.player_out_id AS person_id,
+               COUNT(*) AS dismissals
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {bat_where}
+          AND w.player_out_id IS NOT NULL
+          AND w.kind NOT IN ('retired hurt', 'retired out')
+        GROUP BY m.season, w.player_out_id
+        """,
+        bat_params,
+    )
+    bowl_balls_rows = await db.q(
+        f"""
+        SELECT m.season AS season, d.bowler_id AS person_id,
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
+                        THEN 1 ELSE 0 END) AS legal_balls
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {bowl_where} AND d.bowler_id IS NOT NULL
+        GROUP BY m.season, d.bowler_id
+        """,
+        bowl_params,
+    )
+    bowl_wkts_rows = await db.q(
+        f"""
+        SELECT m.season AS season, d.bowler_id AS person_id,
+               COUNT(*) AS wickets
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {bowl_where}
+          AND d.bowler_id IS NOT NULL
+          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+        GROUP BY m.season, d.bowler_id
+        """,
+        bowl_params,
+    )
+
+    bat_runs = {(r["season"], r["person_id"]): r["runs"] or 0 for r in bat_runs_rows}
+    bat_dism = {(r["season"], r["person_id"]): r["dismissals"] or 0 for r in bat_dism_rows}
+    bowl_balls = {(r["season"], r["person_id"]): r["legal_balls"] or 0 for r in bowl_balls_rows}
+    bowl_wkts = {(r["season"], r["person_id"]): r["wickets"] or 0 for r in bowl_wkts_rows}
+
+    by_season: dict[str, list[dict]] = {}
+    for r in roster_rows:
+        season = r["season"]
+        if not season:
+            continue
+        pid = r["person_id"]
+        key = (season, pid)
+        runs = bat_runs.get(key, 0)
+        dism = bat_dism.get(key, 0)
+        balls = bowl_balls.get(key, 0)
+        wkts = bowl_wkts.get(key, 0)
+        display = r["full_name"] or r["short_name"]
+        by_season.setdefault(season, []).append({
+            "person_id": pid,
+            "name": display,
+            "bat_avg": round(runs / dism, 2) if dism > 0 else None,
+            "bowl_sr": round(balls / wkts, 2) if wkts > 0 else None,
+        })
+
+    # Descending by season (latest first). Turnover is vs the season
+    # immediately after in the returned list (i.e. the previous season
+    # chronologically) so the response is self-contained.
+    ordered_seasons = sorted(by_season.keys(), reverse=True)
+    season_sets = {s: {p["person_id"] for p in by_season[s]} for s in ordered_seasons}
+
+    seasons = []
+    for idx, season in enumerate(ordered_seasons):
+        players = sorted(by_season[season], key=lambda p: p["name"].lower())
+        prev_season = ordered_seasons[idx + 1] if idx + 1 < len(ordered_seasons) else None
+        turnover = None
+        if prev_season is not None:
+            cur = season_sets[season]
+            prev = season_sets[prev_season]
+            turnover = {
+                "prev_season": prev_season,
+                "new_count": len(cur - prev),
+                "left_count": len(prev - cur),
+            }
+        seasons.append({
+            "season": season,
+            "players": players,
+            "turnover": turnover,
+        })
+
+    return {"seasons": seasons}
+
+
 # ============================================================
 # Team ball-level stats — batting, bowling, fielding, partnerships.
 # See docs/spec-team-stats.md.

@@ -85,6 +85,29 @@ export interface TeamSeasonRecord {
   win_pct: number | null
 }
 
+export interface TeamPlayer {
+  person_id: string
+  name: string
+  bat_avg: number | null
+  bowl_sr: number | null
+}
+
+export interface TeamSeasonTurnover {
+  prev_season: string
+  new_count: number
+  left_count: number
+}
+
+export interface TeamPlayersSeasonBucket {
+  season: string
+  players: TeamPlayer[]
+  turnover: TeamSeasonTurnover | null
+}
+
+export interface TeamPlayersBySeason {
+  seasons: TeamPlayersSeasonBucket[]
+}
+
 export interface TeamVsOpponent {
   team: string
   opponent: string
