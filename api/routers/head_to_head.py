@@ -8,6 +8,7 @@ from typing import Optional
 from ..dependencies import get_db
 from ..filters import FilterParams
 from ..tournament_canonical import series_type_clause
+from ..player_nationality import player_nationalities
 
 router = APIRouter(prefix="/api/v1/head-to-head", tags=["Head to Head"])
 
@@ -313,9 +314,18 @@ async def head_to_head(
             "how_out": match_dismiss_map.get(mid),
         })
 
+    batter_nats = await player_nationalities(db, batter_id)
+    bowler_nats = await player_nationalities(db, bowler_id)
+
     return {
-        "batter": {"id": batter_id, "name": batter_name},
-        "bowler": {"id": bowler_id, "name": bowler_name},
+        "batter": {
+            "id": batter_id, "name": batter_name,
+            "nationalities": batter_nats,
+        },
+        "bowler": {
+            "id": bowler_id, "name": bowler_name,
+            "nationalities": bowler_nats,
+        },
         "summary": summary,
         "dismissal_kinds": dismissal_kinds,
         "by_over": by_over,

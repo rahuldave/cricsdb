@@ -7,6 +7,7 @@ from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams
+from ..player_nationality import player_nationalities
 
 router = APIRouter(prefix="/api/v1/fielders", tags=["Fielding"])
 
@@ -233,9 +234,12 @@ async def fielding_summary(
     )
     innings_kept = keeping_rows[0]["c"] if keeping_rows else 0
 
+    nationalities = await player_nationalities(db, person_id)
+
     return {
         "person_id": person_id,
         "name": name,
+        "nationalities": nationalities,
         "matches": matches,
         "catches": catches,
         "stumpings": stumpings,

@@ -7,6 +7,7 @@ from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams
+from ..player_nationality import player_nationalities
 
 router = APIRouter(prefix="/api/v1/bowlers", tags=["Bowling"])
 
@@ -356,9 +357,12 @@ async def bowling_summary(
     dots = lc.get("dots") or 0
     boundaries = fours + sixes
 
+    nationalities = await player_nationalities(db, person_id)
+
     return {
         "person_id": person_id,
         "name": name,
+        "nationalities": nationalities,
         "matches": matches_count,
         "innings": innings_count,
         "balls": balls,

@@ -215,9 +215,15 @@ export interface OpponentsMatrix {
   cells: OpponentMatrixCell[]
 }
 
+export interface NationalityEntry {
+  team: string
+  matches: number
+}
+
 export interface BattingSummary {
   person_id: string
   name: string
+  nationalities: NationalityEntry[]
   matches: number
   innings: number
   runs: number
@@ -348,6 +354,7 @@ export interface InterWicketStats {
 export interface BowlingSummary {
   person_id: string
   name: string
+  nationalities: NationalityEntry[]
   matches: number
   innings: number
   balls: number
@@ -450,8 +457,8 @@ export interface HeadToHeadMatch {
 }
 
 export interface HeadToHeadResponse {
-  batter: { id: string; name: string }
-  bowler: { id: string; name: string }
+  batter: { id: string; name: string; nationalities?: NationalityEntry[] }
+  bowler: { id: string; name: string; nationalities?: NationalityEntry[] }
   summary: HeadToHeadSummary
   dismissal_kinds: Record<string, number>
   by_over: { over_number: number; balls: number; runs: number; wickets: number }[]
@@ -464,6 +471,7 @@ export interface HeadToHeadResponse {
 export interface FieldingSummary {
   person_id: string
   name: string
+  nationalities: NationalityEntry[]
   matches: number
   catches: number
   stumpings: number

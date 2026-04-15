@@ -16,6 +16,7 @@ import {
   getTeamPartnershipsByWicket, getTeamPartnershipsBestPairs, getTeamPartnershipsHeatmap, getTeamPartnershipsTop,
 } from '../api'
 import StatCard from '../components/StatCard'
+import FlagBadge from '../components/FlagBadge'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
 import LineChart from '../components/charts/LineChart'
@@ -164,7 +165,14 @@ export default function Teams() {
               Refreshing…
             </div>
           )}
-          <h2 className="wisden-page-title">{selected}</h2>
+          <h2 className="wisden-page-title">
+            {selected}
+            {/* FlagBadge returns null for franchise sides (they're not
+                in TEAM_TO_FLAG) — no need to branch on team_type. */}
+            <span style={{ marginLeft: '0.6rem', verticalAlign: 'middle' }}>
+              <FlagBadge team={selected} size="lg" />
+            </span>
+          </h2>
           {summary.gender_breakdown && (
             <div className="wisden-gender-notice">
               Showing combined men's &amp; women's. —{' '}

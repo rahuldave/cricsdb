@@ -5,6 +5,7 @@ import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import PlayerSearch from '../components/PlayerSearch'
 import TeamSearch from '../components/TeamSearch'
+import FlagBadge from '../components/FlagBadge'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
@@ -239,10 +240,20 @@ function PlayerVsPlayer() {
             <Link to={`/batting?player=${encodeURIComponent(batterId)}`} className="comp-link" style={{ fontSize: 'inherit', fontWeight: 'inherit' }}>
               {data.batter.name}
             </Link>
+            {data.batter.nationalities?.[0] && (
+              <span style={{ marginLeft: '0.35rem', verticalAlign: 'middle' }}>
+                <FlagBadge team={data.batter.nationalities[0].team} size="sm" />
+              </span>
+            )}
             {' '}<span style={{ fontStyle: 'italic', color: 'var(--accent)', fontWeight: 400 }}>v</span>{' '}
             <Link to={`/bowling?player=${encodeURIComponent(bowlerId)}`} className="comp-link" style={{ fontSize: 'inherit', fontWeight: 'inherit' }}>
               {data.bowler.name}
             </Link>
+            {data.bowler.nationalities?.[0] && (
+              <span style={{ marginLeft: '0.35rem', verticalAlign: 'middle' }}>
+                <FlagBadge team={data.bowler.nationalities[0].team} size="sm" />
+              </span>
+            )}
           </h2>
 
           <div className="wisden-statrow cols-5">

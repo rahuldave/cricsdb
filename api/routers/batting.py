@@ -7,6 +7,7 @@ from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams
+from ..player_nationality import player_nationalities
 
 router = APIRouter(prefix="/api/v1/batters", tags=["Batting"])
 
@@ -264,10 +265,12 @@ async def batting_summary(
     )
 
     matches_count = len({r["match_id"] for r in innings_rows})
+    nationalities = await player_nationalities(db, person_id)
 
     return {
         "person_id": person_id,
         "name": name,
+        "nationalities": nationalities,
         "matches": matches_count,
         "innings": innings_count,
         "runs": runs,

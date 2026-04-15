@@ -6,6 +6,7 @@ import { useFetch, type FetchState } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useDefaultSeasonWindow } from '../hooks/useDefaultSeasonWindow'
 import PlayerSearch from '../components/PlayerSearch'
+import FlagBadge from '../components/FlagBadge'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
@@ -159,7 +160,16 @@ export default function Bowling() {
 
       {playerId && summary && !summaryFetch.loading && (
         <>
-          <h2 className="wisden-page-title">{summary.name}</h2>
+          <h2 className="wisden-page-title">
+            {summary.name}
+            {summary.nationalities?.length > 0 && (
+              <span style={{ marginLeft: '0.6rem', display: 'inline-flex', gap: '0.35rem', verticalAlign: 'middle' }}>
+                {summary.nationalities.map(n => (
+                  <FlagBadge key={n.team} team={n.team} size="lg" />
+                ))}
+              </span>
+            )}
+          </h2>
           <div className="wisden-statrow cols-5">
             <StatCard label="Matches" value={summary.matches} />
             <StatCard label="Innings" value={summary.innings} />
