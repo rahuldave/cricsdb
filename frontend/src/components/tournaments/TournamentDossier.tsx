@@ -228,33 +228,51 @@ export default function TournamentDossier({
         )}
       </div>
 
-      {/* Series-type pill — four mutually-exclusive categories.
-          Composes with FilterBar (gender / team_type / tournament /
-          season range) — those filters apply on top of this scope.
-          Setting team_type=club + series_type=bilateral is contradictory
-          and yields 0 — that's correct. */}
-      {isRivalryMode && !isSingleTournament && (
-        <div className="mt-3 flex items-center gap-2 wisden-tab-help flex-wrap">
-          <span>Show:</span>
-          {(['all', 'bilateral', 'icc', 'club'] as const).map(s => (
-            <button
-              key={s}
-              type="button"
-              className={`wisden-clear${seriesType === s ? ' is-active' : ''}`}
-              onClick={() => setSeriesType(s === 'all' ? '' : s)}
-              style={{
-                color: seriesType === s ? 'var(--accent)' : 'var(--ink-faint)',
-                fontWeight: seriesType === s ? 600 : 400,
-              }}
-            >
-              {s === 'all' ? 'All meetings'
-                : s === 'bilateral' ? 'Bilateral T20Is'
-                : s === 'icc' ? 'ICC events'
-                : 'Club tournaments'}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Series-type pill — hidden/relabeled based on FilterBar team_type
+          so "All meetings" never misrepresents the scope. See the same
+          logic in HeadToHead.tsx. */}
+      {isRivalryMode && !isSingleTournament && (() => {
+        const isClub = filters.team_type === 'club'
+        const isIntl = filters.team_type === 'international'
+        const opts = (['all', 'bilateral', 'icc', 'club'] as const).filter(s =>
+          s === 'all'
+            || (s === 'bilateral' && !isClub)
+            || (s === 'icc' && !isClub)
+            || (s === 'club' && !isIntl))
+        if (seriesType && !opts.includes(seriesType as typeof opts[number])) {
+          setSeriesType('')
+        }
+        if (isClub) {
+          return (
+            <div className="mt-3 wisden-tab-help">
+              Showing: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Club tournaments</span>
+            </div>
+          )
+        }
+        const allLabel = isIntl ? 'All international' : 'All meetings'
+        return (
+          <div className="mt-3 flex items-center gap-2 wisden-tab-help flex-wrap">
+            <span>Show:</span>
+            {opts.map(s => (
+              <button
+                key={s}
+                type="button"
+                className={`wisden-clear${seriesType === s ? ' is-active' : ''}`}
+                onClick={() => setSeriesType(s === 'all' ? '' : s)}
+                style={{
+                  color: seriesType === s ? 'var(--accent)' : 'var(--ink-faint)',
+                  fontWeight: seriesType === s ? 600 : 400,
+                }}
+              >
+                {s === 'all' ? allLabel
+                  : s === 'bilateral' ? 'Bilateral T20Is'
+                  : s === 'icc' ? 'ICC events'
+                  : 'Club tournaments'}
+              </button>
+            ))}
+          </div>
+        )
+      })()}
 
       <div className="wisden-tabs mt-4">
         {tabs.map(tab => (

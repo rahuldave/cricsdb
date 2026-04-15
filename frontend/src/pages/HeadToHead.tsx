@@ -128,24 +128,36 @@ function PlayerVsPlayer() {
         </div>
       </div>
 
-      {/* Series-type pill — four mutually-exclusive categories. Options
-          that contradict the current FilterBar team_type are hidden
-          (e.g. Club hidden under team_type=international) since they'd
-          return 0 by definition. If the currently-active option becomes
-          invalid (user switches team_type), reset to 'all'. */}
+      {/* Series-type pill — four mutually-exclusive categories. The pill
+          only renders options that produce DIFFERENT results:
+          - Type=Club: all four options return identical rows, so render
+            a small "Showing: Club tournaments" caption instead.
+          - Type=International: Club option hidden; "All meetings" label
+            becomes "All international" since that's the truthful scope.
+          - No Type filter: all four options shown.
+          If the active option becomes invalid after a FilterBar change,
+          auto-reset to 'all' so the user never sees a stale highlight. */}
       {enabled && (() => {
-        const allowBilateral = filters.team_type !== 'club'
-        const allowIcc = filters.team_type !== 'club'
-        const allowClub = filters.team_type !== 'international'
+        const isClub = filters.team_type === 'club'
+        const isIntl = filters.team_type === 'international'
         const opts = (['all', 'bilateral', 'icc', 'club'] as const).filter(s =>
           s === 'all'
-            || (s === 'bilateral' && allowBilateral)
-            || (s === 'icc' && allowIcc)
-            || (s === 'club' && allowClub))
-        // Reset if the active option got hidden by a FilterBar change.
+            || (s === 'bilateral' && !isClub)
+            || (s === 'icc' && !isClub)
+            || (s === 'club' && !isIntl))
         if (seriesType && !opts.includes(seriesType as typeof opts[number])) {
           setSeriesType('')
         }
+        if (isClub) {
+          // Pill collapses to a read-only caption — every option would
+          // narrow to the same rows the FilterBar is already showing.
+          return (
+            <div className="mb-4 wisden-tab-help">
+              Showing: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Club tournaments</span>
+            </div>
+          )
+        }
+        const allLabel = isIntl ? 'All international' : 'All meetings'
         return (
           <div className="mb-4 flex items-center gap-2 wisden-tab-help flex-wrap">
             <span>Show:</span>
@@ -160,7 +172,7 @@ function PlayerVsPlayer() {
                   fontWeight: seriesType === s ? 600 : 400,
                 }}
               >
-                {s === 'all' ? 'All meetings'
+                {s === 'all' ? allLabel
                   : s === 'bilateral' ? 'Bilateral T20Is'
                   : s === 'icc' ? 'ICC events'
                   : 'Club tournaments'}

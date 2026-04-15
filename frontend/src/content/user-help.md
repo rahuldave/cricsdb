@@ -52,9 +52,14 @@ Seven top-level tabs across the nav:
 
   The Show pill composes with the FilterBar filters at the top of
   every page — gender / type / tournament / season range all apply
-  on top. Some combinations contradict (e.g. `Type=International` +
-  `Show=Club` yields 0 matches) and that's the honest answer; clear
-  the conflicting filter to broaden.
+  on top. To keep "All" honest, the pill adapts:
+  - With no Type filter: all four options shown; "All meetings"
+    means genuinely every meeting.
+  - With `Type = International`: Club option is hidden and the "All"
+    button reads "All international" (bilateral + ICC combined).
+  - With `Type = Club`: the pill collapses to a small
+    "Showing: Club tournaments" caption — every option would select
+    the same rows, so there's nothing to pick.
 - **Matches** — searchable list of every match. Click any row for
   the full scorecard, ball-by-ball innings grid, worm chart, and
   per-batter / per-bowler matchup grid.
