@@ -127,7 +127,7 @@ Read `docs/design-decisions.md` for full details. Key points:
 
 Full A–O roadmap lives in **`docs/enhancements-roadmap.md`** with done-items as historical markers.
 
-**Next up: M — Tournament analytics page.** Two route levels (listing → per-tournament), season as FilterBar param not path (matches Teams). Spec needs writing; partial design in `docs/spec-team-stats.md` "Implication for tournaments".
+**Next up: M — Tournament analytics page.** Two route levels (listing → per-tournament), season as FilterBar param not path (matches Teams). Spec needs writing; partial design in `docs/spec-team-stats.md` "Implication for tournaments". Design questions + placement debate for the adjacent "team-to-team rollup" work captured in **`docs/next-session-ideas.md`** — open question there is whether `/head-to-head` should go polymorphic (player-v-player + team-v-team) or stay player-only.
 
 **After M: O — Tournament-baseline comparison overlays** on team / batter / bowler / fielder pages. Depends on M's per-tournament-per-season aggregates. Design sketched in `docs/design-decisions.md` "Team metrics need tournament baselines (revisit when /tournaments ships)".
 
