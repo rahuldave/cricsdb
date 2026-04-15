@@ -813,10 +813,34 @@ async def tournament_summary(
 
     # ── Per-team breakdowns when a team pair is in scope ──
     by_team = None
+    head_to_head = None
     if filters.team and filters.opponent:
         by_team = await _summary_by_team(
             db, where, params, [filters.team, filters.opponent],
         )
+        # Wins/losses/ties/NR — the basic "who won how much" stats that
+        # were missing on the Team-vs-Team dossier.
+        h2h_rows = await db.q(
+            f"""
+            SELECT
+              SUM(CASE WHEN m.outcome_winner = :h2h_a THEN 1 ELSE 0 END) AS a_wins,
+              SUM(CASE WHEN m.outcome_winner = :h2h_b THEN 1 ELSE 0 END) AS b_wins,
+              SUM(CASE WHEN m.outcome_result = 'tie' THEN 1 ELSE 0 END) AS ties,
+              SUM(CASE WHEN m.outcome_result = 'no result' THEN 1 ELSE 0 END) AS no_result
+            FROM match m
+            WHERE {where}
+            """,
+            {**params, "h2h_a": filters.team, "h2h_b": filters.opponent},
+        )
+        if h2h_rows:
+            r = h2h_rows[0]
+            head_to_head = {
+                "team1": filters.team, "team2": filters.opponent,
+                "team1_wins": r["a_wins"] or 0,
+                "team2_wins": r["b_wins"] or 0,
+                "ties": r["ties"] or 0,
+                "no_result": r["no_result"] or 0,
+            }
 
     return {
         "canonical": tournament,
@@ -841,6 +865,7 @@ async def tournament_summary(
         "groups": groups_out,
         "knockouts": knockouts,
         "by_team": by_team,
+        "head_to_head": head_to_head,
     }
 
 

@@ -186,10 +186,21 @@ export default function TournamentDossier({
   const summary = summaryFetch.data
 
   // Title composition — rivalry comes first (subject), tournament after (modifier).
+  // Show gender suffix for rivalry views since the dossier itself can't
+  // tell male v female apart from the team strings (cricsheet uses the
+  // same "India" / "Australia" labels for both).
+  const genderSuffix = isRivalryMode && filters.gender
+    ? (filters.gender === 'female' ? " women's" : " men's")
+    : ''
   const headlineTitle = isRivalryMode
     ? (
         <>
           {filterTeam} <span className="wisden-h2h-vs">v</span> {filterOpponent}
+          {genderSuffix && (
+            <span className="wisden-tile-faint" style={{ fontSize: '0.7em' }}>
+              {genderSuffix}
+            </span>
+          )}
           {tournament && (
             <span className="wisden-tile-faint">
               {' · '}{tournament}
@@ -360,10 +371,35 @@ function OverviewTab({
   const isRivalry = !!summary.by_team
   const teamNames = isRivalry && summary.by_team ? Object.keys(summary.by_team) : []
 
+  const h2h = summary.head_to_head
   return (
     <div>
+      {/* Rivalry-mode head-to-head stats up top — the basic
+          "who won how much" answer that wasn't surfaced before. */}
+      {h2h && (
+        <div className="wisden-statrow cols-5 mt-4">
+          <StatCard label="Matches" value={summary.matches.toLocaleString()} />
+          <StatCard
+            label={h2h.team1}
+            value={h2h.team1_wins}
+            subtitle={summary.matches > 0
+              ? `${((h2h.team1_wins * 100) / summary.matches).toFixed(0)}%`
+              : undefined}
+          />
+          <StatCard
+            label={h2h.team2}
+            value={h2h.team2_wins}
+            subtitle={summary.matches > 0
+              ? `${((h2h.team2_wins * 100) / summary.matches).toFixed(0)}%`
+              : undefined}
+          />
+          <StatCard label="Ties" value={h2h.ties} />
+          <StatCard label="No result" value={h2h.no_result} />
+        </div>
+      )}
+
       <div className="wisden-statrow cols-5 mt-4">
-        <StatCard label="Matches" value={summary.matches.toLocaleString()} />
+        {!h2h && <StatCard label="Matches" value={summary.matches.toLocaleString()} />}
         <StatCard label="Run rate" value={fmt(summary.run_rate, 2)} subtitle="per over" />
         <StatCard label="Boundary %" value={fmt(summary.boundary_pct, 1)} />
         <StatCard label="Dot %" value={fmt(summary.dot_pct, 1)} />

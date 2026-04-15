@@ -281,6 +281,7 @@ function TeamVsTeamPicker({
                       >
                         <div className="wisden-tile-title">
                           {r.team1} <span className="wisden-tile-vs">v</span> {r.team2}
+                          <span className="wisden-tile-faint" style={{ fontSize: '0.78em' }}> men's</span>
                         </div>
                         <div className="wisden-tile-sub">
                           {r.matches} bilateral · {r.team1_wins}–{r.team2_wins}
@@ -299,6 +300,7 @@ function TeamVsTeamPicker({
                       >
                         <div className="wisden-tile-title">
                           {r.team1} <span className="wisden-tile-vs">v</span> {r.team2}
+                          <span className="wisden-tile-faint" style={{ fontSize: '0.78em' }}> women's</span>
                         </div>
                         <div className="wisden-tile-sub">
                           {r.matches} bilateral · {r.team1_wins}–{r.team2_wins}

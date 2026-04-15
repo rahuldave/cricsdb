@@ -72,10 +72,12 @@ function RivalryTile({
   if (!p.has('gender')) p.set('gender', gender)
   if (!p.has('team_type')) p.set('team_type', 'international')
   const qs = `?${p.toString()}`
+  const genderLabel = gender === 'female' ? "women's" : "men's"
   return (
     <Link to={`/tournaments${qs}`} className="wisden-tile">
       <div className="wisden-tile-title">
         {entry.team1} <span className="wisden-tile-vs">v</span> {entry.team2}
+        <span className="wisden-tile-faint" style={{ fontSize: '0.78em' }}> {genderLabel}</span>
       </div>
       <div className="wisden-tile-sub">
         {entry.matches} {entry.matches === 1 ? 'match' : 'matches'}

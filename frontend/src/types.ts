@@ -1104,6 +1104,14 @@ export interface TournamentSummary {
     date: string | null
   }[]
   by_team: Record<string, TournamentSummaryByTeam> | null
+  head_to_head: {
+    team1: string
+    team2: string
+    team1_wins: number
+    team2_wins: number
+    ties: number
+    no_result: number
+  } | null
 }
 
 export interface TournamentSeason {
