@@ -5,6 +5,12 @@ from __future__ import annotations
 from fastapi import Query
 from typing import Optional
 
+from .tournament_canonical import (
+    is_canonical_with_variants,
+    variants as canonical_variants,
+    event_name_in_clause,
+)
+
 
 class FilterParams:
     """Extracts global + contextual filter query params via FastAPI Depends()."""
@@ -61,8 +67,20 @@ class FilterParams:
             params["team_type"] = self.team_type
 
         if self.tournament:
-            clauses.append(f"{table_alias}.event_name = :tournament")
-            params["tournament"] = self.tournament
+            # Canonical tournaments (e.g. "T20 World Cup (Men)") expand
+            # to `event_name IN (variants)` — see api/tournament_canonical.py.
+            # Single-variant / non-canonical names stay as equality.
+            if is_canonical_with_variants(self.tournament):
+                clauses.append(
+                    event_name_in_clause(
+                        canonical_variants(self.tournament),
+                        col=f"{table_alias}.event_name",
+                    )
+                )
+                # No bind param — IN list interpolated via f-string.
+            else:
+                clauses.append(f"{table_alias}.event_name = :tournament")
+                params["tournament"] = self.tournament
 
         if self.season_from:
             clauses.append(f"{table_alias}.season >= :season_from")

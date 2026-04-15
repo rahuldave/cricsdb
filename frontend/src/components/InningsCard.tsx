@@ -82,7 +82,12 @@ export default function InningsCard({ innings, linkParams = '', highlightBatterI
         </thead>
         <tbody>
           {innings.batting.map(b => {
-            const isHL = !!(highlightBatterId && b.person_id === highlightBatterId)
+            // highlight_batter may be comma-separated (e.g. both batters
+            // of a partnership) — treat it as an id set.
+            const batterHlSet = highlightBatterId
+              ? highlightBatterId.split(',').map(s => s.trim()).filter(Boolean)
+              : []
+            const isHL = !!(batterHlSet.length && b.person_id && batterHlSet.includes(b.person_id))
               || !!(highlightFielderId && b.dismissal_fielder_ids?.includes(highlightFielderId))
             return (
               <tr key={`${b.person_id}-${b.name}`}

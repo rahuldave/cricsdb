@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
-import { useUrlParam } from '../hooks/useUrlState'
+import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import PlayerSearch from '../components/PlayerSearch'
+import TeamSearch from '../components/TeamSearch'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
@@ -11,12 +12,49 @@ import DonutChart from '../components/charts/DonutChart'
 import { WISDEN_PHASES } from '../components/charts/palette'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
-import { getHeadToHead } from '../api'
-import type { PlayerSearchResult, HeadToHeadResponse, HeadToHeadMatch } from '../types'
+import TournamentDossier from '../components/tournaments/TournamentDossier'
+import { getHeadToHead, getTournamentsLanding } from '../api'
+import type {
+  PlayerSearchResult, HeadToHeadResponse, HeadToHeadMatch,
+  TournamentsLanding, RivalryEntry,
+} from '../types'
 
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
+type Mode = 'player' | 'team'
+
 export default function HeadToHead() {
+  const [mode] = useUrlParam('mode', 'player') as [Mode, (v: Mode) => void]
+  const setUrlParams = useSetUrlParams()
+  // Default mode: if team1+team2 present without explicit mode, pick team
+  const [team1Url] = useUrlParam('team1')
+  const [team2Url] = useUrlParam('team2')
+  const effectiveMode: Mode = (mode === 'team' || (team1Url && team2Url)) ? 'team' : 'player'
+
+  return (
+    <div className="max-w-6xl mx-auto">
+      {/* Mode picker */}
+      <div className="wisden-tabs mb-6">
+        <button
+          type="button"
+          className={`wisden-tab${effectiveMode === 'player' ? ' is-active' : ''}`}
+          onClick={() => setUrlParams({ mode: 'player', team1: '', team2: '' })}
+        >Player vs Player</button>
+        <button
+          type="button"
+          className={`wisden-tab${effectiveMode === 'team' ? ' is-active' : ''}`}
+          onClick={() => setUrlParams({ mode: 'team', batter: '', bowler: '' })}
+        >Team vs Team</button>
+      </div>
+
+      {effectiveMode === 'player' ? <PlayerVsPlayer /> : <TeamVsTeam />}
+    </div>
+  )
+}
+
+// ─── Player vs Player (existing flow) ────────────────────────────────
+
+function PlayerVsPlayer() {
   const filters = useFilters()
   const [batterId, setBatterId] = useUrlParam('batter')
   const [bowlerId, setBowlerId] = useUrlParam('bowler')
@@ -25,7 +63,6 @@ export default function HeadToHead() {
   const handleBowler = (p: PlayerSearchResult) => setBowlerId(p.id)
 
   const enabled = !!(batterId && bowlerId)
-  // Title set after fetch resolves; on first paint with no selection, show generic.
   const { data, loading, error, refetch } = useFetch<HeadToHeadResponse | null>(
     () => enabled
       ? getHeadToHead(batterId, bowlerId, filters)
@@ -54,7 +91,7 @@ export default function HeadToHead() {
   ]
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <>
       <div className="flex gap-6 items-start mb-8">
         <div className="flex-1">
           <label className="wisden-h2h-label">Batter</label>
@@ -74,10 +111,7 @@ export default function HeadToHead() {
       {enabled && loading && <Spinner label="Loading head-to-head…" size="lg" />}
 
       {enabled && error && (
-        <ErrorBanner
-          message={`Could not load head-to-head: ${error}`}
-          onRetry={refetch}
-        />
+        <ErrorBanner message={`Could not load head-to-head: ${error}`} onRetry={refetch} />
       )}
 
       {enabled && data && !loading && !error && (
@@ -150,6 +184,134 @@ export default function HeadToHead() {
           </div>
         </>
       )}
-    </div>
+    </>
+  )
+}
+
+// ─── Team vs Team (new) ──────────────────────────────────────────────
+
+function TeamVsTeam() {
+  const [team1, setTeam1] = useUrlParam('team1')
+  const [team2, setTeam2] = useUrlParam('team2')
+  const enabled = !!(team1 && team2)
+
+  return (
+    <TeamVsTeamPicker
+      team1={team1} team2={team2}
+      onChangeTeam1={setTeam1}
+      onChangeTeam2={setTeam2}
+      showSuggestions={!enabled}
+    />
+  )
+}
+
+function TeamVsTeamPicker({
+  team1, team2, onChangeTeam1, onChangeTeam2, showSuggestions,
+}: {
+  team1: string
+  team2: string
+  onChangeTeam1: (v: string) => void
+  onChangeTeam2: (v: string) => void
+  showSuggestions?: boolean
+}) {
+  const setUrlParams = useSetUrlParams()
+  const enabled = !!(team1 && team2)
+
+  // Common matchups grid — fetched only when picker is shown.
+  const suggestionsFetch = useFetch<TournamentsLanding | null>(
+    () => showSuggestions ? getTournamentsLanding({}) : Promise.resolve(null),
+    [showSuggestions],
+  )
+
+  const pickPair = (a: string, b: string, gender?: string) => {
+    const updates: Record<string, string> = { team1: a, team2: b, mode: 'team' }
+    if (gender) updates.gender = gender
+    if (!updates.team_type) updates.team_type = 'international'
+    setUrlParams(updates)
+  }
+
+  return (
+    <>
+      <div className="flex gap-6 items-start mb-8">
+        <div className="flex-1">
+          <label className="wisden-h2h-label">Team 1</label>
+          <TeamSearch
+            initialValue={team1}
+            placeholder="Search team…"
+            onSelect={onChangeTeam1}
+          />
+        </div>
+        <span className="wisden-h2h-vs">v</span>
+        <div className="flex-1">
+          <label className="wisden-h2h-label">Team 2</label>
+          <TeamSearch
+            initialValue={team2}
+            placeholder="Search team…"
+            onSelect={onChangeTeam2}
+          />
+        </div>
+      </div>
+
+      {enabled ? (
+        <TournamentDossier
+          tournament={null}
+          filterTeam={team1}
+          filterOpponent={team2}
+        />
+      ) : (
+        <>
+          <div className="wisden-empty">
+            Select two teams to see all their meetings — bilateral series and tournament matches combined.
+          </div>
+
+          {showSuggestions && (
+            <div className="mt-8">
+              <h3 className="wisden-section-title">Or browse a common matchup</h3>
+              {suggestionsFetch.loading && <Spinner label="Loading suggestions…" />}
+              {suggestionsFetch.data && (
+                <>
+                  <div className="wisden-tab-help mb-2">Men's</div>
+                  <div className="wisden-tile-grid">
+                    {suggestionsFetch.data.international.bilateral_rivalries.men.top.slice(0, 12).map((r: RivalryEntry) => (
+                      <button
+                        key={`m-${r.team1}|${r.team2}`}
+                        type="button"
+                        className="wisden-tile"
+                        onClick={() => pickPair(r.team1, r.team2, 'male')}
+                      >
+                        <div className="wisden-tile-title">
+                          {r.team1} <span className="wisden-tile-vs">v</span> {r.team2}
+                        </div>
+                        <div className="wisden-tile-sub">
+                          {r.matches} bilateral · {r.team1_wins}–{r.team2_wins}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="wisden-tab-help mt-6 mb-2">Women's</div>
+                  <div className="wisden-tile-grid">
+                    {suggestionsFetch.data.international.bilateral_rivalries.women.top.slice(0, 12).map((r: RivalryEntry) => (
+                      <button
+                        key={`w-${r.team1}|${r.team2}`}
+                        type="button"
+                        className="wisden-tile"
+                        onClick={() => pickPair(r.team1, r.team2, 'female')}
+                      >
+                        <div className="wisden-tile-title">
+                          {r.team1} <span className="wisden-tile-vs">v</span> {r.team2}
+                        </div>
+                        <div className="wisden-tile-sub">
+                          {r.matches} bilateral · {r.team1_wins}–{r.team2_wins}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </>
   )
 }

@@ -625,6 +625,11 @@ a { color: inherit; }
   color: var(--accent);
   text-decoration: none;
   margin-bottom: 1.5rem;
+  /* Button resets so a <button> looks identical to the old <a>. */
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
 .wisden-back:hover { text-decoration: underline; }
 
@@ -1262,3 +1267,67 @@ a { color: inherit; }
   font-size: 0.98rem;
 }
 .wisden-link-list li:last-child { border-bottom: 0; }
+
+/* Tournaments-landing tiles */
+.wisden-landing-section { margin-bottom: 1.75rem; }
+.wisden-tile-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+@media (min-width: 640px) { .wisden-tile-grid { grid-template-columns: 1fr 1fr; } }
+.wisden-tile {
+  display: block;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--bg);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 120ms, background 120ms;
+}
+.wisden-tile:hover { border-color: var(--accent); background: var(--bg-soft); }
+.wisden-tile-title {
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 0.15rem;
+}
+.wisden-tile-sub {
+  font-family: var(--serif);
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--ink-soft);
+  margin-bottom: 0.3rem;
+}
+.wisden-tile-line {
+  font-family: var(--serif);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+.wisden-tile-em { color: var(--ink); font-weight: 500; }
+.wisden-tile-faint { color: var(--ink-faint); }
+.wisden-tile-vs {
+  font-style: italic;
+  color: var(--ink-faint);
+  margin: 0 0.3rem;
+}
+.wisden-chip {
+  display: inline-block;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  font-family: var(--serif);
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: var(--bg);
+}
+.wisden-tile-help {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+}

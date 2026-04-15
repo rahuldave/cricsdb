@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { getMatchScorecard, getInningsGrid } from '../api'
 import ScorecardView from '../components/Scorecard'
 import WormChart from '../components/charts/WormChart'
@@ -14,6 +14,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 export default function MatchScorecard() {
   const { matchId } = useParams<{ matchId: string }>()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const highlightBatterId = searchParams.get('highlight_batter')
   const highlightBowlerId = searchParams.get('highlight_bowler')
   const highlightFielderId = searchParams.get('highlight_fielder')
@@ -52,9 +53,22 @@ export default function MatchScorecard() {
     return () => cancelAnimationFrame(id)
   }, [hasHighlight, bothReady, highlightBatterId, highlightBowlerId, highlightFielderId])
 
+  // Back navigation: prefer browser history (which preserves the tab
+  // the user came from — tournament Records, team Match List, etc.).
+  // Fall back to /matches for direct entries (deep links, new tab).
+  // window.history.length > 2 is a heuristic since any nav through the
+  // app adds entries; length 1 = first-load direct link.
+  const goBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1)
+    } else {
+      navigate('/matches')
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
-      <Link to="/matches" className="wisden-back">← Back to matches</Link>
+      <button type="button" onClick={goBack} className="wisden-back">← Back</button>
 
       {loading && <Spinner label="Loading scorecard…" size="lg" />}
 

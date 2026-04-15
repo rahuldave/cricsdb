@@ -1002,3 +1002,281 @@ export interface PartnershipTopEntry {
   batter1: PartnershipBatterInfo
   batter2: PartnershipBatterInfo
 }
+
+// ─── Tournaments ────────────────────────────────────────────────────
+
+export interface TournamentLandingEntry {
+  canonical: string
+  editions: number
+  matches: number
+  most_titles: { team: string; titles: number } | null
+  latest_edition: { season: string; champion: string } | null
+  team_type: string | null
+  gender: string | null
+}
+
+export interface RivalryEntry {
+  team1: string
+  team2: string
+  matches: number
+  team1_wins: number
+  team2_wins: number
+  ties: number
+  no_result: number
+  latest_match?: { match_id: number; date: string | null; winner: string | null } | null
+}
+
+export interface TournamentsLanding {
+  international: {
+    icc_events: TournamentLandingEntry[]
+    bilateral_rivalries: {
+      men: { top: RivalryEntry[]; other_count: number }
+      women: { top: RivalryEntry[]; other_count: number }
+      other_threshold: number
+    }
+    other_international: TournamentLandingEntry[]
+  }
+  club: {
+    franchise_leagues: TournamentLandingEntry[]
+    domestic_leagues: TournamentLandingEntry[]
+    women_franchise: TournamentLandingEntry[]
+    other: TournamentLandingEntry[]
+  }
+}
+
+export interface PersonRef {
+  person_id: string
+  name: string
+}
+
+export interface TournamentSummaryByTeam {
+  top_scorer: (PersonRef & { runs: number }) | null
+  top_wicket_taker: (PersonRef & { wickets: number }) | null
+  highest_individual: (PersonRef & {
+    runs: number; match_id: number; date: string | null
+  }) | null
+  largest_partnership: {
+    runs: number; match_id: number; date: string | null
+    batter1: PersonRef; batter2: PersonRef
+  } | null
+}
+
+export interface TournamentSummary {
+  canonical: string | null
+  variants: string[]
+  editions: number
+  matches: number
+  total_runs: number
+  total_wickets: number
+  total_sixes: number
+  total_fours: number
+  run_rate: number | null
+  boundary_pct: number | null
+  dot_pct: number | null
+  most_titles: { team: string; titles: number } | null
+  champions_by_season: { season: string; champion: string; match_id: number }[]
+  top_scorer_alltime: (PersonRef & { runs: number }) | null
+  top_wicket_taker_alltime: (PersonRef & { wickets: number }) | null
+  highest_team_total: {
+    team: string; total: number; match_id: number
+    opponent: string; date: string | null
+  } | null
+  largest_partnership: { runs: number; match_id: number } | null
+  best_bowling: (PersonRef & {
+    figures: string; wickets: number; runs: number
+    match_id: number; date: string | null
+  }) | null
+  teams: { name: string; matches: number }[]
+  groups: {
+    season: string
+    group: string
+    teams: { team: string; matches: number }[]
+  }[]
+  knockouts: {
+    match_id: number
+    season: string
+    stage: string
+    team1: string
+    team2: string
+    winner: string | null
+    margin: string
+    venue: string | null
+    date: string | null
+  }[]
+  by_team: Record<string, TournamentSummaryByTeam> | null
+}
+
+export interface TournamentSeason {
+  season: string
+  matches: number
+  champion: string | null
+  runner_up: string | null
+  final_match_id: number | null
+  run_rate: number | null
+  boundary_pct: number | null
+  total_sixes: number
+  top_scorer: (PersonRef & { runs: number }) | null
+  top_wicket_taker: (PersonRef & { wickets: number }) | null
+}
+
+export interface PointsTableRow {
+  team: string
+  played: number
+  wins: number
+  losses: number
+  ties: number
+  nr: number
+  points: number
+  runs_for: number
+  balls_for: number
+  runs_against: number
+  balls_against: number
+  nrr: number | null
+}
+
+export interface TournamentPointsTable {
+  group: string | null
+  rows: PointsTableRow[]
+}
+
+export interface TournamentPointsTableResponse {
+  canonical: string
+  season: string | null
+  tables: TournamentPointsTable[]
+  reason?: string
+}
+
+export interface TournamentRecordTeamTotal {
+  team: string
+  runs: number
+  opponent: string
+  match_id: number
+  date: string | null
+}
+
+export interface TournamentRecordWin {
+  winner: string
+  loser: string
+  margin: number
+  match_id: number
+  date: string | null
+}
+
+export interface TournamentRecordPartnership {
+  runs: number
+  batter1: PersonRef
+  batter2: PersonRef
+  teams: string
+  batting_team: string
+  match_id: number
+  date: string | null
+}
+
+export interface TournamentRecordBowling {
+  person_id: string
+  name: string
+  wickets: number
+  runs: number
+  balls: number
+  figures: string
+  match_id: number
+  date: string | null
+}
+
+export interface TournamentRecordMatchSixes {
+  match_id: number
+  sixes: number
+  teams: string
+  date: string | null
+}
+
+export interface TournamentRecords {
+  canonical: string
+  highest_team_totals: TournamentRecordTeamTotal[]
+  lowest_all_out_totals: TournamentRecordTeamTotal[]
+  biggest_wins_by_runs: TournamentRecordWin[]
+  biggest_wins_by_wickets: TournamentRecordWin[]
+  largest_partnerships: TournamentRecordPartnership[]
+  best_bowling_figures: TournamentRecordBowling[]
+  most_sixes_in_a_match: TournamentRecordMatchSixes[]
+}
+
+export interface TournamentPartnershipByWicket {
+  wicket_number: number
+  n: number
+  avg_runs: number | null
+  avg_balls: number | null
+  best_runs: number | null
+  best_partnership: {
+    runs: number
+    balls: number
+    match_id: number
+    season: string
+    date: string | null
+    batting_team: string
+    opponent: string
+    batter1: { person_id: string | null; name: string }
+    batter2: { person_id: string | null; name: string }
+  } | null
+}
+
+export interface TournamentPartnershipsByWicket {
+  tournament: string
+  side: 'batting' | 'bowling'
+  filter_team: string | null
+  by_wicket: TournamentPartnershipByWicket[]
+}
+
+export interface TournamentPartnershipTopEntry {
+  partnership_id: number
+  runs: number
+  balls: number
+  wicket_number: number | null
+  unbroken: boolean
+  ended_by_kind: string | null
+  match_id: number
+  season: string
+  tournament: string | null
+  date: string | null
+  batting_team: string
+  opponent: string
+  batter1: { person_id: string | null; name: string; runs: number; balls: number }
+  batter2: { person_id: string | null; name: string; runs: number; balls: number }
+}
+
+export interface TournamentPartnershipsTop {
+  tournament: string
+  side: 'batting' | 'bowling'
+  filter_team: string | null
+  partnerships: TournamentPartnershipTopEntry[]
+}
+
+export interface TournamentPartnershipsHeatmap {
+  tournament: string
+  side: 'batting' | 'bowling'
+  filter_team: string | null
+  seasons: string[]
+  wickets: number[]
+  cells: { season: string; wicket_number: number; avg_runs: number | null; n: number }[]
+}
+
+export interface RivalrySummary {
+  team1: string
+  team2: string
+  matches: number
+  team1_wins: number
+  team2_wins: number
+  ties: number
+  no_result: number
+  last_match: {
+    match_id: number; date: string | null
+    winner: string | null; result: string | null; by: string | null
+  } | null
+  by_series_type: Record<string, number>
+  top_scorer_in_rivalry: (PersonRef & { runs: number }) | null
+  top_wicket_taker_in_rivalry: (PersonRef & { wickets: number }) | null
+  highest_individual: (PersonRef & { runs: number; match_id: number; date: string | null }) | null
+  largest_partnership: { runs: number; match_id: number } | null
+  closest_match: { margin: string; winner: string; match_id: number; date: string | null } | null
+  biggest_win: { winner: string; margin: string; match_id: number; date: string | null } | null
+}

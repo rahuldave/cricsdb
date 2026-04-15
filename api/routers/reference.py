@@ -7,6 +7,10 @@ from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams
+from ..tournament_canonical import (
+    canonicalize, variants as canonical_variants,
+    is_canonical_with_variants, event_name_in_clause,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["Reference"])
 
@@ -35,8 +39,13 @@ def _reference_clauses(
         parts.append("m.team_type = :team_type")
         params["team_type"] = team_type
     if tournament:
-        parts.append("m.event_name = :tournament")
-        params["tournament"] = tournament
+        # Expand canonicals → IN (variants) so picking "T20 World Cup
+        # (Men)" narrows seasons across all three cricsheet variants.
+        if is_canonical_with_variants(tournament):
+            parts.append(event_name_in_clause(canonical_variants(tournament)))
+        else:
+            parts.append("m.event_name = :tournament")
+            params["tournament"] = tournament
     return parts, params
 
 
@@ -66,17 +75,36 @@ async def list_tournaments(
         """,
         params,
     )
-    tournaments = []
+    # Merge cricsheet variants under their canonical display name so the
+    # FilterBar dropdown shows "T20 World Cup (Men)" as a single entry
+    # instead of three separate ones that each cover only part of history.
+    # The `event_name` field carries the CANONICAL (not cricsheet raw),
+    # matching the tournament value downstream endpoints now accept.
+    merged: dict[tuple[str, str | None, str | None], dict] = {}
     for r in rows:
-        seasons_str = r.get("seasons") or ""
-        season_list = sorted(seasons_str.split(",")) if seasons_str else []
-        tournaments.append({
-            "event_name": r["event_name"],
+        canon = canonicalize(r["event_name"])
+        key = (canon, r["team_type"], r["gender"])
+        entry = merged.setdefault(key, {
+            "event_name": canon,
             "team_type": r["team_type"],
             "gender": r["gender"],
-            "matches": r["matches"],
-            "seasons": season_list,
+            "matches": 0,
+            "seasons": set(),
         })
+        entry["matches"] += r["matches"] or 0
+        if r.get("seasons"):
+            entry["seasons"].update(r["seasons"].split(","))
+
+    tournaments = [
+        {
+            "event_name": e["event_name"],
+            "team_type": e["team_type"],
+            "gender": e["gender"],
+            "matches": e["matches"],
+            "seasons": sorted(e["seasons"]),
+        }
+        for e in sorted(merged.values(), key=lambda x: (-x["matches"], x["event_name"]))
+    ]
     return {"tournaments": tournaments}
 
 
@@ -121,8 +149,11 @@ async def list_teams(
         where_parts.append("m.team_type = :team_type")
         params["team_type"] = filters.team_type
     if filters.tournament:
-        where_parts.append("m.event_name = :tournament")
-        params["tournament"] = filters.tournament
+        if is_canonical_with_variants(filters.tournament):
+            where_parts.append(event_name_in_clause(canonical_variants(filters.tournament)))
+        else:
+            where_parts.append("m.event_name = :tournament")
+            params["tournament"] = filters.tournament
     if filters.season_from:
         where_parts.append("m.season >= :season_from")
         params["season_from"] = filters.season_from

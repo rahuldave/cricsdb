@@ -787,6 +787,14 @@ function VsOpponentTab({
                 background: 'none', border: 'none', padding: 0, cursor: 'pointer',
               }}
             >clear</button>
+            {' · '}
+            <Link
+              to={`/head-to-head?mode=team&team1=${encodeURIComponent(team)}&team2=${encodeURIComponent(opponent)}${filters.gender ? `&gender=${filters.gender}` : ''}${filters.team_type ? `&team_type=${filters.team_type}` : ''}`}
+              className="comp-link"
+              style={{ fontSize: '0.8rem', fontStyle: 'italic' }}
+            >
+              See full rivalry →
+            </Link>
           </h3>
           {vsFetch.loading && <Spinner label={`Loading ${opponent} detail…`} />}
           {vsFetch.error && (
@@ -997,11 +1005,13 @@ function PartnershipsTab({ team, filters, filterDeps }: TabProps) {
         const b2 = bp.batter2.person_id
           ? <Link to={`/batting?player=${encodeURIComponent(bp.batter2.person_id)}`} className="comp-link">{bp.batter2.name}</Link>
           : bp.batter2.name
+        const ids = [bp.batter1.person_id, bp.batter2.person_id].filter(Boolean).join(',')
+        const qs = ids ? `?highlight_batter=${encodeURIComponent(ids)}` : ''
         return (
           <>
             {b1} + {b2}
             {' · vs '}{bp.opponent}{', '}{bp.season}{' '}
-            <Link to={`/matches/${bp.match_id}`} className="comp-link">
+            <Link to={`/matches/${bp.match_id}${qs}`} className="comp-link">
               → match details
             </Link>
           </>
@@ -1135,11 +1145,16 @@ function PartnershipsTab({ team, filters, filterDeps }: TabProps) {
                 ) : `${r.batter2.name} ${r.batter2.runs}(${r.batter2.balls})`
               ) as unknown as string },
               { key: 'opponent', label: 'Opponent' },
-              { key: 'date', label: 'Date', format: (_, r) => (
-                <Link to={`/matches/${r.match_id}`} className="comp-link">
-                  {r.date ?? '-'}
-                </Link>
-              ) as unknown as string },
+              { key: 'date', label: 'Date', format: (_, r) => {
+                // Highlight both batters of the partnership on the scorecard.
+                const ids = [r.batter1.person_id, r.batter2.person_id].filter(Boolean).join(',')
+                const qs = ids ? `?highlight_batter=${encodeURIComponent(ids)}` : ''
+                return (
+                  <Link to={`/matches/${r.match_id}${qs}`} className="comp-link">
+                    {r.date ?? '-'}
+                  </Link>
+                ) as unknown as string
+              } },
               { key: 'season', label: 'Season' },
             ]}
             data={top.data.partnerships}

@@ -8,6 +8,7 @@ import Fielding from './pages/Fielding'
 import HeadToHead from './pages/HeadToHead'
 import Matches from './pages/Matches'
 import MatchScorecard from './pages/MatchScorecard'
+import Tournaments from './pages/Tournaments'
 import Help from './pages/Help'
 import HelpUsage from './pages/HelpUsage'
 
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/batting" element={<Batting />} />
           <Route path="/bowling" element={<Bowling />} />
           <Route path="/fielding" element={<Fielding />} />
+          <Route path="/tournaments" element={<Tournaments />} />
           <Route path="/head-to-head" element={<HeadToHead />} />
           <Route path="/matches" element={<Matches />} />
           <Route path="/matches/:matchId" element={<MatchScorecard />} />

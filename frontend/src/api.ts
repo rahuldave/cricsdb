@@ -182,3 +182,56 @@ export const getTeamPartnershipsHeatmap = (team: string, filters?: F & { side?: 
 export const getTeamPartnershipsTop = (team: string, filters?: F & { side?: 'batting' | 'bowling'; limit?: number }) =>
   fetchApi<{ team: string; side: 'batting' | 'bowling'; partnerships: import('./types').PartnershipTopEntry[] }>(
     `/api/v1/teams/${te(team)}/partnerships/top`, filters as Record<string, string>)
+
+// Tournaments / match-set dossier — `tournament` is optional; omit for
+// cross-tournament rivalry views (filter_team + filter_opponent in filters).
+type TF = F & { series_type?: string; filter_team?: string; filter_opponent?: string }
+const tparams = (t: string | null | undefined, f?: TF) => {
+  const out: Record<string, string> = { ...(f as Record<string, string>) }
+  if (t) out.tournament = t
+  return out
+}
+
+export const getTournamentsLanding = (filters?: F) =>
+  fetchApi<import('./types').TournamentsLanding>('/api/v1/tournaments/landing', filters as Record<string, string>)
+export const getTournamentSummary = (tournament: string | null, filters?: TF) =>
+  fetchApi<import('./types').TournamentSummary>('/api/v1/tournaments/summary', tparams(tournament, filters))
+export const getTournamentBySeason = (tournament: string | null, filters?: TF) =>
+  fetchApi<{ tournament: string; seasons: import('./types').TournamentSeason[] }>(
+    '/api/v1/tournaments/by-season', tparams(tournament, filters))
+export const getTournamentPointsTable = (tournament: string, filters?: TF) =>
+  fetchApi<import('./types').TournamentPointsTableResponse>(
+    '/api/v1/tournaments/points-table', { ...(filters as Record<string, string>), tournament })
+export const getTournamentRecords = (tournament: string | null, filters?: TF & { limit?: number }) =>
+  fetchApi<import('./types').TournamentRecords>(
+    '/api/v1/tournaments/records', tparams(tournament, filters))
+export const getTournamentOtherRivalries = (filters?: F & { gender?: string }) =>
+  fetchApi<{ rivalries: import('./types').RivalryEntry[]; threshold: number }>(
+    '/api/v1/tournaments/other-rivalries', filters as Record<string, string>)
+export const getRivalrySummary = (team1: string, team2: string, filters?: F) =>
+  fetchApi<import('./types').RivalrySummary>(
+    '/api/v1/rivalries/summary', { ...(filters as Record<string, string>), team1, team2 })
+
+// Variant-aware leader endpoints for tournament dossiers (canonical → IN variants)
+export const getTournamentBattersLeaders = (tournament: string | null, filters?: TF & { limit?: number }) =>
+  fetchApi<import('./types').BattingLeaders>(
+    '/api/v1/tournaments/batters-leaders', tparams(tournament, filters))
+export const getTournamentBowlersLeaders = (tournament: string | null, filters?: TF & { limit?: number }) =>
+  fetchApi<import('./types').BowlingLeaders>(
+    '/api/v1/tournaments/bowlers-leaders', tparams(tournament, filters))
+export const getTournamentFieldersLeaders = (tournament: string | null, filters?: TF & { limit?: number }) =>
+  fetchApi<import('./types').FieldingLeaders>(
+    '/api/v1/tournaments/fielders-leaders', tparams(tournament, filters))
+
+export const getTournamentPartnershipsByWicket = (
+  tournament: string | null, filters?: TF & { side?: 'batting' | 'bowling' },
+) => fetchApi<import('./types').TournamentPartnershipsByWicket>(
+  '/api/v1/tournaments/partnerships/by-wicket', tparams(tournament, filters))
+export const getTournamentPartnershipsTop = (
+  tournament: string | null, filters?: TF & { side?: 'batting' | 'bowling'; limit?: number },
+) => fetchApi<import('./types').TournamentPartnershipsTop>(
+  '/api/v1/tournaments/partnerships/top', tparams(tournament, filters))
+export const getTournamentPartnershipsHeatmap = (
+  tournament: string | null, filters?: TF & { side?: 'batting' | 'bowling' },
+) => fetchApi<import('./types').TournamentPartnershipsHeatmap>(
+  '/api/v1/tournaments/partnerships/heatmap', tparams(tournament, filters))
