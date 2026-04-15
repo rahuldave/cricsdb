@@ -17,6 +17,7 @@ import {
 } from '../api'
 import StatCard from '../components/StatCard'
 import FlagBadge from '../components/FlagBadge'
+import PlayerLink from '../components/PlayerLink'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
 import LineChart from '../components/charts/LineChart'
@@ -337,9 +338,10 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
 
   const batterColumns: Column<TeamTopBatter>[] = [
     { key: 'name', label: 'Batter', format: (_v, r) => (
-      <Link to={`/batting?player=${encodeURIComponent(r.person_id)}`} className="comp-link">
-        {r.name}
-      </Link>
+      <PlayerLink
+        personId={r.person_id} name={r.name} role="batter" gender={filters.gender}
+        contextLabel={`at ${team}`} contextParams={{ filter_team: team }}
+      />
     ) as unknown as string },
     { key: 'runs', label: 'Runs', sortable: true },
     { key: 'balls', label: 'Balls', sortable: true },
@@ -507,9 +509,10 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
 
   const bowlerColumns: Column<TeamTopBowler>[] = [
     { key: 'name', label: 'Bowler', format: (_v, r) => (
-      <Link to={`/bowling?player=${encodeURIComponent(r.person_id)}`} className="comp-link">
-        {r.name}
-      </Link>
+      <PlayerLink
+        personId={r.person_id} name={r.name} role="bowler" gender={filters.gender}
+        contextLabel={`at ${team}`} contextParams={{ filter_team: team }}
+      />
     ) as unknown as string },
     { key: 'wickets', label: 'Wkts', sortable: true },
     { key: 'runs_conceded', label: 'Runs' },
@@ -659,9 +662,10 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
 
   const fielderColumns: Column<TeamTopFielder>[] = [
     { key: 'name', label: 'Fielder', format: (_v, r) => (
-      <Link to={`/fielding?player=${encodeURIComponent(r.person_id)}`} className="comp-link">
-        {r.name}
-      </Link>
+      <PlayerLink
+        personId={r.person_id} name={r.name} role="fielder" gender={filters.gender}
+        contextLabel={`at ${team}`} contextParams={{ filter_team: team }}
+      />
     ) as unknown as string },
     { key: 'catches', label: 'Catches', sortable: true },
     { key: 'caught_and_bowled', label: 'C&B' },

@@ -11,6 +11,7 @@ import {
   getMatches,
 } from '../../api'
 import StatCard from '../StatCard'
+import PlayerLink from '../PlayerLink'
 import DataTable, { type Column } from '../DataTable'
 import LineChart from '../charts/LineChart'
 import Spinner from '../Spinner'
@@ -292,6 +293,7 @@ export default function TournamentDossier({
           summary={summary}
           seasons={bySeasonFetch.data?.seasons ?? []}
           tournament={tournament}
+          gender={filters.gender}
         />
       )}
       {currentTab === 'Editions' && (
@@ -319,6 +321,10 @@ export default function TournamentDossier({
           error={battingFetch.error}
           data={battingFetch.data}
           refetch={battingFetch.refetch}
+          tournament={tournament}
+          filterTeam={filterTeam}
+          filterOpponent={filterOpponent}
+          gender={filters.gender}
         />
       )}
       {currentTab === 'Bowlers' && (
@@ -327,6 +333,10 @@ export default function TournamentDossier({
           error={bowlingFetch.error}
           data={bowlingFetch.data}
           refetch={bowlingFetch.refetch}
+          tournament={tournament}
+          filterTeam={filterTeam}
+          filterOpponent={filterOpponent}
+          gender={filters.gender}
         />
       )}
       {currentTab === 'Fielders' && (
@@ -335,6 +345,10 @@ export default function TournamentDossier({
           error={fieldingFetch.error}
           data={fieldingFetch.data}
           refetch={fieldingFetch.refetch}
+          tournament={tournament}
+          filterTeam={filterTeam}
+          filterOpponent={filterOpponent}
+          gender={filters.gender}
         />
       )}
       {currentTab === 'Records' && (
@@ -380,11 +394,12 @@ const seasonNum = (s: string): number => {
 }
 
 function OverviewTab({
-  summary, seasons, tournament,
+  summary, seasons, tournament, gender,
 }: {
   summary: TournamentSummary
   seasons: TournamentSeason[]
   tournament: string | null
+  gender: string | null | undefined
 }) {
   // Seasons come newest-first from backend — flip for chart reading left-to-right.
   const trend = [...seasons].reverse()
@@ -491,6 +506,10 @@ function OverviewTab({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {teamNames.map(team => {
               const t = summary.by_team![team]
+              // Context = "at <team>" so the second link lands the player
+              // page narrowed to this team's matches within the rivalry.
+              const ctxParams = { filter_team: team }
+              const ctxLabel = `at ${team}`
               return (
                 <div key={team} className="wisden-tile">
                   <div className="wisden-tile-title">{team}</div>
@@ -498,21 +517,33 @@ function OverviewTab({
                     {t.top_scorer && (
                       <div>
                         <span className="wisden-tile-faint">Top scorer: </span>
-                        <span className="wisden-tile-em">{t.top_scorer.name}</span>
+                        <PlayerLink
+                          personId={t.top_scorer.person_id} name={t.top_scorer.name}
+                          role="batter" gender={gender}
+                          contextLabel={ctxLabel} contextParams={ctxParams}
+                        />
                         <span className="wisden-tile-faint"> · {t.top_scorer.runs} runs</span>
                       </div>
                     )}
                     {t.top_wicket_taker && (
                       <div>
                         <span className="wisden-tile-faint">Top wicket-taker: </span>
-                        <span className="wisden-tile-em">{t.top_wicket_taker.name}</span>
+                        <PlayerLink
+                          personId={t.top_wicket_taker.person_id} name={t.top_wicket_taker.name}
+                          role="bowler" gender={gender}
+                          contextLabel={ctxLabel} contextParams={ctxParams}
+                        />
                         <span className="wisden-tile-faint"> · {t.top_wicket_taker.wickets} wkts</span>
                       </div>
                     )}
                     {t.highest_individual && (
                       <div>
                         <span className="wisden-tile-faint">Highest individual: </span>
-                        <span className="wisden-tile-em">{t.highest_individual.name}</span>
+                        <PlayerLink
+                          personId={t.highest_individual.person_id} name={t.highest_individual.name}
+                          role="batter" gender={gender}
+                          contextLabel={ctxLabel} contextParams={ctxParams}
+                        />
                         <span className="wisden-tile-faint"> · {t.highest_individual.runs}</span>
                         {t.highest_individual.date && (
                           <> {' '}{matchLink(t.highest_individual.match_id, `(${t.highest_individual.date})`)}</>
@@ -524,7 +555,19 @@ function OverviewTab({
                         <span className="wisden-tile-faint">Largest partnership: </span>
                         <span className="wisden-tile-em">{t.largest_partnership.runs}</span>
                         <span className="wisden-tile-faint">
-                          {' '}({t.largest_partnership.batter1?.name} & {t.largest_partnership.batter2?.name})
+                          {' '}(
+                          <PlayerLink
+                            personId={t.largest_partnership.batter1?.person_id}
+                            name={t.largest_partnership.batter1?.name ?? ''}
+                            role="batter" gender={gender}
+                          />
+                          {' & '}
+                          <PlayerLink
+                            personId={t.largest_partnership.batter2?.person_id}
+                            name={t.largest_partnership.batter2?.name ?? ''}
+                            role="batter" gender={gender}
+                          />
+                          )
                         </span>
                       </div>
                     )}
@@ -905,17 +948,46 @@ function PointsTab({
   )
 }
 
+/** Build the (label, params) pair for the contextual link shown after
+ *  a player name. Tournament context wins over team-pair for compactness
+ *  when both are set; user can still drill further via the player page. */
+function playerContext(opts: {
+  tournament: string | null
+  filterTeam: string | null | undefined
+  filterOpponent: string | null | undefined
+}): { label: string; params: Record<string, string> } | undefined {
+  const { tournament, filterTeam, filterOpponent } = opts
+  if (tournament) {
+    return { label: `in ${tournament}`, params: { tournament } }
+  }
+  if (filterTeam && filterOpponent) {
+    return {
+      label: `vs ${filterOpponent}`,
+      params: { filter_team: filterTeam, filter_opponent: filterOpponent },
+    }
+  }
+  if (filterTeam) {
+    return { label: `at ${filterTeam}`, params: { filter_team: filterTeam } }
+  }
+  return undefined
+}
+
 function BattersTab({
-  loading, error, data, refetch,
+  loading, error, data, refetch, tournament, filterTeam, filterOpponent, gender,
 }: {
   loading: boolean; error: string | null
   data: BattingLeaders | null; refetch: () => void
+  tournament: string | null
+  filterTeam: string | null | undefined
+  filterOpponent: string | null | undefined
+  gender: string | null | undefined
 }) {
   if (loading) return <Spinner label="Loading batters…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
 
-  // BattingLeaders shape: { by_average, by_strike_rate } — 10 each, all filter-aware.
+  const ctx = playerContext({ tournament, filterTeam, filterOpponent })
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
       <div>
@@ -925,9 +997,10 @@ function BattersTab({
             {
               key: 'name', label: 'Batter',
               format: (_v, r) => (
-                <Link to={`/batting?player=${r.person_id}`} className="comp-link">
-                  {r.name}
-                </Link>
+                <PlayerLink
+                  personId={r.person_id} name={r.name} role="batter" gender={gender}
+                  contextLabel={ctx?.label} contextParams={ctx?.params}
+                />
               ) as unknown as string,
             },
             { key: 'runs', label: 'Runs', sortable: true },
@@ -946,9 +1019,10 @@ function BattersTab({
             {
               key: 'name', label: 'Batter',
               format: (_v, r) => (
-                <Link to={`/batting?player=${r.person_id}`} className="comp-link">
-                  {r.name}
-                </Link>
+                <PlayerLink
+                  personId={r.person_id} name={r.name} role="batter" gender={gender}
+                  contextLabel={ctx?.label} contextParams={ctx?.params}
+                />
               ) as unknown as string,
             },
             { key: 'strike_rate', label: 'SR', sortable: true, format: (v) => fmt(v, 2) },
@@ -964,14 +1038,20 @@ function BattersTab({
 }
 
 function BowlersTab({
-  loading, error, data, refetch,
+  loading, error, data, refetch, tournament, filterTeam, filterOpponent, gender,
 }: {
   loading: boolean; error: string | null
   data: BowlingLeaders | null; refetch: () => void
+  tournament: string | null
+  filterTeam: string | null | undefined
+  filterOpponent: string | null | undefined
+  gender: string | null | undefined
 }) {
   if (loading) return <Spinner label="Loading bowlers…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
+
+  const ctx = playerContext({ tournament, filterTeam, filterOpponent })
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -982,9 +1062,10 @@ function BowlersTab({
             {
               key: 'name', label: 'Bowler',
               format: (_v, r) => (
-                <Link to={`/bowling?player=${r.person_id}`} className="comp-link">
-                  {r.name}
-                </Link>
+                <PlayerLink
+                  personId={r.person_id} name={r.name} role="bowler" gender={gender}
+                  contextLabel={ctx?.label} contextParams={ctx?.params}
+                />
               ) as unknown as string,
             },
             { key: 'strike_rate', label: 'SR', sortable: true, format: (v) => fmt(v, 2) },
@@ -1002,9 +1083,10 @@ function BowlersTab({
             {
               key: 'name', label: 'Bowler',
               format: (_v, r) => (
-                <Link to={`/bowling?player=${r.person_id}`} className="comp-link">
-                  {r.name}
-                </Link>
+                <PlayerLink
+                  personId={r.person_id} name={r.name} role="bowler" gender={gender}
+                  contextLabel={ctx?.label} contextParams={ctx?.params}
+                />
               ) as unknown as string,
             },
             { key: 'economy', label: 'Econ', sortable: true, format: (v) => fmt(v, 2) },
@@ -1020,14 +1102,20 @@ function BowlersTab({
 }
 
 function FieldersTab({
-  loading, error, data, refetch,
+  loading, error, data, refetch, tournament, filterTeam, filterOpponent, gender,
 }: {
   loading: boolean; error: string | null
   data: FieldingLeaders | null; refetch: () => void
+  tournament: string | null
+  filterTeam: string | null | undefined
+  filterOpponent: string | null | undefined
+  gender: string | null | undefined
 }) {
   if (loading) return <Spinner label="Loading fielders…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
+
+  const ctx = playerContext({ tournament, filterTeam, filterOpponent })
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -1038,9 +1126,10 @@ function FieldersTab({
             {
               key: 'name', label: 'Fielder',
               format: (_v, r) => (
-                <Link to={`/fielding?player=${r.person_id}`} className="comp-link">
-                  {r.name}
-                </Link>
+                <PlayerLink
+                  personId={r.person_id} name={r.name} role="fielder" gender={gender}
+                  contextLabel={ctx?.label} contextParams={ctx?.params}
+                />
               ) as unknown as string,
             },
             { key: 'total', label: 'Total', sortable: true },
@@ -1059,9 +1148,10 @@ function FieldersTab({
             {
               key: 'name', label: 'Keeper',
               format: (_v, r) => (
-                <Link to={`/fielding?player=${r.person_id}`} className="comp-link">
-                  {r.name}
-                </Link>
+                <PlayerLink
+                  personId={r.person_id} name={r.name} role="fielder" gender={gender}
+                  contextLabel={ctx?.label} contextParams={ctx?.params}
+                />
               ) as unknown as string,
             },
             { key: 'total', label: 'Total', sortable: true },
