@@ -16,11 +16,13 @@ import {
   getFielderSummary, getFielderBySeason, getFielderByPhase, getFielderByOver,
   getFielderDismissalTypes, getFielderVictims, getFielderInnings,
   getFielderKeepingSummary, getFielderKeepingBySeason, getFielderKeepingInnings,
+  getFieldingLeaders,
 } from '../api'
 import type {
   PlayerSearchResult, FieldingSummary, FieldingSeason, FieldingPhase,
   FieldingVictim, FieldingInnings,
   KeepingSummary, KeepingSeason, KeepingInnings,
+  FieldingLeaders, FieldingLeaderEntry, FilterParams,
 } from '../types'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
@@ -194,7 +196,7 @@ export default function Fielding() {
         <PlayerSearch role="fielder" onSelect={handleSelect} placeholder="Search for a fielder…" />
       </div>
 
-      {!playerId && <div className="wisden-empty">Search for a fielder to view stats</div>}
+      {!playerId && <FieldingLandingBoard filters={filters} filterDeps={filterDeps} />}
 
       {playerId && summaryFetch.loading && <Spinner label="Loading fielder…" size="lg" />}
 
@@ -388,6 +390,137 @@ export default function Fielding() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// ============================================================
+// Fielding landing — top 10 fielders by total dismissals + top 10
+// keepers (by catches + stumpings as the designated keeper). Volume-
+// based, no thresholds. Shown below the search bar when no fielder
+// is selected.
+// ============================================================
+
+interface FieldingLandingBoardProps {
+  filters: FilterParams
+  filterDeps: unknown[]
+}
+
+function FieldingLandingBoard({ filters, filterDeps }: FieldingLandingBoardProps) {
+  const board = useFetch<FieldingLeaders | null>(
+    () => getFieldingLeaders({ ...filters, limit: 10 }),
+    filterDeps,
+  )
+  if (board.loading && !board.data) return <Spinner label="Loading leaders…" />
+  if (board.error) {
+    return <ErrorBanner message={`Could not load leaders: ${board.error}`} onRetry={board.refetch} />
+  }
+  const data = board.data
+  if (!data) return null
+  const bothEmpty = data.by_dismissals.length === 0 && data.by_keeper_dismissals.length === 0
+  if (bothEmpty) {
+    return <div className="wisden-empty">No fielding activity for the current filters.</div>
+  }
+
+  const carry: Record<string, string> = {}
+  if (filters.gender) carry.gender = filters.gender
+  if (filters.team_type) carry.team_type = filters.team_type
+  if (filters.tournament) carry.tournament = filters.tournament
+  if (filters.season_from) carry.season_from = filters.season_from
+  if (filters.season_to) carry.season_to = filters.season_to
+  const fielderLink = (id: string) => {
+    const qs = new URLSearchParams({ player: id, ...carry })
+    return `/fielding?${qs.toString()}`
+  }
+  const keeperLink = (id: string) => {
+    const qs = new URLSearchParams({ player: id, tab: 'Keeping', ...carry })
+    return `/fielding?${qs.toString()}`
+  }
+
+  const fielderTable = (
+    <div>
+      <h3 className="wisden-section-title">Top by dismissals</h3>
+      {data.by_dismissals.length === 0 ? (
+        <div className="wisden-tab-help" style={{ fontStyle: 'italic' }}>No fielders.</div>
+      ) : (
+        <table className="wisden-table" style={{ width: '100%' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left' }}>Fielder</th>
+              <th style={{ textAlign: 'right' }}>Total</th>
+              <th style={{ textAlign: 'right' }}>Ct</th>
+              <th style={{ textAlign: 'right' }}>St</th>
+              <th style={{ textAlign: 'right' }}>RO</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.by_dismissals.map((r, i) => (
+              <tr key={r.person_id}>
+                <td>
+                  <span style={{ color: 'var(--ink-faint)', marginRight: '0.5rem' }}>{i + 1}.</span>
+                  <Link to={fielderLink(r.person_id)} className="comp-link">{r.name}</Link>
+                </td>
+                <td className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{r.total}</td>
+                <td className="num" style={{ textAlign: 'right' }}>{r.catches + (r.c_and_b ?? 0)}</td>
+                <td className="num" style={{ textAlign: 'right' }}>{r.stumpings}</td>
+                <td className="num" style={{ textAlign: 'right' }}>{r.run_outs ?? 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+
+  const keeperTable = (
+    <div>
+      <h3 className="wisden-section-title">Top keepers</h3>
+      {data.by_keeper_dismissals.length === 0 ? (
+        <div className="wisden-tab-help" style={{ fontStyle: 'italic' }}>
+          No designated-keeper dismissals in scope.
+        </div>
+      ) : (
+        <table className="wisden-table" style={{ width: '100%' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left' }}>Keeper</th>
+              <th style={{ textAlign: 'right' }}>Total</th>
+              <th style={{ textAlign: 'right' }}>Ct</th>
+              <th style={{ textAlign: 'right' }}>St</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.by_keeper_dismissals.map((r, i) => (
+              <tr key={r.person_id}>
+                <td>
+                  <span style={{ color: 'var(--ink-faint)', marginRight: '0.5rem' }}>{i + 1}.</span>
+                  <Link to={keeperLink(r.person_id)} className="comp-link">{r.name}</Link>
+                </td>
+                <td className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{r.total}</td>
+                <td className="num" style={{ textAlign: 'right' }}>{r.catches}</td>
+                <td className="num" style={{ textAlign: 'right' }}>{r.stumpings}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+
+  return (
+    <div>
+      <div className="wisden-tab-help" style={{ marginBottom: '1.5rem' }}>
+        Top 10 fielders in the current filter scope. Fielding is ranked by volume, not rate —
+        catches-per-match is mostly a position / opportunity stat, not a skill stat, so the raw
+        count is the honest measure. <b>Ct</b> = catches (includes caught-and-bowled),
+        {' '}<b>St</b> = stumpings, <b>RO</b> = run-outs. The keeper column filters to catches
+        and stumpings taken while the player was the designated wicketkeeper
+        (via our Tier-2 keeper inference).
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2.5rem', alignItems: 'start' }}>
+        {fielderTable}
+        {keeperTable}
+      </div>
     </div>
   )
 }

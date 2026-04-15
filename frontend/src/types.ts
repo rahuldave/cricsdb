@@ -108,6 +108,72 @@ export interface TeamPlayersBySeason {
   seasons: TeamPlayersSeasonBucket[]
 }
 
+export interface TeamsLandingEntry {
+  name: string
+  matches: number
+}
+
+export interface TeamsLandingTournamentGroup {
+  tournament: string
+  matches: number
+  teams: TeamsLandingEntry[]
+}
+
+export interface TeamsLanding {
+  international: {
+    regular: TeamsLandingEntry[]
+    associate: TeamsLandingEntry[]
+  }
+  club: TeamsLandingTournamentGroup[]
+}
+
+export interface BattingLeaderEntry {
+  person_id: string
+  name: string
+  runs: number
+  balls: number
+  dismissals: number
+  average: number | null
+  strike_rate: number | null
+}
+
+export interface BattingLeaders {
+  by_average: BattingLeaderEntry[]
+  by_strike_rate: BattingLeaderEntry[]
+  thresholds: { min_balls: number; min_dismissals: number }
+}
+
+export interface BowlingLeaderEntry {
+  person_id: string
+  name: string
+  balls: number
+  runs_conceded: number
+  wickets: number
+  strike_rate: number | null
+  economy: number | null
+}
+
+export interface BowlingLeaders {
+  by_strike_rate: BowlingLeaderEntry[]
+  by_economy: BowlingLeaderEntry[]
+  thresholds: { min_balls: number; min_wickets: number }
+}
+
+export interface FieldingLeaderEntry {
+  person_id: string
+  name: string
+  total: number
+  catches: number
+  stumpings: number
+  run_outs?: number  // only present on by_dismissals
+  c_and_b?: number
+}
+
+export interface FieldingLeaders {
+  by_dismissals: FieldingLeaderEntry[]
+  by_keeper_dismissals: FieldingLeaderEntry[]
+}
+
 export interface TeamVsOpponent {
   team: string
   opponent: string

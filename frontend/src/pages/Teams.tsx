@@ -6,7 +6,7 @@ import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import {
   getTeams, getTeamSummary, getTeamByseason, getTeamVs, getTeamResults,
-  getTeamOpponentsMatrix, getTeamPlayersBySeason,
+  getTeamOpponentsMatrix, getTeamPlayersBySeason, getTeamsLanding,
   getTeamBattingSummary, getTeamBattingBySeason, getTeamBattingByPhase, getTeamTopBatters,
   getTeamBattingPhaseSeasonHeatmap,
   getTeamBowlingSummary, getTeamBowlingBySeason, getTeamBowlingByPhase, getTeamTopBowlers,
@@ -24,7 +24,7 @@ import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import type {
   TeamInfo, TeamSummary, TeamSeasonRecord, TeamVsOpponent, TeamResult,
-  OpponentRollup, OpponentsMatrix, TeamPlayersBySeason,
+  OpponentRollup, OpponentsMatrix, TeamPlayersBySeason, TeamsLanding,
   TeamBattingSummary, TeamBattingSeason, TeamBattingPhase, TeamTopBatter,
   BattingPhaseSeasonHeatmap, BowlingPhaseSeasonHeatmap,
   TeamBowlingSummary, TeamBowlingSeason, TeamBowlingPhase, TeamTopBowler,
@@ -137,7 +137,9 @@ export default function Teams() {
         )}
       </div>
 
-      {!selected && <div className="wisden-empty">Search for a team to view stats</div>}
+      {!selected && (
+        <TeamsLandingBoard filters={filters} filterDeps={filterDeps} onPick={selectTeam} />
+      )}
 
       {/* Only fully-block when we have NO summary yet (initial load). On
           subsequent fetches (filter changes) keep the previous data
@@ -1243,6 +1245,132 @@ function PlayersTab({ team, filters, filterDeps }: TabProps) {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ============================================================
+// Teams landing board — two-column directory shown below the
+// search bar when no team is selected. Left: international teams
+// split regular (ICC full members) vs associate. Right: clubs
+// grouped by tournament. All counts respect the current FilterBar
+// scope, so e.g. Pune Supergiants drop out of windows outside
+// 2016–2017 naturally.
+// ============================================================
+
+interface TeamsLandingBoardProps {
+  filters: FilterParams
+  filterDeps: unknown[]
+  onPick: (name: string) => void
+}
+
+function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardProps) {
+  const fetch = useFetch<TeamsLanding | null>(
+    () => getTeamsLanding(filters),
+    filterDeps,
+  )
+  if (fetch.loading && !fetch.data) return <Spinner label="Loading teams…" />
+  if (fetch.error) {
+    return <ErrorBanner message={`Could not load teams: ${fetch.error}`} onRetry={fetch.refetch} />
+  }
+  const data = fetch.data
+  if (!data) return null
+
+  const regular = data.international.regular
+  const associate = data.international.associate
+  const clubGroups = data.club
+  const showIntl = regular.length > 0 || associate.length > 0
+  const showClub = clubGroups.length > 0
+  const bothEmpty = !showIntl && !showClub
+  if (bothEmpty) {
+    return <div className="wisden-empty">No teams match the current filters.</div>
+  }
+
+  // Two-column grid when both sides have data; single column otherwise
+  // so the populated side spans the width comfortably.
+  const cols = showIntl && showClub ? '1fr 1fr' : '1fr'
+
+  const renderTeam = (t: { name: string; matches: number }) => (
+    <button
+      key={t.name}
+      onClick={() => onPick(t.name)}
+      className="comp-link"
+      style={{
+        background: 'none', border: 0, padding: 0, cursor: 'pointer',
+        textAlign: 'left', font: 'inherit',
+      }}
+    >
+      {t.name}{' '}
+      <span className="num" style={{ color: 'var(--ink-faint)', fontSize: '0.85em' }}>
+        ({t.matches})
+      </span>
+    </button>
+  )
+
+  return (
+    <div>
+      <div className="wisden-tab-help" style={{ marginBottom: '1.5rem' }}>
+        Pick a team below, or search above. Match counts and team lists respect the
+        filters at the top of the page — change gender, type, tournament, or season
+        to narrow the directory.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: cols, gap: '2.5rem', alignItems: 'start' }}>
+        {showIntl && (
+          <div>
+            <h3 className="wisden-section-title">International</h3>
+            {regular.length > 0 && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <div className="coverage-head" style={{ marginBottom: '0.5rem' }}>
+                  Full members
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  gap: '0.35rem 1rem',
+                }}>
+                  {regular.map(renderTeam)}
+                </div>
+              </div>
+            )}
+            {associate.length > 0 && (
+              <div>
+                <div className="coverage-head" style={{ marginBottom: '0.5rem' }}>
+                  Associate
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  gap: '0.35rem 1rem',
+                }}>
+                  {associate.map(renderTeam)}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {showClub && (
+          <div>
+            <h3 className="wisden-section-title">Clubs</h3>
+            {clubGroups.map(g => (
+              <div key={g.tournament} style={{ marginBottom: '1.5rem' }}>
+                <div className="coverage-head" style={{ marginBottom: '0.5rem' }}>
+                  {g.tournament}{' '}
+                  <span className="num" style={{ color: 'var(--ink-faint)', fontSize: '0.85em', fontWeight: 'normal' }}>
+                    ({g.matches})
+                  </span>
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  gap: '0.35rem 1rem',
+                }}>
+                  {g.teams.map(renderTeam)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

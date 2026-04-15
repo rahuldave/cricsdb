@@ -17,10 +17,12 @@ import ErrorBanner from '../components/ErrorBanner'
 import {
   getBatterSummary, getBatterInnings, getBatterVsBowlers, getBatterByOver,
   getBatterByPhase, getBatterBySeason, getBatterDismissals, getBatterInterWicket,
+  getBattingLeaders,
 } from '../api'
 import type {
   PlayerSearchResult, BattingSummary, BattingInnings, BowlerMatchup,
   OverStats, PhaseStats, SeasonBattingStats, DismissalAnalysis, InterWicketStats,
+  BattingLeaders, BattingLeaderEntry, FilterParams,
 } from '../types'
 
 // Small helper for the consistent loading/error pattern in each tab.
@@ -155,7 +157,7 @@ export default function Batting() {
         <PlayerSearch role="batter" onSelect={handleSelect} placeholder="Search for a batter…" />
       </div>
 
-      {!playerId && <div className="wisden-empty">Search for a batter to view stats</div>}
+      {!playerId && <BattingLandingBoard filters={filters} filterDeps={filterDeps} />}
 
       {playerId && summaryFetch.loading && <Spinner label="Loading batter…" size="lg" />}
 
@@ -402,6 +404,105 @@ export default function Batting() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// ============================================================
+// Batting landing — top 10 by average + top 10 by strike rate,
+// shown below the search bar when no batter is selected. Counts
+// reflect the current FilterBar scope. Each row links to that
+// batter's page with the same filters carried through.
+// ============================================================
+
+interface BattingLandingBoardProps {
+  filters: FilterParams
+  filterDeps: unknown[]
+}
+
+function BattingLandingBoard({ filters, filterDeps }: BattingLandingBoardProps) {
+  const board = useFetch<BattingLeaders | null>(
+    () => getBattingLeaders({ ...filters, limit: 10 }),
+    filterDeps,
+  )
+  if (board.loading && !board.data) return <Spinner label="Loading leaders…" />
+  if (board.error) {
+    return <ErrorBanner message={`Could not load leaders: ${board.error}`} onRetry={board.refetch} />
+  }
+  const data = board.data
+  if (!data) return null
+  const bothEmpty = data.by_average.length === 0 && data.by_strike_rate.length === 0
+  if (bothEmpty) {
+    return <div className="wisden-empty">No batters meet the minimum-sample thresholds for the current filters.</div>
+  }
+
+  // Carry current filters through on player links so clicking into a
+  // batter preserves the tournament/season scope the user is exploring.
+  const carry: Record<string, string> = {}
+  if (filters.gender) carry.gender = filters.gender
+  if (filters.team_type) carry.team_type = filters.team_type
+  if (filters.tournament) carry.tournament = filters.tournament
+  if (filters.season_from) carry.season_from = filters.season_from
+  if (filters.season_to) carry.season_to = filters.season_to
+  const playerLink = (id: string) => {
+    const qs = new URLSearchParams({ player: id, ...carry })
+    return `/batting?${qs.toString()}`
+  }
+
+  const renderTable = (title: string, metric: 'average' | 'strike_rate', rows: BattingLeaderEntry[]) => (
+    <div>
+      <h3 className="wisden-section-title">{title}</h3>
+      {rows.length === 0 ? (
+        <div className="wisden-tab-help" style={{ fontStyle: 'italic' }}>
+          No batters meet the threshold.
+        </div>
+      ) : (
+        <table className="wisden-table" style={{ width: '100%' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left' }}>Batter</th>
+              <th style={{ textAlign: 'right' }}>{metric === 'average' ? 'Avg' : 'SR'}</th>
+              <th style={{ textAlign: 'right' }}>Runs</th>
+              <th style={{ textAlign: 'right' }}>Balls</th>
+              {metric === 'average' && <th style={{ textAlign: 'right' }}>Outs</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.person_id}>
+                <td>
+                  <span style={{ color: 'var(--ink-faint)', marginRight: '0.5rem' }}>{i + 1}.</span>
+                  <Link to={playerLink(r.person_id)} className="comp-link">{r.name}</Link>
+                </td>
+                <td className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
+                  {metric === 'average' ? r.average?.toFixed(2) : r.strike_rate?.toFixed(2)}
+                </td>
+                <td className="num" style={{ textAlign: 'right' }}>{r.runs}</td>
+                <td className="num" style={{ textAlign: 'right' }}>{r.balls}</td>
+                {metric === 'average' && (
+                  <td className="num" style={{ textAlign: 'right' }}>{r.dismissals}</td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+
+  return (
+    <div>
+      <div className="wisden-tab-help" style={{ marginBottom: '1.5rem' }}>
+        Top 10 batters in the current filter scope. Change gender, type, tournament, or season
+        to narrow the leaderboards. Thresholds: at least{' '}
+        <span className="num">{data.thresholds.min_balls}</span> legal balls faced; averages
+        additionally require at least <span className="num">{data.thresholds.min_dismissals}</span> dismissals
+        so a single not-out innings doesn't top the list.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2.5rem', alignItems: 'start' }}>
+        {renderTable('Top by average', 'average', data.by_average)}
+        {renderTable('Top by strike rate', 'strike_rate', data.by_strike_rate)}
+      </div>
     </div>
   )
 }

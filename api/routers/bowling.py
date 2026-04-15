@@ -30,6 +30,131 @@ def _bowling_legal_filter(filters: FilterParams, person_id: str, batter_id: str 
     return " AND ".join(parts), params
 
 
+@router.get("/leaders")
+async def bowling_leaders(
+    filters: FilterParams = Depends(),
+    limit: int = Query(10, ge=1, le=50),
+    min_balls: int = Query(60, ge=1),
+    min_wickets: int = Query(3, ge=0),
+):
+    """Top bowlers in the current filter scope.
+
+    Returns two leaderboards:
+      - by_strike_rate: filtered to `min_balls` + `min_wickets`,
+        sorted by legal_balls / wickets (ASC — lower is better).
+      - by_economy: filtered to `min_balls`, sorted by runs × 6 /
+        legal_balls (ASC). No wicket requirement.
+
+    runs_conceded uses SUM(d.runs_total) so it matches the existing
+    bowling endpoints (all deliveries including extras). Wickets
+    exclude run out / retired / obstructing the field (not bowler-
+    credited).
+
+    Perf note: When no match-level filter is active we skip the
+    innings/match JOINs entirely. See batting_leaders for the
+    super-over caveat (0.04% noise, imperceptible).
+    """
+    db = get_db()
+    match_where, params = filters.build(has_innings_join=False)
+    has_filters = bool(match_where)
+
+    if has_filters:
+        agg_sql = f"""
+            SELECT d.bowler_id AS person_id,
+                   SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
+                            THEN 1 ELSE 0 END) AS balls,
+                   SUM(d.runs_total) AS runs_conceded
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE d.bowler_id IS NOT NULL AND {match_where}
+            GROUP BY d.bowler_id
+            HAVING balls >= :min_balls
+        """
+        wkt_sql = f"""
+            SELECT d.bowler_id AS person_id, COUNT(*) AS wickets
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE d.bowler_id IS NOT NULL
+              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+              AND {match_where}
+            GROUP BY d.bowler_id
+        """
+    else:
+        agg_sql = """
+            SELECT d.bowler_id AS person_id,
+                   SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
+                            THEN 1 ELSE 0 END) AS balls,
+                   SUM(d.runs_total) AS runs_conceded
+            FROM delivery d
+            WHERE d.bowler_id IS NOT NULL
+            GROUP BY d.bowler_id
+            HAVING balls >= :min_balls
+        """
+        wkt_sql = """
+            SELECT d.bowler_id AS person_id, COUNT(*) AS wickets
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            WHERE d.bowler_id IS NOT NULL
+              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+            GROUP BY d.bowler_id
+        """
+
+    agg_rows = await db.q(agg_sql, {**params, "min_balls": min_balls})
+    wkt_rows = await db.q(wkt_sql, params)
+    wkt_map = {r["person_id"]: r["wickets"] or 0 for r in wkt_rows}
+
+    entries: list[dict] = []
+    for r in agg_rows:
+        pid = r["person_id"]
+        balls = r["balls"] or 0
+        runs = r["runs_conceded"] or 0
+        wkts = wkt_map.get(pid, 0)
+        entries.append({
+            "person_id": pid,
+            "balls": balls,
+            "runs_conceded": runs,
+            "wickets": wkts,
+            "strike_rate": _safe_div(balls, wkts) if wkts > 0 else None,
+            "economy": _safe_div(runs, balls, 6),
+        })
+
+    sr_top = sorted(
+        (e for e in entries if e["wickets"] >= min_wickets and e["strike_rate"] is not None),
+        key=lambda e: (e["strike_rate"], -e["wickets"]),
+    )[:limit]
+    econ_top = sorted(
+        (e for e in entries if e["economy"] is not None),
+        key=lambda e: (e["economy"], -e["balls"]),
+    )[:limit]
+
+    top_ids = {e["person_id"] for e in sr_top} | {e["person_id"] for e in econ_top}
+    name_map: dict[str, str] = {}
+    if top_ids:
+        placeholders = ",".join(f":n{i}" for i in range(len(top_ids)))
+        name_params = {f"n{i}": pid for i, pid in enumerate(top_ids)}
+        name_rows = await db.q(
+            f"SELECT id, name FROM person WHERE id IN ({placeholders})",
+            name_params,
+        )
+        name_map = {r["id"]: r["name"] for r in name_rows}
+    for e in sr_top:
+        e["name"] = name_map.get(e["person_id"], e["person_id"])
+    for e in econ_top:
+        e["name"] = name_map.get(e["person_id"], e["person_id"])
+
+    return {
+        "by_strike_rate": sr_top,
+        "by_economy": econ_top,
+        "thresholds": {
+            "min_balls": min_balls,
+            "min_wickets": min_wickets,
+        },
+    }
+
+
 def _bowling_all_filter(filters: FilterParams, person_id: str, batter_id: str | None = None):
     """WHERE clause for all-delivery bowling queries (includes wides/noballs)."""
     where, params = filters.build(has_innings_join=True)

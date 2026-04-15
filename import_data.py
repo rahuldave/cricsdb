@@ -355,6 +355,18 @@ async def main():
     from scripts.populate_partnerships import populate_full as partnerships_full
     await partnerships_full(db)
 
+    # Composite covering indexes + analyze for the leaderboard queries
+    # on the Batting/Bowling landing pages. Without these, an unfiltered
+    # SELECT … GROUP BY batter_id scan is 3s+; with them it drops to
+    # sub-second. ANALYZE updates the query planner stats so wicket
+    # queries pick the small-side-first join order.
+    print("\nBuilding leaderboard indexes + ANALYZE…")
+    await db.q("CREATE INDEX IF NOT EXISTS ix_delivery_batter_agg "
+               "ON delivery(batter_id, extras_wides, extras_noballs, runs_batter)")
+    await db.q("CREATE INDEX IF NOT EXISTS ix_delivery_bowler_agg "
+               "ON delivery(bowler_id, extras_wides, extras_noballs, runs_total)")
+    await db.q("ANALYZE")
+
     print(f"\nDatabase saved to {DB_PATH}")
     print(f"Size: {os.path.getsize(DB_PATH) / 1024 / 1024:.1f} MB")
 

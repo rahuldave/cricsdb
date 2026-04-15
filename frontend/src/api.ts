@@ -57,8 +57,12 @@ export const getTeamByseason = (team: string, filters?: F) =>
   fetchApi<{ seasons: TeamSeasonRecord[] }>(`/api/v1/teams/${encodeURIComponent(team)}/by-season`, filters as Record<string, string>)
 export const getTeamPlayersBySeason = (team: string, filters?: F) =>
   fetchApi<import('./types').TeamPlayersBySeason>(`/api/v1/teams/${encodeURIComponent(team)}/players-by-season`, filters as Record<string, string>)
+export const getTeamsLanding = (filters?: F) =>
+  fetchApi<import('./types').TeamsLanding>(`/api/v1/teams/landing`, filters as Record<string, string>)
 
 // Batting
+export const getBattingLeaders = (filters?: F & { limit?: number; min_balls?: number; min_dismissals?: number }) =>
+  fetchApi<import('./types').BattingLeaders>(`/api/v1/batters/leaders`, filters as Record<string, string>)
 export const getBatterSummary = (id: string, filters?: F) =>
   fetchApi<BattingSummary>(`/api/v1/batters/${id}/summary`, filters as Record<string, string>)
 export const getBatterInnings = (id: string, filters?: F & { limit?: number; offset?: number; sort?: string }) =>
@@ -77,6 +81,8 @@ export const getBatterInterWicket = (id: string, filters?: F) =>
   fetchApi<{ inter_wicket: InterWicketStats[] }>(`/api/v1/batters/${id}/inter-wicket`, filters as Record<string, string>)
 
 // Bowling
+export const getBowlingLeaders = (filters?: F & { limit?: number; min_balls?: number; min_wickets?: number }) =>
+  fetchApi<import('./types').BowlingLeaders>(`/api/v1/bowlers/leaders`, filters as Record<string, string>)
 export const getBowlerSummary = (id: string, filters?: F) =>
   fetchApi<BowlingSummary>(`/api/v1/bowlers/${id}/summary`, filters as Record<string, string>)
 export const getBowlerInnings = (id: string, filters?: F & { limit?: number; offset?: number }) =>
@@ -94,6 +100,8 @@ export const getBowlerWickets = (id: string, filters?: F) =>
   fetchApi<WicketAnalysis>(`/api/v1/bowlers/${id}/wickets`, filters as Record<string, string>)
 
 // Fielding
+export const getFieldingLeaders = (filters?: F & { limit?: number }) =>
+  fetchApi<import('./types').FieldingLeaders>(`/api/v1/fielders/leaders`, filters as Record<string, string>)
 export const getFielderSummary = (id: string, filters?: F) =>
   fetchApi<import('./types').FieldingSummary>(`/api/v1/fielders/${id}/summary`, filters as Record<string, string>)
 export const getFielderBySeason = (id: string, filters?: F) =>

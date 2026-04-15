@@ -16,10 +16,12 @@ import ErrorBanner from '../components/ErrorBanner'
 import {
   getBowlerSummary, getBowlerInnings, getBowlerVsBatters, getBowlerByOver,
   getBowlerByPhase, getBowlerBySeason, getBowlerWickets,
+  getBowlingLeaders,
 } from '../api'
 import type {
   PlayerSearchResult, BowlingSummary, BowlingInnings, BatterMatchup,
   OverStats, PhaseStats, WicketAnalysis,
+  BowlingLeaders, BowlingLeaderEntry, FilterParams,
 } from '../types'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
@@ -143,7 +145,7 @@ export default function Bowling() {
         <PlayerSearch role="bowler" onSelect={handleSelect} placeholder="Search for a bowler…" />
       </div>
 
-      {!playerId && <div className="wisden-empty">Search for a bowler to view stats</div>}
+      {!playerId && <BowlingLandingBoard filters={filters} filterDeps={filterDeps} />}
 
       {playerId && summaryFetch.loading && <Spinner label="Loading bowler…" size="lg" />}
 
@@ -394,6 +396,99 @@ export default function Bowling() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// ============================================================
+// Bowling landing — top 10 by strike rate + top 10 by economy,
+// shown below the search bar when no bowler is selected.
+// ============================================================
+
+interface BowlingLandingBoardProps {
+  filters: FilterParams
+  filterDeps: unknown[]
+}
+
+function BowlingLandingBoard({ filters, filterDeps }: BowlingLandingBoardProps) {
+  const board = useFetch<BowlingLeaders | null>(
+    () => getBowlingLeaders({ ...filters, limit: 10 }),
+    filterDeps,
+  )
+  if (board.loading && !board.data) return <Spinner label="Loading leaders…" />
+  if (board.error) {
+    return <ErrorBanner message={`Could not load leaders: ${board.error}`} onRetry={board.refetch} />
+  }
+  const data = board.data
+  if (!data) return null
+  const bothEmpty = data.by_strike_rate.length === 0 && data.by_economy.length === 0
+  if (bothEmpty) {
+    return <div className="wisden-empty">No bowlers meet the minimum-sample thresholds for the current filters.</div>
+  }
+
+  const carry: Record<string, string> = {}
+  if (filters.gender) carry.gender = filters.gender
+  if (filters.team_type) carry.team_type = filters.team_type
+  if (filters.tournament) carry.tournament = filters.tournament
+  if (filters.season_from) carry.season_from = filters.season_from
+  if (filters.season_to) carry.season_to = filters.season_to
+  const playerLink = (id: string) => {
+    const qs = new URLSearchParams({ player: id, ...carry })
+    return `/bowling?${qs.toString()}`
+  }
+
+  const renderTable = (title: string, metric: 'strike_rate' | 'economy', rows: BowlingLeaderEntry[]) => (
+    <div>
+      <h3 className="wisden-section-title">{title}</h3>
+      {rows.length === 0 ? (
+        <div className="wisden-tab-help" style={{ fontStyle: 'italic' }}>
+          No bowlers meet the threshold.
+        </div>
+      ) : (
+        <table className="wisden-table" style={{ width: '100%' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left' }}>Bowler</th>
+              <th style={{ textAlign: 'right' }}>{metric === 'strike_rate' ? 'SR' : 'Econ'}</th>
+              <th style={{ textAlign: 'right' }}>Wkts</th>
+              <th style={{ textAlign: 'right' }}>Balls</th>
+              <th style={{ textAlign: 'right' }}>Runs</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.person_id}>
+                <td>
+                  <span style={{ color: 'var(--ink-faint)', marginRight: '0.5rem' }}>{i + 1}.</span>
+                  <Link to={playerLink(r.person_id)} className="comp-link">{r.name}</Link>
+                </td>
+                <td className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
+                  {metric === 'strike_rate' ? r.strike_rate?.toFixed(2) : r.economy?.toFixed(2)}
+                </td>
+                <td className="num" style={{ textAlign: 'right' }}>{r.wickets}</td>
+                <td className="num" style={{ textAlign: 'right' }}>{r.balls}</td>
+                <td className="num" style={{ textAlign: 'right' }}>{r.runs_conceded}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+
+  return (
+    <div>
+      <div className="wisden-tab-help" style={{ marginBottom: '1.5rem' }}>
+        Top 10 bowlers in the current filter scope. Lower is better for both metrics:
+        strike rate counts balls per wicket; economy is runs conceded per over.
+        Thresholds: at least <span className="num">{data.thresholds.min_balls}</span> legal balls;
+        strike-rate list additionally requires{' '}
+        <span className="num">{data.thresholds.min_wickets}</span> wickets.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2.5rem', alignItems: 'start' }}>
+        {renderTable('Top by strike rate', 'strike_rate', data.by_strike_rate)}
+        {renderTable('Top by economy', 'economy', data.by_economy)}
+      </div>
     </div>
   )
 }

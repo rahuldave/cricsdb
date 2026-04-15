@@ -11,6 +11,20 @@ from ..filters import FilterParams
 router = APIRouter(prefix="/api/v1/teams", tags=["Teams"])
 
 
+# ICC full-member nations (men's & women's — same team strings in cricsheet).
+# Used by the Teams landing page to split international teams into the
+# top-line "regular" group vs "associate" (everyone else who's played an
+# international T20). Afghanistan + Ireland were elevated in 2017; we
+# treat them as regular for display simplicity since they play the full
+# tournament calendar today. Zimbabwe remains a full member despite
+# historical ICC pressure.
+ICC_FULL_MEMBERS = frozenset({
+    "Afghanistan", "Australia", "Bangladesh", "England", "India",
+    "Ireland", "New Zealand", "Pakistan", "South Africa", "Sri Lanka",
+    "West Indies", "Zimbabwe",
+})
+
+
 def _team_filter_clause(filters: FilterParams, team_param: str = ":team") -> tuple[str, dict]:
     """Build match-level filter clause for team queries (no innings join)."""
     where, params = filters.build(has_innings_join=False)
@@ -18,6 +32,96 @@ def _team_filter_clause(filters: FilterParams, team_param: str = ":team") -> tup
     if where:
         parts.append(where)
     return " AND ".join(parts), params
+
+
+@router.get("/landing")
+async def teams_landing(filters: FilterParams = Depends()):
+    """Filter-sensitive directory of teams for the Teams search landing.
+
+    Returns two branches:
+      - international: {regular: [...], associate: [...]} — split by
+        ICC full-member status (see ICC_FULL_MEMBERS).
+      - club: [{tournament, matches, teams: [...]}] — teams grouped by
+        the tournament they played in, ordered by tournament match
+        count desc. A team that played multiple tournaments in the
+        filter window appears under each.
+
+    All match counts reflect the current filter scope, so teams with
+    zero matches in window (e.g. Rising Pune Supergiant outside
+    2016–2017) vanish naturally.
+    """
+    db = get_db()
+    where, params = filters.build(has_innings_join=False)
+
+    # International — aggregate distinct team names and total filtered
+    # matches. team_type filter may already restrict this; we apply an
+    # additional `team_type = 'international'` unless filters.team_type
+    # is already set to club (in which case we return an empty list).
+    intl_regular: list[dict] = []
+    intl_associate: list[dict] = []
+    if filters.team_type != "club":
+        intl_parts = ["m.team_type = 'international'"]
+        if where:
+            intl_parts.append(where)
+        intl_rows = await db.q(
+            f"""
+            SELECT mp.team AS name, COUNT(DISTINCT m.id) AS matches
+            FROM matchplayer mp
+            JOIN match m ON m.id = mp.match_id
+            WHERE {" AND ".join(intl_parts)}
+            GROUP BY mp.team
+            ORDER BY matches DESC, mp.team
+            """,
+            params,
+        )
+        for r in intl_rows:
+            entry = {"name": r["name"], "matches": r["matches"]}
+            if r["name"] in ICC_FULL_MEMBERS:
+                intl_regular.append(entry)
+            else:
+                intl_associate.append(entry)
+
+    # Club — (team, tournament) pairs. Group tournaments by total match
+    # count in window; within a tournament, teams alphabetical.
+    club_groups: list[dict] = []
+    if filters.team_type != "international":
+        club_parts = ["m.team_type = 'club'", "m.event_name IS NOT NULL"]
+        if where:
+            club_parts.append(where)
+        club_rows = await db.q(
+            f"""
+            SELECT mp.team AS name, m.event_name AS tournament,
+                   COUNT(DISTINCT m.id) AS matches
+            FROM matchplayer mp
+            JOIN match m ON m.id = mp.match_id
+            WHERE {" AND ".join(club_parts)}
+            GROUP BY mp.team, m.event_name
+            """,
+            params,
+        )
+        by_tournament: dict[str, list[dict]] = {}
+        tourney_totals: dict[str, int] = {}
+        for r in club_rows:
+            t = r["tournament"]
+            by_tournament.setdefault(t, []).append(
+                {"name": r["name"], "matches": r["matches"]}
+            )
+            tourney_totals[t] = tourney_totals.get(t, 0) + (r["matches"] or 0)
+        for t in sorted(by_tournament.keys(), key=lambda x: (-tourney_totals[x], x)):
+            teams = sorted(by_tournament[t], key=lambda x: x["name"].lower())
+            club_groups.append({
+                "tournament": t,
+                "matches": tourney_totals[t],
+                "teams": teams,
+            })
+
+    return {
+        "international": {
+            "regular": intl_regular,
+            "associate": intl_associate,
+        },
+        "club": club_groups,
+    }
 
 
 @router.get("/{team}/summary")

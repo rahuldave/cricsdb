@@ -136,7 +136,15 @@ async def main():
     ap.add_argument("--dry-run", action="store_true",
                     help="Report how far behind the DB is and what would be "
                          "imported, without writing anything")
+    ap.add_argument("--db", type=str, default=None,
+                    help="Override the DB path (default: ./cricket.db). "
+                         "Used to smoke-test against a staging copy, e.g. a "
+                         "prod snapshot copied from ~/Downloads/t20-cricket-db_"
+                         "download/data/cricket.db → /tmp. See "
+                         "docs/testing-update-recent.md.")
     args = ap.parse_args()
+
+    db_path = args.db if args.db else DB_PATH
 
     window = pick_window(args.days)
     if window != args.days:
@@ -147,9 +155,11 @@ async def main():
               f"bundle ({AVAILABLE_WINDOWS[-1]}); some matches may be missed. "
               f"For a full rebuild, use download_data.py + import_data.py.")
 
-    if not os.path.exists(DB_PATH):
-        print(f"ERROR: {DB_PATH} not found. Build the DB first.", file=sys.stderr)
+    if not os.path.exists(db_path):
+        print(f"ERROR: {db_path} not found. Build the DB first.", file=sys.stderr)
         sys.exit(1)
+    if args.db:
+        print(f"Using DB override: {db_path}")
 
     workdir = tempfile.mkdtemp(prefix="cricsheet_recent_")
     zip_path = os.path.join(workdir, f"recently_added_{window}_json.zip")
@@ -181,7 +191,7 @@ async def main():
             return
 
         # Connect to DB and dedupe
-        db = Database(f"sqlite+aiosqlite:///{DB_PATH}")
+        db = Database(f"sqlite+aiosqlite:///{db_path}")
         await db.q("PRAGMA journal_mode = WAL")
 
         # How far behind are we?
@@ -285,6 +295,17 @@ async def main():
                     populate_incremental as partnerships_incr,
                 )
                 await partnerships_incr(db, new_match_ids)
+
+                # Refresh query planner stats and ensure leaderboard
+                # indexes exist. Index CREATE is a no-op if already
+                # there; ANALYZE is cheap and keeps bowling-leader
+                # joins from regressing after a big batch.
+                print("Refreshing leaderboard indexes + ANALYZE…")
+                await db.q("CREATE INDEX IF NOT EXISTS ix_delivery_batter_agg "
+                           "ON delivery(batter_id, extras_wides, extras_noballs, runs_batter)")
+                await db.q("CREATE INDEX IF NOT EXISTS ix_delivery_bowler_agg "
+                           "ON delivery(bowler_id, extras_wides, extras_noballs, runs_total)")
+                await db.q("ANALYZE")
 
             print("\nRegenerating site stats…")
             import subprocess

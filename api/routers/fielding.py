@@ -27,6 +27,126 @@ def _fielding_filter(filters: FilterParams, person_id: str):
     return " AND ".join(parts), params
 
 
+@router.get("/leaders")
+async def fielding_leaders(
+    filters: FilterParams = Depends(),
+    limit: int = Query(10, ge=1, le=50),
+):
+    """Top fielders + top keepers in the current filter scope.
+
+    Fielding leaderboards are volume-based, not rate-based: catches
+    per match is mostly a position/opportunity stat, not a skill stat.
+    So no thresholds — the top-N ranking is self-filtering.
+
+    Returns two lists:
+      - by_dismissals: sum of catches + run-outs + caught-and-bowled +
+        stumpings per fielder. Inclusive — keepers will appear here
+        too since they take many catches.
+      - by_keeper_dismissals: catches + stumpings from innings where
+        the fielder was the designated keeper per
+        `keeper_assignment`. This separates specialist keeping from
+        sub-fielders who caught behind the stumps. Uses the Tier 2
+        keeper-identification pipeline; see docs/spec-fielding-tier2.md.
+
+    Tiebreak: stumpings DESC (evidence of sharp hands) then catches
+    DESC then run-outs DESC.
+    """
+    db = get_db()
+    match_where, params = filters.build(has_innings_join=False)
+    has_filters = bool(match_where)
+
+    # --- List 1: top fielders by total dismissals ------------------
+    # All four kinds aggregated per fielder, with per-kind breakdown
+    # so the UI can show how the total composes.
+    fc_parts = ["fc.fielder_id IS NOT NULL"]
+    if has_filters:
+        fc_join = ("JOIN delivery d ON d.id = fc.delivery_id "
+                   "JOIN innings i ON i.id = d.innings_id "
+                   "JOIN match m ON m.id = i.match_id")
+        fc_parts.append(match_where)
+    else:
+        fc_join = ""
+    fc_where = " AND ".join(fc_parts)
+    fielder_rows = await db.q(
+        f"""
+        SELECT fc.fielder_id AS person_id,
+               COUNT(*) AS total,
+               SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+               SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+               SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+               SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS c_and_b
+        FROM fieldingcredit fc {fc_join}
+        WHERE {fc_where}
+        GROUP BY fc.fielder_id
+        ORDER BY total DESC, stumpings DESC, catches DESC, run_outs DESC
+        LIMIT :lim
+        """,
+        {**params, "lim": limit},
+    )
+
+    # --- List 2: top keepers by keeper dismissals ------------------
+    # Only fielding credits from innings where this fielder was the
+    # designated keeper count. Restricts to caught + stumped (run
+    # outs by the keeper are rare and muddy — they're fielding, not
+    # keeping).
+    ka_join = ("JOIN delivery d ON d.id = fc.delivery_id "
+               "JOIN innings i ON i.id = d.innings_id "
+               "JOIN keeperassignment ka ON ka.innings_id = i.id")
+    ka_parts = [
+        "fc.fielder_id IS NOT NULL",
+        "ka.keeper_id = fc.fielder_id",
+        "fc.kind IN ('caught', 'stumped')",
+    ]
+    if has_filters:
+        ka_join += " JOIN match m ON m.id = i.match_id"
+        ka_parts.append(match_where)
+    ka_where = " AND ".join(ka_parts)
+    keeper_rows = await db.q(
+        f"""
+        SELECT fc.fielder_id AS person_id,
+               COUNT(*) AS total,
+               SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+               SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings
+        FROM fieldingcredit fc {ka_join}
+        WHERE {ka_where}
+        GROUP BY fc.fielder_id
+        ORDER BY total DESC, stumpings DESC, catches DESC
+        LIMIT :lim
+        """,
+        {**params, "lim": limit},
+    )
+
+    # Batch name lookup for the ~20 survivors.
+    top_ids = {r["person_id"] for r in fielder_rows} | {r["person_id"] for r in keeper_rows}
+    name_map: dict[str, str] = {}
+    if top_ids:
+        placeholders = ",".join(f":n{i}" for i in range(len(top_ids)))
+        name_params = {f"n{i}": pid for i, pid in enumerate(top_ids)}
+        name_rows = await db.q(
+            f"SELECT id, name FROM person WHERE id IN ({placeholders})",
+            name_params,
+        )
+        name_map = {r["id"]: r["name"] for r in name_rows}
+
+    def enrich(r, keeper: bool) -> dict:
+        d = {
+            "person_id": r["person_id"],
+            "name": name_map.get(r["person_id"], r["person_id"]),
+            "total": r["total"] or 0,
+            "catches": r["catches"] or 0,
+            "stumpings": r["stumpings"] or 0,
+        }
+        if not keeper:
+            d["run_outs"] = r["run_outs"] or 0
+            d["c_and_b"] = r["c_and_b"] or 0
+        return d
+
+    return {
+        "by_dismissals": [enrich(r, keeper=False) for r in fielder_rows],
+        "by_keeper_dismissals": [enrich(r, keeper=True) for r in keeper_rows],
+    }
+
+
 @router.get("/{person_id}/summary")
 async def fielding_summary(
     person_id: str,

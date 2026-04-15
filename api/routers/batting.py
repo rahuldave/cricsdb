@@ -31,6 +31,141 @@ def _batting_filter(filters: FilterParams, person_id: str, bowler_id: str | None
     return " AND ".join(parts), params
 
 
+@router.get("/leaders")
+async def batting_leaders(
+    filters: FilterParams = Depends(),
+    limit: int = Query(10, ge=1, le=50),
+    min_balls: int = Query(100, ge=1),
+    min_dismissals: int = Query(3, ge=0),
+):
+    """Top batters in the current filter scope.
+
+    Returns two leaderboards:
+      - by_average: filtered to `min_balls` + `min_dismissals`, sorted
+        by runs/dismissals (DESC). Excludes tiny-sample "never out"
+        inflations.
+      - by_strike_rate: filtered to `min_balls`, sorted by
+        runs × 100 / balls (DESC). No dismissal requirement — SR is
+        a per-ball measure.
+
+    Tiebreak by total runs (DESC) so within equal rates, the higher-
+    volume batter surfaces.
+
+    Perf note: When no match-level filter is active we skip the
+    innings/match JOINs entirely — scanning the delivery table by
+    batter_id index is ~100× faster than joining row-by-row to match.
+    The trade-off is super-over deliveries (0.04% of 2.95M) leak into
+    the no-filter leaderboard, which is imperceptible given the
+    thresholds.
+    """
+    db = get_db()
+    # has_innings_join=False → only match-level clauses, no super_over
+    # filter. Empty string = no filters at all → skip both joins.
+    match_where, params = filters.build(has_innings_join=False)
+    has_filters = bool(match_where)
+
+    if has_filters:
+        agg_sql = f"""
+            SELECT d.batter_id AS person_id,
+                   SUM(d.runs_batter) AS runs,
+                   COUNT(*) AS balls
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE d.batter_id IS NOT NULL
+              AND d.extras_wides = 0 AND d.extras_noballs = 0
+              AND {match_where}
+            GROUP BY d.batter_id
+            HAVING COUNT(*) >= :min_balls
+        """
+        dism_sql = f"""
+            SELECT w.player_out_id AS person_id, COUNT(*) AS dismissals
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE w.player_out_id IS NOT NULL
+              AND w.kind NOT IN ('retired hurt', 'retired out')
+              AND {match_where}
+            GROUP BY w.player_out_id
+        """
+    else:
+        agg_sql = """
+            SELECT d.batter_id AS person_id,
+                   SUM(d.runs_batter) AS runs,
+                   COUNT(*) AS balls
+            FROM delivery d
+            WHERE d.batter_id IS NOT NULL
+              AND d.extras_wides = 0 AND d.extras_noballs = 0
+            GROUP BY d.batter_id
+            HAVING COUNT(*) >= :min_balls
+        """
+        dism_sql = """
+            SELECT w.player_out_id AS person_id, COUNT(*) AS dismissals
+            FROM wicket w
+            WHERE w.player_out_id IS NOT NULL
+              AND w.kind NOT IN ('retired hurt', 'retired out')
+            GROUP BY w.player_out_id
+        """
+
+    agg_rows = await db.q(agg_sql, {**params, "min_balls": min_balls})
+    dism_rows = await db.q(dism_sql, params)
+    dism_map = {r["person_id"]: r["dismissals"] or 0 for r in dism_rows}
+
+    # Rank in Python, then only fetch names for the ~20 survivors
+    # (top 10 avg + top 10 SR, possibly overlapping). Avoids a
+    # thousand-element IN-clause for name lookup.
+    entries: list[dict] = []
+    for r in agg_rows:
+        pid = r["person_id"]
+        runs = r["runs"] or 0
+        balls = r["balls"] or 0
+        dism = dism_map.get(pid, 0)
+        entries.append({
+            "person_id": pid,
+            "runs": runs,
+            "balls": balls,
+            "dismissals": dism,
+            "average": _safe_div(runs, dism) if dism > 0 else None,
+            "strike_rate": _safe_div(runs, balls, 100),
+        })
+
+    avg_top = sorted(
+        (e for e in entries if e["dismissals"] >= min_dismissals and e["average"] is not None),
+        key=lambda e: (e["average"], e["runs"]),
+        reverse=True,
+    )[:limit]
+    sr_top = sorted(
+        (e for e in entries if e["strike_rate"] is not None),
+        key=lambda e: (e["strike_rate"], e["runs"]),
+        reverse=True,
+    )[:limit]
+
+    top_ids = {e["person_id"] for e in avg_top} | {e["person_id"] for e in sr_top}
+    name_map: dict[str, str] = {}
+    if top_ids:
+        placeholders = ",".join(f":n{i}" for i in range(len(top_ids)))
+        name_params = {f"n{i}": pid for i, pid in enumerate(top_ids)}
+        name_rows = await db.q(
+            f"SELECT id, name FROM person WHERE id IN ({placeholders})",
+            name_params,
+        )
+        name_map = {r["id"]: r["name"] for r in name_rows}
+    for e in avg_top:
+        e["name"] = name_map.get(e["person_id"], e["person_id"])
+    for e in sr_top:
+        e["name"] = name_map.get(e["person_id"], e["person_id"])
+
+    return {
+        "by_average": avg_top,
+        "by_strike_rate": sr_top,
+        "thresholds": {
+            "min_balls": min_balls,
+            "min_dismissals": min_dismissals,
+        },
+    }
+
+
 def _enrich_batting_row(r: dict) -> dict:
     """Add computed metrics to a batting aggregation row."""
     balls = r.get("balls") or 0
