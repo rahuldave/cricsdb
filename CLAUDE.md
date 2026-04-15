@@ -97,6 +97,22 @@ Batting/Bowling/Fielding landings additionally default `season_from`/`season_to`
 
 For every endpoint — path, query params, example curl, and an abbreviated response — see **`docs/api.md`**. It's the quick-reference companion to `SPEC.md` (which has the underlying SQL + full schemas).
 
+## Keeping docs in sync
+
+**Every feature or substantive change must end with a docs pass.** Before calling a change done (and certainly before committing), scan the doc set and update whatever the change affects. Specifically:
+
+- **Added / changed / removed an API route?** Update **`docs/api.md`** — add or amend the endpoint section (path, one-liner, curl, abbreviated JSON response). Hit the endpoint via `curl` to capture a real response rather than inventing one.
+- **Changed a URL scheme, filter param, or response shape on an existing endpoint?** Same — update the affected `docs/api.md` section. Re-curl the example if the shape changed.
+- **Added a new router file, a new page, or a new hook?** Update **`docs/codebase-tour.md`** (both the router summary line and the frontend hooks block).
+- **Shipped a feature that belongs in the A-O narrative?** Add or amend the entry in **`docs/enhancements-roadmap.md`**; done items stay there as historical markers.
+- **Made a non-obvious design decision** (a convention future contributors would otherwise try to change)? Add a bullet to **`docs/design-decisions.md`**.
+- **Changed pipeline behaviour, introduced a new invariant the DB must carry, or added a testing workflow?** Touch **`docs/data-pipeline.md`** (and/or `docs/testing-update-recent.md`).
+- **Introduced a new perf pattern worth reusing?** Add it to **`docs/perf-leaderboards.md`** (or create a sibling `perf-*.md` if scope is different).
+- **Changed the page structure, tabs, or search-bar landing?** Update the "Landing pages" and "Key Files" sections of `CLAUDE.md` itself.
+- **Changed anything user-visible about the home page, filter bar, or global conventions?** Update the relevant narrative doc and this file's convention list.
+
+If the change is genuinely trivial (typo, whitespace, one-line comment), skip. Otherwise default to updating — undocumented features decay fastest.
+
 ## Performance notes
 
 - **Leaderboard landings** (Batting / Bowling / Fielding) depend on two composite covering indexes (`ix_delivery_batter_agg`, `ix_delivery_bowler_agg`) plus fresh `ANALYZE` stats. These are created idempotently by both `import_data.py` and `update_recent.py`. See **`docs/perf-leaderboards.md`** for the diagnosis and the reusable pattern: use `filters.build(has_innings_join=False)` to get a pure match clause, then conditionally drop the innings/match JOINs entirely when no filters are active (avoids 2.95M × 2 PK probes on the delivery scan).
