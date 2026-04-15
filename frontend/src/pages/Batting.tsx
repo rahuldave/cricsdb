@@ -4,6 +4,7 @@ import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch, type FetchState } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useDefaultSeasonWindow } from '../hooks/useDefaultSeasonWindow'
 import PlayerSearch from '../components/PlayerSearch'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
@@ -421,6 +422,11 @@ interface BattingLandingBoardProps {
 }
 
 function BattingLandingBoard({ filters, filterDeps }: BattingLandingBoardProps) {
+  // Default to last 3 seasons when no season filter is set. Writes to
+  // URL so FilterBar reflects the scope. One-shot per mount — user can
+  // clear via FilterBar reset buttons without re-triggering.
+  useDefaultSeasonWindow(filters, true)
+
   const board = useFetch<BattingLeaders | null>(
     () => getBattingLeaders({ ...filters, limit: 10 }),
     filterDeps,

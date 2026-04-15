@@ -128,6 +128,13 @@ export default function FilterBar() {
 
   const segBtn = (active: boolean) => `wisden-seg${active ? ' is-active' : ''}`
 
+  const seasonsSet = Boolean(seasonFrom || seasonTo)
+  const anyFilterSet = Boolean(gender || teamType || tournament || seasonFrom || seasonTo)
+  const clearSeasons = () => setUrlParams({ season_from: '', season_to: '' })
+  const clearAll = () => setUrlParams({
+    gender: '', team_type: '', tournament: '', season_from: '', season_to: '',
+  })
+
   return (
     <div className="wisden-filterbar">
       <div className="wisden-filterbar-inner">
@@ -185,7 +192,20 @@ export default function FilterBar() {
             <option value="">{seasonsError ? '⚠' : 'To'}</option>
             {seasons.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
+          {seasonsSet && (
+            <button type="button" onClick={clearSeasons} className="wisden-reset"
+              title="Clear season range — show all-time">
+              all-time
+            </button>
+          )}
         </div>
+
+        {anyFilterSet && (
+          <button type="button" onClick={clearAll} className="wisden-reset wisden-reset-all"
+            title="Clear every filter">
+            reset all
+          </button>
+        )}
       </div>
     </div>
   )

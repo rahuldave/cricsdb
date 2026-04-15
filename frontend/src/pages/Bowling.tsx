@@ -4,6 +4,7 @@ import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch, type FetchState } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useDefaultSeasonWindow } from '../hooks/useDefaultSeasonWindow'
 import PlayerSearch from '../components/PlayerSearch'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
@@ -411,6 +412,8 @@ interface BowlingLandingBoardProps {
 }
 
 function BowlingLandingBoard({ filters, filterDeps }: BowlingLandingBoardProps) {
+  useDefaultSeasonWindow(filters, true)
+
   const board = useFetch<BowlingLeaders | null>(
     () => getBowlingLeaders({ ...filters, limit: 10 }),
     filterDeps,

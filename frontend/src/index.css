@@ -214,6 +214,19 @@ a { color: inherit; }
 .wisden-select:hover { color: var(--accent); }
 .wisden-select:disabled { color: var(--accent); border-bottom-style: dashed; }
 .wisden-filter-dash { color: var(--ink-faint); }
+.wisden-reset {
+  background: transparent;
+  border: 0;
+  padding: 0.1rem 0;
+  font: inherit;
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: color 120ms;
+}
+.wisden-reset:hover { color: var(--accent); }
+.wisden-reset-all { margin-left: auto; }
 
 /* ─────────────────────────────────────────────────────────────
    Shared components — StatCard, DataTable, Spinner, ErrorBanner, PlayerSearch
