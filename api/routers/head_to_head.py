@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams
+from ..tournament_canonical import series_type_clause
 
 router = APIRouter(prefix="/api/v1/head-to-head", tags=["Head to Head"])
 
@@ -21,6 +23,10 @@ async def head_to_head(
     batter_id: str,
     bowler_id: str,
     filters: FilterParams = Depends(),
+    series_type: Optional[str] = Query(
+        None,
+        description="all (default) / bilateral_only / tournament_only — narrows by series category.",
+    ),
 ):
     db = get_db()
     where, params = filters.build(has_innings_join=True)
@@ -35,6 +41,9 @@ async def head_to_head(
     ]
     if where:
         base_parts.append(where)
+    st = series_type_clause(series_type)
+    if st:
+        base_parts.append(st)
     base_clause = " AND ".join(base_parts)
 
     # Person names — 404 on either side if the id doesn't resolve, so

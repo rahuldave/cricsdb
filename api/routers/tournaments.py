@@ -39,6 +39,7 @@ from ..tournament_canonical import (
     TOURNAMENT_CANONICAL, TOURNAMENT_SERIES_TYPE,
     ICC_EVENT_NAMES, BILATERAL_TOP_TEAMS,
     canonicalize, variants, event_name_in_clause, series_type,
+    series_type_clause as _series_type_clause,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["Tournaments"])
@@ -86,31 +87,6 @@ def _build_filter_clauses(
 def _t20_match_clause(alias: str = "m") -> str:
     """Restrict to T20/IT20 matches (the only format we cover)."""
     return f"{alias}.match_type IN ('T20', 'IT20')"
-
-
-def _series_type_clause(series_type: str | None, alias: str = "m") -> str | None:
-    """Build a clause to narrow event_name by series category.
-
-    `bilateral_only` excludes ICC events (T20 WC, Asia Cup, etc.) and
-    other classified-as-icc_event canonicals — what's left is bilateral
-    tour matches (cricsheet event_name like "England tour of West
-    Indies") plus untagged matches (event_name IS NULL).
-
-    `tournament_only` keeps only ICC events.
-
-    `all` (or None / unrecognized) returns no clause.
-    """
-    if series_type not in ("bilateral_only", "tournament_only"):
-        return None
-    # Build the union of all cricsheet event_name variants under
-    # canonicals classified as icc_event.
-    icc_variants: list[str] = []
-    for canon in ICC_EVENT_NAMES:
-        icc_variants.extend(variants(canon))
-    in_clause = event_name_in_clause(icc_variants, col=f"{alias}.event_name")
-    if series_type == "bilateral_only":
-        return f"({alias}.event_name IS NULL OR NOT {in_clause})"
-    return in_clause
 
 
 # ─── Landing endpoint ─────────────────────────────────────────────────
@@ -308,6 +284,18 @@ async def tournaments_landing(filters: FilterParams = Depends()):
             db, filters, gender="female",
         )
 
+    # Club rivalries — top team-pair matchups within franchise/domestic
+    # leagues. Drives the H2H Team-vs-Team mode's club suggestions
+    # alongside the international rivalries.
+    club_rivalries_men: list[dict] = []
+    club_rivalries_women: list[dict] = []
+    show_club_men = filters.gender != "female" and filters.team_type != "international"
+    show_club_women = filters.gender != "male" and filters.team_type != "international"
+    if show_club_men:
+        club_rivalries_men = await _top_club_rivalries(db, filters, gender="male", limit=12)
+    if show_club_women:
+        club_rivalries_women = await _top_club_rivalries(db, filters, gender="female", limit=12)
+
     return {
         "international": {
             "icc_events": icc_events,
@@ -323,8 +311,72 @@ async def tournaments_landing(filters: FilterParams = Depends()):
             "domestic_leagues": domestic_leagues,
             "women_franchise": women_franchise,
             "other": other_club,
+            "rivalries": {
+                "men": club_rivalries_men,
+                "women": club_rivalries_women,
+            },
         },
     }
+
+
+async def _top_club_rivalries(
+    db, filters: FilterParams, gender: str, limit: int = 12,
+) -> list[dict]:
+    """Top-N most-played team pairs within club tournaments. Used by
+    the H2H Team-vs-Team page's club suggestion tiles. Each entry
+    includes the dominant tournament for context (a pair like
+    "RCB v CSK" is unambiguously IPL — no ICC-event mixing here)."""
+    clauses = [
+        _t20_match_clause(),
+        "m.team_type = 'club'",
+        f"m.gender = '{gender}'",
+    ]
+    if filters.season_from:
+        clauses.append("m.season >= :season_from")
+    if filters.season_to:
+        clauses.append("m.season <= :season_to")
+    where = " AND ".join(clauses)
+    params: dict = {}
+    if filters.season_from:
+        params["season_from"] = filters.season_from
+    if filters.season_to:
+        params["season_to"] = filters.season_to
+    params["lim"] = limit
+
+    rows = await db.q(
+        f"""
+        WITH p AS (
+          SELECT CASE WHEN m.team1 < m.team2 THEN m.team1 ELSE m.team2 END AS a,
+                 CASE WHEN m.team1 < m.team2 THEN m.team2 ELSE m.team1 END AS b,
+                 m.event_name AS tournament,
+                 m.outcome_winner AS winner,
+                 m.outcome_result AS result
+          FROM match m
+          WHERE {where}
+        )
+        SELECT a, b, tournament,
+               COUNT(*) AS matches,
+               SUM(CASE WHEN winner = a THEN 1 ELSE 0 END) AS a_wins,
+               SUM(CASE WHEN winner = b THEN 1 ELSE 0 END) AS b_wins,
+               SUM(CASE WHEN result = 'tie' THEN 1 ELSE 0 END) AS ties,
+               SUM(CASE WHEN result = 'no result' THEN 1 ELSE 0 END) AS no_result
+        FROM p
+        GROUP BY a, b, tournament
+        ORDER BY matches DESC, a, b
+        LIMIT :lim
+        """,
+        params,
+    )
+    return [
+        {
+            "team1": r["a"], "team2": r["b"],
+            "tournament": r["tournament"],
+            "matches": r["matches"],
+            "team1_wins": r["a_wins"], "team2_wins": r["b_wins"],
+            "ties": r["ties"], "no_result": r["no_result"],
+        }
+        for r in rows
+    ]
 
 
 async def _rivalries_top_and_other_count(

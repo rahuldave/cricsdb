@@ -16,8 +16,23 @@ import TournamentDossier from '../components/tournaments/TournamentDossier'
 import { getHeadToHead, getTournamentsLanding } from '../api'
 import type {
   PlayerSearchResult, HeadToHeadResponse, HeadToHeadMatch,
-  TournamentsLanding, RivalryEntry,
+  TournamentsLanding, RivalryEntry, ClubRivalryEntry,
 } from '../types'
+
+// Curated player matchups for the Player-vs-Player canned suggestions.
+// These are the ones we link from the Home page already, plus a few more.
+// Hardcoded since "popular matchup" isn't a stat we compute.
+const POPULAR_MATCHUPS_MEN: { batter: string; bowler: string; batterName: string; bowlerName: string }[] = [
+  { batter: 'ba607b88', bowler: '462411b3', batterName: 'V Kohli',     bowlerName: 'JJ Bumrah' },
+  { batter: '740742ef', bowler: 'ce820073', batterName: 'RG Sharma',   bowlerName: 'Sandeep Sharma' },
+  { batter: 'ba607b88', bowler: '57ee1fde', batterName: 'V Kohli',     bowlerName: 'YS Chahal' },
+  { batter: 'c4487b84', bowler: '462411b3', batterName: 'AB de Villiers', bowlerName: 'JJ Bumrah' },
+]
+const POPULAR_MATCHUPS_WOMEN: { batter: string; bowler: string; batterName: string; bowlerName: string }[] = [
+  { batter: 'd32cf49a', bowler: '63e3b6b3', batterName: 'HK Matthews', bowlerName: 'M Kapp' },
+  { batter: '5d2eda89', bowler: 'be150fc8', batterName: 'S Mandhana',  bowlerName: 'EA Perry' },
+  { batter: '52d1dbc8', bowler: 'be150fc8', batterName: 'BL Mooney',   bowlerName: 'EA Perry' },
+]
 
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
@@ -56,8 +71,10 @@ export default function HeadToHead() {
 
 function PlayerVsPlayer() {
   const filters = useFilters()
+  const setUrlParams = useSetUrlParams()
   const [batterId, setBatterId] = useUrlParam('batter')
   const [bowlerId, setBowlerId] = useUrlParam('bowler')
+  const [seriesType, setSeriesType] = useUrlParam('series_type', 'all')
 
   const handleBatter = (p: PlayerSearchResult) => setBatterId(p.id)
   const handleBowler = (p: PlayerSearchResult) => setBowlerId(p.id)
@@ -65,9 +82,12 @@ function PlayerVsPlayer() {
   const enabled = !!(batterId && bowlerId)
   const { data, loading, error, refetch } = useFetch<HeadToHeadResponse | null>(
     () => enabled
-      ? getHeadToHead(batterId, bowlerId, filters)
+      ? getHeadToHead(batterId, bowlerId, {
+          ...filters,
+          series_type: seriesType === 'all' ? undefined : seriesType,
+        })
       : Promise.resolve(null),
-    [batterId, bowlerId, filters.gender, filters.team_type, filters.tournament,
+    [batterId, bowlerId, seriesType, filters.gender, filters.team_type, filters.tournament,
      filters.season_from, filters.season_to],
   )
   useDocumentTitle(
@@ -104,8 +124,76 @@ function PlayerVsPlayer() {
         </div>
       </div>
 
+      {/* Series-type pill — narrows the H2H to international bilateral
+          (T20I tours), ICC events (T20 WC etc.), or all (default).
+          Doesn't apply for matchups that only meet in club tournaments
+          like IPL — for those, all and bilateral_only return the same
+          rows since IPL isn't an ICC event. */}
+      {enabled && (
+        <div className="mb-4 flex items-center gap-2 wisden-tab-help">
+          <span>Show:</span>
+          {(['all', 'bilateral_only', 'tournament_only'] as const).map(s => (
+            <button
+              key={s}
+              type="button"
+              className="wisden-clear"
+              onClick={() => setSeriesType(s === 'all' ? '' : s)}
+              style={{
+                color: seriesType === s ? 'var(--accent)' : 'var(--ink-faint)',
+                fontWeight: seriesType === s ? 600 : 400,
+              }}
+            >
+              {s === 'all' ? 'All meetings'
+                : s === 'bilateral_only' ? 'Bilateral / club only'
+                : 'ICC events only'}
+            </button>
+          ))}
+        </div>
+      )}
+
       {!enabled && (
-        <div className="wisden-empty">Select both a batter and bowler to view head-to-head stats</div>
+        <>
+          <div className="wisden-empty">Select both a batter and bowler — or pick a popular matchup below</div>
+          <div className="mt-8">
+            <h3 className="wisden-section-title">Popular matchups</h3>
+            <div className="wisden-tab-help mb-2">Men's</div>
+            <div className="wisden-tile-grid">
+              {POPULAR_MATCHUPS_MEN.map(m => (
+                <button
+                  key={`m-${m.batter}-${m.bowler}`}
+                  type="button"
+                  className="wisden-tile"
+                  onClick={() => setUrlParams({
+                    batter: m.batter, bowler: m.bowler, mode: 'player', gender: 'male',
+                  })}
+                >
+                  <div className="wisden-tile-title">
+                    {m.batterName} <span className="wisden-tile-vs">v</span> {m.bowlerName}
+                    <span className="wisden-tile-faint" style={{ fontSize: '0.78em' }}> men's</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="wisden-tab-help mt-6 mb-2">Women's</div>
+            <div className="wisden-tile-grid">
+              {POPULAR_MATCHUPS_WOMEN.map(m => (
+                <button
+                  key={`w-${m.batter}-${m.bowler}`}
+                  type="button"
+                  className="wisden-tile"
+                  onClick={() => setUrlParams({
+                    batter: m.batter, bowler: m.bowler, mode: 'player', gender: 'female',
+                  })}
+                >
+                  <div className="wisden-tile-title">
+                    {m.batterName} <span className="wisden-tile-vs">v</span> {m.bowlerName}
+                    <span className="wisden-tile-faint" style={{ fontSize: '0.78em' }}> women's</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
       )}
 
       {enabled && loading && <Spinner label="Loading head-to-head…" size="lg" />}
@@ -223,10 +311,14 @@ function TeamVsTeamPicker({
     [showSuggestions],
   )
 
-  const pickPair = (a: string, b: string, gender?: string) => {
-    const updates: Record<string, string> = { team1: a, team2: b, mode: 'team' }
+  const pickPair = (
+    a: string, b: string, gender?: string,
+    teamType: 'international' | 'club' = 'international',
+  ) => {
+    const updates: Record<string, string> = {
+      team1: a, team2: b, mode: 'team', team_type: teamType,
+    }
     if (gender) updates.gender = gender
-    if (!updates.team_type) updates.team_type = 'international'
     setUrlParams(updates)
   }
 
@@ -308,6 +400,54 @@ function TeamVsTeamPicker({
                       </button>
                     ))}
                   </div>
+
+                  {/* ── Club rivalries (e.g. CSK v MI in IPL) ── */}
+                  {suggestionsFetch.data.club.rivalries.men.length > 0 && (
+                    <>
+                      <div className="wisden-tab-help mt-6 mb-2">Club — Men's</div>
+                      <div className="wisden-tile-grid">
+                        {suggestionsFetch.data.club.rivalries.men.map((r: ClubRivalryEntry) => (
+                          <button
+                            key={`cm-${r.team1}|${r.team2}`}
+                            type="button"
+                            className="wisden-tile"
+                            onClick={() => pickPair(r.team1, r.team2, 'male', 'club')}
+                          >
+                            <div className="wisden-tile-title">
+                              {r.team1} <span className="wisden-tile-vs">v</span> {r.team2}
+                            </div>
+                            <div className="wisden-tile-sub">
+                              {r.matches} matches · {r.team1_wins}–{r.team2_wins}
+                              <span className="wisden-tile-faint"> · {r.tournament}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {suggestionsFetch.data.club.rivalries.women.length > 0 && (
+                    <>
+                      <div className="wisden-tab-help mt-6 mb-2">Club — Women's</div>
+                      <div className="wisden-tile-grid">
+                        {suggestionsFetch.data.club.rivalries.women.map((r: ClubRivalryEntry) => (
+                          <button
+                            key={`cw-${r.team1}|${r.team2}`}
+                            type="button"
+                            className="wisden-tile"
+                            onClick={() => pickPair(r.team1, r.team2, 'female', 'club')}
+                          >
+                            <div className="wisden-tile-title">
+                              {r.team1} <span className="wisden-tile-vs">v</span> {r.team2}
+                            </div>
+                            <div className="wisden-tile-sub">
+                              {r.matches} matches · {r.team1_wins}–{r.team2_wins}
+                              <span className="wisden-tile-faint"> · {r.tournament}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>

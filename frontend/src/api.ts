@@ -136,7 +136,10 @@ export const getInningsGrid = (matchId: number) =>
   fetchApi<InningsGridResponse>(`/api/v1/matches/${matchId}/innings-grid`)
 
 // Head to Head
-export const getHeadToHead = (batterId: string, bowlerId: string, filters?: F) =>
+export const getHeadToHead = (
+  batterId: string, bowlerId: string,
+  filters?: F & { series_type?: string },
+) =>
   fetchApi<HeadToHeadResponse>(`/api/v1/head-to-head/${batterId}/${bowlerId}`, filters as Record<string, string>)
 
 // Team stats — batting / bowling / fielding / partnerships

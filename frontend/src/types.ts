@@ -1027,6 +1027,17 @@ export interface RivalryEntry {
   latest_match?: { match_id: number; date: string | null; winner: string | null } | null
 }
 
+export interface ClubRivalryEntry {
+  team1: string
+  team2: string
+  tournament: string
+  matches: number
+  team1_wins: number
+  team2_wins: number
+  ties: number
+  no_result: number
+}
+
 export interface TournamentsLanding {
   international: {
     icc_events: TournamentLandingEntry[]
@@ -1042,6 +1053,10 @@ export interface TournamentsLanding {
     domestic_leagues: TournamentLandingEntry[]
     women_franchise: TournamentLandingEntry[]
     other: TournamentLandingEntry[]
+    rivalries: {
+      men: ClubRivalryEntry[]
+      women: ClubRivalryEntry[]
+    }
   }
 }
 

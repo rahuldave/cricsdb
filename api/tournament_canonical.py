@@ -128,3 +128,30 @@ def event_name_in_clause(names: list[str], col: str = "m.event_name") -> str:
 def series_type(canonical: str) -> str:
     """Classify a canonical name into a landing-page bucket."""
     return TOURNAMENT_SERIES_TYPE.get(canonical, "other")
+
+
+def series_type_clause(series_type_value: str | None, alias: str = "m") -> str | None:
+    """Build a clause to narrow event_name by series category.
+
+    `bilateral_only` excludes ICC events (T20 WC, Asia Cup, etc.) and
+    other classified-as-icc_event canonicals — what's left is bilateral
+    tour matches (cricsheet event_name like "England tour of West
+    Indies") plus untagged matches (event_name IS NULL).
+
+    `tournament_only` keeps only ICC events.
+
+    `all` (or None / unrecognized) returns no clause.
+
+    Lives here (not in routers/tournaments.py) so head_to_head and
+    other routers can import it without depending on the tournaments
+    router.
+    """
+    if series_type_value not in ("bilateral_only", "tournament_only"):
+        return None
+    icc_variants: list[str] = []
+    for canon in ICC_EVENT_NAMES:
+        icc_variants.extend(variants(canon))
+    in_clause = event_name_in_clause(icc_variants, col=f"{alias}.event_name")
+    if series_type_value == "bilateral_only":
+        return f"({alias}.event_name IS NULL OR NOT {in_clause})"
+    return in_clause
