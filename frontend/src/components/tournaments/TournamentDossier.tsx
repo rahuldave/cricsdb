@@ -210,7 +210,17 @@ export default function TournamentDossier({
   const headlineTitle = isRivalryMode
     ? (
         <>
-          {filterTeam} <span className="wisden-h2h-vs">v</span> {filterOpponent}
+          <Link
+            to={teamLinkHref(filterTeam!, { tournament, gender: filters.gender })}
+            className="comp-link"
+            style={{ fontSize: 'inherit', fontWeight: 'inherit' }}
+          >{filterTeam}</Link>
+          {' '}<span className="wisden-h2h-vs">v</span>{' '}
+          <Link
+            to={teamLinkHref(filterOpponent!, { tournament, gender: filters.gender })}
+            className="comp-link"
+            style={{ fontSize: 'inherit', fontWeight: 'inherit' }}
+          >{filterOpponent}</Link>
           {genderSuffix && (
             <span className="wisden-tile-faint" style={{ fontSize: '0.7em' }}>
               {genderSuffix}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
@@ -62,6 +62,18 @@ export default function Batting() {
   )
   const summary = summaryFetch.data
   useDocumentTitle(summary ? `${summary.name} — Batting` : playerId ? null : 'Batting')
+
+  // Self-correcting deep link — if a user lands on /batting?player=X
+  // without a gender filter, infer it from the player's international
+  // appearances so downstream FilterBar / endpoint calls scope right.
+  // Most players have only one gender; unambiguous cases get set
+  // automatically, ambiguous ones (extremely rare) stay open.
+  useEffect(() => {
+    if (!summary || filters.gender) return
+    const g = summary.nationalities?.[0]?.gender
+    const allSameGender = summary.nationalities?.every(n => n.gender === g)
+    if (g && allSameGender) setUrlParams({ gender: g })
+  }, [summary, filters.gender])
 
   // Per-tab fetches: each is gated on `activeTab === '...'` so only the
   // visible tab does network work. Switching tabs re-runs the gated fetch.

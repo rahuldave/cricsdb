@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
@@ -61,6 +61,14 @@ export default function Fielding() {
   )
   const summary = summaryFetch.data
   useDocumentTitle(summary ? `${summary.name} — Fielding` : playerId ? null : 'Fielding')
+
+  // Self-correcting deep link — see Batting.tsx for the rationale.
+  useEffect(() => {
+    if (!summary || filters.gender) return
+    const g = summary.nationalities?.[0]?.gender
+    const allSameGender = summary.nationalities?.every(n => n.gender === g)
+    if (g && allSameGender) setUrlParams({ gender: g })
+  }, [summary, filters.gender])
 
   const seasonFetch = useFetch<{ by_season: FieldingSeason[] } | null>(
     () => playerId && activeTab === 'By Season'
