@@ -127,6 +127,34 @@ a { color: inherit; }
   color: var(--accent);
   border-bottom-color: var(--accent);
 }
+/* "?" help icon at the end of the nav — a small circled glyph,
+   visually distinct from the text nav items but aesthetically in
+   line (same serif face, ink-soft on idle, oxblood on hover). */
+.wisden-nav-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-left: 0.5rem;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+  transition: color 120ms, border-color 120ms, background 120ms;
+}
+.wisden-nav-help:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.wisden-nav-help.is-active {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
 .wisden-hamburger {
   display: inline-flex;
   align-items: center;
@@ -1164,3 +1192,72 @@ a { color: inherit; }
   color: var(--ink);
   margin-right: 0.25rem;
 }
+
+/* Help / About page — minimal markdown styling. Not a full pandoc;
+   just what about-me.md and user-help.md happen to use. Anything
+   richer (tables, code blocks) gets decent browser defaults. */
+.markdown-body {
+  font-family: var(--serif);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.markdown-body h1 {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 1.75rem 0 0.75rem;
+  letter-spacing: -0.01em;
+}
+.markdown-body h2 {
+  font-family: var(--serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.5rem;
+}
+.markdown-body h3 {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.4rem;
+}
+.markdown-body p { margin: 0.6rem 0; }
+.markdown-body ul { margin: 0.5rem 0 0.8rem 1.4rem; padding: 0; }
+.markdown-body li { margin: 0.2rem 0; }
+.markdown-body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 120ms;
+}
+.markdown-body a:hover { border-bottom-color: var(--accent); }
+.markdown-body em {
+  font-style: italic;
+  color: var(--ink-soft);
+}
+.markdown-body strong { font-weight: 600; }
+.markdown-body code {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.88em;
+  padding: 0.08rem 0.3rem;
+  background: rgba(0,0,0,0.04);
+  border-radius: 3px;
+}
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--rule-soft);
+  margin: 1.5rem 0;
+}
+
+.wisden-link-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wisden-link-list li {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--rule-soft);
+  font-family: var(--serif);
+  font-size: 0.98rem;
+}
+.wisden-link-list li:last-child { border-bottom: 0; }

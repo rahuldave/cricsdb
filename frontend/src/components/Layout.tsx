@@ -14,8 +14,11 @@ const navItems = [
 export default function Layout() {
   const { pathname } = useLocation()
   // Hide FilterBar on pages where global filters are meaningless:
-  // home (static landing) and the dedicated scorecard for one match.
-  const showFilters = pathname !== '/' && !/^\/matches\/[^/]+$/.test(pathname)
+  // home (static landing), the dedicated scorecard for one match,
+  // and the /help pages.
+  const showFilters = pathname !== '/'
+    && !/^\/matches\/[^/]+$/.test(pathname)
+    && !pathname.startsWith('/help')
 
   const [mobileOpen, setMobileOpen] = useState(false)
   useEffect(() => { setMobileOpen(false) }, [pathname])
@@ -41,6 +44,16 @@ export default function Layout() {
                 {item.label}
               </NavLink>
             ))}
+            <NavLink
+              to="/help"
+              className={({ isActive }) =>
+                `wisden-nav-help${isActive ? ' is-active' : ''}`
+              }
+              aria-label="About this site & help"
+              title="About this site & help"
+            >
+              ?
+            </NavLink>
           </div>
 
           {/* Mobile hamburger */}
@@ -72,6 +85,14 @@ export default function Layout() {
                 {item.label}
               </NavLink>
             ))}
+            <NavLink
+              to="/help"
+              className={({ isActive }) =>
+                `wisden-nav-link${isActive ? ' is-active' : ''}`
+              }
+            >
+              About &amp; Help
+            </NavLink>
           </div>
         )}
       </nav>

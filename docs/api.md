@@ -1,5 +1,13 @@
 # CricsDB API Reference
 
+> **Also useful:**
+> [Interactive Swagger UI](https://t20.rahuldave.com/docs) (prod) or
+> [`http://localhost:8000/docs`](http://localhost:8000/docs) (local)
+> — FastAPI auto-generates this from the route decorators. Every
+> endpoint is clickable with a "Try it out" button. If you want to
+> poke at something live, start there; come back here for narrative
+> + the specific example responses that justify the section text.
+
 Practical one-page reference for every endpoint. Pair this with
 [`../SPEC.md`](../SPEC.md) when you need the underlying SQL or the
 full schema — this doc just gives you the URL, a one-liner, and a

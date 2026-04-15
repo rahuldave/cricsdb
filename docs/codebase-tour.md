@@ -77,7 +77,9 @@ frontend/src/
                                    HeatmapChart, BubbleMatrix,
                                    WormChart, ManhattanChart, InningsGridChart, MatchupGridChart
   pages/                       — Home, Teams, Batting, Bowling, Fielding, HeadToHead,
-                                   Matches, MatchScorecard
+                                   Matches, MatchScorecard, Help (/help), HelpUsage (/help/usage)
+  content/                     — about-me.md + user-help.md. Imported as ?raw by the Help pages
+                                   and rendered via react-markdown. Edit the .md, rebuild, ship.
 ```
 
 ## Infrastructure / docs
