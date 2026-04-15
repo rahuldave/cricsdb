@@ -123,55 +123,72 @@ const TEAM_TO_FLAG: Record<string, string> = {
   "Zambia": "zm",
 }
 
+import { Link } from 'react-router-dom'
+
 type FlagSize = 'xs' | 'sm' | 'md' | 'lg'
 
 const SIZE_PX: Record<FlagSize, number> = {
   xs: 12,   // tile badges, dense lists
-  sm: 16,   // H2H title, inline with player names
-  md: 20,   // default
-  lg: 28,   // player-page header
+  sm: 18,   // H2H title, inline with player names
+  md: 22,   // default
+  lg: 32,   // player-page header
+}
+
+/** Nudge flags down a touch so they sit on the serif cap-height line
+ *  rather than the baseline — serif titles have tall ascenders and
+ *  vertical-align: middle reads as "too low". Eyeballed per size. */
+const Y_NUDGE_EM: Record<FlagSize, string> = {
+  xs: '-0.05em',
+  sm: '-0.12em',
+  md: '-0.12em',
+  lg: '-0.15em',
+}
+
+interface FlagBadgeProps {
+  team: string | null | undefined
+  gender?: string | null
+  size?: FlagSize
+  className?: string
+  /** When true, wrap the flag in a Link to the team page. Requires `team`
+   *  to resolve to a known code (club sides fall through as before). */
+  linkTo?: boolean
 }
 
 export default function FlagBadge({
-  team, size = 'sm', className = '',
-}: { team: string | null | undefined; size?: FlagSize; className?: string }) {
+  team, gender, size = 'sm', className = '', linkTo = false,
+}: FlagBadgeProps) {
   if (!team) return null
   const code = TEAM_TO_FLAG[team]
   if (!code) return null
 
   const h = SIZE_PX[size]
-  // flag-icons renders as 4:3 aspect (width = height * 4/3). Keep the
-  // span size explicit so the flag doesn't distort inside narrow cells.
   const w = Math.round(h * 4 / 3)
+  const nudge = Y_NUDGE_EM[size]
 
-  // West Indies: no ISO code. Render a small "WI" text pill in the
-  // same footprint as a flag so alignment with other entries is clean.
-  if (code === 'wi') {
-    return (
-      <span
-        className={`wisden-flag-wi ${className}`}
-        title={team}
-        style={{
-          display: 'inline-block',
-          width: w,
-          height: h,
-          lineHeight: `${h}px`,
-          textAlign: 'center',
-          fontSize: `${Math.round(h * 0.55)}px`,
-          fontWeight: 700,
-          verticalAlign: 'middle',
-          background: 'var(--accent)',
-          color: 'white',
-          borderRadius: 2,
-          letterSpacing: '-0.02em',
-        }}
-      >
-        WI
-      </span>
-    )
-  }
-
-  return (
+  const inner = code === 'wi' ? (
+    // West Indies: no ISO code. Render a small "WI" pill.
+    <span
+      className={`wisden-flag-wi ${className}`}
+      title={team}
+      style={{
+        display: 'inline-block',
+        width: w,
+        height: h,
+        lineHeight: `${h}px`,
+        textAlign: 'center',
+        fontSize: `${Math.round(h * 0.55)}px`,
+        fontWeight: 700,
+        verticalAlign: 'middle',
+        transform: `translateY(${nudge})`,
+        background: 'var(--accent)',
+        color: 'white',
+        borderRadius: 2,
+        letterSpacing: '-0.02em',
+      }}
+    >
+      WI
+    </span>
+  ) : (
     <span
       className={`fi fi-${code} ${className}`}
       title={team}
@@ -180,9 +197,24 @@ export default function FlagBadge({
         width: w,
         height: h,
         verticalAlign: 'middle',
+        transform: `translateY(${nudge})`,
         borderRadius: 1,
-        // flag-icons sets background-image; we just enforce size.
       }}
     />
+  )
+
+  if (!linkTo) return inner
+
+  const p = new URLSearchParams({ team })
+  if (gender) p.set('gender', gender)
+  p.set('team_type', 'international')
+  return (
+    <Link
+      to={`/teams?${p.toString()}`}
+      aria-label={`Go to ${team}${gender ? ` (${gender === 'female' ? "women's" : "men's"})` : ''} team page`}
+      style={{ textDecoration: 'none', display: 'inline-block' }}
+    >
+      {inner}
+    </Link>
   )
 }

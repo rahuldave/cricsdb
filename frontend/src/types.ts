@@ -217,6 +217,7 @@ export interface OpponentsMatrix {
 
 export interface NationalityEntry {
   team: string
+  gender: string
   matches: number
 }
 

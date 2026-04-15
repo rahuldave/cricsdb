@@ -214,9 +214,9 @@ export default function Fielding() {
           <h2 className="wisden-page-title">
             {summary.name}
             {summary.nationalities?.length > 0 && (
-              <span style={{ marginLeft: '0.6rem', display: 'inline-flex', gap: '0.35rem', verticalAlign: 'middle' }}>
+              <span style={{ marginLeft: '0.6rem', display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
                 {summary.nationalities.map(n => (
-                  <FlagBadge key={n.team} team={n.team} size="lg" />
+                  <FlagBadge key={`${n.team}-${n.gender}`} team={n.team} gender={n.gender} size="lg" linkTo />
                 ))}
               </span>
             )}

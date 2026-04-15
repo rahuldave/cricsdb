@@ -241,8 +241,13 @@ function PlayerVsPlayer() {
               {data.batter.name}
             </Link>
             {data.batter.nationalities?.[0] && (
-              <span style={{ marginLeft: '0.35rem', verticalAlign: 'middle' }}>
-                <FlagBadge team={data.batter.nationalities[0].team} size="sm" />
+              <span style={{ marginLeft: '0.35rem' }}>
+                <FlagBadge
+                  team={data.batter.nationalities[0].team}
+                  gender={data.batter.nationalities[0].gender}
+                  size="sm"
+                  linkTo
+                />
               </span>
             )}
             {' '}<span style={{ fontStyle: 'italic', color: 'var(--accent)', fontWeight: 400 }}>v</span>{' '}
@@ -250,8 +255,13 @@ function PlayerVsPlayer() {
               {data.bowler.name}
             </Link>
             {data.bowler.nationalities?.[0] && (
-              <span style={{ marginLeft: '0.35rem', verticalAlign: 'middle' }}>
-                <FlagBadge team={data.bowler.nationalities[0].team} size="sm" />
+              <span style={{ marginLeft: '0.35rem' }}>
+                <FlagBadge
+                  team={data.bowler.nationalities[0].team}
+                  gender={data.bowler.nationalities[0].gender}
+                  size="sm"
+                  linkTo
+                />
               </span>
             )}
           </h2>
