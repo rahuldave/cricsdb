@@ -67,7 +67,9 @@ cp -r .venv/lib/python3.14/site-packages/deebase "$BUILD_DIR/deebase"
 rm -rf "$BUILD_DIR/deebase/__pycache__" "$BUILD_DIR/deebase"/*/__pycache__
 
 # API code
-cp api/__init__.py api/app.py api/dependencies.py api/filters.py "$BUILD_DIR/api/"
+# api/*.py is globbed so new top-level modules (e.g. tournament_canonical.py)
+# don't silently fail to ship. Routers already use a glob.
+cp api/*.py "$BUILD_DIR/api/"
 cp api/routers/*.py "$BUILD_DIR/api/routers/"
 
 # Models
