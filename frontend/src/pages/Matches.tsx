@@ -1,5 +1,6 @@
+import type React from 'react'
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
@@ -141,14 +142,34 @@ export default function Matches() {
             </tr>
           </thead>
           <tbody>
-            {matches.map(m => (
+            {matches.map(m => {
+              // Row is clickable → scorecard. Team / tournament cells
+              // override the row click so they go to the team / tournament
+              // dossier instead. Preserves FilterBar context.
+              const stop = (e: React.MouseEvent) => e.stopPropagation()
+              const teamHref = (t: string) => {
+                const p = new URLSearchParams({ team: t })
+                if (filters.gender) p.set('gender', filters.gender)
+                if (filters.team_type) p.set('team_type', filters.team_type)
+                if (m.tournament) p.set('tournament', m.tournament)
+                return `/teams?${p.toString()}`
+              }
+              const tournamentHref = (t: string) => {
+                const p = new URLSearchParams({ tournament: t })
+                if (filters.gender) p.set('gender', filters.gender)
+                if (filters.team_type) p.set('team_type', filters.team_type)
+                return `/tournaments?${p.toString()}`
+              }
+              return (
               <tr key={m.match_id}
                 onClick={() => navigate(`/matches/${m.match_id}`)}
                 className="is-clickable">
                 <td className="num whitespace-nowrap" style={{ color: 'var(--ink-faint)' }}>{m.date || '-'}</td>
                 <td>
                   <div style={{ fontFamily: 'var(--serif)', fontSize: '1rem', color: 'var(--ink)', fontVariationSettings: '"opsz" 14' }}>
-                    {m.team1} <span style={{ fontStyle: 'italic', color: 'var(--ink-faint)' }}>v</span> {m.team2}
+                    <Link to={teamHref(m.team1)} className="comp-link" onClick={stop}>{m.team1}</Link>
+                    {' '}<span style={{ fontStyle: 'italic', color: 'var(--ink-faint)' }}>v</span>{' '}
+                    <Link to={teamHref(m.team2)} className="comp-link" onClick={stop}>{m.team2}</Link>
                   </div>
                   <div className="num" style={{ fontSize: '0.78rem', color: 'var(--ink-faint)', marginTop: '0.15rem' }}>
                     {m.team1_score && <>{m.team1}: {m.team1_score}</>}
@@ -158,11 +179,16 @@ export default function Matches() {
                   <div className="sm:hidden" style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginTop: '0.15rem', fontFamily: 'var(--serif)' }}>{m.result_text}</div>
                   <div className="md:hidden" style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.1rem' }}>{m.tournament || ''}</div>
                 </td>
-                <td className="hidden md:table-cell">{m.tournament || '-'}</td>
+                <td className="hidden md:table-cell">
+                  {m.tournament
+                    ? <Link to={tournamentHref(m.tournament)} className="comp-link" onClick={stop}>{m.tournament}</Link>
+                    : '-'}
+                </td>
                 <td className="hidden lg:table-cell">{m.city || m.venue || '-'}</td>
                 <td className="hidden sm:table-cell" style={{ fontFamily: 'var(--serif)', fontVariationSettings: '"opsz" 14' }}>{m.result_text}</td>
               </tr>
-            ))}
+              )
+            })}
             {loading && matches.length === 0 && (
               <tr><td colSpan={5} className="p-0"><Spinner label="Loading matches…" /></td></tr>
             )}

@@ -46,6 +46,20 @@ const partnershipMatchLink = (
   )
 }
 
+/** Team-name link with the dossier's scope preserved. Teams are
+ *  identity-bound to a tournament for clubs and narrow naturally via
+ *  FilterBar on the team page, so one link (no name/context split) is
+ *  sufficient. */
+function teamLinkHref(team: string, scope: {
+  tournament: string | null
+  gender: string | null | undefined
+}): string {
+  const p = new URLSearchParams({ team })
+  if (scope.tournament) p.set('tournament', scope.tournament)
+  if (scope.gender) p.set('gender', scope.gender)
+  return `/teams?${p.toString()}`
+}
+
 // Tab list — Points only included when single-season is in scope; rendered
 // conditionally so it doesn't flash on/off during filter changes.
 const BASE_TABS = ['Overview', 'Editions', 'Batters', 'Bowlers', 'Fielders', 'Partnerships', 'Records', 'Matches'] as const
@@ -357,6 +371,8 @@ export default function TournamentDossier({
           error={recordsFetch.error}
           data={recordsFetch.data}
           refetch={recordsFetch.refetch}
+          tournament={tournament}
+          gender={filters.gender}
         />
       )}
       {currentTab === 'Matches' && (
@@ -366,6 +382,8 @@ export default function TournamentDossier({
           matches={matchesFetch.data?.matches ?? []}
           total={matchesFetch.data?.total ?? 0}
           refetch={matchesFetch.refetch}
+          tournament={tournament}
+          gender={filters.gender}
         />
       )}
       {currentTab === 'Partnerships' && (
@@ -512,7 +530,15 @@ function OverviewTab({
               const ctxLabel = `at ${team}`
               return (
                 <div key={team} className="wisden-tile">
-                  <div className="wisden-tile-title">{team}</div>
+                  <div className="wisden-tile-title">
+                    <Link
+                      to={teamLinkHref(team, { tournament, gender })}
+                      className="comp-link"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      {team}
+                    </Link>
+                  </div>
                   <div className="wisden-tile-line mt-2">
                     {t.top_scorer && (
                       <div>
@@ -610,12 +636,23 @@ function OverviewTab({
               { key: 'stage', label: 'Stage' },
               {
                 key: 'team1', label: 'Match',
-                format: (_v, r) => `${r.team1} v ${r.team2}`,
+                format: (_v, r) => (
+                  <>
+                    <Link to={teamLinkHref(r.team1, { tournament, gender })} className="comp-link">{r.team1}</Link>
+                    {' v '}
+                    <Link to={teamLinkHref(r.team2, { tournament, gender })} className="comp-link">{r.team2}</Link>
+                  </>
+                ) as unknown as string,
               },
               {
                 key: 'winner', label: 'Winner',
                 format: (v: string | null, r) => v
-                  ? `${v} (${r.margin})`
+                  ? (
+                      <>
+                        <Link to={teamLinkHref(v, { tournament, gender })} className="comp-link">{v}</Link>
+                        {` (${r.margin})`}
+                      </>
+                    ) as unknown as string
                   : (r.margin || '—'),
               },
               { key: 'venue', label: 'Venue' },
@@ -640,10 +677,15 @@ function OverviewTab({
           </h3>
           <div className="flex flex-wrap gap-2">
             {summary.teams.map(t => (
-              <span key={t.name} className="wisden-chip">
+              <Link
+                key={t.name}
+                to={teamLinkHref(t.name, { tournament, gender })}
+                className="wisden-chip comp-link"
+                style={{ textDecoration: 'none' }}
+              >
                 {t.name}
                 <span className="wisden-tile-faint"> · {t.matches}</span>
-              </span>
+              </Link>
             ))}
           </div>
         </div>
@@ -655,7 +697,12 @@ function OverviewTab({
           <DataTable
             columns={[
               { key: 'season', label: 'Season', sortable: true },
-              { key: 'champion', label: 'Champion', sortable: true },
+              {
+                key: 'champion', label: 'Champion', sortable: true,
+                format: (v: string) => (
+                  <Link to={teamLinkHref(v, { tournament, gender })} className="comp-link">{v}</Link>
+                ) as unknown as string,
+              },
               {
                 key: 'match_id', label: 'Final',
                 format: (v: number) => matchLink(v, 'scorecard →') as unknown as string,
@@ -795,16 +842,19 @@ function PartnershipsTab({
 }
 
 function MatchesTab({
-  loading, error, matches, total, refetch,
+  loading, error, matches, total, refetch, tournament, gender,
 }: {
   loading: boolean; error: string | null
   matches: MatchListItem[]; total: number; refetch: () => void
+  tournament: string | null
+  gender: string | null | undefined
 }) {
   if (loading) return <Spinner label="Loading matches…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!matches.length) {
     return <div className="wisden-empty">No matches in this filter scope.</div>
   }
+  const scope = { tournament, gender }
   return (
     <div className="mt-4">
       <div className="wisden-tab-help">
@@ -823,11 +873,19 @@ function MatchesTab({
           { key: 'season', label: 'Season' },
           {
             key: 'team1', label: 'Match',
-            format: (_v, r) => `${r.team1} v ${r.team2}`,
+            format: (_v, r) => (
+              <>
+                <Link to={teamLinkHref(r.team1, scope)} className="comp-link">{r.team1}</Link>
+                {' v '}
+                <Link to={teamLinkHref(r.team2, scope)} className="comp-link">{r.team2}</Link>
+              </>
+            ) as unknown as string,
           },
           {
             key: 'winner', label: 'Winner',
-            format: (v: string | null, r) => v ?? (r.result_text || '—'),
+            format: (v: string | null, r) => v
+              ? (<Link to={teamLinkHref(v, scope)} className="comp-link">{v}</Link>) as unknown as string
+              : (r.result_text || '—'),
           },
           {
             key: 'team1_score', label: 'Score',
@@ -1167,14 +1225,21 @@ function FieldersTab({
 }
 
 function RecordsTab({
-  loading, error, data, refetch,
+  loading, error, data, refetch, tournament, gender,
 }: {
   loading: boolean; error: string | null
   data: TournamentRecords | null; refetch: () => void
+  tournament: string | null
+  gender: string | null | undefined
 }) {
   if (loading) return <Spinner label="Loading records…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
+
+  const scope = { tournament, gender }
+  const teamCell = (v: string) => (
+    <Link to={teamLinkHref(v, scope)} className="comp-link">{v}</Link>
+  ) as unknown as string
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -1183,8 +1248,8 @@ function RecordsTab({
         <DataTable
           columns={[
             { key: 'runs', label: 'Runs', sortable: true },
-            { key: 'team', label: 'Team' },
-            { key: 'opponent', label: 'vs' },
+            { key: 'team', label: 'Team', format: (v: string) => teamCell(v) },
+            { key: 'opponent', label: 'vs', format: (v: string) => teamCell(v) },
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordTeamTotal) =>
@@ -1200,8 +1265,8 @@ function RecordsTab({
         <DataTable
           columns={[
             { key: 'runs', label: 'Runs', sortable: true },
-            { key: 'team', label: 'Team' },
-            { key: 'opponent', label: 'vs' },
+            { key: 'team', label: 'Team', format: (v: string) => teamCell(v) },
+            { key: 'opponent', label: 'vs', format: (v: string) => teamCell(v) },
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordTeamTotal) =>
@@ -1217,8 +1282,8 @@ function RecordsTab({
         <DataTable
           columns={[
             { key: 'margin', label: 'Runs', sortable: true },
-            { key: 'winner', label: 'Winner' },
-            { key: 'loser', label: 'Loser' },
+            { key: 'winner', label: 'Winner', format: (v: string) => teamCell(v) },
+            { key: 'loser', label: 'Loser', format: (v: string) => teamCell(v) },
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordWin) =>
@@ -1234,8 +1299,8 @@ function RecordsTab({
         <DataTable
           columns={[
             { key: 'margin', label: 'Wkts', sortable: true },
-            { key: 'winner', label: 'Winner' },
-            { key: 'loser', label: 'Loser' },
+            { key: 'winner', label: 'Winner', format: (v: string) => teamCell(v) },
+            { key: 'loser', label: 'Loser', format: (v: string) => teamCell(v) },
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordWin) =>

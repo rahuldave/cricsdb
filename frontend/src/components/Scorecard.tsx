@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import type { Scorecard } from '../types'
 import InningsCard from './InningsCard'
 
@@ -30,14 +31,41 @@ export default function ScorecardView({ data, children, highlightBatterId, highl
     return params.toString()
   })()
 
+  const teamHref = (t: string) => {
+    const p = new URLSearchParams({ team: t })
+    if (info.gender) p.set('gender', info.gender)
+    if (info.team_type) p.set('team_type', info.team_type)
+    if (info.tournament) p.set('tournament', info.tournament)
+    return `/teams?${p.toString()}`
+  }
+  const tournamentHref = (() => {
+    if (!info.tournament) return null
+    const p = new URLSearchParams({ tournament: info.tournament })
+    if (info.gender) p.set('gender', info.gender)
+    if (info.team_type) p.set('team_type', info.team_type)
+    return `/tournaments?${p.toString()}`
+  })()
+
   return (
     <div>
       <div className="wisden-match-header">
         <h2>
-          {info.teams[0]} <span className="vs">v</span> {info.teams[1]}
+          <Link to={teamHref(info.teams[0])} className="comp-link" style={{ fontSize: 'inherit', fontWeight: 'inherit' }}>
+            {info.teams[0]}
+          </Link>
+          {' '}<span className="vs">v</span>{' '}
+          <Link to={teamHref(info.teams[1])} className="comp-link" style={{ fontSize: 'inherit', fontWeight: 'inherit' }}>
+            {info.teams[1]}
+          </Link>
         </h2>
         <div className="wisden-match-meta">
-          {[info.tournament, stageText, venueText, dateText].filter(Boolean).join(' · ')}
+          {tournamentHref ? (
+            <Link to={tournamentHref} className="comp-link">{info.tournament}</Link>
+          ) : info.tournament}
+          {(stageText || venueText || dateText)
+            && [stageText, venueText, dateText].filter(Boolean).length > 0
+            && ' · '}
+          {[stageText, venueText, dateText].filter(Boolean).join(' · ')}
         </div>
         <div className="wisden-match-result">{info.result_text}</div>
         {tossText && (
