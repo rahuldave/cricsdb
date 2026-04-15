@@ -1,3 +1,4 @@
+import type React from 'react'
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
@@ -1296,92 +1297,116 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
   const clubGroups = data.club
   const showIntl = regular.length > 0 || associate.length > 0
   const showClub = clubGroups.length > 0
-  const bothEmpty = !showIntl && !showClub
-  if (bothEmpty) {
+  if (!showIntl && !showClub) {
     return <div className="wisden-empty">No teams match the current filters.</div>
   }
 
-  // Two-column grid when both sides have data; single column otherwise
-  // so the populated side spans the width comfortably.
-  const cols = showIntl && showClub ? '1fr 1fr' : '1fr'
+  const showGenderBadge = !filters.gender
 
-  const renderTeam = (t: { name: string; matches: number }) => (
-    <button
-      key={t.name}
-      onClick={() => onPick(t.name)}
-      className="comp-link"
-      style={{
-        background: 'none', border: 0, padding: 0, cursor: 'pointer',
-        textAlign: 'left', font: 'inherit',
-      }}
-    >
-      {t.name}{' '}
-      <span className="num" style={{ color: 'var(--ink-faint)', fontSize: '0.85em' }}>
-        ({t.matches})
-      </span>
-    </button>
+  // Click a team — pre-set the gender filter so the team page scopes
+  // correctly. Without this, picking "India" with no gender shows
+  // combined men+women stats which the user almost never wants.
+  const handlePick = (name: string, gender?: string | null) => {
+    if (gender && !filters.gender) {
+      // Mutate URL gender then pick the team. handlePick is called
+      // from within a button click so the parent's setSelected applies
+      // after this microtask — set gender first for atomicity.
+      const url = new URL(window.location.href)
+      url.searchParams.set('gender', gender)
+      window.history.replaceState({}, '', url)
+    }
+    onPick(name)
+  }
+
+  const renderTeam = (t: { name: string; matches: number; gender?: string | null }) => {
+    const gLabel = showGenderBadge && t.gender
+      ? (t.gender === 'female' ? "women's" : "men's")
+      : null
+    return (
+      <button
+        key={`${t.name}|${t.gender ?? ''}`}
+        onClick={() => handlePick(t.name, t.gender)}
+        className="comp-link"
+        style={{
+          background: 'none', border: 0, padding: 0, cursor: 'pointer',
+          textAlign: 'left', font: 'inherit',
+        }}
+      >
+        {t.name}
+        {gLabel && (
+          <span className="wisden-tile-faint" style={{ fontSize: '0.78em' }}>
+            {' '}{gLabel}
+          </span>
+        )}
+        {' '}
+        <span className="num" style={{ color: 'var(--ink-faint)', fontSize: '0.85em' }}>
+          ({t.matches})
+        </span>
+      </button>
+    )
+  }
+
+  // <details> = built-in collapsible. Open by default for International;
+  // Club tournaments collapsed by default since there are many of them.
+  const Section = ({ title, count, defaultOpen, children }: {
+    title: React.ReactNode
+    count?: number
+    defaultOpen: boolean
+    children: React.ReactNode
+  }) => (
+    <details open={defaultOpen} className="wisden-collapse">
+      <summary>
+        <span className="wisden-collapse-title">{title}</span>
+        {count !== undefined && (
+          <span className="wisden-collapse-count num">{count}</span>
+        )}
+      </summary>
+      <div className="wisden-collapse-body">
+        {children}
+      </div>
+    </details>
   )
 
   return (
     <div>
-      <div className="wisden-tab-help" style={{ marginBottom: '1.5rem' }}>
-        Pick a team below, or search above. Match counts and team lists respect the
-        filters at the top of the page — change gender, type, tournament, or season
-        to narrow the directory.
+      <div className="wisden-tab-help" style={{ marginBottom: '1rem' }}>
+        Pick a team below, or search above. Match counts respect the filters at the
+        top — change gender, type, tournament, or season to narrow.
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: cols, gap: '2.5rem', alignItems: 'start' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {showIntl && (
           <div>
             <h3 className="wisden-section-title">International</h3>
             {regular.length > 0 && (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <div className="coverage-head" style={{ marginBottom: '0.5rem' }}>
-                  Full members
-                </div>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                  gap: '0.35rem 1rem',
-                }}>
+              <Section title="Full members" count={regular.length} defaultOpen={true}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                   {regular.map(renderTeam)}
                 </div>
-              </div>
+              </Section>
             )}
             {associate.length > 0 && (
-              <div>
-                <div className="coverage-head" style={{ marginBottom: '0.5rem' }}>
-                  Associate
-                </div>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                  gap: '0.35rem 1rem',
-                }}>
+              <Section title="Associate" count={associate.length} defaultOpen={false}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                   {associate.map(renderTeam)}
                 </div>
-              </div>
+              </Section>
             )}
           </div>
         )}
         {showClub && (
           <div>
             <h3 className="wisden-section-title">Clubs</h3>
-            {clubGroups.map(g => (
-              <div key={g.tournament} style={{ marginBottom: '1.5rem' }}>
-                <div className="coverage-head" style={{ marginBottom: '0.5rem' }}>
-                  {g.tournament}{' '}
-                  <span className="num" style={{ color: 'var(--ink-faint)', fontSize: '0.85em', fontWeight: 'normal' }}>
-                    ({g.matches})
-                  </span>
-                </div>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                  gap: '0.35rem 1rem',
-                }}>
+            {clubGroups.map((g, i) => (
+              <Section
+                key={g.tournament}
+                title={g.tournament}
+                count={g.matches}
+                defaultOpen={i < 3}
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                   {g.teams.map(renderTeam)}
                 </div>
-              </div>
+              </Section>
             ))}
           </div>
         )}

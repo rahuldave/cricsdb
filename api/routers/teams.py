@@ -53,10 +53,11 @@ async def teams_landing(filters: FilterParams = Depends()):
     db = get_db()
     where, params = filters.build(has_innings_join=False)
 
-    # International — aggregate distinct team names and total filtered
-    # matches. team_type filter may already restrict this; we apply an
-    # additional `team_type = 'international'` unless filters.team_type
-    # is already set to club (in which case we return an empty list).
+    # International — aggregate by team AND gender so cricsheet's shared
+    # team strings ("India", "Royal Challengers Bengaluru") split into
+    # men's and women's entries when no gender filter is applied. With
+    # a gender filter set, only that gender returns and the list looks
+    # the same as before.
     intl_regular: list[dict] = []
     intl_associate: list[dict] = []
     if filters.team_type != "club":
@@ -65,24 +66,25 @@ async def teams_landing(filters: FilterParams = Depends()):
             intl_parts.append(where)
         intl_rows = await db.q(
             f"""
-            SELECT mp.team AS name, COUNT(DISTINCT m.id) AS matches
+            SELECT mp.team AS name, m.gender AS gender,
+                   COUNT(DISTINCT m.id) AS matches
             FROM matchplayer mp
             JOIN match m ON m.id = mp.match_id
             WHERE {" AND ".join(intl_parts)}
-            GROUP BY mp.team
+            GROUP BY mp.team, m.gender
             ORDER BY matches DESC, mp.team
             """,
             params,
         )
         for r in intl_rows:
-            entry = {"name": r["name"], "matches": r["matches"]}
+            entry = {"name": r["name"], "gender": r["gender"], "matches": r["matches"]}
             if r["name"] in ICC_FULL_MEMBERS:
                 intl_regular.append(entry)
             else:
                 intl_associate.append(entry)
 
-    # Club — (team, tournament) pairs. Group tournaments by total match
-    # count in window; within a tournament, teams alphabetical.
+    # Club — (team, tournament, gender) tuples. Group tournaments by
+    # total match count in window; within a tournament, teams alphabetical.
     club_groups: list[dict] = []
     if filters.team_type != "international":
         club_parts = ["m.team_type = 'club'", "m.event_name IS NOT NULL"]
@@ -91,11 +93,12 @@ async def teams_landing(filters: FilterParams = Depends()):
         club_rows = await db.q(
             f"""
             SELECT mp.team AS name, m.event_name AS tournament,
+                   m.gender AS gender,
                    COUNT(DISTINCT m.id) AS matches
             FROM matchplayer mp
             JOIN match m ON m.id = mp.match_id
             WHERE {" AND ".join(club_parts)}
-            GROUP BY mp.team, m.event_name
+            GROUP BY mp.team, m.event_name, m.gender
             """,
             params,
         )
@@ -103,9 +106,11 @@ async def teams_landing(filters: FilterParams = Depends()):
         tourney_totals: dict[str, int] = {}
         for r in club_rows:
             t = r["tournament"]
-            by_tournament.setdefault(t, []).append(
-                {"name": r["name"], "matches": r["matches"]}
-            )
+            by_tournament.setdefault(t, []).append({
+                "name": r["name"],
+                "gender": r["gender"],
+                "matches": r["matches"],
+            })
             tourney_totals[t] = tourney_totals.get(t, 0) + (r["matches"] or 0)
         for t in sorted(by_tournament.keys(), key=lambda x: (-tourney_totals[x], x)):
             teams = sorted(by_tournament[t], key=lambda x: x["name"].lower())

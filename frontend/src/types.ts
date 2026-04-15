@@ -111,6 +111,7 @@ export interface TeamPlayersBySeason {
 export interface TeamsLandingEntry {
   name: string
   matches: number
+  gender?: string | null
 }
 
 export interface TeamsLandingTournamentGroup {

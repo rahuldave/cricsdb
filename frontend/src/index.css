@@ -1331,3 +1331,44 @@ a { color: inherit; }
   font-size: 0.82rem;
   color: var(--ink-faint);
 }
+
+/* Collapsibles — built on <details>, no JS. Used for Teams landing
+   sections (Full members / Associate / each Club tournament). */
+.wisden-collapse {
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 0.5rem 0;
+}
+.wisden-collapse > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  user-select: none;
+}
+.wisden-collapse > summary::-webkit-details-marker { display: none; }
+.wisden-collapse > summary::before {
+  content: "▸";
+  color: var(--ink-faint);
+  font-size: 0.78rem;
+  transition: transform 120ms;
+  display: inline-block;
+}
+.wisden-collapse[open] > summary::before { transform: rotate(90deg); }
+.wisden-collapse-title {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink);
+}
+.wisden-collapse-count {
+  color: var(--ink-faint);
+  font-size: 0.85em;
+  font-weight: normal;
+}
+.wisden-collapse-body {
+  padding: 0.5rem 0 0.75rem 1rem;
+}
