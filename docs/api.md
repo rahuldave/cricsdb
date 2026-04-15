@@ -665,12 +665,25 @@ curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/keeping/summary?gender=male
 # Head-to-head (`/api/v1/head-to-head/{batter_id}/{bowler_id}`)
 
 Source: `api/routers/head_to_head.py`. Single endpoint — returns
-everything the HeadToHead page needs. Filter scope applies; if the
-pair never met under those filters, arrays come back empty but the
-structure stays consistent.
+everything the HeadToHead Player-vs-Player page needs. Filter scope
+applies; if the pair never met under those filters, arrays come back
+empty but the structure stays consistent.
+
+Accepts an optional **`series_type`** query param to narrow by series
+category — same semantics as the tournament-dossier endpoints:
+- `all` (default) — every meeting
+- `bilateral_only` — excludes ICC events; includes T20I bilateral
+  tours AND franchise tournaments (IPL, BBL, etc.) since those
+  aren't ICC events
+- `tournament_only` — ICC events only (T20 World Cup, Asia Cup, …)
+
+For matchups where both players are international teammates (Kohli +
+Bumrah on India), `tournament_only` returns 0 — they never face each
+other in ICC events. Use the pill on the H2H page to scope.
 
 ```bash
 curl "http://localhost:8000/api/v1/head-to-head/ba607b88/3fb19989?team_type=international&gender=male"
+curl "http://localhost:8000/api/v1/head-to-head/ba607b88/462411b3?series_type=tournament_only"
 ```
 
 ```json
@@ -799,7 +812,9 @@ for rivalry scope. Same endpoints serve:
 
 When `filter_team` + `filter_opponent` are both set, summary returns a
 `by_team` companion with per-team breakdowns of top scorer, top wicket-
-taker, highest individual, largest partnership.
+taker, highest individual, largest partnership — AND a top-level
+`head_to_head` object with team1_wins / team2_wins / ties / no_result
+so the dossier can show "who won how much" as the top stat row.
 
 ## `GET /api/v1/tournaments/landing`
 
@@ -840,10 +855,25 @@ curl "http://localhost:8000/api/v1/tournaments/landing?gender=male"
     "franchise_leagues": [ { "canonical": "Indian Premier League", "editions": 19, "matches": 1190 } ],
     "domestic_leagues": [ "…" ],
     "women_franchise": [ "…" ],
-    "other": [ "…" ]
+    "other": [ "…" ],
+    "rivalries": {
+      "men": [
+        { "team1": "Chennai Super Kings", "team2": "Mumbai Indians",
+          "tournament": "Indian Premier League",
+          "matches": 39, "team1_wins": 18, "team2_wins": 21,
+          "ties": 0, "no_result": 0 }
+      ],
+      "women": [ "…top-12 most-played pairs in women's club tournaments…" ]
+    }
   }
 }
 ```
+
+The `club.rivalries` lists are top-12 most-played team pairs within
+club tournaments per gender — drives the H2H Team-vs-Team page's club
+suggestion tiles. Each entry carries the dominant tournament for
+context (franchise pairs are unambiguously single-tournament: RCB vs
+CSK is always IPL, never WBBL).
 
 ## `GET /api/v1/tournaments/summary`
 
@@ -882,6 +912,11 @@ curl "http://localhost:8000/api/v1/tournaments/summary?filter_team=India&filter_
                               "batter2": { "name": "Tilak Varma" } }
     },
     "Australia": { "top_scorer": { "name": "GJ Maxwell", "runs": 570 }, "…": "…" }
+  },
+  "head_to_head": {
+    "team1": "India", "team2": "Australia",
+    "team1_wins": 22, "team2_wins": 12,
+    "ties": 0, "no_result": 3
   }
 }
 ```

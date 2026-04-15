@@ -18,15 +18,22 @@ Seven top-level tabs across the nav:
   view shows the top 10 in each metric (by average, strike rate,
   economy, dismissals) filtered to the active season window. Click
   a player name to go deep.
-- **Head to Head** — two-entity matchups. Two modes:
+- **Head to Head** — two-entity matchups. Two modes (picker at the
+  top of the page):
   - *Player vs Player* — any batter vs any bowler (summary, phase
-    breakdown, season trend, match-by-match record).
+    breakdown, season trend, match-by-match record). A "Show" pill
+    narrows by series category: All meetings (default) / Bilateral
+    or club only / ICC events only. The empty picker shows a
+    "Popular matchups" grid (Kohli–Bumrah, Mandhana–Perry, …) so you
+    can jump in without typing.
   - *Team vs Team* — every meeting between two countries, bilateral
-    series AND tournament matches combined. Toggle the "Show" pill
-    between All meetings / Bilateral only / Tournament only. Suggest
-    tiles below the picker for common matchups. Reuses the Tournaments
-    dossier so the same tabs (Batters, Bowlers, Fielders, Partnerships,
-    Records, Matches) apply.
+    series AND tournament matches combined. Same "Show" pill toggles
+    All meetings / Bilateral only / Tournament only. The empty
+    picker has three tile sections: men's international rivalries,
+    women's international rivalries, AND club rivalries (CSK v MI in
+    IPL, etc.) — split by men's / women's. Reuses the Tournaments
+    dossier so the same tabs (Batters, Bowlers, Fielders,
+    Partnerships, Records, Matches) apply.
 - **Matches** — searchable list of every match. Click any row for
   the full scorecard, ball-by-ball innings grid, worm chart, and
   per-batter / per-bowler matchup grid.
@@ -88,7 +95,8 @@ A rivalry isn't a separate screen — it's the same tournament-style
 dossier, just scoped to two teams instead of one tournament. That means
 every question you can ask about IPL ("top partnerships", "best bowling
 figures", "match records") you can also ask about India vs Australia,
-or India vs Australia in the T20 World Cup.
+India vs Australia in the T20 World Cup, or CSK vs Mumbai Indians in
+IPL.
 
 Three ways to get there:
 
@@ -98,12 +106,26 @@ Three ways to get there:
 2. **Head to Head → Team vs Team** → all meetings combined by default,
    with a Show pill to narrow to Bilateral only or Tournament only. Set
    a tournament in the FilterBar to see "India vs Australia across all
-   T20 World Cups". Set a season range to scope by year.
+   T20 World Cups". Set a season range to scope by year. Below the
+   picker: men's + women's international rivalries AND men's + women's
+   club rivalries (CSK v MI in IPL, RCB v MI, etc.) as suggestion tiles.
 3. **Teams → vs Opponent tab → "See full rivalry →"** link, which opens
    the full dossier in Head to Head.
 
 All three land at the same dossier. The URL just expresses different
 default filters.
+
+### Why the same team name appears twice
+
+Cricsheet uses the same string for men's and women's national sides
+("India" plays as both). The Teams landing and the H2H rivalry tiles
+disambiguate by appending "men's" / "women's" to each entry — clicking
+sets the gender filter so the page narrows correctly. With a gender
+filter already applied, the suffix disappears.
+
+For franchise teams, the same string can mean different sides too —
+"Royal Challengers Bengaluru" is both the men's IPL side and the
+women's WPL side. Same disambiguation rule.
 
 ## What's NOT in the data
 
