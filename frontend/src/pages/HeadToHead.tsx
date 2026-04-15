@@ -124,15 +124,16 @@ function PlayerVsPlayer() {
         </div>
       </div>
 
-      {/* Series-type pill — narrows the H2H to international bilateral
-          (T20I tours), ICC events (T20 WC etc.), or all (default).
-          Doesn't apply for matchups that only meet in club tournaments
-          like IPL — for those, all and bilateral_only return the same
-          rows since IPL isn't an ICC event. */}
+      {/* Series-type pill — four mutually-exclusive categories so the
+          three "where do these two meet" questions have separate
+          answers. Composes with FilterBar (gender / team_type /
+          tournament / season). For Kohli + Bumrah (India teammates),
+          bilateral and icc both return 0; club returns their full
+          IPL record. */}
       {enabled && (
-        <div className="mb-4 flex items-center gap-2 wisden-tab-help">
+        <div className="mb-4 flex items-center gap-2 wisden-tab-help flex-wrap">
           <span>Show:</span>
-          {(['all', 'bilateral_only', 'tournament_only'] as const).map(s => (
+          {(['all', 'bilateral', 'icc', 'club'] as const).map(s => (
             <button
               key={s}
               type="button"
@@ -144,8 +145,9 @@ function PlayerVsPlayer() {
               }}
             >
               {s === 'all' ? 'All meetings'
-                : s === 'bilateral_only' ? 'Bilateral / club only'
-                : 'ICC events only'}
+                : s === 'bilateral' ? 'Bilateral T20Is'
+                : s === 'icc' ? 'ICC events'
+                : 'Club tournaments'}
             </button>
           ))}
         </div>

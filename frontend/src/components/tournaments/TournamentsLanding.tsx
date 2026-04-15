@@ -68,7 +68,10 @@ function RivalryTile({
   const p = new URLSearchParams(filterQs)
   p.set('filter_team', entry.team1)
   p.set('filter_opponent', entry.team2)
-  p.set('series_type', 'bilateral_only')
+  // Tournaments-landing rivalry tiles are international bilateral pairs
+  // by definition. Land on bilateral-T20Is scope (excludes ICC events
+  // like World Cup meetings — those have their own discovery path).
+  p.set('series_type', 'bilateral')
   if (!p.has('gender')) p.set('gender', gender)
   if (!p.has('team_type')) p.set('team_type', 'international')
   const qs = `?${p.toString()}`

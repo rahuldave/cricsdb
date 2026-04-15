@@ -696,16 +696,25 @@ applies; if the pair never met under those filters, arrays come back
 empty but the structure stays consistent.
 
 Accepts an optional **`series_type`** query param to narrow by series
-category — same semantics as the tournament-dossier endpoints:
+category — same semantics as the tournament-dossier endpoints. Four
+mutually-exclusive categories that partition the data:
+
 - `all` (default) — every meeting
-- `bilateral_only` — excludes ICC events; includes T20I bilateral
-  tours AND franchise tournaments (IPL, BBL, etc.) since those
-  aren't ICC events
-- `tournament_only` — ICC events only (T20 World Cup, Asia Cup, …)
+- `bilateral` — international bilateral T20Is only (e.g. "India tour
+  of Australia"). Excludes ICC events AND club tournaments.
+- `icc` — ICC events only (T20 World Cup, Asia Cup, qualifiers, …)
+- `club` — club tournaments only (IPL, BBL, PSL, Vitality Blast, …)
 
 For matchups where both players are international teammates (Kohli +
-Bumrah on India), `tournament_only` returns 0 — they never face each
-other in ICC events. Use the pill on the H2H page to scope.
+Bumrah on India), `bilateral` and `icc` both return 0 — they never
+face each other internationally. `club` returns their full IPL record
+(108 balls, 159 runs lifetime). `series_type` composes with FilterBar
+filters; setting `team_type=international&series_type=club` is
+contradictory and yields 0.
+
+Legacy names `bilateral_only` and `tournament_only` map to `bilateral`
+and `icc` respectively for URL compat. The old `bilateral_only`
+included club matches; the new `bilateral` is international-only.
 
 ```bash
 curl "http://localhost:8000/api/v1/head-to-head/ba607b88/3fb19989?team_type=international&gender=male"

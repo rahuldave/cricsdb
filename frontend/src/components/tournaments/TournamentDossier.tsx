@@ -228,12 +228,15 @@ export default function TournamentDossier({
         )}
       </div>
 
-      {/* Series-type pill — only meaningful for international scope without
-          a specific tournament (when tournament is set, it already implies type). */}
+      {/* Series-type pill — four mutually-exclusive categories.
+          Composes with FilterBar (gender / team_type / tournament /
+          season range) — those filters apply on top of this scope.
+          Setting team_type=club + series_type=bilateral is contradictory
+          and yields 0 — that's correct. */}
       {isRivalryMode && !isSingleTournament && (
-        <div className="mt-3 flex items-center gap-2 wisden-tab-help">
+        <div className="mt-3 flex items-center gap-2 wisden-tab-help flex-wrap">
           <span>Show:</span>
-          {(['all', 'bilateral_only', 'tournament_only'] as const).map(s => (
+          {(['all', 'bilateral', 'icc', 'club'] as const).map(s => (
             <button
               key={s}
               type="button"
@@ -245,8 +248,9 @@ export default function TournamentDossier({
               }}
             >
               {s === 'all' ? 'All meetings'
-                : s === 'bilateral_only' ? 'Bilateral only'
-                : 'Tournament only'}
+                : s === 'bilateral' ? 'Bilateral T20Is'
+                : s === 'icc' ? 'ICC events'
+                : 'Club tournaments'}
             </button>
           ))}
         </div>

@@ -131,27 +131,47 @@ def series_type(canonical: str) -> str:
 
 
 def series_type_clause(series_type_value: str | None, alias: str = "m") -> str | None:
-    """Build a clause to narrow event_name by series category.
+    """Build a clause to narrow matches by series category.
 
-    `bilateral_only` excludes ICC events (T20 WC, Asia Cup, etc.) and
-    other classified-as-icc_event canonicals — what's left is bilateral
-    tour matches (cricsheet event_name like "England tour of West
-    Indies") plus untagged matches (event_name IS NULL).
+    Four mutually-exclusive categories that together partition the data:
 
-    `tournament_only` keeps only ICC events.
+    - `bilateral` — international bilateral T20Is. team_type='international'
+      AND event_name not in ICC events (so things like
+      "England tour of West Indies" or NULL event_name).
+    - `icc` — international ICC events. event_name in {T20 World Cup
+      (Men/Women), Asia Cup, Women's Asia Cup, qualifiers, …}.
+    - `club` — franchise + domestic club tournaments. team_type='club'.
+    - `all` (or None / unrecognized) — no clause.
 
-    `all` (or None / unrecognized) returns no clause.
+    Legacy names `bilateral_only` and `tournament_only` map to
+    `bilateral` and `icc` respectively for URL-bookmark compat, with
+    one semantic difference: the old `bilateral_only` ALSO included
+    club matches (everything-not-ICC); the new `bilateral` is
+    international-only. The old name was confusing — "club matchups
+    showing under bilateral" — so we tightened the definition.
 
     Lives here (not in routers/tournaments.py) so head_to_head and
     other routers can import it without depending on the tournaments
     router.
     """
-    if series_type_value not in ("bilateral_only", "tournament_only"):
+    # Legacy name aliases for back-compat
+    if series_type_value == "bilateral_only":
+        series_type_value = "bilateral"
+    elif series_type_value == "tournament_only":
+        series_type_value = "icc"
+
+    if series_type_value not in ("bilateral", "icc", "club"):
         return None
+
     icc_variants: list[str] = []
     for canon in ICC_EVENT_NAMES:
         icc_variants.extend(variants(canon))
-    in_clause = event_name_in_clause(icc_variants, col=f"{alias}.event_name")
-    if series_type_value == "bilateral_only":
-        return f"({alias}.event_name IS NULL OR NOT {in_clause})"
-    return in_clause
+    icc_in = event_name_in_clause(icc_variants, col=f"{alias}.event_name")
+
+    if series_type_value == "bilateral":
+        # International AND not in ICC events
+        return f"({alias}.team_type = 'international' AND ({alias}.event_name IS NULL OR NOT {icc_in}))"
+    if series_type_value == "icc":
+        return icc_in
+    # series_type_value == "club"
+    return f"{alias}.team_type = 'club'"

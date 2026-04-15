@@ -30,18 +30,28 @@ Seven top-level tabs across the nav:
   top of the page):
   - *Player vs Player* — any batter vs any bowler (summary, phase
     breakdown, season trend, match-by-match record). A "Show" pill
-    narrows by series category: All meetings (default) / Bilateral
-    or club only / ICC events only. The empty picker shows a
+    narrows by series category: All meetings (default) /
+    **Bilateral T20Is** (international tours only) / **ICC events**
+    (T20 World Cup, Asia Cup) / **Club tournaments** (IPL, BBL, …).
+    Three separate questions, three separate answers. For Kohli vs
+    Bumrah (India teammates), the bilateral and ICC slices are empty
+    — they never face each other in international cricket — but the
+    club slice has their full IPL record. The empty picker shows a
     "Popular matchups" grid (Kohli–Bumrah, Mandhana–Perry, …) so you
     can jump in without typing.
-  - *Team vs Team* — every meeting between two countries, bilateral
-    series AND tournament matches combined. Same "Show" pill toggles
-    All meetings / Bilateral only / Tournament only. The empty
-    picker has three tile sections: men's international rivalries,
-    women's international rivalries, AND club rivalries (CSK v MI in
-    IPL, etc.) — split by men's / women's. Reuses the Tournaments
-    dossier so the same tabs (Batters, Bowlers, Fielders,
+  - *Team vs Team* — every meeting between two teams, bilateral
+    series AND tournament matches combined. Same four-way "Show" pill.
+    The empty picker has four tile sections: men's international
+    rivalries, women's international rivalries, men's club rivalries
+    (CSK v MI in IPL, etc.), and women's club rivalries. Reuses the
+    Tournaments dossier so the same tabs (Batters, Bowlers, Fielders,
     Partnerships, Records, Matches) apply.
+
+  The Show pill composes with the FilterBar filters at the top of
+  every page — gender / type / tournament / season range all apply
+  on top. Some combinations contradict (e.g. `Type=International` +
+  `Show=Club` yields 0 matches) and that's the honest answer; clear
+  the conflicting filter to broaden.
 - **Matches** — searchable list of every match. Click any row for
   the full scorecard, ball-by-ball innings grid, worm chart, and
   per-batter / per-bowler matchup grid.
