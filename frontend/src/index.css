@@ -140,8 +140,9 @@ a { color: inherit; }
   border-radius: 50%;
   border: 1px solid var(--rule);
   font-family: var(--serif);
-  font-style: italic;
+  font-weight: 500;
   font-size: 0.95rem;
+  line-height: 1;
   color: var(--ink-soft);
   text-decoration: none;
   transition: color 120ms, border-color 120ms, background 120ms;
