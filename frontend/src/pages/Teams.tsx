@@ -1471,7 +1471,10 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
                     key={g.tournament}
                     title={g.tournament}
                     count={g.matches}
-                    defaultOpen={i < 2}
+                    // Only the top franchise (IPL) open by default; BBL
+                    // et al collapsed so the women's section below gets
+                    // a fair share of above-the-fold real estate.
+                    defaultOpen={i < 1}
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                       {g.teams.map(renderTeam)}
@@ -1489,12 +1492,15 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
                 <div className="coverage-head" style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>
                   Women's franchise leagues
                 </div>
-                {clubWomen.map(g => (
+                {clubWomen.map((g, i) => (
                   <Section
                     key={g.tournament}
                     title={g.tournament}
                     count={g.matches}
-                    defaultOpen={false}
+                    // Top women's franchise (WBBL) open by default,
+                    // matching the one-open-per-subsection rule used
+                    // for the men's franchise list above.
+                    defaultOpen={i < 1}
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                       {g.teams.map(renderTeam)}
