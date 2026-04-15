@@ -13,7 +13,7 @@ api/
   dependencies.py     — Database init (WAL mode, PLASH_PRODUCTION-aware path)
   filters.py          — FilterParams class (Depends), builds WHERE clauses with :param bind syntax
   routers/
-    reference.py      — /api/v1/tournaments, /seasons, /teams, /players
+    reference.py      — /api/v1/tournaments (canonicalized — variants merged), /seasons, /teams, /players
     teams.py          — /api/v1/teams/landing (two-column directory, filter-sensitive)
                          /api/v1/teams/{team}/summary|results|vs/{opponent}|by-season
                          /api/v1/teams/{team}/players-by-season (roster + bat avg + bowl SR + turnover)
@@ -27,6 +27,21 @@ api/
     keeping.py        — /api/v1/fielders/{id}/keeping/summary|by-season|by-innings|ambiguous (Tier 2)
     head_to_head.py   — /api/v1/head-to-head/{batter_id}/{bowler_id}
     matches.py        — /api/v1/matches list, /matches/{id}/scorecard, /matches/{id}/innings-grid
+    tournaments.py    — Match-set dossier (enhancement M).
+                         /api/v1/tournaments/landing (sectioned: ICC events, men's + women's
+                          bilateral-rivalry tiles bilateral-only, club leagues, other)
+                         /api/v1/tournaments/{summary,by-season,records,
+                          batters-leaders,bowlers-leaders,fielders-leaders,
+                          partnerships/by-wicket,partnerships/top,partnerships/heatmap}
+                         — all accept optional tournament + series_type
+                          (all/bilateral_only/tournament_only) + filter_team/filter_opponent.
+                          Summary returns by_team per-team breakdowns when team-pair set.
+                         /api/v1/tournaments/points-table (single-season; tournament required)
+                         /api/v1/tournaments/other-rivalries (lazy-load expander)
+                         /api/v1/rivalries/summary (legacy; new code uses dossier endpoints)
+tournament_canonical.py — Shared canonical map (T20 WC variants → "T20 World Cup (Men)" etc.)
+                         imported by filters.py + tournaments.py + reference.py for global
+                         IN-variants expansion of tournament=X queries.
 models/tables.py      — deebase models: Person, Match, Innings, Delivery, Wicket,
                         FieldingCredit, KeeperAssignment, Partnership
 team_aliases.py       — Canonical team-name mapping (used by import + fix script)
@@ -61,7 +76,7 @@ update_recent.py      — Incremental: imports new T20 matches + re-runs
 ```
 frontend/src/
   App.tsx                      — React Router: /, /teams, /batting, /bowling, /fielding,
-                                   /head-to-head, /matches, /matches/:matchId
+                                   /tournaments, /head-to-head, /matches, /matches/:matchId
   api.ts                       — fetchApi<T> wrapper + all endpoint clients
   types.ts                     — All request/response interfaces
   index.css                    — Wisden editorial styles (cream, oxblood, Fraunces/Inter Tight,
@@ -73,13 +88,17 @@ frontend/src/
   hooks/useDefaultSeasonWindow.ts — Batting/Bowling/Fielding landings auto-default to last 3
                                     seasons in scope when no season filter is set (one-shot
                                     per mount via useRef). Writes to URL so FilterBar reflects.
-  components/                  — Layout, FilterBar, PlayerSearch, StatCard, DataTable,
-                                   Spinner, ErrorBanner, Scorecard, InningsCard, charts/
+  components/                  — Layout, FilterBar, PlayerSearch, TeamSearch, StatCard,
+                                   DataTable, Spinner, ErrorBanner, Scorecard, InningsCard, charts/
     charts/                    — BarChart, LineChart, ScatterChart, DonutChart wrappers (responsive),
                                    HeatmapChart, BubbleMatrix,
                                    WormChart, ManhattanChart, InningsGridChart, MatchupGridChart
-  pages/                       — Home, Teams, Batting, Bowling, Fielding, HeadToHead,
-                                   Matches, MatchScorecard, Help (/help), HelpUsage (/help/usage)
+    tournaments/               — TournamentsLanding (sectioned grids + men's/women's rivalry tiles),
+                                   TournamentDossier (shared dossier UI for tournament OR rivalry
+                                   scope; reused by HeadToHead Team-vs-Team mode)
+  pages/                       — Home, Teams, Batting, Bowling, Fielding, Tournaments,
+                                   HeadToHead (mode=player|team), Matches, MatchScorecard,
+                                   Help (/help), HelpUsage (/help/usage)
   content/                     — about-me.md + user-help.md. Imported as ?raw by the Help pages
                                    and rendered via react-markdown. Edit the .md, rebuild, ship.
 ```
@@ -103,6 +122,8 @@ docs/
   spec-fielding.md                     — Fielding Tier 1 (fielding_credit) spec
   spec-fielding-tier2.md               — Wicketkeeper identification (keeper_assignment) spec
   spec-team-stats.md                   — Team batting/bowling/fielding/partnerships spec (enhancement N)
+  spec-tournaments.md                  — Tournaments tab + match-set dossier + polymorphic H2H spec
+                                          (enhancement M, plus the unified rivalry/tournament model)
   enhancements-roadmap.md              — The A–O menu of shipped + planned items
   perf-leaderboards.md                 — Why /batters/leaders etc. are fast: conditional-JOIN
                                           elimination, composite covering indexes, ANALYZE.

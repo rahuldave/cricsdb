@@ -156,8 +156,6 @@ Read `docs/design-decisions.md` for full details. Key points:
 
 Full A–O roadmap lives in **`docs/enhancements-roadmap.md`** with done-items as historical markers.
 
-**Next up: M — Tournament analytics page.** Two route levels (listing → per-tournament), season as FilterBar param not path (matches Teams). Spec needs writing; partial design in `docs/spec-team-stats.md` "Implication for tournaments". Design questions + placement debate for the adjacent "team-to-team rollup" work captured in **`docs/next-session-ideas.md`** — open question there is whether `/head-to-head` should go polymorphic (player-v-player + team-v-team) or stay player-only.
-
-**After M: O — Tournament-baseline comparison overlays** on team / batter / bowler / fielder pages. Depends on M's per-tournament-per-season aggregates. Design sketched in `docs/design-decisions.md` "Team metrics need tournament baselines (revisit when /tournaments ships)".
+**Next up: O — Tournament-baseline comparison overlays** on team / batter / bowler / fielder pages. M shipped the per-tournament endpoints with explicit baseline reusability — call any `/tournaments/{summary,batters-leaders,…}` without a team filter to get the tournament-wide baseline, with one for the team's narrowed view (responses are shape-compatible). Frontend wiring needed: overlay league means on team-tab charts, add "vs league avg" columns to player tables, support "delta from league mean" colour mode on heatmaps. Design sketch in `docs/design-decisions.md` "Team metrics need tournament baselines (revisit when /tournaments ships)".
 
 **Other "(revisit)" items** (see `docs/design-decisions.md` for detail): win-% overlay on discipline tabs (correlates performance with winning), batter consistency stats (median / 30+ rate / dispersion), batter × bowler-type splits + bowler × batter-handedness splits (requires person-table enrichment from Cricinfo).

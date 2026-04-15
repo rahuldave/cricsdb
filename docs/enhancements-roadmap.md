@@ -163,16 +163,31 @@ Fielder search via `role=fielder` in `/api/v1/players`. Tier 1 spec:
      auto-populate. Spec: `docs/spec-fielding-tier2.md`, worklist
      README: `docs/keeper-ambiguous/README.md`.
 
-**M. Tournament analytics page.** _Next up._ New `/tournaments` page
-with **two** route levels (decision made during the team-stats build —
-flatten season into a filter rather than a separate route, mirroring
-how Teams works): tournament listing → per-tournament overview that
-scopes by season via FilterBar. Spec needs writing; first feasibility
-cuts informed by the team-stats build are captured in
-`docs/spec-team-stats.md`'s "Implication for tournaments" callout.
-Tied to **enhancement O (baselines)** — the per-tournament-per-season
-aggregates we compute here are exactly what the team tabs need for
-tournament-mean comparison overlays.
+**M. Tournament analytics page + match-set dossier.** _Done (2026-04-15)._
+Spec at `docs/spec-tournaments.md`. New `/tournaments` page with
+sectioned landing (ICC events, men's + women's bilateral-rivalry tiles
+bilateral-only, franchise / domestic / women's club leagues + other).
+Tournament tile or rivalry tile both open the same dossier UI with tabs:
+Overview, Editions, Points Table (single-edition only), Batters,
+Bowlers, Fielders, Partnerships, Records, Matches. Single shared
+`TournamentDossier` component handles three URL shapes:
+`?tournament=X` (tournament dossier), `?filter_team=A&filter_opponent=B`
+(rivalry dossier), or both (team pair within a tournament). Backend
+endpoints all accept optional `tournament` + `series_type`
+(all/bilateral_only/tournament_only) + filter_team/filter_opponent;
+summary returns `by_team` per-team breakdowns when team-pair set.
+Tournament canonicalization (e.g. T20 WC's three cricsheet variants)
+moved to a shared `api/tournament_canonical.py` module so FilterParams
+expands to IN-variants globally. The `_by_team` and tournament-scoped
+endpoints set up enhancement O cleanly: any team page can fetch the
+same endpoint without a team filter to get a tournament baseline.
+
+**Polymorphic Head-to-Head** (shipped alongside M). `/head-to-head`
+gained `?mode=team` for team-vs-team analysis, reusing the dossier
+UI. Common-matchup suggestion grid (top-9 men's + women's) under the
+picker. Teams > vs Opponent has a "See full rivalry →" link to it.
+Originally listed as enhancement B (deferred); promoted in scope when
+the unified rivalry-as-team-pair-filter model emerged.
 
 **N. Team statistics — batting / bowling / fielding / partnerships.**
 _Done (2026-04-14)._ Spec at `docs/spec-team-stats.md`, ~21h of build.
@@ -204,13 +219,16 @@ tabs, batter consistency stats (median / 30+ rate / dispersion),
 batter × bowler-type and bowler × batter-handedness splits.
 
 **O. Tournament-baseline comparisons across team / batter / bowler /
-fielder pages.** Once enhancement M ships and we have
-per-tournament-per-season aggregates, every team-tab chart should be
-able to overlay the league mean as a reference line/band, every player
-table should gain a "vs league avg" column, and the phase × season
-heatmaps should support a "delta from league mean" colour mode. Detail
-in `docs/design-decisions.md` "Team metrics need tournament baselines
-(revisit when /tournaments ships)".
+fielder pages.** _Next up._ Enhancement M shipped the per-tournament
+endpoints with explicit baseline reusability: call any
+`/tournaments/{summary,batters-leaders,…}` without a team filter to get
+the tournament-wide baseline, with a team filter for the team's
+narrowed view. Both responses are shape-compatible. Now wire this up:
+every team-tab chart should overlay the league mean as a reference
+line/band, every player table should gain a "vs league avg" column,
+phase × season heatmaps should support a "delta from league mean"
+colour mode. Detail in `docs/design-decisions.md` "Team metrics need
+tournament baselines (revisit when /tournaments ships)".
 
 **P. Search-tab landings + default season window + FilterBar resets.**
 _Done (2026-04-15)._ Every search-bar tab (`/teams`, `/batting`,
