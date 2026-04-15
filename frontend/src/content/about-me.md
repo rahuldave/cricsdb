@@ -1,9 +1,5 @@
 # About me
 
-_This section is edited by the site maintainer. See
-`frontend/src/content/about-me.md` — plain markdown, picked up on
-the next build._
-
 Hi, I'm Rahul Dave. I built CricsDB because the cricket data that
 Cricsheet publishes is rich, free, and almost nobody has the time
 to dig around in it at the ball level. Most public sites stop at
