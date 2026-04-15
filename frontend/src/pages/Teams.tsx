@@ -1303,8 +1303,11 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
   const showMen = menRegular.length + menAssociate.length > 0
   const showWomen = womenRegular.length + womenAssociate.length > 0
   const showIntl = showMen || showWomen
-  const showClub = clubFranchise.length + clubDomestic.length + clubWomen.length + clubOther.length > 0
-  if (!showIntl && !showClub) {
+  const hasDomestic = clubDomestic.length > 0
+  const hasClubRight = clubFranchise.length + clubWomen.length + clubOther.length > 0
+  const showLeft = showIntl || hasDomestic
+  const showRight = hasClubRight
+  if (!showLeft && !showRight) {
     return <div className="wisden-empty">No teams match the current filters.</div>
   }
 
@@ -1381,9 +1384,9 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
         top — change gender, type, tournament, or season to narrow.
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-        {showIntl && (
+        {showLeft && (
           <div>
-            <h3 className="wisden-section-title">International</h3>
+            {showIntl && <h3 className="wisden-section-title">International</h3>}
             {showMen && (
               <>
                 <div className="coverage-head" style={{ marginTop: '0.5rem', marginBottom: '0.25rem' }}>
@@ -1426,9 +1429,36 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
                 )}
               </>
             )}
+            {/* Domestic / national championships (SMAT, Vitality Blast,
+                CSA T20 Challenge) sit here in the left column to balance
+                the layout — conceptually closer to national cricket than
+                to franchise leagues, and keeps the right column from
+                dominating the page. */}
+            {hasDomestic && (
+              <>
+                <h3
+                  className="wisden-section-title"
+                  style={{ marginTop: showIntl ? '2rem' : undefined }}
+                >
+                  Domestic / national championships
+                </h3>
+                {clubDomestic.map(g => (
+                  <Section
+                    key={g.tournament}
+                    title={g.tournament}
+                    count={g.matches}
+                    defaultOpen={false}
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {g.teams.map(renderTeam)}
+                    </div>
+                  </Section>
+                ))}
+              </>
+            )}
           </div>
         )}
-        {showClub && (
+        {showRight && (
           <div>
             <h3 className="wisden-section-title">Clubs</h3>
             {clubFranchise.length > 0 && (
@@ -1450,25 +1480,10 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
                 ))}
               </>
             )}
-            {clubDomestic.length > 0 && (
-              <>
-                <div className="coverage-head" style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>
-                  Domestic / national championships
-                </div>
-                {clubDomestic.map(g => (
-                  <Section
-                    key={g.tournament}
-                    title={g.tournament}
-                    count={g.matches}
-                    defaultOpen={false}
-                  >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                      {g.teams.map(renderTeam)}
-                    </div>
-                  </Section>
-                ))}
-              </>
-            )}
+            {/* Domestic / national championships moved to the left
+                column (under International) for page balance — they're
+                national-level competitions, conceptually closer to
+                International than to franchise leagues. */}
             {clubWomen.length > 0 && (
               <>
                 <div className="coverage-head" style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>
