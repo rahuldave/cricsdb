@@ -130,7 +130,16 @@ export default function FilterBar() {
 
   const seasonsSet = Boolean(seasonFrom || seasonTo)
   const anyFilterSet = Boolean(gender || teamType || tournament || seasonFrom || seasonTo)
+  const latestInScope = seasons.length > 0 && !seasonsError ? seasons[seasons.length - 1] : null
   const clearSeasons = () => setUrlParams({ season_from: '', season_to: '' })
+  const setLatest = () => {
+    if (!latestInScope) return
+    // Updates ONLY season_from + season_to — gender/team_type/
+    // tournament (and team, if set) are preserved by useSetUrlParams.
+    // The latest-in-scope lookup itself already respects those filters
+    // via the seasons-fetch effect above.
+    setUrlParams({ season_from: latestInScope, season_to: latestInScope })
+  }
   const clearAll = () => setUrlParams({
     gender: '', team_type: '', tournament: '', season_from: '', season_to: '',
   })
@@ -196,6 +205,12 @@ export default function FilterBar() {
             <button type="button" onClick={clearSeasons} className="wisden-reset"
               title="Clear season range — show all-time">
               all-time
+            </button>
+          )}
+          {latestInScope && (
+            <button type="button" onClick={setLatest} className="wisden-reset"
+              title={`Jump to latest season in scope (${latestInScope})`}>
+              latest
             </button>
           )}
         </div>
