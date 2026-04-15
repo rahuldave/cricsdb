@@ -12,11 +12,16 @@ api/
   filters.py          — FilterParams class (Depends), builds WHERE clauses with :param bind syntax
   routers/
     reference.py      — /api/v1/tournaments, /seasons, /teams, /players
-    teams.py          — /api/v1/teams/{team}/summary|results|vs/{opponent}|by-season
+    teams.py          — /api/v1/teams/landing (two-column directory, filter-sensitive)
+                         /api/v1/teams/{team}/summary|results|vs/{opponent}|by-season
+                         /api/v1/teams/{team}/players-by-season (roster + bat avg + bowl SR + turnover)
                          plus batting/bowling/fielding/partnerships endpoints + opponents-matrix
-    batting.py        — /api/v1/batters/{id}/summary|by-innings|vs-bowlers|by-over|by-phase|by-season|dismissals|inter-wicket
-    bowling.py        — /api/v1/bowlers/{id}/summary|by-innings|vs-batters|by-over|by-phase|by-season|wickets
-    fielding.py       — /api/v1/fielders/{id}/summary|by-season|by-phase|by-over|dismissal-types|victims|by-innings
+    batting.py        — /api/v1/batters/leaders (top 10 by avg + by SR, filter-sensitive)
+                         /api/v1/batters/{id}/summary|by-innings|vs-bowlers|by-over|by-phase|by-season|dismissals|inter-wicket
+    bowling.py        — /api/v1/bowlers/leaders (top 10 by SR + by economy, filter-sensitive)
+                         /api/v1/bowlers/{id}/summary|by-innings|vs-batters|by-over|by-phase|by-season|wickets
+    fielding.py       — /api/v1/fielders/leaders (top 10 fielders + top 10 keepers, volume-based)
+                         /api/v1/fielders/{id}/summary|by-season|by-phase|by-over|dismissal-types|victims|by-innings
     keeping.py        — /api/v1/fielders/{id}/keeping/summary|by-season|by-innings|ambiguous (Tier 2)
     head_to_head.py   — /api/v1/head-to-head/{batter_id}/{bowler_id}
     matches.py        — /api/v1/matches list, /matches/{id}/scorecard, /matches/{id}/innings-grid
@@ -63,6 +68,9 @@ frontend/src/
   hooks/useUrlState.ts         — useUrlParam + useSetUrlParams (atomic URL state updates)
   hooks/useFetch.ts            — { data, loading, error, refetch } wrapper around an async fn
   hooks/useContainerWidth.ts   — ResizeObserver wrapper used by responsive chart wrappers
+  hooks/useDefaultSeasonWindow.ts — Batting/Bowling/Fielding landings auto-default to last 3
+                                    seasons in scope when no season filter is set (one-shot
+                                    per mount via useRef). Writes to URL so FilterBar reflects.
   components/                  — Layout, FilterBar, PlayerSearch, StatCard, DataTable,
                                    Spinner, ErrorBanner, Scorecard, InningsCard, charts/
     charts/                    — BarChart, LineChart, ScatterChart, DonutChart wrappers (responsive),
@@ -92,6 +100,14 @@ docs/
   spec-fielding-tier2.md               — Wicketkeeper identification (keeper_assignment) spec
   spec-team-stats.md                   — Team batting/bowling/fielding/partnerships spec (enhancement N)
   enhancements-roadmap.md              — The A–O menu of shipped + planned items
+  perf-leaderboards.md                 — Why /batters/leaders etc. are fast: conditional-JOIN
+                                          elimination, composite covering indexes, ANALYZE.
+                                          Reusable pattern for full-table aggregate endpoints.
+  testing-update-recent.md             — Smoke-test update_recent.py against a copy of prod
+                                          via the --db flag before deploying.
+  next-session-ideas.md                — Open design questions: /tournaments tab, team-to-team
+                                          H2H placement, landing-page perf options.
+  api.md                               — Practical API reference with example curls + responses.
   keeper-ambiguous/                    — Date-partitioned CSVs of innings where keeper inference
                                           is ambiguous; resolutions fed back by
                                           apply_keeper_resolutions.py

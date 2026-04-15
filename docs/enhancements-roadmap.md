@@ -211,3 +211,35 @@ table should gain a "vs league avg" column, and the phase × season
 heatmaps should support a "delta from league mean" colour mode. Detail
 in `docs/design-decisions.md` "Team metrics need tournament baselines
 (revisit when /tournaments ships)".
+
+**P. Search-tab landings + default season window + FilterBar resets.**
+_Done (2026-04-15)._ Every search-bar tab (`/teams`, `/batting`,
+`/bowling`, `/fielding`) gained a filter-sensitive landing component
+shown when no entity is selected. Four endpoints:
+`/api/v1/teams/landing` (international split regular/associate via a
+hardcoded ICC full-member list + clubs grouped by tournament),
+`/api/v1/batters/leaders` (top 10 by avg + SR, thresholded to 100
+balls + 3 dismissals), `/api/v1/bowlers/leaders` (top 10 by SR + econ,
+thresholded to 60 balls + 3 wickets), `/api/v1/fielders/leaders`
+(top 10 fielders + top 10 designated keepers via `keeper_assignment`,
+volume-based). Batting/Bowling/Fielding landings auto-scope to the
+last 3 seasons via `hooks/useDefaultSeasonWindow.ts` (one-shot per
+mount, writes to URL so FilterBar reflects it). FilterBar gained two
+subtle text buttons — "all-time" clears just the season range,
+"reset all" clears every filter — both appearing only when relevant.
+Teams landing stays all-time so defunct teams like Pune Supergiants
+remain visible. Players tab on `/teams` gives per-season roster with
+batting average / bowling SR / turnover-vs-previous-season; name
+resolution uses the longest `personname` variant strictly longer than
+`person.name` (so "V Kohli" → "Virat Kohli" where available). Perf
+work: conditional-JOIN elimination when no match-level filter is set
++ two composite covering indexes (`ix_delivery_batter_agg`,
+`ix_delivery_bowler_agg`) + ANALYZE, re-asserted idempotently in
+both `import_data.py` and `update_recent.py`. Unfiltered landing
+queries went from 3s+ to sub-second locally. See
+`docs/perf-leaderboards.md` for the reusable pattern.
+`update_recent.py --db <path>` flag added for smoke-testing against
+a copy of the prod snapshot in `/tmp` before deploying (see
+`docs/testing-update-recent.md`). Home-page gains two deep links:
+"(players)" next to West Indies T20 WC 2016 and "MI men — players
+over the years".

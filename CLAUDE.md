@@ -91,6 +91,12 @@ Every search-bar tab — `/teams`, `/batting`, `/bowling`, `/fielding` — has a
 
 All four are filter-sensitive (gender, team_type, tournament, season_from/to) and all landing-row links carry the current filter scope through to the selected-entity page via `URLSearchParams`.
 
+Batting/Bowling/Fielding landings additionally default `season_from`/`season_to` to the last 3 seasons in scope via `hooks/useDefaultSeasonWindow` — one-shot per mount, writes to URL so FilterBar reflects it. FilterBar has an inline `all-time` reset (clears the season range) and a `reset all` reset (clears every filter). Teams landing is NOT auto-defaulted — it stays all-time so defunct teams remain visible.
+
+## API reference
+
+For every endpoint — path, query params, example curl, and an abbreviated response — see **`docs/api.md`**. It's the quick-reference companion to `SPEC.md` (which has the underlying SQL + full schemas).
+
 ## Performance notes
 
 - **Leaderboard landings** (Batting / Bowling / Fielding) depend on two composite covering indexes (`ix_delivery_batter_agg`, `ix_delivery_bowler_agg`) plus fresh `ANALYZE` stats. These are created idempotently by both `import_data.py` and `update_recent.py`. See **`docs/perf-leaderboards.md`** for the diagnosis and the reusable pattern: use `filters.build(has_innings_join=False)` to get a pure match clause, then conditionally drop the innings/match JOINs entirely when no filters are active (avoids 2.95M × 2 PK probes on the delivery scan).

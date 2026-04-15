@@ -157,6 +157,34 @@ bash deploy.sh --first   # uploads the 435 MB cricket.db along with code
 A plain `bash deploy.sh` only redeploys code and leaves the DB on plash
 untouched.
 
+### Indexes + ANALYZE (automatic)
+
+Both `import_data.py` (full rebuild) and `update_recent.py`
+(incremental, when there are new matches) idempotently ensure two
+composite covering indexes exist and re-run `ANALYZE`:
+
+- `ix_delivery_batter_agg (batter_id, extras_wides, extras_noballs, runs_batter)`
+- `ix_delivery_bowler_agg (bowler_id, extras_wides, extras_noballs, runs_total)`
+
+These power the Batting/Bowling/Fielding landing-page leader boards —
+without them, unfiltered aggregates over the 2.95M-row `delivery`
+table take 3+ seconds; with them, sub-second. `CREATE INDEX IF NOT
+EXISTS` is a no-op when the index is already there, so these lines
+are safe to keep in both pipelines. See `docs/perf-leaderboards.md`
+for the diagnosis.
+
+### Smoke-testing `update_recent.py` against a prod snapshot
+
+Before pushing a DB update to prod, it's worth running the
+incremental pipeline against a copy of the live DB to confirm the
+import path works on real data (schema quirks in fresh cricsheet
+files, populate-script regressions on specific matches, etc).
+`update_recent.py --db /tmp/cricket-prod-test.db` routes the import
+at a custom DB path without touching `./cricket.db`. See
+`docs/testing-update-recent.md` for the copy-to-tmp workflow and
+what not to do (never run against `~/Downloads/` directly — keep that
+copy pristine).
+
 ## Caveats
 
 - **Cricsheet lag is normal.** Matches are typically published 1-3 days
