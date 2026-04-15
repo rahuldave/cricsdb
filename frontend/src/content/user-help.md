@@ -12,8 +12,16 @@ Seven top-level tabs across the nav:
   rivalry tile to get the same dossier scoped to that team pair's
   bilateral series. Men's and women's rivalries are separate tiles.
 - **Teams** — win/loss records, team batting/bowling/fielding,
-  partnerships, roster by season. Start with a search or pick one
-  of the teams listed on the landing board.
+  partnerships, roster by season. The landing board splits
+  international by men's / women's (each into ICC full members vs
+  associate) and clubs into franchise leagues (IPL, BBL, …),
+  domestic / national championships (Syed Mushtaq Ali, Vitality
+  Blast, CSA T20), women's franchise leagues (WBBL, WPL, …), and
+  other tournaments. Each section is a collapsible — only the
+  high-traffic ones (men's full members, top franchise leagues) are
+  open by default. Each entry is tagged "men's" or "women's" when
+  no gender filter is set, so "India men's" and "India women's"
+  appear as separate clickable rows.
 - **Batting / Bowling / Fielding** — player-level stats. The landing
   view shows the top 10 in each metric (by average, strike rate,
   economy, dismissals) filtered to the active season window. Click

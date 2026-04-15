@@ -1292,11 +1292,18 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
   const data = fetch.data
   if (!data) return null
 
-  const regular = data.international.regular
-  const associate = data.international.associate
-  const clubGroups = data.club
-  const showIntl = regular.length > 0 || associate.length > 0
-  const showClub = clubGroups.length > 0
+  const menRegular = data.international.men.regular
+  const menAssociate = data.international.men.associate
+  const womenRegular = data.international.women.regular
+  const womenAssociate = data.international.women.associate
+  const clubFranchise = data.club.franchise_leagues
+  const clubDomestic = data.club.domestic_leagues
+  const clubWomen = data.club.women_franchise
+  const clubOther = data.club.other
+  const showMen = menRegular.length + menAssociate.length > 0
+  const showWomen = womenRegular.length + womenAssociate.length > 0
+  const showIntl = showMen || showWomen
+  const showClub = clubFranchise.length + clubDomestic.length + clubWomen.length + clubOther.length > 0
   if (!showIntl && !showClub) {
     return <div className="wisden-empty">No teams match the current filters.</div>
   }
@@ -1377,37 +1384,129 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
         {showIntl && (
           <div>
             <h3 className="wisden-section-title">International</h3>
-            {regular.length > 0 && (
-              <Section title="Full members" count={regular.length} defaultOpen={true}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                  {regular.map(renderTeam)}
+            {showMen && (
+              <>
+                <div className="coverage-head" style={{ marginTop: '0.5rem', marginBottom: '0.25rem' }}>
+                  Men's
                 </div>
-              </Section>
+                {menRegular.length > 0 && (
+                  <Section title="Full members" count={menRegular.length} defaultOpen={true}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {menRegular.map(renderTeam)}
+                    </div>
+                  </Section>
+                )}
+                {menAssociate.length > 0 && (
+                  <Section title="Associate" count={menAssociate.length} defaultOpen={false}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {menAssociate.map(renderTeam)}
+                    </div>
+                  </Section>
+                )}
+              </>
             )}
-            {associate.length > 0 && (
-              <Section title="Associate" count={associate.length} defaultOpen={false}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                  {associate.map(renderTeam)}
+            {showWomen && (
+              <>
+                <div className="coverage-head" style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>
+                  Women's
                 </div>
-              </Section>
+                {womenRegular.length > 0 && (
+                  <Section title="Full members" count={womenRegular.length} defaultOpen={true}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {womenRegular.map(renderTeam)}
+                    </div>
+                  </Section>
+                )}
+                {womenAssociate.length > 0 && (
+                  <Section title="Associate" count={womenAssociate.length} defaultOpen={false}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {womenAssociate.map(renderTeam)}
+                    </div>
+                  </Section>
+                )}
+              </>
             )}
           </div>
         )}
         {showClub && (
           <div>
             <h3 className="wisden-section-title">Clubs</h3>
-            {clubGroups.map((g, i) => (
-              <Section
-                key={g.tournament}
-                title={g.tournament}
-                count={g.matches}
-                defaultOpen={i < 3}
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                  {g.teams.map(renderTeam)}
+            {clubFranchise.length > 0 && (
+              <>
+                <div className="coverage-head" style={{ marginTop: '0.5rem', marginBottom: '0.25rem' }}>
+                  Franchise leagues
                 </div>
-              </Section>
-            ))}
+                {clubFranchise.map((g, i) => (
+                  <Section
+                    key={g.tournament}
+                    title={g.tournament}
+                    count={g.matches}
+                    defaultOpen={i < 2}
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {g.teams.map(renderTeam)}
+                    </div>
+                  </Section>
+                ))}
+              </>
+            )}
+            {clubDomestic.length > 0 && (
+              <>
+                <div className="coverage-head" style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>
+                  Domestic / national championships
+                </div>
+                {clubDomestic.map(g => (
+                  <Section
+                    key={g.tournament}
+                    title={g.tournament}
+                    count={g.matches}
+                    defaultOpen={false}
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {g.teams.map(renderTeam)}
+                    </div>
+                  </Section>
+                ))}
+              </>
+            )}
+            {clubWomen.length > 0 && (
+              <>
+                <div className="coverage-head" style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>
+                  Women's franchise leagues
+                </div>
+                {clubWomen.map(g => (
+                  <Section
+                    key={g.tournament}
+                    title={g.tournament}
+                    count={g.matches}
+                    defaultOpen={false}
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {g.teams.map(renderTeam)}
+                    </div>
+                  </Section>
+                ))}
+              </>
+            )}
+            {clubOther.length > 0 && (
+              <>
+                <div className="coverage-head" style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>
+                  Other tournaments
+                </div>
+                {clubOther.map(g => (
+                  <Section
+                    key={g.tournament}
+                    title={g.tournament}
+                    count={g.matches}
+                    defaultOpen={false}
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {g.teams.map(renderTeam)}
+                    </div>
+                  </Section>
+                ))}
+              </>
+            )}
           </div>
         )}
       </div>

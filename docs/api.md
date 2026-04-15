@@ -163,8 +163,23 @@ directory shown below the search. See
 
 ## `GET /api/v1/teams/landing`
 
-Two-column directory. International split into regular (ICC full
-members) vs associate; clubs grouped by tournament.
+Two-column directory.
+
+International is split by **gender** (men's / women's) so women's full
+members aren't buried inside a mixed list. Each gender bucket has
+`regular` (ICC full members) vs `associate`. With a gender filter set,
+only that gender's bucket is populated.
+
+Club tournaments are bucketed by series_type using the canonicalization
+map in `api/tournament_canonical.py`: **franchise_leagues** (IPL, BBL,
+PSL, …), **domestic_leagues** / national championships (Vitality Blast,
+Syed Mushtaq Ali Trophy, CSA T20 Challenge), **women_franchise** (WBBL,
+WPL, The Hundred Women's, …), and **other** for unclassified.
+
+Each team entry carries a `gender` field — when no gender filter is
+set, the same string ("Royal Challengers Bengaluru" = IPL/men's AND
+WPL/women's) appears as separate entries with different gender so the
+frontend can disambiguate them with a "men's" / "women's" suffix.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/landing?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024"
@@ -172,18 +187,29 @@ curl "http://localhost:8000/api/v1/teams/landing?gender=male&team_type=club&tour
 
 ```json
 {
-  "international": { "regular": [], "associate": [] },
-  "club": [
-    {
-      "tournament": "Indian Premier League",
-      "matches": 142,
-      "teams": [
-        { "name": "Chennai Super Kings", "matches": 14 },
-        { "name": "Delhi Capitals", "matches": 14 }
-      ]
-    }
-  ]
-}
+  "international": {
+    "men":   { "regular": [ { "name": "India", "gender": "male", "matches": 266 } ], "associate": [] },
+    "women": { "regular": [], "associate": [] }
+  },
+  "club": {
+    "franchise_leagues": [
+      {
+        "tournament": "Indian Premier League",
+        "matches": 142,
+        "teams": [
+          { "name": "Chennai Super Kings", "gender": "male", "matches": 14 },
+          { "name": "Delhi Capitals",       "gender": "male", "matches": 14 }
+        ]
+      }
+    ],
+    "domestic_leagues": [
+      { "tournament": "Syed Mushtaq Ali Trophy", "matches": 695, "teams": [ "…" ] }
+    ],
+    "women_franchise": [
+      { "tournament": "Women's Premier League", "matches": 88, "teams": [ "…" ] }
+    ],
+    "other": []
+  }
 ```
 
 ## `GET /api/v1/batters/leaders`

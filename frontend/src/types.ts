@@ -122,10 +122,15 @@ export interface TeamsLandingTournamentGroup {
 
 export interface TeamsLanding {
   international: {
-    regular: TeamsLandingEntry[]
-    associate: TeamsLandingEntry[]
+    men: { regular: TeamsLandingEntry[]; associate: TeamsLandingEntry[] }
+    women: { regular: TeamsLandingEntry[]; associate: TeamsLandingEntry[] }
   }
-  club: TeamsLandingTournamentGroup[]
+  club: {
+    franchise_leagues: TeamsLandingTournamentGroup[]
+    domestic_leagues: TeamsLandingTournamentGroup[]
+    women_franchise: TeamsLandingTournamentGroup[]
+    other: TeamsLandingTournamentGroup[]
+  }
 }
 
 export interface BattingLeaderEntry {

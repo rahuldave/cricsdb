@@ -7,6 +7,7 @@ from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams
+from ..tournament_canonical import series_type as series_type_for
 
 router = APIRouter(prefix="/api/v1/teams", tags=["Teams"])
 
@@ -38,13 +39,16 @@ def _team_filter_clause(filters: FilterParams, team_param: str = ":team") -> tup
 async def teams_landing(filters: FilterParams = Depends()):
     """Filter-sensitive directory of teams for the Teams search landing.
 
-    Returns two branches:
-      - international: {regular: [...], associate: [...]} — split by
-        ICC full-member status (see ICC_FULL_MEMBERS).
-      - club: [{tournament, matches, teams: [...]}] — teams grouped by
-        the tournament they played in, ordered by tournament match
-        count desc. A team that played multiple tournaments in the
-        filter window appears under each.
+    Returns:
+      - international: { men: { regular, associate }, women: { regular, associate } }
+        — split by gender so women's full members aren't buried in a
+        mixed list, and split by ICC full-member status within each.
+        When a gender filter is set, only that gender's bucket is populated.
+      - club: { franchise_leagues, domestic_leagues, women_franchise, other }
+        — tournaments classified using the tournaments-router series_type
+        map so franchise leagues (IPL, BBL, …) are visually separate
+        from domestic leagues (Vitality Blast, Syed Mushtaq Ali, CSA T20)
+        and women's franchise leagues (WBBL, WPL, …).
 
     All match counts reflect the current filter scope, so teams with
     zero matches in window (e.g. Rising Pune Supergiant outside
@@ -53,13 +57,12 @@ async def teams_landing(filters: FilterParams = Depends()):
     db = get_db()
     where, params = filters.build(has_innings_join=False)
 
-    # International — aggregate by team AND gender so cricsheet's shared
-    # team strings ("India", "Royal Challengers Bengaluru") split into
-    # men's and women's entries when no gender filter is applied. With
-    # a gender filter set, only that gender returns and the list looks
-    # the same as before.
-    intl_regular: list[dict] = []
-    intl_associate: list[dict] = []
+    # International — aggregate by team AND gender, then bucket into
+    # men's / women's so each gender has its own collapsible section.
+    men_regular: list[dict] = []
+    men_associate: list[dict] = []
+    women_regular: list[dict] = []
+    women_associate: list[dict] = []
     if filters.team_type != "club":
         intl_parts = ["m.team_type = 'international'"]
         if where:
@@ -78,14 +81,21 @@ async def teams_landing(filters: FilterParams = Depends()):
         )
         for r in intl_rows:
             entry = {"name": r["name"], "gender": r["gender"], "matches": r["matches"]}
-            if r["name"] in ICC_FULL_MEMBERS:
-                intl_regular.append(entry)
+            is_full_member = r["name"] in ICC_FULL_MEMBERS
+            if r["gender"] == "female":
+                (women_regular if is_full_member else women_associate).append(entry)
             else:
-                intl_associate.append(entry)
+                (men_regular if is_full_member else men_associate).append(entry)
 
     # Club — (team, tournament, gender) tuples. Group tournaments by
     # total match count in window; within a tournament, teams alphabetical.
-    club_groups: list[dict] = []
+    # Each tournament is then bucketed by series_type so franchise
+    # leagues, domestic championships (SMAT, Vitality Blast, CSA T20)
+    # and women's franchise leagues get their own collapsible sections.
+    franchise_leagues: list[dict] = []
+    domestic_leagues: list[dict] = []
+    women_franchise: list[dict] = []
+    other_club: list[dict] = []
     if filters.team_type != "international":
         club_parts = ["m.team_type = 'club'", "m.event_name IS NOT NULL"]
         if where:
@@ -114,18 +124,32 @@ async def teams_landing(filters: FilterParams = Depends()):
             tourney_totals[t] = tourney_totals.get(t, 0) + (r["matches"] or 0)
         for t in sorted(by_tournament.keys(), key=lambda x: (-tourney_totals[x], x)):
             teams = sorted(by_tournament[t], key=lambda x: x["name"].lower())
-            club_groups.append({
+            entry = {
                 "tournament": t,
                 "matches": tourney_totals[t],
                 "teams": teams,
-            })
+            }
+            stype = series_type_for(t)
+            if stype == "franchise_league":
+                franchise_leagues.append(entry)
+            elif stype == "domestic_league":
+                domestic_leagues.append(entry)
+            elif stype == "women_franchise":
+                women_franchise.append(entry)
+            else:
+                other_club.append(entry)
 
     return {
         "international": {
-            "regular": intl_regular,
-            "associate": intl_associate,
+            "men":   {"regular": men_regular,   "associate": men_associate},
+            "women": {"regular": women_regular, "associate": women_associate},
         },
-        "club": club_groups,
+        "club": {
+            "franchise_leagues": franchise_leagues,
+            "domestic_leagues": domestic_leagues,
+            "women_franchise": women_franchise,
+            "other": other_club,
+        },
     }
 
 
