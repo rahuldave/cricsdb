@@ -172,12 +172,110 @@ Team-to-team dossiers filter by both teams, so also narrow. Both
 should inherit the conditional-JOIN pattern and covering indexes
 already in place; no new perf work expected.
 
-## Small gotcha to remember
+## Landing-page perf on prod — three options to pick between
 
-The **prod DB does not yet carry the new composite indexes**
-(`ix_delivery_batter_agg`, `ix_delivery_bowler_agg`) because they
-were added to `import_data.py` + `update_recent.py` after the last
-`--first` push. They'll arrive on prod the next time someone runs
-`update_recent.py` locally against `./cricket.db` and then
-`bash deploy.sh --first`. Current prod perf is fine without them
-(sub-400ms unfiltered) but the gap is worth being aware of.
+After the `--first` push at end-of-session 2026-04-14, prod steady-
+state numbers are:
+
+| Endpoint (unfiltered) | Prod | Local | Narrow-filter (both) |
+|---|---:|---:|---:|
+| Batting | 1.63s | 0.83s | 0.03s local / 0.32s prod |
+| Bowling | 1.61s | 0.81s | — |
+| Fielding | 1.34s | 0.67s | — |
+
+Decomposition: the narrow-filter round-trip (0.32s) is essentially
+pure network overhead (TLS + TCP + HTTP over internet to plash), so
+prod server-side DB work unfiltered is ~1.3s vs ~0.83s local. The
+composite indexes are working (without them we'd be at 3s+, which
+is what we saw before the fix), but plash's container is
+CPU/memory-constrained enough that the 575MB `delivery` scan still
+takes about 1.5× longer than on the dev Mac.
+
+User noted "a little bit slow" — 1.5s unfiltered is borderline for
+a landing page. Three options, pick one next session:
+
+### Option 1 — TTL cache on the unfiltered responses
+
+The unfiltered `/batters/leaders`, `/bowlers/leaders`,
+`/fielders/leaders`, `/teams/landing` responses change **only when
+the DB is rebuilt or incrementally updated**. Nothing else
+invalidates them. So a small in-process TTL cache (~15 LOC per
+endpoint, or a shared decorator) gets us near-instant hits on
+repeat visits.
+
+Shape:
+```python
+from functools import wraps
+from time import monotonic
+_cache = {}  # key -> (expires_at, response)
+
+def cache_if_unfiltered(ttl_sec=600):
+    def deco(fn):
+        @wraps(fn)
+        async def wrapper(filters: FilterParams = Depends(), **kw):
+            is_unfiltered = not any([filters.gender, filters.team_type,
+                                     filters.tournament, filters.season_from,
+                                     filters.season_to])
+            if not is_unfiltered:
+                return await fn(filters=filters, **kw)
+            key = (fn.__name__, *sorted(kw.items()))
+            entry = _cache.get(key)
+            if entry and entry[0] > monotonic():
+                return entry[1]
+            result = await fn(filters=filters, **kw)
+            _cache[key] = (monotonic() + ttl_sec, result)
+            return result
+        return wrapper
+    return deco
+```
+
+Invalidate by restart (simplest) or with a hook in
+`update_recent.py` that POSTs to an internal `/_cache/flush`
+endpoint. Restart-based invalidation is fine given plash redeploys
+on every `deploy.sh` run.
+
+Pros: ~15 LOC per endpoint. Eliminates the 1.5s wait on every
+repeat hit. Low risk, zero data-correctness concern.
+Cons: first hit per TTL window is still 1.5s. Memory usage grows
+slightly (response payloads are ~5–20KB each).
+
+### Option 2 — Precomputed summary tables
+
+Add `batter_career_totals`, `bowler_career_totals`,
+`fielder_career_totals` tables refreshed by `update_recent.py`
+after each incremental import. Columns: person_id + the aggregates
+for each filter-axis combo we care about (all-time, per-gender,
+per-team_type).
+
+Pros: eliminates the full-table scan entirely. Even unfiltered
+responses become O(10K rows) single-table scans, ~10ms on prod.
+Cons: another populate script to maintain. Invalidation must be
+correct on every DB mutation. Adds disk (maybe 1-2MB per table,
+negligible). Filter combinations that aren't pre-aggregated still
+fall back to full scan — so we'd need to decide which axes to
+materialize.
+
+### Option 3 — Accept current perf
+
+1.5s unfiltered / 0.3s filtered is "borderline acceptable for a
+landing page". If the user's actual usage skews heavily to
+filtered (IPL 2024, India 2025) which they're most interested in
+anyway — the fast path — then optimizing the slow path is
+premature.
+
+Mitigation if we take this path: show the spinner earlier with a
+"Loading all-time leaders…" message so the wait feels intentional,
+and set default filters (e.g. current season) so users rarely hit
+the unfiltered slow path.
+
+### My lean
+
+**Option 1 (TTL cache)** — biggest ROI for the least code. Repeat
+landing-page visits (the common case) become instant. First visit
+per TTL-window still 1.5s but that's a single-use penalty. No
+risk of stale data since the cache flushes on every deploy.
+
+Option 2 is worth it if we end up with tournament-dossier
+endpoints that would also benefit — those will do similar
+full-table aggregates. Could batch the summary-table work with
+the tournaments build.
