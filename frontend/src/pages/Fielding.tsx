@@ -22,7 +22,7 @@ import type {
   PlayerSearchResult, FieldingSummary, FieldingSeason, FieldingPhase,
   FieldingVictim, FieldingInnings,
   KeepingSummary, KeepingSeason, KeepingInnings,
-  FieldingLeaders, FieldingLeaderEntry, FilterParams,
+  FieldingLeaders, FilterParams,
 } from '../types'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
