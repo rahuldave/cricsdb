@@ -273,6 +273,48 @@ assert_no_react_warnings "after back-back-back"
 
 # --------------------------------------------------------------------
 echo ""
+echo "Test 9 · TeamSearch pre-filled reload: dropdown stays closed;"
+echo "          typing into empty input still opens it"
+# Regression: loading /head-to-head?mode=team&team1=Australia&team2=India
+# used to fire a search for "Australia" on mount and open the dropdown
+# with a single matching result. Fix was a userTyped ref gating the
+# search effect — initial render with pre-filled value doesn't count.
+# Must not break the normal type-to-search path.
+reset
+agent-browser open "$BASE/head-to-head?mode=team&team1=Australia&team2=India&team_type=international&gender=male&tab=Batters" >/dev/null 2>&1
+agent-browser wait --load networkidle >/dev/null 2>&1
+settle 2.5
+# (a) no listitems in the search boxes
+if agent-browser snapshot -i 2>&1 | grep -qE 'listitem "Australia[0-9]+ matches"'; then
+  echo "  ✗ team1 dropdown open on reload (Australia listitem present)"
+  FAIL=$((FAIL + 1))
+else
+  echo "  ✓ team1 dropdown closed on reload"
+  PASS=$((PASS + 1))
+fi
+if agent-browser snapshot -i 2>&1 | grep -qE 'listitem "India[0-9]+ matches"'; then
+  echo "  ✗ team2 dropdown open on reload (India listitem present)"
+  FAIL=$((FAIL + 1))
+else
+  echo "  ✓ team2 dropdown closed on reload"
+  PASS=$((PASS + 1))
+fi
+# (b) typing 'pak' into team1 (after clearing) shows Pakistan
+TEAM1_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'textbox "Search team' | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
+agent-browser fill "$TEAM1_REF" "pak" >/dev/null 2>&1
+settle 1.0
+if agent-browser snapshot -i 2>&1 | grep -qE 'listitem "Pakistan[0-9]+ matches"'; then
+  echo "  ✓ typing 'pak' opens dropdown with Pakistan result"
+  PASS=$((PASS + 1))
+else
+  echo "  ✗ typing 'pak' did NOT open dropdown"
+  FAIL=$((FAIL + 1))
+fi
+assert_no_page_errors "after team-search type"
+assert_no_react_warnings "after team-search type"
+
+# --------------------------------------------------------------------
+echo ""
 echo "────────────────────────────────────────"
 echo "Passed: $PASS"
 echo "Failed: $FAIL"

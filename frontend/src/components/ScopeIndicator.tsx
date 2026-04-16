@@ -7,8 +7,13 @@ import type { FilterParams } from '../types'
  * &filter_team=Mumbai+Indians`) renders smaller-than-career numbers with no
  * on-page explanation of why.
  *
- * `clear` removes just the lens params, leaves player / gender / tournament /
- * season alone so the page stays anchored on the same player.
+ * `clear` strips every narrowing filter down to the player's bare career
+ * view (player + gender only). If the user wants the previous narrowed
+ * view back, the back button walks the filter history — that's what CLEAR
+ * means: "give me the full career, I'll navigate back if I want the scope
+ * again." Previously clear removed only filter_team/filter_opponent and
+ * left any tournament/season/team_type the user had applied on top still
+ * active, which read as half a reset.
  */
 export default function ScopeIndicator({ filters }: { filters: FilterParams }) {
   const setUrlParams = useSetUrlParams()
@@ -30,8 +35,15 @@ export default function ScopeIndicator({ filters }: { filters: FilterParams }) {
       <button
         type="button"
         className="wisden-scope-clear"
-        onClick={() => setUrlParams({ filter_team: '', filter_opponent: '' })}
-        aria-label="Clear scope"
+        onClick={() => setUrlParams({
+          filter_team: '',
+          filter_opponent: '',
+          tournament: '',
+          team_type: '',
+          season_from: '',
+          season_to: '',
+        })}
+        aria-label="Clear scope and return to full career"
       >
         clear
       </button>

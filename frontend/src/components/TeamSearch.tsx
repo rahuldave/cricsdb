@@ -17,13 +17,18 @@ export default function TeamSearch({
   const [results, setResults] = useState<TeamInfo[]>([])
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const suppressedQuery = useRef<string | null>(null)
+  // Gate the search effect on "has the user actually typed?". On page
+  // load with initialValue set (e.g. ?team1=Australia), query equals
+  // the pre-fill and we don't want to fire a search for it — that
+  // would open the dropdown on a reload with a single matching row.
+  // Flipping this ref only in the input's onChange handler means a
+  // pick (which also calls setQuery programmatically) doesn't count
+  // as user input either. More robust than suppressing a specific
+  // query string: survives StrictMode double-invoke of useEffect.
+  const userTyped = useRef(false)
 
   useEffect(() => {
-    if (suppressedQuery.current === query) {
-      suppressedQuery.current = null
-      return
-    }
+    if (!userTyped.current) return
     if (query.length < 2) { setResults([]); setOpen(false); return }
     // cancelled flag protects against stale-fetch setState after
     // unmount or rapid re-typing — same rationale as PlayerSearch.
@@ -52,7 +57,6 @@ export default function TeamSearch({
   }, [])
 
   const pick = (name: string) => {
-    suppressedQuery.current = name
     setQuery(name)
     setOpen(false)
     onSelect(name)
@@ -65,7 +69,7 @@ export default function TeamSearch({
         className="wisden-playersearch-input"
         placeholder={placeholder ?? 'Search team…'}
         value={query}
-        onChange={e => setQuery(e.target.value)}
+        onChange={e => { userTyped.current = true; setQuery(e.target.value) }}
         onFocus={() => { if (results.length > 0) setOpen(true) }}
       />
       {open && results.length > 0 && (

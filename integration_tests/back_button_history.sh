@@ -161,23 +161,36 @@ assert_url_eq "$BASE/"
 
 # --------------------------------------------------------------------
 echo ""
-echo "Test 6 · ScopeIndicator CLEAR pushes history"
+echo "Test 6 · ScopeIndicator CLEAR strips ALL narrowing; back restores"
 reset
-agent-browser open "$BASE/batting?player=ba607b88&gender=male&filter_team=India&filter_opponent=Australia" >/dev/null 2>&1
+# Arrive with a rivalry lens AND a tournament the user added on top
+# of it. CLEAR must drop BOTH — not just filter_team / filter_opponent
+# but also tournament and team_type. The rule: CLEAR returns the
+# player to their full career; back button walks to any past narrowed
+# state.
+agent-browser open "$BASE/batting?player=ba607b88&gender=male&filter_team=India&filter_opponent=Australia&team_type=international&tournament=T20+World+Cup+%28Men%29" >/dev/null 2>&1
 agent-browser wait --load networkidle >/dev/null 2>&1
 settle 2.5
 CLEAR_REF=$(ref_for 'button "Clear scope"')
 click_ref "$CLEAR_REF"
-agent-browser get url 2>/dev/null | grep -q "filter_team=" && {
-  echo "  ✗ filter_team should have been cleared"
-  FAIL=$((FAIL + 1))
-} || {
-  echo "  ✓ filter_team cleared"
-  PASS=$((PASS + 1))
-}
+# Every narrowing param must be gone. Only player + gender stay.
+for p in filter_team filter_opponent tournament team_type season_from season_to; do
+  agent-browser get url 2>/dev/null | grep -q "$p=" && {
+    echo "  ✗ $p should have been cleared"
+    FAIL=$((FAIL + 1))
+  } || {
+    echo "  ✓ $p cleared"
+    PASS=$((PASS + 1))
+  }
+done
+assert_url_contains "player=ba607b88"
+assert_url_contains "gender=male"
+# Back returns to the full scoped URL — everything restored.
 agent-browser back >/dev/null 2>&1; settle 0.8
 assert_url_contains "filter_team=India"
 assert_url_contains "filter_opponent=Australia"
+assert_url_contains "tournament=T20+World+Cup"
+assert_url_contains "team_type=international"
 
 # --------------------------------------------------------------------
 echo ""
