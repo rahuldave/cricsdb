@@ -1631,6 +1631,7 @@ async def tournament_batters_leaders(
 
     top_ids = {e["person_id"] for e in avg_top} | {e["person_id"] for e in sr_top}
     name_map: dict[str, str] = {}
+    team_map: dict[str, str] = {}
     if top_ids:
         placeholders = ",".join(f":n{i}" for i in range(len(top_ids)))
         name_params = {f"n{i}": pid for i, pid in enumerate(top_ids)}
@@ -1639,10 +1640,35 @@ async def tournament_batters_leaders(
             name_params,
         )
         name_map = {r["id"]: r["name"] for r in name_rows}
+        # Dominant team (most balls faced within scope). Needed by the
+        # rivalry-dossier UI so the "vs <opponent>" context link flips
+        # per player — a batter who played for India vs Australia needs
+        # "vs Australia", not the dossier's filter_opponent verbatim.
+        team_rows = await db.q(
+            f"""
+            SELECT d.batter_id AS pid, i.team AS team, COUNT(*) AS n
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE d.batter_id IN ({placeholders})
+              AND d.extras_wides = 0 AND d.extras_noballs = 0
+              AND i.super_over = 0 AND {where}
+            GROUP BY d.batter_id, i.team
+            """,
+            {**params, **name_params},
+        )
+        per_pid: dict[str, tuple[str, int]] = {}
+        for r in team_rows:
+            pid, team, n = r["pid"], r["team"], r["n"] or 0
+            if pid not in per_pid or n > per_pid[pid][1]:
+                per_pid[pid] = (team, n)
+        team_map = {pid: v[0] for pid, v in per_pid.items()}
     for e in avg_top:
         e["name"] = name_map.get(e["person_id"], e["person_id"])
+        e["team"] = team_map.get(e["person_id"])
     for e in sr_top:
         e["name"] = name_map.get(e["person_id"], e["person_id"])
+        e["team"] = team_map.get(e["person_id"])
 
     return {
         "by_average": avg_top,
@@ -1721,6 +1747,7 @@ async def tournament_bowlers_leaders(
 
     top_ids = {e["person_id"] for e in sr_top} | {e["person_id"] for e in econ_top}
     name_map: dict[str, str] = {}
+    team_map: dict[str, str] = {}
     if top_ids:
         placeholders = ",".join(f":n{i}" for i in range(len(top_ids)))
         name_params = {f"n{i}": pid for i, pid in enumerate(top_ids)}
@@ -1729,10 +1756,33 @@ async def tournament_bowlers_leaders(
             name_params,
         )
         name_map = {r["id"]: r["name"] for r in name_rows}
+        # Bowler's team = the side NOT batting in this innings.
+        team_rows = await db.q(
+            f"""
+            SELECT d.bowler_id AS pid,
+                   CASE WHEN i.team = m.team1 THEN m.team2 ELSE m.team1 END AS team,
+                   COUNT(*) AS n
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE d.bowler_id IN ({placeholders})
+              AND i.super_over = 0 AND {where}
+            GROUP BY d.bowler_id, team
+            """,
+            {**params, **name_params},
+        )
+        per_pid: dict[str, tuple[str, int]] = {}
+        for r in team_rows:
+            pid, team, n = r["pid"], r["team"], r["n"] or 0
+            if pid not in per_pid or n > per_pid[pid][1]:
+                per_pid[pid] = (team, n)
+        team_map = {pid: v[0] for pid, v in per_pid.items()}
     for e in sr_top:
         e["name"] = name_map.get(e["person_id"], e["person_id"])
+        e["team"] = team_map.get(e["person_id"])
     for e in econ_top:
         e["name"] = name_map.get(e["person_id"], e["person_id"])
+        e["team"] = team_map.get(e["person_id"])
 
     return {
         "by_strike_rate": sr_top,
@@ -1801,6 +1851,7 @@ async def tournament_fielders_leaders(
 
     top_ids = {r["person_id"] for r in disp_rows} | {r["person_id"] for r in keeper_rows}
     name_map: dict[str, str] = {}
+    team_map: dict[str, str] = {}
     if top_ids:
         placeholders = ",".join(f":n{i}" for i in range(len(top_ids)))
         name_params = {f"n{i}": pid for i, pid in enumerate(top_ids)}
@@ -1809,12 +1860,36 @@ async def tournament_fielders_leaders(
             name_params,
         )
         name_map = {r["id"]: r["name"] for r in name_rows}
+        # Fielder's team = the side NOT batting in this innings (they're
+        # in the field). Same shape as bowlers.
+        team_rows = await db.q(
+            f"""
+            SELECT fc.fielder_id AS pid,
+                   CASE WHEN i.team = m.team1 THEN m.team2 ELSE m.team1 END AS team,
+                   COUNT(*) AS n
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE fc.fielder_id IN ({placeholders})
+              AND i.super_over = 0 AND {where}
+            GROUP BY fc.fielder_id, team
+            """,
+            {**params, **name_params},
+        )
+        per_pid: dict[str, tuple[str, int]] = {}
+        for r in team_rows:
+            pid, team, n = r["pid"], r["team"], r["n"] or 0
+            if pid not in per_pid or n > per_pid[pid][1]:
+                per_pid[pid] = (team, n)
+        team_map = {pid: v[0] for pid, v in per_pid.items()}
 
     def _pack(rows):
         out = []
         for r in rows:
             d = dict(r)
             d["name"] = name_map.get(d["person_id"], d["person_id"])
+            d["team"] = team_map.get(d["person_id"])
             out.append(d)
         return out
 

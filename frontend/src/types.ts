@@ -145,6 +145,10 @@ export interface BattingLeaderEntry {
   dismissals: number
   average: number | null
   strike_rate: number | null
+  /** Dominant team in scope. Only set on tournament/rivalry leaders
+   *  (not on the landing /batters/leaders). Used by TournamentDossier's
+   *  rivalry context links to flip filter_team/filter_opponent per row. */
+  team?: string | null
 }
 
 export interface BattingLeaders {
@@ -161,6 +165,7 @@ export interface BowlingLeaderEntry {
   wickets: number
   strike_rate: number | null
   economy: number | null
+  team?: string | null
 }
 
 export interface BowlingLeaders {
@@ -177,6 +182,7 @@ export interface FieldingLeaderEntry {
   stumpings: number
   run_outs?: number  // only present on by_dismissals
   c_and_b?: number
+  team?: string | null
 }
 
 export interface FieldingLeaders {

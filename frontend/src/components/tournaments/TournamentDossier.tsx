@@ -21,7 +21,9 @@ import type {
   PointsTableRow, TournamentRecords,
   TournamentRecordTeamTotal, TournamentRecordWin,
   TournamentRecordPartnership, TournamentRecordBowling, TournamentRecordMatchSixes,
-  BattingLeaders, BowlingLeaders, FieldingLeaders,
+  BattingLeaders, BattingLeaderEntry,
+  BowlingLeaders, BowlingLeaderEntry,
+  FieldingLeaders, FieldingLeaderEntry,
   MatchListItem,
   TournamentPartnershipsByWicket, TournamentPartnershipsTop,
   TournamentPartnershipTopEntry,
@@ -1026,14 +1028,25 @@ function playerContext(opts: {
   tournament: string | null
   filterTeam: string | null | undefined
   filterOpponent: string | null | undefined
+  /** Player's dominant team in scope. When set in rivalry mode, flips
+   *  filter_team / filter_opponent so the context link points the
+   *  player at their actual opponent (e.g., a Kohli row in an
+   *  India-vs-Australia dossier gets "vs Australia", not "vs India"). */
+  rowTeam?: string | null
 }): { label: string; params: Record<string, string> } | undefined {
-  const { tournament, filterTeam, filterOpponent } = opts
+  const { tournament, filterTeam, filterOpponent, rowTeam } = opts
   const params: Record<string, string> = {}
   const labelParts: string[] = []
   if (filterTeam && filterOpponent) {
-    params.filter_team = filterTeam
-    params.filter_opponent = filterOpponent
-    labelParts.push(`vs ${filterOpponent}`)
+    let myTeam = filterTeam
+    let otherTeam = filterOpponent
+    if (rowTeam && rowTeam === filterOpponent) {
+      myTeam = filterOpponent
+      otherTeam = filterTeam
+    }
+    params.filter_team = myTeam
+    params.filter_opponent = otherTeam
+    labelParts.push(`vs ${otherTeam}`)
   } else if (filterTeam) {
     params.filter_team = filterTeam
     labelParts.push(`at ${filterTeam}`)
@@ -1060,7 +1073,8 @@ function BattersTab({
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
 
-  const ctx = playerContext({ tournament, filterTeam, filterOpponent })
+  const rowCtx = (r: BattingLeaderEntry) =>
+    playerContext({ tournament, filterTeam, filterOpponent, rowTeam: r.team })
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -1070,12 +1084,15 @@ function BattersTab({
           columns={[
             {
               key: 'name', label: 'Batter',
-              format: (_v, r) => (
-                <PlayerLink
-                  personId={r.person_id} name={r.name} role="batter" gender={gender}
-                  contextLabel={ctx?.label} contextParams={ctx?.params}
-                />
-              ) as unknown as string,
+              format: (_v, r) => {
+                const c = rowCtx(r)
+                return (
+                  <PlayerLink
+                    personId={r.person_id} name={r.name} role="batter" gender={gender}
+                    contextLabel={c?.label} contextParams={c?.params}
+                  />
+                ) as unknown as string
+              },
             },
             { key: 'runs', label: 'Runs', sortable: true },
             { key: 'balls', label: 'Balls' },
@@ -1092,12 +1109,15 @@ function BattersTab({
           columns={[
             {
               key: 'name', label: 'Batter',
-              format: (_v, r) => (
-                <PlayerLink
-                  personId={r.person_id} name={r.name} role="batter" gender={gender}
-                  contextLabel={ctx?.label} contextParams={ctx?.params}
-                />
-              ) as unknown as string,
+              format: (_v, r) => {
+                const c = rowCtx(r)
+                return (
+                  <PlayerLink
+                    personId={r.person_id} name={r.name} role="batter" gender={gender}
+                    contextLabel={c?.label} contextParams={c?.params}
+                  />
+                ) as unknown as string
+              },
             },
             { key: 'strike_rate', label: 'SR', sortable: true, format: (v) => fmt(v, 2) },
             { key: 'runs', label: 'Runs' },
@@ -1125,7 +1145,8 @@ function BowlersTab({
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
 
-  const ctx = playerContext({ tournament, filterTeam, filterOpponent })
+  const rowCtx = (r: BowlingLeaderEntry) =>
+    playerContext({ tournament, filterTeam, filterOpponent, rowTeam: r.team })
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -1135,12 +1156,15 @@ function BowlersTab({
           columns={[
             {
               key: 'name', label: 'Bowler',
-              format: (_v, r) => (
-                <PlayerLink
-                  personId={r.person_id} name={r.name} role="bowler" gender={gender}
-                  contextLabel={ctx?.label} contextParams={ctx?.params}
-                />
-              ) as unknown as string,
+              format: (_v, r) => {
+                const c = rowCtx(r)
+                return (
+                  <PlayerLink
+                    personId={r.person_id} name={r.name} role="bowler" gender={gender}
+                    contextLabel={c?.label} contextParams={c?.params}
+                  />
+                ) as unknown as string
+              },
             },
             { key: 'strike_rate', label: 'SR', sortable: true, format: (v) => fmt(v, 2) },
             { key: 'wickets', label: 'W' },
@@ -1156,12 +1180,15 @@ function BowlersTab({
           columns={[
             {
               key: 'name', label: 'Bowler',
-              format: (_v, r) => (
-                <PlayerLink
-                  personId={r.person_id} name={r.name} role="bowler" gender={gender}
-                  contextLabel={ctx?.label} contextParams={ctx?.params}
-                />
-              ) as unknown as string,
+              format: (_v, r) => {
+                const c = rowCtx(r)
+                return (
+                  <PlayerLink
+                    personId={r.person_id} name={r.name} role="bowler" gender={gender}
+                    contextLabel={c?.label} contextParams={c?.params}
+                  />
+                ) as unknown as string
+              },
             },
             { key: 'economy', label: 'Econ', sortable: true, format: (v) => fmt(v, 2) },
             { key: 'wickets', label: 'W' },
@@ -1189,7 +1216,8 @@ function FieldersTab({
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
 
-  const ctx = playerContext({ tournament, filterTeam, filterOpponent })
+  const rowCtx = (r: FieldingLeaderEntry) =>
+    playerContext({ tournament, filterTeam, filterOpponent, rowTeam: r.team })
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -1199,12 +1227,15 @@ function FieldersTab({
           columns={[
             {
               key: 'name', label: 'Fielder',
-              format: (_v, r) => (
-                <PlayerLink
-                  personId={r.person_id} name={r.name} role="fielder" gender={gender}
-                  contextLabel={ctx?.label} contextParams={ctx?.params}
-                />
-              ) as unknown as string,
+              format: (_v, r) => {
+                const c = rowCtx(r)
+                return (
+                  <PlayerLink
+                    personId={r.person_id} name={r.name} role="fielder" gender={gender}
+                    contextLabel={c?.label} contextParams={c?.params}
+                  />
+                ) as unknown as string
+              },
             },
             { key: 'total', label: 'Total', sortable: true },
             { key: 'catches', label: 'C' },
@@ -1221,12 +1252,15 @@ function FieldersTab({
           columns={[
             {
               key: 'name', label: 'Keeper',
-              format: (_v, r) => (
-                <PlayerLink
-                  personId={r.person_id} name={r.name} role="fielder" gender={gender}
-                  contextLabel={ctx?.label} contextParams={ctx?.params}
-                />
-              ) as unknown as string,
+              format: (_v, r) => {
+                const c = rowCtx(r)
+                return (
+                  <PlayerLink
+                    personId={r.person_id} name={r.name} role="fielder" gender={gender}
+                    contextLabel={c?.label} contextParams={c?.params}
+                  />
+                ) as unknown as string
+              },
             },
             { key: 'total', label: 'Total', sortable: true },
             { key: 'catches', label: 'C' },
