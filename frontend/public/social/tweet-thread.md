@@ -16,7 +16,7 @@ https://t20.rahuldave.com
 
 ---
 
-![OG autocard](og-card.png)
+![OG autocard](../og-card.png)
 
 ---
 
@@ -30,7 +30,7 @@ India (men's) — 266 matches, 67.7% wins ↓
 
 ---
 
-![India team dossier](social/03-team-overview.png)
+![India team dossier](03-team-overview.png)
 
 ---
 
@@ -46,7 +46,7 @@ Mumbai Indians ↓
 
 ---
 
-![Mumbai Indians partnerships](social/05-team-partnerships.png)
+![Mumbai Indians partnerships](05-team-partnerships.png)
 
 ---
 
@@ -60,7 +60,7 @@ India v Australia men's: 37 meetings, 22–12 to India ↓
 
 ---
 
-![India v Australia rivalry dossier](social/08-rivalry-dossier.png)
+![India v Australia rivalry dossier](08-rivalry-dossier.png)
 
 ---
 
@@ -74,7 +74,7 @@ Role classifier adapts to scope: narrow to one tournament and a "specialist batt
 
 ---
 
-![Kohli single-player view](social/10-player-single.png)
+![Kohli single-player view](10-player-single.png)
 
 ---
 
@@ -88,7 +88,7 @@ Kohli × Williamson × Smith, all-time ↓
 
 ---
 
-![3-way compare](social/11-player-compare.png)
+![3-way compare](11-player-compare.png)
 
 ---
 
@@ -102,7 +102,7 @@ Kohli ↓
 
 ---
 
-![Batting vs Bowlers scatter](social/12-batting-vs-bowlers.png)
+![Batting vs Bowlers scatter](12-batting-vs-bowlers.png)
 
 ---
 
@@ -118,7 +118,7 @@ Kohli v Bumrah ↓
 
 ---
 
-![Kohli v Bumrah head-to-head](social/14-h2h-player.png)
+![Kohli v Bumrah head-to-head](14-h2h-player.png)
 
 ---
 
@@ -132,7 +132,7 @@ India v Australia, all meetings ↓
 
 ---
 
-![India v Australia team-mode head-to-head](social/15-h2h-team.png)
+![India v Australia team-mode head-to-head](15-h2h-team.png)
 
 ---
 
@@ -148,7 +148,7 @@ Innings-list date links highlight that player's row on load.
 
 ---
 
-![2024 T20 WC Final scorecard](social/17-scorecard-full.png)
+![2024 T20 WC Final scorecard](17-scorecard-full.png)
 
 ---
 
@@ -162,7 +162,7 @@ Click a rivalry link and filter_team + filter_opponent join in. A scope pill nam
 
 ---
 
-![Kohli /batting with rivalry scope pill](social/18-filter-rivalry.png)
+![Kohli /batting with rivalry scope pill](18-filter-rivalry.png)
 
 ---
 
