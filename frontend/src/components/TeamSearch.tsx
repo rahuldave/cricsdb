@@ -25,12 +25,22 @@ export default function TeamSearch({
       return
     }
     if (query.length < 2) { setResults([]); setOpen(false); return }
+    // cancelled flag protects against stale-fetch setState after
+    // unmount or rapid re-typing — same rationale as PlayerSearch.
+    let cancelled = false
     const t = setTimeout(() => {
       getTeams({ ...filters, q: query })
-        .then(d => { setResults(d.teams.slice(0, 12)); setOpen(true) })
+        .then(d => {
+          if (cancelled) return
+          setResults(d.teams.slice(0, 12))
+          setOpen(true)
+        })
         .catch(() => {})
     }, 250)
-    return () => clearTimeout(t)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
   }, [query, filters.gender, filters.team_type])
 
   useEffect(() => {

@@ -22,6 +22,11 @@ BASE="${BASE:-http://localhost:5173}"
 PASS=0
 FAIL=0
 
+# Close any lingering agent-browser sessions so prior HMR state /
+# cached bundles don't affect assertions. Harmless if no session open.
+agent-browser close --all >/dev/null 2>&1 || true
+sleep 1
+
 assert_url_eq() {
   local expected="$1"
   local got

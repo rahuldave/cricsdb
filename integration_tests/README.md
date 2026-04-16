@@ -14,6 +14,14 @@ examples we have:
 - `back_button_history.sh` — URL-state discipline: every user-
   initiated param change must push; every auto-correction must
   replace. See `internal_docs/url-state.md` for the rules.
+- `mount_unmount.sh` — React hygiene: rapid navigation, fast filter
+  clicks, in-flight search fetches, ResizeObserver-heavy chart
+  unmounts. Catches missing `useEffect` cleanup, leftover listeners,
+  setState-after-unmount, stale-response leaks. Asserts on negative
+  signals (no page errors, no React warnings) rather than URL shape.
+
+Each script closes any lingering agent-browser session at the top so
+prior HMR state / cached bundles don't bleed in.
 
 Things that DON'T need integration tests (unit tests or API-level
 curl suffice):
@@ -54,6 +62,7 @@ Prerequisites:
 
 ```bash
 ./integration_tests/back_button_history.sh
+./integration_tests/mount_unmount.sh
 ```
 
 Output is a per-assertion `✓` / `✗` followed by a `Passed: N / Failed:

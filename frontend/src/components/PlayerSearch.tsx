@@ -34,19 +34,30 @@ export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSear
     setLoading(true)
     setError(null)
     clearTimeout(timerRef.current)
+    // `cancelled` guards setState after unmount OR after the effect
+    // re-runs (e.g. user kept typing). Without it, an in-flight fetch
+    // from a prior query could resolve into this component after it's
+    // been unmounted or after the query has moved on — wasted work and
+    // a source of "show stale results" bugs.
+    let cancelled = false
     timerRef.current = setTimeout(async () => {
       try {
         const data = await searchPlayers(query, role)
+        if (cancelled) return
         setResults(data.players)
         setOpen(true)
       } catch (err) {
+        if (cancelled) return
         setResults([])
         setOpen(true)
         setError(err instanceof Error ? err.message : 'Search failed')
       }
-      setLoading(false)
+      if (!cancelled) setLoading(false)
     }, 300)
-    return () => clearTimeout(timerRef.current)
+    return () => {
+      cancelled = true
+      clearTimeout(timerRef.current)
+    }
   }, [query, role])
 
   useEffect(() => {
