@@ -1,6 +1,6 @@
 # Tweet thread — T20 & CricsDB launch
 
-Each tweet is a block separated by `---`. Copy the text below the header, attach the image noted in the header (all images live alongside this file in `frontend/public/social/`).
+Each tweet is a block separated by `---`. Below every tweet is a **slide** (also `---` separated) that previews the image attachment, so you can read the thread top-to-bottom and see exactly how it will look when posted. Copy the tweet text below the header, attach the image named in the header.
 
 Twitter / X counts any URL as 23 characters regardless of length, so the character counts below include that convention. Every tweet is under 250.
 
@@ -16,6 +16,10 @@ https://t20.rahuldave.com
 
 ---
 
+![OG autocard](og-card.png)
+
+---
+
 **Tweet 2 · 2/12 · attach: 03-team-overview.png**
 
 2/ Every T20 side gets a dossier.
@@ -23,6 +27,10 @@ https://t20.rahuldave.com
 Wins/losses, opponents, season-by-season, keepers used, 11-man XI per season with year-on-year turnover, phase splits for batting + bowling.
 
 India (men's) — 266 matches, 67.7% wins ↓
+
+---
+
+![India team dossier](social/03-team-overview.png)
 
 ---
 
@@ -38,6 +46,10 @@ Mumbai Indians ↓
 
 ---
 
+![Mumbai Indians partnerships](social/05-team-partnerships.png)
+
+---
+
 **Tweet 4 · 4/12 · attach: 08-rivalry-dossier.png**
 
 4/ Series tab houses competitions AND bilateral rivalries.
@@ -45,6 +57,10 @@ Mumbai Indians ↓
 ICC events · men's/women's bilateral tiles · club leagues (IPL · BBL · PSL · WPL · WBBL + more).
 
 India v Australia men's: 37 meetings, 22–12 to India ↓
+
+---
+
+![India v Australia rivalry dossier](social/08-rivalry-dossier.png)
 
 ---
 
@@ -58,6 +74,10 @@ Role classifier adapts to scope: narrow to one tournament and a "specialist batt
 
 ---
 
+![Kohli single-player view](social/10-player-single.png)
+
+---
+
 **Tweet 6 · 6/12 · attach: 11-player-compare.png**
 
 6/ Compare up to 3 players side-by-side, aligned by discipline.
@@ -68,6 +88,10 @@ Kohli × Williamson × Smith, all-time ↓
 
 ---
 
+![3-way compare](social/11-player-compare.png)
+
+---
+
 **Tweet 7 · 7/12 · attach: 12-batting-vs-bowlers.png**
 
 7/ Each discipline gets a dedicated deep-dive.
@@ -75,6 +99,10 @@ Kohli × Williamson × Smith, all-time ↓
 Batting: season, over, phase, inter-wicket, dismissals, and a vs-bowlers scatter — strike rate × average, size = balls faced. Click a row in the table, find the dot.
 
 Kohli ↓
+
+---
+
+![Batting vs Bowlers scatter](social/12-batting-vs-bowlers.png)
 
 ---
 
@@ -90,6 +118,10 @@ Kohli v Bumrah ↓
 
 ---
 
+![Kohli v Bumrah head-to-head](social/14-h2h-player.png)
+
+---
+
 **Tweet 9 · 9/12 · attach: 15-h2h-team.png**
 
 9/ Flip mode=team and H2H becomes team vs team.
@@ -97,6 +129,10 @@ Kohli v Bumrah ↓
 Every meeting between two sides — bilateral tours + tournament matches combined — reusing the rivalry dossier's tabs.
 
 India v Australia, all meetings ↓
+
+---
+
+![India v Australia team-mode head-to-head](social/15-h2h-team.png)
 
 ---
 
@@ -112,6 +148,10 @@ Innings-list date links highlight that player's row on load.
 
 ---
 
+![2024 T20 WC Final scorecard](social/17-scorecard-full.png)
+
+---
+
 **Tweet 11 · 11/12 · attach: 18-filter-rivalry.png**
 
 11/ FilterBar composes across every page: gender · type · tournament · season.
@@ -119,6 +159,10 @@ Innings-list date links highlight that player's row on load.
 Click a rivalry link and filter_team + filter_opponent join in. A scope pill names what you're looking at, one tap to CLEAR.
 
 "Scoped to India v Australia" ↓
+
+---
+
+![Kohli /batting with rivalry scope pill](social/18-filter-rivalry.png)
 
 ---
 

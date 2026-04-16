@@ -330,6 +330,25 @@ career-match count — as denominator). Integration tests live in
 `integration_tests/players_tab.sh` + `players_hygiene.sh`. Spec at
 `internal_docs/spec-players.md`.
 
+**T. Launch identity — favicon, OG card, tweet thread, help-page
+walkthrough.** _Done, 2026-04-16._ Replaced the default Vite bolt with
+an italic oxblood Fraunces `&` on cream — the masthead's signature
+glyph — scaled to favicon.svg, apple-touch-icon (180), icon-192,
+icon-512, and embedded in a 1200×630 Open Graph card (rendered at
+headless-Chrome because `rsvg-convert` ignores Fraunces's variable-
+axis settings — see `design-decisions.md` "Fraunces variable-font
+axes need Chrome, not rsvg-convert"). `index.html` gained the full
+OG + Twitter (`summary_large_image`) tag set with `@rahuldave` as
+the creator. A `manifest.webmanifest` makes the site installable
+as a PWA. 18 curated screenshots shipped at
+`frontend/public/social/`, doubled as (a) image manifest for a
+12-tweet launch thread saved at `social/tweet-thread.md` and
+(b) inline walkthroughs embedded into `user-help.md` so the Help
+page now has visual examples for Teams, Series, Players, H2H,
+Matches, and the filter scope pill. Source HTML files for the
+brand assets live in `frontend/scripts/assets-source/` so the
+icons + OG card are reproducible.
+
 **Q. Batter-pair profile page (deferred).** Partnerships are
 consistently scoped everywhere they appear — team page > partnerships
 tab, tournament dossier > partnerships tab, rivalry dossier > by_team.

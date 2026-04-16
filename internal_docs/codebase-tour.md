@@ -137,6 +137,24 @@ frontend/src/
                                    Help (/help), HelpUsage (/help/usage)
   content/                     — about-me.md + user-help.md. Imported as ?raw by the Help pages
                                    and rendered via react-markdown. Edit the .md, rebuild, ship.
+                                   user-help.md embeds screenshots from /social/*.png.
+  scripts/                     — Dev-only tooling (NOT shipped with the frontend):
+    assets-source/             — favicon.html + og-card.html + README. Render the brand
+                                   assets (favicon PNGs, OG card PNG) via headless Chrome
+                                   because rsvg-convert ignores font-variation-settings,
+                                   which Fraunces's variable axes depend on. Regen steps
+                                   in the README; commit the resulting PNGs in public/.
+public/
+  favicon.svg                  — italic Fraunces "&" on cream (masthead glyph)
+  apple-touch-icon.png / icon-192.png / icon-512.png — PNG versions rendered from
+                                   scripts/assets-source/favicon.html via headless Chrome
+  og-card.png                  — 1200×630 Open Graph + Twitter card (summary_large_image),
+                                   rendered from scripts/assets-source/og-card.html
+  manifest.webmanifest         — PWA manifest pointing at the icons
+  social/                      — Curated screenshots (01–18) + tweet-thread.md for the
+                                   launch thread. Referenced by user-help.md for the
+                                   Help page's inline walkthrough images. Ships to prod —
+                                   live at https://t20.rahuldave.com/social/<file>.
 ```
 
 ## Infrastructure / docs

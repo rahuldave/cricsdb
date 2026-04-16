@@ -621,3 +621,15 @@ The `.plash` file in `build_plash/` is preserved across deploys to maintain the 
 ### Database persistence on plash
 
 Plash's `data/` directory persists across deploys. The 435MB `cricket.db` is uploaded once (`deploy.sh --first`), then subsequent deploys only update code. The `dependencies.py` detects production via `PLASH_PRODUCTION=1` (set automatically by plash) and reads from `data/cricket.db`.
+
+## Brand assets
+
+### Fraunces variable-font axes need Chrome, not rsvg-convert
+
+The site's masthead ampersand is a specific Fraunces italic glyph — optical-size 144, weight 400. Fraunces is a variable font with four axes (`ital`, `opsz`, `wght`, plus `SOFT` and `WONK` for alternate shapes).
+
+We regenerate `favicon.svg`, the PNG icons (`apple-touch-icon.png`, `icon-192.png`, `icon-512.png`), and the 1200×630 `og-card.png` from source. First pass used `rsvg-convert` on SVG files with `font-variation-settings` embedded — but `rsvg-convert`'s Cairo/Pango font stack on macOS ignores those variation settings entirely. The result rendered Fraunces's default-WONK glyph, which is a DIFFERENT italic ampersand shape than the masthead shows. The two surfaces read as inconsistent.
+
+Fix: source the PNGs from headless Chrome instead. `frontend/scripts/assets-source/` contains `favicon.html` + `og-card.html` — self-contained HTML files that load Fraunces from Google Fonts, set `font-variation-settings` on the glyphs, and rely on Chrome's CSS font renderer to honour the axes. The regeneration recipe (in the sibling `README.md`) uses `agent-browser screenshot body <path>` to capture the rendered output at exact pixel dimensions, followed by `sips -z` to downscale the 512×512 favicon PNG to the 180 / 192 sizes.
+
+Corollary: the SVG favicon still ships (browsers honour variable axes when rendering SVG favicons), but the authoritative source of truth for the icon and OG-card shapes is the Chrome-rendered PNG. If anyone future-edits `favicon.svg` in isolation, the browser render will drift from the PNGs. The scripts/assets-source/README documents the round-trip.
