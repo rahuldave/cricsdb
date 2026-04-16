@@ -5,7 +5,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import TournamentsLanding from '../components/tournaments/TournamentsLanding'
 import TournamentDossier from '../components/tournaments/TournamentDossier'
 
-/** Render mode for the /tournaments route.
+/** Render mode for the /series route.
  *
  *  Three URL shapes drive the mode:
  *    - no params                              → landing
@@ -36,7 +36,7 @@ export default function Tournaments() {
   }, [rivalry])
 
   const isDossier = !!(tournament || (filterTeam && filterOpp))
-  useDocumentTitle(isDossier ? null : 'Tournaments')
+  useDocumentTitle(isDossier ? null : 'Series')
 
   if (isDossier) {
     return (

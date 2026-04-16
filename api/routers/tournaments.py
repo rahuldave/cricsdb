@@ -1,20 +1,24 @@
-"""Tournaments router — tournament & bilateral-rivalry rollups.
+"""Series router — tournament & bilateral-rivalry rollups.
 
-The tournament dimension. FilterBar already captures it, but until now
-there was no home for it. This router provides:
+Cricket has two shapes of "series": a tournament-season (IPL 2024, a
+T20 World Cup edition) and a bilateral series (India's tour of
+Australia 2024). This router serves both under the common `/series/`
+namespace so the UI can treat them interchangeably. The FilterBar's
+Tournament dropdown still selects a cricsheet `event_name` — the
+`/series/` prefix exists specifically to disambiguate the landing /
+dossier catalog from that filter.
 
-- `/tournaments/landing`    — sectioned directory (ICC / franchise /
+- `/series/landing`    — sectioned directory (ICC / franchise /
   domestic / women / rivalries) for the search landing.
-- `/tournaments/summary`    — headline numbers for one tournament.
-- `/tournaments/by-season`  — per-edition rollup (champion, top scorer…).
-- `/tournaments/points-table` — reconstructed league-stage standings +
-  NRR. Visible only when a single season is in scope.
-- `/tournaments/records`    — highest totals, biggest wins, best bowling,
-  etc.
-- `/tournaments/other-rivalries` — lazy-loaded rivalry list for pairs
+- `/series/summary`    — headline numbers for one series.
+- `/series/by-season`  — per-edition rollup (champion, top scorer…).
+- `/series/points-table` — reconstructed league-stage standings + NRR.
+  Visible only when a single season is in scope.
+- `/series/records`    — highest totals, biggest wins, best bowling, …
+- `/series/other-rivalries` — lazy-loaded rivalry list for pairs
   outside the default top-9 grid.
-- `/rivalries/summary`      — synthesized bilateral rivalry dossier.
-  Reused later by polymorphic /head-to-head.
+- `/rivalries/summary` — synthesized bilateral rivalry dossier
+  (legacy path, kept at /rivalries/summary for external callers).
 
 Canonicalization:
   Cricsheet's `event_name` has drift — the men's T20 World Cup lives
@@ -42,7 +46,7 @@ from ..tournament_canonical import (
     series_type_clause as _series_type_clause,
 )
 
-router = APIRouter(prefix="/api/v1", tags=["Tournaments"])
+router = APIRouter(prefix="/api/v1", tags=["Series"])
 
 
 def _build_filter_clauses(
@@ -92,7 +96,7 @@ def _t20_match_clause(alias: str = "m") -> str:
 # ─── Landing endpoint ─────────────────────────────────────────────────
 
 
-@router.get("/tournaments/landing")
+@router.get("/series/landing")
 async def tournaments_landing(filters: FilterParams = Depends()):
     """Sectioned directory of tournaments + bilateral rivalries.
 
@@ -546,7 +550,7 @@ def _safe_div(a, b, mul=1, ndigits=2):
     return round(a * mul / b, ndigits)
 
 
-@router.get("/tournaments/summary")
+@router.get("/series/summary")
 async def tournament_summary(
     tournament: str | None = Query(None, description="Canonical tournament name (optional)"),
     series_type: str | None = Query(None, description="all / bilateral_only / tournament_only"),
@@ -1032,7 +1036,7 @@ async def _summary_by_team(
     return out
 
 
-@router.get("/tournaments/by-season")
+@router.get("/series/by-season")
 async def tournament_by_season(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
@@ -1177,7 +1181,7 @@ async def tournament_by_season(
     return {"tournament": tournament, "seasons": seasons}
 
 
-@router.get("/tournaments/points-table")
+@router.get("/series/points-table")
 async def tournament_points_table(
     tournament: str = Query(...),
     filters: FilterParams = Depends(),
@@ -1343,7 +1347,7 @@ async def tournament_points_table(
     }
 
 
-@router.get("/tournaments/records")
+@router.get("/series/records")
 async def tournament_records(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
@@ -1561,7 +1565,7 @@ async def tournament_records(
 # one element.
 
 
-@router.get("/tournaments/batters-leaders")
+@router.get("/series/batters-leaders")
 async def tournament_batters_leaders(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
@@ -1677,7 +1681,7 @@ async def tournament_batters_leaders(
     }
 
 
-@router.get("/tournaments/bowlers-leaders")
+@router.get("/series/bowlers-leaders")
 async def tournament_bowlers_leaders(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
@@ -1791,7 +1795,7 @@ async def tournament_bowlers_leaders(
     }
 
 
-@router.get("/tournaments/fielders-leaders")
+@router.get("/series/fielders-leaders")
 async def tournament_fielders_leaders(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
@@ -1940,7 +1944,7 @@ def _partnership_tournament_where(
     return " AND ".join(clauses), params
 
 
-@router.get("/tournaments/partnerships/by-wicket")
+@router.get("/series/partnerships/by-wicket")
 async def tournament_partnerships_by_wicket(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
@@ -2035,7 +2039,7 @@ async def tournament_partnerships_by_wicket(
     }
 
 
-@router.get("/tournaments/partnerships/top")
+@router.get("/series/partnerships/top")
 async def tournament_partnerships_top(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
@@ -2105,7 +2109,7 @@ async def tournament_partnerships_top(
     }
 
 
-@router.get("/tournaments/partnerships/heatmap")
+@router.get("/series/partnerships/heatmap")
 async def tournament_partnerships_heatmap(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
@@ -2155,7 +2159,7 @@ async def tournament_partnerships_heatmap(
 # ─── Rivalry endpoints ────────────────────────────────────────────────
 
 
-@router.get("/tournaments/other-rivalries")
+@router.get("/series/other-rivalries")
 async def tournaments_other_rivalries(filters: FilterParams = Depends()):
     """Pairs outside the default top-9 grid with ≥ 5 matches in scope.
 

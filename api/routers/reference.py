@@ -52,15 +52,27 @@ def _reference_clauses(
 @router.get("/tournaments")
 async def list_tournaments(
     team: Optional[str] = Query(None),
+    opponent: Optional[str] = Query(None),
     gender: Optional[str] = Query(None),
     team_type: Optional[str] = Query(None),
 ):
     """List tournaments, narrowed by team / gender / team_type so the
     dropdown reflects what's reachable from the current filter state.
     Tournament itself is intentionally not a filter here (that would
-    make the list self-referential — you're picking from this list)."""
+    make the list self-referential — you're picking from this list).
+
+    When both `team` and `opponent` are set, returns only tournaments
+    where the two teams actually played each other — lets FilterBar
+    decide whether a rivalry implies a single competition (MI vs CSK
+    → IPL) or spans many (India vs Australia → bilaterals + ICC)."""
     db = get_db()
     parts, params = _reference_clauses(team, gender, team_type, None)
+    if opponent:
+        parts.append(
+            "((m.team1 = :team AND m.team2 = :opponent)"
+            " OR (m.team1 = :opponent AND m.team2 = :team))"
+        )
+        params["opponent"] = opponent
     parts.append("m.event_name IS NOT NULL")
     where = " AND ".join(parts)
     rows = await db.q(

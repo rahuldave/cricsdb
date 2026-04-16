@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import FilterBar from './FilterBar'
 
 const navItems = [
-  { to: '/tournaments', label: 'Tournaments' },
+  { to: '/series', label: 'Series' },
   { to: '/teams', label: 'Teams' },
   { to: '/batting', label: 'Batting' },
   { to: '/bowling', label: 'Bowling' },

@@ -35,7 +35,7 @@ function TournamentTile({
   if (entry.team_type && !p.has('team_type')) p.set('team_type', entry.team_type)
   const qs = `?${p.toString()}`
   return (
-    <Link to={`/tournaments${qs}`} className="wisden-tile">
+    <Link to={`/series${qs}`} className="wisden-tile">
       <div className="wisden-tile-title">{entry.canonical}</div>
       <div className="wisden-tile-sub">
         {entry.editions} {entry.editions === 1 ? 'edition' : 'editions'}
@@ -77,7 +77,7 @@ function RivalryTile({
   const qs = `?${p.toString()}`
   const genderLabel = gender === 'female' ? "women's" : "men's"
   return (
-    <Link to={`/tournaments${qs}`} className="wisden-tile">
+    <Link to={`/series${qs}`} className="wisden-tile">
       <div className="wisden-tile-title">
         {entry.team1} <span className="wisden-tile-vs">v</span> {entry.team2}
         <span className="wisden-tile-faint" style={{ fontSize: '0.78em' }}> {genderLabel}</span>
@@ -199,9 +199,9 @@ export default function TournamentsLanding() {
 
   return (
     <div>
-      <h2 className="wisden-page-title">Tournaments</h2>
+      <h2 className="wisden-page-title">Series</h2>
       <div className="wisden-page-subtitle">
-        Competitions and bilateral rivalries — filter to narrow the scope.
+        Tournaments and bilateral rivalries — filter to narrow the scope.
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">

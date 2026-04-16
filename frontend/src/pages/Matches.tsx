@@ -158,7 +158,7 @@ export default function Matches() {
                 const p = new URLSearchParams({ tournament: t })
                 if (filters.gender) p.set('gender', filters.gender)
                 if (filters.team_type) p.set('team_type', filters.team_type)
-                return `/tournaments?${p.toString()}`
+                return `/series?${p.toString()}`
               }
               return (
               <tr key={m.match_id}

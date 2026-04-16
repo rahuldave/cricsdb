@@ -35,18 +35,27 @@ export default function FilterBar() {
   // filter on the tournaments endpoint (self-referential), but it
   // absolutely narrows seasons — picking IPL should remove
   // CLT20/WPL/rare years MI played elsewhere from the From/To pickers.
-  const team = params.get('team') || undefined
+  //
+  // filter_team / filter_opponent (player-page rivalry scope carried by
+  // PlayerLink context links) also feed in as `team` + `opponent`, so
+  // a rivalry-scoped player page narrows its tournament/season dropdowns
+  // the same way the Teams page does when a team is picked.
+  const pathTeam = params.get('team') || undefined
+  const filterTeam = params.get('filter_team') || undefined
+  const filterOpponent = params.get('filter_opponent') || undefined
+  const team = pathTeam || filterTeam
+  const opponent = pathTeam ? undefined : filterOpponent
   const genderParam = params.get('gender') || undefined
   const teamTypeParam = params.get('team_type') || undefined
   const tournamentParam = params.get('tournament') || undefined
   useEffect(() => {
-    getTournaments({ team, gender: genderParam, team_type: teamTypeParam })
+    getTournaments({ team, opponent, gender: genderParam, team_type: teamTypeParam })
       .then(d => { setTournaments(d.tournaments); setTournamentsError(false) })
       .catch(err => {
         console.warn('Failed to load tournaments:', err)
         setTournamentsError(true)
       })
-  }, [team, genderParam, teamTypeParam])
+  }, [team, opponent, genderParam, teamTypeParam])
   useEffect(() => {
     getSeasons({ team, gender: genderParam, team_type: teamTypeParam, tournament: tournamentParam })
       .then(d => { setSeasons(d.seasons); setSeasonsError(false) })
@@ -95,6 +104,21 @@ export default function FilterBar() {
     if (!gender && genders.size === 1) updates.gender = [...genders][0] as string
     if (Object.keys(updates).length > 0) setUrlParams(updates)
   }, [team, tournaments, gender, teamType])
+
+  // Intra-tournament rivalry auto-narrow: when BOTH filter_team and
+  // filter_opponent are set AND the two teams only ever meet in a
+  // single tournament (e.g. MI × CSK → IPL only), auto-set tournament.
+  // For multi-tournament rivalries (Ind vs Aus spans bilaterals + ICC)
+  // the server returns multiple entries and we leave tournament empty
+  // so the user picks manually. We intentionally do NOT use this for
+  // single-team scoping — MI alone plays IPL + WPL so the set can look
+  // unambiguous while actually hiding the women's side.
+  useEffect(() => {
+    if (!filterTeam || !filterOpponent) return
+    if (tournament) return
+    if (tournaments.length !== 1) return
+    setUrlParams({ tournament: tournaments[0].event_name })
+  }, [filterTeam, filterOpponent, tournaments, tournament])
 
   const setGender = (v: string) => {
     const updates: Record<string, string> = { gender: v }

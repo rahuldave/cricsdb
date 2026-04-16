@@ -266,6 +266,36 @@ a copy of the prod snapshot in `/tmp` before deploying (see
 over the years".
 
 
+**Rivalry polish (shipped 2026-04-16).** Follow-ons to M:
+- Player pages honour `filter_team` + `filter_opponent` end-to-end.
+  `useFilters()` reads them; `FilterParams.build_side_neutral()` makes
+  fielding/bowling/keeping queries apply team/opponent as match-level
+  pair filters (their credits live in opponent-batting innings, so the
+  default `i.team = :team` clause returns zero). Changes in
+  `api/filters.py` + the three routers; 63-URL regression harness
+  described in `docs/regression-testing-api.md` proved the refactor
+  inert on un-scoped paths.
+- Team-page / rivalry-dossier context links now carry the active
+  tournament through to the player's page so the lens is complete.
+  `playerContext` in TournamentDossier merges team + tournament
+  dimensions and flips filter_team/filter_opponent per player in
+  rivalry mode (so India vs Australia gets the right "vs <opponent>"
+  label depending on which side a given batter played for). Needs
+  leaders endpoints to return `team` — done.
+- Player pages show a "Scoped to X" oxblood pill (`ScopeIndicator`)
+  with a CLEAR button when `filter_team` / `filter_opponent` is set.
+- FilterBar auto-narrows team_type + gender from filter_team the
+  same way `team=` on the Teams page does, and also auto-sets
+  `tournament` when filter_team + filter_opponent collapse to exactly
+  one shared competition (MI × CSK → IPL). `/api/v1/tournaments`
+  gained an `opponent` query param for the pair-intersection lookup.
+- `/tournaments` → `/series` rename (route, nav label, API paths, page
+  title). The word "tournament" was doing double duty — the filter-bar
+  dropdown _and_ the catalog page. "Series" is cricket-native for
+  both bilateral tours and tournament editions, so it covers the
+  catalog's real scope. `/tournaments` redirects to `/series` for
+  back-compat.
+
 **Q. Batter-pair profile page (deferred).** Partnerships are
 consistently scoped everywhere they appear — team page > partnerships
 tab, tournament dossier > partnerships tab, rivalry dossier > by_team.

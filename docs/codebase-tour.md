@@ -13,7 +13,9 @@ api/
   dependencies.py     — Database init (WAL mode, PLASH_PRODUCTION-aware path)
   filters.py          — FilterParams class (Depends), builds WHERE clauses with :param bind syntax
   routers/
-    reference.py      — /api/v1/tournaments (canonicalized — variants merged), /seasons, /teams, /players
+    reference.py      — /api/v1/tournaments (FilterBar dropdown; canonicalized,
+                         accepts team + opponent for rivalry-pair intersection),
+                         /seasons, /teams, /players
     teams.py          — /api/v1/teams/landing (two-column directory, filter-sensitive)
                          /api/v1/teams/{team}/summary|results|vs/{opponent}|by-season
                          /api/v1/teams/{team}/players-by-season (roster + bat avg + bowl SR + turnover)
@@ -27,17 +29,22 @@ api/
     keeping.py        — /api/v1/fielders/{id}/keeping/summary|by-season|by-innings|ambiguous (Tier 2)
     head_to_head.py   — /api/v1/head-to-head/{batter_id}/{bowler_id}
     matches.py        — /api/v1/matches list, /matches/{id}/scorecard, /matches/{id}/innings-grid
-    tournaments.py    — Match-set dossier (enhancement M).
-                         /api/v1/tournaments/landing (sectioned: ICC events, men's + women's
+    tournaments.py    — Series catalog + match-set dossier (enhancement M).
+                         Router renamed /tournaments/* → /series/* on 2026-04-16
+                          to disambiguate from FilterBar's "Tournament" dropdown;
+                          file name kept to preserve git blame.
+                         /api/v1/series/landing (sectioned: ICC events, men's + women's
                           bilateral-rivalry tiles bilateral-only, club leagues, other)
-                         /api/v1/tournaments/{summary,by-season,records,
+                         /api/v1/series/{summary,by-season,records,
                           batters-leaders,bowlers-leaders,fielders-leaders,
                           partnerships/by-wicket,partnerships/top,partnerships/heatmap}
                          — all accept optional tournament + series_type
                           (all/bilateral_only/tournament_only) + filter_team/filter_opponent.
+                          Leaders rows carry `team` (dominant side) so rivalry-dossier
+                          context links flip filter_team/filter_opponent per row.
                           Summary returns by_team per-team breakdowns when team-pair set.
-                         /api/v1/tournaments/points-table (single-season; tournament required)
-                         /api/v1/tournaments/other-rivalries (lazy-load expander)
+                         /api/v1/series/points-table (single-season; tournament required)
+                         /api/v1/series/other-rivalries (lazy-load expander)
                          /api/v1/rivalries/summary (legacy; new code uses dossier endpoints)
 tournament_canonical.py — Shared canonical map (T20 WC variants → "T20 World Cup (Men)" etc.)
                          imported by filters.py + tournaments.py + reference.py for global
@@ -76,7 +83,8 @@ update_recent.py      — Incremental: imports new T20 matches + re-runs
 ```
 frontend/src/
   App.tsx                      — React Router: /, /teams, /batting, /bowling, /fielding,
-                                   /tournaments, /head-to-head, /matches, /matches/:matchId
+                                   /series, /head-to-head, /matches, /matches/:matchId.
+                                   /tournaments → /series redirect preserves old deep links.
   api.ts                       — fetchApi<T> wrapper + all endpoint clients
   types.ts                     — All request/response interfaces
   index.css                    — Wisden editorial styles (cream, oxblood, Fraunces/Inter Tight,
@@ -89,7 +97,10 @@ frontend/src/
                                     seasons in scope when no season filter is set (one-shot
                                     per mount via useRef). Writes to URL so FilterBar reflects.
   components/                  — Layout, FilterBar, PlayerSearch, TeamSearch, StatCard,
-                                   DataTable, Spinner, ErrorBanner, Scorecard, InningsCard, charts/
+                                   DataTable, Spinner, ErrorBanner, Scorecard, InningsCard,
+                                   PlayerLink (two-link name + context pattern),
+                                   ScopeIndicator (oxblood pill for filter_team/_opponent
+                                   lens on player pages), FlagBadge, charts/
     charts/                    — BarChart, LineChart, ScatterChart, DonutChart wrappers (responsive),
                                    HeatmapChart, BubbleMatrix,
                                    WormChart, ManhattanChart, InningsGridChart, MatchupGridChart

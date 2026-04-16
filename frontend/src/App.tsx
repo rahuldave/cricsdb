@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import Teams from './pages/Teams'
@@ -12,6 +12,13 @@ import Tournaments from './pages/Tournaments'
 import Help from './pages/Help'
 import HelpUsage from './pages/HelpUsage'
 
+/** Old /tournaments URLs redirect to /series, preserving query params.
+ *  Keeps shared links + bookmarks alive across the rename. */
+function LegacyTournamentsRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={`/series${search}`} replace />
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -22,7 +29,8 @@ export default function App() {
           <Route path="/batting" element={<Batting />} />
           <Route path="/bowling" element={<Bowling />} />
           <Route path="/fielding" element={<Fielding />} />
-          <Route path="/tournaments" element={<Tournaments />} />
+          <Route path="/series" element={<Tournaments />} />
+          <Route path="/tournaments" element={<LegacyTournamentsRedirect />} />
           <Route path="/head-to-head" element={<HeadToHead />} />
           <Route path="/matches" element={<Matches />} />
           <Route path="/matches/:matchId" element={<MatchScorecard />} />

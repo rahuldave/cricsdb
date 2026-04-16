@@ -81,7 +81,18 @@ Source: `api/routers/reference.py`.
 List tournaments with match counts. Variants are merged under their
 canonical display name — picking "T20 World Cup (Men)" in the FilterBar
 narrows queries across all three cricsheet event_names. Accepts the
-common filters plus `team` to narrow to tournaments a team played in.
+common filters plus:
+
+- `team` — tournaments a given team played in (scopes the dropdown on
+  a team-scoped page).
+- `opponent` — combined with `team`, returns only tournaments where
+  the two teams actually played each other. Lets FilterBar decide
+  whether a rivalry implies a single competition (MI vs CSK → IPL
+  only) or spans many (Ind vs Aus → bilaterals + ICC).
+
+Despite being called `tournaments`, this is the FILTER-BAR dropdown
+list (selecting an `event_name`). The sectioned catalog used by the
+`/series` page lives under `/api/v1/series/*` — see below.
 
 ```bash
 curl "http://localhost:8000/api/v1/tournaments?team_type=club&gender=male"
@@ -830,11 +841,15 @@ Per-delivery grid for the InningsGridChart (every ball as a cell).
 
 ---
 
-# Tournaments / match-set dossier (`/api/v1/tournaments/*`)
+# Series catalog / match-set dossier (`/api/v1/series/*`)
 
-Source: `api/routers/tournaments.py`. These power the `/tournaments`
-landing + dossier UI AND the `/head-to-head?mode=team` Team-vs-Team
-view. The "match-set" framing is the unifying concept: every endpoint
+Source: `api/routers/tournaments.py` (filename is historical — the
+router was renamed from `/tournaments/*` to `/series/*` to
+disambiguate from the FilterBar's "Tournament" dropdown). These
+power the `/series` landing + dossier UI AND the
+`/head-to-head?mode=team` Team-vs-Team view.
+
+The "match-set" framing is the unifying concept: every endpoint
 takes optional `tournament` (canonical name; expanded to IN-variants),
 optional `series_type` (`all` / `bilateral_only` / `tournament_only`),
 plus the standard FilterParams including `filter_team` / `filter_opponent`
@@ -851,14 +866,14 @@ taker, highest individual, largest partnership — AND a top-level
 `head_to_head` object with team1_wins / team2_wins / ties / no_result
 so the dossier can show "who won how much" as the top stat row.
 
-## `GET /api/v1/tournaments/landing`
+## `GET /api/v1/series/landing`
 
-Sectioned directory for the `/tournaments` landing page. Bilateral
+Sectioned directory for the `/series` landing page. Bilateral
 rivalry tiles are bilateral-only and split by gender (top-9 full-member
 men's and women's pairs).
 
 ```bash
-curl "http://localhost:8000/api/v1/tournaments/landing?gender=male"
+curl "http://localhost:8000/api/v1/series/landing?gender=male"
 ```
 
 ```json
@@ -910,14 +925,14 @@ suggestion tiles. Each entry carries the dominant tournament for
 context (franchise pairs are unambiguously single-tournament: RCB vs
 CSK is always IPL, never WBBL).
 
-## `GET /api/v1/tournaments/summary`
+## `GET /api/v1/series/summary`
 
 Headline numbers for any match-set scope. Tournament + series_type +
 filter_team/opponent are all optional. Returns `by_team` when team-pair
 in scope.
 
 ```bash
-curl "http://localhost:8000/api/v1/tournaments/summary?filter_team=India&filter_opponent=Australia&gender=male"
+curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male"
 ```
 
 ```json
@@ -956,14 +971,14 @@ curl "http://localhost:8000/api/v1/tournaments/summary?filter_team=India&filter_
 }
 ```
 
-## `GET /api/v1/tournaments/by-season`
+## `GET /api/v1/series/by-season`
 
 Per-edition rollup: champion, runner-up, top scorer, top wicket-taker,
 run rate, boundary %, sixes. Tournament + series_type + filter_*
 optional.
 
 ```bash
-curl "http://localhost:8000/api/v1/tournaments/by-season?tournament=Indian+Premier+League&gender=male&team_type=club"
+curl "http://localhost:8000/api/v1/series/by-season?tournament=Indian+Premier+League&gender=male&team_type=club"
 ```
 
 ```json
@@ -980,7 +995,7 @@ curl "http://localhost:8000/api/v1/tournaments/by-season?tournament=Indian+Premi
 }
 ```
 
-## `GET /api/v1/tournaments/points-table`
+## `GET /api/v1/series/points-table`
 
 Reconstructed league-stage points table + NRR. Single-season scope
 required (`season_from=season_to`). Tournament required. Returns one
@@ -988,7 +1003,7 @@ table per `event_group` for ICC events; one combined table for IPL-shape
 leagues.
 
 ```bash
-curl "http://localhost:8000/api/v1/tournaments/points-table?tournament=Indian+Premier+League&season_from=2024&season_to=2024&gender=male&team_type=club"
+curl "http://localhost:8000/api/v1/series/points-table?tournament=Indian+Premier+League&season_from=2024&season_to=2024&gender=male&team_type=club"
 ```
 
 ```json
@@ -1010,13 +1025,13 @@ When the requested scope is multi-season, response is
 `{ "tables": [], "reason": "multi_season" }` so the frontend can hide
 the tab.
 
-## `GET /api/v1/tournaments/records`
+## `GET /api/v1/series/records`
 
 Records sub-lists for the match-set, each capped at `limit` (default 5).
 Tournament optional.
 
 ```bash
-curl "http://localhost:8000/api/v1/tournaments/records?tournament=Indian+Premier+League&gender=male&team_type=club&limit=2"
+curl "http://localhost:8000/api/v1/series/records?tournament=Indian+Premier+League&gender=male&team_type=club&limit=2"
 ```
 
 ```json
@@ -1036,27 +1051,33 @@ curl "http://localhost:8000/api/v1/tournaments/records?tournament=Indian+Premier
 }
 ```
 
-## `GET /api/v1/tournaments/{batters,bowlers,fielders}-leaders`
+## `GET /api/v1/series/{batters,bowlers,fielders}-leaders`
 
 Variant-aware leader lists (the `/batters/leaders` etc. wrappers, but
 tournament canonical is expanded to IN-variants). Tournament optional;
 when omitted, ranks across the full filter scope (useful for "top
-batters in this rivalry"). Same response shape as `/batters/leaders`,
-`/bowlers/leaders`, `/fielders/leaders`.
+batters in this rivalry").
+
+Each row carries a `team` field — the player's dominant side in the
+current scope (most balls faced for batters, most balls bowled for
+bowlers, most fielding credits for fielders). In rivalry mode the UI
+uses this to flip `filter_team` / `filter_opponent` per row so the
+"vs <opponent>" context link points the player at their actual
+opponent, not the dossier's verbatim `filter_opponent`.
 
 ```bash
-curl "http://localhost:8000/api/v1/tournaments/batters-leaders?tournament=T20+World+Cup+%28Men%29&gender=male&limit=3"
+curl "http://localhost:8000/api/v1/series/batters-leaders?tournament=T20+World+Cup+%28Men%29&gender=male&limit=3"
 ```
 
 ```json
 {
-  "by_average":     [ { "person_id": "…", "name": "ML Hayden", "runs": 259, "balls": 132, "dismissals": 3, "average": 86.33, "strike_rate": 196.21 } ],
-  "by_strike_rate": [ { "person_id": "…", "name": "SV Samson", "strike_rate": 199.38, "runs": 321, "balls": 161 } ],
+  "by_average":     [ { "person_id": "…", "name": "ML Hayden", "team": "Australia", "runs": 259, "balls": 132, "dismissals": 3, "average": 86.33, "strike_rate": 196.21 } ],
+  "by_strike_rate": [ { "person_id": "…", "name": "SV Samson", "team": "India", "strike_rate": 199.38, "runs": 321, "balls": 161 } ],
   "thresholds": { "min_balls": 100, "min_dismissals": 3 }
 }
 ```
 
-## `GET /api/v1/tournaments/partnerships/by-wicket`
+## `GET /api/v1/series/partnerships/by-wicket`
 
 Per-wicket partnership rollup. Each row includes the single best stand
 (batters + match + season + date) so multi-edition scope is
@@ -1065,7 +1086,7 @@ narrows to that team's partnerships (side=batting) or against them
 (side=bowling).
 
 ```bash
-curl "http://localhost:8000/api/v1/tournaments/partnerships/by-wicket?tournament=Indian+Premier+League&gender=male&team_type=club"
+curl "http://localhost:8000/api/v1/series/partnerships/by-wicket?tournament=Indian+Premier+League&gender=male&team_type=club"
 ```
 
 ```json
@@ -1086,13 +1107,13 @@ curl "http://localhost:8000/api/v1/tournaments/partnerships/by-wicket?tournament
 }
 ```
 
-## `GET /api/v1/tournaments/partnerships/top`
+## `GET /api/v1/series/partnerships/top`
 
 Top-N partnerships in the match-set scope. Same filters as `by-wicket`;
 adds `limit` (default 10).
 
 ```bash
-curl "http://localhost:8000/api/v1/tournaments/partnerships/top?tournament=Indian+Premier+League&limit=2&gender=male&team_type=club"
+curl "http://localhost:8000/api/v1/series/partnerships/top?tournament=Indian+Premier+League&limit=2&gender=male&team_type=club"
 ```
 
 ```json
@@ -1111,12 +1132,12 @@ curl "http://localhost:8000/api/v1/tournaments/partnerships/top?tournament=India
 }
 ```
 
-## `GET /api/v1/tournaments/partnerships/heatmap`
+## `GET /api/v1/series/partnerships/heatmap`
 
 Season × wicket-number average-runs matrix.
 
 ```bash
-curl "http://localhost:8000/api/v1/tournaments/partnerships/heatmap?tournament=Indian+Premier+League&gender=male&team_type=club"
+curl "http://localhost:8000/api/v1/series/partnerships/heatmap?tournament=Indian+Premier+League&gender=male&team_type=club"
 ```
 
 ```json
@@ -1131,14 +1152,14 @@ curl "http://localhost:8000/api/v1/tournaments/partnerships/heatmap?tournament=I
 }
 ```
 
-## `GET /api/v1/tournaments/other-rivalries`
+## `GET /api/v1/series/other-rivalries`
 
 Lazy-loaded by the landing's "Show other rivalries" expander. Pairs
 involving at least one non-top-9 team with ≥ 5 bilateral matches in
 scope. Pass `gender` to scope.
 
 ```bash
-curl "http://localhost:8000/api/v1/tournaments/other-rivalries?gender=male"
+curl "http://localhost:8000/api/v1/series/other-rivalries?gender=male"
 ```
 
 ```json

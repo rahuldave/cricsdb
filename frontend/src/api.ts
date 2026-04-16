@@ -33,7 +33,7 @@ async function fetchApi<T>(path: string, params?: Record<string, string | number
 type F = FilterParams
 
 // Reference
-export const getTournaments = (ctx?: { team?: string; gender?: string; team_type?: string }) =>
+export const getTournaments = (ctx?: { team?: string; opponent?: string; gender?: string; team_type?: string }) =>
   fetchApi<{ tournaments: Tournament[] }>('/api/v1/tournaments', ctx as Record<string, string>)
 export const getSeasons = (ctx?: { team?: string; gender?: string; team_type?: string; tournament?: string }) =>
   fetchApi<{ seasons: string[] }>('/api/v1/seasons', ctx as Record<string, string>)
@@ -196,21 +196,21 @@ const tparams = (t: string | null | undefined, f?: TF) => {
 }
 
 export const getTournamentsLanding = (filters?: F) =>
-  fetchApi<import('./types').TournamentsLanding>('/api/v1/tournaments/landing', filters as Record<string, string>)
+  fetchApi<import('./types').TournamentsLanding>('/api/v1/series/landing', filters as Record<string, string>)
 export const getTournamentSummary = (tournament: string | null, filters?: TF) =>
-  fetchApi<import('./types').TournamentSummary>('/api/v1/tournaments/summary', tparams(tournament, filters))
+  fetchApi<import('./types').TournamentSummary>('/api/v1/series/summary', tparams(tournament, filters))
 export const getTournamentBySeason = (tournament: string | null, filters?: TF) =>
   fetchApi<{ tournament: string; seasons: import('./types').TournamentSeason[] }>(
-    '/api/v1/tournaments/by-season', tparams(tournament, filters))
+    '/api/v1/series/by-season', tparams(tournament, filters))
 export const getTournamentPointsTable = (tournament: string, filters?: TF) =>
   fetchApi<import('./types').TournamentPointsTableResponse>(
-    '/api/v1/tournaments/points-table', { ...(filters as Record<string, string>), tournament })
+    '/api/v1/series/points-table', { ...(filters as Record<string, string>), tournament })
 export const getTournamentRecords = (tournament: string | null, filters?: TF & { limit?: number }) =>
   fetchApi<import('./types').TournamentRecords>(
-    '/api/v1/tournaments/records', tparams(tournament, filters))
+    '/api/v1/series/records', tparams(tournament, filters))
 export const getTournamentOtherRivalries = (filters?: F & { gender?: string }) =>
   fetchApi<{ rivalries: import('./types').RivalryEntry[]; threshold: number }>(
-    '/api/v1/tournaments/other-rivalries', filters as Record<string, string>)
+    '/api/v1/series/other-rivalries', filters as Record<string, string>)
 export const getRivalrySummary = (team1: string, team2: string, filters?: F) =>
   fetchApi<import('./types').RivalrySummary>(
     '/api/v1/rivalries/summary', { ...(filters as Record<string, string>), team1, team2 })
@@ -218,23 +218,23 @@ export const getRivalrySummary = (team1: string, team2: string, filters?: F) =>
 // Variant-aware leader endpoints for tournament dossiers (canonical → IN variants)
 export const getTournamentBattersLeaders = (tournament: string | null, filters?: TF & { limit?: number }) =>
   fetchApi<import('./types').BattingLeaders>(
-    '/api/v1/tournaments/batters-leaders', tparams(tournament, filters))
+    '/api/v1/series/batters-leaders', tparams(tournament, filters))
 export const getTournamentBowlersLeaders = (tournament: string | null, filters?: TF & { limit?: number }) =>
   fetchApi<import('./types').BowlingLeaders>(
-    '/api/v1/tournaments/bowlers-leaders', tparams(tournament, filters))
+    '/api/v1/series/bowlers-leaders', tparams(tournament, filters))
 export const getTournamentFieldersLeaders = (tournament: string | null, filters?: TF & { limit?: number }) =>
   fetchApi<import('./types').FieldingLeaders>(
-    '/api/v1/tournaments/fielders-leaders', tparams(tournament, filters))
+    '/api/v1/series/fielders-leaders', tparams(tournament, filters))
 
 export const getTournamentPartnershipsByWicket = (
   tournament: string | null, filters?: TF & { side?: 'batting' | 'bowling' },
 ) => fetchApi<import('./types').TournamentPartnershipsByWicket>(
-  '/api/v1/tournaments/partnerships/by-wicket', tparams(tournament, filters))
+  '/api/v1/series/partnerships/by-wicket', tparams(tournament, filters))
 export const getTournamentPartnershipsTop = (
   tournament: string | null, filters?: TF & { side?: 'batting' | 'bowling'; limit?: number },
 ) => fetchApi<import('./types').TournamentPartnershipsTop>(
-  '/api/v1/tournaments/partnerships/top', tparams(tournament, filters))
+  '/api/v1/series/partnerships/top', tparams(tournament, filters))
 export const getTournamentPartnershipsHeatmap = (
   tournament: string | null, filters?: TF & { side?: 'batting' | 'bowling' },
 ) => fetchApi<import('./types').TournamentPartnershipsHeatmap>(
-  '/api/v1/tournaments/partnerships/heatmap', tparams(tournament, filters))
+  '/api/v1/series/partnerships/heatmap', tparams(tournament, filters))

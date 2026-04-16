@@ -43,7 +43,7 @@ export default function ScorecardView({ data, children, highlightBatterId, highl
     const p = new URLSearchParams({ tournament: info.tournament })
     if (info.gender) p.set('gender', info.gender)
     if (info.team_type) p.set('team_type', info.team_type)
-    return `/tournaments?${p.toString()}`
+    return `/series?${p.toString()}`
   })()
 
   return (

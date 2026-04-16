@@ -4,13 +4,15 @@
 
 Seven top-level tabs across the nav:
 
-- **Tournaments** — the home for competitions (IPL, T20 World Cup,
+- **Series** — the home for competitions (IPL, T20 World Cup,
   Vitality Blast, …) AND bilateral rivalries (India vs Australia,
-  Ashes T20, …). Click a tournament tile to get its dossier
-  (Overview, Editions, Points Table for a single edition, Batters,
-  Bowlers, Fielders, Partnerships, Records, Matches). Click a
-  rivalry tile to get the same dossier scoped to that team pair's
-  bilateral series. Men's and women's rivalries are separate tiles.
+  Ashes T20, …). Cricket uses "series" for both a bilateral tour
+  and a tournament edition, so this tab covers both. Click a
+  tournament tile to get its dossier (Overview, Editions, Points
+  Table for a single edition, Batters, Bowlers, Fielders,
+  Partnerships, Records, Matches). Click a rivalry tile to get the
+  same dossier scoped to that team pair's bilateral matches.
+  Men's and women's rivalries are separate tiles.
 - **Teams** — win/loss records, team batting/bowling/fielding,
   partnerships, roster by season. The landing board is two columns:
   - *Left*: international — men's (full members + associate) and
@@ -47,7 +49,7 @@ Seven top-level tabs across the nav:
     The empty picker has four tile sections: men's international
     rivalries, women's international rivalries, men's club rivalries
     (CSK v MI in IPL, etc.), and women's club rivalries. Reuses the
-    Tournaments dossier so the same tabs (Batters, Bowlers, Fielders,
+    Series dossier so the same tabs (Batters, Bowlers, Fielders,
     Partnerships, Records, Matches) apply.
 
   The Show pill composes with the FilterBar filters at the top of
@@ -126,7 +128,7 @@ IPL.
 
 Three ways to get there:
 
-1. **Tournaments landing** → bilateral-rivalry tiles (men's or women's).
+1. **Series landing** → bilateral-rivalry tiles (men's or women's).
    These open to "pure bilateral series only" — no World Cup meetings
    mixed in.
 2. **Head to Head → Team vs Team** → all meetings combined by default,
@@ -140,6 +142,18 @@ Three ways to get there:
 
 All three land at the same dossier. The URL just expresses different
 default filters.
+
+**Scoped player pages.** From a tournament dossier or a rivalry
+dossier, a small italic "context link" sits next to each player name
+(`· at Mumbai Indians ›`, `· vs Australia ›`). Clicking the plain
+name opens the player's page un-scoped; clicking the context link
+opens it narrowed to that lens. The narrowed page shows an oxblood
+pill under the player header — "Scoped to Mumbai Indians" or "Scoped
+to India vs Australia" — with a `CLEAR` button that lifts the lens
+back to the full career without changing player or gender.
+FilterBar auto-fills team_type / gender (and for single-tournament
+rivalries like MI × CSK, the tournament too) so the dropdowns reflect
+the scope at a glance.
 
 ### Why the same team name appears twice
 
