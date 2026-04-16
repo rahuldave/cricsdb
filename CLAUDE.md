@@ -166,7 +166,14 @@ Read `internal_docs/design-decisions.md` for full details. Key points:
 
 Full A–O roadmap lives in **`internal_docs/enhancements-roadmap.md`** with done-items as historical markers.
 
-**NEXT SESSION: implement S (Venues tab)** — spec drafting starts this session. Research notes captured below; the shape is broadly "cleanup half-day → endpoints → dossier page" mirroring Series. Start by writing `internal_docs/spec-venues.md` then execute. Effort ~2 working days.
+**NEXT SESSION agenda (in order):**
+
+1. **Venues tab (S) — detailed spec first.** Don't start coding. Mirror the shape + rigour of `internal_docs/spec-players.md` (v2). Open questions to answer in the spec: landing grouping (by city or by top-venue?), dossier tabs (Overview / Batters / Bowlers / Fielders / Matches / Records), overall-matches-first Overview panel (matches broken down by tournament × gender × season), `filter_venue` URL param in `FilterParams.build()` + `build_side_neutral()`, and the nav slot (8th top-level tab, or fold Matches into Venues?). Cleanup half-day likely needed first — see research notes below. Effort: cleanup (½ day) + endpoints + page (~2 days total).
+2. **Page-by-page audit** — walk every top-level route + tab looking for missing context links (two-link name + context pattern on every player mention), sensible "links up" from deeper pages to parents (scorecard → match list for that tournament, player page → series they featured in), dead ends, and consistency of the date-cell scorecard-link pattern.
+3. **More filters on `/matches`** — `filter_venue` drops out of Venues; also consider result filter (won/lost/tied/NR from a team perspective), close-match filter, super-over filter, toss-outcome filter. Confirm scope with user before building.
+4. **Venue filters deferred from the Venues push** — whatever S ships vs defers, capture the leftovers as follow-on tickets.
+
+The research notes and risks below feed into (1). Don't execute Venues the same session the spec lands unless the user explicitly asks.
 
 **After S: O — Tournament-baseline comparison overlays** on team / batter / bowler / fielder pages. M shipped the per-tournament endpoints with explicit baseline reusability — call any `/api/v1/series/{summary,batters-leaders,…}` without a team filter to get the tournament-wide baseline, with one for the team's narrowed view (responses are shape-compatible). Frontend wiring needed: overlay league means on team-tab charts, add "vs league avg" columns to player tables, support "delta from league mean" colour mode on heatmaps. Design sketch in `internal_docs/design-decisions.md` "Team metrics need tournament baselines (revisit when /tournaments ships)".
 
