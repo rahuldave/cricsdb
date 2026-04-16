@@ -1,14 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- T20 & CricsDB brand mark — italic oxblood ampersand on cream.
-       Scales from 16×16 (tab) to 512×512 (PWA). The ampersand is the
-       signature visual of the masthead; at tab size the word T20
-       wouldn't read anyway. -->
+  <!-- T20 & CricsDB brand mark — italic oxblood Fraunces ampersand
+       on cream, matching the masthead's .title-amp (weight 400,
+       opsz 144, italic). Scales from 16×16 (tab) to 512×512 (PWA).
+       Without `opsz 144`, Fraunces defaults to the body-text glyph
+       which has a different shape — visibly mismatched against the
+       site's masthead. -->
   <rect width="64" height="64" fill="#FAF7F0"/>
   <text x="32" y="48"
         text-anchor="middle"
         font-family="Fraunces, Georgia, 'Times New Roman', serif"
         font-style="italic"
-        font-weight="500"
+        font-weight="400"
         font-size="48"
-        fill="#7A1F1F">&amp;</text>
+        fill="#7A1F1F"
+        style="font-variation-settings:'opsz' 144">&amp;</text>
 </svg>

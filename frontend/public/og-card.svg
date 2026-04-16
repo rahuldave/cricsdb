@@ -1,13 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
   <!-- Social-media card. 1200×630 satisfies Open Graph and Twitter
-       summary_large_image. Cream + oxblood + Fraunces — mirrors
-       the site masthead so a share card reads as the site, not
-       generic. Rasterized to og-card.png via rsvg-convert. -->
+       summary_large_image. Cream + oxblood + Fraunces — mirrors the
+       site masthead so a share card reads as the site, not generic.
+       Rasterized to og-card.png via rsvg-convert.
+
+       The wordmark `opsz` 144 + the ampersand weight 400 match
+       .title / .title-amp in index.css. Fraunces is a variable font;
+       without opsz, rsvg would pick ~18 (text-body glyph shapes),
+       which differs visibly from the masthead's 144 (display shapes). -->
   <rect width="1200" height="630" fill="#FAF7F0"/>
 
-  <!-- Kicker: small SANS caps above the wordmark. Inter Tight isn't
-       guaranteed at raster time, so the SVG keeps a serif-safe
-       fallback chain. -->
+  <!-- Kicker: small SANS caps above the wordmark. -->
   <text x="600" y="160"
         text-anchor="middle"
         font-family="'Inter Tight', 'Helvetica Neue', Arial, sans-serif"
@@ -16,33 +19,41 @@
         letter-spacing="4"
         fill="#8A7D70">EST. 2024 · A T20 ALMANACK</text>
 
-  <!-- Wordmark -->
+  <!-- Wordmark — display-axis Fraunces matching .title (opsz 144,
+       weight 600, tight tracking). The &amp; tspan inherits the
+       parent's opsz but flips to italic + weight 400 + oxblood,
+       which is .title-amp. -->
   <text x="600" y="300"
         text-anchor="middle"
         font-family="Fraunces, Georgia, 'Times New Roman', serif"
         font-weight="600"
         font-size="144"
-        fill="#2E2823">T20 <tspan font-style="italic" font-weight="400" fill="#7A1F1F">&amp;</tspan> CricsDB</text>
+        letter-spacing="-2.88"
+        fill="#2E2823"
+        style="font-variation-settings:'opsz' 144">T20 <tspan font-style="italic" font-weight="400" fill="#7A1F1F" style="font-variation-settings:'opsz' 144">&amp;</tspan> CricsDB</text>
 
   <!-- Double rule, echoing the masthead -->
   <line x1="360" y1="348" x2="840" y2="348" stroke="#1A1714" stroke-width="2"/>
   <line x1="360" y1="356" x2="840" y2="356" stroke="#1A1714" stroke-width="1"/>
 
-  <!-- Standfirst — italic serif, two lines, centred -->
+  <!-- Standfirst — italic serif, two lines, centred. opsz 24 matches
+       .standfirst in the masthead. -->
   <text x="600" y="430"
         text-anchor="middle"
         font-family="Fraunces, Georgia, 'Times New Roman', serif"
         font-style="italic"
         font-weight="400"
         font-size="32"
-        fill="#5C5048">An almanack of Twenty20 cricket —</text>
+        fill="#5C5048"
+        style="font-variation-settings:'opsz' 24">An almanack of Twenty20 cricket —</text>
   <text x="600" y="478"
         text-anchor="middle"
         font-family="Fraunces, Georgia, 'Times New Roman', serif"
         font-style="italic"
         font-weight="400"
         font-size="32"
-        fill="#5C5048">13,019 matches · 2.95M deliveries · international &amp; club</text>
+        fill="#5C5048"
+        style="font-variation-settings:'opsz' 24">13,019 matches · 2.95M deliveries · international &amp; club</text>
 
   <!-- Bottom-right: site URL in small sans caps -->
   <text x="1140" y="580"
