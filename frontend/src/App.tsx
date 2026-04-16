@@ -9,6 +9,7 @@ import HeadToHead from './pages/HeadToHead'
 import Matches from './pages/Matches'
 import MatchScorecard from './pages/MatchScorecard'
 import Tournaments from './pages/Tournaments'
+import Players from './pages/Players'
 import Help from './pages/Help'
 import HelpUsage from './pages/HelpUsage'
 
@@ -26,6 +27,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="/teams" element={<Teams />} />
+          <Route path="/players" element={<Players />} />
           <Route path="/batting" element={<Batting />} />
           <Route path="/bowling" element={<Bowling />} />
           <Route path="/fielding" element={<Fielding />} />

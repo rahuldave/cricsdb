@@ -1,6 +1,11 @@
 # Spec: Players tab (enhancement R)
 
-Status: draft v2, 2026-04-16. Not yet implemented.
+Status: **shipped 2026-04-16.** This doc captures the design as
+frozen at implementation; any deviations from v2 (role-classifier
+thresholds + compact compare layout) are called out inline. For the
+shipped files + entry points see `internal_docs/codebase-tour.md`
+under `components/players/`. Integration tests at
+`integration_tests/players_tab.sh` + `players_hygiene.sh`.
 
 ## Motivation
 
@@ -635,3 +640,46 @@ spec discussion:
    cross-gender comparison. Fallback: track a flag that the mode is
    intentionally cross-gender and disable the auto-correct in that
    specific case.
+
+## Deviations from v2 in the shipped implementation
+
+Two real departures from the draft, both captured in
+`components/players/roleUtils.ts` and `components/players/PlayerSummaryRow.tsx`:
+
+1. **Role classifier thresholds raised above raw ball counts.** v2
+   said `batted := balls_faced >= 100`, `bowled := balls >= 60`.
+   Those gates misclassify two obvious cases:
+   - Bumrah: 101 balls faced across 36 innings (≈2.8 balls/inn,
+     avg < 3). Classic #10 tail-ender, not a batter.
+   - Kohli: 403 balls bowled across 388 career matches. A part-
+     timer called in to break a partnership, not a bowler.
+
+   Shipped rule:
+   ```
+   batted = innings >= 5
+          AND balls_faced / innings >= 5
+          AND average >= 10
+   bowled = balls >= 60
+          AND balls / fielding.matches >= 3
+   ```
+   `fielding.matches` is the TRUE career-match count (everyone fields
+   every match, so `fielding.matches` is the denominator we want).
+   `bowling.matches` only counts matches where the bowler actually
+   sent down a delivery — using that as the denominator flatters the
+   occasional dabbler.
+
+2. **Compare columns switch to a compact label/value layout, not
+   StatCards.** v2 described stat rows matching the single-player
+   layout. In practice, a 6-cell batting StatCard row in a 1/3-width
+   compare column overflows — 12,755 / 42.38 / 134.18 etc. collide.
+   Shipped: compare columns render the same stats as a
+   `.wisden-player-compact` definition list (label left, value
+   right, bordered between rows). Single-player keeps the StatCard
+   row. The `compact` prop on `PlayerSummaryRow` is the switch.
+
+Also — the "hidden-when-empty" thresholds for the row-visibility
+gates use the weaker `balls_faced > 0` / `balls > 0` rather than the
+role-classifier numbers above. This is deliberate: if the player
+ever faced a ball or bowled one, we render the band with their
+actual (possibly tiny) numbers; the role LABEL uses the stronger
+gates to describe who they _are_ in scope.

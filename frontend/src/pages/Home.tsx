@@ -44,19 +44,45 @@ function TeamLink({
   )
 }
 
+// Home-page player reference — primary name → /players?player=X
+// overview, then a small subscript list of discipline deep-dives.
+//
+// `disciplines` is hand-annotated per call-site (MVP: no runtime
+// discipline-data fetch on the home page — that'd inflate the
+// network cost of the masthead). Letters should match what the
+// player-page would show for that player (batting row iff b,
+// bowling row iff bw, fielding row iff f).
+type DiscLetter = 'b' | 'bw' | 'f'
+const LETTER_PATH: Record<DiscLetter, string> = {
+  b:  '/batting',
+  bw: '/bowling',
+  f:  '/fielding',
+}
+
 function PlayerLink({
-  id, role, gender, children,
+  id, gender, disciplines, children,
 }: {
   id: string
-  role: 'batter' | 'bowler' | 'fielder'
   gender: 'male' | 'female'
+  disciplines: DiscLetter[]
   children: React.ReactNode
 }) {
-  const path = role === 'batter' ? '/batting' : role === 'bowler' ? '/bowling' : '/fielding'
+  const qs = `?player=${id}&gender=${gender}`
   return (
-    <Link to={`${path}?player=${id}&gender=${gender}`} className="comp-link">
-      {children}
-    </Link>
+    <>
+      <Link to={`/players${qs}`} className="comp-link">{children}</Link>
+      {disciplines.length > 0 && (
+        <span className="player-letters">
+          {' '}
+          {disciplines.map((d, i) => (
+            <span key={d}>
+              {i > 0 && <span className="player-letter-sep"> · </span>}
+              <Link to={`${LETTER_PATH[d]}${qs}`} className="comp-link player-letter">{d}</Link>
+            </span>
+          ))}
+        </span>
+      )}
+    </>
   )
 }
 
@@ -175,18 +201,18 @@ export default function Home() {
             </div>
             <div>
               Bat —{' '}
-              <PlayerLink id="ba607b88" role="batter" gender="male">V Kohli</PlayerLink>,{' '}
-              <PlayerLink id="5d2eda89" role="batter" gender="female">S Mandhana</PlayerLink>
+              <PlayerLink id="ba607b88" gender="male"   disciplines={['b', 'bw', 'f']}>V Kohli</PlayerLink>,{' '}
+              <PlayerLink id="5d2eda89" gender="female" disciplines={['b', 'bw', 'f']}>S Mandhana</PlayerLink>
             </div>
             <div>
               Ball —{' '}
-              <PlayerLink id="462411b3" role="bowler" gender="male">JJ Bumrah</PlayerLink>,{' '}
-              <PlayerLink id="be150fc8" role="bowler" gender="female">EA Perry</PlayerLink>
+              <PlayerLink id="462411b3" gender="male"   disciplines={['b', 'bw', 'f']}>JJ Bumrah</PlayerLink>,{' '}
+              <PlayerLink id="be150fc8" gender="female" disciplines={['b', 'bw', 'f']}>EA Perry</PlayerLink>
             </div>
             <div>
               Field —{' '}
-              <PlayerLink id="a757b0d8" role="fielder" gender="male">KA Pollard</PlayerLink>,{' '}
-              <PlayerLink id="52d1dbc8" role="fielder" gender="female">BL Mooney</PlayerLink>
+              <PlayerLink id="a757b0d8" gender="male"   disciplines={['b', 'bw', 'f']}>KA Pollard</PlayerLink>,{' '}
+              <PlayerLink id="52d1dbc8" gender="female" disciplines={['b', 'f']}>BL Mooney</PlayerLink>
             </div>
           </div>
         </div>

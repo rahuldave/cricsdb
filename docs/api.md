@@ -1198,6 +1198,32 @@ curl "http://localhost:8000/api/v1/rivalries/summary?team1=India&team2=Australia
 
 ---
 
+# Players tab — no new endpoints
+
+The `/players` tab (single-player overview + N-way career comparison)
+is composed client-side from existing summary endpoints — no new
+backend work. Per player, the frontend runs four requests in parallel:
+
+```
+GET /api/v1/batters/{id}/summary
+GET /api/v1/bowlers/{id}/summary
+GET /api/v1/fielders/{id}/summary
+GET /api/v1/fielders/{id}/keeping/summary
+```
+
+and composes the four responses into a `PlayerProfile` (see
+`frontend/src/api.ts::getPlayerProfile`). A 404 on any single
+endpoint (specialist batters have no bowling row, etc.) resolves
+to `null` without aborting the rest — the Players page hides
+discipline bands whose summary came back empty.
+
+For N-way comparison, each of the two or three players fires its own
+four-fetch bundle in parallel. All fetches share the same FilterBar
+scope (gender / team_type / tournament / season / filter_team /
+filter_opponent), so narrowing the URL narrows every card at once.
+
+---
+
 # Things NOT yet in the API
 
 - **Tournament-baseline overlays** (enhancement O) on team / batter /

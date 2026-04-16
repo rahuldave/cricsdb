@@ -117,6 +117,21 @@ export const getFielderVictims = (id: string, filters?: F & { limit?: number }) 
 export const getFielderInnings = (id: string, filters?: F & { limit?: number; offset?: number }) =>
   fetchApi<{ innings: import('./types').FieldingInnings[]; total: number }>(`/api/v1/fielders/${id}/by-innings`, filters as Record<string, string>)
 
+// Composed player overview — four summary endpoints in parallel.
+// `.catch(() => null)` per sub-fetch so a 404 on one discipline
+// (specialist batter → no bowling row) doesn't blow up the whole
+// profile. The /players page expects nulls where disciplines are
+// missing; it hides those rows.
+export const getPlayerProfile = async (id: string, filters?: F) => {
+  const [batting, bowling, fielding, keeping] = await Promise.all([
+    getBatterSummary(id, filters).catch(() => null),
+    getBowlerSummary(id, filters).catch(() => null),
+    getFielderSummary(id, filters).catch(() => null),
+    getFielderKeepingSummary(id, filters).catch(() => null),
+  ])
+  return { batting, bowling, fielding, keeping } as import('./types').PlayerProfile
+}
+
 // Keeping (Tier 2 fielding)
 export const getFielderKeepingSummary = (id: string, filters?: F) =>
   fetchApi<import('./types').KeepingSummary>(`/api/v1/fielders/${id}/keeping/summary`, filters as Record<string, string>)

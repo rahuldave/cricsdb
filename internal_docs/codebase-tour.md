@@ -82,10 +82,14 @@ update_recent.py      — Incremental: imports new T20 matches + re-runs
 
 ```
 frontend/src/
-  App.tsx                      — React Router: /, /teams, /batting, /bowling, /fielding,
-                                   /series, /head-to-head, /matches, /matches/:matchId.
-                                   /tournaments → /series redirect preserves old deep links.
-  api.ts                       — fetchApi<T> wrapper + all endpoint clients
+  App.tsx                      — React Router: /, /teams, /players, /batting, /bowling,
+                                   /fielding, /series, /head-to-head, /matches,
+                                   /matches/:matchId. /tournaments → /series redirect preserves
+                                   old deep links.
+  api.ts                       — fetchApi<T> wrapper + all endpoint clients, including
+                                   getPlayerProfile (composes 4 summary fetches in parallel
+                                   for the /players tab; .catch-to-null per discipline so a
+                                   specialist's missing row doesn't blow up the page)
   types.ts                     — All request/response interfaces
   index.css                    — Wisden editorial styles (cream, oxblood, Fraunces/Inter Tight,
                                    .wisden-page-title, .wisden-section-title, .wisden-statrow,
@@ -96,10 +100,13 @@ frontend/src/
   hooks/useDefaultSeasonWindow.ts — Batting/Bowling/Fielding landings auto-default to last 3
                                     seasons in scope when no season filter is set (one-shot
                                     per mount via useRef). Writes to URL so FilterBar reflects.
-  components/                  — Layout, FilterBar, PlayerSearch, TeamSearch, StatCard,
-                                   DataTable, Spinner, ErrorBanner, Scorecard, InningsCard,
-                                   PlayerLink (two-link name + context pattern),
-                                   ScopeIndicator (oxblood pill for filter_team/_opponent
+  components/                  — Layout (now hosts a Players ▾ group with desktop hover-dropdown
+                                   + persistent mobile sub-row while any /players, /batting,
+                                   /bowling, /fielding route is active), FilterBar, PlayerSearch
+                                   (role prop now optional — omit for role-agnostic /players
+                                   search), TeamSearch, StatCard, DataTable, Spinner, ErrorBanner,
+                                   Scorecard, InningsCard, PlayerLink (two-link name + context
+                                   pattern), ScopeIndicator (oxblood pill for filter_team/_opponent
                                    lens on player pages), FlagBadge, charts/
     charts/                    — BarChart, LineChart, ScatterChart, DonutChart wrappers (responsive),
                                    HeatmapChart, BubbleMatrix,
@@ -107,7 +114,25 @@ frontend/src/
     tournaments/               — TournamentsLanding (sectioned grids + men's/women's rivalry tiles),
                                    TournamentDossier (shared dossier UI for tournament OR rivalry
                                    scope; reused by HeadToHead Team-vs-Team mode)
-  pages/                       — Home, Teams, Batting, Bowling, Fielding, Tournaments,
+    players/                   — Players tab (R) internals:
+                                   PlayerProfile         single-player layout
+                                   PlayerSummaryRow      one discipline band (batting/bowling/
+                                                          fielding/keeping), compact mode for
+                                                          narrow compare columns
+                                   PlayerCompareGrid     N-column side-by-side grid, fixed-arity
+                                                          useFetch slots, aligned placeholder bands
+                                   PlayerCompareColumn   inlined in PlayerCompareGrid as CompareColumn
+                                   AddComparePicker      "+ Add another player to compare" input
+                                                          with cross-gender add rejection
+                                   PlayersLanding        curated profile tiles + compare pair tiles
+                                   CuratedLists.ts       PROFILE_MEN / PROFILE_WOMEN /
+                                                          COMPARE_MEN / COMPARE_WOMEN seeds
+                                   roleUtils.ts          classifyRole (specialist batter / specialist
+                                                          bowler / all-rounder / keeper-batter /
+                                                          wicketkeeper / fielder), hasBatting/hasBowling/
+                                                          hasFielding/hasKeeping gates, carryFilters,
+                                                          matchesInScope
+  pages/                       — Home, Teams, Players, Batting, Bowling, Fielding, Tournaments,
                                    HeadToHead (mode=player|team), Matches, MatchScorecard,
                                    Help (/help), HelpUsage (/help/usage)
   content/                     — about-me.md + user-help.md. Imported as ?raw by the Help pages

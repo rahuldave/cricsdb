@@ -296,6 +296,40 @@ over the years".
   catalog's real scope. `/tournaments` redirects to `/series` for
   back-compat.
 
+**R. Players tab — person-focused overview + N-way comparison.**
+_Done, 2026-04-16._ `/players` is the new nav group parent — a fifth
+top-level tab. Three modes driven by the URL:
+- `/players` → curated landing (popular profiles + popular
+  comparisons) with filter-sensitive one-line stat strips.
+- `/players?player=X` → single-player stack: identity line
+  ("specialist batter · 388 matches"), Batting → Bowling → Fielding
+  → Keeping bands, each with a `→ Open <discipline> page` link
+  that carries every active filter. Bands hide when the player has
+  no data for that discipline in the current scope.
+- `/players?player=X&compare=Y[,Z]` → 2-way or 3-way compare. Rows
+  stay vertically aligned via placeholders ("— no bowling in scope —")
+  when one column is empty; compare columns use a compact label/value
+  layout so narrow widths don't overflow. Cross-gender adds are
+  refused in-place.
+
+Nav restructure: Batting / Bowling / Fielding collapse into a
+`Players ▾` group — desktop hover-dropdown + persistent mobile sub-
+row (Players · Batting · Bowling · Fielding) whenever the route is
+in the group. The three discipline URLs are unchanged; only their
+nav presentation moves. Home-page `PlayerLink` primary names now
+route to `/players?player=X` with small italic `b · bw · f`
+subscripts deep-linking to the discipline pages.
+
+No backend endpoints. `getPlayerProfile` in `frontend/src/api.ts`
+composes four existing summary calls per player in parallel, with
+`.catch(() => null)` per discipline so 404s don't abort the bundle.
+Role classifier (`components/players/roleUtils.ts`) tuned to exclude
+tail-end batting (balls/inn ≥ 5 + avg ≥ 10) and one-over-a-season
+bowling (balls/total-match ≥ 3, using `fielding.matches` — the true
+career-match count — as denominator). Integration tests live in
+`integration_tests/players_tab.sh` + `players_hygiene.sh`. Spec at
+`internal_docs/spec-players.md`.
+
 **Q. Batter-pair profile page (deferred).** Partnerships are
 consistently scoped everywhere they appear — team page > partnerships
 tab, tournament dossier > partnerships tab, rivalry dossier > by_team.

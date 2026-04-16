@@ -19,6 +19,20 @@ examples we have:
   unmounts. Catches missing `useEffect` cleanup, leftover listeners,
   setState-after-unmount, stale-response leaks. Asserts on negative
   signals (no page errors, no React warnings) rather than URL shape.
+- `players_tab.sh` — Players tab URL / behaviour discipline: deep-link
+  gender auto-fill uses `replace`, landing tile clicks set
+  `player`+`gender` atomically, 2-way compare renders both columns,
+  cross-gender adds are refused in-place, ✕ drops the right column,
+  ScopeIndicator CLEAR works, nav marks the Players group active on
+  `/batting` / `/bowling` / `/fielding`, mobile sub-row has all four
+  entries, Home-page PlayerLink routes the name to `/players` and
+  the `b`/`bw`/`f` subscripts to the discipline pages.
+- `players_hygiene.sh` — Players tab mount/unmount: rapid filter
+  toggling with a 2-way compare mounted, add-then-remove compare
+  with fetches in flight, rapid route hops across the Players
+  group, 3-way → 2-way via ✕, and fast landing tile clicks — all
+  asserted against negative signals (no page errors, no React
+  warnings).
 
 Each script closes any lingering agent-browser session at the top so
 prior HMR state / cached bundles don't bleed in.

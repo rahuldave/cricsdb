@@ -2,7 +2,8 @@
 
 ## The shape of the site
 
-Seven top-level tabs across the nav:
+Five top-level tabs across the nav (the three discipline pages now
+sit inside a **Players ▾** group — hover on desktop, sub-row on mobile):
 
 - **Series** — the home for competitions (IPL, T20 World Cup,
   Vitality Blast, …) AND bilateral rivalries (India vs Australia,
@@ -27,10 +28,20 @@ Seven top-level tabs across the nav:
   entry is tagged "men's" or "women's" when no gender filter is set,
   so "India men's" and "India women's" appear as separate clickable
   rows.
-- **Batting / Bowling / Fielding** — player-level stats. The landing
-  view shows the top 10 in each metric (by average, strike rate,
-  economy, dismissals) filtered to the active season window. Click
-  a player name to go deep.
+- **Players ▾** — person-focused home that collects batting, bowling,
+  fielding, and keeping on one page, with an N-way comparison mode.
+  See the dedicated section below — this is where you come for a
+  player's full career at a glance. The three discipline pages
+  (Batting / Bowling / Fielding) are still there as sub-routes; the
+  desktop hover-dropdown and the mobile sub-row both surface them.
+  Use the discipline pages for the deep stats (phase splits,
+  matchup scatter, inter-wicket, dismissal analysis, season trend);
+  use Players for the overview + comparisons.
+- **Batting / Bowling / Fielding** (under Players) — player-level
+  deep dives. The landing view on each shows the top 10 by the
+  role's core metrics (average, strike rate, economy, dismissals)
+  filtered to the active season window. Click a player name to go
+  deep.
 - **Head to Head** — two-entity matchups. Two modes (picker at the
   top of the page):
   - *Player vs Player* — any batter vs any bowler (summary, phase
@@ -65,6 +76,47 @@ Seven top-level tabs across the nav:
 - **Matches** — searchable list of every match. Click any row for
   the full scorecard, ball-by-ball innings grid, worm chart, and
   per-batter / per-bowler matchup grid.
+
+## The Players tab
+
+`/players` answers "who is this player?" before any discipline-
+specific question.
+
+**Single-player view** — pick a player from the search box (or click
+a curated tile on the landing) and you get a stack of discipline
+bands: Batting → Bowling → Fielding → Keeping. Each band has the
+top-level numbers for that discipline and a `→ Open <discipline>
+page` link that carries every active filter through to the deep-dive.
+
+An identity line under the name summarises the scope's shape:
+*"specialist batter · 388 matches"* or *"all-rounder · 212 matches"*
+or *"keeper-batter · 240 matches"*. Bands hide themselves when the
+player has no data for that discipline in the current scope — a
+specialist batter's page won't waste a row on their empty bowling
+line, and Bumrah's batting band won't appear if the scope window
+starts after his last T20I.
+
+The role label is computed fresh each time: narrowing the scope
+to a single tournament can truthfully flip someone from "specialist
+batter" to "all-rounder" if they bowled meaningfully there.
+
+**Comparison mode** — enter a second player via the *Compare with
+another player…* box beneath the single-player view, or click any of
+the *Popular comparisons* tiles on the landing. You get two columns
+side-by-side with aligned discipline bands; a disciple without data
+in one column shows a dim "— no bowling in scope —" placeholder so
+the rows stay level. Add a third player with the `+ Add another…`
+picker that appears when only two are compared.
+
+Comparison is single-gender — men vs men or women vs women. Trying
+to add a women's player to a men's comparison (or vice versa)
+surfaces an inline refusal; the FilterBar's gender chip is the way
+to switch.
+
+Filters apply globally. Narrow to IPL and every column shows IPL-
+only numbers; add a rivalry lens (click a context link like "· vs
+Australia ›" elsewhere in the app) and the whole comparison is
+scoped to that rivalry.
 
 ## The filter bar
 

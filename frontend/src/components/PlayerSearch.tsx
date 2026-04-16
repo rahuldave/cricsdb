@@ -3,7 +3,9 @@ import { searchPlayers } from '../api'
 import type { PlayerSearchResult } from '../types'
 
 interface PlayerSearchProps {
-  role: 'batter' | 'bowler' | 'fielder'
+  /** Omit for role-agnostic search (the /players tab). When set, the
+   *  server narrows results to people with ≥N innings in that role. */
+  role?: 'batter' | 'bowler' | 'fielder'
   onSelect: (player: PlayerSearchResult) => void
   placeholder?: string
 }
@@ -74,7 +76,7 @@ export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSear
         type="text"
         value={query}
         onChange={e => setQuery(e.target.value)}
-        placeholder={placeholder || `Search ${role}s…`}
+        placeholder={placeholder || (role ? `Search ${role}s…` : 'Search players…')}
         className="wisden-playersearch-input"
       />
       {loading && <div className="wisden-playersearch-loading">…</div>}

@@ -478,6 +478,16 @@ export interface HeadToHeadResponse {
   by_match: HeadToHeadMatch[]
 }
 
+// Composed player overview (client-side; see /players page).
+// The four sub-types already exist below — one nullable slot per discipline.
+// null = fetch 404'd (player doesn't bat/bowl/etc. in scope) or it failed.
+export interface PlayerProfile {
+  batting: BattingSummary | null
+  bowling: BowlingSummary | null
+  fielding: FieldingSummary | null
+  keeping: KeepingSummary | null
+}
+
 // Fielding
 export interface FieldingSummary {
   person_id: string
