@@ -340,7 +340,11 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
     { key: 'name', label: 'Batter', format: (_v, r) => (
       <PlayerLink
         personId={r.person_id} name={r.name} role="batter" gender={filters.gender}
-        contextLabel={`at ${team}`} contextParams={{ filter_team: team }}
+        contextLabel={`at ${team}`}
+        contextParams={{
+          filter_team: team,
+          ...(filters.tournament ? { tournament: filters.tournament } : {}),
+        }}
       />
     ) as unknown as string },
     { key: 'runs', label: 'Runs', sortable: true },
@@ -511,7 +515,11 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
     { key: 'name', label: 'Bowler', format: (_v, r) => (
       <PlayerLink
         personId={r.person_id} name={r.name} role="bowler" gender={filters.gender}
-        contextLabel={`at ${team}`} contextParams={{ filter_team: team }}
+        contextLabel={`at ${team}`}
+        contextParams={{
+          filter_team: team,
+          ...(filters.tournament ? { tournament: filters.tournament } : {}),
+        }}
       />
     ) as unknown as string },
     { key: 'wickets', label: 'Wkts', sortable: true },
@@ -664,7 +672,11 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
     { key: 'name', label: 'Fielder', format: (_v, r) => (
       <PlayerLink
         personId={r.person_id} name={r.name} role="fielder" gender={filters.gender}
-        contextLabel={`at ${team}`} contextParams={{ filter_team: team }}
+        contextLabel={`at ${team}`}
+        contextParams={{
+          filter_team: team,
+          ...(filters.tournament ? { tournament: filters.tournament } : {}),
+        }}
       />
     ) as unknown as string },
     { key: 'catches', label: 'Catches', sortable: true },

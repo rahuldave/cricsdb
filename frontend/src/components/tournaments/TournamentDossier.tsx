@@ -536,7 +536,10 @@ function OverviewTab({
               const t = summary.by_team![team]
               // Context = "at <team>" so the second link lands the player
               // page narrowed to this team's matches within the rivalry.
-              const ctxParams = { filter_team: team }
+              // Carry tournament through so the lens doesn't silently merge
+              // other tournaments where this team also played.
+              const ctxParams: Record<string, string> = { filter_team: team }
+              if (tournament) ctxParams.tournament = tournament
               const ctxLabel = `at ${team}`
               return (
                 <div key={team} className="wisden-tile">
@@ -1025,19 +1028,22 @@ function playerContext(opts: {
   filterOpponent: string | null | undefined
 }): { label: string; params: Record<string, string> } | undefined {
   const { tournament, filterTeam, filterOpponent } = opts
-  if (tournament) {
-    return { label: `in ${tournament}`, params: { tournament } }
-  }
+  const params: Record<string, string> = {}
+  const labelParts: string[] = []
   if (filterTeam && filterOpponent) {
-    return {
-      label: `vs ${filterOpponent}`,
-      params: { filter_team: filterTeam, filter_opponent: filterOpponent },
-    }
+    params.filter_team = filterTeam
+    params.filter_opponent = filterOpponent
+    labelParts.push(`vs ${filterOpponent}`)
+  } else if (filterTeam) {
+    params.filter_team = filterTeam
+    labelParts.push(`at ${filterTeam}`)
   }
-  if (filterTeam) {
-    return { label: `at ${filterTeam}`, params: { filter_team: filterTeam } }
+  if (tournament) {
+    params.tournament = tournament
+    labelParts.push(`in ${tournament}`)
   }
-  return undefined
+  if (!labelParts.length) return undefined
+  return { label: labelParts.join(' '), params }
 }
 
 function BattersTab({

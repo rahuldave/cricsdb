@@ -53,6 +53,7 @@ export default function Batting() {
   const filterDeps = [
     playerId, filters.gender, filters.team_type, filters.tournament,
     filters.season_from, filters.season_to,
+    filters.filter_team, filters.filter_opponent,
   ]
 
   // Summary drives the page header — page-level state
