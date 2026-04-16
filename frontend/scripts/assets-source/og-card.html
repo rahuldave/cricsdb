@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,SOFT,WONK,wght@0,9..144,0..100,0..1,100..900;1,9..144,0..100,0..1,100..900&family=Inter+Tight:wght@500&display=block" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 1200px; height: 630px;
+    background: #FAF7F0;
+    font-family: 'Fraunces', Georgia, serif;
+    position: relative;
+    overflow: hidden;
+  }
+  .kicker {
+    position: absolute; top: 150px; left: 0; right: 0; text-align: center;
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 500;
+    font-size: 22px;
+    letter-spacing: 4px;
+    color: #8A7D70;
+  }
+  .title {
+    position: absolute; top: 180px; left: 0; right: 0; text-align: center;
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    font-size: 144px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: #2E2823;
+    font-variation-settings: 'opsz' 144;
+  }
+  .title .amp {
+    font-style: italic;
+    font-weight: 400;
+    color: #7A1F1F;
+    font-variation-settings: 'opsz' 144;
+  }
+  .rules {
+    position: absolute; top: 348px; left: 360px; width: 480px;
+  }
+  .rules hr {
+    border: none;
+    height: 2px;
+    background: #1A1714;
+    margin: 0 0 6px;
+  }
+  .rules hr + hr {
+    height: 1px;
+  }
+  .standfirst {
+    position: absolute; top: 390px; left: 0; right: 0; text-align: center;
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 32px;
+    line-height: 1.45;
+    color: #5C5048;
+    font-variation-settings: 'opsz' 24;
+  }
+  /* Fraunces has different ampersand glyph shapes at different opsz
+     values — the body-size italic amp has decorative swashes, the
+     display-size amp is the clean curl. Force display-axis on the
+     standfirst's inline &amp; so its shape matches the wordmark. */
+  .standfirst .amp {
+    font-variation-settings: 'opsz' 144;
+  }
+  .url {
+    position: absolute; bottom: 40px; right: 60px;
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 500;
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: #8A7D70;
+  }
+</style>
+</head>
+<body>
+  <div class="kicker">EST. 2026 · A T20 ALMANACK</div>
+  <div class="title">T20 <span class="amp">&amp;</span> CricsDB</div>
+  <div class="rules"><hr><hr></div>
+  <div class="standfirst">
+    An almanack of Twenty20 cricket —<br>
+    13,019 matches · 2.95M deliveries · international <span class="amp">&amp;</span> club
+  </div>
+  <div class="url">T20.RAHULDAVE.COM</div>
+</body>
+</html>

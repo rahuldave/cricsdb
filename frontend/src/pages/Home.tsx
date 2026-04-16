@@ -98,7 +98,7 @@ export default function Home() {
     <div className="wisden-page">
       {/* Masthead */}
       <header className="masthead">
-        <div className="kicker">Est. 2024 · A T20 Almanack</div>
+        <div className="kicker">Est. 2026 · A T20 Almanack</div>
         <h1 className="title">
           T20 <span className="title-amp">&amp;</span> CricsDB
         </h1>
