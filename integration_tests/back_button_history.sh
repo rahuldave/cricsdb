@@ -171,7 +171,10 @@ reset
 agent-browser open "$BASE/batting?player=ba607b88&gender=male&filter_team=India&filter_opponent=Australia&team_type=international&tournament=T20+World+Cup+%28Men%29" >/dev/null 2>&1
 agent-browser wait --load networkidle >/dev/null 2>&1
 settle 2.5
-CLEAR_REF=$(ref_for 'button "Clear scope"')
+# NB: ScopeIndicator's aria-label is "Clear scope and return to full
+# career" — match by prefix, not by the full quoted label, or grep
+# whiffs on the trailing ".
+CLEAR_REF=$(ref_for 'button "Clear scope')
 click_ref "$CLEAR_REF"
 # Every narrowing param must be gone. Only player + gender stay.
 for p in filter_team filter_opponent tournament team_type season_from season_to; do
