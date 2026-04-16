@@ -141,7 +141,7 @@ async def main():
                          "Used to smoke-test against a staging copy, e.g. a "
                          "prod snapshot copied from ~/Downloads/t20-cricket-db_"
                          "download/data/cricket.db → /tmp. See "
-                         "docs/testing-update-recent.md.")
+                         "internal_docs/testing-update-recent.md.")
     args = ap.parse_args()
 
     db_path = args.db if args.db else DB_PATH

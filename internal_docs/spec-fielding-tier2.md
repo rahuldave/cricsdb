@@ -271,7 +271,7 @@ CricsDB has a deebase-provided admin at `/admin/` that exposes every
 table (including the new `keeper_assignment`) as CRUD views. Full
 details — including how to find a specific innings, the Python 3.14
 compatibility fix, and the authentication story — are in
-[`docs/admin-interface.md`](admin-interface.md).
+[`internal_docs/admin-interface.md`](admin-interface.md).
 
 **Relevant for Tier 2:** once `keeper_assignment` exists, the admin
 lets you list, filter, and edit any row (change `keeper_id`, save).

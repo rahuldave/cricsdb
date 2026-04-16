@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../components/FilterBar'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
@@ -84,6 +85,20 @@ function PlayerVsPlayer() {
   const handleBatter = (p: PlayerSearchResult) => setBatterId(p.id)
   const handleBowler = (p: PlayerSearchResult) => setBowlerId(p.id)
 
+  // If the active series_type becomes invalid after a FilterBar change
+  // (e.g. pick Club → 'bilateral' is no longer offered), reset to 'all'
+  // via replace — the stale state wasn't user-chosen, don't add history.
+  useEffect(() => {
+    if (!seriesType || seriesType === 'all') return
+    const isClub = filters.team_type === 'club'
+    const isIntl = filters.team_type === 'international'
+    const valid =
+      (seriesType === 'bilateral' && !isClub)
+      || (seriesType === 'icc' && !isClub)
+      || (seriesType === 'club' && !isIntl)
+    if (!valid) setSeriesType('', { replace: true })
+  }, [seriesType, filters.team_type])
+
   const enabled = !!(batterId && bowlerId)
   const { data, loading, error, refetch } = useFetch<HeadToHeadResponse | null>(
     () => enabled
@@ -146,9 +161,9 @@ function PlayerVsPlayer() {
             || (s === 'bilateral' && !isClub)
             || (s === 'icc' && !isClub)
             || (s === 'club' && !isIntl))
-        if (seriesType && !opts.includes(seriesType as typeof opts[number])) {
-          setSeriesType('')
-        }
+        // Invalid-series auto-reset moved to the useEffect below —
+        // setting URL state during render pushed a history entry every
+        // time it fired (after we flipped the hook default to push).
         if (isClub) {
           // Pill collapses to a read-only caption — every option would
           // narrow to the same rows the FilterBar is already showing.

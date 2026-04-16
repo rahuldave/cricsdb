@@ -165,7 +165,7 @@ class KeeperAssignment:
 class Partnership:
     """One row per on-field batting partnership.
 
-    See docs/spec-team-stats.md. `partnership_runs` includes ALL extras
+    See internal_docs/spec-team-stats.md. `partnership_runs` includes ALL extras
     (matches innings total math); `partnership_balls` is legal balls only.
     Per-batter `batter{1,2}_runs` are off-the-bat only. `batter1` is the
     earlier-arriver (= survivor of previous partnership; = striker on

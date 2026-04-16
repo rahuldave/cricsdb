@@ -10,7 +10,7 @@ one that fits the available time.
 ---
 
 **A. Loading + error states across all pages.** _Done._ See
-`docs/data-fetching.md` for the full pattern (useFetch hook, Spinner,
+`internal_docs/data-fetching.md` for the full pattern (useFetch hook, Spinner,
 ErrorBanner, gated fetches, per-tab `<TabState>` helper, when NOT to
 use useFetch, where loading/error sit relative to data). Rolled out to
 Home, Matches list, MatchScorecard, Teams, Batting, Bowling, Head to
@@ -23,7 +23,7 @@ this would render each delivery as a feed line: `19.6 — Bumrah to Kohli
 — 4 runs (FOUR)` or `19.4 — Bumrah to Sharma — OUT! caught Rohit b
 Bumrah`. Useful and conventional, but be honest with users that it's
 generated from data, not a writer's prose. Pairs naturally with the
-**innings grid** (see `docs/design-decisions.md` "Innings grid:
+**innings grid** (see `internal_docs/design-decisions.md` "Innings grid:
 per-delivery visualization") — clicking a row in the grid could scroll
 the commentary feed to the same ball, and vice versa.
 
@@ -100,7 +100,7 @@ through `annotations` and `tooltip` props.
 **H. Reverse direction of the scatter↔table linking on Batting/Bowling
 vs-tabs.** The forward direction (click a row → highlight the matching
 dot on the chart with an `enclose` annotation, scroll the row into
-view) is shipped — see `docs/design-decisions.md` "Linking scatter
+view) is shipped — see `internal_docs/design-decisions.md` "Linking scatter
 charts to their data tables." The reverse direction (click a dot →
 highlight the row, scroll the table to it) is missing because Semiotic
 v3's high-level `Scatterplot` component does not expose `onClick` or
@@ -121,7 +121,7 @@ was stripped.
 **J. Distinctive visual identity.** _Done._ Wisden editorial redesign
 shipped. Cream background, Fraunces display serif + Inter Tight sans,
 oxblood accent, rule-based layouts instead of card chrome. Full
-documentation in `docs/visual-identity.md`. Consistency rule: subject
+documentation in `internal_docs/visual-identity.md`. Consistency rule: subject
 in ink, connective in oxblood, hover to oxblood.
 
 **K. Tournament-name canonicalization.** _Done._ Implemented in
@@ -130,7 +130,7 @@ team-aliases pattern. Three competitions merged: NatWest T20 Blast /
 Vitality Blast Men → Vitality Blast (English), MiWAY / Ram Slam → CSA
 T20 Challenge (SA), HRV Cup / HRV Twenty20 → Super Smash (NZ). 784
 rows updated; club-tournament count went from 27 to 21. See
-`docs/design-decisions.md` "Team-name canonicalization across
+`internal_docs/design-decisions.md` "Team-name canonicalization across
 renames" for the shared writeup.
 
 **L. Fielding analytics page.** _Tier 1 + Tier 2 done._ `/fielding`
@@ -139,7 +139,7 @@ page with `fielding_credit` denormalized table (~118K rows),
 endpoints (`api/routers/fielding.py`), frontend page with 6 tabs (By
 Season, By Over, By Phase, Dismissal Types, Victims, Innings List).
 Fielder search via `role=fielder` in `/api/v1/players`. Tier 1 spec:
-`docs/spec-fielding.md`.
+`internal_docs/spec-fielding.md`.
 
    - **Tier 2** — wicketkeeper identification via 4-layer algorithm
      (stumping → season-candidate → career N≥3 → team-ever-keeper).
@@ -160,11 +160,11 @@ Fielder search via `role=fielder` in `/api/v1/players`. Tier 1 spec:
      (ambiguous rows render `"ambiguous — X or Y"` with both
      candidates clickable). Team pages show "Keepers used: X (N), Y
      (M)" rollup. Both `import_data.py` and `update_recent.py`
-     auto-populate. Spec: `docs/spec-fielding-tier2.md`, worklist
+     auto-populate. Spec: `internal_docs/spec-fielding-tier2.md`, worklist
      README: `docs/keeper-ambiguous/README.md`.
 
 **M. Tournament analytics page + match-set dossier.** _Done (2026-04-15)._
-Spec at `docs/spec-tournaments.md`. New `/tournaments` page with
+Spec at `internal_docs/spec-tournaments.md`. New `/tournaments` page with
 sectioned landing (ICC events, men's + women's bilateral-rivalry tiles
 bilateral-only, franchise / domestic / women's club leagues + other).
 Tournament tile or rivalry tile both open the same dossier UI with tabs:
@@ -190,7 +190,7 @@ Originally listed as enhancement B (deferred); promoted in scope when
 the unified rivalry-as-team-pair-filter model emerged.
 
 **N. Team statistics — batting / bowling / fielding / partnerships.**
-_Done (2026-04-14)._ Spec at `docs/spec-team-stats.md`, ~21h of build.
+_Done (2026-04-14)._ Spec at `internal_docs/spec-team-stats.md`, ~21h of build.
 New `partnership` table (~180K rows, populated by
 `scripts/populate_partnerships.py`, auto-called by `import_data.py` +
 `update_recent.py`). 16 new endpoints on `api/routers/teams.py`
@@ -213,7 +213,7 @@ WPL champion links + Pollard/Mooney fielders in focus + WI 2016 T20
 WC). Wisden style addition: `.wisden-section-title` for centered
 editorial headings above charts (avoids the in-chart `title` prop
 colliding with above-bar percentage labels). Several follow-on items
-captured as "(revisit)" subsections in `docs/design-decisions.md`:
+captured as "(revisit)" subsections in `internal_docs/design-decisions.md`:
 tournament baselines (enhancement O), win-% overlay on discipline
 tabs, batter consistency stats (median / 30+ rate / dispersion),
 batter × bowler-type and bowler × batter-handedness splits.
@@ -227,7 +227,7 @@ narrowed view. Both responses are shape-compatible. Now wire this up:
 every team-tab chart should overlay the league mean as a reference
 line/band, every player table should gain a "vs league avg" column,
 phase × season heatmaps should support a "delta from league mean"
-colour mode. Detail in `docs/design-decisions.md` "Team metrics need
+colour mode. Detail in `internal_docs/design-decisions.md` "Team metrics need
 tournament baselines (revisit when /tournaments ships)".
 
 **P. Search-tab landings + default season window + FilterBar resets.**
@@ -258,10 +258,10 @@ work: conditional-JOIN elimination when no match-level filter is set
 `ix_delivery_bowler_agg`) + ANALYZE, re-asserted idempotently in
 both `import_data.py` and `update_recent.py`. Unfiltered landing
 queries went from 3s+ to sub-second locally. See
-`docs/perf-leaderboards.md` for the reusable pattern.
+`internal_docs/perf-leaderboards.md` for the reusable pattern.
 `update_recent.py --db <path>` flag added for smoke-testing against
 a copy of the prod snapshot in `/tmp` before deploying (see
-`docs/testing-update-recent.md`). Home-page gains two deep links:
+`internal_docs/testing-update-recent.md`). Home-page gains two deep links:
 "(players)" next to West Indies T20 WC 2016 and "MI men — players
 over the years".
 
@@ -273,7 +273,7 @@ over the years".
   pair filters (their credits live in opponent-batting innings, so the
   default `i.team = :team` clause returns zero). Changes in
   `api/filters.py` + the three routers; 63-URL regression harness
-  described in `docs/regression-testing-api.md` proved the refactor
+  described in `internal_docs/regression-testing-api.md` proved the refactor
   inert on un-scoped paths.
 - Team-page / rivalry-dossier context links now carry the active
   tournament through to the player's page so the lens is complete.

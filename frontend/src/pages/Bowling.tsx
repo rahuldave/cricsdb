@@ -67,7 +67,7 @@ export default function Bowling() {
     if (!summary || filters.gender) return
     const g = summary.nationalities?.[0]?.gender
     const allSameGender = summary.nationalities?.every(n => n.gender === g)
-    if (g && allSameGender) setUrlParams({ gender: g })
+    if (g && allSameGender) setUrlParams({ gender: g }, { replace: true })
   }, [summary, filters.gender])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

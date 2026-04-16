@@ -682,8 +682,8 @@ optimization for later.
 11. **Per-tournament dossier UI** — all 7 tabs.
 12. **Per-rivalry dossier UI** — simpler, single-page.
 13. **Nav integration** — add "Tournaments" to the top nav.
-14. **Docs pass** — `docs/api.md`, `docs/codebase-tour.md`, CLAUDE.md
-    "Landing pages" section, `docs/enhancements-roadmap.md` (mark M
+14. **Docs pass** — `docs/api.md`, `internal_docs/codebase-tour.md`, CLAUDE.md
+    "Landing pages" section, `internal_docs/enhancements-roadmap.md` (mark M
     done).
 15. **Deploy + verify in browser** per CLAUDE.md UI-verification rule.
 

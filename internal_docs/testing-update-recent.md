@@ -114,7 +114,7 @@ On success, `update_recent.py --db <path>` will:
 6. Ensure composite covering indexes exist
    (`ix_delivery_batter_agg`, `ix_delivery_bowler_agg`) and re-run
    `ANALYZE`, so the batting/bowling leaderboard queries stay fast.
-   See `docs/perf-leaderboards.md` for why.
+   See `internal_docs/perf-leaderboards.md` for why.
 7. Regenerate `frontend/src/generated/site-stats.json` (home-page
    masthead totals).
 

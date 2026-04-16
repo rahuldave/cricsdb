@@ -32,7 +32,9 @@ export default function Tournaments() {
       filter_opponent: b,
     }
     if (!searchParams.get('series_type')) updates.series_type = 'all'
-    setUrlParams(updates)
+    // URL-shape migration → replace so the back button returns to
+    // wherever the user came from, not to the old `?rivalry=…` URL.
+    setUrlParams(updates, { replace: true })
   }, [rivalry])
 
   const isDossier = !!(tournament || (filterTeam && filterOpp))

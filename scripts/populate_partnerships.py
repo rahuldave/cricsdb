@@ -1,6 +1,6 @@
 """Populate the partnership table from ordered delivery + wicket data.
 
-See `docs/spec-team-stats.md` for the full spec. One row per on-field
+See `internal_docs/spec-team-stats.md` for the full spec. One row per on-field
 batting partnership. `partnership_runs` includes all extras;
 `partnership_balls` is legal balls only. Per-batter runs are off-the-bat.
 `batter1` is the earlier-arriver (= survivor of the previous partnership;

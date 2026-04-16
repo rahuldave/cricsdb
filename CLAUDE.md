@@ -14,13 +14,13 @@ Full-stack T20 cricket analytics platform. 12,940 matches (international + 18 cl
 
 - **Database:** SQLite (435MB, WAL mode) via deebase ORM
 - **Backend:** FastAPI, async, raw SQL via `db.q(sql, params)` with bind parameters
-- **Frontend:** React 19 + TypeScript + Tailwind CSS v4 + Semiotic v3 charts
-- **Build:** Vite 8 (see `docs/frontend-build-pipeline.md`)
+- **Frontend:** React 19 + TypeScript + Tailwind CSS v4 + Semiotic v3 charts (ES6-fluent-but-React-new readers: start with `internal_docs/react-primer.md` — it explains how THIS codebase uses React + Vite, not a generic tutorial)
+- **Build:** Vite 8 (see `internal_docs/frontend-build-pipeline.md`)
 - **Deploy:** pla.sh (see deploy section below)
 
 ## Key Files — entry points
 
-Full file-by-file tour lives in **`docs/codebase-tour.md`**. The
+Full file-by-file tour lives in **`internal_docs/codebase-tour.md`**. The
 recurring entry points:
 
 - `api/app.py` — FastAPI app, CORS, admin, SPA fallback (registered in lifespan AFTER routers)
@@ -32,7 +32,7 @@ recurring entry points:
 - `frontend/src/content/` — `about-me.md` and `user-help.md` — editable markdown rendered on the `/help` and `/help/usage` routes via `react-markdown`. Edit the `.md`, rebuild, ship.
 - `frontend/src/api.ts` + `types.ts` — endpoint clients + response types
 - `frontend/src/components/charts/` — Semiotic wrappers (BarChart, LineChart, ScatterChart, HeatmapChart, BubbleMatrix, WormChart, etc.)
-- `frontend/src/index.css` — Wisden editorial styles (see `docs/visual-identity.md`)
+- `frontend/src/index.css` — Wisden editorial styles (see `internal_docs/visual-identity.md`)
 
 ## Running Locally
 
@@ -55,7 +55,7 @@ and click every link to confirm it navigates. `tsc --noEmit` and
 `npm run build` only verify code correctness, not feature correctness.
 Do not claim UI work is complete without a browser-agent run.
 
-See `docs/local-development.md` for prerequisites, the project-layout cheat sheet, type-check / build commands, troubleshooting, and how to query the DB from a Python REPL.
+See `internal_docs/local-development.md` for prerequisites, the project-layout cheat sheet, type-check / build commands, troubleshooting, and how to query the DB from a Python REPL.
 
 ## Deploying
 
@@ -64,11 +64,11 @@ bash deploy.sh           # code-only (DB persists on plash)
 bash deploy.sh --first   # uploads cricket.db (~435 MB)
 ```
 
-See `docs/deploying.md` for what does/doesn't ship, the deebase vendoring quirk, the `.plash` identity file, and troubleshooting.
+See `internal_docs/deploying.md` for what does/doesn't ship, the deebase vendoring quirk, the `.plash` identity file, and troubleshooting.
 
 ## Rebuilding / Updating the Database
 
-Full pipeline + dry-run format documented in **`docs/data-pipeline.md`**. Canonical commands:
+Full pipeline + dry-run format documented in **`internal_docs/data-pipeline.md`**. Canonical commands:
 
 ```bash
 uv run python download_data.py                      # fetches zips + people/names CSVs
@@ -79,9 +79,9 @@ uv run python update_recent.py --days 30            # incremental import
 
 Both `import_data.py` and `update_recent.py` auto-populate `fielding_credit`, `keeper_assignment`, and `partnership`. After a DB update, push to plash with `bash deploy.sh --first` (plain `deploy.sh` skips the DB upload).
 
-To smoke-test `update_recent.py` against a copy of the prod DB before deploying, use `--db /tmp/cricket-prod-test.db` after copying the Downloads snapshot — see **`docs/testing-update-recent.md`** for the copy-to-tmp workflow and what not to do.
+To smoke-test `update_recent.py` against a copy of the prod DB before deploying, use `--db /tmp/cricket-prod-test.db` after copying the Downloads snapshot — see **`internal_docs/testing-update-recent.md`** for the copy-to-tmp workflow and what not to do.
 
-Before shipping a refactor of a shared query helper (e.g. `FilterParams`, a router filter fn, a SQL generator) that touches many endpoints, use the HEAD-vs-patched md5-diff harness in **`docs/regression-testing-api.md`**: enumerate every affected URL + a control sample, tag each `REG` (must match HEAD) or `NEW` (HEAD vs patched should differ), capture both runs via `git stash`/`uvicorn --reload`, and diff. Byte-identical `REG` is the proof the refactor is inert where intended.
+Before shipping a refactor of a shared query helper (e.g. `FilterParams`, a router filter fn, a SQL generator) that touches many endpoints, use the HEAD-vs-patched md5-diff harness in **`internal_docs/regression-testing-api.md`**: enumerate every affected URL + a control sample, tag each `REG` (must match HEAD) or `NEW` (HEAD vs patched should differ), capture both runs via `git stash`/`uvicorn --reload`, and diff. Byte-identical `REG` is the proof the refactor is inert where intended.
 
 ## Landing pages (search-bar tabs)
 
@@ -112,12 +112,12 @@ FastAPI also exposes auto-generated interactive docs at **`/api/docs`** (Swagger
 
 - **Added / changed / removed an API route?** Update **`docs/api.md`** — add or amend the endpoint section (path, one-liner, curl, abbreviated JSON response). Hit the endpoint via `curl` to capture a real response rather than inventing one.
 - **Changed a URL scheme, filter param, or response shape on an existing endpoint?** Same — update the affected `docs/api.md` section. Re-curl the example if the shape changed.
-- **Added a new router file, a new page, or a new hook?** Update **`docs/codebase-tour.md`** (both the router summary line and the frontend hooks block).
-- **Shipped a feature that belongs in the A-O narrative?** Add or amend the entry in **`docs/enhancements-roadmap.md`**; done items stay there as historical markers.
-- **Made a non-obvious design decision** (a convention future contributors would otherwise try to change)? Add a bullet to **`docs/design-decisions.md`**.
-- **Changed pipeline behaviour, introduced a new invariant the DB must carry, or added a testing workflow?** Touch **`docs/data-pipeline.md`** (and/or `docs/testing-update-recent.md`).
-- **Refactored a shared query helper (`FilterParams`, router filter fns, SQL generators) with many callers?** Run the HEAD-vs-patched md5-diff harness in **`docs/regression-testing-api.md`** and report the pass count before claiming done.
-- **Introduced a new perf pattern worth reusing?** Add it to **`docs/perf-leaderboards.md`** (or create a sibling `perf-*.md` if scope is different).
+- **Added a new router file, a new page, or a new hook?** Update **`internal_docs/codebase-tour.md`** (both the router summary line and the frontend hooks block).
+- **Shipped a feature that belongs in the A-O narrative?** Add or amend the entry in **`internal_docs/enhancements-roadmap.md`**; done items stay there as historical markers.
+- **Made a non-obvious design decision** (a convention future contributors would otherwise try to change)? Add a bullet to **`internal_docs/design-decisions.md`**.
+- **Changed pipeline behaviour, introduced a new invariant the DB must carry, or added a testing workflow?** Touch **`internal_docs/data-pipeline.md`** (and/or `internal_docs/testing-update-recent.md`).
+- **Refactored a shared query helper (`FilterParams`, router filter fns, SQL generators) with many callers?** Run the HEAD-vs-patched md5-diff harness in **`internal_docs/regression-testing-api.md`** and report the pass count before claiming done.
+- **Introduced a new perf pattern worth reusing?** Add it to **`internal_docs/perf-leaderboards.md`** (or create a sibling `perf-*.md` if scope is different).
 - **Changed the page structure, tabs, or search-bar landing?** Update the "Landing pages" and "Key Files" sections of `CLAUDE.md` itself.
 - **Changed anything user-visible about the home page, filter bar, or global conventions?** Update the relevant narrative doc and this file's convention list.
 
@@ -125,26 +125,26 @@ If the change is genuinely trivial (typo, whitespace, one-line comment), skip. O
 
 ## Performance notes
 
-- **Leaderboard landings** (Batting / Bowling / Fielding) depend on two composite covering indexes (`ix_delivery_batter_agg`, `ix_delivery_bowler_agg`) plus fresh `ANALYZE` stats. These are created idempotently by both `import_data.py` and `update_recent.py`. See **`docs/perf-leaderboards.md`** for the diagnosis and the reusable pattern: use `filters.build(has_innings_join=False)` to get a pure match clause, then conditionally drop the innings/match JOINs entirely when no filters are active (avoids 2.95M × 2 PK probes on the delivery scan).
+- **Leaderboard landings** (Batting / Bowling / Fielding) depend on two composite covering indexes (`ix_delivery_batter_agg`, `ix_delivery_bowler_agg`) plus fresh `ANALYZE` stats. These are created idempotently by both `import_data.py` and `update_recent.py`. See **`internal_docs/perf-leaderboards.md`** for the diagnosis and the reusable pattern: use `filters.build(has_innings_join=False)` to get a pure match clause, then conditionally drop the innings/match JOINs entirely when no filters are active (avoids 2.95M × 2 PK probes on the delivery scan).
 
 ## Critical Design Decisions
 
-Read `docs/design-decisions.md` for full details. Key points:
+Read `internal_docs/design-decisions.md` for full details. Key points:
 
 - **Over numbering:** DB stores 0-19 (matching cricsheet source). API returns 1-20 (+1 in each router's response). Frontend displays as-is.
 - **Phase boundaries:** Powerplay = overs 1-6, Middle = 7-15, Death = 16-20 (in API responses). SQL internally uses 0-5, 6-14, 15-19.
 - **Legal balls vs all deliveries:** Batting stats count only legal balls (no wides/noballs). Bowling runs_conceded counts ALL deliveries.
 - **Bowler wickets:** Exclude run out, retired hurt, retired out, obstructing the field.
 - **Run rate:** Concatenated rate (SUM(runs) × 6 / SUM(legal balls)), NOT mean of per-innings rates. See design-decisions.md "Run rate: concatenated, not per-innings averaged (revisit)" for the why and when-to-revisit.
-- **URL state:** All page state (player, tab, filters) lives in URL search params for deep linking. Use `useSetUrlParams()` for atomic multi-param updates (two separate `useUrlParam` setters race).
+- **URL state:** All page state (player, tab, filters) lives in URL search params for deep linking. Use `useSetUrlParams()` for atomic multi-param updates (two separate `useUrlParam` setters race). Setters default to pushing history so the back button walks the user's filter steps; pass `{ replace: true }` for programmatic auto-corrections (deep-link gender fill, default season window, invalid-state repair). Full discipline + audit list in **`internal_docs/url-state.md`**. Never call a setter during render — the URL pushes every time, polluting history. Put it in a `useEffect` with `{ replace: true }`.
 - **deebase `db.q()`:** Locally patched to accept `params` dict. Use `:param_name` bind syntax, never f-string interpolation. Exception: list params (`WHERE id IN (...)`) need f-string interpolation — SQLite bind params don't expand lists.
 - **SPA fallback:** Must be registered AFTER API routers in the lifespan handler (not at import time) or it catches /api/* routes.
 - **Bowling field names differ from batting:** `wickets` not `dismissals`, `runs_conceded` not `runs`. Don't reuse batting types.
 - **Scorecard highlight auto-scroll:** The innings-list date links on Batting/Bowling/Fielding pages carry `?highlight_batter=`, `?highlight_bowler=`, or `?highlight_fielder=` (person ID). The scorecard page tints the matching row(s) green (`.is-highlighted`) and scrolls to the first one. Scroll logic is **page-level** in `MatchScorecard.tsx`, gated on both `useFetch` calls resolving, then does `document.querySelector('.is-highlighted')` inside a double `requestAnimationFrame` so layout has settled. Per-InningsCard scrolling was abandoned because sibling async sections (WormChart, MatchupGridChart, InningsGridChart) resized after the scroll fired, displacing the target.
 - **Match-list date convention:** ANY table that lists matches (Teams > Match List, Teams > vs Opponent match list, Batting/Bowling/Fielding "Innings List", Matches page results, Partnerships "Top N" date column, etc.) MUST render the `date` cell as a `<Link to={`/matches/${match_id}`}>` with className `comp-link`. Row-click to scorecard is fine as a secondary affordance, but the date link itself is mandatory — users rely on cmd/ctrl-click to open the scorecard in a new tab. When the table is in a player's innings-list context, the link must also carry the appropriate highlight param (`highlight_batter` / `highlight_bowler` / `highlight_fielder` = that person_id) so the scorecard tints + scrolls to their row.
 - **Fielder dismissal attribution:** The scorecard API joins `fieldingcredit` per innings and returns `dismissal_fielder_ids: string[]` on each batting row. The frontend uses this to match `highlight_fielder` rather than parsing the dismissal text string.
-- **Keeper identification (Tier 2):** Cricsheet has no keeper designation, so we infer it via a 4-layer algorithm (stumping this innings → exactly-1 season-candidate in XI → exactly-1 career-N≥3 keeper in XI → exactly-1 team-ever-keeper in XI). Stored in `keeper_assignment` with nullable `keeper_id` + explicit `confidence` enum. When 2+ candidates match at any layer, the row stays NULL with `ambiguous_reason` + `candidate_ids_json`, and the innings is exported to `docs/keeper-ambiguous/<YYYY-MM-DD>.csv` for later manual/Cricinfo resolution. Manual resolutions (same CSV, `resolved_keeper_id` column) always win — applied last in `populate_full` / `populate_incremental`. See `docs/spec-fielding-tier2.md`.
-- **Team-stats FilterBar auto-narrowing (enhancement N):** When a team is selected, `/api/v1/tournaments?team=X` + `/api/v1/seasons?team=X&tournament=Y&...` return only the team's actual context. FilterBar auto-sets team_type/gender when unambiguous (e.g. MI → club). See `docs/spec-team-stats.md`. Extended 2026-04-16 to cover player-page rivalry scope: when URL has `filter_team` + `filter_opponent`, FilterBar feeds both to `/tournaments?team=X&opponent=Y` (returns only tournaments where the two teams actually met). If the result collapses to one entry, tournament auto-sets (MI × CSK → IPL); otherwise tournament stays empty (India vs Australia spans bilaterals + ICC — the rivalry IS the lens).
+- **Keeper identification (Tier 2):** Cricsheet has no keeper designation, so we infer it via a 4-layer algorithm (stumping this innings → exactly-1 season-candidate in XI → exactly-1 career-N≥3 keeper in XI → exactly-1 team-ever-keeper in XI). Stored in `keeper_assignment` with nullable `keeper_id` + explicit `confidence` enum. When 2+ candidates match at any layer, the row stays NULL with `ambiguous_reason` + `candidate_ids_json`, and the innings is exported to `docs/keeper-ambiguous/<YYYY-MM-DD>.csv` for later manual/Cricinfo resolution. Manual resolutions (same CSV, `resolved_keeper_id` column) always win — applied last in `populate_full` / `populate_incremental`. See `internal_docs/spec-fielding-tier2.md`.
+- **Team-stats FilterBar auto-narrowing (enhancement N):** When a team is selected, `/api/v1/tournaments?team=X` + `/api/v1/seasons?team=X&tournament=Y&...` return only the team's actual context. FilterBar auto-sets team_type/gender when unambiguous (e.g. MI → club). See `internal_docs/spec-team-stats.md`. Extended 2026-04-16 to cover player-page rivalry scope: when URL has `filter_team` + `filter_opponent`, FilterBar feeds both to `/tournaments?team=X&opponent=Y` (returns only tournaments where the two teams actually met). If the result collapses to one entry, tournament auto-sets (MI × CSK → IPL); otherwise tournament stays empty (India vs Australia spans bilaterals + ICC — the rivalry IS the lens).
 
 ## Known Issues / Live TODO
 
@@ -153,12 +153,12 @@ Read `docs/design-decisions.md` for full details. Key points:
 - Player search returns abbreviated cricsheet names ("V Kohli" not "Virat Kohli"). Tracked as enhancement E.1.
 - Inter-wicket analysis is Python-side processing (~200ms for top players) — could be slow under load. Consider moving to SQL or caching.
 - Consider adding compound indexes on `(delivery.bowler_id, delivery.innings_id)` for bowling queries, and `(partnership.innings_id, partnership.wicket_number)` (already has both separately).
-- Admin at `/admin/` is behind HTTP Basic Auth (`ADMIN_USERNAME` + `ADMIN_PASSWORD` from `.env`). Fail-closed: missing env → 503. See `docs/admin-interface.md`.
+- Admin at `/admin/` is behind HTTP Basic Auth (`ADMIN_USERNAME` + `ADMIN_PASSWORD` from `.env`). Fail-closed: missing env → 503. See `internal_docs/admin-interface.md`.
 
 ## Future Enhancements
 
-Full A–O roadmap lives in **`docs/enhancements-roadmap.md`** with done-items as historical markers.
+Full A–O roadmap lives in **`internal_docs/enhancements-roadmap.md`** with done-items as historical markers.
 
-**Next up: O — Tournament-baseline comparison overlays** on team / batter / bowler / fielder pages. M shipped the per-tournament endpoints with explicit baseline reusability — call any `/api/v1/series/{summary,batters-leaders,…}` without a team filter to get the tournament-wide baseline, with one for the team's narrowed view (responses are shape-compatible). Frontend wiring needed: overlay league means on team-tab charts, add "vs league avg" columns to player tables, support "delta from league mean" colour mode on heatmaps. Design sketch in `docs/design-decisions.md` "Team metrics need tournament baselines (revisit when /tournaments ships)".
+**Next up: O — Tournament-baseline comparison overlays** on team / batter / bowler / fielder pages. M shipped the per-tournament endpoints with explicit baseline reusability — call any `/api/v1/series/{summary,batters-leaders,…}` without a team filter to get the tournament-wide baseline, with one for the team's narrowed view (responses are shape-compatible). Frontend wiring needed: overlay league means on team-tab charts, add "vs league avg" columns to player tables, support "delta from league mean" colour mode on heatmaps. Design sketch in `internal_docs/design-decisions.md` "Team metrics need tournament baselines (revisit when /tournaments ships)".
 
-**Other "(revisit)" items** (see `docs/design-decisions.md` for detail): win-% overlay on discipline tabs (correlates performance with winning), batter consistency stats (median / 30+ rate / dispersion), batter × bowler-type splits + bowler × batter-handedness splits (requires person-table enrichment from Cricinfo).
+**Other "(revisit)" items** (see `internal_docs/design-decisions.md` for detail): win-% overlay on discipline tabs (correlates performance with winning), batter consistency stats (median / 30+ rate / dispersion), batter × bowler-type splits + bowler × batter-handedness splits (requires person-table enrichment from Cricinfo).

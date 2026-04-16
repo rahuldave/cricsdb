@@ -39,7 +39,7 @@ from .routers import register_routers  # noqa: E402
 
 # HTTP Basic Auth guard for /admin/*. Credentials come from env vars
 # ADMIN_USERNAME and ADMIN_PASSWORD. Fail-closed: if either env var
-# is missing, every admin request returns 503. See docs/admin-interface.md.
+# is missing, every admin request returns 503. See internal_docs/admin-interface.md.
 _admin_security = HTTPBasic()
 
 
@@ -77,7 +77,7 @@ async def lifespan(app: FastAPI):
     register_routers(app)
 
     # Register admin interface — gated behind HTTP Basic Auth.
-    # See require_admin above and docs/admin-interface.md.
+    # See require_admin above and internal_docs/admin-interface.md.
     if db:
         try:
             from deebase.admin import create_admin_router

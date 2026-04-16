@@ -78,7 +78,7 @@ populates two denormalized tables:
    `scripts/populate_fielding_credits.py:populate_full()`.
 2. `keeper_assignment` (~25.8K rows, one per regular innings) via
    `scripts/populate_keeper_assignments.py:populate_full()`. This is
-   Tier 2 of fielding analytics — see `docs/spec-fielding-tier2.md`.
+   Tier 2 of fielding analytics — see `internal_docs/spec-fielding-tier2.md`.
    Manual resolutions live in `docs/keeper-ambiguous/*.csv` partitions
    (gitted) and are re-applied on every full rebuild so corrections
    survive.
@@ -170,7 +170,7 @@ These power the Batting/Bowling/Fielding landing-page leader boards —
 without them, unfiltered aggregates over the 2.95M-row `delivery`
 table take 3+ seconds; with them, sub-second. `CREATE INDEX IF NOT
 EXISTS` is a no-op when the index is already there, so these lines
-are safe to keep in both pipelines. See `docs/perf-leaderboards.md`
+are safe to keep in both pipelines. See `internal_docs/perf-leaderboards.md`
 for the diagnosis.
 
 ### Smoke-testing `update_recent.py` against a prod snapshot
@@ -181,7 +181,7 @@ import path works on real data (schema quirks in fresh cricsheet
 files, populate-script regressions on specific matches, etc).
 `update_recent.py --db /tmp/cricket-prod-test.db` routes the import
 at a custom DB path without touching `./cricket.db`. See
-`docs/testing-update-recent.md` for the copy-to-tmp workflow and
+`internal_docs/testing-update-recent.md` for the copy-to-tmp workflow and
 what not to do (never run against `~/Downloads/` directly — keep that
 copy pristine).
 

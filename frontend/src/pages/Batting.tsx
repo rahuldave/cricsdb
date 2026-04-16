@@ -74,7 +74,7 @@ export default function Batting() {
     if (!summary || filters.gender) return
     const g = summary.nationalities?.[0]?.gender
     const allSameGender = summary.nationalities?.every(n => n.gender === g)
-    if (g && allSameGender) setUrlParams({ gender: g })
+    if (g && allSameGender) setUrlParams({ gender: g }, { replace: true })
   }, [summary, filters.gender])
 
   // Per-tab fetches: each is gated on `activeTab === '...'` so only the

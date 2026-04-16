@@ -47,8 +47,8 @@ levels:
   chart, etc. If `season_from`/`season_to` is set, scope narrows.
 
 **This is already partly designed** — see
-`docs/spec-team-stats.md` "Implication for tournaments" and
-`docs/design-decisions.md` "Team metrics need tournament baselines"
+`internal_docs/spec-team-stats.md` "Implication for tournaments" and
+`internal_docs/design-decisions.md` "Team metrics need tournament baselines"
 entries. Those were written with enhancement M (next-up) in mind.
 
 **Open question 1:** Time-ranged vs all-time. The user's framing —

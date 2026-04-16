@@ -69,7 +69,7 @@ export default function Fielding() {
     if (!summary || filters.gender) return
     const g = summary.nationalities?.[0]?.gender
     const allSameGender = summary.nationalities?.every(n => n.gender === g)
-    if (g && allSameGender) setUrlParams({ gender: g })
+    if (g && allSameGender) setUrlParams({ gender: g }, { replace: true })
   }, [summary, filters.gender])
 
   const seasonFetch = useFetch<{ by_season: FieldingSeason[] } | null>(

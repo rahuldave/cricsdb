@@ -78,7 +78,7 @@ export default function FilterBar() {
   // fill them in from the tournament's metadata as soon as the
   // tournaments list loads. Without this, /matches?tournament=IPL
   // would aggregate IPL men + WPL women for any team that exists in
-  // both — see docs/design-decisions.md "Tournament deep links".
+  // both — see internal_docs/design-decisions.md "Tournament deep links".
   useEffect(() => {
     if (tournaments.length === 0 || !tournament) return
     if (gender && teamType) return
@@ -87,7 +87,9 @@ export default function FilterBar() {
     const updates: Record<string, string> = {}
     if (!gender && t.gender) updates.gender = t.gender
     if (!teamType && t.team_type) updates.team_type = t.team_type
-    if (Object.keys(updates).length > 0) setUrlParams(updates)
+    // Auto-correcting deep link → replace (no history entry for
+    // something the user didn't actively pick).
+    if (Object.keys(updates).length > 0) setUrlParams(updates, { replace: true })
   }, [tournaments, tournament, gender, teamType])
 
   // When a team is selected (Teams page) AND no team_type / gender is
@@ -102,7 +104,7 @@ export default function FilterBar() {
     const updates: Record<string, string> = {}
     if (!teamType && types.size === 1) updates.team_type = [...types][0] as string
     if (!gender && genders.size === 1) updates.gender = [...genders][0] as string
-    if (Object.keys(updates).length > 0) setUrlParams(updates)
+    if (Object.keys(updates).length > 0) setUrlParams(updates, { replace: true })
   }, [team, tournaments, gender, teamType])
 
   // Intra-tournament rivalry auto-narrow: when BOTH filter_team and
@@ -117,7 +119,7 @@ export default function FilterBar() {
     if (!filterTeam || !filterOpponent) return
     if (tournament) return
     if (tournaments.length !== 1) return
-    setUrlParams({ tournament: tournaments[0].event_name })
+    setUrlParams({ tournament: tournaments[0].event_name }, { replace: true })
   }, [filterTeam, filterOpponent, tournaments, tournament])
 
   const setGender = (v: string) => {

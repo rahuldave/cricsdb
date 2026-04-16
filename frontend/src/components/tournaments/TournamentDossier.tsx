@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../FilterBar'
 import { useUrlParam, useSetUrlParams } from '../../hooks/useUrlState'
@@ -79,6 +80,21 @@ export default function TournamentDossier({
   const [seriesType, setSeriesType] = useUrlParam('series_type', 'all')
   const isRivalryMode = !!(filterTeam && filterOpponent)
   const isSingleTournament = !!tournament
+
+  // Auto-reset series_type when a FilterBar change (team_type=club)
+  // makes the current choice invalid. Replace — the reset is
+  // auto-correcting, not a user pick.
+  useEffect(() => {
+    if (!isRivalryMode || isSingleTournament) return
+    if (!seriesType || seriesType === 'all') return
+    const isClub = filters.team_type === 'club'
+    const isIntl = filters.team_type === 'international'
+    const valid =
+      (seriesType === 'bilateral' && !isClub)
+      || (seriesType === 'icc' && !isClub)
+      || (seriesType === 'club' && !isIntl)
+    if (!valid) setSeriesType('', { replace: true })
+  }, [isRivalryMode, isSingleTournament, seriesType, filters.team_type])
 
   // Build filters object with rivalry + series_type passthrough so all
   // endpoint calls pick up the same scope. URL is the source of truth.
@@ -266,9 +282,8 @@ export default function TournamentDossier({
             || (s === 'bilateral' && !isClub)
             || (s === 'icc' && !isClub)
             || (s === 'club' && !isIntl))
-        if (seriesType && !opts.includes(seriesType as typeof opts[number])) {
-          setSeriesType('')
-        }
+        // Invalid-series auto-reset handled in the useEffect below so
+        // the setter doesn't fire during render (pushing history).
         if (isClub) {
           return (
             <div className="mt-3 wisden-tab-help">

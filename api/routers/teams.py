@@ -745,7 +745,7 @@ async def team_players_by_season(
 
 # ============================================================
 # Team ball-level stats — batting, bowling, fielding, partnerships.
-# See docs/spec-team-stats.md.
+# See internal_docs/spec-team-stats.md.
 # ============================================================
 
 

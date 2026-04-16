@@ -752,7 +752,7 @@ export interface InningsGridResponse {
 
 // ============================================================
 // Team stats — batting / bowling / fielding / partnerships
-// (see docs/spec-team-stats.md)
+// (see internal_docs/spec-team-stats.md)
 // ============================================================
 
 export interface TeamInningsTotal {

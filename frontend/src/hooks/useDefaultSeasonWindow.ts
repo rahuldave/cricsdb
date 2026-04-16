@@ -56,7 +56,9 @@ export function useDefaultSeasonWindow(
         const from = latest[0]
         const to = latest[latest.length - 1]
         if (!from || !to) return
-        setUrlParams({ season_from: from, season_to: to })
+        // Programmatic one-shot default → replace; the user hasn't
+        // actively picked seasons, so it shouldn't occupy history.
+        setUrlParams({ season_from: from, season_to: to }, { replace: true })
         appliedRef.current = true
       })
       .catch(() => {
