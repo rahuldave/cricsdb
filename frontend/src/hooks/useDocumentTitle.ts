@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-const SUFFIX = 'T20 CricsDB'
+const SUFFIX = 'T20 & CricsDB'
 
 /**
  * Set document.title for the current page. Pass the page-specific
