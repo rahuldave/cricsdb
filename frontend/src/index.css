@@ -1600,6 +1600,24 @@ a { color: inherit; }
   font-style: italic;
   color: var(--ink-soft);
 }
+/* Help-page screenshots — constrain to the prose column, add a
+   hairline rule so they read as figures, and centre. */
+.markdown-body img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.25rem auto;
+  border: 1px solid var(--rule-soft);
+  background: var(--bg);
+}
+.markdown-body img + em {
+  display: block;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  margin-top: -0.75rem;
+  margin-bottom: 1.25rem;
+}
 .markdown-body strong { font-weight: 600; }
 .markdown-body code {
   font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);

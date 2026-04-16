@@ -1,5 +1,8 @@
 # Using CricsDB
 
+![T20 & CricsDB homepage](/social/01-homepage.png)
+*The front door — masthead, coverage, recent fixtures, departments.*
+
 ## The shape of the site
 
 Five top-level tabs across the nav (the three discipline pages now
@@ -14,8 +17,20 @@ sit inside a **Players ▾** group — hover on desktop, sub-row on mobile):
   Partnerships, Records, Matches). Click a rivalry tile to get the
   same dossier scoped to that team pair's bilateral matches.
   Men's and women's rivalries are separate tiles.
+
+![Series landing — tournament + rivalry tiles](/social/06-series-landing.png)
+*Series tab — every competition + every men's and women's bilateral rivalry, in tiles.*
+
+![India vs Australia rivalry dossier](/social/08-rivalry-dossier.png)
+*A bilateral rivalry dossier — 37 meetings, by-team breakdowns below the unified summary.*
+
 - **Teams** — win/loss records, team batting/bowling/fielding,
-  partnerships, roster by season. The landing board is two columns:
+  partnerships, roster by season. An example ↓
+
+![India team dossier — summary stats + tabs](/social/03-team-overview.png)
+*A team dossier — summary row, keepers used, By Season / vs Opponent / Batting / Bowling / Fielding / Partnerships / Players / Match List tabs.*
+
+The landing board is two columns:
   - *Left*: international — men's (full members + associate) and
     women's (full members + associate) — plus domestic / national
     championships below them (Syed Mushtaq Ali, Vitality Blast, CSA
@@ -37,13 +52,23 @@ sit inside a **Players ▾** group — hover on desktop, sub-row on mobile):
   Use the discipline pages for the deep stats (phase splits,
   matchup scatter, inter-wicket, dismissal analysis, season trend);
   use Players for the overview + comparisons.
+
+![Kohli single-player view](/social/10-player-single.png)
+*A single-player view stacks every discipline the player has data in. Role classifier adapts to the current scope.*
 - **Batting / Bowling / Fielding** (under Players) — player-level
   deep dives. The landing view on each shows the top 10 by the
   role's core metrics (average, strike rate, economy, dismissals)
   filtered to the active season window. Click a player name to go
   deep.
-- **Head to Head** — two-entity matchups. Two modes (picker at the
-  top of the page):
+
+![Kohli vs Bowlers scatter chart](/social/12-batting-vs-bowlers.png)
+*Batting page has a signature vs-Bowlers scatter — strike rate × average, dot size = balls faced. Click a row in the table to highlight that bowler's dot.*
+- **Head to Head** — two-entity matchups.
+
+![Kohli vs Bumrah head-to-head](/social/14-h2h-player.png)
+*Player vs player — summary, dismissal donut, SR by phase, SR by season, runs by over, every match.*
+
+Two modes (picker at the top of the page):
   - *Player vs Player* — any batter vs any bowler (summary, phase
     breakdown, season trend, match-by-match record). A "Show" pill
     narrows by series category: All meetings (default) /
@@ -77,6 +102,9 @@ sit inside a **Players ▾** group — hover on desktop, sub-row on mobile):
   the full scorecard, ball-by-ball innings grid, worm chart, and
   per-batter / per-bowler matchup grid.
 
+![2024 T20 World Cup Final scorecard](/social/17-scorecard-full.png)
+*Full match page — scorecard for both innings, worm chart, innings grid, fall of wickets, matchup grid.*
+
 ## The Players tab
 
 `/players` answers "who is this player?" before any discipline-
@@ -107,6 +135,9 @@ side-by-side with aligned discipline bands; a disciple without data
 in one column shows a dim "— no bowling in scope —" placeholder so
 the rows stay level. Add a third player with the `+ Add another…`
 picker that appears when only two are compared.
+
+![3-way compare — Kohli vs Williamson vs Smith](/social/11-player-compare.png)
+*Side-by-side 3-way compare. Columns use a compact label/value layout so they fit narrow widths; remove one via the ✕ at the top of each column.*
 
 Comparison is single-gender — men vs men or women vs women. Trying
 to add a women's player to a men's comparison (or vice versa)
@@ -206,6 +237,9 @@ back to the full career without changing player or gender.
 FilterBar auto-fills team_type / gender (and for single-tournament
 rivalries like MI × CSK, the tournament too) so the dropdowns reflect
 the scope at a glance.
+
+![Kohli on /batting, scoped to India vs Australia](/social/18-filter-rivalry.png)
+*Scope pill + auto-filled FilterBar. The "Scoped to India vs Australia" pill has a one-click CLEAR that returns the page to full career.*
 
 ### Why the same team name appears twice
 
