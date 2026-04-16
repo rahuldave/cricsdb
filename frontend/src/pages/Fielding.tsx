@@ -7,6 +7,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useDefaultSeasonWindow } from '../hooks/useDefaultSeasonWindow'
 import PlayerSearch from '../components/PlayerSearch'
 import FlagBadge from '../components/FlagBadge'
+import ScopeIndicator from '../components/ScopeIndicator'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
@@ -230,6 +231,7 @@ export default function Fielding() {
               </span>
             )}
           </h2>
+          <ScopeIndicator filters={filters} />
           <div className="wisden-statrow cols-6">
             <StatCard label="Catches" value={summary.catches} />
             <StatCard label="Stumpings" value={summary.stumpings} />

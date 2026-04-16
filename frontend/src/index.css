@@ -511,6 +511,37 @@ a { color: inherit; }
   margin: -0.5rem 0 1.25rem;
 }
 
+/* Scope pill — shown on player pages when filter_team / filter_opponent
+   is set, so a cold-clicked contextual URL explains its own narrowed
+   numbers. Oxblood left rule picks up the editorial accent. */
+.wisden-scope {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  margin: -0.25rem 0 1rem;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.15rem 0 0.15rem 0.75rem;
+  border-left: 2px solid var(--accent);
+}
+.wisden-scope-text { color: var(--ink-soft); }
+.wisden-scope-clear {
+  font-family: var(--sans);
+  font-style: normal;
+  font-size: 0.78rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--ink-faint);
+  border-bottom: 1px solid transparent;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.wisden-scope-clear:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
 /* Stat row frame — strip of StatCards under a page title.
    Default is 4-up; add .cols-5 for player pages. The cells (StatCards)
    each carry a top rule, and the row carries a bottom rule.

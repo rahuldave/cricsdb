@@ -7,6 +7,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useDefaultSeasonWindow } from '../hooks/useDefaultSeasonWindow'
 import PlayerSearch from '../components/PlayerSearch'
 import FlagBadge from '../components/FlagBadge'
+import ScopeIndicator from '../components/ScopeIndicator'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
@@ -179,6 +180,7 @@ export default function Bowling() {
               </span>
             )}
           </h2>
+          <ScopeIndicator filters={filters} />
           <div className="wisden-statrow cols-5">
             <StatCard label="Matches" value={summary.matches} />
             <StatCard label="Innings" value={summary.innings} />
