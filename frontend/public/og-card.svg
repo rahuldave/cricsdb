@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Social-media card. 1200×630 satisfies Open Graph and Twitter
+       summary_large_image. Cream + oxblood + Fraunces — mirrors
+       the site masthead so a share card reads as the site, not
+       generic. Rasterized to og-card.png via rsvg-convert. -->
+  <rect width="1200" height="630" fill="#FAF7F0"/>
+
+  <!-- Kicker: small SANS caps above the wordmark. Inter Tight isn't
+       guaranteed at raster time, so the SVG keeps a serif-safe
+       fallback chain. -->
+  <text x="600" y="160"
+        text-anchor="middle"
+        font-family="'Inter Tight', 'Helvetica Neue', Arial, sans-serif"
+        font-weight="500"
+        font-size="22"
+        letter-spacing="4"
+        fill="#8A7D70">EST. 2024 · A T20 ALMANACK</text>
+
+  <!-- Wordmark -->
+  <text x="600" y="300"
+        text-anchor="middle"
+        font-family="Fraunces, Georgia, 'Times New Roman', serif"
+        font-weight="600"
+        font-size="144"
+        fill="#2E2823">T20 <tspan font-style="italic" font-weight="400" fill="#7A1F1F">&amp;</tspan> CricsDB</text>
+
+  <!-- Double rule, echoing the masthead -->
+  <line x1="360" y1="348" x2="840" y2="348" stroke="#1A1714" stroke-width="2"/>
+  <line x1="360" y1="356" x2="840" y2="356" stroke="#1A1714" stroke-width="1"/>
+
+  <!-- Standfirst — italic serif, two lines, centred -->
+  <text x="600" y="430"
+        text-anchor="middle"
+        font-family="Fraunces, Georgia, 'Times New Roman', serif"
+        font-style="italic"
+        font-weight="400"
+        font-size="32"
+        fill="#5C5048">An almanack of Twenty20 cricket —</text>
+  <text x="600" y="478"
+        text-anchor="middle"
+        font-family="Fraunces, Georgia, 'Times New Roman', serif"
+        font-style="italic"
+        font-weight="400"
+        font-size="32"
+        fill="#5C5048">13,019 matches · 2.95M deliveries · international &amp; club</text>
+
+  <!-- Bottom-right: site URL in small sans caps -->
+  <text x="1140" y="580"
+        text-anchor="end"
+        font-family="'Inter Tight', 'Helvetica Neue', Arial, sans-serif"
+        font-weight="500"
+        font-size="18"
+        letter-spacing="3"
+        fill="#8A7D70">T20.RAHULDAVE.COM</text>
+</svg>

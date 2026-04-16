@@ -2,9 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>T20 CricsDB</title>
+
+    <title>T20 &amp; CricsDB — An almanack of Twenty20 cricket</title>
+    <meta name="description" content="An almanack of Twenty20 cricket — 13,019 matches, 2.95M deliveries, across international and club competition the world over." />
+
+    <!-- Icons.
+         SVG favicon scales everywhere; apple-touch-icon covers iOS home
+         screen; the manifest carries the 192 / 512 PNGs for Android /
+         PWA install. theme-color matches the page cream so mobile
+         browser chrome tints to the page background. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#FAF7F0" />
+
+    <!-- Open Graph — Facebook, LinkedIn, Slack, Discord, iMessage.
+         Static per-site tags (SPA without SSR can't rewrite per-route
+         reliably); when someone shares a deep link the card still
+         renders the site identity, which is the right fallback. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="T20 & CricsDB" />
+    <meta property="og:title" content="T20 & CricsDB — An almanack of Twenty20 cricket" />
+    <meta property="og:description" content="An almanack of Twenty20 cricket — 13,019 matches, 2.95M deliveries, across international and club competition the world over." />
+    <meta property="og:url" content="https://t20.rahuldave.com/" />
+    <meta property="og:image" content="https://t20.rahuldave.com/og-card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="T20 &amp; CricsDB — serif wordmark with an italic oxblood ampersand on a cream background, over an italic standfirst." />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:creator" content="@rahuldave" />
+    <meta name="twitter:title" content="T20 & CricsDB — An almanack of Twenty20 cricket" />
+    <meta name="twitter:description" content="13,019 matches, 2.95M deliveries, across international and club T20 competition." />
+    <meta name="twitter:image" content="https://t20.rahuldave.com/og-card.png" />
+    <meta name="twitter:image:alt" content="T20 &amp; CricsDB — serif wordmark with an italic oxblood ampersand on a cream background, over an italic standfirst." />
   </head>
   <body>
     <div id="root"></div>
