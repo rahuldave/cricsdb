@@ -264,3 +264,17 @@ a copy of the prod snapshot in `/tmp` before deploying (see
 `docs/testing-update-recent.md`). Home-page gains two deep links:
 "(players)" next to West Indies T20 WC 2016 and "MI men — players
 over the years".
+
+
+**Q. Batter-pair profile page (deferred).** Partnerships are
+consistently scoped everywhere they appear — team page > partnerships
+tab, tournament dossier > partnerships tab, rivalry dossier > by_team.
+The gap: no dedicated "Kohli × ABD across all contexts" view. Their
+combined aggregate only surfaces inside RCB's team page via
+`/partnerships/best-pairs` — a user has to know they played at RCB.
+Proposed: new `/pairs/:a/:b` route + backend endpoint returning
+combined runs/balls/average across all contexts, phase splits, and
+a match-by-match list. Surfaced via a new context link on partnership
+rows' batter cells: `· with <other batter> ›`. Not urgent — flagged
+so we remember. Design in the chat transcript around the time the
+PlayerLink two-link pattern shipped.

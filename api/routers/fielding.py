@@ -19,8 +19,13 @@ def _safe_div(a, b, mul=1, ndigits=2):
 
 
 def _fielding_filter(filters: FilterParams, person_id: str):
-    """Build WHERE clause for fielding queries via fielding_credit."""
-    where, params = filters.build(has_innings_join=True)
+    """Build WHERE clause for fielding queries via fielding_credit.
+
+    Uses build_side_neutral so filter_team / filter_opponent apply at
+    match level — fielders' credits live in opponent-batting innings,
+    so the default `i.team = :team` would return zero.
+    """
+    where, params = filters.build_side_neutral(has_innings_join=True)
     params["person_id"] = person_id
     parts = ["fc.fielder_id = :person_id"]
     if where:
@@ -217,7 +222,8 @@ async def fielding_summary(
 
     # Tier 2: innings where this person was identified as the keeper.
     # Used by the frontend to decide whether to render the "Keeping" tab.
-    keeping_where, keeping_params = filters.build(has_innings_join=True)
+    # side-neutral: keeper's innings live in opponent-batting innings.
+    keeping_where, keeping_params = filters.build_side_neutral(has_innings_join=True)
     keeping_params["person_id"] = person_id
     keeping_parts = ["ka.keeper_id = :person_id"]
     if keeping_where:

@@ -19,8 +19,8 @@ def _safe_div(a, b, mul=1, ndigits=2):
 
 
 def _bowling_legal_filter(filters: FilterParams, person_id: str, batter_id: str | None = None):
-    """WHERE clause for legal-ball bowling queries."""
-    where, params = filters.build(has_innings_join=True)
+    """WHERE clause for legal-ball bowling queries — side-neutral team filter."""
+    where, params = filters.build_side_neutral(has_innings_join=True)
     params["person_id"] = person_id
     parts = ["d.bowler_id = :person_id", "d.extras_wides = 0", "d.extras_noballs = 0"]
     if where:
@@ -157,8 +157,11 @@ async def bowling_leaders(
 
 
 def _bowling_all_filter(filters: FilterParams, person_id: str, batter_id: str | None = None):
-    """WHERE clause for all-delivery bowling queries (includes wides/noballs)."""
-    where, params = filters.build(has_innings_join=True)
+    """WHERE clause for all-delivery bowling queries (includes wides/noballs).
+
+    side-neutral: a bowler's deliveries live in opponent-batting innings.
+    """
+    where, params = filters.build_side_neutral(has_innings_join=True)
     params["person_id"] = person_id
     parts = ["d.bowler_id = :person_id"]
     if where:
@@ -170,8 +173,8 @@ def _bowling_all_filter(filters: FilterParams, person_id: str, batter_id: str | 
 
 
 def _bowling_wicket_filter(filters: FilterParams, person_id: str, batter_id: str | None = None):
-    """WHERE clause for bowler wicket queries."""
-    where, params = filters.build(has_innings_join=True)
+    """WHERE clause for bowler wicket queries — side-neutral team filter."""
+    where, params = filters.build_side_neutral(has_innings_join=True)
     params["person_id"] = person_id
     parts = [
         "d.bowler_id = :person_id",

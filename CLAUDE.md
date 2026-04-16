@@ -81,6 +81,8 @@ Both `import_data.py` and `update_recent.py` auto-populate `fielding_credit`, `k
 
 To smoke-test `update_recent.py` against a copy of the prod DB before deploying, use `--db /tmp/cricket-prod-test.db` after copying the Downloads snapshot — see **`docs/testing-update-recent.md`** for the copy-to-tmp workflow and what not to do.
 
+Before shipping a refactor of a shared query helper (e.g. `FilterParams`, a router filter fn, a SQL generator) that touches many endpoints, use the HEAD-vs-patched md5-diff harness in **`docs/regression-testing-api.md`**: enumerate every affected URL + a control sample, tag each `REG` (must match HEAD) or `NEW` (HEAD vs patched should differ), capture both runs via `git stash`/`uvicorn --reload`, and diff. Byte-identical `REG` is the proof the refactor is inert where intended.
+
 ## Landing pages (search-bar tabs)
 
 Every search-bar tab — `/teams`, `/batting`, `/bowling`, `/fielding` — has a filter-sensitive landing component shown when nothing is selected. Each is backed by a single endpoint:
@@ -114,6 +116,7 @@ FastAPI also exposes auto-generated interactive docs at **`/api/docs`** (Swagger
 - **Shipped a feature that belongs in the A-O narrative?** Add or amend the entry in **`docs/enhancements-roadmap.md`**; done items stay there as historical markers.
 - **Made a non-obvious design decision** (a convention future contributors would otherwise try to change)? Add a bullet to **`docs/design-decisions.md`**.
 - **Changed pipeline behaviour, introduced a new invariant the DB must carry, or added a testing workflow?** Touch **`docs/data-pipeline.md`** (and/or `docs/testing-update-recent.md`).
+- **Refactored a shared query helper (`FilterParams`, router filter fns, SQL generators) with many callers?** Run the HEAD-vs-patched md5-diff harness in **`docs/regression-testing-api.md`** and report the pass count before claiming done.
 - **Introduced a new perf pattern worth reusing?** Add it to **`docs/perf-leaderboards.md`** (or create a sibling `perf-*.md` if scope is different).
 - **Changed the page structure, tabs, or search-bar landing?** Update the "Landing pages" and "Key Files" sections of `CLAUDE.md` itself.
 - **Changed anything user-visible about the home page, filter bar, or global conventions?** Update the relevant narrative doc and this file's convention list.

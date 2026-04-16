@@ -4,6 +4,10 @@ export interface FilterParams {
   tournament?: string
   season_from?: string
   season_to?: string
+  /** Player-page rivalry scope — match-level pair filter. Backend reads
+   *  these as `filter_team` / `filter_opponent` query params. */
+  filter_team?: string
+  filter_opponent?: string
   team?: string
   opponent?: string
 }

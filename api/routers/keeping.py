@@ -44,8 +44,13 @@ def _parse_json_list(val) -> list[str]:
 
 def _keeping_filter(filters: FilterParams, person_id: str) -> tuple[str, dict]:
     """WHERE clause for keeper_assignment queries — joins through
-    innings → match so the standard filter params apply."""
-    where, params = filters.build(has_innings_join=True)
+    innings → match so the standard filter params apply.
+
+    side-neutral: keeperassignment's innings live in opponent-batting
+    innings (keeper is in the field while opponent bats), so we can't
+    use FilterParams' default `i.team = :team`.
+    """
+    where, params = filters.build_side_neutral(has_innings_join=True)
     params["person_id"] = person_id
     parts = ["ka.keeper_id = :person_id"]
     if where:
@@ -122,8 +127,9 @@ async def keeping_summary(
     byes_conceded = byes_rows[0]["byes"] or 0
 
     # Ambiguous innings where this person is a candidate
-    # (filters apply through the innings→match join)
-    amb_where, amb_params = filters.build(has_innings_join=True)
+    # (filters apply through the innings→match join). side-neutral
+    # because keeper-side innings live in opponent-batting rows.
+    amb_where, amb_params = filters.build_side_neutral(has_innings_join=True)
     amb_params["person_id"] = person_id
     amb_parts = [
         "ka.keeper_id IS NULL",
@@ -348,7 +354,8 @@ async def keeping_ambiguous(
     limit: int = Query(100, ge=1, le=500),
 ):
     db = get_db()
-    where, params = filters.build(has_innings_join=True)
+    # side-neutral: ambiguous-keeper innings are opponent-batting.
+    where, params = filters.build_side_neutral(has_innings_join=True)
     params["person_id"] = person_id
     params["limit"] = limit
     parts = [

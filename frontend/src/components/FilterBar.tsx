@@ -12,6 +12,14 @@ export function useFilters(): FilterParams {
     tournament: params.get('tournament') || undefined,
     season_from: params.get('season_from') || undefined,
     season_to: params.get('season_to') || undefined,
+    // Player-page rivalry scope — not set from the FilterBar UI, but
+    // carried via URL when a PlayerLink context link adds them. Player
+    // pages + downstream endpoints honour these as match-level pair
+    // filters. Without these, clicking "vs India" on MS Wade's row
+    // silently dropped the filter — link gave the same result as the
+    // name-only link.
+    filter_team: params.get('filter_team') || undefined,
+    filter_opponent: params.get('filter_opponent') || undefined,
   }
 }
 

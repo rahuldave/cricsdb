@@ -113,3 +113,53 @@ class FilterParams:
 
         where = " AND ".join(clauses) if clauses else ""
         return where, params
+
+    def build_side_neutral(
+        self,
+        has_innings_join: bool = True,
+        table_alias: str = "m",
+        innings_alias: str = "i",
+    ) -> tuple[str, dict]:
+        """Like build(), but filter_team / filter_opponent are applied
+        at MATCH level instead of innings level.
+
+        build() uses `i.team = :team` — correct for batting (a batter's
+        innings IS his team's innings). For fielding / bowling / keeping
+        queries, the player's records live in the OPPONENT's batting
+        innings (you're in the field while they bat). So `i.team = :team`
+        forces the wrong side and returns zero.
+
+        This variant:
+          - drops the i.team = :team / i.team-vs-opponent clauses
+          - applies `(m.team1 = :team OR m.team2 = :team)` at match level
+          - applies `(m.team1 = :opp OR m.team2 = :opp)` for opponent
+          - when both set, requires the match pair exactly
+        """
+        saved_team = self.team
+        saved_opp = self.opponent
+        self.team = None
+        self.opponent = None
+        try:
+            where, params = self.build(has_innings_join, table_alias, innings_alias)
+        finally:
+            self.team = saved_team
+            self.opponent = saved_opp
+
+        pair_clauses: list[str] = []
+        if saved_team and saved_opp:
+            pair_clauses.append(
+                f"(({table_alias}.team1 = :sn_team AND {table_alias}.team2 = :sn_opp)"
+                f" OR ({table_alias}.team1 = :sn_opp AND {table_alias}.team2 = :sn_team))"
+            )
+            params["sn_team"] = saved_team
+            params["sn_opp"] = saved_opp
+        elif saved_team:
+            pair_clauses.append(f"({table_alias}.team1 = :sn_team OR {table_alias}.team2 = :sn_team)")
+            params["sn_team"] = saved_team
+        elif saved_opp:
+            pair_clauses.append(f"({table_alias}.team1 = :sn_opp OR {table_alias}.team2 = :sn_opp)")
+            params["sn_opp"] = saved_opp
+
+        if pair_clauses:
+            where = " AND ".join([where] + pair_clauses) if where else " AND ".join(pair_clauses)
+        return where, params
