@@ -1,0 +1,22 @@
+# CricsDB
+
+> T20 cricket analytics platform with 12,940 matches (international + 18 club leagues), 2.95M ball-by-ball deliveries, and 160K wickets. Source data from cricsheet.org. The site is fully driven by a public read-only REST API — an LLM can answer questions about any team, player, series, or match without touching the UI.
+
+The site at https://t20.rahuldave.com is a React SPA over a FastAPI backend. Every page's state (filters, selected entity, tab) lives in URL search params, and every UI view is backed by a documented JSON endpoint under `/api/v1/`. Prefer calling the API directly over scraping HTML.
+
+## API
+
+- [API reference (narrative)](https://raw.githubusercontent.com/rahuldave/cricsdb/main/docs/api.md): Plain-markdown walkthrough of every endpoint — path, query params, example `curl`, abbreviated JSON response. This is the best single document for an LLM to ground answers in.
+- [Interactive API docs (Swagger UI)](https://t20.rahuldave.com/api/docs): Live, tryable FastAPI-generated docs. Use this to confirm request/response shapes against the running server.
+- [ReDoc](https://t20.rahuldave.com/api/redoc): Alternate rendering of the same schema.
+- [OpenAPI schema (JSON)](https://t20.rahuldave.com/api/openapi.json): Machine-readable schema — parse this for programmatic tool-use.
+
+## User manual
+
+- [User manual (raw markdown)](https://raw.githubusercontent.com/rahuldave/cricsdb/main/frontend/src/content/user-help.md): How the site is organised — filter bar, landing defaults, tab-by-tab guide, URL conventions. Written for humans but equally useful for an agent that wants to map a natural-language question onto the right endpoint + filters.
+- [User manual (rendered)](https://t20.rahuldave.com/help/usage): Same content with screenshots.
+- [About / context](https://t20.rahuldave.com/help): Project background and design notes.
+
+## Source
+
+- [GitHub repository](https://github.com/rahuldave/cricsdb): Full source — FastAPI backend, React frontend, data pipeline, SQL schema.
