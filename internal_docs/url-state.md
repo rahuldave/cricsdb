@@ -181,3 +181,50 @@ Those are set by clicking a date link on a player's innings list —
 that's a `<Link>` navigation, so it pushes. Correct behaviour: user
 clicked, we navigated, back should return them. No special handling
 needed.
+
+## Search inputs: typing buffer, not mirrored state
+
+Search inputs (PlayerSearch, TeamSearch, and the inline search on
+`/teams` and `/matches`) used to hold their input text in local
+`useState(urlParam || '')`. That initializer runs exactly once on
+mount. React SPA navigation — including the back button — doesn't
+unmount the page, so the URL can change while the local copy stays
+stuck, leaving the input full of stale text and the autocomplete
+dropdown re-opening off-URL state. The old web model, where an `<a>`
+is a real link that unmounts the document on click, does not apply
+here: React Router's `<Link>` and any `setUrlParams` call go through
+`history.pushState` without a browser navigation.
+
+The working pattern is "derive from URL, buffer typing locally":
+
+```tsx
+const [typing, setTyping] = useState<string | null>(null)
+const displayValue = typing ?? urlValue ?? ''
+
+<input
+  value={displayValue}
+  onChange={e => setTyping(e.target.value)}
+/>
+
+// On pick:
+onSelect(x)
+setTyping(null)   // release input back to URL truth
+```
+
+- `typing === null` means "not editing" — input falls through to the
+  URL-derived value. Back-nav changing the URL updates the input
+  naturally, no sync-effect needed.
+- `typing !== null` means the user is mid-keystroke — show what they
+  typed, feed it to the dropdown fetch effect (effect deps on
+  `typing`, early-returns when null).
+- On pick, `setTyping(null)` drops the buffer; the input now reads
+  from the URL, or empty if the site convention is "clear after pick"
+  (PlayerSearch used on `/batting`, `/players`, etc., which echo the
+  picked player in a page header instead).
+- Shared search components accept a `value` prop (the URL-derived
+  canonical string). `TeamSearch` in `/head-to-head` uses it so the
+  picked team stays in the input across re-renders; `PlayerSearch`
+  call sites that don't pass `value` reset after each pick.
+
+If you find yourself writing a sync-`useEffect` to copy URL state
+into a `useState`, you're re-creating the bug. The fix is to derive.

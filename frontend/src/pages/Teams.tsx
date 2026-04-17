@@ -56,16 +56,23 @@ export default function Teams() {
   const [opponent, setOpponent] = useUrlParam('vs')
 
   const [teams, setTeams] = useState<TeamInfo[]>([])
-  const [query, setQuery] = useState(selected || '')
+  // Transient typing buffer — `null` = not editing, the input falls
+  // through to `selected` (the URL truth). Back-nav changing the URL
+  // naturally updates the input because we derive, not mirror.
+  const [typing, setTyping] = useState<string | null>(null)
   const [showDropdown, setShowDropdown] = useState(false)
   const [resultsOffset, setResultsOffset] = useState(0)
 
+  const searchValue = typing ?? selected ?? ''
+
   // Team-search dropdown stays a plain useEffect — debounce-style and
-  // failure here is non-blocking.
+  // failure here is non-blocking. Fires only while the user is typing
+  // (typing !== null); any other state — URL-driven display, post-pick
+  // — skips the fetch and keeps the dropdown closed.
   useEffect(() => {
-    if (!query || selected) return
-    getTeams({ ...filters, q: query }).then(d => { setTeams(d.teams); setShowDropdown(true) }).catch(() => {})
-  }, [filters.gender, filters.team_type, filters.tournament, query, selected])
+    if (typing === null || typing.length < 1) return
+    getTeams({ ...filters, q: typing }).then(d => { setTeams(d.teams); setShowDropdown(true) }).catch(() => {})
+  }, [filters.gender, filters.team_type, filters.tournament, typing])
 
   const filterDeps = [
     selected, filters.gender, filters.team_type, filters.tournament,
@@ -100,8 +107,13 @@ export default function Teams() {
   const results = resultsFetch.data?.results ?? []
   const resultsTotal = resultsFetch.data?.total ?? 0
 
-  const selectTeam = (name: string) => {
-    setSelected(name); setQuery(name); setShowDropdown(false)
+  const selectTeam = (name: string, gender?: string | null) => {
+    if (gender && !filters.gender) {
+      setUrlParams({ team: name, gender })
+    } else {
+      setSelected(name)
+    }
+    setTyping(null); setShowDropdown(false)
   }
 
   // Match-list convention (see CLAUDE.md): the `date` column is the
@@ -124,8 +136,8 @@ export default function Teams() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-8 relative max-w-md wisden-playersearch">
-        <input type="text" value={query}
-          onChange={e => { setQuery(e.target.value); setSelected(''); setShowDropdown(true) }}
+        <input type="text" value={searchValue}
+          onChange={e => { setTyping(e.target.value); setSelected(''); setShowDropdown(true) }}
           placeholder="Search teams…"
           className="wisden-playersearch-input" />
         {showDropdown && teams.length > 0 && !selected && (
@@ -1301,7 +1313,7 @@ function PlayersTab({ team, filters, filterDeps }: TabProps) {
 interface TeamsLandingBoardProps {
   filters: FilterParams
   filterDeps: unknown[]
-  onPick: (name: string) => void
+  onPick: (name: string, gender?: string | null) => void
 }
 
 function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardProps) {
@@ -1337,21 +1349,6 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
 
   const showGenderBadge = !filters.gender
 
-  // Click a team — pre-set the gender filter so the team page scopes
-  // correctly. Without this, picking "India" with no gender shows
-  // combined men+women stats which the user almost never wants.
-  const handlePick = (name: string, gender?: string | null) => {
-    if (gender && !filters.gender) {
-      // Mutate URL gender then pick the team. handlePick is called
-      // from within a button click so the parent's setSelected applies
-      // after this microtask — set gender first for atomicity.
-      const url = new URL(window.location.href)
-      url.searchParams.set('gender', gender)
-      window.history.replaceState({}, '', url)
-    }
-    onPick(name)
-  }
-
   const renderTeam = (t: { name: string; matches: number; gender?: string | null }) => {
     const gLabel = showGenderBadge && t.gender
       ? (t.gender === 'female' ? "women's" : "men's")
@@ -1359,7 +1356,7 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
     return (
       <button
         key={`${t.name}|${t.gender ?? ''}`}
-        onClick={() => handlePick(t.name, t.gender)}
+        onClick={() => onPick(t.name, t.gender)}
         className="comp-link"
         style={{
           background: 'none', border: 0, padding: 0, cursor: 'pointer',

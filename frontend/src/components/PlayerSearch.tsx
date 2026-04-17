@@ -8,29 +8,32 @@ interface PlayerSearchProps {
   role?: 'batter' | 'bowler' | 'fielder'
   onSelect: (player: PlayerSearchResult) => void
   placeholder?: string
+  /** Canonical display value — usually the URL-derived picked-player
+   *  name. The input shows this when the user isn't actively typing.
+   *  Omit for pickers where the input should reset after each pick
+   *  (e.g. AddComparePicker). */
+  value?: string
 }
 
-export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSearchProps) {
-  const [query, setQuery] = useState('')
+export default function PlayerSearch({ role, onSelect, placeholder, value }: PlayerSearchProps) {
+  // Transient typing buffer. `null` = not editing; the input falls
+  // through to `value` (the source of truth in the parent). Non-null
+  // means the user is mid-keystroke — we show what they've typed and
+  // feed it to the dropdown fetch. Resetting to `null` on pick (and on
+  // parent unmount / URL back-nav via changing `value`) avoids the
+  // stale-input class of bugs.
+  const [typing, setTyping] = useState<string | null>(null)
   const [results, setResults] = useState<PlayerSearchResult[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const containerRef = useRef<HTMLDivElement>(null)
-  // After a user picks a result we set the input value to the picked
-  // name. The query effect would otherwise re-fetch and re-open the
-  // dropdown 300ms later. This ref names the query value whose next
-  // effect run should be skipped — when the user types something else
-  // the ref no longer matches and search resumes normally.
-  const suppressedQuery = useRef<string | null>(null)
+
+  const displayValue = typing ?? value ?? ''
 
   useEffect(() => {
-    if (suppressedQuery.current === query) {
-      suppressedQuery.current = null
-      return
-    }
-    if (query.length < 2) {
+    if (typing === null || typing.length < 2) {
       setResults([]); setOpen(false); setError(null); return
     }
     setLoading(true)
@@ -39,12 +42,11 @@ export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSear
     // `cancelled` guards setState after unmount OR after the effect
     // re-runs (e.g. user kept typing). Without it, an in-flight fetch
     // from a prior query could resolve into this component after it's
-    // been unmounted or after the query has moved on — wasted work and
-    // a source of "show stale results" bugs.
+    // been unmounted or after the query has moved on.
     let cancelled = false
     timerRef.current = setTimeout(async () => {
       try {
-        const data = await searchPlayers(query, role)
+        const data = await searchPlayers(typing, role)
         if (cancelled) return
         setResults(data.players)
         setOpen(true)
@@ -60,7 +62,7 @@ export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSear
       cancelled = true
       clearTimeout(timerRef.current)
     }
-  }, [query, role])
+  }, [typing, role])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -74,8 +76,8 @@ export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSear
     <div ref={containerRef} className="wisden-playersearch">
       <input
         type="text"
-        value={query}
-        onChange={e => setQuery(e.target.value)}
+        value={displayValue}
+        onChange={e => setTyping(e.target.value)}
         placeholder={placeholder || (role ? `Search ${role}s…` : 'Search players…')}
         className="wisden-playersearch-input"
       />
@@ -87,9 +89,8 @@ export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSear
               key={p.id}
               onClick={() => {
                 clearTimeout(timerRef.current)
-                suppressedQuery.current = p.name
                 onSelect(p)
-                setQuery(p.name)
+                setTyping(null)
                 setOpen(false)
               }}
             >
@@ -99,7 +100,7 @@ export default function PlayerSearch({ role, onSelect, placeholder }: PlayerSear
           ))}
         </ul>
       )}
-      {open && results.length === 0 && !loading && query.length >= 2 && !error && (
+      {open && results.length === 0 && !loading && typing && typing.length >= 2 && !error && (
         <div className="wisden-playersearch-empty">No players found</div>
       )}
       {open && error && !loading && (

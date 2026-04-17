@@ -22,9 +22,14 @@ export default function Matches() {
   const [playerName] = useUrlParam('player_name')
   const setUrlParams = useSetUrlParams()
 
-  const [teamQuery, setTeamQuery] = useState(team || '')
+  // Transient typing buffer for the team filter — `null` = not editing,
+  // input falls through to `team` (URL truth). See PlayerSearch for the
+  // full rationale.
+  const [teamTyping, setTeamTyping] = useState<string | null>(null)
   const [teamSuggest, setTeamSuggest] = useState<TeamInfo[]>([])
   const [showTeamDropdown, setShowTeamDropdown] = useState(false)
+
+  const teamInputValue = teamTyping ?? team ?? ''
 
   const [offset, setOffset] = useState(0)
 
@@ -49,21 +54,21 @@ export default function Matches() {
   const matches = listData?.matches ?? []
   const total = listData?.total ?? 0
 
-  // Team autocomplete
+  // Team autocomplete — fires only while the user is typing.
   useEffect(() => {
-    if (!teamQuery || teamQuery === team) { setTeamSuggest([]); return }
-    getTeams({ ...filters, q: teamQuery })
+    if (teamTyping === null || teamTyping.length < 1) { setTeamSuggest([]); return }
+    getTeams({ ...filters, q: teamTyping })
       .then(d => { setTeamSuggest(d.teams.slice(0, 10)); setShowTeamDropdown(true) })
       .catch(() => {})
-  }, [teamQuery, filters.gender, filters.team_type, filters.tournament])
+  }, [teamTyping, filters.gender, filters.team_type, filters.tournament])
 
   const selectTeam = (name: string) => {
     setTeam(name)
-    setTeamQuery(name)
+    setTeamTyping(null)
     setShowTeamDropdown(false)
   }
 
-  const clearTeam = () => { setTeam(''); setTeamQuery(''); setTeamSuggest([]) }
+  const clearTeam = () => { setTeam(''); setTeamTyping(null); setTeamSuggest([]) }
 
   const clearPlayer = () => {
     setUrlParams({ player: '', player_name: '' })
@@ -81,8 +86,8 @@ export default function Matches() {
         <div className="relative w-64 wisden-playersearch">
           <input
             type="text"
-            value={teamQuery}
-            onChange={e => { setTeamQuery(e.target.value); setShowTeamDropdown(true) }}
+            value={teamInputValue}
+            onChange={e => { setTeamTyping(e.target.value); setShowTeamDropdown(true) }}
             placeholder="Filter by team…"
             className="wisden-playersearch-input"
           />

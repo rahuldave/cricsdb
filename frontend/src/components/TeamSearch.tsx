@@ -6,35 +6,33 @@ import type { TeamInfo } from '../types'
 interface TeamSearchProps {
   onSelect: (teamName: string) => void
   placeholder?: string
-  initialValue?: string
+  /** Canonical value — the URL-derived team name. Input shows this
+   *  when the user isn't actively typing. Changes from the parent
+   *  (e.g. back-nav clearing the URL) propagate naturally. */
+  value?: string
 }
 
 export default function TeamSearch({
-  onSelect, placeholder, initialValue = '',
+  onSelect, placeholder, value,
 }: TeamSearchProps) {
   const filters = useFilters()
-  const [query, setQuery] = useState(initialValue)
+  // Transient typing buffer — see PlayerSearch for the full rationale.
+  const [typing, setTyping] = useState<string | null>(null)
   const [results, setResults] = useState<TeamInfo[]>([])
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  // Gate the search effect on "has the user actually typed?". On page
-  // load with initialValue set (e.g. ?team1=Australia), query equals
-  // the pre-fill and we don't want to fire a search for it — that
-  // would open the dropdown on a reload with a single matching row.
-  // Flipping this ref only in the input's onChange handler means a
-  // pick (which also calls setQuery programmatically) doesn't count
-  // as user input either. More robust than suppressing a specific
-  // query string: survives StrictMode double-invoke of useEffect.
-  const userTyped = useRef(false)
+
+  const displayValue = typing ?? value ?? ''
 
   useEffect(() => {
-    if (!userTyped.current) return
-    if (query.length < 2) { setResults([]); setOpen(false); return }
+    if (typing === null || typing.length < 2) {
+      setResults([]); setOpen(false); return
+    }
     // cancelled flag protects against stale-fetch setState after
     // unmount or rapid re-typing — same rationale as PlayerSearch.
     let cancelled = false
     const t = setTimeout(() => {
-      getTeams({ ...filters, q: query })
+      getTeams({ ...filters, q: typing })
         .then(d => {
           if (cancelled) return
           setResults(d.teams.slice(0, 12))
@@ -46,7 +44,7 @@ export default function TeamSearch({
       cancelled = true
       clearTimeout(t)
     }
-  }, [query, filters.gender, filters.team_type])
+  }, [typing, filters.gender, filters.team_type])
 
   useEffect(() => {
     const click = (e: MouseEvent) => {
@@ -57,9 +55,9 @@ export default function TeamSearch({
   }, [])
 
   const pick = (name: string) => {
-    setQuery(name)
-    setOpen(false)
     onSelect(name)
+    setTyping(null)
+    setOpen(false)
   }
 
   return (
@@ -68,8 +66,8 @@ export default function TeamSearch({
         type="text"
         className="wisden-playersearch-input"
         placeholder={placeholder ?? 'Search team…'}
-        value={query}
-        onChange={e => { userTyped.current = true; setQuery(e.target.value) }}
+        value={displayValue}
+        onChange={e => setTyping(e.target.value)}
         onFocus={() => { if (results.length > 0) setOpen(true) }}
       />
       {open && results.length > 0 && (

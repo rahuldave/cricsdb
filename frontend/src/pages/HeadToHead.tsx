@@ -396,7 +396,7 @@ function TeamVsTeamPicker({
         <div className="flex-1">
           <label className="wisden-h2h-label">Team 1</label>
           <TeamSearch
-            initialValue={team1}
+            value={team1}
             placeholder="Search team…"
             onSelect={onChangeTeam1}
           />
@@ -405,7 +405,7 @@ function TeamVsTeamPicker({
         <div className="flex-1">
           <label className="wisden-h2h-label">Team 2</label>
           <TeamSearch
-            initialValue={team2}
+            value={team2}
             placeholder="Search team…"
             onSelect={onChangeTeam2}
           />
