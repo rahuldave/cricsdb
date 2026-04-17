@@ -444,27 +444,39 @@ entity deep view (not N-way compare, so don't mirror
 `filter_venue` is URL-safe (canonical names don't contain `&` or
 `#`; parens around county names survive URL-encoding fine).
 
-## Open questions to resolve before coding
+## Resolved design decisions (2026-04-17)
 
-1. **Worklist CSV mechanics.** Is the round-trip a committed file in
-   `docs/venue-worklist/`, or do you edit a Google Sheet and
-   export? I'd prefer the committed-file flow (diff-able,
-   auditable), but the Google Sheet is friendlier to edit.
-2. **"County Ground (Taunton)" vs "Somerset County Ground".** The
-   first is minimal intervention (the raw name with a parenthetical
-   disambiguator). The second is what cricinfo uses. Pick one style
-   and stick to it — I'll default to `"{raw name} ({city})"` unless
-   you prefer the cricinfo style.
-3. **Multi-city venues.** Edge cases like the old "Sharjah Cricket
-   Stadium" that's sometimes tagged with UAE generally, sometimes
-   Sharjah specifically. Probably rare; treat as aliases.
-4. **Phase 3 trigger.** After Phase 2 ships, we decide then. But a
-   soft rule: if within a week nobody uses the Venues landing tile
-   to click *through* to anywhere (analytics will tell us), the
-   dossier is YAGNI and we skip Phase 3.
-5. **Index on `match.venue`.** Likely needed once `filter_venue`
-   is hot. Measure after Phase 2 ships; add `CREATE INDEX
-   ix_match_venue ON match(venue)` if the query plans show a scan.
+1. **Worklist CSV mechanics — committed file in `docs/venue-worklist/`.**
+   Round-trip through git: I generate, you edit (in any tool —
+   Numbers, VSCode, or a Google Sheet export/re-import), you commit
+   the edited CSV. Auditable and diff-able, fits the existing
+   `docs/keeper-ambiguous/` pattern.
+2. **Naming style — `"{raw name} ({city})"` as the disambiguator of
+   last resort.** Applied only when the raw name alone would match
+   ≥2 grounds in our data (the six "County Ground"s, plus any
+   similar collisions the worklist surfaces). Where a ground has a
+   universally-known canonical name (`M. A. Chidambaram Stadium`,
+   `Wankhede Stadium`), use that without parens. The rule is
+   "minimal intervention": canonicalize spelling, fill NULL cities,
+   disambiguate only where genuinely ambiguous.
+3. **Multi-city venues — handled by alias density, not architecture.**
+   The resolver supports N raw keys → 1 canonical triple, so
+   Sharjah-labelled-UAE + Sharjah-labelled-Sharjah + Sharjah-NULL
+   all map to the same `("Sharjah Cricket Stadium", "Sharjah",
+   "United Arab Emirates")` entry. Non-issue once the alias table
+   exists.
+4. **Phase 3 trigger — qualitative.** After Phase 2 ships, use the
+   tool for a session or two. If venue-character questions keep
+   coming up that the FilterBar alone can't answer (avg 1st-inn,
+   bat-first win %, toss-decision pie, boundary % by phase), build
+   Phase 3. Otherwise defer indefinitely. No analytics-based
+   threshold — there's no analytics layer to lean on.
+5. **Indexing — defer until measured.** Post-Phase-2, run
+   `EXPLAIN QUERY PLAN` on a representative query (e.g.
+   `/api/v1/teams/India/by-season?filter_venue=X`). If a `SCAN match`
+   shows up costing >50ms, add `CREATE INDEX ix_match_venue ON
+   match(venue)` via the idempotent pattern in
+   `internal_docs/perf-leaderboards.md`. Diagnose-then-index.
 
 ## Risks
 
