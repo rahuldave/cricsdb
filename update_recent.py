@@ -28,7 +28,7 @@ import zipfile
 
 from deebase import Database
 
-from import_data import DB_PATH, DATA_DIR, get_match_tables, import_match_file
+from import_data import DB_PATH, DATA_DIR, get_match_tables, import_match_file, write_unknown_venues
 
 CRICSHEET_BASE = "https://cricsheet.org/downloads"
 CRICSHEET_REGISTER = "https://cricsheet.org/register"
@@ -313,6 +313,8 @@ async def main():
                 ["python", "scripts/generate_site_stats.py"],
                 check=False,
             )
+
+        write_unknown_venues()
 
     finally:
         if args.keep:

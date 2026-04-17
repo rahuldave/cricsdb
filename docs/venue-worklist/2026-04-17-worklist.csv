@@ -47,7 +47,7 @@ Trent Bridge,Nottingham,62,2822,2009-06-06,"Trent Bridge, Nottingham",Nottingham
 "West End Park International Cricket Stadium, Doha",Doha,60,690,2021-10-23,"West End Park International Cricket Stadium, Doha",Doha,Qatar,FALSE,"country unknown — please fill; pre-filled by user, confirmed"
 "Newlands, Cape Town",Cape Town,58,3845,2023-02-10,"Newlands, Cape Town",Cape Town,South Africa,FALSE,
 Perth Stadium,Perth,57,175,2019-11-08,Perth Stadium,Perth,Australia,FALSE,
-"County Ground, Hove",Brighton,55,3367,2019-07-28,County Ground (Hove),Brighton,England,FALSE,"country unknown — please fill; pre-filled by user, confirmed"
+"County Ground, Hove",Brighton,55,3367,2019-07-28,County Ground (Hove),Hove,England,FALSE,"country unknown — please fill; pre-filled by user, confirmed"
 "MA Chidambaram Stadium, Chepauk",Chennai,54,143,2018-11-11,"MA Chidambaram Stadium, Chepauk",Chennai,India,FALSE,
 "Providence Stadium, Guyana",Providence,54,229,2019-08-06,Providence Stadium,Providence,Guyana,FALSE,
 Sharjah Cricket Stadium,,53,3059,2013-11-26,Sharjah Cricket Stadium,Sharjah,United Arab Emirates,FALSE,city filled from sibling rows (Sharjah)
@@ -75,7 +75,7 @@ Melbourne Cricket Ground,,46,1,2017-02-17,Melbourne Cricket Ground,Melbourne,Aus
 Bayer Uerdingen Cricket Ground,Krefeld,45,508,2021-08-05,Bayer Uerdingen Cricket Ground,Krefeld,Germany,FALSE,
 "Eden Gardens, Kolkata",Kolkata,45,615,2021-11-21,"Eden Gardens, Kolkata",Kolkata,India,FALSE,
 "MA Chidambaram Stadium, Chepauk, Chennai",Chennai,45,1805,2025-01-25,"MA Chidambaram Stadium, Chepauk",Chennai,India,FALSE,
-Providence Stadium,Guyana,45,2865,2010-04-30,Providence Stadium,Georgetown,Guyana,FALSE,"country unknown — please fill; pre-filled by user, confirmed"
+Providence Stadium,Guyana,45,2865,2010-04-30,Providence Stadium,Providence,Guyana,FALSE,"country unknown — please fill; pre-filled by user, confirmed"
 "Senwes Park, Potchefstroom",Potchefstroom,45,4086,2024-03-30,"Senwes Park, Potchefstroom",Potchefstroom,South Africa,FALSE,
 "Boland Park, Paarl",Paarl,44,2159,2026-01-27,"Boland Park, Paarl",Paarl,South Africa,FALSE,
 Headingley,Leeds,44,8317,2017-07-07,"Headingley, Leeds",Leeds,England,FALSE,
@@ -118,7 +118,7 @@ North Sydney Oval,Sydney,36,3242,2017-11-17,"North Sydney Oval, Sydney",Sydney,A
 "Punjab Cricket Association Stadium, Mohali",Chandigarh,36,2900,2009-12-12,"Punjab Cricket Association Stadium, Mohali",Chandigarh,India,FALSE,
 Shere Bangla National Stadium,Mirpur,36,2951,2011-10-11,"Shere Bangla National Stadium, Mirpur",Dhaka,Bangladesh,FALSE,"ambiguous venue name across cities ['Dhaka', 'Mirpur'] — paren-disambiguate; collapse to canonical; Mirpur = neighborhood of Dhaka"
 "Brabourne Stadium, Mumbai",Mumbai,35,3893,2022-12-14,"Brabourne Stadium, Mumbai",Mumbai,India,FALSE,
-"Daren Sammy National Cricket Stadium, Gros Islet",St Lucia,35,3322,2018-11-12,"Daren Sammy National Cricket Stadium, Gros Islet",St Lucia,Saint Lucia,FALSE,country unknown — please fill; country filled via research (Saint Lucia)
+"Daren Sammy National Cricket Stadium, Gros Islet",St Lucia,35,3322,2018-11-12,"Daren Sammy National Cricket Stadium, Gros Islet",Gros Islet,Saint Lucia,FALSE,country unknown — please fill; country filled via research (Saint Lucia)
 "Grace Road, Leicester",Leicester,35,8780,2021-06-11,"Grace Road, Leicester",Leicester,England,FALSE,
 "Mahinda Rajapaksa International Cricket Stadium, Sooriyawewa, Hambantota",Hambantota,35,4334,2024-06-24,"Mahinda Rajapaksa International Cricket Stadium, Sooriyawewa",Hambantota,Sri Lanka,FALSE,
 Manuka Oval,Canberra,35,174,2019-11-05,"Manuka Oval, Canberra",Canberra,Australia,FALSE,
@@ -132,7 +132,7 @@ Seddon Park,Hamilton,35,29,2018-02-18,"Seddon Park, Hamilton",Hamilton,New Zeala
 "Sir Vivian Richards Stadium, North Sound, Antigua",North Sound,34,699,2021-11-08,"Sir Vivian Richards Stadium, North Sound",North Sound,Antigua and Barbuda,FALSE,
 "Zahur Ahmed Chowdhury Stadium, Chittagong",Chattogram,34,10939,2016-11-20,"Zahur Ahmed Chowdhury Stadium, Chattogram",Chattogram,Bangladesh,FALSE,
 Basin Reserve,Wellington,33,3470,2020-02-09,"Basin Reserve, Wellington",Wellington,New Zealand,FALSE,
-"Brian Lara Stadium, Tarouba",Trinidad,33,3342,2018-09-28,"Brian Lara Stadium, Tarouba",Trinidad,Trinidad and Tobago,FALSE,country unknown — please fill; country filled via research (Trinidad and Tobago)
+"Brian Lara Stadium, Tarouba",Trinidad,33,3342,2018-09-28,"Brian Lara Stadium, Tarouba",Tarouba,Trinidad and Tobago,FALSE,country unknown — please fill; country filled via research (Trinidad and Tobago)
 "Gymkhana Club Ground, Nairobi",Nairobi,33,1018,2022-08-25,Gymkhana Club Ground (Nairobi),Nairobi,Kenya,FALSE,
 Kingsmead,Durban,33,197,2020-02-14,"Kingsmead, Durban",Durban,South Africa,FALSE,
 Kinrara Academy Oval,Kuala Lumpur,33,202,2019-06-24,"Kinrara Academy Oval, Kuala Lumpur",Kuala Lumpur,Malaysia,FALSE,
@@ -159,7 +159,7 @@ Gelephu International Cricket Ground,Gelephu,30,1974,2024-10-19,Gelephu Internat
 Arun Jaitley Stadium,,29,10242,2018-01-08,"Arun Jaitley Stadium, Delhi",Delhi,India,FALSE,city filled from sibling rows (Delhi)
 "County Ground, Derby",Derby,29,3684,2022-07-25,County Ground (Derby),Derby,England,FALSE,
 Holkar Stadium,,29,10323,2019-02-21,Holkar Stadium,Indore,India,FALSE,"city NULL and no siblings with a city — please fill; no city — country unknown; filled via research (city=Indore, country=India)"
-"Sabina Park, Kingston",Jamaica,29,50,2017-07-09,"Sabina Park, Kingston",Jamaica,Jamaica,FALSE,country unknown — please fill; country filled via research (Jamaica)
+"Sabina Park, Kingston",Jamaica,29,50,2017-07-09,"Sabina Park, Kingston",Kingston,Jamaica,FALSE,country unknown — please fill; country filled via research (Jamaica)
 "Docklands Stadium, Melbourne",Melbourne,28,6864,2021-12-07,"Docklands Stadium, Melbourne",Melbourne,Australia,FALSE,
 Gaddafi Stadium,Lahore,28,58,2017-09-12,"Gaddafi Stadium, Lahore",Lahore,Pakistan,FALSE,
 "St Albans Club, Buenos Aires",Buenos Aires,28,1180,2023-02-21,"St Albans Club, Buenos Aires",Buenos Aires,Argentina,FALSE,country unknown — please fill; country filled via research (Argentina)
@@ -226,7 +226,7 @@ Westpac Stadium,Wellington,18,27,2018-02-13,Westpac Stadium,Wellington,New Zeala
 Allan Border Field,Brisbane,17,3277,2018-10-01,"Allan Border Field, Brisbane",Brisbane,Australia,FALSE,
 "Amini Park, Port Moresby",Port Moresby,17,1284,2023-07-22,"Amini Park, Port Moresby",Port Moresby,Papua New Guinea,FALSE,country unknown — please fill; country filled via research (Papua New Guinea)
 DRIEMS Ground,,17,10326,2019-02-21,DRIEMS Ground,Cuttack,India,FALSE,"city NULL and no siblings with a city — please fill; no city — country unknown; filled via research (city=Cuttack, country=India)"
-Dr DY Patil Sports Academy,Mumbai,17,6038,2008-04-27,"Dr DY Patil Sports Academy, Navi Mumbai",Mumbai,India,FALSE,
+Dr DY Patil Sports Academy,Mumbai,17,6038,2008-04-27,"Dr DY Patil Sports Academy, Navi Mumbai",Navi Mumbai,India,FALSE,
 Eden Gardens,,17,10303,2018-01-21,"Eden Gardens, Kolkata",Kolkata,India,FALSE,city filled from sibling rows (Kolkata)
 Happy Valley Ground,Episkopi,17,627,2021-10-05,Happy Valley Ground,Episkopi,Cyprus,FALSE,prefix of 'Happy Valley Ground 2' — verify whether to merge or keep separate; country unknown — please fill; keep separate from Happy Valley Ground 2
 Himachal Pradesh Cricket Association Stadium,Dharamsala,17,3179,2016-03-09,Himachal Pradesh Cricket Association Stadium,Dharamsala,India,FALSE,"ambiguous venue name across cities ['Dharamsala', 'Dharmasala'] — paren-disambiguate"
@@ -282,11 +282,11 @@ Greenfield Stadium,,13,10451,2019-11-08,Greenfield Stadium,Thiruvananthapuram,In
 Jawaharlal Nehru Stadium,,13,10854,2016-01-02,Jawaharlal Nehru Stadium,Kochi,India,FALSE,"city NULL and no siblings with a city — please fill; no city — country unknown; filled via research (city=Kochi, country=India)"
 Motibaug Cricket Ground,,13,10585,2021-01-10,Motibaug Cricket Ground,Vadodara,India,FALSE,"city NULL and no siblings with a city — please fill; no city — country unknown; filled via research (city=Vadodara, country=India)"
 Pukekura Park,New Plymouth,13,3270,2018-03-20,"Pukekura Park, New Plymouth",New Plymouth,New Zealand,FALSE,
-"Punjab Cricket Association IS Bindra Stadium, Mohali, Chandigarh",Chandigarh,13,1009,2022-09-20,"Punjab Cricket Association IS Bindra Stadium, Mohali",Chandigarh,India,FALSE,
+"Punjab Cricket Association IS Bindra Stadium, Mohali, Chandigarh",Chandigarh,13,1009,2022-09-20,"Punjab Cricket Association IS Bindra Stadium, Mohali",Mohali,India,FALSE,
 "Sardar Patel Stadium, Motera",Ahmedabad,13,3025,2012-12-28,"Sardar Patel Stadium, Motera",Ahmedabad,India,FALSE,
 Saurashtra Cricket Association Stadium,Rajkot,13,68,2017-11-04,"Saurashtra Cricket Association Stadium, Rajkot",Rajkot,India,FALSE,
 "Saxton Oval, Nelson",Nelson,13,1830,2025-01-02,"Saxton Oval, Nelson",Nelson,New Zealand,FALSE,
-"Sir Vivian Richards Stadium, North Sound",Antigua,13,2902,2010-05-19,"Sir Vivian Richards Stadium, North Sound",Antigua,Antigua and Barbuda,FALSE,country unknown — please fill; country filled via research (Antigua and Barbuda)
+"Sir Vivian Richards Stadium, North Sound",Antigua,13,2902,2010-05-19,"Sir Vivian Richards Stadium, North Sound",North Sound,Antigua and Barbuda,FALSE,country unknown — please fill; country filled via research (Antigua and Barbuda)
 "Takashinga Sports Club, Highfield, Harare",Harare,13,2506,2025-09-26,Takashinga Sports Club,Harare,Zimbabwe,FALSE,
 University of Doha for Science and Technology,Doha,13,1603,2024-02-27,University of Doha for Science and Technology,Doha,Qatar,FALSE,country unknown — please fill; country filled via research (Qatar)
 "Vidarbha Cricket Association Stadium, Jamtha",Nagpur,13,17,2017-01-29,"Vidarbha Cricket Association Stadium, Jamtha",Nagpur,India,FALSE,
@@ -342,7 +342,7 @@ Lilac Hill Park,Perth,10,11887,2017-01-13,"Lilac Hill Park, Perth",Perth,Austral
 Lisicji Jarak Cricket Ground,Belgrade,10,991,2022-07-08,Lisicji Jarak Cricket Ground,Belgrade,Serbia,FALSE,country unknown — please fill; country filled via research (Serbia)
 "National Cricket Stadium, St George's, Grenada",St George's,10,465,2021-06-26,"National Cricket Stadium, St George's",St George's,Grenada,FALSE,
 Pierre Werner Cricket Ground,Walferdange,10,393,2020-08-29,Pierre Werner Cricket Ground,Walferdange,Luxembourg,FALSE,country unknown — please fill; country filled via research (Luxembourg)
-Punjab Cricket Association IS Bindra Stadium,Chandigarh,10,5488,2018-04-08,"Punjab Cricket Association IS Bindra Stadium, Mohali",Chandigarh,India,FALSE,
+Punjab Cricket Association IS Bindra Stadium,Chandigarh,10,5488,2018-04-08,"Punjab Cricket Association IS Bindra Stadium, Mohali",Mohali,India,FALSE,
 "R.Premadasa Stadium, Khettarama",Colombo,10,51,2017-09-06,"R.Premadasa Stadium, Khettarama",Colombo,Sri Lanka,FALSE,
 "Royal Brussels Cricket Club Ground, Waterloo",Waterloo,10,879,2022-06-29,"Royal Brussels Cricket Club Ground, Waterloo",Waterloo,Belgium,FALSE,
 Saurashtra Cricket Association Stadium,,10,10239,2018-01-07,"Saurashtra Cricket Association Stadium, Rajkot",Rajkot,India,FALSE,city filled from sibling rows (Rajkot)
@@ -441,7 +441,7 @@ Royal Selangor Club,Kuala Lumpur,6,3305,2018-06-04,"Royal Selangor Club, Kuala L
 "Ruaraka Sports Club Ground, Nairobi",Nairobi,6,1984,2024-10-19,"Ruaraka Sports Club Ground, Nairobi",Nairobi,Kenya,FALSE,
 Shaheed Veer Narayan Singh International Stadium,Raipur,6,6385,2013-04-28,"Shaheed Veer Narayan Singh International Stadium, Raipur",Raipur,India,FALSE,
 Sheikh Zayed Stadium Nursery 1,Abu Dhabi,6,5254,2013-11-15,Tolerance Oval,Abu Dhabi,United Arab Emirates,FALSE,
-"Simonds Stadium, South Geelong, Victoria",Geelong,6,6653,2018-01-03,"Simonds Stadium, South Geelong",Geelong,Australia,FALSE,
+"Simonds Stadium, South Geelong, Victoria",Geelong,6,6653,2018-01-03,"Simonds Stadium, South Geelong",South Geelong,Australia,FALSE,
 Sportpark Thurlede,Schiedam,6,5178,2018-09-01,Sportpark Thurlede,Schiedam,Netherlands,FALSE,country unknown — please fill; country filled via research (Netherlands)
 The Kent County Cricket Ground,Beckenham,6,8330,2017-07-09,The Kent County Cricket Ground,Beckenham,England,FALSE,
 "Titwood, Glasgow",Glasgow,6,2257,2025-06-15,"Titwood, Glasgow",Glasgow,Scotland,FALSE,
@@ -466,7 +466,7 @@ Malkerns Country Club oval,Malkerns,5,2487,2025-09-12,Malkerns Country Club oval
 "Meersen, Gent",Ghent,5,877,2022-06-28,"Meersen, Gent",Ghent,Belgium,FALSE,country unknown — please fill; country filled via research (Belgium)
 "Merchant Taylors' School Ground, Northwood",Northwood,5,9036,2023-05-29,"Merchant Taylors' School Ground, Northwood",Northwood,England,FALSE,country unknown — please fill; country filled via research (England)
 Narendra Modi Stadium,Ahmedabad,5,426,2021-03-12,"Narendra Modi Stadium, Ahmedabad",Ahmedabad,India,FALSE,
-"National Stadium, Hamilton",Hamilton,5,1411,2023-10-03,National Stadium (Hamilton),Hamilton,New Zealand,FALSE,
+"National Stadium, Hamilton",Hamilton,5,1411,2023-10-03,National Stadium (Hamilton),Hamilton,Bermuda,FALSE,
 Nehru Stadium,Kochi,5,6203,2011-04-09,Nehru Stadium,Kochi,India,FALSE,
 "Nigeria Cricket Federation Oval 2, Abuja",Abuja,5,2038,2024-11-28,"Nigeria Cricket Federation Oval 2, Abuja",Abuja,Nigeria,FALSE,
 SSN College Ground,,5,10594,2021-01-11,SSN College Ground,Chennai,India,FALSE,"city NULL and no siblings with a city — please fill; no city — country unknown; filled via research (city=Chennai, country=India)"
@@ -506,7 +506,7 @@ Los Reyes Polo Club,Guacima,4,1701,2024-04-12,Los Reyes Polo Club,Guacima,Costa 
 "Maharaja Yadavindra Singh International Cricket Stadium, New Chandigarh",New Chandigarh,4,2189,2025-12-11,"Maharaja Yadavindra Singh International Cricket Stadium, New Chandigarh",New Chandigarh,India,FALSE,country unknown — please fill; country filled via research (India)
 "Malek Cricket Ground, Ajman",Ajman,4,3718,2022-04-27,"Malek Cricket Ground, Ajman",Ajman,United Arab Emirates,FALSE,
 "Maple Leaf North-East Ground, King City",King City,4,2307,2025-06-12,"Maple Leaf North-East Ground, King City",King City,Canada,FALSE,
-"Mission Road Ground, Mong Kok",Hong Kong,4,3205,2016-01-30,"Mission Road Ground, Mong Kok",Hong Kong,Hong Kong,FALSE,
+"Mission Road Ground, Mong Kok",Hong Kong,4,3205,2016-01-30,"Mission Road Ground, Mong Kok",Mong Kok,Hong Kong,FALSE,
 Morodok Techo National Stadium,Phnom Penh,4,3902,2023-02-09,Morodok Techo National Stadium,Phnom Penh,Cambodia,FALSE,country unknown — please fill; country filled via research (Cambodia)
 Myreside,Edinburgh,4,5321,2015-07-10,Myreside,Edinburgh,Scotland,FALSE,
 Nehru Stadium,,4,10675,2021-11-04,Nehru Stadium,Kochi,India,FALSE,city filled from sibling rows (Kochi)
@@ -541,7 +541,7 @@ Mangaung Oval,Bloemfontein,3,39,2017-10-26,"Mangaung Oval, Bloemfontein",Bloemfo
 Merrion Cricket Club Ground,Dublin,3,5392,2013-07-25,Merrion Cricket Club Ground,Dublin,Ireland,FALSE,
 Moara Vlasiei Cricket Ground,,3,414,2020-10-16,"Moara Vlasiei Cricket Ground, Ilfov County",Ilfov County,Romania,FALSE,"city NULL and no siblings with a city — please fill; no city — country unknown; filled via research (city=Ilfov County, country=Romania)"
 Mombasa Sports Club Ground,,3,2984,2012-02-22,Mombasa Sports Club Ground,Mombasa,Kenya,FALSE,"city NULL and no siblings with a city — please fill; no city — country unknown; filled via research (city=Mombasa, country=Kenya)"
-"National Cricket Stadium, St George's",Grenada,3,5072,2015-10-29,"National Cricket Stadium, St George's",Grenada,Grenada,FALSE,country unknown — please fill; country filled via research (Grenada)
+"National Cricket Stadium, St George's",Grenada,3,5072,2015-10-29,"National Cricket Stadium, St George's",St George's,Grenada,FALSE,country unknown — please fill; country filled via research (Grenada)
 "New Farnley CC, Leeds",Leeds,3,4796,2025-08-31,"New Farnley CC, Leeds",Leeds,England,FALSE,
 OUTsurance Oval,Bloemfontein,3,2918,2010-10-08,OUTsurance Oval,Bloemfontein,South Africa,FALSE,
 "P Sara Oval, Colombo",Colombo,3,3954,2023-07-08,"P Sara Oval, Colombo",Colombo,Sri Lanka,FALSE,
@@ -558,7 +558,7 @@ West Park Oval,Burnie,3,11955,2018-12-08,West Park Oval,Burnie,Australia,FALSE,c
 York Cricket Club,York,3,9328,2025-06-15,York Cricket Club,York,England,FALSE,country unknown — please fill; country filled via research (England)
 Abu Dhabi Oval 2,Abu Dhabi,2,5265,2013-11-17,Abu Dhabi Oval 2,Abu Dhabi,United Arab Emirates,FALSE,
 Aigburth,Liverpool,2,8329,2017-07-09,"Aigburth, Liverpool",Liverpool,England,FALSE,
-"Arnos Vale Ground, Kingstown",St Vincent,2,3044,2013-07-27,"Arnos Vale Ground, Kingstown",St Vincent,Saint Vincent and the Grenadines,FALSE,country unknown — please fill; country filled via research (Saint Vincent and the Grenadines)
+"Arnos Vale Ground, Kingstown",St Vincent,2,3044,2013-07-27,"Arnos Vale Ground, Kingstown",Kingstown,Saint Vincent and the Grenadines,FALSE,country unknown — please fill; country filled via research (Saint Vincent and the Grenadines)
 "Ballpark Ground, Graz",Graz,2,2265,2025-05-18,"Ballpark Ground, Graz",Graz,Austria,FALSE,country unknown — please fill; country filled via research (Austria)
 Bankstown Oval,Sydney,2,11993,2019-01-06,Bankstown Oval,Sydney,Australia,FALSE,
 "Barabati Stadium, Cuttack",Cuttack,2,623,2022-06-12,"Barabati Stadium, Cuttack",Cuttack,India,FALSE,
@@ -614,13 +614,13 @@ Tony Ireland Stadium,Townsville,2,3207,2016-02-07,Tony Ireland Stadium,Townsvill
 "University Oval, Hobart",Hobart,2,12130,2021-10-27,University Oval (Hobart),Hobart,Australia,FALSE,
 "Vidarbha Cricket Association Stadium, Jamtha, Nagpur",Nagpur,2,1010,2022-09-23,"Vidarbha Cricket Association Stadium, Jamtha",Nagpur,India,FALSE,
 Willowmoore Park,Benoni,2,3424,2019-05-22,"Willowmoore Park, Benoni",Benoni,South Africa,FALSE,
-"Windsor Park, Roseau",Dominica,2,3108,2014-07-05,"Windsor Park, Roseau",Dominica,Dominica,FALSE,country unknown — please fill; country filled via research (Dominica)
+"Windsor Park, Roseau",Dominica,2,3108,2014-07-05,"Windsor Park, Roseau",Roseau,Dominica,FALSE,country unknown — please fill; country filled via research (Dominica)
 "Windsor Park, Roseau, Dominica",Roseau,2,855,2022-07-02,"Windsor Park, Roseau",Roseau,Dominica,FALSE,
 Zahur Ahmed Chowdhury Stadium,Chattogram,2,249,2019-09-18,"Zahur Ahmed Chowdhury Stadium, Chattogram",Chattogram,Bangladesh,FALSE,
 Zayed Cricket Stadium,Abu Dhabi,2,5262,2013-11-16,Sheikh Zayed Stadium,Abu Dhabi,United Arab Emirates,FALSE,
 Adelaide Oval No. 2,,1,12377,2016-01-17,Adelaide Oval No. 2,Adelaide,Australia,FALSE,"city NULL and no siblings with a city — please fill; no city — country unknown; filled via research (city=Adelaide, country=Australia)"
 Affies Park,Windhoek,1,5375,2017-09-16,Affies Park,Windhoek,Namibia,FALSE,
-Bermuda National Stadium,Hamilton,1,257,2019-08-22,Bermuda National Stadium,Hamilton,New Zealand,FALSE,
+Bermuda National Stadium,Hamilton,1,257,2019-08-22,National Stadium (Hamilton),Hamilton,Bermuda,FALSE,
 Boland Bank Park,Paarl,1,4962,2009-10-28,Boland Bank Park,Paarl,South Africa,FALSE,
 "Boughton Hall Cricket Club Ground, Chester",Chester,1,12531,2019-08-18,"Boughton Hall Cricket Club Ground, Chester",Chester,England,FALSE,country unknown — please fill; country filled via research (England)
 Bready,Derry,1,151,2019-07-14,"Bready Cricket Club, Magheramason",Bready,Ireland,FALSE,country unknown — please fill; collapse to full name; Derry/Londonderry neighbouring
@@ -673,5 +673,5 @@ Thailand Cricket Ground,Bangkok,1,5411,2015-11-28,Thailand Cricket Ground,Bangko
 Turf City B Cricket Ground,Singapore,1,3986,2023-08-27,Turf City B Cricket Ground,Singapore,Singapore,FALSE,
 Uxbridge Cricket Club Ground,Uxbridge,1,8647,2019-08-24,Uxbridge Cricket Club Ground,Uxbridge,England,FALSE,country unknown — please fill; country filled via research (England)
 Wanderers,Windhoek,1,452,2021-04-03,Wanderers Cricket Ground,Windhoek,Namibia,FALSE,prefix of 'Wanderers Cricket Ground' — verify whether to merge or keep separate; merge: same ground
-"Warner Park, Basseterre",,1,7600,2016-08-03,"Warner Park, Basseterre",St Kitts,Saint Kitts and Nevis,FALSE,city filled from sibling rows (St Kitts); country unknown — please fill; country filled via research (Saint Kitts and Nevis)
+"Warner Park, Basseterre",,1,7600,2016-08-03,"Warner Park, Basseterre",Basseterre,Saint Kitts and Nevis,FALSE,city filled from sibling rows (St Kitts); country unknown — please fill; country filled via research (Saint Kitts and Nevis)
 Waverley Oval,Sydney,1,12376,2016-01-15,Waverley Oval,Sydney,Australia,FALSE,

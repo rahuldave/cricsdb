@@ -54,6 +54,8 @@ models/tables.py      — deebase models: Person, Match, Innings, Delivery, Wick
 team_aliases.py       — Canonical team-name mapping (used by import + fix script)
 event_aliases.py      — Canonical tournament-name mapping (same pattern as team_aliases)
 fielder_aliases.py    — Canonical fielder-name mapping (married names, disambiguated names)
+api/venue_aliases.py  — Canonical venue mapping: (raw_venue, raw_city) → (canonical_venue, canonical_city, country).
+                        676 raw pairs → 456 canonical venues. Generated from docs/venue-worklist/2026-04-17-worklist.csv.
 ```
 
 ## Scripts
@@ -61,6 +63,8 @@ fielder_aliases.py    — Canonical fielder-name mapping (married names, disambi
 ```
 scripts/fix_team_names.py             — One-time UPDATE pass to canonicalize old team names in cricket.db
 scripts/fix_event_names.py            — Same for tournament names (match.event_name)
+scripts/fix_venue_names.py            — Same for venues: canonicalizes match.venue / city + fills match.venue_country via api/venue_aliases.resolve_or_raw. Idempotent.
+scripts/generate_venue_worklist.py    — Emits docs/venue-worklist/YYYY-MM-DD-worklist.csv for human review when new unknown venues appear in cricsheet data.
 scripts/populate_fielding_credits.py  — Builds fielding_credit table (auto-called by import + update pipelines)
 scripts/populate_keeper_assignments.py — Builds keeper_assignment table + writes ambiguous worklist partitions (auto on import + update)
 scripts/apply_keeper_resolutions.py   — Applies manual resolutions from docs/keeper-ambiguous/*.csv back into the DB
@@ -72,10 +76,12 @@ scripts/populate_partnerships.py      — Builds partnership table (auto on impo
 ```
 download_data.py      — Fetches cricsheet zips + people/names CSVs
 import_data.py        — Full rebuild: downloads + imports into SQLite
-                        (canonicalizes via team_aliases + event_aliases,
+                        (canonicalizes via team_aliases + event_aliases + venue_aliases
+                         [soft-fail — unknown venues logged to docs/venue-worklist/unknowns-<date>.csv],
                          populates fielding_credit + keeper_assignment + partnership)
 update_recent.py      — Incremental: imports new T20 matches + re-runs
-                        all populate_* scripts on just those matches
+                        all populate_* scripts on just those matches.
+                        Same venue canonicalization + unknown-logging hook as import_data.py.
 ```
 
 ## Frontend (React 19 + TypeScript + Tailwind v4 + Semiotic v3)

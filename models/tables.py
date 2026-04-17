@@ -49,6 +49,7 @@ class Match:
     team2: str
     venue: Optional[str] = None
     city: Optional[str] = None
+    venue_country: Optional[str] = None  # populated via api.venue_aliases
     event_name: Optional[str] = None
     event_match_number: Optional[int] = None
     event_group: Optional[str] = None

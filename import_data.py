@@ -16,9 +16,16 @@ from models import (
 )
 from team_aliases import canonicalize as canon_team
 from event_aliases import canonicalize as canon_event
+from api.venue_aliases import resolve_or_raw as resolve_venue
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 DB_PATH = os.path.join(os.path.dirname(__file__), "cricket.db")
+
+# Venues the alias table doesn't know about. Populated during
+# import_match_file when resolve_or_raw() returns (raw, raw, None).
+# Written to docs/venue-worklist/unknowns-<date>.csv at end of run so the
+# next worklist cycle can fold them in. See internal_docs/spec-venues.md.
+UNKNOWN_VENUES: set[tuple[str, str | None]] = set()
 
 MATCH_DIRS = [
     # International T20s
@@ -168,6 +175,16 @@ async def import_match_file(db, filepath, tables):
     by = outcome.get("by", {})
     teams = info["teams"]
 
+    # Venue canonicalization — soft-fail. resolve_venue returns
+    # (canonical_venue, canonical_city, country) on hit or
+    # (raw_venue, raw_city, None) passthrough on miss. Misses go into
+    # UNKNOWN_VENUES so the end-of-run hook can emit them for review.
+    raw_venue = info.get("venue")
+    raw_city = info.get("city")
+    canon_venue, canon_city, venue_country = resolve_venue(raw_venue, raw_city)
+    if venue_country is None and raw_venue is not None:
+        UNKNOWN_VENUES.add((raw_venue, raw_city))
+
     match = await matches_table.insert({
         "filename": filename,
         "data_version": meta.get("data_version", ""),
@@ -179,8 +196,9 @@ async def import_match_file(db, filepath, tables):
         "season": str(info.get("season", "")),
         "team1": canon_team(teams[0]) if len(teams) > 0 else "",
         "team2": canon_team(teams[1]) if len(teams) > 1 else "",
-        "venue": info.get("venue"),
-        "city": info.get("city"),
+        "venue": canon_venue,
+        "city": canon_city,
+        "venue_country": venue_country,
         "event_name": canon_event(event.get("name")),
         "event_match_number": event.get("match_number"),
         "event_group": str(event["group"]) if "group" in event else None,
@@ -327,6 +345,37 @@ async def import_matches(db):
                 "innings", "delivery", "wicket"]:
         result = await db.q(f"SELECT COUNT(*) as c FROM {tbl}")
         print(f"  {tbl}: {result[0]['c']} rows")
+
+    write_unknown_venues()
+
+
+def write_unknown_venues():
+    """Emit any unresolved (venue, city) pairs to a dated CSV for review.
+
+    Soft-fail venue canonicalization persists unknown pairs as raw values
+    with venue_country NULL. This function writes the pairs that missed
+    the alias table during this run so the next worklist cycle can fold
+    them in.
+    """
+    if not UNKNOWN_VENUES:
+        return
+    import datetime
+    import csv as _csv
+    out_dir = os.path.join(os.path.dirname(__file__), "docs", "venue-worklist")
+    os.makedirs(out_dir, exist_ok=True)
+    today = datetime.date.today().isoformat()
+    out_path = os.path.join(out_dir, f"unknowns-{today}.csv")
+    print(f"\n!! {len(UNKNOWN_VENUES)} unknown venue(s) encountered during this run")
+    print(f"   Writing list to {out_path} for next worklist cycle.")
+    # Append mode — multiple runs in a day shouldn't clobber earlier ones
+    new_file = not os.path.exists(out_path)
+    with open(out_path, "a", newline="", encoding="utf-8") as f:
+        w = _csv.writer(f)
+        if new_file:
+            w.writerow(["raw_venue", "raw_city"])
+        for v, c in sorted(UNKNOWN_VENUES):
+            w.writerow([v, c or ""])
+            print(f"     {v!r:60} | city={c!r}")
 
 
 async def main():
