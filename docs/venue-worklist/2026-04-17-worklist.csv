@@ -244,7 +244,7 @@ Arun Jaitley Stadium,Delhi,16,67,2017-11-01,Arun Jaitley Stadium,Delhi,India,FAL
 "King George V Sports Ground, Castel",Castel,16,1809,2024-06-22,"King George V Sports Ground, Castel",Castel,Guernsey,FALSE,country unknown — please fill; country filled via research (Guernsey)
 La Manga Club Top Ground,Murcia,16,1688,2024-04-14,La Manga Club Top Ground,Murcia,Spain,FALSE,country unknown — please fill; country filled via research (Spain)
 McLean Park,Napier,16,8,2017-01-03,McLean Park,Napier,New Zealand,FALSE,
-"Molyneux Park, Alexandra",Alexandra,16,10061,2023-12-28,"Molyneux Park, Alexandra",Alexandra,Australia,FALSE,country unknown — please fill; country filled via research (Australia)
+"Molyneux Park, Alexandra",Alexandra,16,10061,2023-12-28,"Molyneux Park, Alexandra",Alexandra,New Zealand,FALSE,"country unknown — please fill; country filled via research (Australia); corrected Alexandra=NZ (Central Otago), not Australia"
 "National Sports Academy, Sofia",Sofia,16,489,2021-06-24,"National Sports Academy, Sofia",Sofia,Bulgaria,FALSE,country unknown — please fill; country filled via research (Bulgaria)
 "Sikh Union Club Ground, Nairobi",Nairobi,16,1815,2024-06-28,"Sikh Union Club Ground, Nairobi",Nairobi,Kenya,FALSE,
 University Oval,Dunedin,16,407,2021-02-25,University Oval,Dunedin,New Zealand,FALSE,
@@ -386,7 +386,7 @@ Hazelaarweg,Rotterdam,8,98,2018-06-12,Hazelaarweg,Rotterdam,Netherlands,FALSE,
 Hong Kong Cricket Club,Wong Nai Chung Gap,8,4121,2023-11-18,Hong Kong Cricket Club,Wong Nai Chung Gap,Hong Kong,FALSE,country unknown — please fill; country filled via research (Hong Kong)
 Karen Rolton Oval,Adelaide,8,11972,2018-12-21,Karen Rolton Oval,Adelaide,Australia,FALSE,
 "Lilac Hill Park, Perth",Perth,8,12132,2021-10-30,"Lilac Hill Park, Perth",Perth,Australia,FALSE,
-Molyneux Park,Alexandra,8,9780,2017-12-26,Molyneux Park,Alexandra,Australia,FALSE,country unknown — please fill; country filled via research (Australia)
+Molyneux Park,Alexandra,8,9780,2017-12-26,Molyneux Park,Alexandra,New Zealand,FALSE,"country unknown — please fill; country filled via research (Australia); corrected Alexandra=NZ (Central Otago), not Australia"
 "Nassau County International Cricket Stadium, New York",New York,8,1511,2024-06-03,"Nassau County International Cricket Stadium, New York",New York,USA,FALSE,
 Old Hararians,Harare,8,3431,2019-05-05,Old Hararians,Harare,Zimbabwe,FALSE,
 "Pembroke Cricket Club, Sandymount, Dublin",Dublin,8,3727,2022-06-03,"Pembroke Cricket Club, Sandymount, Dublin",Dublin,Ireland,FALSE,
