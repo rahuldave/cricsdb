@@ -479,16 +479,18 @@ catches_per_match, dismissals_per_match }`. Subroutes: `/by-season`,
 
 ### Partnerships
 
-Four endpoints, all under `/teams/{team}/partnerships/…`. Takes the
-same filter scope plus `side` on by-wicket / best-pairs
-(`batting`/`bowling` — whether partnerships are FOR or AGAINST the
-team).
+Five endpoints, all under `/teams/{team}/partnerships/…`. Takes the
+same filter scope plus `side` (`batting`/`bowling` — whether
+partnerships are FOR or AGAINST the team).
 
 - `.../by-wicket?side=batting` — stats per wicket-number (1st-wicket
   avg partnership, 2nd, …, 10th).
 - `.../best-pairs` — top-3 pairs per wicket by total runs together.
 - `.../heatmap` — wicket × season matrix for avg partnership.
 - `.../top?side=batting&limit=10` — top-N individual partnerships.
+- `.../summary?side=batting` — aggregate counts (total / 50+ / 100+),
+  highest single partnership, avg runs, and the all-time top pair.
+  Powers the Teams → Compare tab's partnerships row.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/partnerships/top?gender=male&team_type=international&season_from=2024&limit=1&side=batting"
@@ -497,6 +499,31 @@ curl "http://localhost:8000/api/v1/teams/India/partnerships/top?gender=male&team
 Returns a list of `{ partnership_id, match_id, date, season,
 opposition, wicket_number, batter1, batter2, runs, balls, run_rate,
 ended_by_kind }`.
+
+```bash
+curl "http://localhost:8000/api/v1/teams/India/partnerships/summary?gender=male&team_type=international"
+```
+
+```json
+{
+  "team": "India",
+  "side": "batting",
+  "total": 1404,
+  "count_50_plus": 226,
+  "count_100_plus": 43,
+  "avg_runs": 26.4,
+  "highest": {
+    "runs": 176, "balls": 85, "match_id": 795, "date": "2022-06-28",
+    "batter1": { "person_id": "a4cc73aa", "name": "SV Samson" },
+    "batter2": { "person_id": "73ad96ed", "name": "DJ Hooda" }
+  },
+  "best_pair": {
+    "batter1": { "person_id": "0a476045", "name": "S Dhawan" },
+    "batter2": { "person_id": "740742ef", "name": "RG Sharma" },
+    "n": 52, "total_runs": 1743, "best_runs": 160
+  }
+}
+```
 
 ---
 

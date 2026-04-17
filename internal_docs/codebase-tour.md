@@ -132,6 +132,24 @@ frontend/src/
                                                           wicketkeeper / fielder), hasBatting/hasBowling/
                                                           hasFielding/hasKeeping gates, carryFilters,
                                                           matchesInScope
+    teams/                     — Teams → Compare tab internals (sibling of players/ with a
+                                   one-for-one structural parity):
+                                   TeamCompareGrid       N-column side-by-side grid, fixed-arity
+                                                          useFetch on getTeamProfile(team, filters)
+                                                          per slot, FlagBadge on each column head
+                                                          (null for franchise sides)
+                                   TeamSummaryRow        one discipline band — Results / Batting /
+                                                          Bowling / Fielding / Partnerships —
+                                                          compact label/value layout only
+                                   AddTeamComparePicker  TeamSearch wrapper, refuses candidates
+                                                          whose in-scope match count is zero
+                                                          (FilterBar auto-narrow is the upstream
+                                                          cross-type/cross-gender gate)
+                                   teamUtils.ts          teamDisciplineHasData (drives per-row
+                                                          band visibility + placeholders),
+                                                          teamMatchesInScope (uses summary.matches
+                                                          as canonical — fielding.matches is
+                                                          currently unfiltered), carryTeamFilters
   pages/                       — Home, Teams, Players, Batting, Bowling, Fielding, Tournaments,
                                    HeadToHead (mode=player|team), Matches, MatchScorecard,
                                    Help (/help), HelpUsage (/help/usage)

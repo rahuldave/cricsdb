@@ -200,6 +200,25 @@ export const getTeamPartnershipsHeatmap = (team: string, filters?: F & { side?: 
 export const getTeamPartnershipsTop = (team: string, filters?: F & { side?: 'batting' | 'bowling'; limit?: number }) =>
   fetchApi<{ team: string; side: 'batting' | 'bowling'; partnerships: import('./types').PartnershipTopEntry[] }>(
     `/api/v1/teams/${te(team)}/partnerships/top`, filters as Record<string, string>)
+export const getTeamPartnershipsSummary = (team: string, filters?: F & { side?: 'batting' | 'bowling' }) =>
+  fetchApi<import('./types').TeamPartnershipsSummary>(
+    `/api/v1/teams/${te(team)}/partnerships/summary`, filters as Record<string, string>)
+
+// Composed team overview — five summary endpoints in parallel. Mirrors
+// getPlayerProfile: `.catch(() => null)` per sub-fetch so a scope that
+// yields zero results in one discipline (e.g. a defunct team with no
+// recent partnerships) doesn't blow up the whole column. Consumed by
+// TeamCompareGrid which hides rows where every column is null.
+export const getTeamProfile = async (team: string, filters?: F) => {
+  const [summary, batting, bowling, fielding, partnerships] = await Promise.all([
+    getTeamSummary(team, filters).catch(() => null),
+    getTeamBattingSummary(team, filters).catch(() => null),
+    getTeamBowlingSummary(team, filters).catch(() => null),
+    getTeamFieldingSummary(team, filters).catch(() => null),
+    getTeamPartnershipsSummary(team, filters).catch(() => null),
+  ])
+  return { summary, batting, bowling, fielding, partnerships } as import('./types').TeamProfile
+}
 
 // Tournaments / match-set dossier — `tournament` is optional; omit for
 // cross-tournament rivalry views (filter_team + filter_opponent in filters).

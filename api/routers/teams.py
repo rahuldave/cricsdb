@@ -2174,3 +2174,126 @@ async def team_partnerships_top(
             },
         })
     return {"team": team, "side": side, "partnerships": partnerships}
+
+
+@router.get("/{team}/partnerships/summary")
+async def team_partnerships_summary(
+    team: str,
+    filters: FilterParams = Depends(),
+    side: str = Query("batting"),
+):
+    """Scope-aware partnership aggregates: total count, 50+ / 100+
+    counts, highest single partnership, and the top pair by total
+    runs together. Powers the Compare tab on the Teams page — the
+    granular partnership endpoints return too much data for a 1-row
+    summary comparison.
+
+    Filters out retired-hurt / retired-not-out terminations to match
+    the other partnership endpoints' convention.
+    """
+    side = _validate_side(side)
+    db = get_db()
+    where, params = _partnership_filter(filters, team, side)
+
+    # Aggregates in a single scan.
+    agg_rows = await db.q(
+        f"""
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN p.partnership_runs >= 50  THEN 1 ELSE 0 END) as count_50_plus,
+            SUM(CASE WHEN p.partnership_runs >= 100 THEN 1 ELSE 0 END) as count_100_plus,
+            MAX(p.partnership_runs) as highest_runs,
+            ROUND(AVG(p.partnership_runs * 1.0), 1) as avg_runs
+        FROM partnership p
+        JOIN innings i ON i.id = p.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+          AND p.ended_by_kind NOT IN ('retired hurt', 'retired not out')
+        """,
+        params,
+    )
+    agg = agg_rows[0] if agg_rows else {}
+    total = agg.get("total", 0) or 0
+
+    # Best single partnership — fetch the match+batters for the MAX row
+    # so the UI can render "210 · Kohli/Rohit".
+    highest = None
+    if total > 0:
+        hi_rows = await db.q(
+            f"""
+            SELECT p.partnership_runs as runs, p.partnership_balls as balls,
+                   p.batter1_id, p.batter1_name,
+                   p.batter2_id, p.batter2_name,
+                   m.id as match_id,
+                   (SELECT MIN(date) FROM matchdate md WHERE md.match_id = m.id) as date
+            FROM partnership p
+            JOIN innings i ON i.id = p.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {where}
+              AND p.ended_by_kind NOT IN ('retired hurt', 'retired not out')
+            ORDER BY p.partnership_runs DESC, p.id
+            LIMIT 1
+            """,
+            params,
+        )
+        if hi_rows:
+            r = hi_rows[0]
+            highest = {
+                "runs": r["runs"],
+                "balls": r["balls"],
+                "match_id": r["match_id"],
+                "date": r["date"],
+                "batter1": {"person_id": r["batter1_id"], "name": r["batter1_name"]},
+                "batter2": {"person_id": r["batter2_id"], "name": r["batter2_name"]},
+            }
+
+    # Top pair by total runs together (any wicket). Canonicalize the
+    # pair id-wise so AB+CD = CD+AB, as in /best-pairs.
+    best_pair = None
+    if total > 0:
+        pair_rows = await db.q(
+            f"""
+            SELECT
+                CASE WHEN p.batter1_id < p.batter2_id THEN p.batter1_id ELSE p.batter2_id END as p1_id,
+                CASE WHEN p.batter1_id < p.batter2_id THEN p.batter2_id ELSE p.batter1_id END as p2_id,
+                COUNT(*) as n,
+                SUM(p.partnership_runs) as total_runs,
+                MAX(p.partnership_runs) as best_runs
+            FROM partnership p
+            JOIN innings i ON i.id = p.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {where}
+              AND p.ended_by_kind NOT IN ('retired hurt', 'retired not out')
+              AND p.batter1_id IS NOT NULL
+              AND p.batter2_id IS NOT NULL
+            GROUP BY p1_id, p2_id
+            ORDER BY total_runs DESC, n DESC
+            LIMIT 1
+            """,
+            params,
+        )
+        if pair_rows:
+            r = pair_rows[0]
+            name_rows = await db.q(
+                "SELECT id, name FROM person WHERE id IN (:p1, :p2)",
+                {"p1": r["p1_id"], "p2": r["p2_id"]},
+            )
+            names = {row["id"]: row["name"] for row in name_rows}
+            best_pair = {
+                "batter1": {"person_id": r["p1_id"], "name": names.get(r["p1_id"], r["p1_id"])},
+                "batter2": {"person_id": r["p2_id"], "name": names.get(r["p2_id"], r["p2_id"])},
+                "n": r["n"],
+                "total_runs": r["total_runs"],
+                "best_runs": r["best_runs"],
+            }
+
+    return {
+        "team": team,
+        "side": side,
+        "total": total,
+        "count_50_plus": agg.get("count_50_plus", 0) or 0,
+        "count_100_plus": agg.get("count_100_plus", 0) or 0,
+        "highest": highest,
+        "avg_runs": agg.get("avg_runs"),
+        "best_pair": best_pair,
+    }

@@ -25,10 +25,15 @@ sit inside a **Players ▾** group — hover on desktop, sub-row on mobile):
 *A bilateral rivalry dossier — 37 meetings, by-team breakdowns below the unified summary.*
 
 - **Teams** — win/loss records, team batting/bowling/fielding,
-  partnerships, roster by season. An example ↓
+  partnerships, roster by season, plus a **Compare** tab that stacks
+  up to three teams side by side across Results / Batting / Bowling /
+  Fielding / Partnerships — same shape as the player comparison.
+  Comparison is single-gender and single-type (international teams
+  only compare with internationals; club teams only with clubs) —
+  both constraints are enforced automatically via the filter bar.
 
 ![India team dossier — summary stats + tabs](/social/03-team-overview.png)
-*A team dossier — summary row, keepers used, By Season / vs Opponent / Batting / Bowling / Fielding / Partnerships / Players / Match List tabs.*
+*A team dossier — summary row, keepers used, By Season / vs Opponent / Compare / Batting / Bowling / Fielding / Partnerships / Players / Match List tabs.*
 
 The landing board is two columns:
   - *Left*: international — men's (full members + associate) and

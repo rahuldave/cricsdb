@@ -1,0 +1,43 @@
+import type { FilterParams, TeamProfile } from '../../types'
+
+export type TeamDiscipline =
+  | 'results' | 'batting' | 'bowling' | 'fielding' | 'partnerships'
+
+/** Each discipline's "has meaningful data in scope" gate. Drives both
+ *  per-column band visibility and the grid-wide anyHasData mask. */
+export function teamDisciplineHasData(
+  discipline: TeamDiscipline, profile: TeamProfile,
+): boolean {
+  if (discipline === 'results')      return (profile.summary?.matches ?? 0) > 0
+  if (discipline === 'batting')      return (profile.batting?.innings_batted ?? 0) > 0
+  if (discipline === 'bowling')      return (profile.bowling?.innings_bowled ?? 0) > 0
+  if (discipline === 'fielding') {
+    const f = profile.fielding
+    if (!f) return false
+    return (f.catches + f.stumpings + f.run_outs) > 0
+  }
+  return (profile.partnerships?.total ?? 0) > 0
+}
+
+/** Filter-scoped match count for the column identity line. Uses the
+ *  team summary as the canonical source — unlike fielding.matches
+ *  (unfiltered pre-existing bug) or bowling.matches (innings-bowled
+ *  proxy that diverges from match count when an innings is super-over-
+ *  only), summary.matches honours every active FilterBar param. */
+export function teamMatchesInScope(profile: TeamProfile): number {
+  return profile.summary?.matches
+    ?? profile.bowling?.matches
+    ?? 0
+}
+
+/** Query-string carry for a Teams-page deep link — all active FilterBar
+ *  params. Mirrors `players/roleUtils.carryFilters`. */
+export function carryTeamFilters(filters: FilterParams): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (filters.gender)          out.gender          = filters.gender
+  if (filters.team_type)       out.team_type       = filters.team_type
+  if (filters.tournament)      out.tournament      = filters.tournament
+  if (filters.season_from)     out.season_from     = filters.season_from
+  if (filters.season_to)       out.season_to       = filters.season_to
+  return out
+}

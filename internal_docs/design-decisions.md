@@ -633,3 +633,17 @@ We regenerate `favicon.svg`, the PNG icons (`apple-touch-icon.png`, `icon-192.pn
 Fix: source the PNGs from headless Chrome instead. `frontend/scripts/assets-source/` contains `favicon.html` + `og-card.html` — self-contained HTML files that load Fraunces from Google Fonts, set `font-variation-settings` on the glyphs, and rely on Chrome's CSS font renderer to honour the axes. The regeneration recipe (in the sibling `README.md`) uses `agent-browser screenshot body <path>` to capture the rendered output at exact pixel dimensions, followed by `sips -z` to downscale the 512×512 favicon PNG to the 180 / 192 sizes.
 
 Corollary: the SVG favicon still ships (browsers honour variable axes when rendering SVG favicons), but the authoritative source of truth for the icon and OG-card shapes is the Chrome-rendered PNG. If anyone future-edits `favicon.svg` in isolation, the browser render will drift from the PNGs. The scripts/assets-source/README documents the round-trip.
+
+## Team Compare: no special FilterBar awareness, picker probes scope-match
+
+The `/teams` Compare tab reuses the player-compare architecture almost verbatim: `TeamCompareGrid` mirrors `PlayerCompareGrid`, `TeamSummaryRow` mirrors `PlayerSummaryRow`, `AddTeamComparePicker` mirrors `AddComparePicker`. The interesting divergence is how cross-gender / cross-team_type adds get blocked.
+
+Players does a bespoke probe (`getBatterSummary(id)` → read `nationalities[0].gender`) because `PlayerSearchResult` carries no gender, and a URL-paste add can bypass the dropdown entirely.
+
+Teams sidesteps that. The primary's presence drives FilterBar's auto-narrow (`FilterBar.tsx:99-108` — when the primary's tournaments are all one type and/or one gender, `team_type` + `gender` get auto-filled with `replace: true`). Every real team in the DB is either fully international or fully club, so the one-type guarantee always holds in practice. `TeamSearch`, in turn, calls `getTeams({...filters, q})` and the `/teams` list endpoint honours `team_type` + `gender` + `tournament` — so the picker dropdown can't surface a wrong-type team.
+
+`AddTeamComparePicker` still runs a probe, but it's a scope-match-count check (`getTeamSummary(candidate, filters).matches < 1`), not a team-type / gender inspection. This catches the one race-condition path — if a URL-paste add arrives before the FilterBar auto-narrow effect fires, the candidate's scope-match count is zero and the add is refused in-place with a clear "no matches in current filter scope" message.
+
+**Why it matters if you future-edit this:** don't thread `team_type` / `gender` into `AddTeamComparePicker` as explicit props or gates. The FilterBar is the single source of truth; duplicating the gate elsewhere would be an instance of the URL-as-input anti-pattern we fixed across all search inputs (see `internal_docs/url-state.md`).
+
+**Pre-existing bug surfaced by this work:** `/{team}/fielding/summary` at `api/routers/teams.py:1677-1688` queries a match count that does **not** apply `FilterParams`. It returns an all-formats / all-genders / all-time number even when a filter scope is set, and feeds `catches_per_match` on the same endpoint as a misleading denominator. The Compare identity line deliberately avoids `profile.fielding.matches` for exactly this reason and uses `profile.summary.matches` (which IS scope-correct). Fix target: rebuild that matches query using `filters.build()` + the standard team clause. Tracked as a follow-up.

@@ -904,6 +904,43 @@ export interface TeamFieldingSummary {
   run_outs_per_match: number | null
 }
 
+/** Aggregate partnership stats for a team in the current filter scope.
+ *  Returned by /api/v1/teams/{team}/partnerships/summary. */
+export interface TeamPartnershipsSummary {
+  team: string
+  side: 'batting' | 'bowling'
+  total: number
+  count_50_plus: number
+  count_100_plus: number
+  avg_runs: number | null
+  highest: {
+    runs: number
+    balls: number
+    match_id: number
+    date: string | null
+    batter1: { person_id: string; name: string | null }
+    batter2: { person_id: string; name: string | null }
+  } | null
+  best_pair: {
+    batter1: { person_id: string; name: string }
+    batter2: { person_id: string; name: string }
+    n: number
+    total_runs: number
+    best_runs: number
+  } | null
+}
+
+/** Bundle fetched for each column in the Teams → Compare tab. Each
+ *  sub-fetch is wrapped in `.catch(() => null)` so a single 404 or
+ *  scope-empty discipline doesn't sink the whole column. */
+export interface TeamProfile {
+  summary: TeamSummary | null
+  batting: TeamBattingSummary | null
+  bowling: TeamBowlingSummary | null
+  fielding: TeamFieldingSummary | null
+  partnerships: TeamPartnershipsSummary | null
+}
+
 export interface TeamFieldingSeason {
   season: string
   catches: number

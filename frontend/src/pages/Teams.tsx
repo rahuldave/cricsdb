@@ -18,6 +18,8 @@ import {
 import StatCard from '../components/StatCard'
 import FlagBadge from '../components/FlagBadge'
 import PlayerLink from '../components/PlayerLink'
+import TeamCompareGrid from '../components/teams/TeamCompareGrid'
+import AddTeamComparePicker from '../components/teams/AddTeamComparePicker'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
 import LineChart from '../components/charts/LineChart'
@@ -40,8 +42,11 @@ import type {
 // Tab order: discipline tabs come BEFORE the bare match list so the
 // "list of games" sits at the end — same convention as the player
 // pages (Batting/Bowling/Fielding all keep "Innings List" last).
+// Compare is slotted after "vs Opponent" since both are multi-team
+// views (vs Opponent = two teams side-by-side in a head-to-head
+// lens; Compare = up to three teams side-by-side across disciplines).
 const tabs = [
-  'By Season', 'vs Opponent',
+  'By Season', 'vs Opponent', 'Compare',
   'Batting', 'Bowling', 'Fielding', 'Partnerships',
   'Players', 'Match List',
 ] as const
@@ -54,6 +59,22 @@ export default function Teams() {
   useDocumentTitle(selected || 'Teams')
   const [activeTab, setActiveTab] = useUrlParam('tab', 'By Season')
   const [opponent, setOpponent] = useUrlParam('vs')
+  const [compareCsv] = useUrlParam('compare')
+  // Split CSV, trim, drop empties, cap at 2 extra teams (primary + 2 = 3 total).
+  const compareTeams = compareCsv
+    ? compareCsv.split(',').map(s => s.trim()).filter(Boolean).slice(0, 2)
+    : []
+
+  // Self-correcting deep link — if a share URL arrives with `compare=`
+  // set but no `tab`, the default "By Season" would silently hide the
+  // compare columns. Auto-switch to the Compare tab (replace, no new
+  // history entry, matching the tournament deep-link pattern in
+  // FilterBar.tsx:82-93).
+  useEffect(() => {
+    if (compareCsv && selected && activeTab !== 'Compare') {
+      setActiveTab('Compare', { replace: true })
+    }
+  }, [compareCsv, selected])
 
   const [teams, setTeams] = useState<TeamInfo[]>([])
   // Transient typing buffer — `null` = not editing, the input falls
@@ -269,6 +290,19 @@ export default function Teams() {
                 vsData={vsData}
                 vsFetch={vsFetch}
               />
+            )}
+
+            {activeTab === 'Compare' && selected && (
+              <>
+                <TeamCompareGrid
+                  teams={[selected, ...compareTeams]}
+                  filters={filters}
+                />
+                <AddTeamComparePicker
+                  currentTeams={[selected, ...compareTeams]}
+                  filters={filters}
+                />
+              </>
             )}
 
             {activeTab === 'Match List' && (
