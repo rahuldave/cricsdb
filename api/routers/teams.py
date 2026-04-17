@@ -1673,17 +1673,20 @@ async def team_fielding_summary(team: str, filters: FilterParams = Depends()):
     stumpings = by_kind.get("stumped", 0)
     run_outs = by_kind.get("run_out", 0)
 
-    # Match count when this team was in the field
+    # Match count when this team was in the field — reuse the same
+    # fielding-side `where` + params as the kind aggregation above so
+    # every active FilterBar param (gender, team_type, tournament,
+    # season range) applies here too. Feeds `catches_per_match` etc.
+    # as the denominator, so a scope-ignorant count silently flattens
+    # per-match rates.
     match_rows = await db.q(
         f"""
         SELECT COUNT(DISTINCT m.id) as matches
         FROM innings i
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0
-          AND i.team != :team
-          AND (m.team1 = :team OR m.team2 = :team)
+        WHERE {where}
         """,
-        {"team": team},
+        params,
     )
     matches = match_rows[0]["matches"] if match_rows else 0
 

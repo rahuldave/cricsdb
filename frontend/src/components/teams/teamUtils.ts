@@ -19,11 +19,12 @@ export function teamDisciplineHasData(
   return (profile.partnerships?.total ?? 0) > 0
 }
 
-/** Filter-scoped match count for the column identity line. Uses the
- *  team summary as the canonical source — unlike fielding.matches
- *  (unfiltered pre-existing bug) or bowling.matches (innings-bowled
- *  proxy that diverges from match count when an innings is super-over-
- *  only), summary.matches honours every active FilterBar param. */
+/** Filter-scoped match count for the column identity line. Uses
+ *  summary.matches as the canonical match-level count (team_summary's
+ *  COUNT(*) over the filtered match table). fielding.matches and
+ *  bowling.matches are innings-derived and can diverge by a handful
+ *  of abandoned / no-result matches where a team never fielded or
+ *  bowled — correct for their own stats, misleading as a headline. */
 export function teamMatchesInScope(profile: TeamProfile): number {
   return profile.summary?.matches
     ?? profile.bowling?.matches
