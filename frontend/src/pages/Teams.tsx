@@ -1336,6 +1336,16 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
   const clubDomestic = data.club.domestic_leagues
   const clubWomen = data.club.women_franchise
   const clubOther = data.club.other
+  // Every club tournament in the DB is single-gender, so the first
+  // team's gender determines the bucket for the whole tournament. Used
+  // to split the Domestic and Other sections into Men's / Women's
+  // sub-headers matching the International column's pattern.
+  const byGender = <T extends { teams: Array<{ gender?: string | null }> }>(groups: T[]) => ({
+    men: groups.filter(g => g.teams[0]?.gender !== 'female'),
+    women: groups.filter(g => g.teams[0]?.gender === 'female'),
+  })
+  const domesticSplit = byGender(clubDomestic)
+  const otherSplit = byGender(clubOther)
   const showMen = menRegular.length + menAssociate.length > 0
   const showWomen = womenRegular.length + womenAssociate.length > 0
   const showIntl = showMen || showWomen
@@ -1463,18 +1473,44 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
                 >
                   Domestic / national championships
                 </h3>
-                {clubDomestic.map(g => (
-                  <Section
-                    key={g.tournament}
-                    title={g.tournament}
-                    count={g.matches}
-                    defaultOpen={false}
-                  >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                      {g.teams.map(renderTeam)}
+                {domesticSplit.men.length > 0 && (
+                  <>
+                    <div className="coverage-head" style={{ marginTop: '0.5rem', marginBottom: '0.25rem' }}>
+                      Men's
                     </div>
-                  </Section>
-                ))}
+                    {domesticSplit.men.map(g => (
+                      <Section
+                        key={g.tournament}
+                        title={g.tournament}
+                        count={g.matches}
+                        defaultOpen={false}
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                          {g.teams.map(renderTeam)}
+                        </div>
+                      </Section>
+                    ))}
+                  </>
+                )}
+                {domesticSplit.women.length > 0 && (
+                  <>
+                    <div className="coverage-head" style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>
+                      Women's
+                    </div>
+                    {domesticSplit.women.map(g => (
+                      <Section
+                        key={g.tournament}
+                        title={g.tournament}
+                        count={g.matches}
+                        defaultOpen={false}
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                          {g.teams.map(renderTeam)}
+                        </div>
+                      </Section>
+                    ))}
+                  </>
+                )}
               </>
             )}
           </div>
@@ -1485,7 +1521,7 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
             {clubFranchise.length > 0 && (
               <>
                 <div className="coverage-head" style={{ marginTop: '0.5rem', marginBottom: '0.25rem' }}>
-                  Franchise leagues
+                  Men's franchise leagues
                 </div>
                 {clubFranchise.map((g, i) => (
                   <Section
@@ -1530,12 +1566,31 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
                 ))}
               </>
             )}
-            {clubOther.length > 0 && (
+            {otherSplit.men.length > 0 && (
               <>
                 <div className="coverage-head" style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>
-                  Other tournaments
+                  Other men's tournaments
                 </div>
-                {clubOther.map(g => (
+                {otherSplit.men.map(g => (
+                  <Section
+                    key={g.tournament}
+                    title={g.tournament}
+                    count={g.matches}
+                    defaultOpen={false}
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {g.teams.map(renderTeam)}
+                    </div>
+                  </Section>
+                ))}
+              </>
+            )}
+            {otherSplit.women.length > 0 && (
+              <>
+                <div className="coverage-head" style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>
+                  Other women's tournaments
+                </div>
+                {otherSplit.women.map(g => (
                   <Section
                     key={g.tournament}
                     title={g.tournament}
