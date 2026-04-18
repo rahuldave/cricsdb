@@ -20,7 +20,7 @@
 #   - A FastAPI backend on http://localhost:8000 (uv run uvicorn ...).
 #
 # Run:
-#   ./integration_tests/players_tab.sh
+#   ./tests/integration/players_tab.sh
 #
 # Exits non-zero on the first failure.
 set -u

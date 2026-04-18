@@ -5,7 +5,7 @@ frozen at implementation; any deviations from v2 (role-classifier
 thresholds + compact compare layout) are called out inline. For the
 shipped files + entry points see `internal_docs/codebase-tour.md`
 under `components/players/`. Integration tests at
-`integration_tests/players_tab.sh` + `players_hygiene.sh`.
+`tests/integration/players_tab.sh` + `players_hygiene.sh`.
 
 ## Motivation
 
@@ -533,14 +533,14 @@ Before the final commit:
 
 ### Integration (agent-browser)
 
-Extend `integration_tests/back_button_history.sh`:
+Extend `tests/integration/back_button_history.sh`:
 
 - Test: `/players` → pick Kohli → add compare Markram → back walks
   compare then primary.
 - Test: click a landing compare-tile → URL sets `player` + `compare`
   + `gender` atomically (one history entry, not three).
 
-Extend `integration_tests/mount_unmount.sh`:
+Extend `tests/integration/mount_unmount.sh`:
 
 - Test: rapid filter change while 8 fetches in flight (two players ×
   four disciplines). No React warnings, no page errors.

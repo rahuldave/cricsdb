@@ -6,6 +6,10 @@ thin CDP-driver CLI over Chromium). These aren't unit tests — they
 drive the real Vite dev server against the real FastAPI backend
 against the real SQLite DB, and assert behaviour at the URL level.
 
+> Previously at repo-root `integration_tests/`; renamed to
+> `tests/integration/` on 2026-04-17 alongside a new
+> `tests/regression/` sibling. See `tests/README.md` for the split.
+
 ## When to write one here
 
 When correctness depends on multiple layers cooperating. Concrete
@@ -75,8 +79,8 @@ Prerequisites:
   --port 8000`.
 
 ```bash
-./integration_tests/back_button_history.sh
-./integration_tests/mount_unmount.sh
+./tests/integration/back_button_history.sh
+./tests/integration/venues.sh
 ```
 
 Output is a per-assertion `✓` / `✗` followed by a `Passed: N / Failed:
@@ -85,7 +89,7 @@ M` summary. Exits 0 on all-pass, 1 otherwise — fits into CI.
 Set `BASE` to test a non-default origin (prod sanity checks):
 
 ```bash
-BASE=https://t20.rahuldave.com ./integration_tests/back_button_history.sh
+BASE=https://t20.rahuldave.com ./tests/integration/back_button_history.sh
 ```
 
 ## Writing a new one

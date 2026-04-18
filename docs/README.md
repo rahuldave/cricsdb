@@ -36,7 +36,8 @@ A quick map — follow the links for the full index in the sibling folder.
 - **Make a full-table aggregate endpoint fast** → [`../internal_docs/perf-leaderboards.md`](../internal_docs/perf-leaderboards.md)
 - **Run a regression harness before shipping a helper refactor** → [`../internal_docs/regression-testing-api.md`](../internal_docs/regression-testing-api.md)
 - **See what's next and what's stuck behind what** → [`../internal_docs/next-session-ideas.md`](../internal_docs/next-session-ideas.md) + [`../internal_docs/enhancements-roadmap.md`](../internal_docs/enhancements-roadmap.md)
-- **Run end-to-end browser checks** → [`../integration_tests/`](../integration_tests/)
+- **Run end-to-end browser checks** → [`../tests/integration/`](../tests/integration/)
+- **Run backend regression (md5-diff) checks** → [`../tests/regression/`](../tests/regression/)
 - **Find a known issue, gotcha, or future enhancement idea** → [`../CLAUDE.md`](../CLAUDE.md)
 
 If a new doc would only ever be read by someone working on the code,

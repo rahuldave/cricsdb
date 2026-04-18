@@ -82,7 +82,7 @@ Both `import_data.py` and `update_recent.py` auto-populate `fielding_credit`, `k
 
 To smoke-test `update_recent.py` against a copy of the prod DB before deploying, use `--db /tmp/cricket-prod-test.db` after copying the Downloads snapshot — see **`internal_docs/testing-update-recent.md`** for the copy-to-tmp workflow and what not to do.
 
-Before shipping a refactor of a shared query helper (e.g. `FilterParams`, a router filter fn, a SQL generator) that touches many endpoints, use the HEAD-vs-patched md5-diff harness in **`internal_docs/regression-testing-api.md`**: enumerate every affected URL + a control sample, tag each `REG` (must match HEAD) or `NEW` (HEAD vs patched should differ), capture both runs via `git stash`/`uvicorn --reload`, and diff. Byte-identical `REG` is the proof the refactor is inert where intended.
+Before shipping a refactor of a shared query helper (e.g. `FilterParams`, a router filter fn, a SQL generator) that touches many endpoints, use the HEAD-vs-patched md5-diff harness. The workflow is documented in **`internal_docs/regression-testing-api.md`**; the runner + per-feature URL inventories live at **`tests/regression/`** (use `./tests/regression/run.sh <feature>`). Enumerate every affected URL + a control sample in `tests/regression/<feature>/urls.txt`, tag each `REG` (must match HEAD) or `NEW` (must differ), then the runner does `git stash`/`uvicorn --reload`/diff. Byte-identical `REG` is the proof the refactor is inert where intended. End-to-end browser flows live alongside at **`tests/integration/`** — one bash + `agent-browser` script per feature.
 
 ## Landing pages (search-bar tabs)
 
@@ -128,7 +128,8 @@ FastAPI also exposes auto-generated interactive docs at **`/api/docs`** (Swagger
 - **Shipped a feature that belongs in the A-O narrative?** Add or amend the entry in **`internal_docs/enhancements-roadmap.md`**; done items stay there as historical markers.
 - **Made a non-obvious design decision** (a convention future contributors would otherwise try to change)? Add a bullet to **`internal_docs/design-decisions.md`**.
 - **Changed pipeline behaviour, introduced a new invariant the DB must carry, or added a testing workflow?** Touch **`internal_docs/data-pipeline.md`** (and/or `internal_docs/testing-update-recent.md`).
-- **Refactored a shared query helper (`FilterParams`, router filter fns, SQL generators) with many callers?** Run the HEAD-vs-patched md5-diff harness in **`internal_docs/regression-testing-api.md`** and report the pass count before claiming done.
+- **Refactored a shared query helper (`FilterParams`, router filter fns, SQL generators) with many callers?** Run `./tests/regression/run.sh <feature>` against a URL inventory at `tests/regression/<feature>/urls.txt`. Workflow + inventory conventions in **`internal_docs/regression-testing-api.md`** + **`tests/regression/README.md`**. Report the pass count before claiming done.
+- **Added a user-visible feature the browser-agent can exercise?** Write or extend the matching **`tests/integration/<feature>.sh`** script. See **`tests/integration/README.md`** for the helper set and when-to-run rules.
 - **Introduced a new perf pattern worth reusing?** Add it to **`internal_docs/perf-leaderboards.md`** (or create a sibling `perf-*.md` if scope is different).
 - **Changed the page structure, tabs, or search-bar landing?** Update the "Landing pages" and "Key Files" sections of `CLAUDE.md` itself.
 - **Changed anything user-visible about the home page, filter bar, or global conventions?** Update the relevant narrative doc and this file's convention list.

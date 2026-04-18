@@ -59,15 +59,34 @@ rule").
   files) should be either committed or intentionally out-of-scope so
   the `git stash` step is clean.
 
-## Step-by-step, with reusable code
+## Preferred: run via `tests/regression/run.sh`
 
-The convention below writes all artefacts under `/tmp/regression-test/`
-so they don't leak into the repo. Nothing here is committed — these
-are per-change, disposable runs.
+The canonical way to run this today is the checked-in runner at
+`tests/regression/run.sh`, which encapsulates everything below. URL
+inventories live under `tests/regression/<feature>/urls.txt` and ARE
+committed — they become the long-lived test surface for that feature.
+Artefacts still land in `/tmp/regression-test-<feature>/` so they
+don't bloat the repo.
+
+```bash
+./tests/regression/run.sh venues     # runs tests/regression/venues/urls.txt
+```
+
+See `tests/regression/README.md` for the runner's exact contract and
+the URL-inventory format. The rest of this doc describes the underlying
+mechanics — useful when debugging a failure, writing a one-off probe
+without committing a new feature dir, or explaining why the harness
+does what it does.
+
+## Step-by-step mechanics (what `run.sh` does internally)
+
+The convention below writes artefacts under `/tmp/regression-test/` so
+they don't leak into the repo.
 
 ### 1. Write the URL inventory
 
-Create `/tmp/regression-test/urls.txt` with one test per line:
+Create `/tmp/regression-test/urls.txt` (or `tests/regression/<feature>/urls.txt`
+if this is a feature worth keeping) with one test per line:
 
 ```text
 # <kind> <label> <url-path-and-query>

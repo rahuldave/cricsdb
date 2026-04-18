@@ -327,7 +327,7 @@ Role classifier (`components/players/roleUtils.ts`) tuned to exclude
 tail-end batting (balls/inn ≥ 5 + avg ≥ 10) and one-over-a-season
 bowling (balls/total-match ≥ 3, using `fielding.matches` — the true
 career-match count — as denominator). Integration tests live in
-`integration_tests/players_tab.sh` + `players_hygiene.sh`. Spec at
+`tests/integration/players_tab.sh` + `players_hygiene.sh`. Spec at
 `internal_docs/spec-players.md`.
 
 **S. Venues — canonicalization + filter + landing + dossier.** _Phases 1

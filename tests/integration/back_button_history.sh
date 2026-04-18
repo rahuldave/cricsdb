@@ -13,7 +13,7 @@
 #   - A FastAPI backend on http://localhost:8000 (uv run uvicorn ... --reload).
 #
 # Run:
-#   ./integration_tests/back_button_history.sh
+#   ./tests/integration/back_button_history.sh
 #
 # Exits non-zero on the first failure.
 set -u
