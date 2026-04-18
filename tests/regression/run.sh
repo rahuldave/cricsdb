@@ -35,6 +35,7 @@ mkdir -p "$WORK/head" "$WORK/patched"
 # ──────────────── capture ────────────────
 capture() {
   local out="$1"
+  mkdir -p "$out"
   : > "$out/manifest.txt"
   : > "$out/errors.txt"
   while IFS= read -r line; do
