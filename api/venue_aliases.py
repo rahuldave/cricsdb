@@ -123,10 +123,13 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     ('Wankhede Stadium, Mumbai', 'Mumbai'): ('Wankhede Stadium, Mumbai', 'Mumbai', 'India'),
     ('Wankhede Stadium', None): ('Wankhede Stadium, Mumbai', 'Mumbai', 'India'),
 
-    # ─── Gahanga International Cricket Stadium. Rwanda (Kigali, Rwanda) ─
-    ('Gahanga International Cricket Stadium. Rwanda', 'Kigali City'): ('Gahanga International Cricket Stadium. Rwanda', 'Kigali', 'Rwanda'),
-    ('Gahanga International Cricket Stadium. Rwanda', None): ('Gahanga International Cricket Stadium. Rwanda', 'Kigali', 'Rwanda'),
-    ('Gahanga International Cricket Stadium. Rwanda', 'Kigali'): ('Gahanga International Cricket Stadium. Rwanda', 'Kigali', 'Rwanda'),
+    # Punctuation collision: "Gahanga International Cricket Stadium. Rwanda"
+    # (full stop) is the same ground as the "…, Rwanda" canonical above.
+    # Remap to the comma form; don't preserve the period variant as its
+    # own canonical. Caught by scripts/sweep_venue_punctuation_collisions.py.
+    ('Gahanga International Cricket Stadium. Rwanda', 'Kigali City'): ('Gahanga International Cricket Stadium, Rwanda', 'Kigali', 'Rwanda'),
+    ('Gahanga International Cricket Stadium. Rwanda', None): ('Gahanga International Cricket Stadium, Rwanda', 'Kigali', 'Rwanda'),
+    ('Gahanga International Cricket Stadium. Rwanda', 'Kigali'): ('Gahanga International Cricket Stadium, Rwanda', 'Kigali', 'Rwanda'),
 
     # ─── Old Trafford, Manchester (Manchester, England) ─
     ('Old Trafford, Manchester', 'Manchester'): ('Old Trafford, Manchester', 'Manchester', 'England'),
@@ -341,8 +344,11 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     ('Grace Road', 'Leicester'): ('Grace Road, Leicester', 'Leicester', 'England'),
     ('Grace Road, Leicester', 'Leicester'): ('Grace Road, Leicester', 'Leicester', 'England'),
 
-    # ─── Grand Prairie Stadium, Dallas (Dallas, USA) ─
-    ('Grand Prairie Stadium, Dallas', 'Dallas'): ('Grand Prairie Stadium, Dallas', 'Dallas', 'USA'),
+    # Collision with "Grand Prairie Stadium" canonical elsewhere. Same
+    # ground, different city suffix — Grand Prairie is a Dallas suburb.
+    # Remap to the suburb form (canonical elsewhere sets city='Grand
+    # Prairie'). Caught by scripts/sweep_venue_punctuation_collisions.py.
+    ('Grand Prairie Stadium, Dallas', 'Dallas'): ('Grand Prairie Stadium', 'Grand Prairie', 'USA'),
 
     # ─── Pallekele International Cricket Stadium (Kandy, Sri Lanka) ─
     ('Pallekele International Cricket Stadium', 'Kandy'): ('Pallekele International Cricket Stadium', 'Kandy', 'Sri Lanka'),
@@ -582,9 +588,12 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     ('Carrara Oval', 'Carrara'): ('Carrara Oval', 'Carrara', 'Australia'),
     ('Carrara Oval', None): ('Carrara Oval', 'Carrara', 'Australia'),
 
-    # ─── Dr. Y.S. Rajasekhara Reddy ACA VDCA Cricket Stadium (Visakhapatnam, India) ─
-    ('Dr. Y.S. Rajasekhara Reddy ACA VDCA Cricket Stadium', None): ('Dr. Y.S. Rajasekhara Reddy ACA VDCA Cricket Stadium', 'Visakhapatnam', 'India'),
-    ('Dr. Y.S. Rajasekhara Reddy ACA VDCA Cricket Stadium', 'Visakhapatnam'): ('Dr. Y.S. Rajasekhara Reddy ACA VDCA Cricket Stadium', 'Visakhapatnam', 'India'),
+    # Punctuation collision: the space-separated "ACA VDCA" variant is
+    # the same ground as "ACA-VDCA" (hyphenated) elsewhere. Remap to
+    # the hyphenated long-form canonical. Caught by
+    # scripts/sweep_venue_punctuation_collisions.py.
+    ('Dr. Y.S. Rajasekhara Reddy ACA VDCA Cricket Stadium', None): ('Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium, Visakhapatnam', 'Visakhapatnam', 'India'),
+    ('Dr. Y.S. Rajasekhara Reddy ACA VDCA Cricket Stadium', 'Visakhapatnam'): ('Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium, Visakhapatnam', 'Visakhapatnam', 'India'),
 
     # ─── Queens Sports Club, Bulawayo (Bulawayo, Zimbabwe) ─
     ('Queens Sports Club, Bulawayo', 'Bulawayo'): ('Queens Sports Club, Bulawayo', 'Bulawayo', 'Zimbabwe'),
@@ -693,8 +702,11 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     # ─── Kotambi Stadium, Vadodara (Vadodara, India) ─
     ('Kotambi Stadium, Vadodara', 'Vadodara'): ('Kotambi Stadium, Vadodara', 'Vadodara', 'India'),
 
-    # ─── M.Chinnaswamy Stadium (Bengaluru, India) ─
-    ('M.Chinnaswamy Stadium', 'Bengaluru'): ('M.Chinnaswamy Stadium', 'Bengaluru', 'India'),
+    # Punctuation collision: "M.Chinnaswamy Stadium" (dot, no space after
+    # M.) is the same ground as "M Chinnaswamy Stadium, Bengaluru" above.
+    # Remap to the canonical house-style form (no period on initial).
+    # Caught by scripts/sweep_venue_punctuation_collisions.py.
+    ('M.Chinnaswamy Stadium', 'Bengaluru'): ('M Chinnaswamy Stadium, Bengaluru', 'Bengaluru', 'India'),
 
     # ─── Maple Leaf North-West Ground, King City (King City, Canada) ─
     ('Maple Leaf North-West Ground, King City', 'King City'): ('Maple Leaf North-West Ground, King City', 'King City', 'Canada'),
@@ -1169,8 +1181,12 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     # ─── Botkyrka Cricket Center, Stockholm (Stockholm, Sweden) ─
     ('Botkyrka Cricket Center, Stockholm', 'Stockholm'): ('Botkyrka Cricket Center, Stockholm', 'Stockholm', 'Sweden'),
 
-    # ─── Casey Fields No. 4 (Melbourne, Australia) ─
-    ('Casey Fields No. 4', 'Melbourne'): ('Casey Fields No. 4', 'Melbourne', 'Australia'),
+    # Punctuation collision: "Casey Fields No. 4" (with period) vs
+    # "Casey Fields No 4, Melbourne" (no period + city suffix) — same
+    # ground. Remap to the canonical house-style form (no period on
+    # "No", city suffix). Caught by
+    # scripts/sweep_venue_punctuation_collisions.py.
+    ('Casey Fields No. 4', 'Melbourne'): ('Casey Fields No 4, Melbourne', 'Melbourne', 'Australia'),
 
     # ─── Greenfield International Stadium, Thiruvananthapuram (Thiruvananthapuram, India) ─
     ('Greenfield International Stadium, Thiruvananthapuram', 'Thiruvananthapuram'): ('Greenfield International Stadium, Thiruvananthapuram', 'Thiruvananthapuram', 'India'),

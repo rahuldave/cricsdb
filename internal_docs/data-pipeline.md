@@ -188,6 +188,18 @@ once — each is idempotent, so re-running is a no-op. Re-run
 `fix_venue_names.py` whenever `venue_aliases.py` grows new entries so
 previously-raw rows get retrofitted.
 
+**Venue punctuation-collision sweep.** The initial canonicalization
+matches on token-level prefix/suffix and will miss pairs that differ
+only by punctuation (e.g. `M.Chinnaswamy Stadium` vs
+`M Chinnaswamy Stadium, Bengaluru`). Run
+`scripts/sweep_venue_punctuation_collisions.py` after every big
+incremental import — it slugifies each canonical venue (strip
+punctuation, lowercase, strip city suffix), groups by slug + country,
+and prints candidates with match counts. Human edits
+`api/venue_aliases.py` to remap losers → winners, then
+`fix_venue_names.py` retrofits the DB. Because canonical-venue growth
+requires new stadiums, which is rare, this sweep should rarely fire.
+
 ### Indexes + ANALYZE (automatic)
 
 Both `import_data.py` (full rebuild) and `update_recent.py`

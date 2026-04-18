@@ -70,6 +70,7 @@ scripts/fix_team_names.py             — One-time UPDATE pass to canonicalize o
 scripts/fix_event_names.py            — Same for tournament names (match.event_name)
 scripts/fix_venue_names.py            — Same for venues: canonicalizes match.venue / city + fills match.venue_country via api/venue_aliases.resolve_or_raw. Idempotent.
 scripts/generate_venue_worklist.py    — Emits docs/venue-worklist/YYYY-MM-DD-worklist.csv for human review when new unknown venues appear in cricsheet data.
+scripts/sweep_venue_punctuation_collisions.py — Scans api/venue_aliases.py for canonical-vs-canonical collisions that only differ by punctuation (dots, commas, hyphens, whitespace). Run it after big incremental imports. Prints merge-candidate groups with match counts; doesn't modify anything — human resolves by editing api/venue_aliases.py + rerunning fix_venue_names.py.
 scripts/populate_fielding_credits.py  — Builds fielding_credit table (auto-called by import + update pipelines)
 scripts/populate_keeper_assignments.py — Builds keeper_assignment table + writes ambiguous worklist partitions (auto on import + update)
 scripts/apply_keeper_resolutions.py   — Applies manual resolutions from docs/keeper-ambiguous/*.csv back into the DB

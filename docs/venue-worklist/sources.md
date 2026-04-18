@@ -44,6 +44,17 @@ decisions later without re-searching.
   almost always mean a sibling pitch at the same complex — keep separate
   unless external evidence says they're synonyms (Sheikh Zayed Nursery 1
   was the lone merge in this pass).
+- **Punctuation-only collisions** (dots, commas, apostrophes, hyphens,
+  whitespace) need a dedicated second-pass sweep. Initial
+  canonicalization matched on token-level prefix/suffix and missed
+  e.g. `M.Chinnaswamy Stadium` vs `M Chinnaswamy Stadium, Bengaluru`.
+  Run `scripts/sweep_venue_punctuation_collisions.py` after every
+  big incremental import; it lists candidate groups punctuation-
+  insensitively grouped, human edits `api/venue_aliases.py` to
+  remap losers → winners, then `fix_venue_names.py` retrofits.
+  Five collisions found + fixed 2026-04-17: M.Chinnaswamy,
+  Casey Fields No. 4, ACA-VDCA hyphen variant, Gahanga period/comma,
+  Grand Prairie Stadium/Dallas.
 - **Neutral venues:** Pakistan's "home" games 2009-2019 were mostly in
   UAE (Sharjah, Abu Dhabi, Dubai). A Pakistan-Australia match at Sharjah
   doesn't imply Sharjah is in Pakistan. When cross-checking via teams,

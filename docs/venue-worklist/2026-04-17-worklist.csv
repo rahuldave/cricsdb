@@ -21,7 +21,7 @@ Eden Gardens,Kolkata,84,141,2018-11-04,"Eden Gardens, Kolkata",Kolkata,India,FAL
 "Headingley, Leeds",Leeds,81,421,2021-07-18,"Headingley, Leeds",Leeds,England,FALSE,
 "Trent Bridge, Nottingham",Nottingham,80,420,2021-07-16,"Trent Bridge, Nottingham",Nottingham,England,FALSE,
 Wankhede Stadium,Mumbai,80,78,2017-12-24,"Wankhede Stadium, Mumbai",Mumbai,India,FALSE,
-Gahanga International Cricket Stadium. Rwanda,Kigali City,77,533,2021-08-18,Gahanga International Cricket Stadium. Rwanda,Kigali,Rwanda,FALSE,"country unknown — please fill; pre-filled by user, confirmed"
+Gahanga International Cricket Stadium. Rwanda,Kigali City,77,533,2021-08-18,"Gahanga International Cricket Stadium, Rwanda",Kigali,Rwanda,FALSE,"country unknown — please fill; pre-filled by user, confirmed; punctuation collision — merged into canonical"
 "Old Trafford, Manchester",Manchester,77,422,2021-07-20,"Old Trafford, Manchester",Manchester,England,FALSE,
 "Sophia Gardens, Cardiff",Cardiff,76,431,2021-06-23,"Sophia Gardens, Cardiff",Cardiff,Wales,FALSE,
 "Zahur Ahmed Chowdhury Stadium, Chattogram",Chattogram,76,1169,2023-03-09,"Zahur Ahmed Chowdhury Stadium, Chattogram",Chattogram,Bangladesh,FALSE,
@@ -87,7 +87,7 @@ County Ground,Bristol,43,66,2018-07-08,County Ground (Bristol),Bristol,England,F
 "Narendra Modi Stadium, Ahmedabad",Ahmedabad,42,1142,2023-02-01,"Narendra Modi Stadium, Ahmedabad",Ahmedabad,India,FALSE,
 "Desert Springs Cricket Ground, Almeria",Almeria,41,592,2021-09-10,"Desert Springs Cricket Ground, Almeria","Palomares, Almeria",Spain,FALSE,"country unknown — please fill; pre-filled by user, confirmed"
 Grace Road,Leicester,41,8352,2017-07-21,"Grace Road, Leicester",Leicester,England,FALSE,
-"Grand Prairie Stadium, Dallas",Dallas,41,1508,2024-06-01,"Grand Prairie Stadium, Dallas",Dallas,USA,FALSE,
+"Grand Prairie Stadium, Dallas",Dallas,41,1508,2024-06-01,Grand Prairie Stadium,Grand Prairie,USA,FALSE,punctuation collision — merged into canonical
 Pallekele International Cricket Stadium,Kandy,41,245,2019-09-01,Pallekele International Cricket Stadium,Kandy,Sri Lanka,FALSE,
 "Warner Park, Basseterre",St Kitts,41,124,2018-07-31,"Warner Park, Basseterre",Basseterre,Saint Kitts and Nevis,FALSE,"country unknown — please fill; pre-filled by user, confirmed"
 "County Ground, New Road",Worcester,40,8322,2017-07-07,New Road (Worcester),Worcester,England,FALSE,
@@ -189,7 +189,7 @@ Maharashtra Cricket Association Stadium,Pune,24,354,2020-01-10,"Maharashtra Cric
 SuperSport Park,Centurion,24,74,2018-02-21,"SuperSport Park, Centurion",Centurion,South Africa,FALSE,
 Bay Oval,Mount Maunganui,23,9,2017-01-06,"Bay Oval, Mount Maunganui",Mount Maunganui,New Zealand,FALSE,
 Carrara Oval,Carrara,23,858,2022-10-05,Carrara Oval,Carrara,Australia,FALSE,country unknown — please fill; country filled via research (Australia)
-Dr. Y.S. Rajasekhara Reddy ACA VDCA Cricket Stadium,,23,10243,2018-01-08,Dr. Y.S. Rajasekhara Reddy ACA VDCA Cricket Stadium,Visakhapatnam,India,FALSE,"city NULL and no siblings with a city — please fill; no city — country unknown; filled via research (city=Visakhapatnam, country=India)"
+Dr. Y.S. Rajasekhara Reddy ACA VDCA Cricket Stadium,,23,10243,2018-01-08,"Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium, Visakhapatnam",Visakhapatnam,India,FALSE,"city NULL and no siblings with a city — please fill; no city — country unknown; filled via research (city=Visakhapatnam, country=India); punctuation collision — merged into canonical"
 Harare Sports Club,,23,5,2016-06-18,Harare Sports Club,Harare,Zimbabwe,FALSE,city filled from sibling rows (Harare)
 ICC Academy,Dubai,23,152,2019-01-31,"ICC Academy, Dubai",Dubai,United Arab Emirates,FALSE,prefix of 'ICC Academy Ground No 2' — verify whether to merge or keep separate; keep separate from ICC Academy Ground No 2
 "Queens Sports Club, Bulawayo",Bulawayo,23,846,2022-05-17,"Queens Sports Club, Bulawayo",Bulawayo,Zimbabwe,FALSE,
@@ -232,7 +232,7 @@ Happy Valley Ground,Episkopi,17,627,2021-10-05,Happy Valley Ground,Episkopi,Cypr
 Himachal Pradesh Cricket Association Stadium,Dharamsala,17,3179,2016-03-09,Himachal Pradesh Cricket Association Stadium,Dharamsala,India,FALSE,"ambiguous venue name across cities ['Dharamsala', 'Dharmasala'] — paren-disambiguate"
 Indian Association Ground,Singapore,17,232,2019-07-22,"Indian Association Ground, Singapore",Singapore,Singapore,FALSE,
 "Kotambi Stadium, Vadodara",Vadodara,17,12424,2025-02-14,"Kotambi Stadium, Vadodara",Vadodara,India,FALSE,
-M.Chinnaswamy Stadium,Bengaluru,17,149,2019-02-27,M.Chinnaswamy Stadium,Bengaluru,India,FALSE,
+M.Chinnaswamy Stadium,Bengaluru,17,149,2019-02-27,"M Chinnaswamy Stadium, Bengaluru",Bengaluru,India,FALSE,punctuation collision — merged into canonical
 "Maple Leaf North-West Ground, King City",King City,17,1958,2024-09-28,"Maple Leaf North-West Ground, King City",King City,Canada,FALSE,
 Pallekele International Cricket Stadium,,17,2931,2011-08-06,Pallekele International Cricket Stadium,Kandy,Sri Lanka,FALSE,city filled from sibling rows (Kandy)
 "Punjab Cricket Association IS Bindra Stadium, Mohali",Chandigarh,17,207,2019-09-18,"Punjab Cricket Association IS Bindra Stadium, Mohali",Mohali,India,FALSE,"ambiguous venue name across cities ['Chandigarh', 'Mohali'] — paren-disambiguate; twin-city mislabel; ground is in Mohali"
@@ -313,7 +313,7 @@ Blacktown International Sportspark,Sydney,11,11878,2017-01-02,"Blacktown Interna
 "Dr DY Patil Sports Academy, Mumbai",Mumbai,11,5729,2022-03-27,"Dr DY Patil Sports Academy, Navi Mumbai",Navi Mumbai,India,FALSE,"ambiguous venue name across cities ['Mumbai', 'Navi Mumbai'] — paren-disambiguate; correct city Navi Mumbai (Nerul)"
 "Drummoyne Oval, Sydney",Sydney,11,12309,2024-11-12,"Drummoyne Oval, Sydney",Sydney,Australia,FALSE,
 Friendship Oval,Dasmarinas,11,5236,2018-12-01,Friendship Oval,Dasmarinas,Philippines,FALSE,country unknown — please fill; country filled via research (Philippines)
-Gahanga International Cricket Stadium. Rwanda,,11,5142,2018-07-07,Gahanga International Cricket Stadium. Rwanda,Kigali,Rwanda,FALSE,city filled from sibling rows (Kigali City); country unknown — please fill; country filled via research (Rwanda)
+Gahanga International Cricket Stadium. Rwanda,,11,5142,2018-07-07,"Gahanga International Cricket Stadium, Rwanda",Kigali,Rwanda,FALSE,city filled from sibling rows (Kigali City); country unknown — please fill; country filled via research (Rwanda); punctuation collision — merged into canonical
 Grand Prairie Stadium,Dallas,11,11523,2023-07-14,Grand Prairie Stadium,Grand Prairie,USA,FALSE,"ambiguous venue name across cities ['Dallas', 'Grand Prairie'] — paren-disambiguate; Grand Prairie is a suburb of Dallas"
 Holkar Cricket Stadium,Indore,11,77,2017-12-22,"Holkar Cricket Stadium, Indore",Indore,India,FALSE,
 ICC Academy Ground No 2,Dubai,11,290,2019-10-19,"ICC Academy Ground No 2, Dubai",Dubai,United Arab Emirates,FALSE,
@@ -427,7 +427,7 @@ Amini Park,Port Moresby,6,161,2019-03-22,"Amini Park, Port Moresby",Port Moresby
 "Botkyrka Cricket Center, Stockholm",Stockholm,6,2442,2025-08-08,"Botkyrka Cricket Center, Stockholm",Stockholm,Sweden,FALSE,country unknown — please fill; country filled via research (Sweden)
 "Bready Cricket Club, Magheramason",Londonderry,6,4,2016-09-05,"Bready Cricket Club, Magheramason",Bready,Ireland,FALSE,"ambiguous venue name across cities ['Bready', 'Londonderry'] — paren-disambiguate; country unknown — please fill; Bready/Magheramason are in County Londonderry; cricket-Ireland ground"
 Brisbane Cricket Ground,Brisbane,6,6807,2021-01-02,"Brisbane Cricket Ground, Woolloongabba",Brisbane,Australia,FALSE,
-Casey Fields No. 4,Melbourne,6,11866,2016-12-17,Casey Fields No. 4,Melbourne,Australia,FALSE,
+Casey Fields No. 4,Melbourne,6,11866,2016-12-17,"Casey Fields No 4, Melbourne",Melbourne,Australia,FALSE,punctuation collision — merged into canonical
 "Greenfield International Stadium, Thiruvananthapuram",Thiruvananthapuram,6,1012,2022-09-28,"Greenfield International Stadium, Thiruvananthapuram",Thiruvananthapuram,India,FALSE,
 "Ground 1, Independence Park",Port Vila,6,3443,2019-05-06,"Ground 1, Independence Park",Port Vila,Vanuatu,FALSE,country unknown — please fill; country filled via research (Vanuatu)
 Gymkhana Club Ground,Nairobi,6,2804,2007-09-01,Gymkhana Club Ground (Nairobi),Nairobi,Kenya,FALSE,
