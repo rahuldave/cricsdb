@@ -40,6 +40,10 @@ frontend/dist/
 .vscode/
 .idea/
 
+# macOS
+.DS_Store
+**/.DS_Store
+
 # Claude Code local config + agent/skill state (per-developer, not project)
 .claude/
 .agents/
