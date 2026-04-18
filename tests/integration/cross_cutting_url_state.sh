@@ -96,21 +96,32 @@ assert_url_contains "team_type=international"
 
 # --------------------------------------------------------------------
 echo ""
-echo "Test 2 · PlayerLink (series dossier tile → player page) pushes + carries scope"
-# PlayerLink is a cross-tab widget: click a player name on a Series
-# dossier, land on their discipline page with tournament preserved.
+echo "Test 2 · PlayerLink letter link (series dossier → player page) pushes + carries scope"
+# PlayerLink is a cross-tab widget: click a player's `(t)` letter link
+# on a Series dossier, land on their discipline page with tournament
+# preserved (and season dropped — that's the (t) tier semantic).
 # The target route varies by discipline; we test the batting flavour.
+#
+# Was 'link "· in Indian Premier League ›"' before the 2026-04-19
+# scope-link refactor replaced contextual labels with letter links.
 reset
 agent-browser open "$BASE/series?tournament=Indian+Premier+League&gender=male&team_type=club&tab=Batters" >/dev/null 2>&1
 agent-browser wait --load networkidle >/dev/null 2>&1
 settle 2.5
-CTX_REF=$(ref_for 'link "· in Indian Premier League ›"')
-click_ref "$CTX_REF"
-assert_url_contains "/batting?player="
-assert_url_contains "tournament=Indian+Premier+League"
-agent-browser back >/dev/null 2>&1; settle 0.8
-assert_url_contains "/series?tournament=Indian+Premier+League"
-assert_url_contains "tab=Batters"
+# Click the first `t` letter link — the URL already carries tournament,
+# so (t) should route to /batting?player=X&gender&team_type&tournament.
+TIER_HREF=$(agent-browser eval "const a = document.querySelector('a.scope-sub[title*=\"Indian Premier League\"]'); a ? a.getAttribute('href') : ''" 2>/dev/null | tail -1 | tr -d '"')
+if [[ -z "$TIER_HREF" || "$TIER_HREF" == "null" ]]; then
+  echo "  ✗ no letter link found"; FAIL=$((FAIL + 1))
+else
+  agent-browser open "$BASE$TIER_HREF" >/dev/null 2>&1
+  settle 1.5
+  assert_url_contains "/batting?player="
+  assert_url_contains "tournament=Indian+Premier+League"
+  agent-browser back >/dev/null 2>&1; settle 0.8
+  assert_url_contains "/series?tournament=Indian+Premier+League"
+  assert_url_contains "tab=Batters"
+fi
 
 # --------------------------------------------------------------------
 echo ""

@@ -277,11 +277,24 @@ for tab in Overview Batters Bowlers Fielders Matches Records; do
   assert_snapshot_contains "$tab" "$tab tab"
 done
 
-# Batters tab — should render a PlayerLink with contextual "at Wankhede" suffix
-agent-browser eval "document.querySelectorAll('.wisden-tab')[1].click()" >/dev/null 2>&1
-settle 1.5
+# Batters tab — PlayerLink emits letter links (e, t, s, b) only when a
+# tournament or rivalry axis is active. Venue alone doesn't fire letter
+# links (it's an orthogonal narrowing, not its own axis — rides through
+# on every letter when other axes are active). So navigate with
+# tournament=IPL added; letter-link tooltips then include "at Wankhede".
+# (Was: a plain "at Wankhede Stadium" inline suffix before the 2026-04-19
+# scope-link refactor.)
+agent-browser open "$BASE/venues?venue=$WANKHEDE_URLENC&tab=Batters&tournament=Indian+Premier+League" >/dev/null 2>&1
+agent-browser wait --load networkidle >/dev/null 2>&1
+settle 2.0
 assert_snapshot_contains "By average"                  "Batters tab header"
-assert_snapshot_contains "at Wankhede Stadium" "PlayerLink context suffix"
+# Letter-link tooltip check — title attr on .scope-sub carries the scope text.
+LETTER_TOOLTIP=$(agent-browser eval "Array.from(document.querySelectorAll('.scope-sub')).map(a=>a.title).find(t=>t && t.includes('Wankhede')) || ''" 2>/dev/null | tail -1)
+if [[ "$LETTER_TOOLTIP" == *"Wankhede Stadium"* ]]; then
+  echo "  ✓ PlayerLink letter-link tooltip carries filter_venue"; PASS=$((PASS + 1))
+else
+  echo "  ✗ PlayerLink letter-link tooltip missing venue; got: $LETTER_TOOLTIP"; FAIL=$((FAIL + 1))
+fi
 
 # Records tab — tournament records endpoint reused with filter_venue.
 # Records needs a longer settle — the endpoint is heavier than leaders.
