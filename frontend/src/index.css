@@ -608,6 +608,52 @@ a { color: inherit; }
   font-size: 0.9rem;
   color: var(--ink-faint);
 }
+
+/* Venue search — compact inline variant of playersearch for the
+ * FilterBar. Width follows tournament dropdown; no max-width. */
+.wisden-venue-search { max-width: 22rem; }
+
+/* Chip mode shown when filter_venue is active. Truncates long names
+ * but the `title` tooltip gives the full value on hover. */
+.wisden-venue-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  font-family: var(--serif);
+  max-width: 28rem;
+}
+.wisden-venue-chip-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+.wisden-venue-chip-name {
+  font-size: 0.95rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
+}
+.wisden-venue-chip-clear {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dotted var(--ink-faint);
+  padding: 0;
+  margin-left: 0.2rem;
+  cursor: pointer;
+}
+.wisden-venue-chip-clear:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .wisden-playersearch-error { border-color: var(--accent); color: var(--accent); }
 
 /* ─────────────────────────────────────────────────────────────

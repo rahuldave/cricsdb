@@ -46,6 +46,11 @@ api/
                          /api/v1/series/points-table (single-season; tournament required)
                          /api/v1/series/other-rivalries (lazy-load expander)
                          /api/v1/rivalries/summary (legacy; new code uses dossier endpoints)
+    venues.py         — Venues Phase 2. /api/v1/venues (typeahead; q substring match
+                         on venue OR city + standard FilterParams; top-50 when q absent)
+                         and /api/v1/venues/landing (country-grouped tile grid). Both
+                         strip filter_venue from their own filter chain (self-
+                         referential).
 tournament_canonical.py — Shared canonical map (T20 WC variants → "T20 World Cup (Men)" etc.)
                          imported by filters.py + tournaments.py + reference.py for global
                          IN-variants expansion of tournament=X queries.
@@ -158,7 +163,16 @@ frontend/src/
                                                           currently unfiltered), carryTeamFilters
   pages/                       — Home, Teams, Players, Batting, Bowling, Fielding, Tournaments,
                                    HeadToHead (mode=player|team), Matches, MatchScorecard,
+                                   Venues (Phase 2 landing — country-grouped tile grid;
+                                   tile click sets filter_venue and navigates to
+                                   /matches?filter_venue=X),
                                    Help (/help), HelpUsage (/help/usage)
+  components/VenueSearch.tsx   — Debounced typeahead for the FilterBar Venue slot.
+                                   Mirrors TeamSearch.tsx structurally. Renders an input
+                                   when no venue is selected; flips to a chip + "× Clear
+                                   venue" button when filter_venue is set.
+  components/venues/           — VenuesLanding.tsx (country-grouped accordion, top-3
+                                   countries open by default).
   content/                     — about-me.md + user-help.md. Imported as ?raw by the Help pages
                                    and rendered via react-markdown. Edit the .md, rebuild, ship.
                                    user-help.md embeds screenshots from /social/*.png.

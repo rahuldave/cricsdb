@@ -78,6 +78,9 @@ def _build_filter_clauses(
     if filters.season_to:
         clauses.append(f"{alias}.season <= :season_to")
         params["season_to"] = filters.season_to
+    if filters.venue:
+        clauses.append(f"{alias}.venue = :filter_venue")
+        params["filter_venue"] = filters.venue
     if include_team_pair:
         if filters.team:
             clauses.append(f"({alias}.team1 = :filter_team OR {alias}.team2 = :filter_team)")

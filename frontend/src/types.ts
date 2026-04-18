@@ -8,6 +8,10 @@ export interface FilterParams {
    *  these as `filter_team` / `filter_opponent` query params. */
   filter_team?: string
   filter_opponent?: string
+  /** Ambient venue filter — narrows every filter-consuming endpoint to
+   *  a single canonical venue (e.g. "Wankhede Stadium, Mumbai"). Set
+   *  via the FilterBar VenueSearch on any tab. */
+  filter_venue?: string
   team?: string
   opponent?: string
 }
@@ -1377,4 +1381,29 @@ export interface RivalrySummary {
   largest_partnership: { runs: number; match_id: number } | null
   closest_match: { margin: string; winner: string; match_id: number; date: string | null } | null
   biggest_win: { winner: string; margin: string; match_id: number; date: string | null } | null
+}
+
+// ─── Venues (Phase 2) ────────────────────────────────────────────────
+
+export interface VenueInfo {
+  venue: string
+  city: string | null
+  country: string | null
+  matches: number
+}
+
+export interface VenueLandingEntry {
+  venue: string
+  city: string | null
+  matches: number
+}
+
+export interface VenueCountryGroup {
+  country: string
+  matches: number
+  venues: VenueLandingEntry[]
+}
+
+export interface VenuesLanding {
+  by_country: VenueCountryGroup[]
 }

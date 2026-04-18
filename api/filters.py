@@ -24,6 +24,7 @@ class FilterParams:
         season_to: Optional[str] = Query(None),
         filter_team: Optional[str] = Query(None),
         filter_opponent: Optional[str] = Query(None),
+        filter_venue: Optional[str] = Query(None),
     ):
         self.gender = gender
         self.team_type = team_type
@@ -32,6 +33,7 @@ class FilterParams:
         self.season_to = season_to
         self.team = filter_team
         self.opponent = filter_opponent
+        self.venue = filter_venue
 
     def build(
         self,
@@ -89,6 +91,10 @@ class FilterParams:
         if self.season_to:
             clauses.append(f"{table_alias}.season <= :season_to")
             params["season_to"] = self.season_to
+
+        if self.venue:
+            clauses.append(f"{table_alias}.venue = :filter_venue")
+            params["filter_venue"] = self.venue
 
         if self.team:
             if has_innings_join:

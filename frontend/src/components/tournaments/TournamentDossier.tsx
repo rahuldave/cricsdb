@@ -130,6 +130,7 @@ export default function TournamentDossier({
     tournament, filterTeam, filterOpponent, seriesType,
     filters.gender, filters.team_type,
     filters.season_from, filters.season_to,
+    filters.filter_venue,
   ]
 
   const summaryFetch = useFetch<TournamentSummary>(

@@ -6,6 +6,7 @@ import type {
   BowlingSummary, BowlingInnings, BatterMatchup, WicketAnalysis,
   HeadToHeadResponse,
   MatchListItem, Scorecard, InningsGridResponse,
+  VenueInfo, VenuesLanding,
 } from './types'
 
 async function fetchApi<T>(path: string, params?: Record<string, string | number | undefined | null>): Promise<T> {
@@ -41,6 +42,12 @@ export const getTeams = (filters?: F & { q?: string }) =>
   fetchApi<{ teams: TeamInfo[] }>('/api/v1/teams', filters as Record<string, string>)
 export const searchPlayers = (q: string, role?: string, limit = 20) =>
   fetchApi<{ players: PlayerSearchResult[] }>('/api/v1/players', { q, role, limit })
+
+// Venues (Phase 2)
+export const getVenues = (filters?: F & { q?: string; limit?: number }) =>
+  fetchApi<{ venues: VenueInfo[] }>('/api/v1/venues', filters as Record<string, string>)
+export const getVenuesLanding = (filters?: F) =>
+  fetchApi<VenuesLanding>('/api/v1/venues/landing', filters as Record<string, string>)
 
 // Teams
 export const getTeamSummary = (team: string, filters?: F) =>

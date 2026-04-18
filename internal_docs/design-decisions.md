@@ -115,6 +115,32 @@ Global filters (gender, tournament, season range) are also in URL params, manage
 
 Example URL: `/batting?player=ba607b88&tab=By+Over&tournament=Indian+Premier+League`
 
+### filterDeps arrays — explicit, per-page, easy to under-wire (revisit)
+
+Every page that runs `useFetch(fn, deps)` maintains its own hand-rolled
+`filterDeps` array listing the individual filter fields it cares about
+— `[filters.gender, filters.team_type, filters.tournament,
+filters.season_from, filters.season_to, filters.filter_team,
+filters.filter_opponent, filters.filter_venue, …]`. This is explicit
+and gives every page tight control over which filter changes trigger
+refetches, but it's a **landmine when adding a new filter**: Phase 2
+of Venues added `filter_venue` to `FilterParams`, the FilterBar, and
+the URL — but the page-level `filterDeps` arrays kept the old list, so
+an SPA-set venue change wouldn't trigger a refetch (only reloading
+would, because reload rebuilds from URL). We patched 13 call sites +
+5 carry functions by hand.
+
+**Revisit when it bites again**: either derive `filterDeps` from
+`Object.values(filters)` in `useFilters()` — stable-keyed so reference
+identity is preserved when nothing changes — or expose a
+`useFilterDeps()` helper that returns the same array everywhere. The
+carry-filter utilities (`components/teams/teamUtils.ts::carryTeamFilters`,
+`components/players/roleUtils.ts::carryFilters`, inline blocks on
+Batting/Bowling/Fielding, `TournamentsLanding.buildFilterQs`) would
+collapse similarly. Risk is if an unrelated URL param sneaks into
+`useFilters()` later and starts triggering spurious refetches — but
+that's a discipline thing, not an architectural blocker.
+
 ### Semiotic v3 chart wrappers
 
 Semiotic v3 exports named chart components (`BarChart`, `LineChart`, `Scatterplot`, `DonutChart`) rather than the generic Frame components of v1/v2. Our wrappers are thin — they pass props through with sensible defaults:

@@ -172,6 +172,9 @@ async def list_teams(
     if filters.season_to:
         where_parts.append("m.season <= :season_to")
         params["season_to"] = filters.season_to
+    if filters.venue:
+        where_parts.append("m.venue = :filter_venue")
+        params["filter_venue"] = filters.venue
     if q:
         where_parts.append("mp.team LIKE :q")
         params["q"] = f"%{q}%"

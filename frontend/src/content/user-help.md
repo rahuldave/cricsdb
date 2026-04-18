@@ -5,7 +5,7 @@
 
 ## The shape of the site
 
-Five top-level tabs across the nav (the three discipline pages now
+Six top-level tabs across the nav (the three discipline pages now
 sit inside a **Players ▾** group — hover on desktop, sub-row on mobile):
 
 - **Series** — the home for competitions (IPL, T20 World Cup,
@@ -103,6 +103,16 @@ Two modes (picker at the top of the page):
   - With `Type = Club`: the pill collapses to a small
     "Showing: Club tournaments" caption — every option would select
     the same rows, so there's nothing to pick.
+- **Venues** — directory of every ground that's hosted a match,
+  grouped by country (India has 78 venues in the dataset, England
+  38, Australia 56, …). The top three countries open by default and
+  the long tail of associate nations (Rwanda, Bhutan, …) stays
+  collapsed. Click a tile to open its match list — the list respects
+  every filter at the top, so "India men's internationals at
+  Wankhede" is one click + one FilterBar tick. To scope any other
+  tab by venue, use the **Venue** typeahead in the filter bar (see
+  the filter-bar section below) — venue-filtered stats work across
+  Teams, Players, Head-to-Head, Series and Matches.
 - **Matches** — searchable list of every match. Click any row for
   the full scorecard, ball-by-ball innings grid, worm chart, and
   per-batter / per-bowler matchup grid.
@@ -172,6 +182,13 @@ set on one page follows you around until you change it.
 - **Seasons** — `From ... To ...` range. Cricsheet uses a mix of
   calendar years (`2024`) and split-year labels (`2024/25`);
   sorting is chronological.
+- **Venue** — search for a ground by name or city (type at least
+  two letters). The dropdown narrows to the current filter scope —
+  picking India + Men and typing "eden" will show Eden Gardens if
+  India men's have played there. Once a venue is set, the input
+  flips to a compact chip with a dedicated **× Clear venue** button;
+  the chip stays visible on every tab so you always know your data
+  is scoped, and one click clears it wherever you are.
 
 Three little text buttons sit beside the season pickers:
 
@@ -179,7 +196,7 @@ Three little text buttons sit beside the season pickers:
 - **`latest`** — pins both ends to the most recent season available
   in your current filter scope (so with Tournament = BBL set, it
   jumps to the current BBL season, not the current IPL).
-- **`reset all`** — clears every filter at once.
+- **`reset all`** — clears every filter at once (including venue).
 
 The Batting, Bowling, and Fielding pages default the season range
 to the **last 3 seasons** on first visit, because the unfiltered

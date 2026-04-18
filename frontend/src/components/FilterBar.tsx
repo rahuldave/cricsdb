@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getTournaments, getSeasons } from '../api'
 import { useSetUrlParams } from '../hooks/useUrlState'
+import VenueSearch from './VenueSearch'
 import type { FilterParams, Tournament } from '../types'
 
 export function useFilters(): FilterParams {
@@ -20,6 +21,9 @@ export function useFilters(): FilterParams {
     // name-only link.
     filter_team: params.get('filter_team') || undefined,
     filter_opponent: params.get('filter_opponent') || undefined,
+    // Ambient venue filter (Phase 2). Set via the VenueSearch
+    // typeahead below; honored by every filter-consuming endpoint.
+    filter_venue: params.get('filter_venue') || undefined,
   }
 }
 
@@ -153,6 +157,7 @@ export default function FilterBar() {
   }
   const seasonFrom = params.get('season_from') || ''
   const seasonTo = params.get('season_to') || ''
+  const filterVenue = params.get('filter_venue') || ''
 
   const filteredTournaments = tournaments.filter(t => {
     if (teamType && t.team_type !== teamType) return false
@@ -162,7 +167,7 @@ export default function FilterBar() {
 
   const segBtn = (active: boolean) => `wisden-seg${active ? ' is-active' : ''}`
 
-  const anyFilterSet = Boolean(gender || teamType || tournament || seasonFrom || seasonTo)
+  const anyFilterSet = Boolean(gender || teamType || tournament || seasonFrom || seasonTo || filterVenue)
   const latestInScope = seasons.length > 0 && !seasonsError ? seasons[seasons.length - 1] : null
   const clearSeasons = () => setUrlParams({ season_from: '', season_to: '' })
   const setLatest = () => {
@@ -174,8 +179,12 @@ export default function FilterBar() {
     setUrlParams({ season_from: latestInScope, season_to: latestInScope })
   }
   const clearAll = () => setUrlParams({
-    gender: '', team_type: '', tournament: '', season_from: '', season_to: '',
+    gender: '', team_type: '', tournament: '',
+    season_from: '', season_to: '', filter_venue: '',
   })
+
+  const setVenue = (name: string) => setUrlParams({ filter_venue: name })
+  const clearVenue = () => setUrlParams({ filter_venue: '' })
 
   return (
     <div className="wisden-filterbar">
@@ -244,6 +253,15 @@ export default function FilterBar() {
               latest
             </button>
           )}
+        </div>
+
+        <div className="wisden-filter-group">
+          <span className="wisden-filter-label">Venue</span>
+          <VenueSearch
+            value={filterVenue}
+            onSelect={setVenue}
+            onClear={clearVenue}
+          />
         </div>
 
         {anyFilterSet && (

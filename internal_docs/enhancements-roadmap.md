@@ -330,8 +330,8 @@ career-match count — as denominator). Integration tests live in
 `integration_tests/players_tab.sh` + `players_hygiene.sh`. Spec at
 `internal_docs/spec-players.md`.
 
-**S. Venues — canonicalization + filter + landing + dossier.** _Phase 1
-done, 2026-04-17._ Three-phase delivery (spec at
+**S. Venues — canonicalization + filter + landing + dossier.** _Phases 1
++ 2 done, 2026-04-17._ Three-phase delivery (spec at
 `internal_docs/spec-venues.md`). **Phase 1** (DB cleanup + insert hooks)
 shipped: 676 raw `(venue, city)` pairs from cricsheet canonicalized to
 456 distinct venues across 88 countries via
@@ -351,10 +351,18 @@ on insert so the DB stays clean from day 1. Soft-fail: unknown venues
 pass through as raw with `venue_country` NULL and get logged to
 `docs/venue-worklist/unknowns-<date>.csv` for the next review cycle.
 `scripts/fix_venue_names.py` is the idempotent retrofit tool — rerun it
-any time the alias dict grows. **Phase 2** (FilterBar `filter_venue`
-param + flat `/venues` landing + nav slot) is next. **Phase 3**
+any time the alias dict grows. **Phase 2** added `filter_venue` as an
+ambient filter (`FilterParams.build()` + two hand-rolled pickers),
+`GET /api/v1/venues` (typeahead with `q` substring match; top-50 cap)
+and `GET /api/v1/venues/landing` (country-grouped tile directory),
+plus the `/venues` route, a Venues nav slot (7 → 8 top-level tabs),
+and a FilterBar Venue typeahead (`components/VenueSearch.tsx`) that
+flips to a chip with "× Clear venue" when active. Every page's
+`filterDeps` array + 5 carry functions were patched to include
+`filter_venue` (SPA navigation refetches + back-button works). Regression
+harness: 18/18 REG byte-identical, 9/9 NEW queries differ. **Phase 3**
 (per-venue dossier with Overview / Batters / Bowlers / Fielders /
-Matches / Records) is opt-in after Phase 2.
+Matches / Records) is opt-in after Phase 2 proves thin or sufficient.
 
 **T. Launch identity — favicon, OG card, tweet thread, help-page
 walkthrough.** _Done, 2026-04-16._ Replaced the default Vite bolt with

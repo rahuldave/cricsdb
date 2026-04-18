@@ -1,11 +1,7 @@
 # Spec: Venues (enhancement S)
 
-Status: **Phase 1 shipped 2026-04-17 (commit `d182149` + docs sweep).**
-Three-phase delivery agreed in-session. Phase 1 (human-in-the-loop DB
-cleanup + alias module + insert hooks) is done. Phase 2 (FilterBar
-param + flat `/venues` landing) is the next phase. Phase 3 (per-venue
-dossier) remains opt-in after Phase 2. Each phase a separate commit +
-deploy.
+Status: **Phases 1 + 2 shipped 2026-04-17.** Phase 3 (per-venue
+dossier) remains opt-in after Phases 1+2 prove thin or sufficient.
 
 **Phase 1 result**: 12,940 existing matches canonicalized. 676 raw
 (venue, city) pairs collapsed to 456 canonical venues across 88
@@ -15,6 +11,23 @@ countries. Zero unknowns. `api/venue_aliases.py`, `scripts/fix_venue_names.py`,
 and `update_recent.py` canonicalize on insert via `resolve_or_raw()`;
 unknown venues are logged to `docs/venue-worklist/unknowns-<date>.csv`
 at end of run. Soft-fail contract: unknown venues never block import.
+
+**Phase 2 result**: `filter_venue` is an ambient filter across every
+tab. `FilterParams.build()` + `reference.py::list_teams` +
+`tournaments.py::_build_filter_clauses` all honour it (3-line
+additions per helper; 68 other endpoints cover via `filters.build()`
+automatically). New `/api/v1/venues` (typeahead; `q` substring match
+on venue or city; top-50 cap when `q` absent) and
+`/api/v1/venues/landing` (country-grouped tiles). Both self-strip
+`filter_venue` from their own filter chain. Frontend adds
+`components/VenueSearch.tsx` (typeahead, chip mode when active),
+`components/venues/VenuesLanding.tsx` (country accordion, top-3 open),
+`pages/Venues.tsx`, the `/venues` route, and a Venues nav slot
+between Players ▾ and Head to Head (7 → 8 top-level tabs). Every
+page's `filterDeps` array + 5 carry functions patched to include
+`filters.filter_venue` (SPA navigation refetches, back button works).
+Regression harness: 18/18 REG byte-identical, 9/9 NEW queries differ
+as intended.
 
 ## Motivation
 

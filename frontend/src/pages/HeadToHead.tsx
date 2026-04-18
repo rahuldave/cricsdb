@@ -108,7 +108,7 @@ function PlayerVsPlayer() {
         })
       : Promise.resolve(null),
     [batterId, bowlerId, seriesType, filters.gender, filters.team_type, filters.tournament,
-     filters.season_from, filters.season_to],
+     filters.season_from, filters.season_to, filters.filter_venue],
   )
   useDocumentTitle(
     data ? `${data.batter.name} v ${data.bowler.name}` : enabled ? null : 'Head to Head'

@@ -10,6 +10,7 @@ import Matches from './pages/Matches'
 import MatchScorecard from './pages/MatchScorecard'
 import Tournaments from './pages/Tournaments'
 import Players from './pages/Players'
+import Venues from './pages/Venues'
 import Help from './pages/Help'
 import HelpUsage from './pages/HelpUsage'
 
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/fielding" element={<Fielding />} />
           <Route path="/series" element={<Tournaments />} />
           <Route path="/tournaments" element={<LegacyTournamentsRedirect />} />
+          <Route path="/venues" element={<Venues />} />
           <Route path="/head-to-head" element={<HeadToHead />} />
           <Route path="/matches" element={<Matches />} />
           <Route path="/matches/:matchId" element={<MatchScorecard />} />

@@ -31,6 +31,7 @@ export default function TeamCompareGrid({ teams, filters }: Props) {
   const filterDeps = [
     filters.gender, filters.team_type, filters.tournament,
     filters.season_from, filters.season_to,
+    filters.filter_venue,
   ]
 
   // Fixed-arity slots so React sees the same number of useFetch calls

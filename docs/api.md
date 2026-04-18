@@ -51,6 +51,7 @@ that axis.
 | `tournament` | string | `match.event_name` (exact OR canonical → IN variants) | `tournament=Indian%20Premier%20League` or `tournament=T20%20World%20Cup%20%28Men%29` |
 | `season_from` | string | `match.season >= ...` | `season_from=2024` |
 | `season_to` | string | `match.season <= ...` | `season_to=2024/25` |
+| `filter_venue` | string | `match.venue = ...` (exact canonical) | `filter_venue=Wankhede%20Stadium%2C%20Mumbai` |
 
 The `tournament` filter is canonicalization-aware everywhere. Pass
 `T20 World Cup (Men)` and FilterParams expands it to
@@ -65,6 +66,13 @@ Some endpoints also accept contextual filters:
   When both `filter_team` + `filter_opponent` are set on a tournament-
   dossier endpoint, the scope becomes a team-pair rivalry and summary
   responses gain a `by_team` companion object.
+
+`filter_venue` is an **ambient** filter (honored by every endpoint that
+echoes the FilterBar, same as `gender`/`season`). Must match the
+canonical venue name exactly — see the Conventions note above on venue
+canonicalization. The FilterBar's Venue typeahead (frontend) calls
+`/api/v1/venues?q=...` so the user doesn't need to know the exact
+canonical string.
 
 A handful of endpoints add endpoint-specific params (`limit`,
 `offset`, `min_balls`, `min_dismissals`, `min_wickets`, `q`, `role`,
@@ -152,6 +160,59 @@ curl "http://localhost:8000/api/v1/teams?q=India&team_type=international&gender=
 ```json
 { "teams": [ { "name": "India", "matches": 266 } ] }
 ```
+
+## `GET /api/v1/venues`
+
+Scope-narrowed venue list, used as the FilterBar's Venue typeahead
+(`components/VenueSearch.tsx`). Accepts all common filters except
+`filter_venue` itself (self-referential) plus:
+
+- `q` — substring match (case-insensitive) on `venue` OR `city`. When
+  absent, returns the top-50 by match count (enough for an empty-state
+  dropdown-on-focus).
+- `limit` — default 50, max 500.
+
+```bash
+curl "http://localhost:8000/api/v1/venues?q=wank&limit=3"
+```
+
+```json
+{
+  "venues": [
+    { "venue": "Wankhede Stadium, Mumbai", "city": "Mumbai",
+      "country": "India", "matches": 178 }
+  ]
+}
+```
+
+## `GET /api/v1/venues/landing`
+
+Country-grouped venue directory powering the `/venues` landing page.
+Accepts all common filters except `filter_venue`. Countries ordered by
+total match count DESC; venues within a country by match count DESC.
+
+```bash
+curl "http://localhost:8000/api/v1/venues/landing"
+```
+
+```json
+{
+  "by_country": [
+    { "country": "India", "matches": 2019, "venues": [
+        { "venue": "Wankhede Stadium, Mumbai", "city": "Mumbai", "matches": 178 },
+        { "venue": "Eden Gardens, Kolkata",    "city": "Kolkata", "matches": 146 },
+        { "venue": "M Chinnaswamy Stadium, Bengaluru", "city": "Bengaluru", "matches": 122 },
+        "… 75 more"
+    ] },
+    { "country": "England", "matches": 1942, "venues": [ "…" ] },
+    "…"
+  ]
+}
+```
+
+88 countries in the current DB. Filter-sensitive: with
+`?team_type=international&gender=male`, totals and venue inclusion
+narrow to men's internationals only.
 
 ## `GET /api/v1/players`
 

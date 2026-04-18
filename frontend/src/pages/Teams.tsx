@@ -98,6 +98,7 @@ export default function Teams() {
   const filterDeps = [
     selected, filters.gender, filters.team_type, filters.tournament,
     filters.season_from, filters.season_to,
+    filters.filter_venue,
   ]
 
   // Summary drives the page header — failure blocks the whole tab area.

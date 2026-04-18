@@ -66,6 +66,7 @@ function SinglePlayerView({ playerId }: { playerId: string }) {
     playerId, filters.gender, filters.team_type, filters.tournament,
     filters.season_from, filters.season_to,
     filters.filter_team, filters.filter_opponent,
+    filters.filter_venue,
   ]
 
   const profileFetch = useFetch<PlayerProfileT | null>(

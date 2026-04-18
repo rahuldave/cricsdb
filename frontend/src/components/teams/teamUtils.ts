@@ -40,5 +40,6 @@ export function carryTeamFilters(filters: FilterParams): Record<string, string> 
   if (filters.tournament)      out.tournament      = filters.tournament
   if (filters.season_from)     out.season_from     = filters.season_from
   if (filters.season_to)       out.season_to       = filters.season_to
+  if (filters.filter_venue)    out.filter_venue    = filters.filter_venue
   return out
 }

@@ -55,6 +55,7 @@ export default function Batting() {
     playerId, filters.gender, filters.team_type, filters.tournament,
     filters.season_from, filters.season_to,
     filters.filter_team, filters.filter_opponent,
+    filters.filter_venue,
   ]
 
   // Summary drives the page header — page-level state
@@ -475,6 +476,7 @@ function BattingLandingBoard({ filters, filterDeps }: BattingLandingBoardProps) 
   if (filters.tournament) carry.tournament = filters.tournament
   if (filters.season_from) carry.season_from = filters.season_from
   if (filters.season_to) carry.season_to = filters.season_to
+  if (filters.filter_venue) carry.filter_venue = filters.filter_venue
   const playerLink = (id: string) => {
     const qs = new URLSearchParams({ player: id, ...carry })
     return `/batting?${qs.toString()}`

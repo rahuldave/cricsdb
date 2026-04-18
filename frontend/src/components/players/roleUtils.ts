@@ -96,5 +96,6 @@ export function carryFilters(filters: FilterParams): Record<string, string> {
   if (filters.season_to)       out.season_to       = filters.season_to
   if (filters.filter_team)     out.filter_team     = filters.filter_team
   if (filters.filter_opponent) out.filter_opponent = filters.filter_opponent
+  if (filters.filter_venue)    out.filter_venue    = filters.filter_venue
   return out
 }

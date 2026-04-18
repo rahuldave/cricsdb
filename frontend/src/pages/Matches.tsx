@@ -36,7 +36,8 @@ export default function Matches() {
   // Reset pagination when filters change
   useEffect(() => { setOffset(0) }, [
     filters.gender, filters.team_type, filters.tournament,
-    filters.season_from, filters.season_to, team, playerId,
+    filters.season_from, filters.season_to, filters.filter_venue,
+    team, playerId,
   ])
 
   // Fetch match list
@@ -49,7 +50,8 @@ export default function Matches() {
       offset,
     }),
     [filters.gender, filters.team_type, filters.tournament,
-     filters.season_from, filters.season_to, team, playerId, offset],
+     filters.season_from, filters.season_to, filters.filter_venue,
+     team, playerId, offset],
   )
   const matches = listData?.matches ?? []
   const total = listData?.total ?? 0

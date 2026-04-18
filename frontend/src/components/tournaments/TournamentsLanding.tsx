@@ -18,6 +18,7 @@ function buildFilterQs(filters: ReturnType<typeof useFilters>): string {
   if (filters.team_type) p.set('team_type', filters.team_type)
   if (filters.season_from) p.set('season_from', filters.season_from)
   if (filters.season_to) p.set('season_to', filters.season_to)
+  if (filters.filter_venue) p.set('filter_venue', filters.filter_venue)
   return p.toString()
 }
 
@@ -161,7 +162,7 @@ export default function TournamentsLanding() {
   const { data, loading, error, refetch } = useFetch<TLandingData>(
     () => getTournamentsLanding(filters),
     [filters.gender, filters.team_type, filters.tournament,
-     filters.season_from, filters.season_to],
+     filters.season_from, filters.season_to, filters.filter_venue],
   )
 
   const [showOthersMen, setShowOthersMen] = useState(false)
@@ -172,14 +173,14 @@ export default function TournamentsLanding() {
       ? getTournamentOtherRivalries({ ...filters, gender: 'male' })
       : Promise.resolve(null),
     [showOthersMen, filters.team_type, filters.tournament,
-     filters.season_from, filters.season_to],
+     filters.season_from, filters.season_to, filters.filter_venue],
   )
   const othersWomenFetch = useFetch<{ rivalries: RivalryEntry[]; threshold: number } | null>(
     () => showOthersWomen
       ? getTournamentOtherRivalries({ ...filters, gender: 'female' })
       : Promise.resolve(null),
     [showOthersWomen, filters.team_type, filters.tournament,
-     filters.season_from, filters.season_to],
+     filters.season_from, filters.season_to, filters.filter_venue],
   )
 
   if (loading) return <Spinner label="Loading tournaments…" size="lg" />
