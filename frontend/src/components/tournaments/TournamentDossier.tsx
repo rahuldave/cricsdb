@@ -28,7 +28,6 @@ import type {
   MatchListItem,
   TournamentPartnershipsByWicket, TournamentPartnershipsTop,
   TournamentPartnershipTopEntry,
-  PersonRef,
 } from '../../types'
 
 const fmt = (v: number | null | undefined, d = 2) =>
@@ -50,12 +49,12 @@ const partnershipMatchLink = (
   )
 }
 
-const renderBatterPair = (b1: PersonRef, b2: PersonRef) => (
-  <>
-    <Link to={`/batting?player=${encodeURIComponent(b1.person_id)}`} className="comp-link">{b1.name}</Link>
-    {' & '}
-    <Link to={`/batting?player=${encodeURIComponent(b2.person_id)}`} className="comp-link">{b2.name}</Link>
-  </>
+type BatterLike = { person_id: string | null; name: string }
+const renderBatter = (b: BatterLike) => b.person_id
+  ? <Link to={`/batting?player=${encodeURIComponent(b.person_id)}`} className="comp-link">{b.name}</Link>
+  : <>{b.name}</>
+const renderBatterPair = (b1: BatterLike, b2: BatterLike) => (
+  <>{renderBatter(b1)}{' & '}{renderBatter(b2)}</>
 )
 
 const renderVsTeams = (team1: string, team2: string, sep = ' v ') => (
