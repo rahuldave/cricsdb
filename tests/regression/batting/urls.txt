@@ -1,0 +1,39 @@
+# Batting tab — endpoint inventory for the Batting page.
+#
+# Subjects: V Kohli (ba607b88 — male, international+IPL), SV Samson
+# (a4cc73aa — IPL). All REG; when refactoring a shared helper that
+# touches batting, add paired NEW entries for URLs you expect to drift.
+
+KOHLI=ba607b88
+
+# ── landing ──────────────────────────────────────────────────────
+REG bat_leaders_all                   /api/v1/batters/leaders
+REG bat_leaders_men_intl              /api/v1/batters/leaders?gender=male&team_type=international&limit=10
+REG bat_leaders_ipl_2024              /api/v1/batters/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=10
+REG bat_leaders_with_thresholds       /api/v1/batters/leaders?gender=male&team_type=international&min_balls=200&min_dismissals=5
+
+# ── per-batter endpoints (all tabs on the batting page) ──────────
+REG bat_summary_kohli_intl            /api/v1/batters/ba607b88/summary?gender=male&team_type=international
+REG bat_summary_kohli_ipl             /api/v1/batters/ba607b88/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG bat_summary_kohli_recent          /api/v1/batters/ba607b88/summary?gender=male&season_from=2024&season_to=2025
+REG bat_by_innings_kohli              /api/v1/batters/ba607b88/by-innings?limit=10
+REG bat_by_innings_kohli_ipl          /api/v1/batters/ba607b88/by-innings?tournament=Indian%20Premier%20League&limit=5
+REG bat_vs_bowlers_kohli              /api/v1/batters/ba607b88/vs-bowlers?gender=male&team_type=international&min_balls=12
+REG bat_vs_bowlers_kohli_vs_bumrah    /api/v1/batters/ba607b88/vs-bowlers?bowler_id=462411b3&min_balls=6
+REG bat_by_over_kohli                 /api/v1/batters/ba607b88/by-over?gender=male&team_type=international
+REG bat_by_phase_kohli                /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international
+REG bat_by_season_kohli               /api/v1/batters/ba607b88/by-season?gender=male
+REG bat_dismissals_kohli              /api/v1/batters/ba607b88/dismissals?gender=male&team_type=international
+REG bat_inter_wicket_kohli            /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international
+
+# ── rivalry scope (filter_team / filter_opponent) ────────────────
+REG bat_summary_kohli_vs_aus          /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+REG bat_by_innings_kohli_vs_aus       /api/v1/batters/ba607b88/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5
+REG bat_by_season_kohli_ipl_rcb       /api/v1/batters/ba607b88/by-season?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_team=Royal%20Challengers%20Bangalore
+
+# ── venue-scope sanity ───────────────────────────────────────────
+REG bat_summary_kohli_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+
+# ── search (landing → player picker) ─────────────────────────────
+REG ref_players_search_kohli          /api/v1/players?q=Kohli&limit=10
+REG ref_players_search_batter_role    /api/v1/players?q=Samson&role=batter&limit=5

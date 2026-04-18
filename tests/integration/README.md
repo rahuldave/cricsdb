@@ -10,20 +10,51 @@ against the real SQLite DB, and assert behaviour at the URL level.
 > `tests/integration/` on 2026-04-17 alongside a new
 > `tests/regression/` sibling. See `tests/README.md` for the split.
 
+## Script layout
+
+Scripts split into **per-tab** (happy-path for a single tab) and
+**cross-cutting** (concerns that span multiple tabs — URL-state
+contract, React mount/unmount hygiene). Cross-cutting scripts carry
+a `cross_cutting_` prefix so their nature is obvious at a glance.
+
+```
+integration/
+  README.md
+  teams.sh          — Teams landing, tabs, Compare, match list
+  batting.sh        — Batting leaders, player page, tabs, innings-list highlight
+  bowling.sh        — Bowling leaders, player page, tabs, innings-list highlight
+  fielding.sh       — Fielders, Keeping tab (conditional), filter_team auto-narrow
+  series.sh         — Series landing, dossier, series_type reset, legacy redirects
+  head_to_head.sh   — Player H2H + Team H2H (mode=team), series_type toggle
+  matches.sh        — Matches list, FilterBar push, scorecard, highlight_batter
+  players.sh        — Players landing, compare, ScopeIndicator, nav group
+  players_hygiene.sh — Players-tab mount/unmount (companion to players.sh)
+  venues.sh         — Venues landing + filter_venue fan-out
+  cross_cutting_url_state.sh       — ScopeIndicator + PlayerLink across tabs
+  cross_cutting_mount_unmount.sh   — React hygiene on rapid nav / fetch cancel
+```
+
 ## When to write one here
 
-When correctness depends on multiple layers cooperating. Concrete
-examples we have:
+When correctness depends on multiple layers cooperating. The
+per-tab scripts cover each tab's own happy path (landing, filters,
+sub-tabs, page-specific URL state); the cross-cutting scripts cover
+concerns that span the whole app (URL-state contract, React mount/
+unmount hygiene). Concrete examples:
 
-- `back_button_history.sh` — URL-state discipline: every user-
+- `cross_cutting_url_state.sh` — URL-state discipline: every user-
   initiated param change must push; every auto-correction must
-  replace. See `internal_docs/url-state.md` for the rules.
-- `mount_unmount.sh` — React hygiene: rapid navigation, fast filter
-  clicks, in-flight search fetches, ResizeObserver-heavy chart
-  unmounts. Catches missing `useEffect` cleanup, leftover listeners,
-  setState-after-unmount, stale-response leaks. Asserts on negative
-  signals (no page errors, no React warnings) rather than URL shape.
-- `players_tab.sh` — Players tab URL / behaviour discipline: deep-link
+  replace. See `internal_docs/url-state.md`. The tab-specific
+  instances (e.g. `/batting` gender fill, `/series` series_type
+  reset, `/matches` filter push) live in the per-tab scripts —
+  this file keeps only the cross-tab widgets (ScopeIndicator,
+  PlayerLink).
+- `cross_cutting_mount_unmount.sh` — React hygiene: rapid navigation,
+  fast filter clicks, in-flight search fetches, ResizeObserver-heavy
+  chart unmounts. Catches missing `useEffect` cleanup, leftover
+  listeners, setState-after-unmount, stale-response leaks. Asserts on
+  negative signals (no page errors, no React warnings).
+- `players.sh` — Players tab URL / behaviour discipline: deep-link
   gender auto-fill uses `replace`, landing tile clicks set
   `player`+`gender` atomically, 2-way compare renders both columns,
   cross-gender adds are refused in-place, ✕ drops the right column,
@@ -31,12 +62,11 @@ examples we have:
   `/batting` / `/bowling` / `/fielding`, mobile sub-row has all four
   entries, Home-page PlayerLink routes the name to `/players` and
   the `b`/`bw`/`f` subscripts to the discipline pages.
-- `players_hygiene.sh` — Players tab mount/unmount: rapid filter
-  toggling with a 2-way compare mounted, add-then-remove compare
-  with fetches in flight, rapid route hops across the Players
-  group, 3-way → 2-way via ✕, and fast landing tile clicks — all
-  asserted against negative signals (no page errors, no React
-  warnings).
+- `players_hygiene.sh` — Players tab mount/unmount (companion to
+  `players.sh`): rapid filter toggling with a 2-way compare mounted,
+  add-then-remove compare with fetches in flight, rapid route hops
+  across the Players group, 3-way → 2-way via ✕, and fast landing
+  tile clicks — all asserted against negative signals.
 
 Each script closes any lingering agent-browser session at the top so
 prior HMR state / cached bundles don't bleed in.
@@ -44,7 +74,7 @@ prior HMR state / cached bundles don't bleed in.
 Things that DON'T need integration tests (unit tests or API-level
 curl suffice):
 
-- Pure SQL logic (add to `integration_tests` only if the JSON
+- Pure SQL logic (add to `tests/integration/` only if the JSON
   response shape matters across many routes — then the approach in
   `internal_docs/regression-testing-api.md` is better).
 - Component rendering (TS type-check + manual browser-agent poke
@@ -79,8 +109,10 @@ Prerequisites:
   --port 8000`.
 
 ```bash
-./tests/integration/back_button_history.sh
 ./tests/integration/venues.sh
+./tests/integration/cross_cutting_url_state.sh
+# Or run them all (verbose; ~20 minutes total):
+for s in tests/integration/*.sh; do bash "$s"; done
 ```
 
 Output is a per-assertion `✓` / `✗` followed by a `Passed: N / Failed:
@@ -89,14 +121,15 @@ M` summary. Exits 0 on all-pass, 1 otherwise — fits into CI.
 Set `BASE` to test a non-default origin (prod sanity checks):
 
 ```bash
-BASE=https://t20.rahuldave.com ./tests/integration/back_button_history.sh
+BASE=https://t20.rahuldave.com ./tests/integration/venues.sh
 ```
 
 ## Writing a new one
 
-Copy `back_button_history.sh` and edit. The helpers at the top
-(`reset`, `click_ref`, `ref_for`, `assert_url_eq`,
-`assert_url_contains`, `settle`) cover the common patterns.
+Copy `teams.sh` (or any per-tab script) and edit. The helpers at
+the top (`reset`, `click_ref`, `ref_for`, `assert_url_eq`,
+`assert_url_contains`, `_innerText_has`, `assert_snapshot_contains`,
+`settle`) cover the common patterns.
 
 Two things worth remembering:
 

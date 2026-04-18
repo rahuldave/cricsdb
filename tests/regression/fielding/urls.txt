@@ -1,0 +1,38 @@
+# Fielding tab — endpoint inventory for the Fielding + Keeping pages.
+#
+# Subjects:
+#   - V Kohli (ba607b88) — Tier-1 fielder, covers the fielding tabs.
+#   - MS Dhoni (4a8a2e3b) — Tier-2 keeper, covers the keeping tabs
+#     (only shown when summary.innings_kept > 0).
+# All REG.
+
+# ── landing ──────────────────────────────────────────────────────
+REG field_leaders_all                 /api/v1/fielders/leaders
+REG field_leaders_men_intl            /api/v1/fielders/leaders?gender=male&team_type=international&limit=10
+REG field_leaders_ipl_2024            /api/v1/fielders/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=10
+
+# ── Tier-1 (fielding) endpoints ──────────────────────────────────
+REG field_summary_kohli_intl          /api/v1/fielders/ba607b88/summary?gender=male&team_type=international
+REG field_summary_kohli_ipl           /api/v1/fielders/ba607b88/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG field_by_season_kohli             /api/v1/fielders/ba607b88/by-season?gender=male&team_type=international
+REG field_by_phase_kohli              /api/v1/fielders/ba607b88/by-phase?gender=male&team_type=international
+REG field_by_over_kohli               /api/v1/fielders/ba607b88/by-over?gender=male&team_type=international
+REG field_dismissal_types_kohli       /api/v1/fielders/ba607b88/dismissal-types?gender=male&team_type=international
+REG field_victims_kohli               /api/v1/fielders/ba607b88/victims?gender=male&team_type=international
+REG field_by_innings_kohli            /api/v1/fielders/ba607b88/by-innings?gender=male&team_type=international&limit=10
+
+# ── Tier-2 (keeping) endpoints — Dhoni ───────────────────────────
+REG keep_summary_dhoni_intl           /api/v1/fielders/4a8a2e3b/keeping/summary?gender=male&team_type=international
+REG keep_summary_dhoni_ipl            /api/v1/fielders/4a8a2e3b/keeping/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG keep_by_season_dhoni              /api/v1/fielders/4a8a2e3b/keeping/by-season?gender=male&team_type=international
+REG keep_by_innings_dhoni             /api/v1/fielders/4a8a2e3b/keeping/by-innings?gender=male&team_type=international&limit=10
+REG keep_ambiguous_dhoni              /api/v1/fielders/4a8a2e3b/keeping/ambiguous?gender=male&team_type=international&limit=10
+
+# ── rivalry scope ────────────────────────────────────────────────
+REG field_summary_kohli_vs_aus        /api/v1/fielders/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+
+# ── venue-scope sanity ───────────────────────────────────────────
+REG field_summary_kohli_wankhede      /api/v1/fielders/ba607b88/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+
+# ── search ───────────────────────────────────────────────────────
+REG ref_players_search_fielder_role   /api/v1/players?q=Dhoni&role=fielder&limit=5

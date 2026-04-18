@@ -27,19 +27,33 @@ tests/
   README.md               — this file
   integration/            — agent-browser bash scripts
     README.md
-    back_button_history.sh
-    mount_unmount.sh
-    players_tab.sh
-    players_hygiene.sh
+    # per-tab happy paths
+    teams.sh
+    batting.sh
+    bowling.sh
+    fielding.sh
+    series.sh
+    head_to_head.sh
+    matches.sh
+    players.sh
+    players_hygiene.sh    — Players-tab mount/unmount companion
     venues.sh
-    …
+    # cross-cutting (span multiple tabs)
+    cross_cutting_url_state.sh       — ScopeIndicator + PlayerLink
+    cross_cutting_mount_unmount.sh   — React hygiene on rapid nav
   regression/             — backend URL md5-diff regression
     README.md
     run.sh                — generalised runner: stash → capture HEAD,
                             pop → capture patched, diff.
-    venues/
-      urls.txt
-    …per-feature subdirs
+    teams/    urls.txt
+    batting/  urls.txt
+    bowling/  urls.txt
+    fielding/ urls.txt
+    series/   urls.txt
+    head_to_head/ urls.txt
+    matches/  urls.txt
+    players/  urls.txt
+    venues/   urls.txt
 ```
 
 ## Running
@@ -70,7 +84,11 @@ feature's suite.
 
 ## Roadmap
 
-Next session goal (2026-04-17 plan): backfill a `regression/` URL
-inventory + `integration/` browser script for every top-level tab
-(Teams, Players + Batting/Bowling/Fielding, Head-to-Head, Series,
-Matches, Venues). Use the venues subdir as the template.
+Backfill landed 2026-04-17 — every top-level tab has a
+`regression/<tab>/urls.txt` and an `integration/<tab>.sh`. The
+cross-cutting tests were also reorganised: page-specific URL-state
+assertions moved from the former `back_button_history.sh` into the
+relevant per-tab script, and the file itself was renamed
+`cross_cutting_url_state.sh` to keep only ScopeIndicator + PlayerLink
+(which span multiple tabs). `mount_unmount.sh` was similarly renamed
+`cross_cutting_mount_unmount.sh`.

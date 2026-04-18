@@ -1,0 +1,46 @@
+# Head-to-Head tab — player-vs-player + team-vs-team (via series).
+#
+# Player-vs-player uses /api/v1/head-to-head/{batter}/{bowler}.
+# Team-vs-team (mode=team) reuses the /series/* dossier endpoints
+# with filter_team + filter_opponent — those URLs overlap with
+# tests/regression/series/urls.txt but are enumerated here under a
+# team-vs-team lens (often with series_type to partition bilateral /
+# icc / club).
+#
+# Subjects: Kohli (ba607b88) vs Bumrah (462411b3), Kohli vs Starc
+# (3fb19989 — bilateral angle), India vs Australia.
+
+# ── player-vs-player core ────────────────────────────────────────
+REG h2h_kohli_vs_bumrah_all           /api/v1/head-to-head/ba607b88/462411b3
+REG h2h_kohli_vs_bumrah_men_intl      /api/v1/head-to-head/ba607b88/462411b3?gender=male&team_type=international
+REG h2h_kohli_vs_bumrah_ipl           /api/v1/head-to-head/ba607b88/462411b3?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG h2h_kohli_vs_starc_intl           /api/v1/head-to-head/ba607b88/3fb19989?gender=male&team_type=international
+
+# ── series_type partitioning ─────────────────────────────────────
+REG h2h_kohli_vs_starc_bilateral      /api/v1/head-to-head/ba607b88/3fb19989?series_type=bilateral
+REG h2h_kohli_vs_starc_icc            /api/v1/head-to-head/ba607b88/3fb19989?series_type=icc
+REG h2h_kohli_vs_bumrah_club          /api/v1/head-to-head/ba607b88/462411b3?series_type=club
+# Legacy alias URLs — must still resolve.
+REG h2h_kohli_vs_starc_bilonly        /api/v1/head-to-head/ba607b88/3fb19989?series_type=bilateral_only
+REG h2h_kohli_vs_bumrah_tournonly     /api/v1/head-to-head/ba607b88/462411b3?series_type=tournament_only
+
+# ── filter-scope sanity ──────────────────────────────────────────
+REG h2h_kohli_vs_bumrah_2024          /api/v1/head-to-head/ba607b88/462411b3?season_from=2024&season_to=2024
+REG h2h_kohli_vs_bumrah_wankhede      /api/v1/head-to-head/ba607b88/462411b3?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+
+# ── team-vs-team (mode=team) backs these via /series/* ───────────
+REG h2h_team_summary_ind_aus          /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male&team_type=international
+REG h2h_team_by_season_ind_aus        /api/v1/series/by-season?filter_team=India&filter_opponent=Australia&gender=male&team_type=international
+REG h2h_team_records_ind_aus          /api/v1/series/records?filter_team=India&filter_opponent=Australia&gender=male&team_type=international&limit=3
+REG h2h_team_batters_ind_aus          /api/v1/series/batters-leaders?filter_team=India&filter_opponent=Australia&gender=male&team_type=international&limit=5
+REG h2h_team_bowlers_ind_aus          /api/v1/series/bowlers-leaders?filter_team=India&filter_opponent=Australia&gender=male&team_type=international&limit=5
+
+# ── team-vs-team series_type variants ────────────────────────────
+REG h2h_team_summary_ind_aus_bil      /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male&team_type=international&series_type=bilateral_only
+REG h2h_team_summary_ind_aus_tourn    /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male&team_type=international&series_type=tournament_only
+
+# ── club-pair team-vs-team (MI vs CSK) ───────────────────────────
+REG h2h_team_summary_mi_csk           /api/v1/series/summary?filter_team=Mumbai%20Indians&filter_opponent=Chennai%20Super%20Kings&gender=male&team_type=club&tournament=Indian%20Premier%20League
+
+# ── search (suggestion tiles) ────────────────────────────────────
+REG ref_players_search_starc          /api/v1/players?q=Starc&role=bowler&limit=3

@@ -1,0 +1,39 @@
+# Bowling tab — endpoint inventory for the Bowling page.
+#
+# Subject: JJ Bumrah (462411b3 — male, international+IPL). All REG;
+# when refactoring a shared helper that touches bowling, add paired
+# NEW entries for URLs you expect to drift.
+#
+# Bowling-specific conventions (from CLAUDE.md): response fields are
+# `wickets` not `dismissals`, `runs_conceded` not `runs`. Don't reuse
+# batting types.
+
+# ── landing ──────────────────────────────────────────────────────
+REG bow_leaders_all                   /api/v1/bowlers/leaders
+REG bow_leaders_men_intl              /api/v1/bowlers/leaders?gender=male&team_type=international&limit=10
+REG bow_leaders_ipl_2024              /api/v1/bowlers/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=10
+REG bow_leaders_with_thresholds       /api/v1/bowlers/leaders?gender=male&team_type=international&min_balls=120&min_wickets=5
+
+# ── per-bowler endpoints (all tabs on the bowling page) ──────────
+REG bow_summary_bumrah_intl           /api/v1/bowlers/462411b3/summary?gender=male&team_type=international
+REG bow_summary_bumrah_ipl            /api/v1/bowlers/462411b3/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG bow_summary_bumrah_recent         /api/v1/bowlers/462411b3/summary?gender=male&season_from=2024&season_to=2025
+REG bow_by_innings_bumrah             /api/v1/bowlers/462411b3/by-innings?limit=10
+REG bow_by_innings_bumrah_ipl         /api/v1/bowlers/462411b3/by-innings?tournament=Indian%20Premier%20League&limit=5
+REG bow_vs_batters_bumrah             /api/v1/bowlers/462411b3/vs-batters?gender=male&team_type=international&min_balls=12
+REG bow_vs_batters_bumrah_vs_kohli    /api/v1/bowlers/462411b3/vs-batters?batter_id=ba607b88&min_balls=6
+REG bow_by_over_bumrah                /api/v1/bowlers/462411b3/by-over?gender=male&team_type=international
+REG bow_by_phase_bumrah               /api/v1/bowlers/462411b3/by-phase?gender=male&team_type=international
+REG bow_by_season_bumrah              /api/v1/bowlers/462411b3/by-season?gender=male
+REG bow_wickets_bumrah                /api/v1/bowlers/462411b3/wickets?gender=male&team_type=international
+
+# ── rivalry scope ────────────────────────────────────────────────
+REG bow_summary_bumrah_vs_aus         /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+REG bow_by_innings_bumrah_vs_aus      /api/v1/bowlers/462411b3/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5
+
+# ── venue-scope sanity ───────────────────────────────────────────
+REG bow_summary_bumrah_wankhede       /api/v1/bowlers/462411b3/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+
+# ── search ───────────────────────────────────────────────────────
+REG ref_players_search_bumrah         /api/v1/players?q=Bumrah&limit=5
+REG ref_players_search_bowler_role    /api/v1/players?q=Starc&role=bowler&limit=5

@@ -1,0 +1,58 @@
+# Series tab — endpoint inventory for the Series landing + dossier.
+#
+# Covers:
+#   - landing (sectioned catalog)
+#   - single-tournament dossier (IPL all-time, IPL 2024 single-season)
+#   - bilateral rivalry dossier (India vs Australia)
+#   - team-pair scope inside a tournament (IND vs AUS at T20 WC)
+#   - legacy /rivalries/summary endpoint
+#   - series_type variants (all / bilateral_only / tournament_only)
+#
+# All REG.
+
+# ── landing ──────────────────────────────────────────────────────
+REG series_landing_plain              /api/v1/series/landing
+REG series_landing_men                /api/v1/series/landing?gender=male
+REG series_landing_women              /api/v1/series/landing?gender=female
+
+# ── tournament dossier: IPL all-time ─────────────────────────────
+REG series_summary_ipl                /api/v1/series/summary?tournament=Indian%20Premier%20League
+REG series_by_season_ipl              /api/v1/series/by-season?tournament=Indian%20Premier%20League&gender=male&team_type=club
+REG series_records_ipl                /api/v1/series/records?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
+REG series_batters_leaders_ipl        /api/v1/series/batters-leaders?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
+REG series_bowlers_leaders_ipl        /api/v1/series/bowlers-leaders?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
+REG series_fielders_leaders_ipl       /api/v1/series/fielders-leaders?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
+REG series_partnerships_by_wkt_ipl    /api/v1/series/partnerships/by-wicket?tournament=Indian%20Premier%20League&gender=male&team_type=club
+REG series_partnerships_top_ipl       /api/v1/series/partnerships/top?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
+REG series_partnerships_heatmap_ipl   /api/v1/series/partnerships/heatmap?tournament=Indian%20Premier%20League&gender=male&team_type=club
+
+# ── single-season (points table) ─────────────────────────────────
+REG series_points_table_ipl_2024      /api/v1/series/points-table?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&gender=male&team_type=club
+REG series_summary_ipl_2024           /api/v1/series/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&gender=male&team_type=club
+
+# ── ICC event canonicalization (IN-variant expansion) ────────────
+REG series_summary_t20wc_men          /api/v1/series/summary?tournament=T20%20World%20Cup%20%28Men%29&gender=male
+REG series_batters_t20wc_men          /api/v1/series/batters-leaders?tournament=T20%20World%20Cup%20%28Men%29&gender=male&limit=5
+
+# ── bilateral rivalry (filter_team + filter_opponent) ────────────
+REG series_summary_ind_vs_aus         /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male
+REG series_by_season_ind_vs_aus       /api/v1/series/by-season?filter_team=India&filter_opponent=Australia&gender=male
+REG series_records_ind_vs_aus         /api/v1/series/records?filter_team=India&filter_opponent=Australia&gender=male&limit=3
+REG series_batters_ind_vs_aus         /api/v1/series/batters-leaders?filter_team=India&filter_opponent=Australia&gender=male&limit=5
+
+# ── series_type variants ─────────────────────────────────────────
+REG series_summary_ind_aus_bilateral  /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male&series_type=bilateral_only
+REG series_summary_ind_aus_tournament /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male&series_type=tournament_only
+
+# ── team-pair inside a tournament ────────────────────────────────
+REG series_summary_ind_aus_at_t20wc   /api/v1/series/summary?tournament=T20%20World%20Cup%20%28Men%29&filter_team=India&filter_opponent=Australia&gender=male
+
+# ── other-rivalries (lazy load) ──────────────────────────────────
+REG series_other_rivalries_men        /api/v1/series/other-rivalries?gender=male
+REG series_other_rivalries_women      /api/v1/series/other-rivalries?gender=female
+
+# ── legacy rivalries/summary ─────────────────────────────────────
+REG rivalries_summary_ind_aus         /api/v1/rivalries/summary?team1=India&team2=Australia&gender=male
+
+# ── venue scope (Phase 2 filter_venue fan-out) ───────────────────
+REG series_summary_ipl_wankhede       /api/v1/series/summary?tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium%2C%20Mumbai

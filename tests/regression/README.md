@@ -14,10 +14,15 @@ in the right direction.
 regression/
   README.md               — this file
   run.sh                  — the runner
-  venues/
-    urls.txt              — Phase 2 filter_venue coverage
-  <feature>/
-    urls.txt
+  teams/           urls.txt   — Teams endpoint inventory
+  batting/         urls.txt   — Batting endpoint inventory
+  bowling/         urls.txt   — Bowling endpoint inventory
+  fielding/        urls.txt   — Fielding + Keeping endpoints
+  series/          urls.txt   — Series landing + dossier endpoints
+  head_to_head/    urls.txt   — Player H2H + team H2H (via /series)
+  matches/         urls.txt   — /matches list + scorecard
+  players/         urls.txt   — Players composer (4-way summary bundle)
+  venues/          urls.txt   — Phase 2 filter_venue fan-out
 ```
 
 Each feature subdir owns one `urls.txt`. Line format:
@@ -77,3 +82,14 @@ Exit 0 on zero REG drifts + zero NEW unchanged; non-zero otherwise.
    errors in the manifest.
 4. Make your change. Run `./tests/regression/run.sh <feature>`.
 5. Inspect any drift. Fix and re-run until REG:0 drifted.
+
+## Per-tab suites
+
+The per-tab suites (teams, batting, bowling, fielding, series,
+head_to_head, matches, players) are all-REG inventories: they
+document which endpoints each tab's page family hits, across
+representative filter combinations. Extending them is standard —
+when you ship a shared-helper change that touches a tab, add paired
+NEW entries in that tab's `urls.txt` for the URLs you expect to
+drift, run, and remove the NEW entries after the change lands (or
+keep them if they encode invariants worth protecting long-term).

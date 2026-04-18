@@ -1,0 +1,54 @@
+# Players tab — endpoint inventory for the Players landing + single-
+# player + compare views.
+#
+# The Players tab has no dedicated backend — it composes four summary
+# endpoints per player (batting + bowling + fielding + keeping) via
+# the client-side getPlayerProfile(). For an N-way compare, N * 4
+# parallel summaries fire. These are the endpoints this tab touches.
+#
+# Subjects:
+#   - V Kohli       (ba607b88) — specialist batter, male
+#   - JJ Bumrah     (462411b3) — specialist bowler, male
+#   - KA Pollard    (a757b0d8) — all-rounder, club
+#   - MS Dhoni      (4a8a2e3b) — keeper-batter, male/intl (keeping path)
+#   - S Mandhana    (5d2eda89) — women's (cross-gender sanity)
+# All REG.
+
+# ── search ───────────────────────────────────────────────────────
+REG players_search_kohli              /api/v1/players?q=Kohli&limit=10
+REG players_search_bumrah             /api/v1/players?q=Bumrah&limit=5
+REG players_search_mandhana           /api/v1/players?q=Mandhana&limit=5
+REG players_search_short              /api/v1/players?q=KL&limit=5
+
+# ── Kohli profile bundle (batter-role tile shows bat stat strip) ─
+REG player_kohli_bat_summary          /api/v1/batters/ba607b88/summary?gender=male&team_type=international
+REG player_kohli_bow_summary          /api/v1/bowlers/ba607b88/summary?gender=male&team_type=international
+REG player_kohli_field_summary        /api/v1/fielders/ba607b88/summary?gender=male&team_type=international
+REG player_kohli_keep_summary         /api/v1/fielders/ba607b88/keeping/summary?gender=male&team_type=international
+
+# ── Bumrah profile bundle (bowler-role tile) ────────────────────
+REG player_bumrah_bat_summary         /api/v1/batters/462411b3/summary?gender=male&team_type=international
+REG player_bumrah_bow_summary         /api/v1/bowlers/462411b3/summary?gender=male&team_type=international
+REG player_bumrah_field_summary       /api/v1/fielders/462411b3/summary?gender=male&team_type=international
+REG player_bumrah_keep_summary        /api/v1/fielders/462411b3/keeping/summary?gender=male&team_type=international
+
+# ── Dhoni profile bundle (keeper path exercised) ────────────────
+REG player_dhoni_bat_summary          /api/v1/batters/4a8a2e3b/summary?gender=male&team_type=international
+REG player_dhoni_bow_summary          /api/v1/bowlers/4a8a2e3b/summary?gender=male&team_type=international
+REG player_dhoni_field_summary        /api/v1/fielders/4a8a2e3b/summary?gender=male&team_type=international
+REG player_dhoni_keep_summary         /api/v1/fielders/4a8a2e3b/keeping/summary?gender=male&team_type=international
+
+# ── Mandhana profile bundle (women's) ───────────────────────────
+REG player_mandhana_bat_summary       /api/v1/batters/5d2eda89/summary?gender=female&team_type=international
+REG player_mandhana_field_summary     /api/v1/fielders/5d2eda89/summary?gender=female&team_type=international
+
+# ── compare scope narrowing (rivalry lens applies to all tiles) ─
+REG player_kohli_bat_vs_aus           /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+REG player_kohli_bow_vs_aus           /api/v1/bowlers/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+REG player_bumrah_bat_vs_aus          /api/v1/batters/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+REG player_bumrah_bow_vs_aus          /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+
+# ── landings the Players page may cross-link to ─────────────────
+REG bat_leaders_from_players          /api/v1/batters/leaders?gender=male&team_type=international&limit=5
+REG bow_leaders_from_players          /api/v1/bowlers/leaders?gender=male&team_type=international&limit=5
+REG field_leaders_from_players        /api/v1/fielders/leaders?gender=male&team_type=international&limit=5

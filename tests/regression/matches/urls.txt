@@ -1,0 +1,24 @@
+# Matches tab — endpoint inventory for match list + scorecard.
+#
+# Subjects:
+#   - match_id 13017 — a recent men's international (used for
+#     scorecard + innings-grid).
+# All REG.
+
+# ── match list ───────────────────────────────────────────────────
+REG matches_list_plain                /api/v1/matches?limit=5
+REG matches_list_men_intl             /api/v1/matches?gender=male&team_type=international&limit=5
+REG matches_list_men_intl_offset      /api/v1/matches?gender=male&team_type=international&limit=5&offset=10
+REG matches_list_ipl_2024             /api/v1/matches?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=5
+REG matches_list_women                /api/v1/matches?gender=female&limit=5
+REG matches_list_wankhede             /api/v1/matches?filter_venue=Wankhede%20Stadium%2C%20Mumbai&limit=5
+REG matches_list_t20wc_men            /api/v1/matches?tournament=T20%20World%20Cup%20%28Men%29&gender=male&limit=5
+
+# ── filter_team + filter_opponent (rivalry lens) ─────────────────
+REG matches_list_ind_vs_aus           /api/v1/matches?filter_team=India&filter_opponent=Australia&gender=male&team_type=international&limit=5
+
+# ── scorecard ────────────────────────────────────────────────────
+REG match_scorecard_13017             /api/v1/matches/13017/scorecard
+
+# ── innings-grid ─────────────────────────────────────────────────
+REG match_innings_grid_13017          /api/v1/matches/13017/innings-grid

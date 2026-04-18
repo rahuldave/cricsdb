@@ -1,0 +1,66 @@
+# Teams tab — endpoint inventory for the Teams page family.
+#
+# Exercises every backend endpoint the Teams route hits, across
+# representative filter combinations. All entries are REG — they
+# document current behaviour. When refactoring a shared helper that
+# touches Teams endpoints, add paired NEW entries in this file for
+# the URLs you expect to drift.
+#
+# Subjects: India (men's international), Mumbai Indians (men's club, IPL).
+# Australia is used as the opponent for the vs-opponent endpoint.
+
+# ── landing ──────────────────────────────────────────────────────
+REG teams_landing_plain               /api/v1/teams/landing
+REG teams_landing_men_intl            /api/v1/teams/landing?gender=male&team_type=international
+REG teams_landing_men_club_ipl_2024   /api/v1/teams/landing?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+REG teams_landing_women               /api/v1/teams/landing?gender=female
+
+# ── team summary / headline endpoints ────────────────────────────
+REG team_summary_india                /api/v1/teams/India/summary?gender=male&team_type=international
+REG team_summary_india_recent         /api/v1/teams/India/summary?gender=male&team_type=international&season_from=2024&season_to=2025
+REG team_summary_mi                   /api/v1/teams/Mumbai%20Indians/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG team_results_india                /api/v1/teams/India/results?gender=male&team_type=international&limit=5
+REG team_results_india_offset         /api/v1/teams/India/results?gender=male&team_type=international&limit=5&offset=5
+REG team_by_season_india              /api/v1/teams/India/by-season?gender=male&team_type=international
+REG team_players_by_season_india      /api/v1/teams/India/players-by-season?gender=male&team_type=international&season_from=2024&season_to=2024
+REG team_opponents_india              /api/v1/teams/India/opponents?gender=male&team_type=international
+REG team_opponents_matrix_india       /api/v1/teams/India/opponents-matrix?gender=male&team_type=international&top_n=5
+REG team_vs_opponent_ind_aus          /api/v1/teams/India/vs/Australia?gender=male&team_type=international&season_from=2024&season_to=2025
+
+# ── ball-level tabs: Batting ─────────────────────────────────────
+REG team_batting_summary_india        /api/v1/teams/India/batting/summary?gender=male&team_type=international
+REG team_batting_by_season_india      /api/v1/teams/India/batting/by-season?gender=male&team_type=international
+REG team_batting_by_phase_india       /api/v1/teams/India/batting/by-phase?gender=male&team_type=international
+REG team_batting_top_batters_india    /api/v1/teams/India/batting/top-batters?gender=male&team_type=international&limit=5
+REG team_batting_heatmap_india        /api/v1/teams/India/batting/phase-season-heatmap?gender=male&team_type=international
+
+# ── Bowling ──────────────────────────────────────────────────────
+REG team_bowling_summary_india        /api/v1/teams/India/bowling/summary?gender=male&team_type=international
+REG team_bowling_by_season_india      /api/v1/teams/India/bowling/by-season?gender=male&team_type=international
+REG team_bowling_by_phase_india       /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international
+REG team_bowling_top_bowlers_india    /api/v1/teams/India/bowling/top-bowlers?gender=male&team_type=international&limit=5
+REG team_bowling_heatmap_india        /api/v1/teams/India/bowling/phase-season-heatmap?gender=male&team_type=international
+
+# ── Fielding ─────────────────────────────────────────────────────
+REG team_fielding_summary_india       /api/v1/teams/India/fielding/summary?gender=male&team_type=international
+REG team_fielding_by_season_india     /api/v1/teams/India/fielding/by-season?gender=male&team_type=international
+REG team_fielding_top_fielders_india  /api/v1/teams/India/fielding/top-fielders?gender=male&team_type=international&limit=5
+
+# ── Partnerships ─────────────────────────────────────────────────
+REG team_partnerships_summary_india   /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=batting
+REG team_partnerships_by_wicket_india /api/v1/teams/India/partnerships/by-wicket?gender=male&team_type=international&side=batting
+REG team_partnerships_best_pairs_ind  /api/v1/teams/India/partnerships/best-pairs?gender=male&team_type=international&side=batting
+REG team_partnerships_heatmap_india   /api/v1/teams/India/partnerships/heatmap?gender=male&team_type=international&side=batting
+REG team_partnerships_top_india       /api/v1/teams/India/partnerships/top?gender=male&team_type=international&side=batting&limit=5
+
+# ── bowling-side partnerships (against the team) ────────────────
+REG team_partnerships_bowling_summary /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=bowling
+
+# ── club-team variant (Mumbai Indians) ───────────────────────────
+REG team_mi_batting_summary           /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG team_mi_bowling_top               /api/v1/teams/Mumbai%20Indians/bowling/top-bowlers?gender=male&team_type=club&tournament=Indian%20Premier%20League&limit=3
+
+# ── reference (FilterBar support) ────────────────────────────────
+REG ref_teams_search_india            /api/v1/teams?q=India&team_type=international&gender=male
+REG ref_seasons_india                 /api/v1/seasons?team=India&gender=male&team_type=international
+REG ref_tournaments_india             /api/v1/tournaments?team=India&gender=male&team_type=international

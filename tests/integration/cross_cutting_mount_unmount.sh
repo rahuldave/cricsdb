@@ -1,12 +1,14 @@
 #!/bin/bash
-# Mount / unmount hygiene tests.
+# Cross-cutting mount / unmount hygiene tests.
 #
 # Verifies that rapid navigation, fast filter changes, and in-flight
 # searches don't produce console errors, page errors, or stale-data
 # leaks. Tests here drive the real browser and assert on negative
 # signals (no errors / no stale content) — good for catching things
 # like missing cleanup in useEffect, leftover listeners, setState
-# after unmount.
+# after unmount. React-hygiene concerns apply across every page; this
+# file exercises a representative subset. Players-tab-specific mount/
+# unmount coverage lives in players_hygiene.sh.
 #
 # Prerequisites + how to run: see README.md.
 set -u
