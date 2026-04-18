@@ -20,8 +20,8 @@ const navItems: NavItem[] = [
     { to: '/bowling',  label: 'Bowling'  },
     { to: '/fielding', label: 'Fielding' },
   ]},
-  { to: '/venues', label: 'Venues' },
   { to: '/head-to-head', label: 'Head to Head' },
+  { to: '/venues', label: 'Venues' },
   { to: '/matches', label: 'Matches' },
 ]
 
