@@ -6,7 +6,7 @@ import type {
   BowlingSummary, BowlingInnings, BatterMatchup, WicketAnalysis,
   HeadToHeadResponse,
   MatchListItem, Scorecard, InningsGridResponse,
-  VenueInfo, VenuesLanding,
+  VenueInfo, VenuesLanding, VenueSummary,
 } from './types'
 
 async function fetchApi<T>(path: string, params?: Record<string, string | number | undefined | null>): Promise<T> {
@@ -48,6 +48,11 @@ export const getVenues = (filters?: F & { q?: string; limit?: number }) =>
   fetchApi<{ venues: VenueInfo[] }>('/api/v1/venues', filters as Record<string, string>)
 export const getVenuesLanding = (filters?: F) =>
   fetchApi<VenuesLanding>('/api/v1/venues/landing', filters as Record<string, string>)
+export const getVenueSummary = (venue: string, filters?: F) =>
+  fetchApi<VenueSummary>(
+    `/api/v1/venues/${encodeURIComponent(venue)}/summary`,
+    filters as Record<string, string>,
+  )
 
 // Teams
 export const getTeamSummary = (team: string, filters?: F) =>

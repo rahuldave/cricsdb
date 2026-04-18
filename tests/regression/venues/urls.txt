@@ -9,53 +9,68 @@
 # Subjects: Kohli=ba607b88, Bumrah=462411b3, India team, IPL event.
 # Wankhede is the chosen venue — 178 match-rows in scope.
 
+# All filter_venue flavour URLs are REG now — Phase 2 shipped and
+# made them part of the stable API. Phase 3 must not perturb them.
+#
 # ── batting (auto-covered via FilterParams) ──────────────────────
 REG bat_summary_plain                 /api/v1/batters/ba607b88/summary
 REG bat_summary_ipl                   /api/v1/batters/ba607b88/summary?tournament=Indian%20Premier%20League
 REG bat_byinn_plain                   /api/v1/batters/ba607b88/by-innings?limit=5
-NEW bat_summary_venue_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
-NEW bat_byinn_venue_wankhede          /api/v1/batters/ba607b88/by-innings?filter_venue=Wankhede%20Stadium%2C%20Mumbai&limit=5
+REG bat_summary_venue_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG bat_byinn_venue_wankhede          /api/v1/batters/ba607b88/by-innings?filter_venue=Wankhede%20Stadium%2C%20Mumbai&limit=5
 
 # ── bowling ──────────────────────────────────────────────────────
 REG bow_summary_plain                 /api/v1/bowlers/462411b3/summary
 REG bow_summary_ipl                   /api/v1/bowlers/462411b3/summary?tournament=Indian%20Premier%20League
-NEW bow_summary_venue_wankhede        /api/v1/bowlers/462411b3/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG bow_summary_venue_wankhede        /api/v1/bowlers/462411b3/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
 
 # ── fielding ─────────────────────────────────────────────────────
 REG field_summary_plain               /api/v1/fielders/ba607b88/summary
-NEW field_summary_venue_wankhede      /api/v1/fielders/ba607b88/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG field_summary_venue_wankhede      /api/v1/fielders/ba607b88/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
 
 # ── teams (uses filters.build directly via _team_filter_clause) ──
 REG teams_landing_plain               /api/v1/teams/landing
 REG team_summary_india                /api/v1/teams/India/summary?gender=male&team_type=international
-NEW team_summary_india_venue_wank     /api/v1/teams/India/summary?gender=male&team_type=international&filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG team_summary_india_venue_wank     /api/v1/teams/India/summary?gender=male&team_type=international&filter_venue=Wankhede%20Stadium%2C%20Mumbai
 REG team_results_india                /api/v1/teams/India/results?gender=male&team_type=international&limit=5
 
 # ── head_to_head (path params; not query) ────────────────────────
 REG h2h_plain                         /api/v1/head-to-head/ba607b88/462411b3
-NEW h2h_venue_wankhede                /api/v1/head-to-head/ba607b88/462411b3?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG h2h_venue_wankhede                /api/v1/head-to-head/ba607b88/462411b3?filter_venue=Wankhede%20Stadium%2C%20Mumbai
 
 # ── matches ──────────────────────────────────────────────────────
 REG matches_plain                     /api/v1/matches?gender=male&team_type=international&limit=5
-NEW matches_venue_wankhede            /api/v1/matches?filter_venue=Wankhede%20Stadium%2C%20Mumbai&limit=5
+REG matches_venue_wankhede            /api/v1/matches?filter_venue=Wankhede%20Stadium%2C%20Mumbai&limit=5
 
 # ── reference.list_teams (hand-rolled helper) ────────────────────
 REG ref_list_teams_plain              /api/v1/teams?gender=male&team_type=international
-NEW ref_list_teams_venue_wankhede     /api/v1/teams?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG ref_list_teams_venue_wankhede     /api/v1/teams?filter_venue=Wankhede%20Stadium%2C%20Mumbai
 
 # ── series / tournaments (hand-rolled helper used by 13 eps) ─────
 REG series_landing_plain              /api/v1/series/landing
 REG series_summary_ipl                /api/v1/series/summary?tournament=Indian%20Premier%20League
-NEW series_summary_ipl_venue_wankhede /api/v1/series/summary?tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG series_summary_ipl_venue_wankhede /api/v1/series/summary?tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium%2C%20Mumbai
 REG series_records_ipl                /api/v1/series/records?tournament=Indian%20Premier%20League
 REG series_batters_ipl                /api/v1/series/batters-leaders?tournament=Indian%20Premier%20League&limit=5
-NEW series_batters_ipl_venue          /api/v1/series/batters-leaders?tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium%2C%20Mumbai&limit=5
+REG series_batters_ipl_venue          /api/v1/series/batters-leaders?tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium%2C%20Mumbai&limit=5
 
 # ── reference (control — MUST NOT drift when filter_venue toggles) ─
 REG ref_tournaments_plain             /api/v1/tournaments?gender=male&team_type=international
 REG ref_seasons_ipl                   /api/v1/seasons?tournament=Indian%20Premier%20League
 
-# ── venues router (Phase 2 new endpoints) ────────────────────────
-# Not included as REG/NEW here because they don't exist on HEAD —
-# they'd show as MISSING on HEAD and be noise in the diff. They're
-# exercised by tests/integration/venues.sh instead.
+# ── venues router (Phase 2 endpoints — stable between refactors) ─
+# Now that Phase 2 has shipped, the typeahead + landing + canonical
+# responses should be byte-identical across refactors that don't
+# touch them. Runs as REG against whatever HEAD looks like at the
+# time of the diff.
+REG venues_typeahead_wank          /api/v1/venues?q=Wank
+REG venues_landing_plain           /api/v1/venues/landing
+REG venues_landing_male_intl       /api/v1/venues/landing?gender=male&team_type=international
+
+# ── Phase 3: /venues/{venue}/summary ─────────────────────────────
+# New endpoint — all rows marked NEW (no baseline on HEAD).
+NEW venue_summary_wank_plain       /api/v1/venues/Wankhede%20Stadium%2C%20Mumbai/summary
+NEW venue_summary_wank_female      /api/v1/venues/Wankhede%20Stadium%2C%20Mumbai/summary?gender=female
+NEW venue_summary_wank_ipl         /api/v1/venues/Wankhede%20Stadium%2C%20Mumbai/summary?tournament=Indian%20Premier%20League
+NEW venue_summary_chepauk_plain    /api/v1/venues/MA%20Chidambaram%20Stadium%2C%20Chepauk/summary
+NEW venue_summary_chepauk_male     /api/v1/venues/MA%20Chidambaram%20Stadium%2C%20Chepauk/summary?gender=male

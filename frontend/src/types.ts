@@ -1407,3 +1407,48 @@ export interface VenueCountryGroup {
 export interface VenuesLanding {
   by_country: VenueCountryGroup[]
 }
+
+// ─── Venues (Phase 3 — dossier) ──────────────────────────────────────
+
+export interface VenueTGSRow {
+  tournament: string
+  gender: string | null
+  season: string
+  matches: number
+}
+
+export interface VenueTotalEntry {
+  runs: number
+  team: string
+  opponent: string
+  match_id: number
+  season: string | null
+  date: string | null
+}
+
+export interface VenueTossWinEntry {
+  wins: number
+  decided: number
+  win_pct: number | null
+}
+
+export interface VenueSummary {
+  venue: string
+  city: string | null
+  country: string | null
+  matches: number
+  by_tournament_gender_season: VenueTGSRow[]
+  avg_first_innings_total: number | null
+  first_innings_sample: number
+  bat_first_wins: number
+  chase_wins: number
+  indecisive: number
+  bat_first_win_pct: number | null
+  chase_win_pct: number | null
+  toss_decision_split: Record<string, number>
+  toss_and_win_pct: Record<string, VenueTossWinEntry>
+  boundary_pct_by_phase: { powerplay: number | null; middle: number | null; death: number | null }
+  dot_pct_by_phase: { powerplay: number | null; middle: number | null; death: number | null }
+  highest_total: VenueTotalEntry | null
+  lowest_all_out: VenueTotalEntry | null
+}

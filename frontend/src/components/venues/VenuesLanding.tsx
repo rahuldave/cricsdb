@@ -1,6 +1,5 @@
-import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import type { FilterParams, VenuesLanding } from '../../types'
+import { useMemo, useState } from 'react'
+import type { FilterParams, VenuesLanding, VenueCountryGroup } from '../../types'
 import { getVenuesLanding } from '../../api'
 import { useFetch } from '../../hooks/useFetch'
 import { useSetUrlParams } from '../../hooks/useUrlState'
@@ -15,19 +14,45 @@ interface Props {
 /**
  * Country-grouped venue directory. Top-3 countries by match count are
  * open by default; the rest collapse so a long tail (80+ associate
- * nations) doesn't swamp the page. Tile click sets filter_venue and
- * navigates to /matches — the Phase 2 default drilldown. Phase 3 will
- * swap this for a per-venue dossier at /venues?venue=X.
+ * nations) doesn't swamp the page. Tile click opens the per-venue
+ * dossier in-place via `?venue=<canonical>` — Venues.tsx switches
+ * landing ↔ dossier on the same page.
+ *
+ * Inline **search** input does a client-side substring match on venue
+ * name + city against the full 456-row landing payload (one-shot
+ * fetch, no extra round-trip per keystroke). When the query is
+ * non-empty, countries without any matching venue drop out and every
+ * surviving country is force-expanded. The FilterBar's Venue typeahead
+ * is NOT the right tool for this tab — it selects a single venue and
+ * Venues.tsx now promotes that pick to the dossier URL. This search
+ * is the tab-local analogue for "show me everything matching 'mumbai'".
  */
 export default function VenuesLandingBoard({ filters, filterDeps }: Props) {
   const fetch = useFetch<VenuesLanding | null>(
     () => getVenuesLanding(filters),
     filterDeps,
   )
-  const navigate = useNavigate()
   const setUrlParams = useSetUrlParams()
+  const [query, setQuery] = useState('')
 
-  const openCountries = useMemo(() => {
+  const filtered: VenueCountryGroup[] = useMemo(() => {
+    if (!fetch.data) return []
+    const q = query.trim().toLowerCase()
+    if (!q) return fetch.data.by_country
+    const out: VenueCountryGroup[] = []
+    for (const g of fetch.data.by_country) {
+      const venues = g.venues.filter(v =>
+        v.venue.toLowerCase().includes(q)
+        || (v.city ?? '').toLowerCase().includes(q),
+      )
+      if (venues.length === 0) continue
+      const matches = venues.reduce((a, v) => a + v.matches, 0)
+      out.push({ ...g, venues, matches })
+    }
+    return out
+  }, [fetch.data, query])
+
+  const defaultOpen = useMemo(() => {
     if (!fetch.data) return new Set<string>()
     return new Set(fetch.data.by_country.slice(0, 3).map(g => g.country))
   }, [fetch.data])
@@ -47,25 +72,48 @@ export default function VenuesLandingBoard({ filters, filterDeps }: Props) {
   }
 
   const pick = (venueName: string) => {
-    // Atomic: set filter_venue, then navigate. Navigate carries the URL
-    // params along so the match list inherits the scope.
-    setUrlParams({ filter_venue: venueName })
-    navigate(`/matches?${new URLSearchParams({ filter_venue: venueName }).toString()}`)
+    // Opens the Phase-3 dossier via the `venue=` param. The ambient
+    // filter_venue is intentionally NOT set — the dossier pins its
+    // venue by URL param, and leaving filter_venue unset means
+    // navigating away from /venues returns the user to a clean filter
+    // scope rather than carrying this venue into every other tab.
+    setUrlParams({ venue: venueName })
   }
+
+  const hasQuery = query.trim().length > 0
 
   return (
     <div>
-      <div className="wisden-tab-help" style={{ marginBottom: '1rem' }}>
-        Pick a venue below, or search via the Venue box in the filter bar.
-        Match counts respect every filter at the top — change gender,
-        type, tournament, or season to narrow. Clicking a venue opens
-        its match list.
+      <div className="wisden-tab-help" style={{ marginBottom: '0.75rem' }}>
+        Pick a venue to open its dossier. Counts respect every filter
+        at the top (gender, type, tournament, season). Type below to
+        narrow to venues whose name or city matches — e.g. "mumbai"
+        reveals Wankhede, Brabourne, DY Patil, … in one sweep.
       </div>
+      <div style={{ marginBottom: '1rem', maxWidth: '28rem' }}>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Filter by venue or city…"
+          className="wisden-input"
+          style={{ width: '100%' }}
+          aria-label="Filter venues and cities"
+        />
+      </div>
+      {hasQuery && filtered.length === 0 && (
+        <div className="wisden-empty">
+          No venues match "{query}".
+        </div>
+      )}
       <div className="flex flex-col gap-3">
-        {data.by_country.map(group => (
+        {filtered.map(group => (
           <details
-            key={group.country}
-            open={openCountries.has(group.country)}
+            // Key changes when query flips between "" and non-empty so
+            // <details open=…> re-renders its initial state (browsers
+            // treat `open` as an initial prop after user-toggle).
+            key={`${group.country}|${hasQuery ? 'q' : 'default'}`}
+            open={hasQuery || defaultOpen.has(group.country)}
             className="wisden-collapse"
           >
             <summary>

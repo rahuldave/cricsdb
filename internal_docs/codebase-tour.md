@@ -165,15 +165,20 @@ frontend/src/
   pages/                       — Home, Teams, Players, Batting, Bowling, Fielding, Tournaments,
                                    HeadToHead (mode=player|team), Matches, MatchScorecard,
                                    Venues (Phase 2 landing — country-grouped tile grid;
-                                   tile click sets filter_venue and navigates to
-                                   /matches?filter_venue=X),
+                                   landing + per-venue dossier, mode flips on ?venue=),
                                    Help (/help), HelpUsage (/help/usage)
   components/VenueSearch.tsx   — Debounced typeahead for the FilterBar Venue slot.
                                    Mirrors TeamSearch.tsx structurally. Renders an input
                                    when no venue is selected; flips to a chip + "× Clear
                                    venue" button when filter_venue is set.
   components/venues/           — VenuesLanding.tsx (country-grouped accordion, top-3
-                                   countries open by default).
+                                   countries open by default; tile click opens the
+                                   Phase-3 dossier via ?venue=). VenueDossier.tsx
+                                   (Phase 3 — 6 tabs Overview/Batters/Bowlers/Fielders/
+                                   Matches/Records, mirrors TournamentDossier's
+                                   fetch-gating). VenueOverviewPanel.tsx (Overview:
+                                   StatCards + toss panel + phase table + ground-record
+                                   tiles + matches-by-tournament-gender-season table).
   content/                     — about-me.md + user-help.md. Imported as ?raw by the Help pages
                                    and rendered via react-markdown. Edit the .md, rebuild, ship.
                                    user-help.md embeds screenshots from /social/*.png.

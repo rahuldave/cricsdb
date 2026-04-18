@@ -1,7 +1,23 @@
 # Spec: Venues (enhancement S)
 
-Status: **Phases 1 + 2 shipped 2026-04-17.** Phase 3 (per-venue
-dossier) remains opt-in after Phases 1+2 prove thin or sufficient.
+Status: **Phases 1 + 2 shipped 2026-04-17. Phase 3 shipped 2026-04-18.**
+Full enhancement S complete.
+
+**Phase 3 result**: per-venue dossier live at `/venues?venue=X`. One
+new backend endpoint `/api/v1/venues/{venue}/summary` (path-pins
+venue, strips any ambient `filter_venue`, honours every other
+FilterParams field). Six dossier tabs — Overview / Batters / Bowlers
+/ Fielders / Matches / Records — all lean on existing endpoints with
+`filter_venue=X` *except* Overview, which is the venue-character
+bundle unique to this endpoint. Landing tile click flips from
+`/matches?filter_venue=X` to `/venues?venue=X` (dossier); a "view all
+matches →" link on the dossier preserves the old drilldown for users
+who want the bare list. Sanity checks match the spec's gut tests —
+Wankhede bat-first 43% (dew-heavy ✓), Chepauk bat-first 54% (spin-
+friendly ✓). Regression harness 18/18 REG byte-identical; integration
+49/49 asserts. `_strip_venue` gained a `has_innings_join` kwarg to
+let the summary endpoint reuse the same self-referential strip for
+delivery-level phase aggregations.
 
 **Phase 1 result**: 12,940 existing matches canonicalized. 676 raw
 (venue, city) pairs collapsed to 456 canonical venues across 88

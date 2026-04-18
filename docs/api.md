@@ -214,6 +214,60 @@ curl "http://localhost:8000/api/v1/venues/landing"
 `?team_type=international&gender=male`, totals and venue inclusion
 narrow to men's internationals only.
 
+## `GET /api/v1/venues/{venue}/summary`
+
+Venue-character dossier bundle (Phase 3). Pins `m.venue = :venue` from
+the path and strips any ambient `filter_venue` on the query; every
+other common filter (gender / team_type / tournament / season window
+/ filter_team / filter_opponent) is honored. 404 if the venue has no
+matches in scope.
+
+Returns: headline match count; matches-hosted-by tournament × gender
+× season; average first-innings total; bat-first vs chase win counts
+and percentages; toss decision split; toss-winner outcome correlation
+per decision; boundary % and dot % per phase (powerplay 1-6, middle
+7-15, death 16-20); ground-record highest total and lowest all-out.
+
+```bash
+curl "http://localhost:8000/api/v1/venues/Wankhede%20Stadium%2C%20Mumbai/summary"
+```
+
+```json
+{
+  "venue": "Wankhede Stadium, Mumbai",
+  "city": "Mumbai",
+  "country": "India",
+  "matches": 178,
+  "by_tournament_gender_season": [
+    { "tournament": "Indian Premier League", "gender": "male", "season": "2026", "matches": 2 },
+    { "tournament": "ICC Men's T20 World Cup", "gender": "male", "season": "2025/26", "matches": 8 },
+    "… 26 more"
+  ],
+  "avg_first_innings_total": 170.5,
+  "first_innings_sample": 178,
+  "bat_first_wins": 77,
+  "chase_wins": 100,
+  "indecisive": 1,
+  "bat_first_win_pct": 43.3,
+  "chase_win_pct": 56.2,
+  "toss_decision_split": { "bat": 38, "field": 140 },
+  "toss_and_win_pct": {
+    "bat":   { "wins": 15, "decided": 37,  "win_pct": 40.5 },
+    "field": { "wins": 78, "decided": 140, "win_pct": 55.7 }
+  },
+  "boundary_pct_by_phase": { "powerplay": 20.0, "middle": 15.5, "death": 22.2 },
+  "dot_pct_by_phase":      { "powerplay": 47.4, "middle": 32.3, "death": 28.4 },
+  "highest_total":  { "runs": 254, "team": "West Indies", "opponent": "Zimbabwe",
+                      "match_id": 2632, "season": "2025/26", "date": "2026-02-23" },
+  "lowest_all_out": { "runs": 67,  "team": "Kolkata Knight Riders",
+                      "opponent": "Mumbai Indians",
+                      "match_id": 6065, "season": "2007/08", "date": "2008-05-16" }
+}
+```
+
+Sanity: `bat_first_win_pct < 50` on dew-heavy grounds (Wankhede,
+Chinnaswamy), ≥ 50 on spin-friendly grounds (Chepauk).
+
 ## `GET /api/v1/players`
 
 Player search. Params: `q` (≥2 chars), `role` (`batter`/`bowler`/

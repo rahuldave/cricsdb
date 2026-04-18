@@ -360,9 +360,20 @@ and a FilterBar Venue typeahead (`components/VenueSearch.tsx`) that
 flips to a chip with "× Clear venue" when active. Every page's
 `filterDeps` array + 5 carry functions were patched to include
 `filter_venue` (SPA navigation refetches + back-button works). Regression
-harness: 18/18 REG byte-identical, 9/9 NEW queries differ. **Phase 3**
-(per-venue dossier with Overview / Batters / Bowlers / Fielders /
-Matches / Records) is opt-in after Phase 2 proves thin or sufficient.
+harness: 18/18 REG byte-identical, 9/9 NEW queries differ. **Phase 3
+shipped 2026-04-18** — per-venue dossier at `/venues?venue=X` with
+Overview / Batters / Bowlers / Fielders / Matches / Records tabs.
+One new backend endpoint (`GET /api/v1/venues/{venue}/summary`) for
+the Overview bundle — avg 1st-inn total, bat-first vs chase win %,
+toss-decision split + win correlation, boundary % and dot % per
+phase, highest total, lowest all-out, matches hosted by tournament ×
+gender × season. Other tabs reuse `/batters,/bowlers,/fielders/leaders`
++ `/matches` + `/series/records` with `filter_venue=X` — no shape
+change required. Landing tile click now opens the dossier rather
+than a bare `/matches?filter_venue=X` list; a "view all matches →"
+escape hatch preserves the old drilldown. Sanity: Wankhede bat-first
+43% (dew-heavy ✓), Chepauk bat-first 54% (spin-friendly ✓).
+Regression 18/18 REG byte-identical; integration 49/49 asserts.
 
 **T. Launch identity — favicon, OG card, tweet thread, help-page
 walkthrough.** _Done, 2026-04-16._ Replaced the default Vite bolt with

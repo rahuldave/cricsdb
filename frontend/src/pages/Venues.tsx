@@ -1,26 +1,54 @@
+import { useEffect } from 'react'
 import { useFilters } from '../components/FilterBar'
 import VenuesLandingBoard from '../components/venues/VenuesLanding'
+import VenueDossier from '../components/venues/VenueDossier'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 
 /**
- * /venues — country-grouped venue directory (Phase 2).
+ * /venues — country-grouped directory (landing) OR per-venue dossier.
  *
- * There is no per-venue dossier yet (Phase 3 decision). The FilterBar's
- * VenueSearch typeahead is the way to set filter_venue and narrow
- * other tabs to a specific ground; this page answers "what grounds
- * exist?" as a flat country-grouped tile grid. Clicking a tile
- * navigates to /matches?filter_venue=X — the bare list of matches
- * played there.
+ * Mode flip is driven by the `?venue=` query param:
+ *   /venues                       → VenuesLandingBoard
+ *   /venues?venue=<canonical>     → VenueDossier
+ *
+ * Elsewhere in the app the FilterBar's VenueSearch typeahead sets
+ * `filter_venue` — an ambient filter that narrows every other tab's
+ * stats. On this tab that behavior would be redundant (the landing
+ * strips filter_venue self-referentially, and we have a dedicated
+ * dossier URL), so an effect below promotes any incoming
+ * `filter_venue` to `?venue=` and clears the ambient — turning the
+ * FilterBar pick into a shortcut that opens the dossier, matching
+ * what a landing-tile click does.
  */
 export default function Venues() {
   const filters = useFilters()
-  useDocumentTitle('Venues')
+  const [venue] = useUrlParam('venue', '')
+  const setUrlParams = useSetUrlParams()
+  useDocumentTitle(venue || 'Venues')
+
+  useEffect(() => {
+    if (filters.filter_venue) {
+      setUrlParams(
+        { venue: filters.filter_venue, filter_venue: '' },
+        { replace: true },
+      )
+    }
+  }, [filters.filter_venue, setUrlParams])
 
   const filterDeps = [
     filters.gender, filters.team_type, filters.tournament,
     filters.season_from, filters.season_to,
     filters.filter_team, filters.filter_opponent,
   ]
+
+  if (venue) {
+    return (
+      <div className="wisden-page">
+        <VenueDossier venue={venue} />
+      </div>
+    )
+  }
 
   return (
     <div className="wisden-page">

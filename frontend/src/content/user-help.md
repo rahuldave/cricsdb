@@ -107,12 +107,23 @@ Two modes (picker at the top of the page):
   grouped by country (India has 78 venues in the dataset, England
   38, Australia 56, …). The top three countries open by default and
   the long tail of associate nations (Rwanda, Bhutan, …) stays
-  collapsed. Click a tile to open its match list — the list respects
-  every filter at the top, so "India men's internationals at
-  Wankhede" is one click + one FilterBar tick. To scope any other
-  tab by venue, use the **Venue** typeahead in the filter bar (see
-  the filter-bar section below) — venue-filtered stats work across
-  Teams, Players, Head-to-Head, Series and Matches.
+  collapsed. A search box at the top filters tiles instantly as
+  you type — "mumbai" surfaces Wankhede, Brabourne, DY Patil, BKC
+  Ground, and Sharad Pawar Academy in one sweep regardless of what
+  country they're nominally grouped under. Click a tile to open
+  that ground's **dossier** —
+  headline match count, average first-innings total, bat-first vs
+  chasing win %, toss-decision split + win correlation, boundary %
+  and dot % per phase (powerplay / middle / death), ground-record
+  highest total and lowest all-out, plus matches hosted broken down
+  by tournament × gender × season. Sub-tabs show the top batters,
+  bowlers, fielders, and full match list at that venue (all
+  filter-sensitive). A "view all matches →" link on the dossier
+  opens the bare list for users who want to skip the tabs. To scope
+  any other tab by venue instead, use the **Venue** typeahead in
+  the filter bar (see the filter-bar section below) — venue-
+  filtered stats work across Teams, Players, Head-to-Head, Series
+  and Matches.
 - **Matches** — searchable list of every match. Click any row for
   the full scorecard, ball-by-ball innings grid, worm chart, and
   per-batter / per-bowler matchup grid.
