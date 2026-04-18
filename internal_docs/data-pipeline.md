@@ -170,13 +170,19 @@ writing each match:
   rebrands (NatWest T20 Blast → Vitality Blast, Ram Slam → CSA T20
   Challenge, etc.).
 - `api.venue_aliases.resolve_or_raw()` on `(venue, city)`. Returns
-  `(canonical_venue, canonical_city, country)` on hit; on miss, passes
-  raw values through with `venue_country=NULL` and adds the pair to
-  the module-level `UNKNOWN_VENUES` set. At end of run,
+  `(canonical_venue, canonical_city, country)` on hit; on miss, applies
+  `_strip_city_suffix` as a display-tidy fallback — if the raw venue
+  ends with `", <raw_city>"` and the stripped result is non-empty,
+  returns `(stripped, raw_city, None)`. Otherwise passes raw values
+  through. Either way, unknown venues get `venue_country=NULL` and are
+  added to the module-level `UNKNOWN_VENUES` set. At end of run,
   `write_unknown_venues()` appends them to
   `docs/venue-worklist/unknowns-<date>.csv` so the next review cycle
   can fold them into `api/venue_aliases.py`. **Unknown venues never
-  block import** (soft-fail).
+  block import** (soft-fail). Because `update_recent.py` imports
+  `import_data.import_match_file`, the resolver and its fallback fire
+  identically on both full rebuild and incremental paths — one hook
+  in `resolve_or_raw` covers both.
 
 The venue pass is the only one that also fills a new column
 (`match.venue_country`, added by the Match model; existing DBs gain it
