@@ -675,3 +675,79 @@ Teams sidesteps that. The primary's presence drives FilterBar's auto-narrow (`Fi
 **Pre-existing bug fixed in the same batch:** `/{team}/fielding/summary` was computing its `matches` count without applying `FilterParams`, so it returned an all-formats / all-genders / all-time number even under a filter scope. That fed `catches_per_match` / `stumpings_per_match` / `run_outs_per_match` as a diluted denominator (India men's intl was 422 instead of ≈263). Fix: the matches query now reuses the same `where` / `params` built by `_team_innings_clause(filters, team, side="fielding")` that the kind aggregation above it already uses.
 
 The Compare identity line still reads from `profile.summary.matches` — same value conceptually now, but it's the match-level count (team_summary's `COUNT(*)` over filtered matches) vs the fielding endpoint's innings-derived `COUNT(DISTINCT m.id)`. The two can diverge by a handful of abandoned / no-result matches where a team never fielded; `summary.matches` is the canonical headline number.
+
+## Team-name link scope ambiguity — disambiguate via a `TeamLink` component (revisit)
+
+As of 2026-04-18 the scope attached to a team-name hyperlink varies by the
+page that emits it:
+
+- **Teams landing / team tiles / FlagBadge linkTo:** `/teams?team=X&gender=&team_type=`.
+  Pure overall view.
+- **Matches list row, Scorecard header, Series dossier team cells:**
+  `/teams?team=X&tournament=Y&gender=&team_type=`. Tournament-scoped.
+- **Stray `<Link>`s without a helper:** sometimes just `?team=X`.
+
+Clicking "India" therefore means three different things depending on where
+you click. For tournament events (e.g. T20 World Cup (Men)) the
+tournament-scoped link lands on "India across all editions" because
+`tournament` is the canonical event name — editions are keyed via
+`season_from` / `season_to`. For bilateral series, `tournament` is a
+transient series name ("Pakistan tour of New Zealand 2026"), and clicking
+a team link from a bilateral match lands on a scoped view that may show
+just the 1-3 matches of that tour. Feels broken.
+
+The cleanest fix is a `TeamLink` component parallel to `PlayerLink`, with
+the same two-link name + context pattern:
+
+- Name link → `/teams?team=X&gender=&team_type=` (overall, always).
+- Context link (optional, faint italic suffix) → `/teams?team=X&...filter params`.
+  Context suffix should read "in {tournament} {season}" for
+  tournament-scoped views and "in {bilateral-series-name} {season}" for
+  bilaterals — the bilateral + season tuple disambiguates the specific
+  tour the same way tournament + season disambiguates a tournament
+  edition.
+- Dense contexts (scorecard h2) use a compact mode that skips the
+  context suffix; the tournament link in the meta line already carries
+  that affordance.
+
+The `PlayerLink` pattern can't be reused verbatim because it's hard-coded
+to discipline routes. A dedicated `TeamLink` keeps the two-link rule
+consistent site-wide and eliminates the current ambiguity. Not done in
+this session — flagged for the next one.
+
+## Scorecard linkability: API response-shape follow-up
+
+The scorecard (`/matches/{match_id}`) has several text fields that
+would benefit from being linked — player mentions that currently
+render as plain strings because the backend returns names without
+person IDs. Listed here as a pre-defined shopping list for when we
+extend the matches router's response shape.
+
+Pure-frontend linking was shipped for: match breadcrumb (tournament /
+season-edition / all-matches escape hatches), toss-winner team name,
+innings-header team name.
+
+Still needs backend work:
+
+- **`player_of_match` (`ScorecardInfo.player_of_match: string[]`)** —
+  currently names only. Should be `{name, person_id}[]` so the
+  frontend can wrap each in a `PlayerLink`. Tiny change: one extra
+  join in `api/routers/matches.py` when building the info block.
+- **Dismissal text (`ScorecardBatter.dismissal: string`)** — e.g.
+  "c Sharma b Bumrah". The fielder half is already covered by the
+  separate `dismissal_fielder_ids: string[]` field (see CLAUDE.md
+  "Fielder dismissal attribution"); the bowler half is embedded only
+  in the text string. Cleanest fix: return structured
+  `dismissal: {how_out, bowler?: PersonRef, fielders?: PersonRef[]}`
+  alongside (or instead of) the pre-rendered string, and have the
+  frontend compose the "c X b Y" text with each name wrapped.
+- **Did-not-bat (`ScorecardInnings.did_not_bat: string[]`)** — same
+  shape issue. Change to `PersonRef[]`.
+- **Fall-of-wickets (`ScorecardFallOfWicket`)** — has the over/score,
+  but batter is embedded in a text string. Change to expose
+  `batter: PersonRef` directly on the fall-of-wickets row.
+
+All four are response-shape changes to `/api/v1/matches/{match_id}` —
+cheaply added in one PR since the backend already has person_id
+access (it's doing the fielder join for one of them). Do as a single
+batch to avoid multiple deploy cycles.

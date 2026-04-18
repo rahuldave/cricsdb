@@ -234,8 +234,8 @@ export default function Teams() {
               {summary.keepers.slice(0, 6).map((k, i) => (
                 <span key={k.person_id}>
                   {i > 0 && ', '}
-                  <a href={`/fielding?player=${encodeURIComponent(k.person_id)}&tab=Keeping`}
-                     className="comp-link">{k.name}</a>
+                  <Link to={`/fielding?player=${encodeURIComponent(k.person_id)}&tab=Keeping`}
+                     className="comp-link">{k.name}</Link>
                   {' '}
                   <span style={{ color: 'var(--ink-faint)' }}>({k.innings_kept})</span>
                 </span>
@@ -253,7 +253,7 @@ export default function Teams() {
 
           <div className="wisden-tabs">
             {tabs.map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
+              <button key={tab} onClick={() => setUrlParams({ tab, vs: '' })}
                 className={`wisden-tab${activeTab === tab ? ' is-active' : ''}`}
               >{tab}</button>
             ))}
@@ -839,6 +839,11 @@ function VsOpponentTab({
             data={matrix.data.opponents}
             selected={opponent}
             onPick={setOpponent}
+            rivalryHref={name =>
+              `/head-to-head?mode=team&team1=${encodeURIComponent(team)}&team2=${encodeURIComponent(name)}`
+              + (filters.gender ? `&gender=${filters.gender}` : '')
+              + (filters.team_type ? `&team_type=${filters.team_type}` : '')
+            }
           />
         </div>
       )}
@@ -963,10 +968,12 @@ function OpponentStackedBars({
   data,
   selected,
   onPick,
+  rivalryHref,
 }: {
   data: OpponentRollup[]
   selected?: string
   onPick: (name: string) => void
+  rivalryHref: (name: string) => string
 }) {
   const max = data.reduce((m, o) => Math.max(m, o.matches), 1)
   return (
@@ -1003,7 +1010,12 @@ function OpponentStackedBars({
               color: 'var(--ink)',
             }}
           >
-            <span style={{ fontSize: 14 }}>{o.name}</span>
+            <Link
+              to={rivalryHref(o.name)}
+              className="comp-link"
+              onClick={e => e.stopPropagation()}
+              style={{ fontSize: 14, justifySelf: 'start' }}
+            >{o.name}</Link>
             <span style={{ display: 'flex', height: 18, background: 'var(--bg-soft)' }}>
               {bar(o.wins,       '#2E6FB5', 'wins')}
               {bar(o.ties,       '#C9871F', 'ties')}
@@ -1311,7 +1323,11 @@ function PlayersTab({ team, filters, filterDeps }: TabProps) {
             {bucket.players.map(p => (
               <div key={p.person_id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
                 <Link
-                  to={`/batting?player=${encodeURIComponent(p.person_id)}`}
+                  to={(() => {
+                    const qs = new URLSearchParams({ player: p.person_id, filter_team: team })
+                    if (filters.gender) qs.set('gender', filters.gender)
+                    return `/players?${qs.toString()}`
+                  })()}
                   className="comp-link"
                 >{p.name}</Link>
                 <span className="num" style={{ color: 'var(--ink-faint)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>

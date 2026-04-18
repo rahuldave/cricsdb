@@ -28,6 +28,7 @@ import type {
   MatchListItem,
   TournamentPartnershipsByWicket, TournamentPartnershipsTop,
   TournamentPartnershipTopEntry,
+  PersonRef,
 } from '../../types'
 
 const fmt = (v: number | null | undefined, d = 2) =>
@@ -47,6 +48,28 @@ const partnershipMatchLink = (
   return (
     <Link to={`/matches/${matchId}${qs}`} className="comp-link">{label}</Link>
   )
+}
+
+const renderBatterPair = (b1: PersonRef, b2: PersonRef) => (
+  <>
+    <Link to={`/batting?player=${encodeURIComponent(b1.person_id)}`} className="comp-link">{b1.name}</Link>
+    {' & '}
+    <Link to={`/batting?player=${encodeURIComponent(b2.person_id)}`} className="comp-link">{b2.name}</Link>
+  </>
+)
+
+const renderVsTeams = (team1: string, team2: string, sep = ' v ') => (
+  <>
+    <Link to={`/teams?team=${encodeURIComponent(team1)}`} className="comp-link">{team1}</Link>
+    {sep}
+    <Link to={`/teams?team=${encodeURIComponent(team2)}`} className="comp-link">{team2}</Link>
+  </>
+)
+
+const renderVsTeamsFromString = (s: string) => {
+  const parts = s.split(/ vs | v /)
+  if (parts.length !== 2) return s
+  return renderVsTeams(parts[0].trim(), parts[1].trim())
 }
 
 /** Team-name link with the dossier's scope preserved. Teams are
@@ -799,13 +822,13 @@ function PartnershipsTab({
               {
                 key: 'best_partnership', label: 'Best stand',
                 format: (_v, r) => r.best_partnership
-                  ? `${r.best_partnership.batter1.name} & ${r.best_partnership.batter2.name}`
+                  ? (renderBatterPair(r.best_partnership.batter1, r.best_partnership.batter2) as unknown as string)
                   : '-',
               },
               {
                 key: 'best_partnership', label: 'Match',
                 format: (_v, r) => r.best_partnership
-                  ? `${r.best_partnership.batting_team} v ${r.best_partnership.opponent}`
+                  ? (renderVsTeams(r.best_partnership.batting_team, r.best_partnership.opponent) as unknown as string)
                   : '-',
               },
               {
@@ -847,12 +870,12 @@ function PartnershipsTab({
               {
                 key: 'batter1', label: 'Batters',
                 format: (_v, r: TournamentPartnershipTopEntry) =>
-                  `${r.batter1.name} & ${r.batter2.name}`,
+                  renderBatterPair(r.batter1, r.batter2) as unknown as string,
               },
               {
                 key: 'batting_team', label: 'Match',
                 format: (_v, r: TournamentPartnershipTopEntry) =>
-                  `${r.batting_team} v ${r.opponent}`,
+                  renderVsTeams(r.batting_team, r.opponent) as unknown as string,
               },
               { key: 'season', label: 'Season' },
               {
@@ -957,17 +980,37 @@ function EditionsTab({
       ) as unknown as string,
     },
     { key: 'matches', label: 'Matches', sortable: true },
-    { key: 'champion', label: 'Champion', sortable: true },
-    { key: 'runner_up', label: 'Runner-up' },
+    {
+      key: 'champion', label: 'Champion', sortable: true,
+      format: (v: string | null) => v ? (
+        <Link to={`/teams?team=${encodeURIComponent(v)}`} className="comp-link">{v}</Link>
+      ) as unknown as string : '-',
+    },
+    {
+      key: 'runner_up', label: 'Runner-up',
+      format: (v: string | null) => v ? (
+        <Link to={`/teams?team=${encodeURIComponent(v)}`} className="comp-link">{v}</Link>
+      ) as unknown as string : '-',
+    },
     {
       key: 'top_scorer', label: 'Top scorer',
-      format: (_v, r) => r.top_scorer
-        ? (`${r.top_scorer.name} (${r.top_scorer.runs})`) : '-',
+      format: (_v, r) => r.top_scorer ? (
+        <>
+          <Link to={`/batting?player=${encodeURIComponent(r.top_scorer.person_id)}`}
+            className="comp-link">{r.top_scorer.name}</Link>
+          {` (${r.top_scorer.runs})`}
+        </>
+      ) as unknown as string : '-',
     },
     {
       key: 'top_wicket_taker', label: 'Top wicket-taker',
-      format: (_v, r) => r.top_wicket_taker
-        ? (`${r.top_wicket_taker.name} (${r.top_wicket_taker.wickets})`) : '-',
+      format: (_v, r) => r.top_wicket_taker ? (
+        <>
+          <Link to={`/bowling?player=${encodeURIComponent(r.top_wicket_taker.person_id)}`}
+            className="comp-link">{r.top_wicket_taker.name}</Link>
+          {` (${r.top_wicket_taker.wickets})`}
+        </>
+      ) as unknown as string : '-',
     },
     {
       key: 'run_rate', label: 'Run rate', sortable: true,
@@ -1067,9 +1110,14 @@ function playerContext(opts: {
     params.filter_team = filterTeam
     labelParts.push(`at ${filterTeam}`)
   }
+  // We're on the tournament dossier itself — a per-row suffix that
+  // repeats the long tournament name ("in T20 World Cup (Men)") is
+  // noise. Flow tournament through URL params so the destination is
+  // still correctly narrowed, but only surface "tournament" in the
+  // label when there's no team/rivalry scope carrying the weight.
   if (tournament) {
     params.tournament = tournament
-    labelParts.push(`in ${tournament}`)
+    if (labelParts.length === 0) labelParts.push('tournament')
   }
   if (!labelParts.length) return undefined
   return { label: labelParts.join(' '), params }
@@ -1385,9 +1433,16 @@ function RecordsTab({
             {
               key: 'batter1', label: 'Batters',
               format: (_v, r: TournamentRecordPartnership) =>
-                `${r.batter1?.name ?? '?'} & ${r.batter2?.name ?? '?'}`,
+                (r.batter1 && r.batter2
+                  ? renderBatterPair(r.batter1, r.batter2)
+                  : '-') as unknown as string,
             },
-            { key: 'teams', label: 'Match' },
+            {
+              key: 'teams', label: 'Match',
+              format: (v: string) => v
+                ? (renderVsTeamsFromString(v) as unknown as string)
+                : '-',
+            },
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordPartnership) =>
@@ -1403,7 +1458,13 @@ function RecordsTab({
         <DataTable
           columns={[
             { key: 'figures', label: 'Figures', sortable: true },
-            { key: 'name', label: 'Bowler' },
+            {
+              key: 'name', label: 'Bowler',
+              format: (_v, r: TournamentRecordBowling) => (
+                <Link to={`/bowling?player=${encodeURIComponent(r.person_id)}`}
+                  className="comp-link">{r.name}</Link>
+              ) as unknown as string,
+            },
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordBowling) =>
@@ -1419,7 +1480,12 @@ function RecordsTab({
         <DataTable
           columns={[
             { key: 'sixes', label: 'Sixes', sortable: true },
-            { key: 'teams', label: 'Teams' },
+            {
+              key: 'teams', label: 'Teams',
+              format: (v: string) => v
+                ? (renderVsTeamsFromString(v) as unknown as string)
+                : '-',
+            },
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordMatchSixes) =>

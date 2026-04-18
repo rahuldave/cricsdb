@@ -32,7 +32,26 @@ export default function InningsCard({ innings, linkParams = '', highlightBatterI
   return (
     <div className="wisden-innings">
       <div className="wisden-innings-head">
-        <h3>{innings.label}</h3>
+        <h3>{(() => {
+          // `innings.label` is "{team} — 1st innings" (or "Super Over",
+          // etc). When the label begins with the team name, link just
+          // that prefix; leave the rest plain. Falls back to the raw
+          // label unchanged if the prefix doesn't match — covers
+          // super-over / unusual label shapes defensively.
+          const team = innings.team
+          const label = innings.label
+          if (team && label.startsWith(team)) {
+            const rest = label.slice(team.length)
+            return (
+              <>
+                <Link to={`/teams?team=${encodeURIComponent(team)}`}
+                  className="comp-link" style={{ fontSize: 'inherit', fontWeight: 'inherit' }}>{team}</Link>
+                {rest}
+              </>
+            )
+          }
+          return label
+        })()}</h3>
         <div className="wisden-innings-score">
           <span className="big num">{innings.total_runs}/{innings.wickets}</span>
           <span className="meta num">({innings.overs} ov, RR {innings.run_rate.toFixed(2)})</span>

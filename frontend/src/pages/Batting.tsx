@@ -137,8 +137,14 @@ export default function Batting() {
       <Link to={`/matches/${r.match_id}?highlight_batter=${encodeURIComponent(playerId || '')}`}
         className="comp-link" onClick={e => e.stopPropagation()}>{v || '-'}</Link>
     ) as unknown as string },
-    { key: 'opponent', label: 'Opponent', sortable: true },
-    { key: 'tournament', label: 'Tournament' },
+    { key: 'opponent', label: 'Opponent', sortable: true, format: (v: any) => v ? (
+      <Link to={`/teams?team=${encodeURIComponent(v)}`}
+        className="comp-link" onClick={e => e.stopPropagation()}>{v}</Link>
+    ) as unknown as string : '-' },
+    { key: 'tournament', label: 'Tournament', format: (v: any) => v ? (
+      <Link to={`/series?tournament=${encodeURIComponent(v)}`}
+        className="comp-link" onClick={e => e.stopPropagation()}>{v}</Link>
+    ) as unknown as string : '-' },
     { key: 'runs', label: 'Runs', sortable: true },
     { key: 'balls', label: 'Balls', sortable: true },
     { key: 'fours', label: '4s' },
@@ -150,14 +156,13 @@ export default function Batting() {
   const bowlerColumns: Column<BowlerMatchup>[] = [
     { key: 'bowler_name', label: 'Bowler', sortable: true, format: (_v: any, r: any) => (
       <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: '0.5em' }}>
-        <span>{r.bowler_name}</span>
-        <span style={{ fontSize: '0.7rem', color: 'var(--ink-faint)' }}>
-          (<Link to={`/bowling?player=${encodeURIComponent(r.bowler_id)}`}
-            className="comp-link" onClick={e => e.stopPropagation()}>stats</Link>
-          {' · '}
-          <Link to={`/head-to-head?batter=${encodeURIComponent(playerId || '')}&bowler=${encodeURIComponent(r.bowler_id)}`}
-            className="comp-link" onClick={e => e.stopPropagation()}>h2h</Link>)
-        </span>
+        <Link to={`/bowling?player=${encodeURIComponent(r.bowler_id)}`}
+          className="comp-link" onClick={e => e.stopPropagation()}>{r.bowler_name}</Link>
+        <Link to={`/head-to-head?batter=${encodeURIComponent(playerId || '')}&bowler=${encodeURIComponent(r.bowler_id)}`}
+          className="comp-link" onClick={e => e.stopPropagation()}
+          style={{ fontSize: '0.55rem', textTransform: 'uppercase', opacity: 0.65 }}>
+          head to head
+        </Link>
       </span>
     ) as unknown as string },
     { key: 'balls', label: 'Balls', sortable: true },

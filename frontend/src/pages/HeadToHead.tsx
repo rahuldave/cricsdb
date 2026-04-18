@@ -121,7 +121,10 @@ function PlayerVsPlayer() {
         className="comp-link"
         onClick={e => e.stopPropagation()}>{v || '-'}</Link>
     ) as unknown as string },
-    { key: 'tournament', label: 'Tournament' },
+    { key: 'tournament', label: 'Tournament', format: (v: any) => v ? (
+      <Link to={`/series?tournament=${encodeURIComponent(v)}`}
+        className="comp-link" onClick={e => e.stopPropagation()}>{v}</Link>
+    ) as unknown as string : '-' },
     { key: 'venue', label: 'Venue' },
     { key: 'balls', label: 'Balls', sortable: true },
     { key: 'runs', label: 'Runs', sortable: true },

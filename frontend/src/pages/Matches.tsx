@@ -171,7 +171,12 @@ export default function Matches() {
               <tr key={m.match_id}
                 onClick={() => navigate(`/matches/${m.match_id}`)}
                 className="is-clickable">
-                <td className="num whitespace-nowrap" style={{ color: 'var(--ink-faint)' }}>{m.date || '-'}</td>
+                <td className="num whitespace-nowrap" style={{ color: 'var(--ink-faint)' }}>
+                  {m.date ? (
+                    <Link to={`/matches/${m.match_id}`} className="comp-link"
+                      style={{ color: 'inherit' }} onClick={stop}>{m.date}</Link>
+                  ) : '-'}
+                </td>
                 <td>
                   <div style={{ fontFamily: 'var(--serif)', fontSize: '1rem', color: 'var(--ink)', fontVariationSettings: '"opsz" 14' }}>
                     <Link to={teamHref(m.team1)} className="comp-link" onClick={stop}>{m.team1}</Link>
@@ -191,7 +196,17 @@ export default function Matches() {
                     ? <Link to={tournamentHref(m.tournament)} className="comp-link" onClick={stop}>{m.tournament}</Link>
                     : '-'}
                 </td>
-                <td className="hidden lg:table-cell">{m.city || m.venue || '-'}</td>
+                <td className="hidden lg:table-cell">
+                  {m.venue ? (
+                    <>
+                      <Link to={`/matches?filter_venue=${encodeURIComponent(m.venue)}`}
+                        className="comp-link" onClick={stop}>{m.venue}</Link>
+                      {m.city && m.city !== m.venue && (
+                        <span style={{ color: 'var(--ink-faint)' }}> · {m.city}</span>
+                      )}
+                    </>
+                  ) : (m.city || '-')}
+                </td>
                 <td className="hidden sm:table-cell" style={{ fontFamily: 'var(--serif)', fontVariationSettings: '"opsz" 14' }}>{m.result_text}</td>
               </tr>
               )

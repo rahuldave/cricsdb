@@ -14,13 +14,27 @@ interface Props {
 
 export default function ScorecardView({ data, children, highlightBatterId, highlightBowlerId, highlightFielderId }: Props) {
   const { info, innings } = data
-  const tossText = info.toss_winner && info.toss_decision
-    ? `${info.toss_winner} won the toss and chose to ${info.toss_decision}`
+  const tossNode: ReactNode = info.toss_winner && info.toss_decision
+    ? (
+      <>
+        <Link to={`/teams?team=${encodeURIComponent(info.toss_winner)}${info.gender ? `&gender=${info.gender}` : ''}${info.team_type ? `&team_type=${info.team_type}` : ''}`}
+          className="comp-link">{info.toss_winner}</Link>
+        {` won the toss and chose to ${info.toss_decision}`}
+      </>
+    )
     : null
   const dateText = info.dates && info.dates.length > 0
     ? info.dates.join(' – ')
     : null
-  const venueText = [info.venue, info.city].filter(Boolean).join(', ')
+  const venueNode: ReactNode = info.venue
+    ? (
+      <>
+        <Link to={`/matches?filter_venue=${encodeURIComponent(info.venue)}`}
+          className="comp-link">{info.venue}</Link>
+        {info.city && info.city !== info.venue && <>, {info.city}</>}
+      </>
+    )
+    : info.city || null
   const stageText = info.stage || (info.match_number != null ? `Match ${info.match_number}` : null)
 
   const linkParams = (() => {
@@ -46,8 +60,40 @@ export default function ScorecardView({ data, children, highlightBatterId, highl
     return `/series?${p.toString()}`
   })()
 
+  // Edition-scoped matches link: "2026" under T20 World Cup (Men)
+  // → /matches?tournament=T20+World+Cup+(Men)&season_from=2026&season_to=2026.
+  // Clicking lands on the match list for that specific edition.
+  const seasonMatchesHref = (() => {
+    if (!info.season) return null
+    const p = new URLSearchParams()
+    if (info.tournament) p.set('tournament', info.tournament)
+    if (info.gender) p.set('gender', info.gender)
+    if (info.team_type) p.set('team_type', info.team_type)
+    p.set('season_from', info.season)
+    p.set('season_to', info.season)
+    return `/matches?${p.toString()}`
+  })()
+
   return (
     <div>
+      {/* Breadcrumb — sideways escape hatches for deep-linked arrivals.
+          `← Back` lives on the page shell (uses history); this row
+          gives explicit up/across links that work without history. */}
+      <div className="wisden-match-breadcrumb">
+        {tournamentHref && (
+          <>
+            <Link to={tournamentHref} className="comp-link">{info.tournament}</Link>
+            <span className="sep"> › </span>
+          </>
+        )}
+        {seasonMatchesHref && (
+          <>
+            <Link to={seasonMatchesHref} className="comp-link">{info.season}</Link>
+            <span className="sep"> › </span>
+          </>
+        )}
+        <Link to="/matches" className="comp-link">All matches</Link>
+      </div>
       <div className="wisden-match-header">
         <h2>
           <Link to={teamHref(info.teams[0])} className="comp-link" style={{ fontSize: 'inherit', fontWeight: 'inherit' }}>
@@ -62,15 +108,17 @@ export default function ScorecardView({ data, children, highlightBatterId, highl
           {tournamentHref ? (
             <Link to={tournamentHref} className="comp-link">{info.tournament}</Link>
           ) : info.tournament}
-          {(stageText || venueText || dateText)
-            && [stageText, venueText, dateText].filter(Boolean).length > 0
-            && ' · '}
-          {[stageText, venueText, dateText].filter(Boolean).join(' · ')}
+          {[stageText, venueNode, dateText].filter(Boolean).map((node, i) => (
+            <span key={i}>
+              {(info.tournament || i > 0) && ' · '}
+              {node}
+            </span>
+          ))}
         </div>
         <div className="wisden-match-result">{info.result_text}</div>
-        {tossText && (
+        {tossNode && (
           <div className="wisden-match-extra">
-            <span className="lbl">Toss</span>{tossText}
+            <span className="lbl">Toss</span>{tossNode}
           </div>
         )}
         {info.player_of_match && info.player_of_match.length > 0 && (

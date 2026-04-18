@@ -1022,6 +1022,16 @@ a { color: inherit; }
 .wisden-back:hover { text-decoration: underline; }
 
 .wisden-match-header { margin-bottom: 2rem; }
+.wisden-match-breadcrumb {
+  font-family: var(--serif);
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  margin-bottom: 0.6rem;
+}
+.wisden-match-breadcrumb .sep {
+  color: var(--ink-faint);
+  margin: 0 0.15rem;
+}
 .wisden-match-header h2 {
   font-family: var(--serif);
   font-size: 2rem;
@@ -1709,6 +1719,13 @@ a { color: inherit; }
   text-decoration: none;
   color: inherit;
   transition: border-color 120ms, background 120ms;
+  /* Neutralise button defaults so `<button class="wisden-tile">` (used
+     by HeadToHead suggestion tiles, which set URL params rather than
+     navigate) renders identically to `<a class="wisden-tile">`. */
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  width: 100%;
 }
 .wisden-tile:hover { border-color: var(--accent); background: var(--bg-soft); }
 .wisden-tile-title {
