@@ -15,6 +15,7 @@ import { WISDEN_PHASES } from '../components/charts/palette'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import TournamentDossier from '../components/tournaments/TournamentDossier'
+import { ScopeContext } from '../components/scopeLinks'
 import { getHeadToHead, getTournamentsLanding } from '../api'
 import type {
   PlayerSearchResult, HeadToHeadResponse, HeadToHeadMatch,
@@ -416,11 +417,17 @@ function TeamVsTeamPicker({
       </div>
 
       {enabled ? (
-        <TournamentDossier
-          tournament={null}
-          filterTeam={team1}
-          filterOpponent={team2}
-        />
+        // Promote team1/team2 path params → filter_team/filter_opponent
+        // pinning so PlayerLink/TeamLink inside the dossier carry the
+        // rivalry through their (s)/(b) letter links. The dossier itself
+        // reads the same pair via props; this is purely for link-building.
+        <ScopeContext.Provider value={{ filter_team: team1, filter_opponent: team2 }}>
+          <TournamentDossier
+            tournament={null}
+            filterTeam={team1}
+            filterOpponent={team2}
+          />
+        </ScopeContext.Provider>
       ) : (
         <>
           <div className="wisden-empty">

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useFilters } from '../components/FilterBar'
 import VenuesLandingBoard from '../components/venues/VenuesLanding'
 import VenueDossier from '../components/venues/VenueDossier'
+import { ScopeContext } from '../components/scopeLinks'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 
@@ -43,9 +44,14 @@ export default function Venues() {
   ]
 
   if (venue) {
+    // Promote the `venue=X` path identity → filter_venue pinning so
+    // every PlayerLink / TeamLink inside the dossier carries "at <venue>"
+    // through its letter links.
     return (
       <div className="wisden-page">
-        <VenueDossier venue={venue} />
+        <ScopeContext.Provider value={{ filter_venue: venue }}>
+          <VenueDossier venue={venue} />
+        </ScopeContext.Provider>
       </div>
     )
   }

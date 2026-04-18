@@ -194,7 +194,7 @@ export default function VenueDossier({ venue }: { venue: string }) {
 // ─── Tabs ─────────────────────────────────────────────────────────────
 
 function BattersTab({
-  loading, error, data, refetch, gender, venue,
+  loading, error, data, refetch, gender,
 }: {
   loading: boolean; error: string | null
   data: BattingLeaders | null; refetch: () => void
@@ -204,7 +204,6 @@ function BattersTab({
   if (loading) return <Spinner label="Loading batters…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
-  const ctx = { label: `at ${venue}`, params: { filter_venue: venue } }
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
       <div>
@@ -216,7 +215,6 @@ function BattersTab({
               format: (_v, r: BattingLeaderEntry) => (
                 <PlayerLink
                   personId={r.person_id} name={r.name} role="batter" gender={gender}
-                  contextLabel={ctx.label} contextParams={ctx.params}
                 />
               ) as unknown as string,
             },
@@ -238,7 +236,6 @@ function BattersTab({
               format: (_v, r: BattingLeaderEntry) => (
                 <PlayerLink
                   personId={r.person_id} name={r.name} role="batter" gender={gender}
-                  contextLabel={ctx.label} contextParams={ctx.params}
                 />
               ) as unknown as string,
             },
@@ -255,7 +252,7 @@ function BattersTab({
 }
 
 function BowlersTab({
-  loading, error, data, refetch, gender, venue,
+  loading, error, data, refetch, gender,
 }: {
   loading: boolean; error: string | null
   data: BowlingLeaders | null; refetch: () => void
@@ -265,7 +262,6 @@ function BowlersTab({
   if (loading) return <Spinner label="Loading bowlers…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
-  const ctx = { label: `at ${venue}`, params: { filter_venue: venue } }
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
       <div>
@@ -277,7 +273,6 @@ function BowlersTab({
               format: (_v, r: BowlingLeaderEntry) => (
                 <PlayerLink
                   personId={r.person_id} name={r.name} role="bowler" gender={gender}
-                  contextLabel={ctx.label} contextParams={ctx.params}
                 />
               ) as unknown as string,
             },
@@ -298,7 +293,6 @@ function BowlersTab({
               format: (_v, r: BowlingLeaderEntry) => (
                 <PlayerLink
                   personId={r.person_id} name={r.name} role="bowler" gender={gender}
-                  contextLabel={ctx.label} contextParams={ctx.params}
                 />
               ) as unknown as string,
             },
@@ -315,7 +309,7 @@ function BowlersTab({
 }
 
 function FieldersTab({
-  loading, error, data, refetch, gender, venue,
+  loading, error, data, refetch, gender,
 }: {
   loading: boolean; error: string | null
   data: FieldingLeaders | null; refetch: () => void
@@ -325,7 +319,6 @@ function FieldersTab({
   if (loading) return <Spinner label="Loading fielders…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
-  const ctx = { label: `at ${venue}`, params: { filter_venue: venue } }
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
       <div>
@@ -337,7 +330,6 @@ function FieldersTab({
               format: (_v, r: FieldingLeaderEntry) => (
                 <PlayerLink
                   personId={r.person_id} name={r.name} role="fielder" gender={gender}
-                  contextLabel={ctx.label} contextParams={ctx.params}
                 />
               ) as unknown as string,
             },
@@ -359,7 +351,6 @@ function FieldersTab({
               format: (_v, r: FieldingLeaderEntry) => (
                 <PlayerLink
                   personId={r.person_id} name={r.name} role="fielder" gender={gender}
-                  contextLabel={ctx.label} contextParams={ctx.params}
                 />
               ) as unknown as string,
             },

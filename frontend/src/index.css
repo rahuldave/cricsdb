@@ -1569,6 +1569,23 @@ a { color: inherit; }
 }
 .player-letter:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .player-letter-sep { color: var(--ink-faint); }
+/* PlayerLink / TeamLink subscript tier-links — "Aniket (e, t)" / "RCB (s, b)"
+   where each letter is a separate zoom-out link. Smaller + faint italic so
+   the name reads as primary and the subscripts as secondary affordances.
+   Title attribute on each letter spells out its scope in words. */
+.scope-subs {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.78em;
+  color: var(--ink-faint);
+  margin-left: 0.15em;
+}
+.scope-sub {
+  border-bottom-width: 0;
+  color: var(--ink-faint);
+}
+.scope-sub:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.scope-subs-sep { color: var(--ink-faint); }
 .coverage-stats > div { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.4rem; }
 .big-num {
   font-family: var(--serif);

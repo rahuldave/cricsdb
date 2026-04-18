@@ -18,6 +18,7 @@ import {
 import StatCard from '../components/StatCard'
 import FlagBadge from '../components/FlagBadge'
 import PlayerLink from '../components/PlayerLink'
+import { ScopeContext } from '../components/scopeLinks'
 import TeamCompareGrid from '../components/teams/TeamCompareGrid'
 import AddTeamComparePicker from '../components/teams/AddTeamComparePicker'
 import DataTable, { type Column } from '../components/DataTable'
@@ -194,7 +195,12 @@ export default function Teams() {
       )}
 
       {selected && summary && (
-        <>
+        /* Promote the `team=X` path identity into a filter_team pinning so
+         * every PlayerLink / TeamLink inside carries "at <team>" through
+         * its letter links. The /teams page doesn't use URL filter_team —
+         * it uses the `team=` path param — so useFilters alone would
+         * drop the team context. */
+        <ScopeContext.Provider value={{ filter_team: selected }}>
           {summaryFetch.loading && (
             <div className="wisden-tab-help" style={{ marginTop: '-1rem', marginBottom: '1rem', fontStyle: 'italic' }}>
               Refreshing…
@@ -340,7 +346,7 @@ export default function Teams() {
               <PlayersTab team={selected} filters={filters} filterDeps={filterDeps} />
             )}
           </div>
-        </>
+        </ScopeContext.Provider>
       )}
     </div>
   )
@@ -386,12 +392,7 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
   const batterColumns: Column<TeamTopBatter>[] = [
     { key: 'name', label: 'Batter', format: (_v, r) => (
       <PlayerLink
-        personId={r.person_id} name={r.name} role="batter" gender={filters.gender}
-        contextLabel={`at ${team}`}
-        contextParams={{
-          filter_team: team,
-          ...(filters.tournament ? { tournament: filters.tournament } : {}),
-        }}
+        personId={r.person_id} name={r.name} role="batter"
       />
     ) as unknown as string },
     { key: 'runs', label: 'Runs', sortable: true },
@@ -561,12 +562,7 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
   const bowlerColumns: Column<TeamTopBowler>[] = [
     { key: 'name', label: 'Bowler', format: (_v, r) => (
       <PlayerLink
-        personId={r.person_id} name={r.name} role="bowler" gender={filters.gender}
-        contextLabel={`at ${team}`}
-        contextParams={{
-          filter_team: team,
-          ...(filters.tournament ? { tournament: filters.tournament } : {}),
-        }}
+        personId={r.person_id} name={r.name} role="bowler"
       />
     ) as unknown as string },
     { key: 'wickets', label: 'Wkts', sortable: true },
@@ -718,12 +714,7 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
   const fielderColumns: Column<TeamTopFielder>[] = [
     { key: 'name', label: 'Fielder', format: (_v, r) => (
       <PlayerLink
-        personId={r.person_id} name={r.name} role="fielder" gender={filters.gender}
-        contextLabel={`at ${team}`}
-        contextParams={{
-          filter_team: team,
-          ...(filters.tournament ? { tournament: filters.tournament } : {}),
-        }}
+        personId={r.person_id} name={r.name} role="fielder"
       />
     ) as unknown as string },
     { key: 'catches', label: 'Catches', sortable: true },

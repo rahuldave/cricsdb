@@ -574,13 +574,10 @@ function OverviewTab({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {teamNames.map(team => {
               const t = summary.by_team![team]
-              // Context = "at <team>" so the second link lands the player
-              // page narrowed to this team's matches within the rivalry.
-              // Carry tournament through so the lens doesn't silently merge
-              // other tournaments where this team also played.
-              const ctxParams: Record<string, string> = { filter_team: team }
-              if (tournament) ctxParams.tournament = tournament
-              const ctxLabel = `at ${team}`
+              // Per-team tile in a rivalry dossier: the player link's
+              // (s, b) tier should orient toward this tile's team.
+              const otherTeam = teamNames.find(n => n !== team) ?? null
+              const rivalrySrc = { team1: team, team2: otherTeam }
               return (
                 <div key={team} className="wisden-tile">
                   <div className="wisden-tile-title">
@@ -599,7 +596,7 @@ function OverviewTab({
                         <PlayerLink
                           personId={t.top_scorer.person_id} name={t.top_scorer.name}
                           role="batter" gender={gender}
-                          contextLabel={ctxLabel} contextParams={ctxParams}
+                          subscriptSource={rivalrySrc}
                         />
                         <span className="wisden-tile-faint"> · {t.top_scorer.runs} runs</span>
                       </div>
@@ -610,7 +607,7 @@ function OverviewTab({
                         <PlayerLink
                           personId={t.top_wicket_taker.person_id} name={t.top_wicket_taker.name}
                           role="bowler" gender={gender}
-                          contextLabel={ctxLabel} contextParams={ctxParams}
+                          subscriptSource={rivalrySrc}
                         />
                         <span className="wisden-tile-faint"> · {t.top_wicket_taker.wickets} wkts</span>
                       </div>
@@ -621,7 +618,7 @@ function OverviewTab({
                         <PlayerLink
                           personId={t.highest_individual.person_id} name={t.highest_individual.name}
                           role="batter" gender={gender}
-                          contextLabel={ctxLabel} contextParams={ctxParams}
+                          subscriptSource={rivalrySrc}
                         />
                         <span className="wisden-tile-faint"> · {t.highest_individual.runs}</span>
                         {t.highest_individual.date && (
@@ -1079,51 +1076,26 @@ function PointsTab({
   )
 }
 
-/** Build the (label, params) pair for the contextual link shown after
- *  a player name. Tournament context wins over team-pair for compactness
- *  when both are set; user can still drill further via the player page. */
-function playerContext(opts: {
-  tournament: string | null
+/** Per-row subscript source for a leaderboard entry in rivalry mode —
+ *  orient (s, b) to the row's own team so a Kohli row in an India-vs-Aus
+ *  dossier shows "India vs Australia" and a Smith row shows "Australia vs
+ *  India". Outside rivalry mode returns undefined (component falls back
+ *  to useFilters, which already has the tournament + season for (e, t)). */
+function rowSubscriptSource(opts: {
   filterTeam: string | null | undefined
   filterOpponent: string | null | undefined
-  /** Player's dominant team in scope. When set in rivalry mode, flips
-   *  filter_team / filter_opponent so the context link points the
-   *  player at their actual opponent (e.g., a Kohli row in an
-   *  India-vs-Australia dossier gets "vs Australia", not "vs India"). */
   rowTeam?: string | null
-}): { label: string; params: Record<string, string> } | undefined {
-  const { tournament, filterTeam, filterOpponent, rowTeam } = opts
-  const params: Record<string, string> = {}
-  const labelParts: string[] = []
-  if (filterTeam && filterOpponent) {
-    let myTeam = filterTeam
-    let otherTeam = filterOpponent
-    if (rowTeam && rowTeam === filterOpponent) {
-      myTeam = filterOpponent
-      otherTeam = filterTeam
-    }
-    params.filter_team = myTeam
-    params.filter_opponent = otherTeam
-    labelParts.push(`vs ${otherTeam}`)
-  } else if (filterTeam) {
-    params.filter_team = filterTeam
-    labelParts.push(`at ${filterTeam}`)
+}): { team1: string; team2: string } | undefined {
+  const { filterTeam, filterOpponent, rowTeam } = opts
+  if (!filterTeam || !filterOpponent) return undefined
+  if (rowTeam && rowTeam === filterOpponent) {
+    return { team1: filterOpponent, team2: filterTeam }
   }
-  // We're on the tournament dossier itself — a per-row suffix that
-  // repeats the long tournament name ("in T20 World Cup (Men)") is
-  // noise. Flow tournament through URL params so the destination is
-  // still correctly narrowed, but only surface "tournament" in the
-  // label when there's no team/rivalry scope carrying the weight.
-  if (tournament) {
-    params.tournament = tournament
-    if (labelParts.length === 0) labelParts.push('tournament')
-  }
-  if (!labelParts.length) return undefined
-  return { label: labelParts.join(' '), params }
+  return { team1: filterTeam, team2: filterOpponent }
 }
 
 function BattersTab({
-  loading, error, data, refetch, tournament, filterTeam, filterOpponent, gender,
+  loading, error, data, refetch, filterTeam, filterOpponent, gender,
 }: {
   loading: boolean; error: string | null
   data: BattingLeaders | null; refetch: () => void
@@ -1136,8 +1108,8 @@ function BattersTab({
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
 
-  const rowCtx = (r: BattingLeaderEntry) =>
-    playerContext({ tournament, filterTeam, filterOpponent, rowTeam: r.team })
+  const rowSrc = (r: BattingLeaderEntry) =>
+    rowSubscriptSource({ filterTeam, filterOpponent, rowTeam: r.team })
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -1148,11 +1120,11 @@ function BattersTab({
             {
               key: 'name', label: 'Batter',
               format: (_v, r) => {
-                const c = rowCtx(r)
+                const src = rowSrc(r)
                 return (
                   <PlayerLink
                     personId={r.person_id} name={r.name} role="batter" gender={gender}
-                    contextLabel={c?.label} contextParams={c?.params}
+                    subscriptSource={src}
                   />
                 ) as unknown as string
               },
@@ -1173,11 +1145,11 @@ function BattersTab({
             {
               key: 'name', label: 'Batter',
               format: (_v, r) => {
-                const c = rowCtx(r)
+                const src = rowSrc(r)
                 return (
                   <PlayerLink
                     personId={r.person_id} name={r.name} role="batter" gender={gender}
-                    contextLabel={c?.label} contextParams={c?.params}
+                    subscriptSource={src}
                   />
                 ) as unknown as string
               },
@@ -1195,7 +1167,7 @@ function BattersTab({
 }
 
 function BowlersTab({
-  loading, error, data, refetch, tournament, filterTeam, filterOpponent, gender,
+  loading, error, data, refetch, filterTeam, filterOpponent, gender,
 }: {
   loading: boolean; error: string | null
   data: BowlingLeaders | null; refetch: () => void
@@ -1208,8 +1180,8 @@ function BowlersTab({
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
 
-  const rowCtx = (r: BowlingLeaderEntry) =>
-    playerContext({ tournament, filterTeam, filterOpponent, rowTeam: r.team })
+  const rowSrc = (r: BowlingLeaderEntry) =>
+    rowSubscriptSource({ filterTeam, filterOpponent, rowTeam: r.team })
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -1220,11 +1192,11 @@ function BowlersTab({
             {
               key: 'name', label: 'Bowler',
               format: (_v, r) => {
-                const c = rowCtx(r)
+                const src = rowSrc(r)
                 return (
                   <PlayerLink
                     personId={r.person_id} name={r.name} role="bowler" gender={gender}
-                    contextLabel={c?.label} contextParams={c?.params}
+                    subscriptSource={src}
                   />
                 ) as unknown as string
               },
@@ -1244,11 +1216,11 @@ function BowlersTab({
             {
               key: 'name', label: 'Bowler',
               format: (_v, r) => {
-                const c = rowCtx(r)
+                const src = rowSrc(r)
                 return (
                   <PlayerLink
                     personId={r.person_id} name={r.name} role="bowler" gender={gender}
-                    contextLabel={c?.label} contextParams={c?.params}
+                    subscriptSource={src}
                   />
                 ) as unknown as string
               },
@@ -1266,7 +1238,7 @@ function BowlersTab({
 }
 
 function FieldersTab({
-  loading, error, data, refetch, tournament, filterTeam, filterOpponent, gender,
+  loading, error, data, refetch, filterTeam, filterOpponent, gender,
 }: {
   loading: boolean; error: string | null
   data: FieldingLeaders | null; refetch: () => void
@@ -1279,8 +1251,8 @@ function FieldersTab({
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
 
-  const rowCtx = (r: FieldingLeaderEntry) =>
-    playerContext({ tournament, filterTeam, filterOpponent, rowTeam: r.team })
+  const rowSrc = (r: FieldingLeaderEntry) =>
+    rowSubscriptSource({ filterTeam, filterOpponent, rowTeam: r.team })
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -1291,11 +1263,11 @@ function FieldersTab({
             {
               key: 'name', label: 'Fielder',
               format: (_v, r) => {
-                const c = rowCtx(r)
+                const src = rowSrc(r)
                 return (
                   <PlayerLink
                     personId={r.person_id} name={r.name} role="fielder" gender={gender}
-                    contextLabel={c?.label} contextParams={c?.params}
+                    subscriptSource={src}
                   />
                 ) as unknown as string
               },
@@ -1316,11 +1288,11 @@ function FieldersTab({
             {
               key: 'name', label: 'Keeper',
               format: (_v, r) => {
-                const c = rowCtx(r)
+                const src = rowSrc(r)
                 return (
                   <PlayerLink
                     personId={r.person_id} name={r.name} role="fielder" gender={gender}
-                    contextLabel={c?.label} contextParams={c?.params}
+                    subscriptSource={src}
                   />
                 ) as unknown as string
               },
