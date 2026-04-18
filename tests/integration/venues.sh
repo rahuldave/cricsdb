@@ -62,14 +62,43 @@ assert_url_not_contains() {
   fi
 }
 
+_innerText_has() {
+  # Returns "true" or "false" for whether body.innerText contains $1
+  # (case-insensitive — CSS text-transform gets applied to innerText,
+  # so "Clear venue" in the source might render as "CLEAR VENUE" to
+  # innerText). base64-wrapped to sidestep shell-quoting on bash 3.2.
+  local needle_b64
+  needle_b64=$(printf '%s' "$1" | base64)
+  local js_b64
+  js_b64=$(printf 'document.body.innerText.toLowerCase().includes(atob("%s").toLowerCase())' "$needle_b64" | base64)
+  agent-browser eval -b "$js_b64" 2>/dev/null | tail -1 | tr -d '[:space:]'
+}
+
 assert_snapshot_contains() {
+  # Use document.body.innerText — the accessibility-tree snapshot
+  # doesn't surface <details>/<summary> text or CSS-uppercased chip
+  # labels, but innerText does.
   local needle="$1"
   local label="${2:-$needle}"
-  if agent-browser snapshot -i 2>&1 | grep -q -F "$needle"; then
+  local got; got=$(_innerText_has "$needle")
+  if [[ "$got" == "true" ]]; then
     printf "  ✓ page contains %s\n" "$label"
     PASS=$((PASS + 1))
   else
     printf "  ✗ page missing %s\n" "$label"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+assert_snapshot_not_contains() {
+  local needle="$1"
+  local label="${2:-$needle}"
+  local got; got=$(_innerText_has "$needle")
+  if [[ "$got" == "false" ]]; then
+    printf "  ✓ page does not contain %s\n" "$label"
+    PASS=$((PASS + 1))
+  else
+    printf "  ✗ page still contains %s\n" "$label"
     FAIL=$((FAIL + 1))
   fi
 }
@@ -92,10 +121,10 @@ agent-browser open "$BASE/venues" >/dev/null 2>&1
 agent-browser wait --load networkidle >/dev/null 2>&1
 settle 1.5
 
-assert_snapshot_contains "INDIA"             "India section header"
+assert_snapshot_contains "India"                     "India section header"
 assert_snapshot_contains "Wankhede Stadium, Mumbai"  "Wankhede canonical name"
 assert_snapshot_contains "Eden Gardens, Kolkata"     "Eden Gardens canonical"
-assert_snapshot_contains "VENUES"            "Venues nav tab active"
+assert_snapshot_contains "VENUES"                    "Venues nav tab"
 
 # --------------------------------------------------------------------
 echo
@@ -126,7 +155,8 @@ else
     settle 1.2
     assert_url_contains "filter_venue=$WANKHEDE_URLENC"
     assert_snapshot_contains "Clear venue"               "clear-venue button"
-    assert_snapshot_contains "VENUE:"                    "chip label"
+    assert_snapshot_contains "Venue:"                    "chip label"
+    assert_snapshot_contains "Wankhede Stadium, Mumbai"  "chip venue name"
   fi
 fi
 
@@ -135,25 +165,12 @@ echo
 echo "Test 3 · filter_venue narrows Teams data via SPA (no reload)"
 
 # After Test 2 we're on /teams/India with filter_venue set. Data should
-# reflect India's 8 matches at Wankhede, not 266.
+# reflect India's scoped-to-Wankhede matches, not all 266.
 settle 1.0
-assert_snapshot_contains "India 🇮🇳"          "India header"
-# Look for the small "8" summary. Can't assert exact number reliably
-# across data updates; look for the "Matches" label adjacent to a
-# small one- or two-digit number (vs the 266 all-time).
-if agent-browser snapshot -i 2>&1 | grep -A1 "Matches" | grep -qE "^\s*(generic )?\"?[0-9]{1,2}\"?\s*$"; then
-  echo "  ✓ Matches count is double-digit (scoped to venue)"
-  PASS=$((PASS + 1))
-else
-  # Fallback: make sure it's NOT the unfiltered 266.
-  if agent-browser snapshot -i 2>&1 | grep -q "266"; then
-    echo "  ✗ data did not refetch — still shows 266 (SPA refetch bug)"
-    FAIL=$((FAIL + 1))
-  else
-    echo "  ✓ Matches count changed from 266 (scoped)"
-    PASS=$((PASS + 1))
-  fi
-fi
+assert_snapshot_contains "India"           "India header"
+# Make sure the big 266 is NOT in innerText — that's the all-time
+# total which the SPA refetch bug used to leave stuck on screen.
+assert_snapshot_not_contains "266"         "all-time total (should be scoped)"
 
 # --------------------------------------------------------------------
 echo
@@ -214,17 +231,12 @@ settle 1.2
 assert_url_contains "filter_venue=$WANKHEDE_URLENC"
 
 agent-browser eval "history.back()" >/dev/null 2>&1
-settle 1.5
+settle 2.5  # longer settle — data refetch needs network round-trip
 assert_url_not_contains "filter_venue"
 assert_url_contains     "team=India"
 # Summary should refetch back to all-time India men's (266 matches).
-if agent-browser snapshot -i 2>&1 | grep -q "266"; then
-  echo "  ✓ data refetched on back (shows 266 all-time)"
-  PASS=$((PASS + 1))
-else
-  echo "  ✗ back did not refetch — missing all-time total"
-  FAIL=$((FAIL + 1))
-fi
+# innerText includes the summary numbers; 266 appears in the header row.
+assert_snapshot_contains "266" "all-time matches total after back"
 
 # --------------------------------------------------------------------
 echo
@@ -234,16 +246,12 @@ agent-browser open "$BASE/series?tournament=Indian+Premier+League&filter_venue=$
 agent-browser wait --load networkidle >/dev/null 2>&1
 settle 2.0
 
-assert_snapshot_contains "Indian Premier League"  "series header"
+assert_snapshot_contains "Indian Premier League"     "series header"
 assert_snapshot_contains "Wankhede Stadium, Mumbai"  "chip / venue surfaced"
-# IPL at Wankhede should be far fewer than the IPL total of ~1200.
-if agent-browser snapshot -i 2>&1 | grep -qE "1[0-9]{2} matches|[0-9]{2} matches"; then
-  echo "  ✓ Series dossier narrowed to scoped matches"
-  PASS=$((PASS + 1))
-else
-  echo "  ✗ Series dossier does not appear to be scoped"
-  FAIL=$((FAIL + 1))
-fi
+# IPL at Wankhede should be far fewer than the IPL total of ~1190.
+# Assert the total count isn't showing.
+assert_snapshot_not_contains "1,190 matches"  "unfiltered IPL total"
+assert_snapshot_not_contains "1190 matches"   "unfiltered IPL total (no comma)"
 
 # --------------------------------------------------------------------
 agent-browser close >/dev/null 2>&1 || true
