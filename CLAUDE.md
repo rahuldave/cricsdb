@@ -168,35 +168,22 @@ Read `internal_docs/design-decisions.md` for full details. Key points:
 
 Full A–O roadmap lives in **`internal_docs/enhancements-roadmap.md`** with done-items as historical markers.
 
-**Shipped 2026-04-17 (this session, displaced the Venues-first plan):**
+**Shipped 2026-04-17 (this session):**
 
 - **llms.txt** at `/llms.txt` pointing to api.md, Swagger, OpenAPI JSON, user-help — lets an LLM interact with the public API without scraping.
 - **Teams landing cross-gender link bug fix**: clicking a gendered tile now atomically sets both `team` and `gender` in the URL (was dropping gender via a raw `history.replaceState` race). Same architectural fix rippled into a codebase-wide **"derive don't mirror" refactor** on every search input — PlayerSearch, TeamSearch, Teams.tsx, Matches.tsx — replacing `useState(urlParam || '')` mirrors with a typing-buffer pattern (`internal_docs/url-state.md` "Search inputs" section).
 - **Teams landing gender labeling**: "Franchise leagues" → "Men's franchise leagues"; Domestic section splits Men's / Women's; "Other tournaments" → "Other men's tournaments" / "Other women's tournaments". Per-tile gender badges already present; now section headers also disambiguate.
 - **Teams → Compare tab (T)**: up to 3 teams side-by-side across Results / Batting / Bowling / Fielding / Partnerships rows. Mirrors Players compare architecturally. New endpoint `/api/v1/teams/{team}/partnerships/summary` for aggregate counts + highest + top pair. Cross-gender / cross-type blocked via FilterBar auto-narrow + scope-match probe in the picker.
 - **Pre-existing fielding/summary filter bug fixed**: the matches-count sub-query wasn't applying `FilterParams`, so `catches_per_match` etc. had a diluted denominator. Surfaced by Compare, fixed in the same batch.
+- **Venues Phase 1 (S)** — DB canonicalization + insert hooks. 676 raw `(venue, city)` cricsheet pairs collapse to 456 canonical venues across 88 countries via `api/venue_aliases.py::resolve_or_raw()`. New column `match.venue_country` TEXT NULL. Full worklist round-trip via `scripts/generate_venue_worklist.py` → human-reviewed CSV at `docs/venue-worklist/2026-04-17-worklist.csv` → regenerated alias module. Idempotent retrofit via `scripts/fix_venue_names.py` (can be re-run whenever the alias dict grows). `import_data.py` + `update_recent.py` canonicalize on insert; unknown venues soft-fail to raw pass-through and log to `docs/venue-worklist/unknowns-<date>.csv`. No user-visible UI changes yet — all endpoints that echo `venue`/`city` now return canonical forms (documented in `docs/api.md` Conventions), but the FilterBar `filter_venue` param + `/venues` landing are Phase 2.
 
 **NEXT SESSION agenda (in order):**
 
-1. **Venues tab (S) — spec is ready, kick off Phase 1 (DB cleanup).** Three-phase plan in `internal_docs/spec-venues.md`. Five design calls resolved 2026-04-17 (see spec "Resolved design decisions"): committed-file CSV workflow under `docs/venue-worklist/`, `"{raw name} ({city})"` parenthetical disambiguation, alias-density approach to multi-city venues, qualitative Phase-3 trigger (build only if FilterBar+landing prove thin in use), defer indexing until `EXPLAIN QUERY PLAN` demands it. Phase 1 starts with `scripts/generate_venue_worklist.py` so we can see the actual scale of ambiguity before sign-off. Phase 2 (FilterBar `filter_venue` + `/venues` landing) benefits every existing tab at ~zero new-code cost. Phase 3 (per-venue dossier with Overview / Batters / Bowlers / Fielders / Matches / Records) is opt-in based on felt need after Phase 2.
+1. **Venues Phase 2 (S)** — backend `FilterParams.filter_venue` + `/api/v1/venues` (FilterBar dropdown) + `/api/v1/venues/landing` (country-grouped tile list) + the `/venues` route + nav slot. Spec in `internal_docs/spec-venues.md` "Phase 2" section. Benefits every existing tab at ~zero new-code cost because `filter_venue` just drops into `FilterParams.build()` / `build_side_neutral()` and is honored everywhere.
 2. **Page-by-page audit** — walk every top-level route + tab looking for missing context links (two-link name + context pattern on every player mention), sensible "links up" from deeper pages to parents (scorecard → match list for that tournament, player page → series they featured in), dead ends, and consistency of the date-cell scorecard-link pattern.
 3. **More filters on `/matches`** — `filter_venue` drops out of Venues Phase 2 for free; also consider result filter (won/lost/tied/NR from a team perspective), close-match filter, super-over filter, toss-outcome filter. Confirm scope with user before building.
-4. **Venue filters deferred from the Venues push** — whatever S ships vs defers, capture the leftovers as follow-on tickets.
-
-The research notes below (2026-04-16) are the raw data for the spec.
+4. **Venues Phase 3 (optional)** — per-venue dossier. Build only if Phase 2 feels thin. See spec `internal_docs/spec-venues.md`.
 
 **After S: O — Tournament-baseline comparison overlays** on team / batter / bowler / fielder pages. M shipped the per-tournament endpoints with explicit baseline reusability — call any `/api/v1/series/{summary,batters-leaders,…}` without a team filter to get the tournament-wide baseline, with one for the team's narrowed view (responses are shape-compatible). Frontend wiring needed: overlay league means on team-tab charts, add "vs league avg" columns to player tables, support "delta from league mean" colour mode on heatmaps. Design sketch in `internal_docs/design-decisions.md` "Team metrics need tournament baselines (revisit when /tournaments ships)".
 
 **Other "(revisit)" items** (see `internal_docs/design-decisions.md` for detail): win-% overlay on discipline tabs (correlates performance with winning), batter consistency stats (median / 30+ rate / dispersion), batter × bowler-type splits + bowler × batter-handedness splits (requires person-table enrichment from Cricinfo).
-
-**Venues tab (S) — research done 2026-04-16, spec next session:**
-
-- Data: `match.venue` (631 distinct strings) + `match.city` (281 distinct). **Dirty**: 81 venues have `city=NULL`; same-venue-different-city-labels are common (Shere Bangla Mirpur↔Dhaka, Wankhede Mumbai↔NULL, Chittagong↔Chattogram, etc.). Big cities have many venues (Sydney 15, Colombo 10, Dubai 9, Mumbai 6).
-- **Critical**: `"County Ground"` is the literal name of 6 different grounds in 6 English counties (Taunton, Bristol, Chelmsford, Northampton, Derby, Hove). Venue string alone is NOT a unique key — use `(venue, city)` compound or canonicalize with a new `venue_aliases.py` + `scripts/fix_venue_names.py` (mirror team/event aliases). Half-day cleanup scan.
-- Shape the spec will need to define:
-  - Landing: city-grouped list? Or venue-grouped list with top venues first?
-  - Dossier tabs: Overview (matches, average first-innings score, bat-first-vs-chase win split, boundary %, highest/lowest totals) / Batters leaders / Bowlers leaders / Fielders leaders / Matches list / Records.
-  - **Overall-matches view**: first-class on the Overview tab. Each venue dossier must answer "how many matches has this venue hosted, broken out by tournament / gender / season" before any player drilldowns. FilterBar filters (gender, team_type, tournament, season) narrow ALL of it.
-  - `filter_venue` URL param on player/team/series endpoints so "Kohli at Wankhede" etc. compose with existing rivalry scoping. Add to `FilterParams.build()` + `build_side_neutral()`.
-  - New top-level nav entry (8th tab) — decide if we keep the count or fold Matches into it.
-- Effort: cleanup (half day) + endpoints + page (~2 days). Low risk, high reuse from the series dossier infra.

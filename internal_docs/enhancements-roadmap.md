@@ -330,6 +330,32 @@ career-match count — as denominator). Integration tests live in
 `integration_tests/players_tab.sh` + `players_hygiene.sh`. Spec at
 `internal_docs/spec-players.md`.
 
+**S. Venues — canonicalization + filter + landing + dossier.** _Phase 1
+done, 2026-04-17._ Three-phase delivery (spec at
+`internal_docs/spec-venues.md`). **Phase 1** (DB cleanup + insert hooks)
+shipped: 676 raw `(venue, city)` pairs from cricsheet canonicalized to
+456 distinct venues across 88 countries via
+`api/venue_aliases.py::resolve_or_raw()`. Worklist round-trip (generator
+script → human-reviewed CSV at `docs/venue-worklist/2026-04-17-worklist.csv`
+→ `venue_aliases.py` ingester) handles name renames (Chittagong →
+Chattogram, Bangalore → Bengaluru, Port Elizabeth → Gqeberha, Sheikh
+Zayed Nursery 1/2 → Tolerance Oval / Mohan's Oval) and same-ground-
+multi-label duplicates (Wankhede / Wankhede Stadium, Mumbai etc. collapse
+to one). Paren-disambiguate form for genuinely ambiguous bare names (six
+"County Ground"s, National Stadium Karachi vs Hamilton, University
+Oval Dunedin vs Hobart, etc.). Sibling grounds at multi-oval complexes
+(Alur I/II/III, ICC Academy Ground No 2 vs Oval 2, Eden Park vs Outer
+Oval) deliberately kept separate. `match.venue_country` TEXT NULL added
+to the schema; `import_data.py` and `update_recent.py` apply the alias
+on insert so the DB stays clean from day 1. Soft-fail: unknown venues
+pass through as raw with `venue_country` NULL and get logged to
+`docs/venue-worklist/unknowns-<date>.csv` for the next review cycle.
+`scripts/fix_venue_names.py` is the idempotent retrofit tool — rerun it
+any time the alias dict grows. **Phase 2** (FilterBar `filter_venue`
+param + flat `/venues` landing + nav slot) is next. **Phase 3**
+(per-venue dossier with Overview / Batters / Bowlers / Fielders /
+Matches / Records) is opt-in after Phase 2.
+
 **T. Launch identity — favicon, OG card, tweet thread, help-page
 walkthrough.** _Done, 2026-04-16._ Replaced the default Vite bolt with
 an italic oxblood Fraunces `&` on cream — the masthead's signature

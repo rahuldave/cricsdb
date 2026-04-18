@@ -157,6 +157,37 @@ bash deploy.sh --first   # uploads the 435 MB cricket.db along with code
 A plain `bash deploy.sh` only redeploys code and leaves the DB on plash
 untouched.
 
+### Canonicalization on insert
+
+`import_match_file()` in `import_data.py` — shared by the full-rebuild
+and incremental paths — applies three canonicalization passes before
+writing each match:
+
+- `team_aliases.canonicalize()` on `team1`, `team2`, `toss_winner`,
+  `outcome_winner`. Collapses franchise renames (Kings XI Punjab →
+  Punjab Kings, RCB → RCBengaluru, etc.) into a single current name.
+- `event_aliases.canonicalize()` on `event_name`. Collapses sponsor
+  rebrands (NatWest T20 Blast → Vitality Blast, Ram Slam → CSA T20
+  Challenge, etc.).
+- `api.venue_aliases.resolve_or_raw()` on `(venue, city)`. Returns
+  `(canonical_venue, canonical_city, country)` on hit; on miss, passes
+  raw values through with `venue_country=NULL` and adds the pair to
+  the module-level `UNKNOWN_VENUES` set. At end of run,
+  `write_unknown_venues()` appends them to
+  `docs/venue-worklist/unknowns-<date>.csv` so the next review cycle
+  can fold them into `api/venue_aliases.py`. **Unknown venues never
+  block import** (soft-fail).
+
+The venue pass is the only one that also fills a new column
+(`match.venue_country`, added by the Match model; existing DBs gain it
+via `scripts/fix_venue_names.py`'s idempotent `ALTER TABLE ADD COLUMN`
+block).
+
+For DBs that predate these aliases, run the matching `scripts/fix_*_names.py`
+once — each is idempotent, so re-running is a no-op. Re-run
+`fix_venue_names.py` whenever `venue_aliases.py` grows new entries so
+previously-raw rows get retrofitted.
+
 ### Indexes + ANALYZE (automatic)
 
 Both `import_data.py` (full rebuild) and `update_recent.py`

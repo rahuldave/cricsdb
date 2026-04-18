@@ -29,6 +29,14 @@ prod. Responses have been truncated to show shape, not full payloads.
   `/admin/*` is the only protected surface, via HTTP Basic Auth).
 - Responses are best-effort on failure: a 500 returns
   `{"detail": "..."}` rather than partial JSON.
+- **Venue / city strings are canonical.** `match.venue` and `match.city`
+  go through `api/venue_aliases.py` at insert time, so every endpoint
+  that echoes them returns the canonicalized form (e.g. `Wankhede
+  Stadium, Mumbai`, not the raw cricsheet `Wankhede`; `County Ground
+  (Taunton)`, not the ambiguous `County Ground`). Safe to use as an
+  exact-match key. `match.venue_country` exists in the DB but is not
+  yet surfaced on any endpoint — that's a Phase 2 addition when the
+  `/venues` landing ships.
 
 ## Common filter query params
 
@@ -334,12 +342,15 @@ curl "http://localhost:8000/api/v1/teams/India/results?gender=male&team_type=int
 {
   "results": [
     {
-      "match_id": 12903,
-      "date": "2026-02-02",
-      "opponent": "England",
-      "venue": "ACA-VDCA Stadium",
-      "tournament": "England in India T20I Series",
-      "result": "won", "margin": "India won by 150 runs"
+      "match_id": 2643,
+      "date": "2026-03-08",
+      "opponent": "New Zealand",
+      "venue": "Narendra Modi Stadium, Ahmedabad",
+      "city": "Ahmedabad",
+      "tournament": "ICC Men's T20 World Cup",
+      "toss_winner": "New Zealand", "toss_decision": "field",
+      "result": "won", "margin": "96 runs",
+      "player_of_match": "[\"JJ Bumrah\"]"
     }
   ],
   "total": 266
@@ -567,16 +578,16 @@ curl "http://localhost:8000/api/v1/batters/ba607b88/by-innings?limit=1"
 {
   "innings": [
     {
-      "match_id": 1551, "date": "2024-06-29",
-      "team": "India", "opponent": "South Africa",
-      "venue": "Kensington Oval, Bridgetown, Barbados",
-      "tournament": "ICC Men's T20 World Cup",
-      "runs": 76, "balls": 58, "fours": 6, "sixes": 2,
-      "strike_rate": 131.03, "not_out": false,
-      "how_out": "caught", "dismissed_by": "M Jansen"
+      "match_id": 13015, "date": "2026-04-12",
+      "team": "Royal Challengers Bengaluru", "opponent": "Mumbai Indians",
+      "venue": "Wankhede Stadium, Mumbai",
+      "tournament": "Indian Premier League",
+      "runs": 50, "balls": 38, "fours": 5, "sixes": 1,
+      "strike_rate": 131.58, "not_out": false,
+      "how_out": "caught", "dismissed_by": "HH Pandya"
     }
   ],
-  "total": 378
+  "total": 375
 }
 ```
 

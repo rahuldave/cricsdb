@@ -1,10 +1,20 @@
 # Spec: Venues (enhancement S)
 
-Status: **draft, 2026-04-17.** Three-phase delivery agreed in-session.
-Phase 1 is a human-in-the-loop DB cleanup and must complete before
-Phase 2 starts. Phase 2 ships the FilterBar param and a flat
-`/venues` landing. Phase 3 adds a per-venue dossier with venue-
-character stats. Each phase is a separate commit + deploy.
+Status: **Phase 1 shipped 2026-04-17 (commit `d182149` + docs sweep).**
+Three-phase delivery agreed in-session. Phase 1 (human-in-the-loop DB
+cleanup + alias module + insert hooks) is done. Phase 2 (FilterBar
+param + flat `/venues` landing) is the next phase. Phase 3 (per-venue
+dossier) remains opt-in after Phase 2. Each phase a separate commit +
+deploy.
+
+**Phase 1 result**: 12,940 existing matches canonicalized. 676 raw
+(venue, city) pairs collapsed to 456 canonical venues across 88
+countries. Zero unknowns. `api/venue_aliases.py`, `scripts/fix_venue_names.py`,
+`scripts/generate_venue_worklist.py` are the live modules;
+`match.venue_country` TEXT NULL added to the schema. `import_data.py`
+and `update_recent.py` canonicalize on insert via `resolve_or_raw()`;
+unknown venues are logged to `docs/venue-worklist/unknowns-<date>.csv`
+at end of run. Soft-fail contract: unknown venues never block import.
 
 ## Motivation
 
