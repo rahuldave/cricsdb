@@ -31,8 +31,8 @@ FAIL=0
 agent-browser close --all >/dev/null 2>&1 || true
 sleep 1
 
-WANKHEDE="Wankhede Stadium, Mumbai"
-WANKHEDE_URLENC="Wankhede+Stadium%2C+Mumbai"
+WANKHEDE="Wankhede Stadium"
+WANKHEDE_URLENC="Wankhede+Stadium"
 
 assert_url_contains() {
   local needle="$1"
@@ -122,8 +122,8 @@ agent-browser wait --load networkidle >/dev/null 2>&1
 settle 1.5
 
 assert_snapshot_contains "India"                     "India section header"
-assert_snapshot_contains "Wankhede Stadium, Mumbai"  "Wankhede canonical name"
-assert_snapshot_contains "Eden Gardens, Kolkata"     "Eden Gardens canonical"
+assert_snapshot_contains "Wankhede Stadium"  "Wankhede canonical name"
+assert_snapshot_contains "Eden Gardens"              "Eden Gardens canonical"
 assert_snapshot_contains "VENUES"                    "Venues nav tab"
 
 # --------------------------------------------------------------------
@@ -143,10 +143,10 @@ else
   echo "  → typing 'wank'"
   agent-browser fill "$SEARCH" "wank" >/dev/null 2>&1
   settle 1.0
-  assert_snapshot_contains "Wankhede Stadium, Mumbai"  "typeahead result"
+  assert_snapshot_contains "Wankhede Stadium"  "typeahead result"
 
   # Click the result
-  PICK=$(agent-browser snapshot -i 2>&1 | grep "listitem" | grep -F "Wankhede Stadium, Mumbai" | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
+  PICK=$(agent-browser snapshot -i 2>&1 | grep "listitem" | grep -F "Wankhede Stadium" | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
   if [ -z "$PICK" ]; then
     echo "  ✗ could not find the typeahead listitem ref"
     FAIL=$((FAIL + 1))
@@ -156,7 +156,7 @@ else
     assert_url_contains "filter_venue=$WANKHEDE_URLENC"
     assert_snapshot_contains "Clear venue"               "clear-venue button"
     assert_snapshot_contains "Venue:"                    "chip label"
-    assert_snapshot_contains "Wankhede Stadium, Mumbai"  "chip venue name"
+    assert_snapshot_contains "Wankhede Stadium"  "chip venue name"
   fi
 fi
 
@@ -198,7 +198,7 @@ agent-browser wait --load networkidle >/dev/null 2>&1
 settle 1.5
 
 # Click the Wankhede tile. It's a button inside the open India accordion.
-TILE=$(agent-browser snapshot -i 2>&1 | grep -F "Wankhede Stadium, Mumbai · Mumbai" | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
+TILE=$(agent-browser snapshot -i 2>&1 | grep -F "Wankhede Stadium · Mumbai" | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
 if [ -z "$TILE" ]; then
   # Fallback — any button whose text starts with "Wankhede"
   TILE=$(agent-browser snapshot -i 2>&1 | grep "button" | grep -F "Wankhede" | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
@@ -227,7 +227,7 @@ settle 1.5
 SEARCH=$(ref_for_placeholder "Search venue…")
 agent-browser fill "$SEARCH" "wank" >/dev/null 2>&1
 settle 1.0
-PICK=$(agent-browser snapshot -i 2>&1 | grep "listitem" | grep -F "Wankhede Stadium, Mumbai" | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
+PICK=$(agent-browser snapshot -i 2>&1 | grep "listitem" | grep -F "Wankhede Stadium" | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
 agent-browser click "$PICK" >/dev/null 2>&1
 settle 1.2
 assert_url_contains "filter_venue=$WANKHEDE_URLENC"
@@ -249,7 +249,7 @@ agent-browser wait --load networkidle >/dev/null 2>&1
 settle 2.0
 
 assert_snapshot_contains "Indian Premier League"     "series header"
-assert_snapshot_contains "Wankhede Stadium, Mumbai"  "chip / venue surfaced"
+assert_snapshot_contains "Wankhede Stadium"  "chip / venue surfaced"
 # IPL at Wankhede should be far fewer than the IPL total of ~1190.
 # Assert the total count isn't showing.
 assert_snapshot_not_contains "1,190 matches"  "unfiltered IPL total"
@@ -263,7 +263,7 @@ agent-browser open "$BASE/venues?venue=$WANKHEDE_URLENC" >/dev/null 2>&1
 agent-browser wait --load networkidle >/dev/null 2>&1
 settle 1.5
 
-assert_snapshot_contains "Wankhede Stadium, Mumbai" "dossier headline"
+assert_snapshot_contains "Wankhede Stadium" "dossier headline"
 assert_snapshot_contains "All venues"               "back-to-landing link"
 assert_snapshot_contains "view all matches"        "view-all-matches escape hatch"
 assert_snapshot_contains "Bat-first win %"         "Overview StatCard"
@@ -281,7 +281,7 @@ done
 agent-browser eval "document.querySelectorAll('.wisden-tab')[1].click()" >/dev/null 2>&1
 settle 1.5
 assert_snapshot_contains "By average"                  "Batters tab header"
-assert_snapshot_contains "at Wankhede Stadium, Mumbai" "PlayerLink context suffix"
+assert_snapshot_contains "at Wankhede Stadium" "PlayerLink context suffix"
 
 # Records tab — tournament records endpoint reused with filter_venue.
 # Records needs a longer settle — the endpoint is heavier than leaders.
@@ -349,7 +349,7 @@ else
   FAIL=$((FAIL + 1))
 fi
 
-assert_snapshot_contains "Wankhede Stadium, Mumbai" "Wankhede surfaces under 'mumbai'"
+assert_snapshot_contains "Wankhede Stadium" "Wankhede surfaces under 'mumbai'"
 assert_snapshot_contains "Brabourne"                "Brabourne surfaces under 'mumbai'"
 
 # "xyzqqq" — no matches → empty-state message. Reopen the page between

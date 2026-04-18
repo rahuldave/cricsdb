@@ -1,7 +1,25 @@
 # Spec: Venues (enhancement S)
 
-Status: **Phases 1 + 2 shipped 2026-04-17. Phase 3 shipped 2026-04-18.**
-Full enhancement S complete.
+Status: **Phases 1 + 2 shipped 2026-04-17. Phase 3 shipped 2026-04-18.
+Suffix-strip canonicalization + incremental fallback rule shipped
+2026-04-18 (same day).** Full enhancement S complete.
+
+**Suffix-strip pass (2026-04-18)**: 198 canonical venues followed the
+pattern `"X, <City>"` with city column also holding `"<City>"` — the
+frontend displayed "X, City · City" with redundant duplication. One
+mechanical rewrite stripped the trailing `", <city>"` from every such
+canonical (scripts/strip_venue_suffix.py), leaving the raw
+cricsheet-sourced keys untouched so lookups still resolve. Parens-
+style disambiguators (`County Ground (Taunton)` × 6, etc.) preserved.
+Zero collisions: 451 distinct canonicals before, 451 after. 7,074
+match rows updated in place via `scripts/fix_venue_names.py`. A
+runtime fallback (`_strip_city_suffix` inside
+`api/venue_aliases.resolve_or_raw`) applies the same rule to
+**any new cricsheet venue** on a dict miss — both full rebuild
+(`import_data.py`) and incremental (`update_recent.py`) paths, which
+share `import_match_file`, get it for free. New venues still log to
+`unknowns-<date>.csv` so country can be backfilled; the pretty
+display comes automatically.
 
 **Phase 3 result**: per-venue dossier live at `/venues?venue=X`. One
 new backend endpoint `/api/v1/venues/{venue}/summary` (path-pins

@@ -179,7 +179,7 @@ curl "http://localhost:8000/api/v1/venues?q=wank&limit=3"
 ```json
 {
   "venues": [
-    { "venue": "Wankhede Stadium, Mumbai", "city": "Mumbai",
+    { "venue": "Wankhede Stadium", "city": "Mumbai",
       "country": "India", "matches": 178 }
   ]
 }
@@ -199,9 +199,9 @@ curl "http://localhost:8000/api/v1/venues/landing"
 {
   "by_country": [
     { "country": "India", "matches": 2019, "venues": [
-        { "venue": "Wankhede Stadium, Mumbai", "city": "Mumbai", "matches": 178 },
-        { "venue": "Eden Gardens, Kolkata",    "city": "Kolkata", "matches": 146 },
-        { "venue": "M Chinnaswamy Stadium, Bengaluru", "city": "Bengaluru", "matches": 122 },
+        { "venue": "Wankhede Stadium", "city": "Mumbai", "matches": 178 },
+        { "venue": "Eden Gardens",    "city": "Kolkata", "matches": 146 },
+        { "venue": "M Chinnaswamy Stadium", "city": "Bengaluru", "matches": 122 },
         "… 75 more"
     ] },
     { "country": "England", "matches": 1942, "venues": [ "…" ] },
@@ -234,7 +234,7 @@ curl "http://localhost:8000/api/v1/venues/Wankhede%20Stadium%2C%20Mumbai/summary
 
 ```json
 {
-  "venue": "Wankhede Stadium, Mumbai",
+  "venue": "Wankhede Stadium",
   "city": "Mumbai",
   "country": "India",
   "matches": 178,
@@ -695,7 +695,7 @@ curl "http://localhost:8000/api/v1/batters/ba607b88/by-innings?limit=1"
     {
       "match_id": 13015, "date": "2026-04-12",
       "team": "Royal Challengers Bengaluru", "opponent": "Mumbai Indians",
-      "venue": "Wankhede Stadium, Mumbai",
+      "venue": "Wankhede Stadium",
       "tournament": "Indian Premier League",
       "runs": 50, "balls": 38, "fours": 5, "sixes": 1,
       "strike_rate": 131.58, "not_out": false,
