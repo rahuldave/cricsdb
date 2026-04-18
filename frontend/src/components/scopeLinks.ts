@@ -22,7 +22,7 @@
  */
 import { createContext, useContext } from 'react'
 import type { FilterParams } from '../types'
-import { useFilters } from './FilterBar'
+import { useFilters } from '../hooks/useFilters'
 
 // ─── Filter registry ───────────────────────────────────────────────────
 //

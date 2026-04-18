@@ -33,10 +33,20 @@ async function fetchApi<T>(path: string, params?: Record<string, string | number
 
 type F = FilterParams
 
-// Reference
-export const getTournaments = (ctx?: { team?: string; opponent?: string; gender?: string; team_type?: string }) =>
+// Reference. `getTournaments` / `getSeasons` accept the full FilterParams
+// shape plus a few extras: path `team`, rivalry `opponent`, page-local
+// `series_type`. Backend drops its own self-referential axis —
+// /tournaments ignores `tournament`, /seasons ignores `season_from`/
+// `season_to` — so callers can pass the whole filter state without
+// stripping fields per endpoint.
+type ReferenceCtx = F & {
+  team?: string
+  opponent?: string
+  series_type?: string
+}
+export const getTournaments = (ctx?: ReferenceCtx) =>
   fetchApi<{ tournaments: Tournament[] }>('/api/v1/tournaments', ctx as Record<string, string>)
-export const getSeasons = (ctx?: { team?: string; gender?: string; team_type?: string; tournament?: string }) =>
+export const getSeasons = (ctx?: ReferenceCtx) =>
   fetchApi<{ seasons: string[] }>('/api/v1/seasons', ctx as Record<string, string>)
 export const getTeams = (filters?: F & { q?: string }) =>
   fetchApi<{ teams: TeamInfo[] }>('/api/v1/teams', filters as Record<string, string>)

@@ -1,0 +1,39 @@
+# FilterBar reference-endpoint refactor — proves:
+#   1. /tournaments + /seasons accept the full FilterParams + page-
+#      local series_type without changing behavior for any existing
+#      (pre-refactor) param combination (REG).
+#   2. /tournaments narrows correctly when series_type / filter_venue /
+#      season range are added (NEW must differ from HEAD).
+#   3. /seasons narrows correctly when filter_venue / series_type /
+#      rivalry pair are added (NEW).
+#
+# Subjects: India, Australia, Mumbai Indians (MI), IPL, Wankhede.
+
+# ── /tournaments — existing-shape calls (unchanged) ──────────────
+REG trn_bare                          /api/v1/tournaments
+REG trn_gender_male                   /api/v1/tournaments?gender=male
+REG trn_gender_female                 /api/v1/tournaments?gender=female
+REG trn_team_type_intl                /api/v1/tournaments?team_type=international
+REG trn_team_type_club                /api/v1/tournaments?team_type=club
+REG trn_team_india                    /api/v1/tournaments?team=India
+REG trn_team_mi                       /api/v1/tournaments?team=Mumbai%20Indians
+REG trn_rivalry_ind_aus               /api/v1/tournaments?team=India&opponent=Australia&gender=male&team_type=international
+REG trn_team_gender_type              /api/v1/tournaments?team=India&gender=male&team_type=international
+
+# ── /tournaments — NEW axes (must DIFFER from HEAD) ──────────────
+NEW trn_series_bilateral_rivalry      /api/v1/tournaments?team=India&opponent=Australia&gender=male&team_type=international&series_type=bilateral
+NEW trn_series_icc_rivalry            /api/v1/tournaments?team=India&opponent=Australia&gender=male&team_type=international&series_type=icc
+NEW trn_venue_wankhede                /api/v1/tournaments?filter_venue=Wankhede%20Stadium
+NEW trn_season_range                  /api/v1/tournaments?gender=male&team_type=international&season_from=2022&season_to=2024
+
+# ── /seasons — existing-shape calls (unchanged) ──────────────────
+REG sea_bare                          /api/v1/seasons
+REG sea_gender_male                   /api/v1/seasons?gender=male
+REG sea_tournament_ipl                /api/v1/seasons?tournament=Indian%20Premier%20League
+REG sea_team_india                    /api/v1/seasons?team=India
+REG sea_team_tournament               /api/v1/seasons?team=Mumbai%20Indians&tournament=Indian%20Premier%20League
+
+# ── /seasons — NEW axes (must DIFFER from HEAD) ──────────────────
+NEW sea_venue_wankhede                /api/v1/seasons?filter_venue=Wankhede%20Stadium
+NEW sea_rivalry_pair                  /api/v1/seasons?filter_team=India&filter_opponent=Australia&gender=male&team_type=international
+NEW sea_series_icc_team               /api/v1/seasons?team=India&gender=male&team_type=international&series_type=icc

@@ -132,6 +132,50 @@ assert_url_eq "$BASE/"
 
 # --------------------------------------------------------------------
 echo ""
+echo "Test 5a · series_type=bilateral narrows the FilterBar tournament dropdown"
+# Before the FilterBar ↔ refs refactor, the tournament dropdown on a
+# rivalry page ignored series_type and offered ICC events even under
+# series_type=bilateral. After the refactor, /tournaments accepts
+# series_type and narrows accordingly, so the dropdown hides WC etc.
+reset
+agent-browser open "$BASE/series?filter_team=Australia&filter_opponent=India&gender=male&team_type=international&series_type=bilateral" >/dev/null 2>&1
+agent-browser wait --load networkidle >/dev/null 2>&1
+settle 3.0
+# The dropdown options live in <select>. Collect option labels.
+OPTS=$(agent-browser eval "Array.from(document.querySelectorAll('select option')).map(o=>o.text).join('|')" 2>/dev/null | tail -1)
+# ICC tournaments should be absent; bilateral series names should be present.
+if [[ "$OPTS" == *"Australia tour of India"* ]]; then
+  echo "  ✓ bilateral 'Australia tour of India' option present"; PASS=$((PASS + 1))
+else
+  echo "  ✗ bilateral option missing; OPTS=$OPTS"; FAIL=$((FAIL + 1))
+fi
+if [[ "$OPTS" == *"T20 World Cup"* ]]; then
+  echo "  ✗ T20 World Cup should NOT appear under series_type=bilateral; OPTS=$OPTS"; FAIL=$((FAIL + 1))
+else
+  echo "  ✓ T20 World Cup correctly hidden under series_type=bilateral"; PASS=$((PASS + 1))
+fi
+
+# Flip to series_type=icc — the inverse narrowing must kick in.
+echo ""
+echo "Test 5b · series_type=icc shows ICC events, hides bilateral tours"
+reset
+agent-browser open "$BASE/series?filter_team=Australia&filter_opponent=India&gender=male&team_type=international&series_type=icc" >/dev/null 2>&1
+agent-browser wait --load networkidle >/dev/null 2>&1
+settle 3.0
+OPTS_ICC=$(agent-browser eval "Array.from(document.querySelectorAll('select option')).map(o=>o.text).join('|')" 2>/dev/null | tail -1)
+if [[ "$OPTS_ICC" == *"T20 World Cup"* ]]; then
+  echo "  ✓ T20 World Cup present under series_type=icc"; PASS=$((PASS + 1))
+else
+  echo "  ✗ T20 World Cup missing under series_type=icc; OPTS=$OPTS_ICC"; FAIL=$((FAIL + 1))
+fi
+if [[ "$OPTS_ICC" == *"Australia tour of India"* ]]; then
+  echo "  ✗ bilateral tour should NOT appear under series_type=icc; OPTS=$OPTS_ICC"; FAIL=$((FAIL + 1))
+else
+  echo "  ✓ bilateral tours correctly hidden under series_type=icc"; PASS=$((PASS + 1))
+fi
+
+# --------------------------------------------------------------------
+echo ""
 echo "Test 6 · Legacy ?rivalry= param migration does NOT push (migrated)"
 reset
 agent-browser open "$BASE/series?rivalry=India,Australia" >/dev/null 2>&1

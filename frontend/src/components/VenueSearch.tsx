@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { getVenues } from '../api'
-import { useFilters } from './FilterBar'
+import { useFilters } from '../hooks/useFilters'
 import type { VenueInfo } from '../types'
 
 interface VenueSearchProps {

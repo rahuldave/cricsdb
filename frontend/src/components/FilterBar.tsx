@@ -2,72 +2,70 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getTournaments, getSeasons } from '../api'
 import { useSetUrlParams } from '../hooks/useUrlState'
+import { useFilters } from '../hooks/useFilters'
 import VenueSearch from './VenueSearch'
-import type { FilterParams, Tournament } from '../types'
-
-export function useFilters(): FilterParams {
-  const [params] = useSearchParams()
-  return {
-    gender: params.get('gender') || undefined,
-    team_type: params.get('team_type') || undefined,
-    tournament: params.get('tournament') || undefined,
-    season_from: params.get('season_from') || undefined,
-    season_to: params.get('season_to') || undefined,
-    // Player-page rivalry scope — not set from the FilterBar UI, but
-    // carried via URL when a PlayerLink context link adds them. Player
-    // pages + downstream endpoints honour these as match-level pair
-    // filters. Without these, clicking "vs India" on MS Wade's row
-    // silently dropped the filter — link gave the same result as the
-    // name-only link.
-    filter_team: params.get('filter_team') || undefined,
-    filter_opponent: params.get('filter_opponent') || undefined,
-    // Ambient venue filter (Phase 2). Set via the VenueSearch
-    // typeahead below; honored by every filter-consuming endpoint.
-    filter_venue: params.get('filter_venue') || undefined,
-  }
-}
+import type { Tournament } from '../types'
 
 export default function FilterBar() {
   const [params] = useSearchParams()
   const setUrlParams = useSetUrlParams()
+  const filters = useFilters()
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [seasons, setSeasons] = useState<string[]>([])
   const [tournamentsError, setTournamentsError] = useState(false)
   const [seasonsError, setSeasonsError] = useState(false)
 
-  // Narrow the dropdowns to the active context. A tournament isn't a
-  // filter on the tournaments endpoint (self-referential), but it
-  // absolutely narrows seasons — picking IPL should remove
-  // CLT20/WPL/rare years MI played elsewhere from the From/To pickers.
+  // Dropdown-narrowing fetches. Pass the FULL filter state through so
+  // every narrowing field (including future additions — filter_venue,
+  // season range, etc.) automatically participates. The backend drops
+  // self-referential axes per-endpoint (e.g. /tournaments ignores
+  // `tournament`, /seasons ignores `season_from`/`season_to`).
   //
-  // filter_team / filter_opponent (player-page rivalry scope carried by
-  // PlayerLink context links) also feed in as `team` + `opponent`, so
-  // a rivalry-scoped player page narrows its tournament/season dropdowns
-  // the same way the Teams page does when a team is picked.
+  // `series_type` is a Series-tab URL param (not in FilterParams —
+  // doesn't ride through to every other tab). Read directly from URL
+  // so the Series dossier's bilateral/ICC toggle narrows the dropdown.
   const pathTeam = params.get('team') || undefined
-  const filterTeam = params.get('filter_team') || undefined
-  const filterOpponent = params.get('filter_opponent') || undefined
-  const team = pathTeam || filterTeam
-  const opponent = pathTeam ? undefined : filterOpponent
-  const genderParam = params.get('gender') || undefined
-  const teamTypeParam = params.get('team_type') || undefined
-  const tournamentParam = params.get('tournament') || undefined
+  const filterTeam = filters.filter_team
+  const filterOpponent = filters.filter_opponent
+  // Path team (Teams page identity) wins over filter_team when set —
+  // same precedence rule used elsewhere. Opponent only applies when
+  // there's no path team (rivalry scope is URL-filter-mediated).
+  const teamForFetch = pathTeam || filterTeam
+  const opponentForFetch = pathTeam ? undefined : filterOpponent
+  const seriesType = params.get('series_type') || undefined
   useEffect(() => {
-    getTournaments({ team, opponent, gender: genderParam, team_type: teamTypeParam })
+    getTournaments({
+      ...filters,
+      team: teamForFetch,
+      opponent: opponentForFetch,
+      series_type: seriesType,
+    })
       .then(d => { setTournaments(d.tournaments); setTournamentsError(false) })
       .catch(err => {
         console.warn('Failed to load tournaments:', err)
         setTournamentsError(true)
       })
-  }, [team, opponent, genderParam, teamTypeParam])
+  }, [
+    teamForFetch, opponentForFetch, seriesType,
+    filters.gender, filters.team_type, filters.filter_venue,
+    filters.season_from, filters.season_to,
+  ])
   useEffect(() => {
-    getSeasons({ team, gender: genderParam, team_type: teamTypeParam, tournament: tournamentParam })
+    getSeasons({
+      ...filters,
+      team: teamForFetch,
+      series_type: seriesType,
+    })
       .then(d => { setSeasons(d.seasons); setSeasonsError(false) })
       .catch(err => {
         console.warn('Failed to load seasons:', err)
         setSeasonsError(true)
       })
-  }, [team, genderParam, teamTypeParam, tournamentParam])
+  }, [
+    teamForFetch, seriesType,
+    filters.gender, filters.team_type, filters.tournament,
+    filters.filter_team, filters.filter_opponent, filters.filter_venue,
+  ])
 
   const set = (key: string, value: string) => {
     setUrlParams({ [key]: value })
@@ -101,7 +99,7 @@ export default function FilterBar() {
   // gender), auto-fill the filter so MI doesn't aggregate WPL women's
   // numbers etc. Driven by the team-scoped tournaments list above.
   useEffect(() => {
-    if (!team || tournaments.length === 0) return
+    if (!teamForFetch || tournaments.length === 0) return
     if (gender && teamType) return
     const types = new Set(tournaments.map(t => t.team_type).filter(Boolean))
     const genders = new Set(tournaments.map(t => t.gender).filter(Boolean))
@@ -109,7 +107,7 @@ export default function FilterBar() {
     if (!teamType && types.size === 1) updates.team_type = [...types][0] as string
     if (!gender && genders.size === 1) updates.gender = [...genders][0] as string
     if (Object.keys(updates).length > 0) setUrlParams(updates, { replace: true })
-  }, [team, tournaments, gender, teamType])
+  }, [teamForFetch, tournaments, gender, teamType])
 
   // Intra-tournament rivalry auto-narrow: when BOTH filter_team and
   // filter_opponent are set AND the two teams only ever meet in a

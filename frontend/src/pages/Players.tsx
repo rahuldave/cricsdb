@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useFilters } from '../components/FilterBar'
+import { useFilters } from '../hooks/useFilters'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'

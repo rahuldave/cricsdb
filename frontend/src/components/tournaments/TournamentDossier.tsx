@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { useFilters } from '../FilterBar'
+import { useFilters } from '../../hooks/useFilters'
 import { useUrlParam, useSetUrlParams } from '../../hooks/useUrlState'
 import { useFetch } from '../../hooks/useFetch'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'

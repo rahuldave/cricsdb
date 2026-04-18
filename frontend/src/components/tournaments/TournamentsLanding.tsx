@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useFilters } from '../FilterBar'
+import { useFilters } from '../../hooks/useFilters'
 import { useFetch } from '../../hooks/useFetch'
 import { getTournamentsLanding, getTournamentOtherRivalries } from '../../api'
 import Spinner from '../Spinner'

@@ -10,6 +10,7 @@ from ..filters import FilterParams
 from ..tournament_canonical import (
     canonicalize, variants as canonical_variants,
     is_canonical_with_variants, event_name_in_clause,
+    series_type_clause as _series_type_clause,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["Reference"])
@@ -20,12 +21,23 @@ def _reference_clauses(
     gender: Optional[str],
     team_type: Optional[str],
     tournament: Optional[str],
+    season_from: Optional[str] = None,
+    season_to: Optional[str] = None,
+    filter_venue: Optional[str] = None,
+    series_type: Optional[str] = None,
 ) -> tuple[list[str], dict]:
     """Build WHERE fragments for /tournaments and /seasons.
 
-    All four dimensions narrow the result set — so picking
+    Every dimension passed in narrows the result set — picking
     tournament=IPL on the Teams page makes the seasons dropdown show
-    just IPL seasons. Path team wins over any filter_team in the URL.
+    just IPL seasons; setting filter_venue=Wankhede narrows both lists
+    to tournaments/seasons played there; series_type=bilateral narrows
+    to international bilateral series only. Path team wins over any
+    filter_team in the URL.
+
+    Callers drop their own self-referential axis (tournaments endpoint
+    omits `tournament`; seasons omits `season_from`/`season_to`) before
+    passing through here.
     """
     parts: list[str] = []
     params: dict = {}
@@ -46,6 +58,19 @@ def _reference_clauses(
         else:
             parts.append("m.event_name = :tournament")
             params["tournament"] = tournament
+    if season_from:
+        parts.append("m.season >= :season_from")
+        params["season_from"] = season_from
+    if season_to:
+        parts.append("m.season <= :season_to")
+        params["season_to"] = season_to
+    if filter_venue:
+        parts.append("m.venue = :filter_venue")
+        params["filter_venue"] = filter_venue
+    if series_type:
+        st = _series_type_clause(series_type)
+        if st:
+            parts.append(st)
     return parts, params
 
 
@@ -55,18 +80,32 @@ async def list_tournaments(
     opponent: Optional[str] = Query(None),
     gender: Optional[str] = Query(None),
     team_type: Optional[str] = Query(None),
+    season_from: Optional[str] = Query(None),
+    season_to: Optional[str] = Query(None),
+    filter_venue: Optional[str] = Query(None),
+    series_type: Optional[str] = Query(None, description="all / bilateral / icc / club (narrows the tournament list)"),
 ):
-    """List tournaments, narrowed by team / gender / team_type so the
-    dropdown reflects what's reachable from the current filter state.
-    Tournament itself is intentionally not a filter here (that would
-    make the list self-referential — you're picking from this list).
+    """List tournaments, narrowed by every FilterBar field the page
+    has set — gender, team_type, team, season range, filter_venue,
+    plus the Series-tab page-local `series_type`. Tournament itself is
+    intentionally not a filter here (that would make the list self-
+    referential — you're picking from this list).
 
     When both `team` and `opponent` are set, returns only tournaments
     where the two teams actually played each other — lets FilterBar
     decide whether a rivalry implies a single competition (MI vs CSK
-    → IPL) or spans many (India vs Australia → bilaterals + ICC)."""
+    → IPL) or spans many (India vs Australia → bilaterals + ICC).
+
+    `series_type=bilateral` narrows the dropdown to international
+    bilateral series; `icc` to ICC events; `club` to club tournaments.
+    Used by the Series dossier so picking "bilateral" hides WC etc.
+    from the tournament picker."""
     db = get_db()
-    parts, params = _reference_clauses(team, gender, team_type, None)
+    parts, params = _reference_clauses(
+        team, gender, team_type, None,
+        season_from=season_from, season_to=season_to,
+        filter_venue=filter_venue, series_type=series_type,
+    )
     if opponent:
         parts.append(
             "((m.team1 = :team AND m.team2 = :opponent)"
@@ -126,13 +165,41 @@ async def list_seasons(
     gender: Optional[str] = Query(None),
     team_type: Optional[str] = Query(None),
     tournament: Optional[str] = Query(None),
+    filter_team: Optional[str] = Query(None),
+    filter_opponent: Optional[str] = Query(None),
+    filter_venue: Optional[str] = Query(None),
+    series_type: Optional[str] = Query(None),
 ):
-    """Seasons narrowed by team / gender / team_type / tournament. When
-    tournament=IPL, only IPL seasons are returned — so the From/To
-    pickers can't offer 2009/10 (a Champions League season) or 2026 (a
-    season MI has played but IPL hasn't entered yet)."""
+    """Seasons narrowed by every FilterBar field the page has set —
+    team / gender / team_type / tournament / filter_venue — plus
+    page-local series_type and the rivalry pair (filter_team +
+    filter_opponent). When tournament=IPL, only IPL seasons are
+    returned — so the From/To pickers can't offer 2009/10 (a Champions
+    League season) or 2026 (a season MI has played but IPL hasn't
+    entered yet). filter_venue=Wankhede narrows to seasons that
+    actually saw matches there.
+
+    season_from / season_to are intentionally NOT accepted here — the
+    endpoint builds the list the From/To pickers choose from (self-
+    referential)."""
     db = get_db()
-    parts, params = _reference_clauses(team, gender, team_type, tournament)
+    # Rivalry pair narrows like the tournaments endpoint — if the page
+    # has filter_team+filter_opponent, only seasons where the two teams
+    # actually met are relevant.
+    parts, params = _reference_clauses(
+        team, gender, team_type, tournament,
+        filter_venue=filter_venue, series_type=series_type,
+    )
+    if filter_team and filter_opponent:
+        parts.append(
+            "((m.team1 = :filter_team AND m.team2 = :filter_opponent)"
+            " OR (m.team1 = :filter_opponent AND m.team2 = :filter_team))"
+        )
+        params["filter_team"] = filter_team
+        params["filter_opponent"] = filter_opponent
+    elif filter_team:
+        parts.append("(m.team1 = :filter_team OR m.team2 = :filter_team)")
+        params["filter_team"] = filter_team
     where = " AND ".join(parts) if parts else "1=1"
     rows = await db.q(
         f"""

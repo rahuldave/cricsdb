@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useFilters } from '../components/FilterBar'
+import { useFilters } from '../hooks/useFilters'
 import VenuesLandingBoard from '../components/venues/VenuesLanding'
 import VenueDossier from '../components/venues/VenueDossier'
 import { ScopeContext } from '../components/scopeLinks'

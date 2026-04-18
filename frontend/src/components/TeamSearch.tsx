@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { getTeams } from '../api'
-import { useFilters } from './FilterBar'
+import { useFilters } from '../hooks/useFilters'
 import type { TeamInfo } from '../types'
 
 interface TeamSearchProps {
