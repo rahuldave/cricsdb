@@ -1032,7 +1032,14 @@ function OverviewTab({
                     ) as unknown as string
                   : (r.margin || '—'),
               },
-              { key: 'venue', label: 'Venue' },
+              {
+                key: 'venue', label: 'Venue',
+                format: (v: string) => v
+                  ? (
+                      <Link to={`/venues?venue=${encodeURIComponent(v)}`} className="comp-link">{v}</Link>
+                    ) as unknown as string
+                  : '-',
+              },
               {
                 key: 'date', label: 'Date',
                 format: (v: string | null, r) => v
