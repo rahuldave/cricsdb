@@ -1246,6 +1246,10 @@ export interface TournamentSeason {
   runner_up: string | null
   runner_up_record: { played: number; won: number } | null
   final_match_id: number | null
+  final_team1: string | null
+  final_team2: string | null
+  final_team1_score: string | null
+  final_team2_score: string | null
   run_rate: number | null
   boundary_pct: number | null
   total_sixes: number

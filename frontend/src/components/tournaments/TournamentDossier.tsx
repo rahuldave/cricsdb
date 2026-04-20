@@ -15,6 +15,7 @@ import StatCard from '../StatCard'
 import PlayerLink from '../PlayerLink'
 import TeamLink from '../TeamLink'
 import SeriesLink from '../SeriesLink'
+import Score from '../Score'
 import {
   resolveBucket, resolveScopePhrases, seasonTag,
   type PhraseTier, type SubscriptSource,
@@ -1285,6 +1286,48 @@ function MatchesTab({
   const currentPage = Math.floor(offset / pageSize) + 1
   const rangeStart = offset + 1
   const rangeEnd = Math.min(offset + matches.length, total)
+  // When scoped to a single tournament, the Tournament column is
+  // redundant — every row says the same name. Keep it for rivalries
+  // (bilateral + ICC across tournaments, so the column disambiguates).
+  const showTournamentCol = !tournament
+  const columns: Column<MatchListItem>[] = [
+    {
+      key: 'date', label: 'Date', sortable: true,
+      format: (v: string | null, r) => v
+        ? (matchLink(r.match_id, v) as unknown as string)
+        : '-',
+    },
+    ...(showTournamentCol ? [{ key: 'tournament', label: 'Tournament' } as Column<MatchListItem>] : []),
+    { key: 'season', label: 'Season' },
+    {
+      key: 'team1', label: 'Match',
+      format: (_v, r) => (
+        <>
+          <Link to={teamLinkHref(r.team1, scope)} className="comp-link">{r.team1}</Link>
+          {' v '}
+          <Link to={teamLinkHref(r.team2, scope)} className="comp-link">{r.team2}</Link>
+        </>
+      ) as unknown as string,
+    },
+    {
+      key: 'winner', label: 'Winner',
+      format: (v: string | null, r) => v
+        ? (<Link to={teamLinkHref(v, scope)} className="comp-link">{v}</Link>) as unknown as string
+        : (r.result_text || '—'),
+    },
+    {
+      key: 'team1_score', label: 'Score',
+      format: (_v, r) => (
+        <Score team1Score={r.team1_score} team2Score={r.team2_score} matchId={r.match_id} />
+      ) as unknown as string,
+    },
+    {
+      key: 'venue', label: 'Venue',
+      format: (v: string | null) => v
+        ? (<Link to={`/venues?venue=${encodeURIComponent(v)}`} className="comp-link">{v}</Link>) as unknown as string
+        : '-',
+    },
+  ]
   return (
     <div className="mt-4">
       <div className="wisden-tab-help">
@@ -1292,41 +1335,7 @@ function MatchesTab({
         Filters (gender, team type, seasons) respected.
       </div>
       <DataTable
-        columns={[
-          {
-            key: 'date', label: 'Date', sortable: true,
-            format: (v: string | null, r) => v
-              ? (matchLink(r.match_id, v) as unknown as string)
-              : '-',
-          },
-          { key: 'tournament', label: 'Tournament' },
-          { key: 'season', label: 'Season' },
-          {
-            key: 'team1', label: 'Match',
-            format: (_v, r) => (
-              <>
-                <Link to={teamLinkHref(r.team1, scope)} className="comp-link">{r.team1}</Link>
-                {' v '}
-                <Link to={teamLinkHref(r.team2, scope)} className="comp-link">{r.team2}</Link>
-              </>
-            ) as unknown as string,
-          },
-          {
-            key: 'winner', label: 'Winner',
-            format: (v: string | null, r) => v
-              ? (<Link to={teamLinkHref(v, scope)} className="comp-link">{v}</Link>) as unknown as string
-              : (r.result_text || '—'),
-          },
-          {
-            key: 'team1_score', label: 'Score',
-            format: (_v, r) => {
-              const s1 = r.team1_score ?? '-'
-              const s2 = r.team2_score ?? '-'
-              return `${s1} / ${s2}`
-            },
-          },
-          { key: 'venue', label: 'Venue' },
-        ]}
+        columns={columns}
         data={matches}
         rowKey={(r) => `m-${r.match_id}`}
       />
@@ -1489,7 +1498,22 @@ function EditionsTab({
     },
     {
       key: 'final_match_id', label: 'Final',
-      format: (v: number | null) => v ? (matchLink(v, 'scorecard →') as unknown as string) : '-',
+      format: (v: number | null, r) => {
+        if (!v) return '-'
+        const hasScore = r.final_team1_score != null || r.final_team2_score != null
+        if (!hasScore) return matchLink(v, 'scorecard →') as unknown as string
+        const title = r.final_team1 && r.final_team2
+          ? `${r.final_team1} ${r.final_team1_score ?? '—'} vs ${r.final_team2} ${r.final_team2_score ?? '—'} — scorecard`
+          : undefined
+        return (
+          <Score
+            team1Score={r.final_team1_score}
+            team2Score={r.final_team2_score}
+            matchId={v}
+            title={title}
+          />
+        ) as unknown as string
+      },
     },
   ]
 

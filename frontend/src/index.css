@@ -1892,6 +1892,11 @@ a { color: inherit; }
 }
 .wisden-tile-em { color: var(--ink); font-weight: 500; }
 .wisden-tile-faint { color: var(--ink-faint); }
+
+/* Score separator — the thin box-drawings vertical between the two
+   innings scores in <Score /> stays muted so the numbers carry the
+   weight. */
+.wisden-score-sep { color: var(--ink-faint); }
 .wisden-tile-vs {
   font-style: italic;
   color: var(--ink-faint);

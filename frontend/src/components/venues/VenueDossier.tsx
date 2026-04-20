@@ -20,6 +20,7 @@ import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
 import DataTable from '../DataTable'
 import PlayerLink from '../PlayerLink'
+import Score from '../Score'
 import VenueOverviewPanel from './VenueOverviewPanel'
 
 const TABS = ['Overview', 'Batters', 'Bowlers', 'Fielders', 'Matches', 'Records'] as const
@@ -421,7 +422,9 @@ function MatchesTab({
           },
           {
             key: 'team1_score', label: 'Score',
-            format: (_v, r) => `${r.team1_score ?? '-'} / ${r.team2_score ?? '-'}`,
+            format: (_v, r) => (
+              <Score team1Score={r.team1_score} team2Score={r.team2_score} matchId={r.match_id} />
+            ) as unknown as string,
           },
         ]}
         data={matches}

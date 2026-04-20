@@ -1203,11 +1203,34 @@ async def tournament_by_season(
         params,
     )
 
+    # Per-innings totals for the final — we surface these alongside the
+    # match_id so the frontend Editions tab can render an actual score
+    # ("185/6 │ 180/5") in place of a bare "scorecard →" link. Separate
+    # scalar subqueries for runs and wickets avoid the delivery × wicket
+    # LEFT JOIN overcount (see matches.py's inn_rows / wkt_rows split).
     finals_rows = await db.q(
         f"""
         SELECT m.season, m.id AS match_id,
                m.outcome_winner AS winner,
-               m.team1, m.team2
+               m.team1, m.team2,
+               (SELECT COALESCE(SUM(d.runs_total), 0)
+                  FROM innings i JOIN delivery d ON d.innings_id = i.id
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_runs,
+               (SELECT COUNT(*) FROM wicket w
+                  JOIN delivery d ON d.id = w.delivery_id
+                  JOIN innings i ON i.id = d.innings_id
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_wkts,
+               (SELECT COALESCE(SUM(d.runs_total), 0)
+                  FROM innings i JOIN delivery d ON d.innings_id = i.id
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_runs,
+               (SELECT COUNT(*) FROM wicket w
+                  JOIN delivery d ON d.id = w.delivery_id
+                  JOIN innings i ON i.id = d.innings_id
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_wkts,
+               (SELECT COUNT(*) FROM innings i
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_has_innings,
+               (SELECT COUNT(*) FROM innings i
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_has_innings
         FROM match m
         WHERE {where} AND m.event_stage = 'Final' AND m.outcome_winner IS NOT NULL
         """,
@@ -1216,10 +1239,16 @@ async def tournament_by_season(
     finals_by_season: dict[str, dict] = {}
     for r in finals_rows:
         runner_up = r["team1"] if r["winner"] == r["team2"] else r["team2"]
+        t1_score = f"{r['t1_runs']}/{r['t1_wkts']}" if r["t1_has_innings"] else None
+        t2_score = f"{r['t2_runs']}/{r['t2_wkts']}" if r["t2_has_innings"] else None
         finals_by_season[r["season"]] = {
             "champion": r["winner"],
             "runner_up": runner_up,
             "final_match_id": r["match_id"],
+            "final_team1": r["team1"],
+            "final_team2": r["team2"],
+            "final_team1_score": t1_score,
+            "final_team2_score": t2_score,
         }
 
     # Per-season batting aggregates
@@ -1343,6 +1372,10 @@ async def tournament_by_season(
             "runner_up": runner_up,
             "runner_up_record": record_by_season_team.get((season, runner_up)) if runner_up else None,
             "final_match_id": f.get("final_match_id"),
+            "final_team1": f.get("final_team1"),
+            "final_team2": f.get("final_team2"),
+            "final_team1_score": f.get("final_team1_score"),
+            "final_team2_score": f.get("final_team2_score"),
             "run_rate": _safe_div(total_runs, legal_balls, 6),
             "boundary_pct": _safe_div(fours + sixes, legal_balls, 100),
             "total_sixes": sixes,
