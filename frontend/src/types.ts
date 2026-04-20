@@ -1290,6 +1290,8 @@ export interface TournamentRecordTeamTotal {
   opponent: string
   match_id: number
   date: string | null
+  tournament: string | null
+  season: string | null
 }
 
 export interface TournamentRecordWin {
@@ -1298,6 +1300,8 @@ export interface TournamentRecordWin {
   margin: number
   match_id: number
   date: string | null
+  tournament: string | null
+  season: string | null
 }
 
 export interface TournamentRecordPartnership {
@@ -1305,9 +1309,13 @@ export interface TournamentRecordPartnership {
   batter1: PersonRef
   batter2: PersonRef
   teams: string
+  team1: string
+  team2: string
   batting_team: string
   match_id: number
   date: string | null
+  tournament: string | null
+  season: string | null
 }
 
 export interface TournamentRecordBowling {
@@ -1319,13 +1327,19 @@ export interface TournamentRecordBowling {
   figures: string
   match_id: number
   date: string | null
+  tournament: string | null
+  season: string | null
 }
 
 export interface TournamentRecordMatchSixes {
   match_id: number
   sixes: number
   teams: string
+  team1: string
+  team2: string
   date: string | null
+  tournament: string | null
+  season: string | null
 }
 
 export interface TournamentRecords {

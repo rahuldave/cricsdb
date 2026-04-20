@@ -72,11 +72,6 @@ const renderVsTeams = (team1: string, team2: string, sep = ' v ') => (
   </>
 )
 
-const renderVsTeamsFromString = (s: string) => {
-  const parts = s.split(/ vs | v /)
-  if (parts.length !== 2) return s
-  return renderVsTeams(parts[0].trim(), parts[1].trim())
-}
 
 /** Team-name link with the dossier's scope preserved. Teams are
  *  identity-bound to a tournament for clubs and narrow naturally via
@@ -92,31 +87,40 @@ function teamLinkHref(team: string, scope: {
   return `/teams?${p.toString()}`
 }
 
-/** URL for the "ed" per-row link — team pinned to THAT match's edition
- *  (tournament + season from the row itself), not the FilterBar season
- *  window. For rivalry-mode Matches, a bilateral row resolves to that
- *  bilateral series; an ICC-event row resolves to that event at that
- *  season. Returns null when the row has no tournament (rare). */
-function teamEdHref(
-  team: string,
-  row: { tournament: string | null; season: string | null },
-  scope: { gender: string | null | undefined; team_type?: string | null | undefined },
-): string | null {
-  if (!row.tournament) return null
-  const p = new URLSearchParams({ team, tournament: row.tournament })
-  if (row.season) { p.set('season_from', row.season); p.set('season_to', row.season) }
-  if (scope.gender) p.set('gender', scope.gender)
-  if (scope.team_type) p.set('team_type', scope.team_type)
-  return `/teams?${p.toString()}`
-}
-
-/** Compact "ed" link rendered directly after a team name, scoping that
- *  team to the row's edition. See teamEdHref for rationale. */
-function EdTag({ href, team, tournament, season }: {
-  href: string; team: string; tournament: string; season: string | null
+/** TeamLink scoped to the row's edition — (ed) token renders the
+ *  compact phraseLabel while the href comes from resolveBucket with a
+ *  per-row SubscriptSource override. See design-decisions.md
+ *  "Per-row '(ed)' tag" for the scope-source rationale.
+ *
+ *  `team1: null, team2: null` explicitly clears any FilterBar rivalry
+ *  pair from the phrase bucket. Without this, `resolveScopePhrases`'s
+ *  "bilateral-series concern" branch drops the tournament from the URL
+ *  whenever a rivalry pair is set — and in rivalry-mode Records /
+ *  Matches that's exactly the scope we're ON, so the (ed) would come
+ *  out to "India in 2023/24" instead of "India at Australia tour of
+ *  India, 2023/24". The (ed) destination is single-team, so rivalry
+ *  never applies — null it. */
+function TeamWithEd({ team, row, gender, team_type }: {
+  team: string
+  row: { tournament: string | null; season: string | null }
+  gender: string | null | undefined
+  team_type: string | null | undefined
 }) {
-  const title = season ? `${team} at ${tournament}, ${season}` : `${team} at ${tournament}`
-  return <Link to={href} className="wisden-ed-tag" title={title}>ed</Link>
+  return (
+    <TeamLink
+      teamName={team}
+      gender={gender ?? null}
+      team_type={team_type ?? null}
+      subscriptSource={{
+        tournament: row.tournament,
+        season: row.season,
+        team1: null,
+        team2: null,
+      }}
+      maxTiers={1}
+      phraseLabel="ed"
+    />
+  )
 }
 
 // Tab list — Points only included when single-season is in scope; rendered
@@ -492,6 +496,7 @@ export default function TournamentDossier({
           refetch={recordsFetch.refetch}
           tournament={tournament}
           gender={filters.gender}
+          team_type={filters.team_type}
         />
       )}
       {currentTab === 'Matches' && (
@@ -1326,7 +1331,6 @@ function MatchesTab({
   if (!matches.length) {
     return <div className="wisden-empty">No matches in this filter scope.</div>
   }
-  const scope = { tournament, gender }
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.floor(offset / pageSize) + 1
   const rangeStart = offset + 1
@@ -1346,30 +1350,20 @@ function MatchesTab({
     { key: 'season', label: 'Season' },
     {
       key: 'team1', label: 'Match',
-      format: (_v, r) => {
-        const ed1 = teamEdHref(r.team1, r, { gender, team_type })
-        const ed2 = teamEdHref(r.team2, r, { gender, team_type })
-        return (
-          <>
-            <Link to={teamLinkHref(r.team1, scope)} className="comp-link">{r.team1}</Link>
-            {ed1 && r.tournament && <EdTag href={ed1} team={r.team1} tournament={r.tournament} season={r.season} />}
-            {' v '}
-            <Link to={teamLinkHref(r.team2, scope)} className="comp-link">{r.team2}</Link>
-            {ed2 && r.tournament && <EdTag href={ed2} team={r.team2} tournament={r.tournament} season={r.season} />}
-          </>
-        ) as unknown as string
-      },
+      format: (_v, r) => (
+        <>
+          <TeamWithEd team={r.team1} row={r} gender={gender} team_type={team_type} />
+          {' v '}
+          <TeamWithEd team={r.team2} row={r} gender={gender} team_type={team_type} />
+        </>
+      ) as unknown as string,
     },
     {
       key: 'winner', label: 'Winner',
       format: (v: string | null, r) => {
         if (!v) return r.result_text || '—'
-        const ed = teamEdHref(v, r, { gender, team_type })
         return (
-          <>
-            <Link to={teamLinkHref(v, scope)} className="comp-link">{v}</Link>
-            {ed && r.tournament && <EdTag href={ed} team={v} tournament={r.tournament} season={r.season} />}
-          </>
+          <TeamWithEd team={v} row={r} gender={gender} team_type={team_type} />
         ) as unknown as string
       },
     },
@@ -1867,21 +1861,42 @@ function FieldersTab({
 }
 
 function RecordsTab({
-  loading, error, data, refetch, tournament, gender,
+  loading, error, data, refetch, tournament, gender, team_type,
 }: {
   loading: boolean; error: string | null
   data: TournamentRecords | null; refetch: () => void
   tournament: string | null
   gender: string | null | undefined
+  team_type: string | null | undefined
 }) {
   if (loading) return <Spinner label="Loading records…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
 
-  const scope = { tournament, gender }
-  const teamCell = (v: string) => (
-    <Link to={teamLinkHref(v, scope)} className="comp-link">{v}</Link>
+  // Team cells use the unified TeamWithEd helper so the (ed) subscript
+  // resolves through resolveBucket + phraseLabel — one pipeline with
+  // the Matches tab, no parallel scope-link computation here.
+  const teamCell = (v: string, row: { tournament: string | null; season: string | null }) => (
+    <TeamWithEd team={v} row={row} gender={gender} team_type={team_type} />
   ) as unknown as string
+
+  // Inside a single-tournament dossier, every row's tournament equals
+  // the dossier's — show just the season to avoid a wide repeating
+  // column. Rivalry mode (tournament unset) shows "Tournament, Season"
+  // so the reader can tell bilateral from ICC rows apart.
+  const editionCell = (row: { tournament: string | null; season: string | null }) => {
+    if (tournament) return row.season ?? '-'
+    if (row.tournament && row.season) return `${row.tournament}, ${row.season}`
+    return row.tournament ?? row.season ?? '-'
+  }
+  // Typed as Column<any> so the same object threads through each
+  // table's typed DataTable columns[] array without the key narrowing
+  // to one specific record shape.
+  const editionCol: Column<any> = {
+    key: 'season', label: 'Edition',
+    format: (_v: unknown, r: { tournament: string | null; season: string | null }) =>
+      editionCell(r),
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -1890,8 +1905,15 @@ function RecordsTab({
         <DataTable
           columns={[
             { key: 'runs', label: 'Runs', sortable: true },
-            { key: 'team', label: 'Team', format: (v: string) => teamCell(v) },
-            { key: 'opponent', label: 'vs', format: (v: string) => teamCell(v) },
+            {
+              key: 'team', label: 'Team',
+              format: (v: string, r: TournamentRecordTeamTotal) => teamCell(v, r),
+            },
+            {
+              key: 'opponent', label: 'vs',
+              format: (v: string, r: TournamentRecordTeamTotal) => teamCell(v, r),
+            },
+            editionCol,
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordTeamTotal) =>
@@ -1907,8 +1929,15 @@ function RecordsTab({
         <DataTable
           columns={[
             { key: 'runs', label: 'Runs', sortable: true },
-            { key: 'team', label: 'Team', format: (v: string) => teamCell(v) },
-            { key: 'opponent', label: 'vs', format: (v: string) => teamCell(v) },
+            {
+              key: 'team', label: 'Team',
+              format: (v: string, r: TournamentRecordTeamTotal) => teamCell(v, r),
+            },
+            {
+              key: 'opponent', label: 'vs',
+              format: (v: string, r: TournamentRecordTeamTotal) => teamCell(v, r),
+            },
+            editionCol,
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordTeamTotal) =>
@@ -1924,8 +1953,15 @@ function RecordsTab({
         <DataTable
           columns={[
             { key: 'margin', label: 'Runs', sortable: true },
-            { key: 'winner', label: 'Winner', format: (v: string) => teamCell(v) },
-            { key: 'loser', label: 'Loser', format: (v: string) => teamCell(v) },
+            {
+              key: 'winner', label: 'Winner',
+              format: (v: string, r: TournamentRecordWin) => teamCell(v, r),
+            },
+            {
+              key: 'loser', label: 'Loser',
+              format: (v: string, r: TournamentRecordWin) => teamCell(v, r),
+            },
+            editionCol,
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordWin) =>
@@ -1941,8 +1977,15 @@ function RecordsTab({
         <DataTable
           columns={[
             { key: 'margin', label: 'Wkts', sortable: true },
-            { key: 'winner', label: 'Winner', format: (v: string) => teamCell(v) },
-            { key: 'loser', label: 'Loser', format: (v: string) => teamCell(v) },
+            {
+              key: 'winner', label: 'Winner',
+              format: (v: string, r: TournamentRecordWin) => teamCell(v, r),
+            },
+            {
+              key: 'loser', label: 'Loser',
+              format: (v: string, r: TournamentRecordWin) => teamCell(v, r),
+            },
+            editionCol,
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordWin) =>
@@ -1966,11 +2009,16 @@ function RecordsTab({
                   : '-') as unknown as string,
             },
             {
-              key: 'teams', label: 'Match',
-              format: (v: string) => v
-                ? (renderVsTeamsFromString(v) as unknown as string)
-                : '-',
+              key: 'team1', label: 'Match',
+              format: (_v, r: TournamentRecordPartnership) => (
+                <>
+                  {teamCell(r.team1, r)}
+                  {' v '}
+                  {teamCell(r.team2, r)}
+                </>
+              ) as unknown as string,
             },
+            editionCol,
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordPartnership) =>
@@ -1993,6 +2041,7 @@ function RecordsTab({
                   className="comp-link">{r.name}</Link>
               ) as unknown as string,
             },
+            editionCol,
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordBowling) =>
@@ -2009,11 +2058,16 @@ function RecordsTab({
           columns={[
             { key: 'sixes', label: 'Sixes', sortable: true },
             {
-              key: 'teams', label: 'Teams',
-              format: (v: string) => v
-                ? (renderVsTeamsFromString(v) as unknown as string)
-                : '-',
+              key: 'team1', label: 'Teams',
+              format: (_v, r: TournamentRecordMatchSixes) => (
+                <>
+                  {teamCell(r.team1, r)}
+                  {' v '}
+                  {teamCell(r.team2, r)}
+                </>
+              ) as unknown as string,
             },
+            editionCol,
             {
               key: 'date', label: 'Date',
               format: (_v, r: TournamentRecordMatchSixes) =>

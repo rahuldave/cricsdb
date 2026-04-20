@@ -20,6 +20,7 @@ import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
 import DataTable from '../DataTable'
 import PlayerLink from '../PlayerLink'
+import TeamLink from '../TeamLink'
 import Score from '../Score'
 import VenueOverviewPanel from './VenueOverviewPanel'
 
@@ -37,27 +38,32 @@ const teamLink = (team: string) => (
   <Link to={`/teams?team=${encodeURIComponent(team)}`} className="comp-link">{team}</Link>
 )
 
-/** URL for the "ed" per-row link — team pinned to THAT match's edition
- *  (tournament + season from the row). Mirrors TournamentDossier's
- *  teamEdHref; kept local here to avoid hoisting a dossier-internal
- *  convention into the shared components module. */
-function teamEdHref(
-  team: string,
-  row: { tournament: string | null; season: string | null },
-  scope: { gender: string | null | undefined; team_type?: string | null | undefined },
-): string | null {
-  if (!row.tournament) return null
-  const p = new URLSearchParams({ team, tournament: row.tournament })
-  if (row.season) { p.set('season_from', row.season); p.set('season_to', row.season) }
-  if (scope.gender) p.set('gender', scope.gender)
-  if (scope.team_type) p.set('team_type', scope.team_type)
-  return `/teams?${p.toString()}`
-}
-function EdTag({ href, team, tournament, season }: {
-  href: string; team: string; tournament: string; season: string | null
+/** Compact TeamLink with an "ed" phraseLabel — scoped to the row's
+ *  tournament + season via SubscriptSource. See TournamentDossier's
+ *  matching helper; the rendering pipeline is
+ *  resolveBucket → resolveScopePhrases → the phraseLabel prop simply
+ *  swaps the subscript text while keeping the computed href. */
+function TeamWithEd({ team, row, gender, team_type }: {
+  team: string
+  row: { tournament: string | null; season: string | null }
+  gender: string | null | undefined
+  team_type: string | null | undefined
 }) {
-  const title = season ? `${team} at ${tournament}, ${season}` : `${team} at ${tournament}`
-  return <Link to={href} className="wisden-ed-tag" title={title}>ed</Link>
+  return (
+    <TeamLink
+      teamName={team}
+      gender={gender ?? null}
+      team_type={team_type ?? null}
+      subscriptSource={{
+        tournament: row.tournament,
+        season: row.season,
+        team1: null,
+        team2: null,
+      }}
+      maxTiers={1}
+      phraseLabel="ed"
+    />
+  )
 }
 
 export default function VenueDossier({ venue }: { venue: string }) {
@@ -451,32 +457,19 @@ function MatchesTab({
           { key: 'season', label: 'Season' },
           {
             key: 'team1', label: 'Match',
-            format: (_v, r) => {
-              const ed1 = teamEdHref(r.team1, r, { gender, team_type: teamType })
-              const ed2 = teamEdHref(r.team2, r, { gender, team_type: teamType })
-              return (
-                <>
-                  {teamLink(r.team1)}
-                  {ed1 && r.tournament && <EdTag href={ed1} team={r.team1} tournament={r.tournament} season={r.season} />}
-                  {' v '}
-                  {teamLink(r.team2)}
-                  {ed2 && r.tournament && <EdTag href={ed2} team={r.team2} tournament={r.tournament} season={r.season} />}
-                </>
-              ) as unknown as string
-            },
+            format: (_v, r) => (
+              <>
+                <TeamWithEd team={r.team1} row={r} gender={gender} team_type={teamType} />
+                {' v '}
+                <TeamWithEd team={r.team2} row={r} gender={gender} team_type={teamType} />
+              </>
+            ) as unknown as string,
           },
           {
             key: 'winner', label: 'Winner',
-            format: (v: string | null, r) => {
-              if (!v) return r.result_text || '—'
-              const ed = teamEdHref(v, r, { gender, team_type: teamType })
-              return (
-                <>
-                  {teamLink(v)}
-                  {ed && r.tournament && <EdTag href={ed} team={v} tournament={r.tournament} season={r.season} />}
-                </>
-              ) as unknown as string
-            },
+            format: (v: string | null, r) => v
+              ? (<TeamWithEd team={v} row={r} gender={gender} team_type={teamType} />) as unknown as string
+              : (r.result_text || '—'),
           },
           {
             key: 'team1_score', label: 'Score',

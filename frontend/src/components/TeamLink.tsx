@@ -63,12 +63,30 @@ interface TeamLinkProps {
    *  tiers are redundant there because the team name link itself is the
    *  all-time view. */
   maxTiers?: number
+  /** Override the rendered phrase text while keeping the URL that the
+   *  bucket would naturally produce. A string replaces every rendered
+   *  phrase; a function gets (tier, index) and can return per-tier
+   *  text. The computed tier's `label` is preserved in the tooltip so
+   *  the fully-descriptive scope stays discoverable on hover.
+   *
+   *  Use case: dense table cells that want a compact token (e.g. "ed")
+   *  instead of the full "at T20 WC, 2024" phrase. The URL, tooltip,
+   *  and subscript-source override still flow through the same
+   *  resolveBucket → resolveScopePhrases pipeline — this prop is
+   *  rendering-only. */
+  phraseLabel?: string | ((tier: { label: string }, index: number) => string)
 }
 
 export default function TeamLink({
   teamName, subscriptSource, gender, team_type, compact, layout = 'inline',
   keepRivalry = false, seriesType: seriesTypeProp, maxTiers,
+  phraseLabel,
 }: TeamLinkProps) {
+  const renderPhraseLabel = (origLabel: string, index: number): string => {
+    if (phraseLabel === undefined) return origLabel
+    if (typeof phraseLabel === 'string') return phraseLabel
+    return phraseLabel({ label: origLabel }, index)
+  }
   const filters = useScopeFilters()
   const [searchParams] = useSearchParams()
   // series_type is a Series-tab-local URL param (mirrors the backend's
@@ -118,9 +136,9 @@ export default function TeamLink({
       <span className="team-link-block">
         <Link to={nameHref} className="comp-link">{teamName}</Link>
         <span className="scope-phrases-block">
-          {subs.map(s => (
+          {subs.map((s, i) => (
             <Link key={s.key} to={s.href} className="comp-link scope-phrase" title={s.tooltip}>
-              {s.label}
+              {renderPhraseLabel(s.label, i)}
             </Link>
           ))}
         </span>
@@ -136,7 +154,7 @@ export default function TeamLink({
           <span key={s.key}>
             {i === 0 ? ' ' : <span className="scope-phrases-sep">, </span>}
             <Link to={s.href} className="comp-link scope-phrase" title={s.tooltip}>
-              {s.label}
+              {renderPhraseLabel(s.label, i)}
             </Link>
           </span>
         ))}

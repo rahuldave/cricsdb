@@ -1228,41 +1228,43 @@ documentation entry catches up after exactly that confusion on
 2026-04-20 (Editions-tab `champion_record` / `runner_up_record`
 extension).
 
-## Per-row "(ed)" tag uses row scope, not FilterBar scope
+## Per-row "(ed)" tag uses row scope, routed through TeamLink
 
-On the Series / Venue dossier Matches tab, each team name in the
-Match and Winner cells is followed by a compact muted italic "ed"
-link (`.wisden-ed-tag`). Unlike TeamLink's phrase tiers — which
-inherit ambient FilterBar scope through `useFilters()` — the (ed)
-link reads from the row itself:
+On the Series / Venue dossier Matches + Records tabs, each team name
+is followed by a compact muted italic "ed" link. The (ed) pins that
+team to the row's specific edition — the tournament + season attached
+to that match, NOT the FilterBar's ambient season window.
 
-```
-/teams?team=<r.team>&tournament=<r.tournament>
-      &season_from=<r.season>&season_to=<r.season>
-      &gender=<filter.gender>&team_type=<filter.team_type>
-```
+**The row-scope override is what `SubscriptSource` was built for.**
+Pass `{ tournament: r.tournament, season: r.season, team1: null,
+team2: null }` into `<TeamLink subscriptSource={…} maxTiers={1}
+phraseLabel="ed" />`:
 
-The distinction matters most for rivalries. On
-`/series?filter_team=Ind&filter_opponent=Aus&gender=male` with a
-FilterBar season window of 2024–2026, an Ind vs Aus row inside
-T20 WC 2024 resolves its (ed) to "India at T20 World Cup, 2024" —
-NOT to "India vs Australia, 2024–2026". The bilateral-tour rows in
-the same list resolve to each tour's own bilateral series. Each row
-describes its own edition; the (ed) link makes that edition directly
-clickable without the user reasoning about which of the many
-tournaments the row belongs to.
+- `tournament` / `season` override the FilterBar bucket per-row via
+  `resolveBucket`.
+- `team1: null` / `team2: null` explicitly clear any rivalry pair
+  FilterBar had — otherwise `resolveScopePhrases`'s bilateral-series
+  concern drops the tournament from the URL whenever a rivalry pair
+  is present, and we'd get "India in 2023/24" instead of "India at
+  Australia tour of India, 2023/24". The (ed) destination is
+  single-team so rivalry never applies; null it.
+- `phraseLabel="ed"` is a TeamLink rendering-only override that swaps
+  the computed phrase text for a compact token while preserving the
+  href and the tooltip (which still reads the full descriptive scope,
+  e.g. "at T20 World Cup (Men), 2024").
 
-Helper: `teamEdHref(team, row, scope)` — returns null when
-`row.tournament` is null (rare; cricsheet has a handful of matches
-without an event name). Don't reuse TeamLink for this — its tier
-chain is designed to be inherited from the page's scope, which is
-the opposite of what we want here. The helper lives duplicated in
-`TournamentDossier.tsx` and `VenueDossier.tsx` rather than hoisted
-to `components/` to avoid giving it more architectural weight than
-the single affordance it serves.
+One pipeline — `resolveBucket` → `resolveScopePhrases` — produces
+both the full-phrase subscripts on H2s / tiles AND the compact (ed)
+tokens on dense tables. An earlier version of (ed) shipped as a
+parallel `teamEdHref` + `EdTag` helper; it was retired when the
+`phraseLabel` prop landed (2026-04-20 evening), per CLAUDE.md's
+"Extend existing abstractions — do NOT fork parallel helpers" rule.
 
 The rivalry Matches tab's `Tournament` column is renamed **Edition**
 for consistency with this framing — each row's container IS an
 edition (bilateral tour OR ICC event season), not a generic
 "tournament". The column is dropped entirely in single-tournament
-context (every row would otherwise repeat the same name).
+context (every row would otherwise repeat the same name). On the
+Records tab the Edition column shows just the season in single-
+tournament mode (2024, 2025, …) and "Tournament, Season" in rivalry
+mode (multiple tournaments may appear).

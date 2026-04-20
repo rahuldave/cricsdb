@@ -152,6 +152,51 @@ Concretely: if you just finished "X" and "X works", commit X before
 starting "Y". Even if Y is obviously the next step, the atomicity is
 the point. Don't wait for the whole arc to finish.
 
+## Extend existing abstractions — do NOT fork parallel helpers
+
+**Before writing a new helper or component, find the existing API that
+already solves this class of problem, and extend it with a narrow
+option.** The codebase has deliberate, maintained APIs for recurring
+patterns:
+
+- Scope-link URLs → `frontend/src/components/scopeLinks.ts`
+  (`FILTER_KEYS`, `SubscriptSource`, `resolveBucket`,
+  `resolveScopePhrases`, `ScopeContext`)
+- Team / player rendering → `TeamLink.tsx` / `PlayerLink.tsx`
+- Filter state → `useFilters()`, `FILTER_KEYS`
+- Tabular rendering → `DataTable.tsx`
+- Score rendering → `Score.tsx`
+- Innings-score aggregation in SQL → `scalar-subquery pattern from
+  `api/routers/matches.py::inn_rows` / `wkt_rows`
+
+When a new surface's needs don't fit an existing API's shape (label
+text, URL shape, render variant), **add a narrow prop / render-prop /
+override to that API**, don't write a sibling helper that duplicates
+its logic. Duplicated mechanisms drift: one path gets a bug fix, the
+other silently keeps the bug; one path learns a new filter key, the
+other silently ignores it.
+
+If you find yourself typing `teamXHref(...)`, `EdTag`, `scoreCell`,
+`playerYTag` alongside existing `TeamLink` / `Score` / `PlayerLink`,
+stop and ask: **"why can't the existing API do this with one more
+prop?"** The answer is almost always "it can — I just didn't read it
+first." Reading 100 lines of the existing module is cheaper than
+maintaining two pipelines that are supposed to stay in lockstep.
+
+Concrete examples of the right move:
+
+- "I need a compact `ed` token after the team name" → add
+  `phraseLabel` prop to `TeamLink`, not a parallel `EdTag` component.
+- "I need to override TeamLink's rivalry behaviour per-tile" → add
+  `keepRivalry` / `seriesType` props (already done 2026-04-20), not a
+  parallel `RivalryTeamLink`.
+- "I need a per-row scope override" → use `SubscriptSource` +
+  `resolveBucket`, not a new `rowScope` helper.
+
+This rule overrides the "just make it work" instinct. A parallel
+helper that works in the current call-site is a liability at every
+call-site that follows.
+
 ## Performance notes
 
 - **Leaderboard landings** (Batting / Bowling / Fielding) depend on two composite covering indexes (`ix_delivery_batter_agg`, `ix_delivery_bowler_agg`) plus fresh `ANALYZE` stats. These are created idempotently by both `import_data.py` and `update_recent.py`. See **`internal_docs/perf-leaderboards.md`** for the diagnosis and the reusable pattern: use `filters.build(has_innings_join=False)` to get a pure match clause, then conditionally drop the innings/match JOINs entirely when no filters are active (avoids 2.95M × 2 PK probes on the delivery scan).

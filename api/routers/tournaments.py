@@ -1575,6 +1575,7 @@ async def tournament_records(
         f"""
         SELECT i.team, tot.total AS runs, m.id AS match_id,
                CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
+               m.event_name AS tournament, m.season AS season,
                (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
         FROM (
           SELECT d.innings_id, SUM(d.runs_total) AS total
@@ -1607,6 +1608,7 @@ async def tournament_records(
         )
         SELECT i.team, it.total AS runs, m.id AS match_id,
                CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
+               m.event_name AS tournament, m.season AS season,
                (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
         FROM innings_totals it
         JOIN innings i ON i.id = it.innings_id
@@ -1624,6 +1626,7 @@ async def tournament_records(
                CASE WHEN m.team1 = m.outcome_winner THEN m.team2 ELSE m.team1 END AS loser,
                m.outcome_by_runs AS margin,
                m.id AS match_id,
+               m.event_name AS tournament, m.season AS season,
                (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
         FROM match m
         WHERE {where} AND m.outcome_by_runs IS NOT NULL
@@ -1639,6 +1642,7 @@ async def tournament_records(
                CASE WHEN m.team1 = m.outcome_winner THEN m.team2 ELSE m.team1 END AS loser,
                m.outcome_by_wickets AS margin,
                m.id AS match_id,
+               m.event_name AS tournament, m.season AS season,
                (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
         FROM match m
         WHERE {where} AND m.outcome_by_wickets IS NOT NULL
@@ -1656,6 +1660,7 @@ async def tournament_records(
                m.id AS match_id,
                m.team1, m.team2,
                i.team AS batting_team,
+               m.event_name AS tournament, m.season AS season,
                (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
         FROM partnership p
         JOIN innings i ON i.id = p.innings_id
@@ -1688,9 +1693,11 @@ async def tournament_records(
         )
         SELECT pm.bowler_id AS person_id, p.name,
                pm.wickets, pm.runs, pm.balls, pm.match_id,
+               m2.event_name AS tournament, m2.season AS season,
                (SELECT MIN(date) FROM matchdate WHERE match_id = pm.match_id) AS date
         FROM per_match_bowler pm
         LEFT JOIN person p ON p.id = pm.bowler_id
+        LEFT JOIN match m2 ON m2.id = pm.match_id
         WHERE pm.wickets >= 2
         ORDER BY pm.wickets DESC, pm.runs ASC LIMIT :lim
         """,
@@ -1703,6 +1710,8 @@ async def tournament_records(
         SELECT m.id AS match_id,
                SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
                m.team1 || ' v ' || m.team2 AS teams,
+               m.team1, m.team2,
+               m.event_name AS tournament, m.season AS season,
                (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
@@ -1718,22 +1727,26 @@ async def tournament_records(
         "canonical": tournament,
         "highest_team_totals": [
             {"team": r["team"], "runs": r["runs"], "opponent": r["opponent"],
-             "match_id": r["match_id"], "date": r["date"]}
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
             for r in ht_rows
         ],
         "lowest_all_out_totals": [
             {"team": r["team"], "runs": r["runs"], "opponent": r["opponent"],
-             "match_id": r["match_id"], "date": r["date"]}
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
             for r in lo_rows
         ],
         "biggest_wins_by_runs": [
             {"winner": r["winner"], "loser": r["loser"], "margin": r["margin"],
-             "match_id": r["match_id"], "date": r["date"]}
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
             for r in bwr_rows
         ],
         "biggest_wins_by_wickets": [
             {"winner": r["winner"], "loser": r["loser"], "margin": r["margin"],
-             "match_id": r["match_id"], "date": r["date"]}
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
             for r in bww_rows
         ],
         "largest_partnerships": [
@@ -1741,20 +1754,26 @@ async def tournament_records(
              "batter1": {"person_id": r["batter1_id"], "name": r["b1_name"]},
              "batter2": {"person_id": r["batter2_id"], "name": r["b2_name"]},
              "teams": f"{r['team1']} v {r['team2']}",
+             "team1": r["team1"], "team2": r["team2"],
              "batting_team": r["batting_team"],
-             "match_id": r["match_id"], "date": r["date"]}
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
             for r in lp_rows
         ],
         "best_bowling_figures": [
             {"person_id": r["person_id"], "name": r["name"],
              "wickets": r["wickets"], "runs": r["runs"], "balls": r["balls"],
              "figures": f"{r['wickets']}/{r['runs']}",
-             "match_id": r["match_id"], "date": r["date"]}
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
             for r in bb_rows
         ],
         "most_sixes_in_a_match": [
             {"match_id": r["match_id"], "sixes": r["sixes"],
-             "teams": r["teams"], "date": r["date"]}
+             "teams": r["teams"],
+             "team1": r["team1"], "team2": r["team2"],
+             "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
             for r in ms_rows
         ],
     }
