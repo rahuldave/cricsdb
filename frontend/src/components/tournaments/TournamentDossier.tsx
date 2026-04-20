@@ -16,7 +16,7 @@ import PlayerLink from '../PlayerLink'
 import TeamLink from '../TeamLink'
 import SeriesLink from '../SeriesLink'
 import {
-  resolveBucket, resolveScopePhrases,
+  resolveBucket, resolveScopePhrases, seasonTag,
   type PhraseTier, type SubscriptSource,
 } from '../scopeLinks'
 import DataTable, { type Column } from '../DataTable'
@@ -1021,27 +1021,54 @@ function OverviewTab({
         </div>
       )}
 
-      {/* ── Participating teams (only meaningful for tournaments) ── */}
-      {tournament && summary.teams.length > 0 && (
-        <div className="mt-8">
-          <h3 className="wisden-section-title">
-            Participating teams ({summary.teams.length})
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {summary.teams.map(t => (
-              <Link
-                key={t.name}
-                to={teamLinkHref(t.name, { tournament, gender })}
-                className="wisden-chip comp-link"
-                style={{ textDecoration: 'none' }}
-              >
-                {t.name}
-                <span className="wisden-tile-faint"> · {t.matches}</span>
-              </Link>
-            ))}
+      {/* ── Participating teams (only meaningful for tournaments) ──
+          The section title embeds the tournament + season scope once, so
+          per-chip text can stay tight. Each chip splits into two links:
+          the country NAME is a TeamLink (all-time — preserves the "team-
+          name-as-link always means all-time" convention), and the match
+          COUNT links to the scoped view (team at this tournament +
+          season window). */}
+      {tournament && summary.teams.length > 0 && (() => {
+        const season = seasonTag(filters.season_from, filters.season_to)
+        const scopeLabel = season
+          ? `at ${tournament}, ${season}`
+          : `at ${tournament}`
+        return (
+          <div className="mt-8">
+            <h3 className="wisden-section-title">
+              Teams {scopeLabel} ({summary.teams.length})
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {summary.teams.map(t => {
+                const scopedQs = new URLSearchParams({ team: t.name })
+                scopedQs.set('tournament', tournament)
+                if (gender) scopedQs.set('gender', gender)
+                if (teamType) scopedQs.set('team_type', teamType)
+                if (filters.season_from) scopedQs.set('season_from', filters.season_from)
+                if (filters.season_to) scopedQs.set('season_to', filters.season_to)
+                return (
+                  <span key={t.name} className="wisden-chip">
+                    <TeamLink
+                      teamName={t.name}
+                      compact
+                      gender={gender}
+                      team_type={teamType}
+                    />
+                    <span className="wisden-tile-faint"> · </span>
+                    <Link
+                      to={`/teams?${scopedQs.toString()}`}
+                      className="comp-link"
+                      title={`${t.name} ${scopeLabel} — ${t.matches} matches`}
+                    >
+                      {t.matches}
+                    </Link>
+                  </span>
+                )
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {tournament && summary.champions_by_season.length > 0 && (
         <div className="mt-8">
