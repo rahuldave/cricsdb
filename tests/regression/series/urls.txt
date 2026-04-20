@@ -17,7 +17,7 @@ REG series_landing_women              /api/v1/series/landing?gender=female
 
 # ── tournament dossier: IPL all-time ─────────────────────────────
 REG series_summary_ipl                /api/v1/series/summary?tournament=Indian%20Premier%20League
-REG series_by_season_ipl              /api/v1/series/by-season?tournament=Indian%20Premier%20League&gender=male&team_type=club
+NEW series_by_season_ipl              /api/v1/series/by-season?tournament=Indian%20Premier%20League&gender=male&team_type=club
 REG series_records_ipl                /api/v1/series/records?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
 REG series_batters_leaders_ipl        /api/v1/series/batters-leaders?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
 REG series_bowlers_leaders_ipl        /api/v1/series/bowlers-leaders?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
@@ -36,7 +36,7 @@ REG series_batters_t20wc_men          /api/v1/series/batters-leaders?tournament=
 
 # ── bilateral rivalry (filter_team + filter_opponent) ────────────
 REG series_summary_ind_vs_aus         /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male
-REG series_by_season_ind_vs_aus       /api/v1/series/by-season?filter_team=India&filter_opponent=Australia&gender=male
+NEW series_by_season_ind_vs_aus       /api/v1/series/by-season?filter_team=India&filter_opponent=Australia&gender=male
 REG series_records_ind_vs_aus         /api/v1/series/records?filter_team=India&filter_opponent=Australia&gender=male&limit=3
 REG series_batters_ind_vs_aus         /api/v1/series/batters-leaders?filter_team=India&filter_opponent=Australia&gender=male&limit=5
 
