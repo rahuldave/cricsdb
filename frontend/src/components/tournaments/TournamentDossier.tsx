@@ -936,20 +936,45 @@ function OverviewTab({
         </div>
       )}
 
-      {/* ── Groups (only meaningful for a single edition with a tournament) ── */}
+      {/* ── Groups — only render on a single edition of a tournament
+          (group-stage tables don't make sense aggregated across years).
+          Same convention as Participating teams: country NAME is a
+          TeamLink (all-time), match COUNT is a scoped link. The
+          season for the scope is the group row's season — guaranteed
+          single because editions === 1. */}
       {tournament && summary.editions === 1 && summary.groups.length > 0 && (
         <div className="mt-8">
           <h3 className="wisden-section-title">Groups</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {summary.groups.map(g => (
-              <div key={`${g.season}-${g.group}`} className="wisden-tile">
+              <div key={`${g.season}-${g.group}`} className="wisden-tile" style={{ cursor: 'default' }}>
                 <div className="wisden-tile-title">Group {g.group}</div>
                 <div className="wisden-tile-line mt-1">
-                  {g.teams.map(t => (
-                    <div key={t.team}>
-                      {t.team} <span className="wisden-tile-faint">· {t.matches} m</span>
-                    </div>
-                  ))}
+                  {g.teams.map(t => {
+                    const qs = new URLSearchParams({ team: t.team, tournament })
+                    if (gender) qs.set('gender', gender)
+                    if (teamType) qs.set('team_type', teamType)
+                    qs.set('season_from', g.season)
+                    qs.set('season_to', g.season)
+                    return (
+                      <div key={t.team}>
+                        <TeamLink
+                          teamName={t.team}
+                          compact
+                          gender={gender}
+                          team_type={teamType}
+                        />
+                        <span className="wisden-tile-faint"> · </span>
+                        <Link
+                          to={`/teams?${qs.toString()}`}
+                          className="comp-link wisden-tile-faint"
+                          title={`${t.team} at ${tournament}, ${g.season} — ${t.matches} matches`}
+                        >
+                          {t.matches} m
+                        </Link>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             ))}
