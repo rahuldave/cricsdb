@@ -9,6 +9,7 @@ import { getMatches, getTeams } from '../api'
 import PlayerSearch from '../components/PlayerSearch'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
+import Score from '../components/Score'
 import type { TeamInfo } from '../types'
 
 const PAGE_SIZE = 50
@@ -183,11 +184,11 @@ export default function Matches() {
                     {' '}<span style={{ fontStyle: 'italic', color: 'var(--ink-faint)' }}>v</span>{' '}
                     <Link to={teamHref(m.team2)} className="comp-link" onClick={stop}>{m.team2}</Link>
                   </div>
-                  <div className="num" style={{ fontSize: '0.78rem', color: 'var(--ink-faint)', marginTop: '0.15rem' }}>
-                    {m.team1_score && <>{m.team1}: {m.team1_score}</>}
-                    {m.team1_score && m.team2_score && <>  ·  </>}
-                    {m.team2_score && <>{m.team2}: {m.team2_score}</>}
-                  </div>
+                  {(m.team1_score || m.team2_score) && (
+                    <div style={{ fontSize: '0.78rem', color: 'var(--ink-faint)', marginTop: '0.15rem' }}>
+                      <Score team1Score={m.team1_score} team2Score={m.team2_score} />
+                    </div>
+                  )}
                   <div className="sm:hidden" style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginTop: '0.15rem', fontFamily: 'var(--serif)' }}>{m.result_text}</div>
                   <div className="md:hidden" style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.1rem' }}>{m.tournament || ''}</div>
                 </td>
