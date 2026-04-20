@@ -5,38 +5,87 @@ import { useFetch } from '../../hooks/useFetch'
 import { getTournamentsLanding, getTournamentOtherRivalries } from '../../api'
 import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
+import SeriesLink from '../SeriesLink'
+import TeamLink from '../TeamLink'
+
+/** Build a /teams?team=X URL with whatever scope params are non-empty.
+ *  Used on tile lines where natural-language phrasing puts the scope on
+ *  the team NAME (e.g. "Winner: India" reads as "India won this edition"
+ *  — the India link should land on India-at-this-edition, not all-time).
+ *  TeamLink's contract is the opposite (name = all-time); these inline
+ *  usages are intentional exceptions. */
+interface TeamScope {
+  team: string
+  gender?: string | null
+  team_type?: string | null
+  tournament?: string | null
+  season_from?: string | null
+  season_to?: string | null
+  filter_team?: string | null
+  filter_opponent?: string | null
+  series_type?: string | null
+}
+function teamUrl(s: TeamScope): string {
+  const qs = new URLSearchParams()
+  qs.set('team', s.team)
+  if (s.gender) qs.set('gender', s.gender)
+  if (s.team_type) qs.set('team_type', s.team_type)
+  if (s.tournament) qs.set('tournament', s.tournament)
+  if (s.season_from) qs.set('season_from', s.season_from)
+  if (s.season_to) qs.set('season_to', s.season_to)
+  if (s.filter_team) qs.set('filter_team', s.filter_team)
+  if (s.filter_opponent) qs.set('filter_opponent', s.filter_opponent)
+  if (s.series_type && s.series_type !== 'all') qs.set('series_type', s.series_type)
+  return `/teams?${qs.toString()}`
+}
 import type {
   TournamentsLanding as TLandingData,
   TournamentLandingEntry,
   RivalryEntry,
 } from '../../types'
 
-/** Build a querystring that carries filters into dossier navigation. */
-function buildFilterQs(filters: ReturnType<typeof useFilters>): string {
-  const p = new URLSearchParams()
-  if (filters.gender) p.set('gender', filters.gender)
-  if (filters.team_type) p.set('team_type', filters.team_type)
-  if (filters.season_from) p.set('season_from', filters.season_from)
-  if (filters.season_to) p.set('season_to', filters.season_to)
-  if (filters.filter_venue) p.set('filter_venue', filters.filter_venue)
-  return p.toString()
+/** Pass-through scope fields common to every landing link. Used by the
+ *  stretched primary link on each tile. */
+interface AmbientScope {
+  gender?: string
+  team_type?: string
+  season_from?: string
+  season_to?: string
+  filter_venue?: string
+}
+
+function ambientFromFilters(filters: ReturnType<typeof useFilters>): AmbientScope {
+  return {
+    gender: filters.gender || undefined,
+    team_type: filters.team_type || undefined,
+    season_from: filters.season_from || undefined,
+    season_to: filters.season_to || undefined,
+    filter_venue: filters.filter_venue || undefined,
+  }
 }
 
 function TournamentTile({
-  entry, filterQs,
-}: { entry: TournamentLandingEntry; filterQs: string }) {
-  // Carry the tile's implicit gender/team_type into the URL so the
-  // FilterBar doesn't have to auto-correct. For canonical names like
-  // "T20 World Cup (Men)" those aren't auto-narrowable (no matching
-  // cricsheet event_name); passing them explicitly keeps downstream
-  // endpoints scoped correctly.
-  const p = new URLSearchParams(filterQs)
-  p.set('tournament', entry.canonical)
-  if (entry.gender && !p.has('gender')) p.set('gender', entry.gender)
-  if (entry.team_type && !p.has('team_type')) p.set('team_type', entry.team_type)
-  const qs = `?${p.toString()}`
+  entry, ambient,
+}: { entry: TournamentLandingEntry; ambient: AmbientScope }) {
+  // Tile-implicit gender/team_type wins over ambient — "T20 World Cup
+  // (Men)" never matches a cricsheet event_name for FilterBar
+  // auto-narrow, so we pass them explicitly on every link URL.
+  const rowGender = entry.gender || ambient.gender
+  const rowTeamType = entry.team_type || ambient.team_type
   return (
-    <Link to={`/series${qs}`} className="wisden-tile">
+    <div className="wisden-tile tile-wrapper">
+      <SeriesLink
+        tournament={entry.canonical}
+        gender={rowGender}
+        team_type={rowTeamType}
+        season_from={ambient.season_from}
+        season_to={ambient.season_to}
+        filter_venue={ambient.filter_venue}
+        className="tile-stretched"
+        title={`All editions of ${entry.canonical}`}
+      >
+        {entry.canonical}
+      </SeriesLink>
       <div className="wisden-tile-title">{entry.canonical}</div>
       <div className="wisden-tile-sub">
         {entry.editions} {entry.editions === 1 ? 'edition' : 'editions'}
@@ -45,47 +94,118 @@ function TournamentTile({
       </div>
       {entry.most_titles && (
         <div className="wisden-tile-line">
-          Most titles: <span className="wisden-tile-em">{entry.most_titles.team}</span>
-          {entry.most_titles.titles > 1 && ` (${entry.most_titles.titles})`}
-        </div>
-      )}
-      {entry.latest_edition && (
-        <div className="wisden-tile-line">
-          Latest: {entry.latest_edition.season}
-          {entry.latest_edition.champion && (
-            <> — <span className="wisden-tile-em">{entry.latest_edition.champion}</span></>
+          Most titles:{' '}
+          <TeamLink
+            teamName={entry.most_titles.team}
+            compact
+            gender={rowGender ?? null}
+            team_type={rowTeamType ?? null}
+          />
+          {entry.most_titles.titles > 1 && (
+            <>
+              {' ('}
+              <Link
+                to={teamUrl({
+                  team: entry.most_titles.team,
+                  gender: rowGender,
+                  team_type: rowTeamType,
+                  tournament: entry.canonical,
+                })}
+                className="comp-link"
+                title={`${entry.most_titles.team} at ${entry.canonical}`}
+              >
+                {entry.most_titles.titles}
+              </Link>
+              {')'}
+            </>
           )}
         </div>
       )}
-    </Link>
+      {entry.latest_edition && (
+        <>
+          <div className="wisden-tile-line">
+            Latest:{' '}
+            <SeriesLink
+              tournament={entry.canonical}
+              season={entry.latest_edition.season}
+              gender={rowGender}
+              team_type={rowTeamType}
+              filter_venue={ambient.filter_venue}
+              title={`${entry.canonical}, ${entry.latest_edition.season}`}
+            >
+              {entry.latest_edition.season}
+            </SeriesLink>
+          </div>
+          {entry.latest_edition.champion && (
+            <div className="wisden-tile-line">
+              <Link
+                to={teamUrl({
+                  team: entry.latest_edition.champion,
+                  gender: rowGender,
+                  team_type: rowTeamType,
+                  tournament: entry.canonical,
+                  season_from: entry.latest_edition.season,
+                  season_to: entry.latest_edition.season,
+                })}
+                className="comp-link"
+                title={`${entry.latest_edition.champion} at ${entry.canonical}, ${entry.latest_edition.season}`}
+              >
+                Winner: {entry.latest_edition.champion}
+              </Link>
+              <span className="scope-phrases-inline">
+                {' '}
+                <Link
+                  to={teamUrl({
+                    team: entry.latest_edition.champion,
+                    gender: rowGender,
+                    team_type: rowTeamType,
+                  })}
+                  className="comp-link scope-phrase"
+                  title={`${entry.latest_edition.champion}, all-time`}
+                >
+                  all-time
+                </Link>
+              </span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   )
 }
 
 function RivalryTile({
-  entry, filterQs, gender,
-}: { entry: RivalryEntry; filterQs: string; gender: 'male' | 'female' }) {
-  // Rivalry tiles are bilateral-only by design. Click → match-set
-  // dossier scoped to the team pair, filtered to bilateral series.
-  const p = new URLSearchParams(filterQs)
-  p.set('filter_team', entry.team1)
-  p.set('filter_opponent', entry.team2)
-  // Tournaments-landing rivalry tiles are international bilateral pairs
-  // by definition. Land on bilateral-T20Is scope (excludes ICC events
-  // like World Cup meetings — those have their own discovery path).
-  p.set('series_type', 'bilateral')
-  if (!p.has('gender')) p.set('gender', gender)
-  if (!p.has('team_type')) p.set('team_type', 'international')
-  const qs = `?${p.toString()}`
+  entry, ambient, gender,
+}: { entry: RivalryEntry; ambient: AmbientScope; gender: 'male' | 'female' }) {
+  // Rivalry tiles show an all-time bilateral pair; tile click opens the
+  // rivalry dossier on `all` (bilateral + ICC) so the user can see the
+  // full picture and narrow via the series-type pill.
   const genderLabel = gender === 'female' ? "women's" : "men's"
+  const latest = entry.latest_match
+  // Bilateral when event_name was null on the server side.
+  const latestIsBilateral = !!latest && latest.tournament == null
   return (
-    <Link to={`/series${qs}`} className="wisden-tile">
+    <div className="wisden-tile tile-wrapper">
+      <SeriesLink
+        team1={entry.team1}
+        team2={entry.team2}
+        seriesType="all"
+        gender={gender}
+        team_type="international"
+        season_from={ambient.season_from}
+        season_to={ambient.season_to}
+        filter_venue={ambient.filter_venue}
+        className="tile-stretched"
+        title={`${entry.team1} vs ${entry.team2} — all meetings`}
+      >
+        {`${entry.team1} v ${entry.team2}`}
+      </SeriesLink>
       <div className="wisden-tile-title">
         {entry.team1} <span className="wisden-tile-vs">v</span> {entry.team2}
         <span className="wisden-tile-faint" style={{ fontSize: '0.78em' }}> {genderLabel}</span>
       </div>
       <div className="wisden-tile-sub">
         {entry.matches} {entry.matches === 1 ? 'match' : 'matches'}
-        <span className="wisden-tile-faint"> · bilateral</span>
       </div>
       <div className="wisden-tile-line">
         {entry.team1_wins}–{entry.team2_wins}
@@ -96,17 +216,74 @@ function RivalryTile({
           </span>
         ) : null}
       </div>
-    </Link>
+      {latest && (
+        <>
+          <div className="wisden-tile-line">
+            Latest:{' '}
+            <SeriesLink
+              tournament={latestIsBilateral ? null : latest.tournament}
+              season={latest.season}
+              seriesType={latestIsBilateral ? 'bilateral' : 'all'}
+              team1={entry.team1}
+              team2={entry.team2}
+              gender={gender}
+              team_type="international"
+            >
+              {latestIsBilateral
+                ? `${latest.season} bilateral`
+                : `${latest.tournament} ${latest.season}`}
+            </SeriesLink>
+          </div>
+          {latest.winner && (() => {
+            const opp = latest.winner === entry.team1 ? entry.team2 : entry.team1
+            const scopedHref = teamUrl({
+              team: latest.winner,
+              gender,
+              team_type: 'international',
+              tournament: latestIsBilateral ? null : latest.tournament,
+              season_from: latest.season,
+              season_to: latest.season,
+              filter_opponent: opp,
+              series_type: latestIsBilateral ? 'bilateral' : undefined,
+            })
+            const scopedDesc = latestIsBilateral
+              ? `${latest.winner} vs ${opp}, ${latest.season} bilateral`
+              : `${latest.winner} at ${latest.tournament}, ${latest.season} vs ${opp}`
+            return (
+              <div className="wisden-tile-line">
+                <Link to={scopedHref} className="comp-link" title={scopedDesc}>
+                  Winner: {latest.winner}
+                </Link>
+                <span className="scope-phrases-inline">
+                  {' '}
+                  <Link
+                    to={teamUrl({
+                      team: latest.winner,
+                      gender,
+                      team_type: 'international',
+                    })}
+                    className="comp-link scope-phrase"
+                    title={`${latest.winner}, all-time`}
+                  >
+                    all-time
+                  </Link>
+                </span>
+              </div>
+            )
+          })()}
+        </>
+      )}
+    </div>
   )
 }
 
 function Section({
-  title, tiles, emptyLabel, filterQs,
+  title, tiles, emptyLabel, ambient,
 }: {
   title: string
   tiles: TournamentLandingEntry[]
   emptyLabel?: string
-  filterQs: string
+  ambient: AmbientScope
 }) {
   if (!tiles.length) {
     if (!emptyLabel) return null
@@ -122,7 +299,7 @@ function Section({
       <h3 className="wisden-section-title">{title}</h3>
       <div className="wisden-tile-grid">
         {tiles.map(e => (
-          <TournamentTile key={e.canonical} entry={e} filterQs={filterQs} />
+          <TournamentTile key={e.canonical} entry={e} ambient={ambient} />
         ))}
       </div>
     </div>
@@ -130,12 +307,12 @@ function Section({
 }
 
 function RivalryGrid({
-  title, top, gender, filterQs,
+  title, top, gender, ambient,
 }: {
   title: string
   top: RivalryEntry[]
   gender: 'male' | 'female'
-  filterQs: string
+  ambient: AmbientScope
 }) {
   if (!top.length) return null
   return (
@@ -146,7 +323,7 @@ function RivalryGrid({
           <RivalryTile
             key={`${gender}-${e.team1}|${e.team2}`}
             entry={e}
-            filterQs={filterQs}
+            ambient={ambient}
             gender={gender}
           />
         ))}
@@ -157,7 +334,7 @@ function RivalryGrid({
 
 export default function TournamentsLanding() {
   const filters = useFilters()
-  const filterQs = buildFilterQs(filters)
+  const ambient = ambientFromFilters(filters)
 
   const { data, loading, error, refetch } = useFetch<TLandingData>(
     () => getTournamentsLanding(filters),
@@ -212,7 +389,7 @@ export default function TournamentsLanding() {
             <Section
               title="International events"
               tiles={intlEvents}
-              filterQs={filterQs}
+              ambient={ambient}
               emptyLabel="No international events in this filter scope."
             />
 
@@ -222,7 +399,7 @@ export default function TournamentsLanding() {
                 title={`Men's bilateral rivalries (${rivalries.men.top.length})`}
                 top={rivalries.men.top}
                 gender="male"
-                filterQs={filterQs}
+                ambient={ambient}
               />
             )}
             {rivalries.men.other_count > 0 && (
@@ -249,9 +426,9 @@ export default function TournamentsLanding() {
                       <div className="wisden-tile-grid mt-2">
                         {othersMenFetch.data.rivalries.map(e => (
                           <RivalryTile
-                            key={`m-${e.team1}|${e.team2}`}
+                            key={`om-${e.team1}|${e.team2}`}
                             entry={e}
-                            filterQs={filterQs}
+                            ambient={ambient}
                             gender="male"
                           />
                         ))}
@@ -268,7 +445,7 @@ export default function TournamentsLanding() {
                 title={`Women's bilateral rivalries (${rivalries.women.top.length})`}
                 top={rivalries.women.top}
                 gender="female"
-                filterQs={filterQs}
+                ambient={ambient}
               />
             )}
             {rivalries.women.other_count > 0 && (
@@ -295,9 +472,9 @@ export default function TournamentsLanding() {
                       <div className="wisden-tile-grid mt-2">
                         {othersWomenFetch.data.rivalries.map(e => (
                           <RivalryTile
-                            key={`w-${e.team1}|${e.team2}`}
+                            key={`ow-${e.team1}|${e.team2}`}
                             entry={e}
-                            filterQs={filterQs}
+                            ambient={ambient}
                             gender="female"
                           />
                         ))}
@@ -332,7 +509,7 @@ export default function TournamentsLanding() {
                     </div>
                     <div className="wisden-tile-grid mt-1">
                       {otherIntl.map(e => (
-                        <TournamentTile key={e.canonical} entry={e} filterQs={filterQs} />
+                        <TournamentTile key={e.canonical} entry={e} ambient={ambient} />
                       ))}
                     </div>
                   </>
@@ -348,23 +525,23 @@ export default function TournamentsLanding() {
             <Section
               title="Franchise leagues"
               tiles={clubFranchise}
-              filterQs={filterQs}
+              ambient={ambient}
               emptyLabel="No franchise leagues in this filter scope."
             />
             <Section
               title="Domestic leagues"
               tiles={clubDomestic}
-              filterQs={filterQs}
+              ambient={ambient}
             />
             <Section
               title="Women's franchise leagues"
               tiles={clubWomen}
-              filterQs={filterQs}
+              ambient={ambient}
             />
             <Section
               title="Other tournaments"
               tiles={clubOther}
-              filterQs={filterQs}
+              ambient={ambient}
             />
           </div>
         )}

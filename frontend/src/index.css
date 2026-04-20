@@ -1745,6 +1745,26 @@ a { color: inherit; }
   width: 100%;
 }
 .wisden-tile:hover { border-color: var(--accent); background: var(--bg-soft); }
+/* Stretched-link tile: tile is a plain div; one child is an absolutely-
+   positioned anchor covering the whole card (the "primary" destination).
+   Sibling children are click-transparent by default so empty regions
+   (padding, gaps between text lines, etc.) fall through to the
+   stretched link; inner <a>/<button> re-enable pointer-events and sit
+   on top via z-index so they capture their own clicks. Nested <a> in
+   <a> is avoided this way, while cmd-click still discriminates. */
+.wisden-tile.tile-wrapper { position: relative; }
+.wisden-tile.tile-wrapper .tile-stretched {
+  position: absolute; inset: 0; z-index: 1;
+  /* No visible text — zero content on the stretched anchor. */
+  font-size: 0; line-height: 0; color: transparent;
+}
+.wisden-tile.tile-wrapper > *:not(.tile-stretched) { pointer-events: none; }
+.wisden-tile.tile-wrapper > *:not(.tile-stretched) a,
+.wisden-tile.tile-wrapper > *:not(.tile-stretched) button {
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+}
 .wisden-tile-title {
   font-family: var(--serif);
   font-size: 1rem;

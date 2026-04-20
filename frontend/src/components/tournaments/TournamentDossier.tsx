@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
 import { useUrlParam, useSetUrlParams } from '../../hooks/useUrlState'
 import { useFetch } from '../../hooks/useFetch'
@@ -13,6 +13,12 @@ import {
 } from '../../api'
 import StatCard from '../StatCard'
 import PlayerLink from '../PlayerLink'
+import TeamLink from '../TeamLink'
+import SeriesLink from '../SeriesLink'
+import {
+  resolveBucket, resolveScopePhrases,
+  type PhraseTier, type SubscriptSource,
+} from '../scopeLinks'
 import DataTable, { type Column } from '../DataTable'
 import LineChart from '../charts/LineChart'
 import Spinner from '../Spinner'
@@ -251,17 +257,14 @@ export default function TournamentDossier({
   const headlineTitle = isRivalryMode
     ? (
         <>
-          <Link
-            to={teamLinkHref(filterTeam!, { tournament, gender: filters.gender })}
-            className="comp-link"
-            style={{ fontSize: 'inherit', fontWeight: 'inherit' }}
-          >{filterTeam}</Link>
+          {/* H2 team links use block-layout subscripts. When tournament
+              or season filter is set, each team's name gets small-caps
+              phrase subscripts below it (tournament-level and/or
+              edition-level). Rivalry is page identity (shown in the H2
+              text) so it never produces a subscript — see resolveScopePhrases. */}
+          <TeamLink teamName={filterTeam!} layout="block" />
           {' '}<span className="wisden-h2h-vs">v</span>{' '}
-          <Link
-            to={teamLinkHref(filterOpponent!, { tournament, gender: filters.gender })}
-            className="comp-link"
-            style={{ fontSize: 'inherit', fontWeight: 'inherit' }}
-          >{filterOpponent}</Link>
+          <TeamLink teamName={filterOpponent!} layout="block" />
           {genderSuffix && (
             <span className="wisden-tile-faint" style={{ fontSize: '0.7em' }}>
               {genderSuffix}
@@ -323,14 +326,27 @@ export default function TournamentDossier({
                 key={s}
                 type="button"
                 className={`wisden-clear${seriesType === s ? ' is-active' : ''}`}
-                onClick={() => setSeriesType(s === 'all' ? '' : s)}
+                onClick={() => {
+                  // Clear tournament too. The series-type change
+                  // usually invalidates the current tournament choice
+                  // (e.g. "bilateral" + tournament=T20 WC is empty).
+                  // If the new scope unambiguously implies one
+                  // tournament, FilterBar's auto-narrow re-pins it via
+                  // replace. Clearing here also ensures the push URL
+                  // doesn't carry a stale tournament through the back
+                  // button.
+                  setUrlParams({
+                    series_type: s === 'all' ? '' : s,
+                    tournament: '',
+                  })
+                }}
                 style={{
                   color: seriesType === s ? 'var(--accent)' : 'var(--ink-faint)',
                   fontWeight: seriesType === s ? 600 : 400,
                 }}
               >
                 {s === 'all' ? allLabel
-                  : s === 'bilateral' ? 'Bilateral T20Is'
+                  : s === 'bilateral' ? 'only bilaterals'
                   : s === 'icc' ? 'ICC events'
                   : 'Club tournaments'}
               </button>
@@ -358,6 +374,7 @@ export default function TournamentDossier({
           seasons={bySeasonFetch.data?.seasons ?? []}
           tournament={tournament}
           gender={filters.gender}
+          teamType={filters.team_type}
         />
       )}
       {currentTab === 'Editions' && (
@@ -462,12 +479,13 @@ const seasonNum = (s: string): number => {
 }
 
 function OverviewTab({
-  summary, seasons, tournament, gender,
+  summary, seasons, tournament, gender, teamType,
 }: {
   summary: TournamentSummary
   seasons: TournamentSeason[]
   tournament: string | null
   gender: string | null | undefined
+  teamType: string | null | undefined
 }) {
   // Seasons come newest-first from backend — flip for chart reading left-to-right.
   const trend = [...seasons].reverse()
@@ -477,6 +495,83 @@ function OverviewTab({
   const teamNames = isRivalry && summary.by_team ? Object.keys(summary.by_team) : []
 
   const h2h = summary.head_to_head
+
+  // Scope-phrase tiers for the top-of-Overview StatCards. Subtitle
+  // renders tiers inline narrow→broad ("759 runs · at IPL, 2024, at IPL"),
+  // giving readers every meaningful destination the card's scope implies.
+  //
+  // On rivalry scope, the phrase orientation must reflect the player's
+  // own team. A batter playing for India against Australia should read
+  // "vs Australia" (not "vs India"). `orientedSource` flips the rivalry
+  // pair per-card based on the payload's `team` field; same pattern the
+  // leaderboard tables use via `rowSubscriptSource`.
+  const filters = useFilters()
+  const [phraseSearchParams] = useSearchParams()
+  const seriesType = phraseSearchParams.get('series_type')
+  const filterTeam = filters.filter_team
+  const filterOpponent = filters.filter_opponent
+
+  const orientedSource = (rowTeam: string | null | undefined): SubscriptSource | undefined => {
+    if (!filterTeam || !filterOpponent || !rowTeam) return undefined
+    return rowTeam === filterOpponent
+      ? { team1: filterOpponent, team2: filterTeam }
+      : { team1: filterTeam, team2: filterOpponent }
+  }
+
+  /** Compute phrase tiers for one card, correctly oriented per its `rowTeam`. */
+  const cardPhrases = (keepRivalry: boolean, rowTeam?: string | null): PhraseTier[] => {
+    const source = keepRivalry ? orientedSource(rowTeam) : undefined
+    const bucket = resolveBucket(filters, source)
+    return resolveScopePhrases(bucket, { keepRivalry, seriesType })
+  }
+
+  /** Render the full tier chain inline, comma-separated. Matches PlayerLink
+   *  / TeamLink inline format. Returns null when there are no phrases. */
+  const phraseLinks = (
+    phrases: PhraseTier[],
+    baseHref: string,
+    baseParams: Record<string, string>,
+  ) => {
+    if (phrases.length === 0) return null
+    return (
+      <>
+        {phrases.map((ph, i) => {
+          const qs = new URLSearchParams({ ...baseParams, ...ph.params })
+          return (
+            <span key={`${i}-${ph.label}`}>
+              {i > 0 && <span className="scope-phrases-sep">, </span>}
+              <Link
+                to={`${baseHref}?${qs.toString()}`}
+                className="comp-link scope-phrase"
+                title={ph.tooltip}
+              >
+                {ph.label}
+              </Link>
+            </span>
+          )
+        })}
+      </>
+    )
+  }
+
+  // Per-card phrase tiers. Non-player-axis cards (Most titles, Highest
+  // total) use keepRivalry=false so orientation is irrelevant — rivalry
+  // drops from the URL, destination is the single-team/edition page.
+  const teamCardPhrases = cardPhrases(false, null)
+  const topScorerPhrases = summary.top_scorer_alltime
+    ? cardPhrases(true, summary.top_scorer_alltime.team)
+    : []
+  const topWicketPhrases = summary.top_wicket_taker_alltime
+    ? cardPhrases(true, summary.top_wicket_taker_alltime.team)
+    : []
+  // Largest partnership is attributed to the batting team (both batters
+  // belong to it), so orient to the partnership's team. The other best-
+  // moments lines use PlayerLink's native phrase rendering (name → stat
+  // → phrase tiers via trailingContent), which orients via the
+  // subscriptSource we pass directly.
+  const lpPhrases = summary.largest_partnership
+    ? cardPhrases(true, summary.largest_partnership.team)
+    : []
   return (
     <div>
       {/* Rivalry-mode head-to-head stats up top — the basic
@@ -503,44 +598,224 @@ function OverviewTab({
         </div>
       )}
 
-      <div className="wisden-statrow cols-5 mt-4">
+      <div className={`wisden-statrow ${h2h ? 'cols-5' : 'cols-6'} mt-4`}>
         {!h2h && <StatCard label="Matches" value={summary.matches.toLocaleString()} />}
         <StatCard label="Run rate" value={fmt(summary.run_rate, 2)} subtitle="per over" />
         <StatCard label="Boundary %" value={fmt(summary.boundary_pct, 1)} />
         <StatCard label="Dot %" value={fmt(summary.dot_pct, 1)} />
+        <StatCard label="Fours" value={summary.total_fours.toLocaleString()} />
         <StatCard label="Sixes" value={summary.total_sixes.toLocaleString()} />
       </div>
 
-      <div className="wisden-statrow mt-2">
+      {/* Leaders row — aggregate titles + top-of-leaderboard. */}
+      <div className="wisden-statrow cols-3 mt-2">
         {summary.most_titles && (
           <StatCard
             label="Most titles"
-            value={summary.most_titles.team}
-            subtitle={`${summary.most_titles.titles} ${summary.most_titles.titles === 1 ? 'title' : 'titles'}`}
+            value={<TeamLink compact teamName={summary.most_titles.team} gender={gender} />}
+            subtitle={
+              <>
+                {summary.most_titles.titles}{' '}
+                {summary.most_titles.titles === 1 ? 'title' : 'titles'}
+                {teamCardPhrases.length > 0 && (
+                  <>
+                    {' · '}
+                    {phraseLinks(teamCardPhrases, '/teams', { team: summary.most_titles.team })}
+                  </>
+                )}
+              </>
+            }
           />
         )}
         {summary.top_scorer_alltime && (
           <StatCard
             label="Top scorer"
-            value={summary.top_scorer_alltime.name}
-            subtitle={`${summary.top_scorer_alltime.runs.toLocaleString()} runs`}
+            value={
+              <PlayerLink
+                compact
+                personId={summary.top_scorer_alltime.person_id}
+                name={summary.top_scorer_alltime.name}
+                role="batter"
+                gender={gender}
+                subscriptSource={orientedSource(summary.top_scorer_alltime.team)}
+              />
+            }
+            subtitle={
+              <>
+                {summary.top_scorer_alltime.runs.toLocaleString()} runs
+                {topScorerPhrases.length > 0 && summary.top_scorer_alltime.person_id && (
+                  <>
+                    {' · '}
+                    {phraseLinks(topScorerPhrases, '/batting', {
+                      player: summary.top_scorer_alltime.person_id,
+                    })}
+                  </>
+                )}
+              </>
+            }
           />
         )}
         {summary.top_wicket_taker_alltime && (
           <StatCard
             label="Top wicket-taker"
-            value={summary.top_wicket_taker_alltime.name}
-            subtitle={`${summary.top_wicket_taker_alltime.wickets} wickets`}
-          />
-        )}
-        {summary.highest_team_total && (
-          <StatCard
-            label="Highest total"
-            value={`${summary.highest_team_total.total}`}
-            subtitle={`${summary.highest_team_total.team} v ${summary.highest_team_total.opponent}`}
+            value={
+              <PlayerLink
+                compact
+                personId={summary.top_wicket_taker_alltime.person_id}
+                name={summary.top_wicket_taker_alltime.name}
+                role="bowler"
+                gender={gender}
+                subscriptSource={orientedSource(summary.top_wicket_taker_alltime.team)}
+              />
+            }
+            subtitle={
+              <>
+                {summary.top_wicket_taker_alltime.wickets} wickets
+                {topWicketPhrases.length > 0 && summary.top_wicket_taker_alltime.person_id && (
+                  <>
+                    {' · '}
+                    {phraseLinks(topWicketPhrases, '/bowling', {
+                      player: summary.top_wicket_taker_alltime.person_id,
+                    })}
+                  </>
+                )}
+              </>
+            }
           />
         )}
       </div>
+
+      {/* Best moments — single-match highlights across the scope.
+          Prose lines rather than tiles: too many big cards made the
+          Overview read as a wall. Same markup as the rivalry by-team
+          tile body. PlayerLink's `trailingContent` holds the stat; the
+          scope-phrase tiers flow after it via the component's native
+          phrase rendering. */}
+      {(summary.highest_individual || summary.best_bowling
+        || summary.largest_partnership || summary.best_fielding
+        || summary.highest_team_total) && (
+        <div className="mt-8">
+          <h3 className="wisden-section-title">Best moments</h3>
+          <div className="wisden-tile-line mt-2">
+            {summary.highest_individual && (
+              <div>
+                <span className="wisden-tile-faint">Best batting: </span>
+                <PlayerLink
+                  personId={summary.highest_individual.person_id}
+                  name={summary.highest_individual.name}
+                  role="batter"
+                  gender={gender}
+                  subscriptSource={orientedSource(summary.highest_individual.team)}
+                  trailingContent={
+                    <span className="wisden-tile-faint">
+                      {' · '}{summary.highest_individual.runs}
+                      {summary.highest_individual.date && (
+                        <> · {matchLink(summary.highest_individual.match_id, summary.highest_individual.date)}</>
+                      )}
+                    </span>
+                  }
+                />
+              </div>
+            )}
+            {summary.best_bowling && (
+              <div>
+                <span className="wisden-tile-faint">Best bowling: </span>
+                <PlayerLink
+                  personId={summary.best_bowling.person_id}
+                  name={summary.best_bowling.name}
+                  role="bowler"
+                  gender={gender}
+                  subscriptSource={orientedSource(summary.best_bowling.team)}
+                  trailingContent={
+                    <span className="wisden-tile-faint">
+                      {' · '}{summary.best_bowling.figures}
+                      {summary.best_bowling.date && (
+                        <> · {matchLink(summary.best_bowling.match_id, summary.best_bowling.date)}</>
+                      )}
+                    </span>
+                  }
+                />
+              </div>
+            )}
+            {summary.largest_partnership && (
+              <div>
+                <span className="wisden-tile-faint">Highest partnership: </span>
+                <span className="wisden-tile-em">{summary.largest_partnership.runs}</span>
+                <span className="wisden-tile-faint">
+                  {' ('}
+                  <PlayerLink
+                    compact
+                    personId={summary.largest_partnership.batter1.person_id}
+                    name={summary.largest_partnership.batter1.name}
+                    role="batter"
+                    gender={gender}
+                  />
+                  {' & '}
+                  <PlayerLink
+                    compact
+                    personId={summary.largest_partnership.batter2.person_id}
+                    name={summary.largest_partnership.batter2.name}
+                    role="batter"
+                    gender={gender}
+                  />
+                  {')'}
+                  {summary.largest_partnership.date && (
+                    <> · {matchLink(summary.largest_partnership.match_id, summary.largest_partnership.date)}</>
+                  )}
+                  {lpPhrases.length > 0 && summary.largest_partnership.team && (
+                    <>
+                      {' '}
+                      {phraseLinks(lpPhrases, '/teams', { team: summary.largest_partnership.team })}
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
+            {summary.best_fielding && (
+              <div>
+                <span className="wisden-tile-faint">Best fielding: </span>
+                <PlayerLink
+                  personId={summary.best_fielding.person_id}
+                  name={summary.best_fielding.name}
+                  role="fielder"
+                  gender={gender}
+                  subscriptSource={orientedSource(summary.best_fielding.team)}
+                  trailingContent={
+                    <span className="wisden-tile-faint">
+                      {' · '}{summary.best_fielding.total} dismissal{summary.best_fielding.total === 1 ? '' : 's'}
+                      {summary.best_fielding.date && (
+                        <> · {matchLink(summary.best_fielding.match_id, summary.best_fielding.date)}</>
+                      )}
+                    </span>
+                  }
+                />
+              </div>
+            )}
+            {summary.highest_team_total && (
+              <div>
+                <span className="wisden-tile-faint">Highest total: </span>
+                <span className="wisden-tile-em">{summary.highest_team_total.total}</span>
+                <span className="wisden-tile-faint">
+                  {' ('}
+                  <TeamLink compact teamName={summary.highest_team_total.team} gender={gender} />
+                  {' v '}
+                  <TeamLink compact teamName={summary.highest_team_total.opponent} gender={gender} />
+                  {')'}
+                  {summary.highest_team_total.date && (
+                    <> · {matchLink(summary.highest_team_total.match_id, summary.highest_team_total.date)}</>
+                  )}
+                  {teamCardPhrases.length > 0 && (
+                    <>
+                      {' '}
+                      {phraseLinks(teamCardPhrases, '/series', {})}
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {trend.length > 1 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
@@ -597,8 +872,10 @@ function OverviewTab({
                           personId={t.top_scorer.person_id} name={t.top_scorer.name}
                           role="batter" gender={gender}
                           subscriptSource={rivalrySrc}
+                          trailingContent={
+                            <span className="wisden-tile-faint"> · {t.top_scorer.runs} runs</span>
+                          }
                         />
-                        <span className="wisden-tile-faint"> · {t.top_scorer.runs} runs</span>
                       </div>
                     )}
                     {t.top_wicket_taker && (
@@ -608,8 +885,10 @@ function OverviewTab({
                           personId={t.top_wicket_taker.person_id} name={t.top_wicket_taker.name}
                           role="bowler" gender={gender}
                           subscriptSource={rivalrySrc}
+                          trailingContent={
+                            <span className="wisden-tile-faint"> · {t.top_wicket_taker.wickets} wkts</span>
+                          }
                         />
-                        <span className="wisden-tile-faint"> · {t.top_wicket_taker.wickets} wkts</span>
                       </div>
                     )}
                     {t.highest_individual && (
@@ -619,8 +898,10 @@ function OverviewTab({
                           personId={t.highest_individual.person_id} name={t.highest_individual.name}
                           role="batter" gender={gender}
                           subscriptSource={rivalrySrc}
+                          trailingContent={
+                            <span className="wisden-tile-faint"> · {t.highest_individual.runs}</span>
+                          }
                         />
-                        <span className="wisden-tile-faint"> · {t.highest_individual.runs}</span>
                         {t.highest_individual.date && (
                           <> {' '}{matchLink(t.highest_individual.match_id, `(${t.highest_individual.date})`)}</>
                         )}
@@ -682,7 +963,28 @@ function OverviewTab({
           <h3 className="wisden-section-title">Knockouts</h3>
           <DataTable
             columns={[
-              { key: 'season', label: 'Season' },
+              {
+                // Edition column. Single-tournament dossier: just the
+                // season (plain text, tournament implied by page scope).
+                // Multi-tournament scope (rivalry, ICC Trophies, etc.):
+                // "<Tournament> <Season>" as a link to that edition's
+                // dossier, since the season alone is ambiguous.
+                key: 'season',
+                label: tournament ? 'Season' : 'Edition',
+                format: (v: string, r) => {
+                  if (tournament || !r.tournament) return v
+                  return (
+                    <SeriesLink
+                      tournament={r.tournament}
+                      season={r.season}
+                      gender={gender}
+                      team_type={teamType}
+                    >
+                      {r.tournament} {r.season}
+                    </SeriesLink>
+                  ) as unknown as string
+                },
+              },
               { key: 'stage', label: 'Stage' },
               {
                 key: 'team1', label: 'Match',
