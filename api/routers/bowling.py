@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams
+from ..filters import FilterParams, AuxParams
 from ..player_nationality import player_nationalities
 
 router = APIRouter(prefix="/api/v1/bowlers", tags=["Bowling"])
@@ -18,9 +18,9 @@ def _safe_div(a, b, mul=1, ndigits=2):
     return round(a * mul / b, ndigits)
 
 
-def _bowling_legal_filter(filters: FilterParams, person_id: str, batter_id: str | None = None):
+def _bowling_legal_filter(filters: FilterParams, person_id: str, batter_id: str | None = None, aux: AuxParams | None = None):
     """WHERE clause for legal-ball bowling queries — side-neutral team filter."""
-    where, params = filters.build_side_neutral(has_innings_join=True)
+    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
     params["person_id"] = person_id
     parts = ["d.bowler_id = :person_id", "d.extras_wides = 0", "d.extras_noballs = 0"]
     if where:
@@ -34,6 +34,7 @@ def _bowling_legal_filter(filters: FilterParams, person_id: str, batter_id: str 
 @router.get("/leaders")
 async def bowling_leaders(
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(10, ge=1, le=50),
     min_balls: int = Query(60, ge=1),
     min_wickets: int = Query(3, ge=0),
@@ -56,7 +57,7 @@ async def bowling_leaders(
     super-over caveat (0.04% noise, imperceptible).
     """
     db = get_db()
-    match_where, params = filters.build(has_innings_join=False)
+    match_where, params = filters.build(has_innings_join=False, aux=aux)
     has_filters = bool(match_where)
 
     if has_filters:
@@ -156,12 +157,12 @@ async def bowling_leaders(
     }
 
 
-def _bowling_all_filter(filters: FilterParams, person_id: str, batter_id: str | None = None):
+def _bowling_all_filter(filters: FilterParams, person_id: str, batter_id: str | None = None, aux: AuxParams | None = None):
     """WHERE clause for all-delivery bowling queries (includes wides/noballs).
 
     side-neutral: a bowler's deliveries live in opponent-batting innings.
     """
-    where, params = filters.build_side_neutral(has_innings_join=True)
+    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
     params["person_id"] = person_id
     parts = ["d.bowler_id = :person_id"]
     if where:
@@ -172,9 +173,9 @@ def _bowling_all_filter(filters: FilterParams, person_id: str, batter_id: str | 
     return " AND ".join(parts), params
 
 
-def _bowling_wicket_filter(filters: FilterParams, person_id: str, batter_id: str | None = None):
+def _bowling_wicket_filter(filters: FilterParams, person_id: str, batter_id: str | None = None, aux: AuxParams | None = None):
     """WHERE clause for bowler wicket queries — side-neutral team filter."""
-    where, params = filters.build_side_neutral(has_innings_join=True)
+    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
     params["person_id"] = person_id
     parts = [
         "d.bowler_id = :person_id",
@@ -217,6 +218,7 @@ def _format_overs(balls: int) -> str:
 async def bowling_summary(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     batter_id: Optional[str] = Query(None),
 ):
     db = get_db()
@@ -227,7 +229,7 @@ async def bowling_summary(
     name = name_rows[0]["name"] if name_rows else person_id
 
     # Legal balls: balls, batter runs, boundaries, dots
-    legal_where, legal_params = _bowling_legal_filter(filters, person_id, batter_id)
+    legal_where, legal_params = _bowling_legal_filter(filters, person_id, batter_id, aux=aux)
     legal = await db.q(
         f"""
         SELECT
@@ -247,7 +249,7 @@ async def bowling_summary(
     lc = legal[0] if legal else {}
 
     # All deliveries: runs conceded, wides, noballs
-    all_where, all_params = _bowling_all_filter(filters, person_id, batter_id)
+    all_where, all_params = _bowling_all_filter(filters, person_id, batter_id, aux=aux)
     all_del = await db.q(
         f"""
         SELECT
@@ -265,7 +267,7 @@ async def bowling_summary(
     ac = all_del[0] if all_del else {}
 
     # Wickets
-    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id)
+    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id, aux=aux)
     wkt_rows = await db.q(
         f"""
         SELECT COUNT(*) as wickets
@@ -395,13 +397,14 @@ async def bowling_summary(
 async def bowling_by_innings(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     batter_id: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     sort: str = Query("date"),
 ):
     db = get_db()
-    all_where, all_params = _bowling_all_filter(filters, person_id, batter_id)
+    all_where, all_params = _bowling_all_filter(filters, person_id, batter_id, aux=aux)
     all_params["limit"] = limit
     all_params["offset"] = offset
 
@@ -491,13 +494,14 @@ async def bowling_by_innings(
 async def bowling_vs_batters(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     batter_id: Optional[str] = Query(None),
     min_balls: int = Query(6, ge=1),
     limit: int = Query(50, ge=1, le=200),
     sort: str = Query("balls"),
 ):
     db = get_db()
-    legal_where, legal_params = _bowling_legal_filter(filters, person_id, batter_id)
+    legal_where, legal_params = _bowling_legal_filter(filters, person_id, batter_id, aux=aux)
     legal_params["min_balls"] = min_balls
     legal_params["limit"] = limit
 
@@ -533,7 +537,7 @@ async def bowling_vs_batters(
     )
 
     # Wickets by batter
-    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id)
+    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id, aux=aux)
     wkt_rows = await db.q(
         f"""
         SELECT w.player_out_id as batter_id, COUNT(*) as wickets
@@ -566,10 +570,11 @@ async def bowling_vs_batters(
 async def bowling_by_over(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     batter_id: Optional[str] = Query(None),
 ):
     db = get_db()
-    legal_where, legal_params = _bowling_legal_filter(filters, person_id, batter_id)
+    legal_where, legal_params = _bowling_legal_filter(filters, person_id, batter_id, aux=aux)
 
     rows = await db.q(
         f"""
@@ -592,7 +597,7 @@ async def bowling_by_over(
     )
 
     # Wickets per over
-    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id)
+    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id, aux=aux)
     wkt_rows = await db.q(
         f"""
         SELECT d.over_number, COUNT(*) as wickets
@@ -621,10 +626,11 @@ async def bowling_by_over(
 async def bowling_by_phase(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     batter_id: Optional[str] = Query(None),
 ):
     db = get_db()
-    legal_where, legal_params = _bowling_legal_filter(filters, person_id, batter_id)
+    legal_where, legal_params = _bowling_legal_filter(filters, person_id, batter_id, aux=aux)
 
     rows = await db.q(
         f"""
@@ -650,7 +656,7 @@ async def bowling_by_phase(
         legal_params,
     )
 
-    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id)
+    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id, aux=aux)
     wkt_rows = await db.q(
         f"""
         SELECT
@@ -736,10 +742,11 @@ async def bowling_by_phase(
 async def bowling_by_season(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     batter_id: Optional[str] = Query(None),
 ):
     db = get_db()
-    legal_where, legal_params = _bowling_legal_filter(filters, person_id, batter_id)
+    legal_where, legal_params = _bowling_legal_filter(filters, person_id, batter_id, aux=aux)
 
     rows = await db.q(
         f"""
@@ -763,7 +770,7 @@ async def bowling_by_season(
     )
 
     # All deliveries per season for runs_conceded
-    all_where, all_params = _bowling_all_filter(filters, person_id, batter_id)
+    all_where, all_params = _bowling_all_filter(filters, person_id, batter_id, aux=aux)
     all_rows = await db.q(
         f"""
         SELECT m.season, SUM(d.runs_total) as runs_conceded
@@ -778,7 +785,7 @@ async def bowling_by_season(
     runs_map = {r["season"]: r["runs_conceded"] for r in all_rows}
 
     # Wickets per season
-    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id)
+    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id, aux=aux)
     wkt_rows = await db.q(
         f"""
         SELECT m.season, COUNT(*) as wickets
@@ -809,10 +816,11 @@ async def bowling_by_season(
 async def bowling_wickets(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     batter_id: Optional[str] = Query(None),
 ):
     db = get_db()
-    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id)
+    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, batter_id, aux=aux)
 
     # by_kind
     kind_rows = await db.q(

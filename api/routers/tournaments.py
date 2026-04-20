@@ -675,9 +675,16 @@ async def tournament_summary(
         most_titles = {"team": team, "titles": n}
 
     # ── Top scorer all-time (in this tournament scope) ──
+    #
+    # `team` is needed so the frontend StatCard can orient the rivalry
+    # phrase correctly on rivalry scope (a batter playing FOR India
+    # should read "vs Australia", not "vs India"). SQLite's bare-column
+    # GROUP BY returns an arbitrary team from the batter's innings in
+    # scope — deterministic for rivalry (one team per batter) and
+    # informational for non-rivalry multi-team scope.
     ts_rows = await db.q(
         f"""
-        SELECT d.batter_id AS person_id, p.name,
+        SELECT d.batter_id AS person_id, p.name, i.team AS team,
                SUM(d.runs_batter) AS runs
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
@@ -695,12 +702,17 @@ async def tournament_summary(
     top_scorer = None
     if ts_rows:
         r = ts_rows[0]
-        top_scorer = {"person_id": r["person_id"], "name": r["name"], "runs": r["runs"]}
+        top_scorer = {
+            "person_id": r["person_id"], "name": r["name"],
+            "team": r["team"], "runs": r["runs"],
+        }
 
     # ── Top wicket-taker all-time ──
+    # Bowler's team = opposite of the innings batting team.
     tw_rows = await db.q(
         f"""
         SELECT d.bowler_id AS person_id, p.name,
+               CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS team,
                COUNT(*) AS wickets
         FROM wicket w
         JOIN delivery d ON d.id = w.delivery_id
@@ -720,7 +732,8 @@ async def tournament_summary(
     if tw_rows:
         r = tw_rows[0]
         top_wicket_taker = {
-            "person_id": r["person_id"], "name": r["name"], "wickets": r["wickets"]
+            "person_id": r["person_id"], "name": r["name"],
+            "team": r["team"], "wickets": r["wickets"],
         }
 
     # ── Highest team total (innings) ──
@@ -752,10 +765,44 @@ async def tournament_summary(
             "date": r["date"],
         }
 
-    # ── Largest partnership ──
+    # ── Highest individual innings (best batting single-match) ──
+    hi_rows = await db.q(
+        f"""
+        SELECT d.batter_id AS person_id, p.name, i.team AS team,
+               m.id AS match_id,
+               SUM(d.runs_batter) AS runs,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        LEFT JOIN person p ON p.id = d.batter_id
+        WHERE i.super_over = 0 AND {where}
+          AND d.batter_id IS NOT NULL
+          AND d.extras_wides = 0 AND d.extras_noballs = 0
+        GROUP BY d.batter_id, m.id
+        ORDER BY runs DESC
+        LIMIT 1
+        """,
+        params,
+    )
+    highest_individual = None
+    if hi_rows:
+        r = hi_rows[0]
+        highest_individual = {
+            "person_id": r["person_id"], "name": r["name"],
+            "team": r["team"],
+            "runs": r["runs"], "match_id": r["match_id"], "date": r["date"],
+        }
+
+    # ── Largest partnership (enriched — batter IDs, team, date) ──
     lp_rows = await db.q(
         f"""
-        SELECT p.partnership_runs AS runs, m.id AS match_id
+        SELECT p.partnership_runs AS runs, m.id AS match_id,
+               p.batter1_id, p.batter1_name,
+               p.batter2_id, p.batter2_name,
+               i.team AS team,
+               CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
         FROM partnership p
         JOIN innings i ON i.id = p.innings_id
         JOIN match m ON m.id = i.match_id
@@ -768,13 +815,21 @@ async def tournament_summary(
     largest_partnership = None
     if lp_rows:
         r = lp_rows[0]
-        largest_partnership = {"runs": r["runs"], "match_id": r["match_id"]}
+        largest_partnership = {
+            "runs": r["runs"], "match_id": r["match_id"],
+            "team": r["team"], "opponent": r["opponent"],
+            "date": r["date"],
+            "batter1": {"person_id": r["batter1_id"], "name": r["batter1_name"]},
+            "batter2": {"person_id": r["batter2_id"], "name": r["batter2_name"]},
+        }
 
     # ── Best bowling figures (single match) ──
+    # Bowler's team = opposite of the innings they bowled in.
     bb_rows = await db.q(
         f"""
         WITH per_match_bowler AS (
           SELECT d.bowler_id, i.match_id,
+                 CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS bowler_team,
                  SUM(CASE WHEN w.id IS NOT NULL
                               AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
                           THEN 1 ELSE 0 END) AS wickets,
@@ -789,6 +844,7 @@ async def tournament_summary(
           GROUP BY d.bowler_id, i.match_id
         )
         SELECT pm.bowler_id AS person_id, p.name,
+               pm.bowler_team AS team,
                pm.wickets, pm.runs_conceded AS runs,
                pm.match_id,
                (SELECT MIN(date) FROM matchdate WHERE match_id = pm.match_id) AS date
@@ -804,8 +860,55 @@ async def tournament_summary(
         r = bb_rows[0]
         best_bowling = {
             "person_id": r["person_id"], "name": r["name"],
+            "team": r["team"],
             "figures": f"{r['wickets']}/{r['runs']}",
             "wickets": r["wickets"], "runs": r["runs"],
+            "match_id": r["match_id"], "date": r["date"],
+        }
+
+    # ── Best fielding (most dismissals in a single match) ──
+    # Counts catches + stumpings + run-outs + caught-and-bowled. Excludes
+    # substitute fielders. Fielder's team = opposite of innings batting team.
+    bf_rows = await db.q(
+        f"""
+        WITH per_match_fielder AS (
+          SELECT fc.fielder_id, i.match_id,
+                 CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS fielder_team,
+                 SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+                 SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+                 SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+                 SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS caught_bowled,
+                 COUNT(*) AS total
+          FROM fieldingcredit fc
+          JOIN delivery d ON d.id = fc.delivery_id
+          JOIN innings i ON i.id = d.innings_id
+          JOIN match m ON m.id = i.match_id
+          WHERE i.super_over = 0 AND {where}
+            AND fc.fielder_id IS NOT NULL
+            AND fc.is_substitute = 0
+          GROUP BY fc.fielder_id, i.match_id
+        )
+        SELECT pf.fielder_id AS person_id, p.name,
+               pf.fielder_team AS team,
+               pf.catches, pf.stumpings, pf.run_outs, pf.caught_bowled,
+               pf.total, pf.match_id,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = pf.match_id) AS date
+        FROM per_match_fielder pf
+        LEFT JOIN person p ON p.id = pf.fielder_id
+        ORDER BY pf.total DESC, pf.stumpings DESC
+        LIMIT 1
+        """,
+        params,
+    )
+    best_fielding = None
+    if bf_rows:
+        r = bf_rows[0]
+        best_fielding = {
+            "person_id": r["person_id"], "name": r["name"],
+            "team": r["team"],
+            "catches": r["catches"], "stumpings": r["stumpings"],
+            "run_outs": r["run_outs"], "caught_bowled": r["caught_bowled"],
+            "total": r["total"],
             "match_id": r["match_id"], "date": r["date"],
         }
 
@@ -860,7 +963,7 @@ async def tournament_summary(
     # ── Knockouts (semi-finals + finals) ──
     ko_rows = await db.q(
         f"""
-        SELECT m.id AS match_id, m.season, m.event_stage,
+        SELECT m.id AS match_id, m.season, m.event_stage, m.event_name,
                m.team1, m.team2, m.outcome_winner,
                m.outcome_by_runs, m.outcome_by_wickets, m.outcome_result,
                m.venue,
@@ -889,6 +992,7 @@ async def tournament_summary(
             "match_id": r["match_id"],
             "season": r["season"],
             "stage": r["event_stage"],
+            "tournament": r["event_name"],
             "team1": r["team1"],
             "team2": r["team2"],
             "winner": r["outcome_winner"],
@@ -948,9 +1052,11 @@ async def tournament_summary(
         "champions_by_season": champions_by_season,
         "top_scorer_alltime": top_scorer,
         "top_wicket_taker_alltime": top_wicket_taker,
+        "highest_individual": highest_individual,
         "highest_team_total": highest_team_total,
         "largest_partnership": largest_partnership,
         "best_bowling": best_bowling,
+        "best_fielding": best_fielding,
         "teams": teams,
         "groups": groups_out,
         "knockouts": knockouts,

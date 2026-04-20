@@ -1,4 +1,27 @@
-"""Filter system for CricsDB API queries."""
+"""Filter system for CricsDB API queries.
+
+Two-class model:
+
+- `FilterBarParams` — the 8 fields driven by the frontend's FilterBar UI
+  (gender, team_type, tournament, season_from/to, filter_team,
+  filter_opponent, filter_venue). Maps 1:1 with `FILTER_KEYS` on the
+  frontend (`components/scopeLinks.ts`). Rides through scope-link URLs.
+
+- `AuxParams` — page-local narrowings that don't originate from the
+  FilterBar. Currently `series_type` (Series-tab local pill). Future
+  page-local filters (result_filter, close_match, super_over,
+  toss_decision) land here without bleeding into the UI contract.
+
+Endpoints that care only about FilterBar use `FilterBarParams = Depends()`.
+Endpoints that also want aux take both dependencies and pass aux to
+`filters.build(aux=aux)`, which threads `series_type_clause` and future
+aux clauses centrally. This keeps each router from re-wiring the same
+clause by hand (the original `/matches` endpoint bug was precisely a
+missing hand-wire).
+
+`FilterParams` is kept as an alias for `FilterBarParams` for incremental
+migration — existing call sites keep working.
+"""
 
 from __future__ import annotations
 
@@ -9,11 +32,36 @@ from .tournament_canonical import (
     is_canonical_with_variants,
     variants as canonical_variants,
     event_name_in_clause,
+    series_type_clause,
 )
 
 
-class FilterParams:
-    """Extracts global + contextual filter query params via FastAPI Depends()."""
+class AuxParams:
+    """Page-local, non-FilterBar narrowings.
+
+    Distinct from FilterBarParams so:
+      - scope-link URLs and status-strip summaries can iterate FilterBar
+        fields without accidentally including aux;
+      - future page-local filters (result_filter, close_match,
+        toss_decision, …) have a natural home without polluting the
+        FilterBar contract.
+    """
+
+    def __init__(
+        self,
+        series_type: Optional[str] = Query(
+            None,
+            description=(
+                "Page-local narrowing: all (default) / bilateral / icc / club."
+                " Legacy: bilateral_only / tournament_only."
+            ),
+        ),
+    ):
+        self.series_type = series_type
+
+
+class FilterBarParams:
+    """The 8 FilterBar fields. Each maps to a frontend FILTER_KEYS entry."""
 
     def __init__(
         self,
@@ -40,6 +88,7 @@ class FilterParams:
         has_innings_join: bool = True,
         table_alias: str = "m",
         innings_alias: str = "i",
+        aux: Optional[AuxParams] = None,
     ) -> tuple[str, dict]:
         """Build WHERE clause fragments and params dict.
 
@@ -48,6 +97,8 @@ class FilterParams:
                 innings-level opponent logic. If False, uses match-level opponent logic.
             table_alias: Alias for the match table.
             innings_alias: Alias for the innings table.
+            aux: Optional AuxParams to fold in page-local clauses (e.g.
+                series_type) without each router having to hand-wire them.
 
         Returns:
             (where_clause_str, params_dict) — the clause string includes leading
@@ -117,6 +168,12 @@ class FilterParams:
                 )
             params["opponent"] = self.opponent
 
+        # Aux clauses fold in here centrally — no router hand-wiring.
+        if aux is not None and aux.series_type:
+            st = series_type_clause(aux.series_type, alias=table_alias)
+            if st:
+                clauses.append(st)
+
         where = " AND ".join(clauses) if clauses else ""
         return where, params
 
@@ -125,6 +182,7 @@ class FilterParams:
         has_innings_join: bool = True,
         table_alias: str = "m",
         innings_alias: str = "i",
+        aux: Optional[AuxParams] = None,
     ) -> tuple[str, dict]:
         """Like build(), but filter_team / filter_opponent are applied
         at MATCH level instead of innings level.
@@ -146,7 +204,9 @@ class FilterParams:
         self.team = None
         self.opponent = None
         try:
-            where, params = self.build(has_innings_join, table_alias, innings_alias)
+            where, params = self.build(
+                has_innings_join, table_alias, innings_alias, aux=aux,
+            )
         finally:
             self.team = saved_team
             self.opponent = saved_opp
@@ -169,3 +229,8 @@ class FilterParams:
         if pair_clauses:
             where = " AND ".join([where] + pair_clauses) if where else " AND ".join(pair_clauses)
         return where, params
+
+
+# Backward-compat alias — existing code imports FilterParams everywhere.
+# Gradual rename over time.
+FilterParams = FilterBarParams

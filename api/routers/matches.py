@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..dependencies import get_db
-from ..filters import FilterParams
+from ..filters import FilterParams, AuxParams
 
 router = APIRouter(prefix="/api/v1/matches", tags=["Matches"])
 
@@ -157,13 +157,14 @@ async def _innings_summary(db, innings_id: int) -> dict:
 @router.get("")
 async def list_matches(
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     team: Optional[str] = Query(None),
     player_id: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
     db = get_db()
-    where, params = filters.build(has_innings_join=False)
+    where, params = filters.build(has_innings_join=False, aux=aux)
     clauses = [where] if where else []
 
     if team:

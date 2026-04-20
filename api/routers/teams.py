@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams
+from ..filters import FilterParams, AuxParams
 from ..tournament_canonical import series_type as series_type_for
 
 router = APIRouter(prefix="/api/v1/teams", tags=["Teams"])
@@ -26,9 +26,9 @@ ICC_FULL_MEMBERS = frozenset({
 })
 
 
-def _team_filter_clause(filters: FilterParams, team_param: str = ":team") -> tuple[str, dict]:
+def _team_filter_clause(filters: FilterParams, team_param: str = ":team", aux: AuxParams | None = None) -> tuple[str, dict]:
     """Build match-level filter clause for team queries (no innings join)."""
-    where, params = filters.build(has_innings_join=False)
+    where, params = filters.build(has_innings_join=False, aux=aux)
     parts = [f"(m.team1 = {team_param} OR m.team2 = {team_param})"]
     if where:
         parts.append(where)
@@ -36,7 +36,10 @@ def _team_filter_clause(filters: FilterParams, team_param: str = ":team") -> tup
 
 
 @router.get("/landing")
-async def teams_landing(filters: FilterParams = Depends()):
+async def teams_landing(
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
     """Filter-sensitive directory of teams for the Teams search landing.
 
     Returns:
@@ -55,7 +58,7 @@ async def teams_landing(filters: FilterParams = Depends()):
     2016–2017) vanish naturally.
     """
     db = get_db()
-    where, params = filters.build(has_innings_join=False)
+    where, params = filters.build(has_innings_join=False, aux=aux)
 
     # International — aggregate by team AND gender, then bucket into
     # men's / women's so each gender has its own collapsible section.
@@ -157,9 +160,10 @@ async def teams_landing(filters: FilterParams = Depends()):
 async def team_summary(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
-    filt, params = _team_filter_clause(filters)
+    filt, params = _team_filter_clause(filters, aux=aux)
     params["team"] = team
 
     rows = await db.q(
@@ -218,7 +222,7 @@ async def team_summary(
     # Tier 2 — keepers used by this team (fielding innings where
     # keeper_assignment picked someone, grouped by that someone).
     # Match-level filters apply via params (already include :team).
-    k_filt, k_params = filters.build(has_innings_join=True)
+    k_filt, k_params = filters.build(has_innings_join=True, aux=aux)
     k_params["team"] = team
     # The FIELDING team = NOT the batting team; team_filt ensures the
     # match involves this side, and i.team != :team means we're looking
@@ -282,11 +286,12 @@ async def team_summary(
 async def team_results(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
     db = get_db()
-    filt, params = _team_filter_clause(filters)
+    filt, params = _team_filter_clause(filters, aux=aux)
     params["team"] = team
     params["limit"] = limit
     params["offset"] = offset
@@ -337,9 +342,10 @@ async def team_vs_opponent(
     team: str,
     opponent: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
-    base_where, params = filters.build(has_innings_join=False)
+    base_where, params = filters.build(has_innings_join=False, aux=aux)
     params["team"] = team
     params["opponent"] = opponent
 
@@ -423,6 +429,7 @@ async def team_vs_opponent(
 async def team_opponents_matrix(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     top_n: int = Query(20, ge=1, le=200),
 ):
     """Opponents × seasons win-matrix for the Teams > vs Opponent tab.
@@ -436,7 +443,7 @@ async def team_opponents_matrix(
         top-N opponents are returned (noise suppression).
     """
     db = get_db()
-    filt, params = _team_filter_clause(filters)
+    filt, params = _team_filter_clause(filters, aux=aux)
     params["team"] = team
 
     # Rollup — per opponent totals
@@ -523,10 +530,11 @@ async def team_opponents_matrix(
 async def team_opponents(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     """Return opponents the team has actually played (non-zero matches), respecting filters."""
     db = get_db()
-    filt, params = _team_filter_clause(filters)
+    filt, params = _team_filter_clause(filters, aux=aux)
     params["team"] = team
 
     rows = await db.q(
@@ -548,9 +556,10 @@ async def team_opponents(
 async def team_by_season(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
-    filt, params = _team_filter_clause(filters)
+    filt, params = _team_filter_clause(filters, aux=aux)
     params["team"] = team
 
     rows = await db.q(
@@ -585,6 +594,7 @@ async def team_by_season(
 async def team_players_by_season(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     """Distinct players per season who appeared in the team's XI,
     with that season's batting average and bowling strike rate, and
@@ -604,7 +614,7 @@ async def team_players_by_season(
     db = get_db()
 
     # Roster: who was in the XI each season. Match-level filter.
-    roster_filt, roster_params = _team_filter_clause(filters)
+    roster_filt, roster_params = _team_filter_clause(filters, aux=aux)
     roster_params["team"] = team
 
     roster_rows = await db.q(
@@ -632,8 +642,8 @@ async def team_players_by_season(
 
     # Batting / bowling stats reuse _team_innings_clause so the same
     # filter scope as the team batting/bowling tabs applies.
-    bat_where, bat_params = _team_innings_clause(filters, team, side="batting")
-    bowl_where, bowl_params = _team_innings_clause(filters, team, side="fielding")
+    bat_where, bat_params = _team_innings_clause(filters, team, side="batting", aux=aux)
+    bowl_where, bowl_params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
     bat_runs_rows = await db.q(
         f"""
@@ -757,6 +767,7 @@ def _safe_div(a, b, mul=1, ndigits=2):
 
 def _team_innings_clause(
     filters: FilterParams, team: str, side: str = "batting",
+    aux: AuxParams | None = None,
 ) -> tuple[str, dict]:
     """Build WHERE clause for team-scoped innings queries.
 
@@ -769,7 +780,7 @@ def _team_innings_clause(
     # Null out filter_team so our :team bind isn't clobbered. Each request
     # gets a fresh FilterParams via Depends() so this mutation is safe.
     filters.team = None
-    where, params = filters.build(has_innings_join=True)
+    where, params = filters.build(has_innings_join=True, aux=aux)
     params["team"] = team
     if side == "batting":
         parts = ["i.team = :team"]
@@ -781,9 +792,13 @@ def _team_innings_clause(
 
 
 @router.get("/{team}/batting/summary")
-async def team_batting_summary(team: str, filters: FilterParams = Depends()):
+async def team_batting_summary(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="batting")
+    where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
 
     core = await db.q(
         f"""
@@ -897,9 +912,13 @@ async def team_batting_summary(team: str, filters: FilterParams = Depends()):
 
 
 @router.get("/{team}/batting/by-season")
-async def team_batting_by_season(team: str, filters: FilterParams = Depends()):
+async def team_batting_by_season(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="batting")
+    where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
 
     # Per-season aggregate deliveries
     season_rows = await db.q(
@@ -981,9 +1000,13 @@ async def team_batting_by_season(team: str, filters: FilterParams = Depends()):
 
 
 @router.get("/{team}/batting/by-phase")
-async def team_batting_by_phase(team: str, filters: FilterParams = Depends()):
+async def team_batting_by_phase(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="batting")
+    where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
 
     rows = await db.q(
         f"""
@@ -1011,7 +1034,7 @@ async def team_batting_by_phase(team: str, filters: FilterParams = Depends()):
     )
 
     # Wickets lost per phase (same filter scope, but via wicket join)
-    wicket_where, wicket_params = _team_innings_clause(filters, team, side="batting")
+    wicket_where, wicket_params = _team_innings_clause(filters, team, side="batting", aux=aux)
     wicket_rows = await db.q(
         f"""
         SELECT
@@ -1065,10 +1088,11 @@ async def team_batting_by_phase(team: str, filters: FilterParams = Depends()):
 async def team_top_batters(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(5, ge=1, le=50),
 ):
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="batting")
+    where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
     params["lim"] = limit
 
     rows = await db.q(
@@ -1111,6 +1135,7 @@ async def team_top_batters(
 @router.get("/{team}/batting/phase-season-heatmap")
 async def team_batting_phase_season_heatmap(
     team: str, filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     """Season × phase matrix for batting — both run_rate and
     wickets_lost per cell, so the frontend can render two heatmaps
@@ -1119,7 +1144,7 @@ async def team_batting_phase_season_heatmap(
     Cells: {season, phase, run_rate, wickets_lost, balls}.
     """
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="batting")
+    where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
 
     rate_rows = await db.q(
         f"""
@@ -1199,9 +1224,13 @@ BOWLER_WICKET_EXCLUDE = "('run out', 'retired hurt', 'retired out', 'obstructing
 
 
 @router.get("/{team}/bowling/summary")
-async def team_bowling_summary(team: str, filters: FilterParams = Depends()):
+async def team_bowling_summary(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="fielding")
+    where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
     core = await db.q(
         f"""
@@ -1335,9 +1364,13 @@ async def team_bowling_summary(team: str, filters: FilterParams = Depends()):
 
 
 @router.get("/{team}/bowling/by-season")
-async def team_bowling_by_season(team: str, filters: FilterParams = Depends()):
+async def team_bowling_by_season(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="fielding")
+    where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
     season_rows = await db.q(
         f"""
@@ -1425,9 +1458,13 @@ async def team_bowling_by_season(team: str, filters: FilterParams = Depends()):
 
 
 @router.get("/{team}/bowling/by-phase")
-async def team_bowling_by_phase(team: str, filters: FilterParams = Depends()):
+async def team_bowling_by_phase(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="fielding")
+    where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
     rows = await db.q(
         f"""
@@ -1505,10 +1542,11 @@ async def team_bowling_by_phase(team: str, filters: FilterParams = Depends()):
 async def team_top_bowlers(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(5, ge=1, le=50),
 ):
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="fielding")
+    where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
     params["lim"] = limit
 
     rows = await db.q(
@@ -1571,11 +1609,12 @@ async def team_top_bowlers(
 @router.get("/{team}/bowling/phase-season-heatmap")
 async def team_bowling_phase_season_heatmap(
     team: str, filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     """Season × phase matrix for bowling — both economy and wickets
     per cell. Cells: {season, phase, economy, wickets, balls}."""
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="fielding")
+    where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
     rate_rows = await db.q(
         f"""
@@ -1649,9 +1688,13 @@ async def team_bowling_phase_season_heatmap(
 
 
 @router.get("/{team}/fielding/summary")
-async def team_fielding_summary(team: str, filters: FilterParams = Depends()):
+async def team_fielding_summary(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="fielding")
+    where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
     # fielding_credit aggregation — fc joins via delivery, so we can reuse
     # the delivery-level clause directly.
@@ -1705,9 +1748,13 @@ async def team_fielding_summary(team: str, filters: FilterParams = Depends()):
 
 
 @router.get("/{team}/fielding/by-season")
-async def team_fielding_by_season(team: str, filters: FilterParams = Depends()):
+async def team_fielding_by_season(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="fielding")
+    where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
     rows = await db.q(
         f"""
@@ -1779,10 +1826,11 @@ async def team_fielding_by_season(team: str, filters: FilterParams = Depends()):
 async def team_top_fielders(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(5, ge=1, le=50),
 ):
     db = get_db()
-    where, params = _team_innings_clause(filters, team, side="fielding")
+    where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
     params["lim"] = limit
 
     rows = await db.q(
@@ -1829,7 +1877,10 @@ async def team_top_fielders(
     return {"top_fielders": players[:limit]}
 
 
-def _partnership_filter(filters: FilterParams, team: str, side: str):
+def _partnership_filter(
+    filters: FilterParams, team: str, side: str,
+    aux: AuxParams | None = None,
+):
     """Build WHERE clause for partnership table queries.
 
     side='batting' → partnerships when :team batted (i.team = :team)
@@ -1837,7 +1888,7 @@ def _partnership_filter(filters: FilterParams, team: str, side: str):
                      (i.team != :team AND :team in match)
     """
     filters.team = None
-    where, params = filters.build(has_innings_join=True)
+    where, params = filters.build(has_innings_join=True, aux=aux)
     params["team"] = team
     if side == "batting":
         parts = ["i.team = :team"]
@@ -1856,11 +1907,12 @@ def _validate_side(side: str) -> str:
 async def team_partnerships_by_wicket(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     side: str = Query("batting"),
 ):
     side = _validate_side(side)
     db = get_db()
-    where, params = _partnership_filter(filters, team, side)
+    where, params = _partnership_filter(filters, team, side, aux=aux)
 
     rows = await db.q(
         f"""
@@ -1947,6 +1999,7 @@ async def team_partnerships_by_wicket(
 async def team_partnerships_best_pairs(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     side: str = Query("batting"),
     min_n: int = Query(2, ge=1, le=20),
     top_n: int = Query(3, ge=1, le=10),
@@ -1973,7 +2026,7 @@ async def team_partnerships_best_pairs(
     """
     side = _validate_side(side)
     db = get_db()
-    where, params = _partnership_filter(filters, team, side)
+    where, params = _partnership_filter(filters, team, side, aux=aux)
     params["min_n"] = min_n
 
     # Canonicalize pair (smaller id first) so AB+CD and CD+AB count as
@@ -2060,11 +2113,12 @@ async def team_partnerships_best_pairs(
 async def team_partnerships_heatmap(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     side: str = Query("batting"),
 ):
     side = _validate_side(side)
     db = get_db()
-    where, params = _partnership_filter(filters, team, side)
+    where, params = _partnership_filter(filters, team, side, aux=aux)
 
     rows = await db.q(
         f"""
@@ -2119,12 +2173,13 @@ async def team_partnerships_heatmap(
 async def team_partnerships_top(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     side: str = Query("batting"),
     limit: int = Query(10, ge=1, le=50),
 ):
     side = _validate_side(side)
     db = get_db()
-    where, params = _partnership_filter(filters, team, side)
+    where, params = _partnership_filter(filters, team, side, aux=aux)
     params["lim"] = limit
 
     rows = await db.q(
@@ -2183,6 +2238,7 @@ async def team_partnerships_top(
 async def team_partnerships_summary(
     team: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     side: str = Query("batting"),
 ):
     """Scope-aware partnership aggregates: total count, 50+ / 100+
@@ -2196,7 +2252,7 @@ async def team_partnerships_summary(
     """
     side = _validate_side(side)
     db = get_db()
-    where, params = _partnership_filter(filters, team, side)
+    where, params = _partnership_filter(filters, team, side, aux=aux)
 
     # Aggregates in a single scan.
     agg_rows = await db.q(

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams
+from ..filters import FilterParams, AuxParams
 from ..player_nationality import player_nationalities
 
 router = APIRouter(prefix="/api/v1/batters", tags=["Batting"])
@@ -19,9 +19,9 @@ def _safe_div(a, b, mul=1, ndigits=2):
     return round(a * mul / b, ndigits)
 
 
-def _batting_filter(filters: FilterParams, person_id: str, bowler_id: str | None = None):
+def _batting_filter(filters: FilterParams, person_id: str, bowler_id: str | None = None, aux: AuxParams | None = None):
     """Build WHERE clause for batting delivery queries."""
-    where, params = filters.build(has_innings_join=True)
+    where, params = filters.build(has_innings_join=True, aux=aux)
     params["person_id"] = person_id
     parts = ["d.batter_id = :person_id", "d.extras_wides = 0", "d.extras_noballs = 0"]
     if where:
@@ -35,6 +35,7 @@ def _batting_filter(filters: FilterParams, person_id: str, bowler_id: str | None
 @router.get("/leaders")
 async def batting_leaders(
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(10, ge=1, le=50),
     min_balls: int = Query(100, ge=1),
     min_dismissals: int = Query(3, ge=0),
@@ -62,7 +63,7 @@ async def batting_leaders(
     db = get_db()
     # has_innings_join=False → only match-level clauses, no super_over
     # filter. Empty string = no filters at all → skip both joins.
-    match_where, params = filters.build(has_innings_join=False)
+    match_where, params = filters.build(has_innings_join=False, aux=aux)
     has_filters = bool(match_where)
 
     if has_filters:
@@ -192,6 +193,7 @@ def _enrich_batting_row(r: dict) -> dict:
 async def batting_summary(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     bowler_id: Optional[str] = Query(None),
 ):
     db = get_db()
@@ -202,7 +204,7 @@ async def batting_summary(
     )
     name = name_rows[0]["name"] if name_rows else person_id
 
-    where, params = _batting_filter(filters, person_id, bowler_id)
+    where, params = _batting_filter(filters, person_id, bowler_id, aux=aux)
 
     # Core ball-level aggregation (legal balls only)
     core = await db.q(
@@ -299,13 +301,14 @@ async def batting_summary(
 async def batting_by_innings(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     bowler_id: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     sort: str = Query("date"),
 ):
     db = get_db()
-    where, params = _batting_filter(filters, person_id, bowler_id)
+    where, params = _batting_filter(filters, person_id, bowler_id, aux=aux)
     params["limit"] = limit
     params["offset"] = offset
 
@@ -388,13 +391,14 @@ async def batting_by_innings(
 async def batting_vs_bowlers(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     bowler_id: Optional[str] = Query(None),
     min_balls: int = Query(6, ge=1),
     limit: int = Query(50, ge=1, le=200),
     sort: str = Query("balls"),
 ):
     db = get_db()
-    where, params = _batting_filter(filters, person_id, bowler_id)
+    where, params = _batting_filter(filters, person_id, bowler_id, aux=aux)
     params["min_balls"] = min_balls
     params["limit"] = limit
 
@@ -431,7 +435,7 @@ async def batting_vs_bowlers(
     )
 
     # Dismissals by bowler
-    dismiss_where, dismiss_params = filters.build(has_innings_join=True)
+    dismiss_where, dismiss_params = filters.build(has_innings_join=True, aux=aux)
     dismiss_params["person_id"] = person_id
     dismiss_parts = [
         "w.player_out_id = :person_id",
@@ -475,10 +479,11 @@ async def batting_vs_bowlers(
 async def batting_by_over(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     bowler_id: Optional[str] = Query(None),
 ):
     db = get_db()
-    where, params = _batting_filter(filters, person_id, bowler_id)
+    where, params = _batting_filter(filters, person_id, bowler_id, aux=aux)
 
     rows = await db.q(
         f"""
@@ -501,7 +506,7 @@ async def batting_by_over(
     )
 
     # Dismissals per over
-    dismiss_where, dismiss_params = filters.build(has_innings_join=True)
+    dismiss_where, dismiss_params = filters.build(has_innings_join=True, aux=aux)
     dismiss_params["person_id"] = person_id
     dismiss_parts = [
         "w.player_out_id = :person_id",
@@ -542,10 +547,11 @@ async def batting_by_over(
 async def batting_by_phase(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     bowler_id: Optional[str] = Query(None),
 ):
     db = get_db()
-    where, params = _batting_filter(filters, person_id, bowler_id)
+    where, params = _batting_filter(filters, person_id, bowler_id, aux=aux)
 
     rows = await db.q(
         f"""
@@ -572,7 +578,7 @@ async def batting_by_phase(
     )
 
     # Dismissals per phase
-    dismiss_where, dismiss_params = filters.build(has_innings_join=True)
+    dismiss_where, dismiss_params = filters.build(has_innings_join=True, aux=aux)
     dismiss_params["person_id"] = person_id
     dismiss_parts = [
         "w.player_out_id = :person_id",
@@ -620,9 +626,10 @@ async def batting_by_phase(
 async def batting_by_season(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
-    where, params = _batting_filter(filters, person_id)
+    where, params = _batting_filter(filters, person_id, aux=aux)
 
     # Ball-level stats by season
     rows = await db.q(
@@ -695,10 +702,11 @@ async def batting_by_season(
 async def batting_dismissals(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     bowler_id: Optional[str] = Query(None),
 ):
     db = get_db()
-    filt_where, filt_params = filters.build(has_innings_join=True)
+    filt_where, filt_params = filters.build(has_innings_join=True, aux=aux)
     filt_params["person_id"] = person_id
     base_parts = [
         "w.player_out_id = :person_id",
@@ -808,9 +816,10 @@ async def batting_dismissals(
 async def batting_inter_wicket(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
-    where, params = filters.build(has_innings_join=True)
+    where, params = filters.build(has_innings_join=True, aux=aux)
     params["person_id"] = person_id
 
     filter_clause = f"d.batter_id = :person_id"

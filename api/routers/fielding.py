@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams
+from ..filters import FilterParams, AuxParams
 from ..player_nationality import player_nationalities
 
 router = APIRouter(prefix="/api/v1/fielders", tags=["Fielding"])
@@ -18,14 +18,14 @@ def _safe_div(a, b, mul=1, ndigits=2):
     return round(a * mul / b, ndigits)
 
 
-def _fielding_filter(filters: FilterParams, person_id: str):
+def _fielding_filter(filters: FilterParams, person_id: str, aux: AuxParams | None = None):
     """Build WHERE clause for fielding queries via fielding_credit.
 
     Uses build_side_neutral so filter_team / filter_opponent apply at
     match level — fielders' credits live in opponent-batting innings,
     so the default `i.team = :team` would return zero.
     """
-    where, params = filters.build_side_neutral(has_innings_join=True)
+    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
     params["person_id"] = person_id
     parts = ["fc.fielder_id = :person_id"]
     if where:
@@ -36,6 +36,7 @@ def _fielding_filter(filters: FilterParams, person_id: str):
 @router.get("/leaders")
 async def fielding_leaders(
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(10, ge=1, le=50),
 ):
     """Top fielders + top keepers in the current filter scope.
@@ -58,7 +59,7 @@ async def fielding_leaders(
     DESC then run-outs DESC.
     """
     db = get_db()
-    match_where, params = filters.build(has_innings_join=False)
+    match_where, params = filters.build(has_innings_join=False, aux=aux)
     has_filters = bool(match_where)
 
     # --- List 1: top fielders by total dismissals ------------------
@@ -157,6 +158,7 @@ async def fielding_leaders(
 async def fielding_summary(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
 
@@ -165,7 +167,7 @@ async def fielding_summary(
     )
     name = name_rows[0]["name"] if name_rows else person_id
 
-    where, params = _fielding_filter(filters, person_id)
+    where, params = _fielding_filter(filters, person_id, aux=aux)
 
     # Counts by kind
     kind_rows = await db.q(
@@ -202,7 +204,7 @@ async def fielding_summary(
     total = catches + stumpings + run_outs + caught_and_bowled
 
     # Match count from matchplayer
-    match_where, match_params = filters.build(has_innings_join=False)
+    match_where, match_params = filters.build(has_innings_join=False, aux=aux)
     match_params["person_id"] = person_id
     match_parts = ["mp.person_id = :person_id"]
     if match_where:
@@ -223,7 +225,7 @@ async def fielding_summary(
     # Tier 2: innings where this person was identified as the keeper.
     # Used by the frontend to decide whether to render the "Keeping" tab.
     # side-neutral: keeper's innings live in opponent-batting innings.
-    keeping_where, keeping_params = filters.build_side_neutral(has_innings_join=True)
+    keeping_where, keeping_params = filters.build_side_neutral(has_innings_join=True, aux=aux)
     keeping_params["person_id"] = person_id
     keeping_parts = ["ka.keeper_id = :person_id"]
     if keeping_where:
@@ -262,9 +264,10 @@ async def fielding_summary(
 async def fielding_by_season(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
-    where, params = _fielding_filter(filters, person_id)
+    where, params = _fielding_filter(filters, person_id, aux=aux)
 
     rows = await db.q(
         f"""
@@ -316,9 +319,10 @@ async def fielding_by_season(
 async def fielding_by_phase(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
-    where, params = _fielding_filter(filters, person_id)
+    where, params = _fielding_filter(filters, person_id, aux=aux)
 
     rows = await db.q(
         f"""
@@ -380,9 +384,10 @@ async def fielding_by_phase(
 async def fielding_by_over(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
-    where, params = _fielding_filter(filters, person_id)
+    where, params = _fielding_filter(filters, person_id, aux=aux)
 
     rows = await db.q(
         f"""
@@ -414,9 +419,10 @@ async def fielding_by_over(
 async def fielding_dismissal_types(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
-    where, params = _fielding_filter(filters, person_id)
+    where, params = _fielding_filter(filters, person_id, aux=aux)
 
     rows = await db.q(
         f"""
@@ -442,10 +448,11 @@ async def fielding_dismissal_types(
 async def fielding_victims(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(50, ge=1, le=200),
 ):
     db = get_db()
-    where, params = _fielding_filter(filters, person_id)
+    where, params = _fielding_filter(filters, person_id, aux=aux)
     params["limit"] = limit
 
     rows = await db.q(
@@ -497,11 +504,12 @@ async def fielding_victims(
 async def fielding_by_innings(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
     db = get_db()
-    where, params = _fielding_filter(filters, person_id)
+    where, params = _fielding_filter(filters, person_id, aux=aux)
     params["limit"] = limit
     params["offset"] = offset
 

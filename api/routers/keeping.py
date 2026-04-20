@@ -14,7 +14,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, Query
 
 from ..dependencies import get_db
-from ..filters import FilterParams
+from ..filters import FilterParams, AuxParams
 
 router = APIRouter(prefix="/api/v1/fielders", tags=["Keeping"])
 
@@ -42,7 +42,7 @@ def _parse_json_list(val) -> list[str]:
     return []
 
 
-def _keeping_filter(filters: FilterParams, person_id: str) -> tuple[str, dict]:
+def _keeping_filter(filters: FilterParams, person_id: str, aux: AuxParams | None = None) -> tuple[str, dict]:
     """WHERE clause for keeper_assignment queries — joins through
     innings → match so the standard filter params apply.
 
@@ -50,7 +50,7 @@ def _keeping_filter(filters: FilterParams, person_id: str) -> tuple[str, dict]:
     innings (keeper is in the field while opponent bats), so we can't
     use FilterParams' default `i.team = :team`.
     """
-    where, params = filters.build_side_neutral(has_innings_join=True)
+    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
     params["person_id"] = person_id
     parts = ["ka.keeper_id = :person_id"]
     if where:
@@ -67,6 +67,7 @@ def _keeping_filter(filters: FilterParams, person_id: str) -> tuple[str, dict]:
 async def keeping_summary(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
 
@@ -75,7 +76,7 @@ async def keeping_summary(
     )
     name = name_rows[0]["name"] if name_rows else person_id
 
-    where, params = _keeping_filter(filters, person_id)
+    where, params = _keeping_filter(filters, person_id, aux=aux)
 
     # Innings count + confidence breakdown
     conf_rows = await db.q(
@@ -129,7 +130,7 @@ async def keeping_summary(
     # Ambiguous innings where this person is a candidate
     # (filters apply through the innings→match join). side-neutral
     # because keeper-side innings live in opponent-batting rows.
-    amb_where, amb_params = filters.build_side_neutral(has_innings_join=True)
+    amb_where, amb_params = filters.build_side_neutral(has_innings_join=True, aux=aux)
     amb_params["person_id"] = person_id
     amb_parts = [
         "ka.keeper_id IS NULL",
@@ -182,9 +183,10 @@ async def keeping_summary(
 async def keeping_by_season(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     db = get_db()
-    where, params = _keeping_filter(filters, person_id)
+    where, params = _keeping_filter(filters, person_id, aux=aux)
 
     # Innings kept per season
     inn_rows = await db.q(
@@ -268,11 +270,12 @@ async def keeping_by_season(
 async def keeping_by_innings(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
     db = get_db()
-    where, params = _keeping_filter(filters, person_id)
+    where, params = _keeping_filter(filters, person_id, aux=aux)
     params["limit"] = limit
     params["offset"] = offset
 
@@ -351,11 +354,12 @@ async def keeping_by_innings(
 async def keeping_ambiguous(
     person_id: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(100, ge=1, le=500),
 ):
     db = get_db()
     # side-neutral: ambiguous-keeper innings are opponent-batting.
-    where, params = filters.build_side_neutral(has_innings_join=True)
+    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
     params["person_id"] = person_id
     params["limit"] = limit
     parts = [

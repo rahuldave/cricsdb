@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams
+from ..filters import FilterParams, AuxParams
 
 router = APIRouter(prefix="/api/v1/venues", tags=["Venues"])
 
@@ -28,6 +28,7 @@ router = APIRouter(prefix="/api/v1/venues", tags=["Venues"])
 def _strip_venue(
     filters: FilterParams,
     has_innings_join: bool = False,
+    aux: AuxParams | None = None,
     **kwargs,
 ) -> tuple[str, dict]:
     """Run filters.build() with filter_venue temporarily cleared.
@@ -41,7 +42,7 @@ def _strip_venue(
     saved = filters.venue
     filters.venue = None
     try:
-        return filters.build(has_innings_join=has_innings_join, **kwargs)
+        return filters.build(has_innings_join=has_innings_join, aux=aux, **kwargs)
     finally:
         filters.venue = saved
 
@@ -49,6 +50,7 @@ def _strip_venue(
 @router.get("")
 async def list_venues(
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     q: Optional[str] = Query(None, description="Substring match on venue name OR city, case-insensitive"),
     limit: int = Query(50, ge=1, le=500),
 ):
@@ -60,7 +62,7 @@ async def list_venues(
     (default 50) so initial dropdown on focus is small.
     """
     db = get_db()
-    where, params = _strip_venue(filters)
+    where, params = _strip_venue(filters, aux=aux)
 
     clauses = ["m.venue IS NOT NULL"]
     if where:
@@ -89,7 +91,10 @@ async def list_venues(
 
 
 @router.get("/landing")
-async def venues_landing(filters: FilterParams = Depends()):
+async def venues_landing(
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
     """Country-grouped venue directory for the /venues landing page.
 
     Returns:
@@ -101,7 +106,7 @@ async def venues_landing(filters: FilterParams = Depends()):
     bucketed under the `"Unknown"` country key.
     """
     db = get_db()
-    where, params = _strip_venue(filters)
+    where, params = _strip_venue(filters, aux=aux)
 
     clauses = ["m.venue IS NOT NULL"]
     if where:
@@ -153,6 +158,7 @@ def _safe_div(a, b, mul=1, ndigits=2):
 async def venue_summary(
     venue: str,
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     """Venue-character overview bundle for the Phase-3 dossier.
 
@@ -173,7 +179,7 @@ async def venue_summary(
 
     # Match-level clause (no delivery join) — used for every match-scan
     # query below.
-    match_where, match_params = _strip_venue(filters, has_innings_join=False)
+    match_where, match_params = _strip_venue(filters, has_innings_join=False, aux=aux)
     match_params["venue"] = venue
     clauses_m = ["m.venue = :venue"]
     if match_where:
@@ -182,7 +188,7 @@ async def venue_summary(
 
     # Delivery-level clause — same filters with the innings join (for
     # super_over exclusion).
-    d_where, d_params = _strip_venue(filters, has_innings_join=True)
+    d_where, d_params = _strip_venue(filters, has_innings_join=True, aux=aux)
     d_params["venue"] = venue
     clauses_d = ["m.venue = :venue"]
     if d_where:
