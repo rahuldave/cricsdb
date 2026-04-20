@@ -1453,10 +1453,6 @@ function EditionsTab({
       ) as unknown as string : '-',
     },
     {
-      key: 'run_rate', label: 'Run rate', sortable: true,
-      format: (v: number | null) => fmt(v, 2),
-    },
-    {
       key: 'final_match_id', label: 'Final',
       format: (v: number | null) => v ? (matchLink(v, 'scorecard →') as unknown as string) : '-',
     },
