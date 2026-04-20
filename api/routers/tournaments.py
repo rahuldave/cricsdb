@@ -445,7 +445,23 @@ async def _rivalries_top_and_other_count(
         params,
     )
 
-    # Latest match per pair — one query, MAX date via matchdate subquery.
+    # Latest match per pair — intentionally NOT bilateral-only. The home
+    # tile's "Latest" line surfaces the most recent meeting between the
+    # two teams regardless of series type ("be that a WC or a
+    # bilateral"), so a WC 2024 final beats a 2023 bilateral. The pair
+    # counts above stay bilateral-only (that's what the headline number
+    # represents); the latest_match payload carries `tournament` +
+    # `season` so the frontend can scope the click correctly.
+    latest_clauses = [
+        _t20_match_clause(),
+        "m.team_type = 'international'",
+        f"m.gender = '{gender}'",
+    ]
+    if filters.season_from:
+        latest_clauses.append("m.season >= :season_from")
+    if filters.season_to:
+        latest_clauses.append("m.season <= :season_to")
+    latest_where = " AND ".join(latest_clauses + [top_teams_clause, top_teams_clause2])
     latest_rows = await db.q(
         f"""
         WITH p AS (
@@ -453,28 +469,43 @@ async def _rivalries_top_and_other_count(
                  CASE WHEN m.team1 < m.team2 THEN m.team2 ELSE m.team1 END AS b,
                  m.id AS match_id,
                  m.outcome_winner AS winner,
+                 m.event_name AS event_name,
+                 m.season AS season,
                  (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS d
           FROM match m
-          WHERE {rivalry_where}
+          WHERE {latest_where}
         )
-        SELECT a, b, match_id, winner, d
+        SELECT a, b, match_id, winner, event_name, season, d
         FROM p
         WHERE d = (SELECT MAX(d2.d) FROM (
             SELECT CASE WHEN m2.team1 < m2.team2 THEN m2.team1 ELSE m2.team2 END AS a2,
                    CASE WHEN m2.team1 < m2.team2 THEN m2.team2 ELSE m2.team1 END AS b2,
                    (SELECT MIN(date) FROM matchdate WHERE match_id = m2.id) AS d
             FROM match m2
-            WHERE {rivalry_where.replace('m.', 'm2.')}
+            WHERE {latest_where.replace('m.', 'm2.')}
           ) d2 WHERE d2.a2 = p.a AND d2.b2 = p.b)
         """,
         params,
     )
     latest_by_pair: dict[tuple[str, str], dict] = {}
     for r in latest_rows:
+        # Classify the meeting's series-type. `canonicalize()` returns the
+        # raw event_name when no alias exists, so we can't use its output
+        # alone — bilateral tours carry event_names like "Pakistan tour
+        # of New Zealand" that aren't canonical tournaments. Treat a
+        # match as a recognized tournament only when its canonical name
+        # is in ICC_EVENT_NAMES; everything else (tours, unlisted one-
+        # offs, NULL event_name) reports as tournament=None so the
+        # frontend knows to render the "Latest" link as a bilateral-
+        # scoped series view.
+        canon = canonicalize(r["event_name"])
+        tournament = canon if canon in ICC_EVENT_NAMES else None
         latest_by_pair.setdefault((r["a"], r["b"]), {
             "match_id": r["match_id"],
             "date": r["d"],
             "winner": r["winner"],
+            "tournament": tournament,
+            "season": r["season"],
         })
 
     rivalries: list[dict] = []

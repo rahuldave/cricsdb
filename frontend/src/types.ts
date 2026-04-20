@@ -1102,7 +1102,14 @@ export interface RivalryEntry {
   team2_wins: number
   ties: number
   no_result: number
-  latest_match?: { match_id: number; date: string | null; winner: string | null } | null
+  latest_match?: {
+    match_id: number
+    date: string | null
+    winner: string | null
+    /** Canonical tournament name. `null` ⇒ meeting was a pure bilateral. */
+    tournament: string | null
+    season: string
+  } | null
 }
 
 export interface ClubRivalryEntry {
