@@ -176,6 +176,16 @@ export default function FilterBar() {
     // via the seasons-fetch effect above.
     setUrlParams({ season_from: latestInScope, season_to: latestInScope })
   }
+  const setLastN = (n: number) => {
+    if (seasons.length === 0) return
+    // Scope-aware last-N — seasons list is already narrowed by
+    // gender/team_type/tournament via the seasons-fetch effect. Takes
+    // the last N entries (API returns chronological ascending).
+    const latest = seasons.slice(-n)
+    const from = latest[0]
+    const to = latest[latest.length - 1]
+    setUrlParams({ season_from: from, season_to: to })
+  }
   const clearAll = () => setUrlParams({
     gender: '', team_type: '', tournament: '',
     season_from: '', season_to: '', filter_venue: '',
@@ -245,6 +255,12 @@ export default function FilterBar() {
             title="Clear season range — show all-time">
             all-time
           </button>
+          {seasons.length >= 3 && (
+            <button type="button" onClick={() => setLastN(3)} className="wisden-reset"
+              title={`Last 3 seasons in scope (${seasons.slice(-3).join(', ')})`}>
+              last 3
+            </button>
+          )}
           {latestInScope && (
             <button type="button" onClick={setLatest} className="wisden-reset"
               title={`Jump to latest season in scope (${latestInScope})`}>
