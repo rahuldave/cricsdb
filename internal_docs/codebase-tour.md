@@ -125,12 +125,17 @@ frontend/src/
                                    (role prop now optional — omit for role-agnostic /players
                                    search), TeamSearch, StatCard, DataTable, Spinner, ErrorBanner,
                                    Scorecard, InningsCard,
-                                   PlayerLink (letter-subscript model: name link + (e, t, s, b)
-                                   scoped variants — see internal_docs/design-decisions.md),
-                                   TeamLink (phrase-subscript model: name link + named-phrase
-                                   subscripts driven by series_type container resolution; layout
-                                   inline|block, compact mode for H2 / tile headers — see same
-                                   design doc),
+                                   PlayerLink + TeamLink (unified phrase-subscript model: name
+                                   link = all-time identity; named-phrase subscripts driven by
+                                   series_type container resolution. TeamLink has keepRivalry,
+                                   team_type, seriesType, maxTiers opt-in props for tile
+                                   surfaces; layout inline|block, compact mode for H2 / tile
+                                   headers — see internal_docs/design-decisions.md),
+                                   SeriesLink (thin Link wrapper that builds /series?... URLs
+                                   from an explicit scope spec — tournament, season, seriesType,
+                                   team1, team2, gender, team_type, filter_venue. Used by tile
+                                   stretched-link primaries, innings-list tournament cells,
+                                   TournamentDossier by-season rows),
                                    ScopeStatusStrip (one-line read-mode mirror of active filters
                                    below the FilterBar; SHOWING: GENDER/TYPE/TOURNAMENT/TEAM/...
                                    prose summary + COPY LINK clipboard button; surfaces aux
@@ -139,11 +144,11 @@ frontend/src/
                                    ScopeIndicator (oxblood pill for filter_team/_opponent
                                    lens on player pages — narrowing-announcement banner, not
                                    the same as ScopeStatusStrip), FlagBadge,
-                                   scopeLinks.ts (PlayerLink + TeamLink shared model:
-                                   FILTER_KEYS registry, ScopeContext for path identity,
-                                   nameParams + tierParams + tierTooltip for letters,
-                                   resolveScopePhrases for TeamLink phrases — series_type-driven
-                                   container resolution lives here), charts/
+                                   scopeLinks.ts (shared PlayerLink/TeamLink model: FILTER_KEYS
+                                   registry, ScopeContext for path identity, nameParams +
+                                   resolveScopePhrases — series_type-driven container
+                                   resolution; seasonTag helper for "2024" / "2023–2024"
+                                   range formatting), charts/
     charts/                    — BarChart, LineChart, ScatterChart, DonutChart wrappers (responsive),
                                    HeatmapChart, BubbleMatrix,
                                    WormChart, ManhattanChart, InningsGridChart, MatchupGridChart

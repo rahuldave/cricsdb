@@ -468,6 +468,78 @@ batches) and serves as the "what shipped on day X" history.
 - **ScopeStatusStrip now has `--bg-soft` background.** Visual separator between nav/filter chrome and page content. Considered tinting the whole nav bar same color; rejected — the strip earns its tint because it's the last band before content.
 - **API health sweep** — ran bash probe across ~70 endpoints × several param combinations including `series_type=icc` / `series_type=bilateral`. Zero 500s after the partnership fix. Probe script at `/tmp/api_sweep.sh`; worth committing under `tests/` if we hit a third aux-threading class bug.
 
+### Shipped 2026-04-20 (pm — Series tab deep-dive)
+
+Walk down the Series tab, tile-by-tile, establishing the scope-link
+conventions for subsequent tabs. Commits `9107ca3`…`4d9f0e1`.
+
+- **SeriesLink component.** Mirror of TeamLink/PlayerLink but with a
+  `/series?...` destination. Takes an explicit scope spec
+  (tournament, season, seriesType, team1, team2, gender, team_type,
+  filter_venue) — no FilterBar context, since tiles describe row-
+  intrinsic scope. Migrated five existing raw-Link call sites
+  (Batting/Bowling/Fielding/HeadToHead innings-list tournament cells,
+  TournamentDossier by-season edition rows).
+- **Series-landing tile redesign.** Tournament + rivalry tiles now
+  use a stretched-link pattern (CSS `.tile-stretched` + pointer-
+  events-none siblings + z-index) so the tile body is clickable
+  without nesting `<a>` inside `<a>`, while inner TeamLink/SeriesLink
+  affordances capture their own clicks + cmd-clicks. Tournament
+  tiles carry new "Most titles: [TeamLink India] (3)" (name →
+  all-time, count → scoped) and split "Latest: 2025/26" + "Winner:
+  India · all-time" lines — scope hoisted on the Winner line as
+  a whole-phrase link so the bare "India" never means scoped.
+- **Rivalry tile Latest + Winner lines.** Backend `latest_match`
+  extension — scoped across all-international (not bilateral-only)
+  so T20 WC 2024 beats a 2023 bilateral when it's the most recent
+  meeting. Returns `tournament` (canonical name for ICC-event
+  meetings, `null` for bilateral tours) + `season`. Frontend renders
+  Latest as a SeriesLink to the appropriate scoped dossier and
+  Winner as a whole-phrase link with `keepRivalry=true` on TeamLink.
+- **TeamLink opt-in props.** `keepRivalry`, `seriesType`, `team_type`,
+  `maxTiers` — all defaults preserve today's behavior. Used on home-
+  tab rivalry tiles to override scope without the caller's URL
+  having to carry aux filters.
+- **Dossier pill rename.** "Bilateral T20Is" → "only bilaterals"
+  (reads cleaner next to "All international" / "ICC events" /
+  "Club tournaments").
+- **Participating teams refactor.** Section title hoists the scope
+  once ("Teams at T20 World Cup (Men), 2025/26 (19)"). Each chip
+  splits: TeamLink compact (name → all-time) + " · " + Link on the
+  count (→ team at tournament + season). Convention-correct.
+- **Groups tile fix.** Removed phantom `cursor: pointer` (tile had
+  no click handler). Each team row now splits into TeamLink + scoped
+  count link. Groups only render on single-edition scope (`editions
+  === 1`).
+- **Knockouts venue cell.** Linked to `/venues?venue=X` dossier.
+- **Editions tab bracketed counts.** Champion / Runner-up /
+  Top scorer / Top wicket-taker columns now render "<name> (<count>)"
+  where `<name>` is TeamLink/PlayerLink compact (all-time) and
+  `<count>` is a Link scoped to the edition. Backend `/series/by-
+  season` extended with `champion_record` + `runner_up_record`
+  `{played, won}` per season via a UNION-ALL participations CTE.
+- **Editions tab dropped Run rate column.** Every remaining column
+  is actionable (drill into a team / player / scorecard / season
+  narrow); run rate was a read-only meta-stat better suited to
+  Records or the Overview trend chart (both untouched).
+- **Discipline landings default to all-time.** Removed the
+  `useDefaultSeasonWindow(filters, true)` one-shot on Batting /
+  Bowling / Fielding — landings now open all-time. User opt-in via
+  FilterBar "last 3" button replaces the auto-apply.
+- **FilterBar "last 3 seasons" button.** Scope-aware quick-select.
+  Respects every FilterBar field (gender / team_type / tournament /
+  filter_team / filter_opponent / filter_venue / series_type). On
+  `Ind v Aus ICC` → last 3 WC meetings (2013/14, 2015/16, 2024), not
+  last 3 calendar seasons.
+- **Teams page search bug.** Swapped inline `<input>` for the
+  existing `<TeamSearch>` component (matches `/players` pattern). No
+  more "Pakistan" appearing twice when on `/teams?team=Pakistan`.
+- **Commit cadence + REG→NEW flip workflow notes.** Two new CLAUDE.md
+  sections: "Commit cadence" (commit as feature completes, not in
+  bulk) and "Intentionally changed response shape?" docs hook under
+  Keeping docs in sync — the regression runner reads HEAD-side
+  `urls.txt`, so an uncommitted REG→NEW flip is invisible.
+
 ---
 
 ## Known issues / live TODO

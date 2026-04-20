@@ -1,43 +1,44 @@
-# Next-session ideas — Tournaments, team-to-team, H2H scope
+# Next-session ideas — Head-to-Head tab walk, Teams tab, cross-tab audit
 
-> **NO DEPLOYS** until the Series + Teams + cross-tab audit (items 1–3
-> below) completes. Per session memory, last reaffirmed 2026-04-19.
+> **NO DEPLOYS** until the Series + Teams + H2H deep-dive completes.
+> Per session memory, last reaffirmed 2026-04-20.
 
 ## NEXT SESSION agenda (in order)
 
-Lifted from CLAUDE.md on 2026-04-19 when CLAUDE.md was trimmed to keep
-only always-on instructions. Detail for items 1–3 lives in the Series +
-Teams deep-dive plan immediately below; items 4–6 are placeholders
-that expand when picked up.
+Series tab deep-dive completed 2026-04-20 (pm) — SeriesLink shipped,
+tile conventions set, TournamentDossier Overview/Editions/Groups/
+Knockouts/Participating-teams cells converted. Next tabs to walk:
 
-1. **Series tab deep dive — cell migrations.** TournamentDossier still
-   has 15+ `teamLinkHref` call sites (Knockouts, Participating teams
-   chips, Champions by season, Matches tab, Records `teamCell`,
-   Editions champion/runner-up, by-team tile headers, `renderVsTeams`
-   helpers). Convert each to `<TeamLink>` (`compact` for tile headers
-   where the tile already expresses scope; `inline` for tables where
-   each cell is a pivot). Also raw `/batting?player=` /
-   `/bowling?player=` links in Editions / Records / Partnerships →
-   `<PlayerLink>`. Same pattern for IPL + T20 WC dossiers. Walk:
-   India-vs-Australia (rivalry), IPL (club tournament), T20 World Cup
-   (Men) (ICC tournament) — three reference scenarios. See detail in
-   the next section.
-2. **Teams tab deep dive.** Apply the conventions to `/teams?team=X`
-   page: every team-mention should be a `<TeamLink>` (probably compact
-   for the H2 since the H2 is the team identity); every player-mention
-   a `<PlayerLink>`. Verify deep-links from Series carry through
-   (`?team=X&series_type=bilateral` etc.) and the page shows the right
-   counts. See detail in the next section.
-3. **Cross-tab name-link invariant audit.** Across every tab, the bare
-   name link must go to the entity's overall page (identity only —
-   gender + team_type for teams, gender for players). Current state:
-   probably violated in many places (raw inline `<Link>` calls with
-   extra scope params). Hunt them down one tab at a time. See detail
-   in the next section.
-4. **Venue-cell sweep** (deferred from 2026-04-18) — Series Knockouts +
-   Matches venue cells, HeadToHead by-match venue, anywhere else venue
-   text is plain. Link to `/venues?venue={venue}` (dossier) or
-   `?filter_venue={venue}` where contextual.
+1. **Head-to-Head tab walk.** `/head-to-head` is the polymorphic tab
+   with `mode=player` and `mode=team`. Verify that:
+   - All team names use `<TeamLink>`, all player names use
+     `<PlayerLink>` (compact where the page context already expresses
+     scope, inline where the cell is a pivot).
+   - Tile convention applies to the Common-matchups suggestion tiles
+     when no teams are picked (stretched-link + inner TeamLink/
+     PlayerLink per the Series-landing template — see
+     `internal_docs/design-decisions.md` "Series-landing tile
+     convention").
+   - Team-vs-team mode reuses TournamentDossier correctly with the
+     rivalry scope threaded through.
+   - Innings-list tournament column already migrated to `<SeriesLink>`
+     (2026-04-20 session); verify visually in the browser agent.
+2. **Teams tab deep dive.** `/teams?team=X` — every team-mention
+   should be a `<TeamLink>`, every player-mention a `<PlayerLink>`.
+   Apply the tile conventions to Compare tile, Players-in-team grid.
+   Verify deep-links from Series (e.g. "India at T20 WC, 2025/26")
+   arrive with right filters populated.
+3. **Cross-tab name-link invariant audit.** Across every tab, the
+   bare name-as-link text must go to the entity's overall page
+   (identity only — gender + team_type for teams, gender for
+   players). Hunt down inline `<Link>` calls with extra scope params
+   and convert them, or phrase-wrap them per the 2026-04-20 Winner-
+   line convention.
+4. **Venue-cell sweep** (deferred from 2026-04-18, partially done on
+   2026-04-20 — Series Knockouts shipped) — Matches venue cells,
+   HeadToHead by-match venue, anywhere else venue text is plain.
+   Link to `/venues?venue={venue}` (dossier) or `?filter_venue={venue}`
+   where contextual.
 5. **Scorecard linkability API batch** (deferred from 2026-04-18) —
    `/api/v1/matches/{match_id}` response shapes for `player_of_match`,
    dismissal text, did-not-bat, fall-of-wickets to return `PersonRef`s;
@@ -48,11 +49,15 @@ that expand when picked up.
    stable-memoized. Pages can gradually adopt it to replace their
    hand-rolled arrays.
 
-## Series + Teams deep-dive plan (2026-04-19, what to do first next session)
+## Series deep-dive — DONE 2026-04-20 (kept as reference scenarios)
 
-Now that `TeamLink` (phrase model) and the `FilterBarParams` /
-`AuxParams` split are in, the next session walks the Series and Teams
-tabs cell-by-cell to apply the conventions consistently.
+> Series tab cell migrations shipped 2026-04-20 (pm). SeriesLink
+> component introduced, tile conventions set, TournamentDossier
+> Overview/Editions/Groups/Knockouts/Participating-teams converted.
+> Commits `9107ca3`..`4d9f0e1`, plus design-decisions.md "Series-
+> landing tile convention" for the stretched-link + phrase-wraps-name
+> + title-hoists-scope patterns. Below stays as the canonical
+> reference-scenario set for HEAD-to-head and Teams walks.
 
 ### Three reference scenarios
 

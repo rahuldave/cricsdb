@@ -1045,7 +1045,12 @@ so the dossier can show "who won how much" as the top stat row.
 
 Sectioned directory for the `/series` landing page. Bilateral
 rivalry tiles are bilateral-only and split by gender (top-9 full-member
-men's and women's pairs).
+men's and women's pairs). Each rivalry entry's `latest_match` carries
+the most recent meeting across **all** international meetings (not
+bilateral-only) — `tournament` is the canonical ICC event name when
+the meeting was a recognized tournament (T20 WC, Asia Cup, …), or
+`null` for bilateral tours. The pair counts (`matches`, `team1_wins`,
+etc.) remain bilateral-only.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/landing?gender=male"
@@ -1067,7 +1072,8 @@ curl "http://localhost:8000/api/v1/series/landing?gender=male"
             "matches": 42, "team1_wins": 21, "team2_wins": 19,
             "ties": 0, "no_result": 2,
             "latest_match": { "match_id": 1835, "date": "2025-03-26",
-                              "winner": "New Zealand" } }
+                              "winner": "New Zealand",
+                              "tournament": null, "season": "2024/25" } }
         ],
         "other_count": 153
       },
@@ -1174,7 +1180,9 @@ curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_oppon
 
 Per-edition rollup: champion, runner-up, top scorer, top wicket-taker,
 run rate, boundary %, sixes. Tournament + series_type + filter_*
-optional.
+optional. `champion_record` / `runner_up_record` carry `{played, won}`
+for that team in that edition — used by the dossier's Editions tab to
+render "India (8/9)" style bracketed fractions.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/by-season?tournament=Indian+Premier+League&gender=male&team_type=club"
@@ -1185,7 +1193,10 @@ curl "http://localhost:8000/api/v1/series/by-season?tournament=Indian+Premier+Le
   "tournament": "Indian Premier League",
   "seasons": [
     { "season": "2024", "matches": 71,
-      "champion": "Kolkata Knight Riders", "runner_up": "Sunrisers Hyderabad",
+      "champion": "Kolkata Knight Riders",
+      "champion_record": { "played": 17, "won": 12 },
+      "runner_up": "Sunrisers Hyderabad",
+      "runner_up_record": { "played": 16, "won": 9 },
       "final_match_id": 5945,
       "run_rate": 9.56, "boundary_pct": 21.07, "total_sixes": 1261,
       "top_scorer":      { "person_id": "ba607b88", "name": "V Kohli", "runs": 741 },

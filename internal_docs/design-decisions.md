@@ -1051,3 +1051,179 @@ All four are response-shape changes to `/api/v1/matches/{match_id}` —
 cheaply added in one PR since the backend already has person_id
 access (it's doing the fielder join for one of them). Do as a single
 batch to avoid multiple deploy cycles.
+
+## Series-landing tile convention: scope hoists to title, name stays all-time
+
+On surfaces with many similar chips/rows (Series-landing tiles,
+Participating teams, Groups, Editions table), the tile/row would be
+unreadable if every team-or-player link subscript spelled out its
+tournament+season context. Two patterns resolve this.
+
+### Pattern 1 — tile with stretched primary link + inner affordances
+
+Used on tournament + rivalry tiles on the Series landing.
+
+```
+┌─ [tile-wrapper div] ─────────────────┐
+│ [stretched SeriesLink → tournament]  │  ← absolute inset:0, z:1
+│ T20 World Cup (Men)                  │  ← text, pointer-events:none
+│ 10 editions · 334 matches            │
+│ Most titles: [TeamLink India] (3)    │  ← inner link, z:2
+│ Latest: [SeriesLink 2025/26]         │
+│ [Link Winner: India] [Link all-time] │
+└──────────────────────────────────────┘
+```
+
+CSS (index.css):
+- `.wisden-tile.tile-wrapper { position: relative }`
+- `.tile-stretched { position: absolute; inset: 0; z-index: 1; font-size: 0 }`
+- `.tile-wrapper > *:not(.tile-stretched) { pointer-events: none }` —
+  transparent to clicks so empty regions (padding, gaps) fall through
+  to the stretched link.
+- `.tile-wrapper > *:not(.tile-stretched) a, button { pointer-events:
+  auto; position: relative; z-index: 2 }` — inner links/buttons
+  re-enable pointer-events and sit above the stretched link.
+
+Net effect: tile body click → stretched primary; inner link click →
+inner link. No nested `<a>` tags. Cmd-click discriminates correctly.
+
+### Pattern 2 — phrase-wraps-name when natural reading is scoped
+
+The `TeamLink` / `PlayerLink` contract is "bare team-name (or
+player-name) as link text ALWAYS means all-time." A naive tile
+implementation breaks this: `Winner: [India]` with `India` linked to
+the scoped URL reads fine in isolation but violates the convention
+(a bare "India" link elsewhere means India all-time).
+
+Resolution: **the link TEXT is the whole phrase `"Winner: India"`**,
+going to the scoped URL. The word "India" alone is never shown as a
+link pointing to scoped — it's always part of a larger phrase.
+
+Example (tournament tile Winner line):
+
+```tsx
+<Link to={scopedTeamUrl(...)}>Winner: {team}</Link>
+{' '}
+<Link to={allTimeTeamUrl(...)} className="comp-link scope-phrase">
+  all-time
+</Link>
+```
+
+- `"Winner: India"` (full phrase) → scoped to this edition
+- `"all-time"` (subscript escape) → all-time India page
+
+If the line has a natural per-row count (e.g. `Most titles: India
+(3)` or Editions-tab `India (8/9)`), the convention stays and the
+count carries the scope:
+
+```tsx
+<TeamLink teamName="India" compact />   // bare name → all-time
+{' ('}
+<Link to={scopedUrl(...)}>8/9</Link>     // count → scoped
+{')'}
+```
+
+Same pattern for players on the Editions tab — bracketed counts
+("runs" / "wickets") link scoped, PlayerLink compact on the name
+links all-time.
+
+### Pattern 3 — section title hoists the scope once
+
+Participating-teams section (TournamentDossier Overview) uses:
+
+```
+Teams at T20 World Cup (Men), 2025/26 (19)
+[India · 8]  [Australia · 7]  [Pakistan · 6]  ...
+```
+
+Title embeds the scope via `seasonTag(filters.season_from,
+filters.season_to)`; per-chip text stays tight. Same two-link split
+per chip: `TeamLink compact` (name → all-time) + `Link` on the count
+(→ team at this tournament + season). Groups section follows the
+same convention where each group row's season is guaranteed single.
+
+### SeriesLink — the `/series?...` sibling to TeamLink/PlayerLink
+
+`components/SeriesLink.tsx`. Thin `<Link>` wrapper that builds a
+`/series?...` URL from an explicit scope spec (`tournament`,
+`season`, `seriesType`, `team1`, `team2`, `gender`, `team_type`,
+`filter_venue`). Unlike TeamLink/PlayerLink it takes no FilterBar
+context — callers pass the full scope directly so tiles can describe
+row-intrinsic gender/team_type without relying on ambient URL state.
+
+Primary call sites: tournament-tile stretched-link primary, Latest-
+edition inner link, rivalry-tile primary, innings-list tournament
+cells (Batting/Bowling/Fielding/HeadToHead), TournamentDossier's
+by-season edition rows.
+
+## TeamLink — opt-in props for rivalry/tile surfaces (2026-04-20)
+
+Default `TeamLink` behavior is single-team-page destination with
+rivalry pair dropped from subscript URLs — the "go to this team's
+overall page" invariant. Four opt-in props for surfaces that need
+more:
+
+- `keepRivalry?: boolean` — preserves `filter_team`/`filter_opponent`
+  on subscript URLs + emits the "vs Opp" phrase. PlayerLink defaults
+  to true; TeamLink defaults to false. Rivalry-tile Winner lines pass
+  true so the phrase reads "at T20 WC, 2024 vs Australia".
+- `seriesType?: string | null` — override the URL-derived series_type.
+  Curated surfaces (home-tab rivalry tiles) pass `'bilateral'`
+  explicitly since the tile's own URL doesn't carry the aux filter.
+- `team_type?: string | null` — override team_type on the name link
+  for curated surfaces where team_type is known per-row but no
+  FilterBar context is available.
+- `maxTiers?: number` — cap the scope-phrase chain (narrowest first).
+  Default unlimited (all tiers applicable to active axes). Dense
+  surfaces (tiles) pass 1 so the reader gets the narrowest phrase
+  without the stepped-up broader tiers that only make sense on stats
+  tables where they're anchored to a preceding number.
+
+## FilterBar "last 3 seasons" — scope-aware quick-select button
+
+`components/FilterBar.tsx` exposes `last 3` alongside `all-time` and
+`latest`. Pins `season_from`/`season_to` to the last 3 entries in the
+scoped seasons list (the list itself is already narrowed by
+gender/team_type/tournament/filter_team/filter_opponent/filter_venue/
+series_type via `getSeasons`). So:
+
+- `/batting` → last 3 calendar seasons (2025, 2025/26, 2026)
+- `/series?tournament=Indian+Premier+League` → last 3 IPL seasons
+  (2024, 2025, 2026)
+- `/series?filter_team=India&filter_opponent=Australia&series_type=icc`
+  → last 3 Ind-vs-Aus WC meetings (2013/14, 2015/16, 2024) — rivalry
+  + ICC scope all narrow the list before the slice.
+
+Replaces the old automatic `useDefaultSeasonWindow(filters, true)`
+one-shot on Batting/Bowling/Fielding landings, which pinned the last
+3 calendar seasons on arrival. That auto-default was removed at user
+request on 2026-04-20 — discipline landings now open all-time; the
+user opt-in via `last 3` covers the rare case where the old default
+was what they wanted. Hook file remains unused for possible future
+opt-in callers.
+
+Shows when `seasons.length >= 3`. Tooltip lists the three seasons
+verbatim ("Last 3 seasons in scope (2025, 2025/26, 2026)") so users
+aren't misled by the display-collapsed "2025–2026" range.
+
+## Regression runner: REG→NEW flip lands BEFORE the shape change
+
+`./tests/regression/run.sh <feature>` classifies each URL diff using
+the `kind` column from the HEAD-side (stashed) `urls.txt` — see
+`kind, hh = head[k]` in `run.sh`. When a commit intentionally changes
+an endpoint's response shape, the REG→NEW flip on affected URLs has
+to land in a **separate, earlier commit** so the runner's HEAD-side
+read sees the new NEW classification.
+
+Workflow for a response-shape change:
+1. `git commit -m "regression: flip X REG→NEW ahead of <feature>"`
+2. `git commit -m "<feature>: the actual shape change"`
+3. `./tests/regression/run.sh <feature>` — expected output is
+   `N REG matched, 0 REG drifted, K NEW changed, 0 NEW unchanged`.
+
+If the flip is uncommitted at runtime, `git stash push` restores the
+tree to pre-flip state for the HEAD capture — which reads the OLD
+`REG` classification and flags the intentional diff as a drift. This
+documentation entry catches up after exactly that confusion on
+2026-04-20 (Editions-tab `champion_record` / `runner_up_record`
+extension).
