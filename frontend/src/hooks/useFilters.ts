@@ -24,6 +24,12 @@ export function useFilters(): FilterParams {
       const v = params.get(k as FilterKey)
       if (v) out[k as FilterKey] = v
     }
+    // series_type is page-local aux (not in FILTER_KEYS, doesn't ride
+    // through scope-link URLs) but every API consumer needs to pass it
+    // through to the backend's AuxParams. Read alongside FILTER_KEYS
+    // so consumers don't have to remember to merge it themselves.
+    const st = params.get('series_type')
+    if (st) out.series_type = st
     return out as FilterParams
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qs])

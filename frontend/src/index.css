@@ -930,6 +930,15 @@ a { color: inherit; }
 @media (min-width: 1024px) {
   .wisden-statrow.cols-5 { grid-template-columns: repeat(5, 1fr); }
 }
+/* 3-card variant — used for leader rows (Most titles, Top scorer,
+   Top wicket-taker) where 4-up leaves a lonely empty slot. */
+.wisden-statrow.cols-3 { grid-template-columns: repeat(3, 1fr); }
+/* 6-card variant — used on the aggregate row when Fours + Sixes are
+   both surfaced alongside Run rate / Boundary % / Dot %. */
+.wisden-statrow.cols-6 { grid-template-columns: repeat(3, 1fr); }
+@media (min-width: 1024px) {
+  .wisden-statrow.cols-6 { grid-template-columns: repeat(6, 1fr); }
+}
 
 /* Phase block — three-up summary used by Batting/Bowling "By Phase" */
 .wisden-phase-first > .wisden-phaseblock:first-child,
@@ -1586,6 +1595,102 @@ a { color: inherit; }
 }
 .scope-sub:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .scope-subs-sep { color: var(--ink-faint); }
+
+/* Scope-phrase subscripts — shared by PlayerLink and TeamLink. Inline
+   form rides after the name (or after trailingContent) in italic; block
+   form stacks below the name in small-caps (H2 titles). The 1px border
+   from .comp-link is preserved at rest so the phrase reads as a link,
+   not decoration. */
+.scope-phrase {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.68em;
+  color: var(--ink-faint);
+  letter-spacing: 0.01em;
+}
+.scope-phrase:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.scope-phrases-inline { margin-left: 0.1em; }
+.scope-phrases-sep { font-size: 0.68em; color: var(--ink-faint); font-style: italic; }
+/* TeamLink block-layout wrapper — inline-block so the H2 flow doesn't
+   break when subscripts stack below the name. */
+.team-link-block {
+  display: inline-block;
+  vertical-align: top;
+  position: relative;
+}
+.scope-phrases-block {
+  display: block;
+  font-size: 0.38em;
+  line-height: 1.3;
+  color: var(--ink-faint);
+  margin-top: 0.25em;
+  font-weight: 500;
+}
+.scope-phrases-block .scope-phrase {
+  display: block;
+  font-size: 1em;
+  font-style: normal;
+  font-variant: all-small-caps;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+
+/* Scope-status strip — one-liner between FilterBar and page content.
+   Read-mode mirror of the FilterBar's active state plus a copy-link
+   button. Deliberately subdued so it doesn't fight the H2. The
+   `--bg-soft` tint visually separates the nav + filter chrome above
+   from the page content below, so a dense dossier doesn't read as
+   one uninterrupted wall. */
+.wisden-scope-strip {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0.4rem 1rem;
+  font-family: var(--serif);
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 0.15rem;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.wisden-scope-strip-label {
+  font-variant: all-small-caps;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-right: 0.4rem;
+  color: var(--ink);
+}
+.wisden-scope-strip-seg { display: inline; }
+.wisden-scope-strip-segLabel {
+  font-variant: all-small-caps;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  color: var(--ink-faint);
+}
+.wisden-scope-strip-segValue {
+  color: var(--ink);
+  font-weight: 500;
+}
+.wisden-scope-strip-sep { color: var(--ink-faint); }
+.wisden-scope-strip-copy {
+  margin-left: auto;
+  font-family: var(--serif);
+  font-size: 0.8rem;
+  font-variant: all-small-caps;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--rule-soft);
+  border-radius: 3px;
+  padding: 0.15rem 0.55rem;
+  cursor: pointer;
+  transition: border-color 120ms, color 120ms;
+}
+.wisden-scope-strip-copy:hover {
+  border-color: var(--accent);
+}
 .coverage-stats > div { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.4rem; }
 .big-num {
   font-family: var(--serif);

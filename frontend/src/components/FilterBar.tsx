@@ -14,6 +14,13 @@ export default function FilterBar() {
   const [seasons, setSeasons] = useState<string[]>([])
   const [tournamentsError, setTournamentsError] = useState(false)
   const [seasonsError, setSeasonsError] = useState(false)
+  // Tracks WHICH scope the `tournaments` state was last fetched for.
+  // Auto-narrow useEffects compare this against the current scope
+  // signature to detect staleness SYNCHRONOUSLY. An async staleness
+  // flag wouldn't work — the back-button URL change and the next
+  // auto-narrow fire in the same render, before the async stale=true
+  // setter lands, so they'd race.
+  const [fetchedScope, setFetchedScope] = useState('')
 
   // Dropdown-narrowing fetches. Pass the FULL filter state through so
   // every narrowing field (including future additions — filter_venue,
@@ -33,6 +40,16 @@ export default function FilterBar() {
   const teamForFetch = pathTeam || filterTeam
   const opponentForFetch = pathTeam ? undefined : filterOpponent
   const seriesType = params.get('series_type') || undefined
+  // Scope signature — every field that affects what /tournaments
+  // returns. Compared against `fetchedScope` below for synchronous
+  // staleness detection.
+  const currentScope = JSON.stringify({
+    teamForFetch, opponentForFetch, seriesType,
+    gender: filters.gender, team_type: filters.team_type,
+    filter_venue: filters.filter_venue,
+    season_from: filters.season_from, season_to: filters.season_to,
+  })
+  const tournamentsStale = fetchedScope !== currentScope
   useEffect(() => {
     getTournaments({
       ...filters,
@@ -40,16 +57,16 @@ export default function FilterBar() {
       opponent: opponentForFetch,
       series_type: seriesType,
     })
-      .then(d => { setTournaments(d.tournaments); setTournamentsError(false) })
+      .then(d => {
+        setTournaments(d.tournaments)
+        setFetchedScope(currentScope)
+        setTournamentsError(false)
+      })
       .catch(err => {
         console.warn('Failed to load tournaments:', err)
         setTournamentsError(true)
       })
-  }, [
-    teamForFetch, opponentForFetch, seriesType,
-    filters.gender, filters.team_type, filters.filter_venue,
-    filters.season_from, filters.season_to,
-  ])
+  }, [currentScope])
   useEffect(() => {
     getSeasons({
       ...filters,
@@ -82,6 +99,7 @@ export default function FilterBar() {
   // would aggregate IPL men + WPL women for any team that exists in
   // both — see internal_docs/design-decisions.md "Tournament deep links".
   useEffect(() => {
+    if (tournamentsStale) return
     if (tournaments.length === 0 || !tournament) return
     if (gender && teamType) return
     const t = tournaments.find(x => x.event_name === tournament)
@@ -92,13 +110,14 @@ export default function FilterBar() {
     // Auto-correcting deep link → replace (no history entry for
     // something the user didn't actively pick).
     if (Object.keys(updates).length > 0) setUrlParams(updates, { replace: true })
-  }, [tournaments, tournament, gender, teamType])
+  }, [tournaments, tournamentsStale, tournament, gender, teamType])
 
   // When a team is selected (Teams page) AND no team_type / gender is
   // set yet AND the team's tournaments are unambiguous (one type, one
   // gender), auto-fill the filter so MI doesn't aggregate WPL women's
   // numbers etc. Driven by the team-scoped tournaments list above.
   useEffect(() => {
+    if (tournamentsStale) return
     if (!teamForFetch || tournaments.length === 0) return
     if (gender && teamType) return
     const types = new Set(tournaments.map(t => t.team_type).filter(Boolean))
@@ -107,7 +126,7 @@ export default function FilterBar() {
     if (!teamType && types.size === 1) updates.team_type = [...types][0] as string
     if (!gender && genders.size === 1) updates.gender = [...genders][0] as string
     if (Object.keys(updates).length > 0) setUrlParams(updates, { replace: true })
-  }, [teamForFetch, tournaments, gender, teamType])
+  }, [teamForFetch, tournaments, tournamentsStale, gender, teamType])
 
   // Intra-tournament rivalry auto-narrow: when BOTH filter_team and
   // filter_opponent are set AND the two teams only ever meet in a
@@ -118,11 +137,12 @@ export default function FilterBar() {
   // single-team scoping — MI alone plays IPL + WPL so the set can look
   // unambiguous while actually hiding the women's side.
   useEffect(() => {
+    if (tournamentsStale) return
     if (!filterTeam || !filterOpponent) return
     if (tournament) return
     if (tournaments.length !== 1) return
     setUrlParams({ tournament: tournaments[0].event_name }, { replace: true })
-  }, [filterTeam, filterOpponent, tournaments, tournament])
+  }, [filterTeam, filterOpponent, tournaments, tournamentsStale, tournament])
 
   const setGender = (v: string) => {
     const updates: Record<string, string> = { gender: v }

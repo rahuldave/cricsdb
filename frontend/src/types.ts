@@ -14,6 +14,12 @@ export interface FilterParams {
   filter_venue?: string
   team?: string
   opponent?: string
+  /** Page-local aux filter — Series-tab pill (all/bilateral/icc/club).
+   *  NOT in FILTER_KEYS (the FilterBar UI doesn't drive it; it's not
+   *  part of scope-link letter URLs), but `useFilters` surfaces it so
+   *  every endpoint consumer can pass it through to the backend, where
+   *  it lands in AuxParams. Mirror of api/filters.py::AuxParams. */
+  series_type?: string
 }
 
 export interface Tournament {
@@ -1176,15 +1182,31 @@ export interface TournamentSummary {
   dot_pct: number | null
   most_titles: { team: string; titles: number } | null
   champions_by_season: { season: string; champion: string; match_id: number }[]
-  top_scorer_alltime: (PersonRef & { runs: number }) | null
-  top_wicket_taker_alltime: (PersonRef & { wickets: number }) | null
+  top_scorer_alltime: (PersonRef & { team: string | null; runs: number }) | null
+  top_wicket_taker_alltime: (PersonRef & { team: string | null; wickets: number }) | null
+  highest_individual: (PersonRef & {
+    team: string | null; runs: number
+    match_id: number; date: string | null
+  }) | null
   highest_team_total: {
     team: string; total: number; match_id: number
     opponent: string; date: string | null
   } | null
-  largest_partnership: { runs: number; match_id: number } | null
+  largest_partnership: {
+    runs: number; match_id: number
+    team: string | null; opponent: string | null
+    date: string | null
+    batter1: PersonRef; batter2: PersonRef
+  } | null
   best_bowling: (PersonRef & {
+    team: string | null
     figures: string; wickets: number; runs: number
+    match_id: number; date: string | null
+  }) | null
+  best_fielding: (PersonRef & {
+    team: string | null
+    catches: number; stumpings: number; run_outs: number; caught_bowled: number
+    total: number
     match_id: number; date: string | null
   }) | null
   teams: { name: string; matches: number }[]
@@ -1197,6 +1219,7 @@ export interface TournamentSummary {
     match_id: number
     season: string
     stage: string
+    tournament: string | null
     team1: string
     team2: string
     winner: string | null

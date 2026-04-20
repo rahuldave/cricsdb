@@ -1,27 +1,32 @@
 /**
- * PlayerLink — name link + contextual letter links for a player.
+ * PlayerLink — name link + contextual scope-phrase subscripts for a player.
  *
  *   Name link    → /batting|/bowling|/fielding|/players?player=X
  *                  All-time, gender only. "Go to this player"; no scope.
  *
- *   Letter links (e, t, s, b) → scoped variants. Each carries the
- *                  entire FilterBar state EXCEPT the axis it represents.
- *                  See `scopeLinks.ts` for the full table-driven model.
- *                    (e) = this tournament, current season range
- *                    (t) = this tournament, all editions
- *                    (s) = this rivalry, current series
- *                    (b) = this rivalry, all-time
- *                  Tooltip spells out the full scope in words.
+ *   Phrase subscripts (0–3), small-caps:
+ *     - "vs <Opp>"                — rivalry alone (all-time vs opponent)
+ *     - "at <Tournament> vs <Opp>" — rivalry + tournament
+ *     - "at <Tournament>, <Season> vs <Opp>" — rivalry + tournament + season
+ *     - "at <Tournament>"          — tournament alone (no rivalry)
+ *     - "at <Tournament>, <Season>" — tournament alone narrowed by season
+ *     - "in <Season>"              — season alone
  *
- * Per-row surfaces (innings lists, match rows) pass `subscriptSource` to
- * draw the letter-link bucket from the row's match, not page filters.
+ *   See `scopeLinks.ts::resolveScopePhrases` (called with keepRivalry: true)
+ *   for tier resolution.
+ *
+ * Per-row surfaces (innings lists, leaderboard rows) pass `subscriptSource`
+ * to draw the phrase bucket from the row's match, not page filters. For
+ * rivalry-mode rows, `rowSubscriptSource` (in TournamentDossier) pre-orients
+ * the source so the rivalry phrase faces the row's own team.
  *
  * Dense surfaces (scorecard rows, matchup grids) pass `compact` to
  * render only the name link.
  */
-import { Link } from 'react-router-dom'
+import type React from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
-  resolveBucket, nameParams, tierParams, activeTiers, tierTooltip, sameParams,
+  resolveBucket, nameParams, resolveScopePhrases,
   useScopeFilters,
   type SubscriptSource,
 } from './scopeLinks'
@@ -44,67 +49,59 @@ interface PlayerLinkProps {
    *  Use on curated/filter-less surfaces (Home's featured players) where
    *  gender is known per-link but no FilterBar is present. */
   gender?: string | null
-  /** Hide the letter-link cluster. For dense surfaces (scorecard rows). */
+  /** Hide the phrase subscripts. For dense surfaces (scorecard rows). */
   compact?: boolean
+  /** Content rendered between the name link and the phrase subscripts.
+   *  Use when a stat is intrinsic to the scope (e.g. "· 794 runs" against
+   *  a rivalry opponent reads more natural with the "vs Australia" phrase
+   *  AFTER the stat: `V Kohli · 794 runs vs Australia`). */
+  trailingContent?: React.ReactNode
 }
 
 export default function PlayerLink({
-  personId, name, role, subscriptSource, gender, compact,
+  personId, name, role, subscriptSource, gender, compact, trailingContent,
 }: PlayerLinkProps) {
   const filters = useScopeFilters()
+  const [searchParams] = useSearchParams()
+  const seriesType = searchParams.get('series_type')
   const effectiveFilters = gender !== undefined
     ? { ...filters, gender: gender ?? undefined }
     : filters
 
-  if (!personId) return <>{name}</>
+  if (!personId) return <>{name}{trailingContent}</>
   const path = ROLE_PATH[role]
 
   const nameQs = new URLSearchParams({ player: personId, ...nameParams(effectiveFilters) })
   const nameHref = `${path}?${nameQs.toString()}`
 
   if (compact) {
-    return <Link to={nameHref} className="comp-link">{name}</Link>
+    return <><Link to={nameHref} className="comp-link">{name}</Link>{trailingContent}</>
   }
 
   const bucket = resolveBucket(effectiveFilters, subscriptSource)
-  const tiers = activeTiers(bucket, subscriptSource)
-  if (tiers.length === 0) {
-    return <Link to={nameHref} className="comp-link">{name}</Link>
+  const phrases = resolveScopePhrases(bucket, { keepRivalry: true, seriesType })
+  if (phrases.length === 0) {
+    return <><Link to={nameHref} className="comp-link">{name}</Link>{trailingContent}</>
   }
 
-  // Build subscript links + collapse duplicates.
-  const subs = tiers.map(tier => {
-    const p = tierParams(bucket, tier)
-    const qs = new URLSearchParams({ player: personId, ...p })
-    return {
-      tier,
-      href: `${path}?${qs.toString()}`,
-      tooltip: tierTooltip(bucket, tier),
-      params: p,
-    }
-  })
-  // Hide (e) if its URL == (t)'s; hide (s) if == (b)'s.
-  const visible = subs.filter((s, i) => {
-    if (s.tier === 'e' || s.tier === 's') {
-      const sibling = subs[i + 1]  // t or b
-      return !sibling || !sameParams(s.params, sibling.params)
-    }
-    return true
+  const subs = phrases.map((ph, i) => {
+    const qs = new URLSearchParams({ player: personId, ...ph.params })
+    return { key: `${i}-${ph.label}`, href: `${path}?${qs.toString()}`, ...ph }
   })
 
   return (
     <>
       <Link to={nameHref} className="comp-link">{name}</Link>
-      {' '}
-      <span className="scope-subs">
-        (
-        {visible.map((s, i) => (
-          <span key={s.tier}>
-            {i > 0 && <span className="scope-subs-sep">, </span>}
-            <Link to={s.href} className="comp-link scope-sub" title={s.tooltip}>{s.tier}</Link>
+      {trailingContent}
+      <span className="scope-phrases-inline">
+        {subs.map((s, i) => (
+          <span key={s.key}>
+            {i === 0 ? ' ' : <span className="scope-phrases-sep">, </span>}
+            <Link to={s.href} className="comp-link scope-phrase" title={s.tooltip}>
+              {s.label}
+            </Link>
           </span>
         ))}
-        )
       </span>
     </>
   )

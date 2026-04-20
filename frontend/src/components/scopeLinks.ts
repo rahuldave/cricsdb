@@ -3,21 +3,21 @@
  *
  * Model
  * -----
- * - **Name link**: all-time + gender only. See `nameParams`.
- * - **Letter links** (e, t, s, b): carry the *entire* FilterBar state
- *   through, dropping only the axis the letter represents. Everything
- *   else rides through unchanged.
+ * - **Name link**: identity only (gender; +team_type for TeamLink). See `nameParams`.
+ * - **Phrase subscripts**: small-caps descriptive phrases that chain
+ *   container + rivalry + season. TeamLink passes `keepRivalry: false`
+ *   (destination is a single-team page, so rivalry always drops).
+ *   PlayerLink passes `keepRivalry: true` (a player's "vs Opp" axis is
+ *   meaningful). See `resolveScopePhrases`.
  *
  * Extensibility
  * -------------
- * Adding a new filter to the FilterBar (e.g. a future `filter_result`)
- * is ONE edit here: append it to `FILTER_KEYS`. It will auto-ride through
- * every letter link. Only touch `TIER_SPECS.drops` if the new filter has
- * an axis that a tier must clear; only touch `SOURCE_MAP` if it needs a
- * per-row override path (row data differing from page state).
+ * Adding a new filter to the FilterBar is ONE edit here: append it to
+ * `FILTER_KEYS`. It auto-rides through every phrase URL. Only touch
+ * `SOURCE_MAP` if the filter needs a per-row override path.
  *
- * This guarantees that no tab falls out of sync when a filter is added —
- * the "explicit, per-page, easy to under-wire" landmine documented in
+ * This guarantees no tab falls out of sync when a filter is added — the
+ * "explicit, per-page, easy to under-wire" landmine documented in
  * internal_docs/design-decisions.md doesn't reappear on link URLs.
  */
 import { createContext, useContext } from 'react'
@@ -26,9 +26,8 @@ import { useFilters } from '../hooks/useFilters'
 
 // ─── Filter registry ───────────────────────────────────────────────────
 //
-// Single source of truth for which FilterBar fields appear in letter
-// link URLs. Every one rides through every letter by default; see
-// `TIER_SPECS` below for the per-letter exceptions.
+// Single source of truth for which FilterBar fields appear in subscript
+// link URLs. Every one rides through by default.
 export const FILTER_KEYS = [
   'gender',
   'team_type',
@@ -67,38 +66,6 @@ const SOURCE_MAP: Record<keyof SubscriptSource, FilterKey[]> = {
   team2: ['filter_opponent'],
 }
 
-// ─── Tier specs ────────────────────────────────────────────────────────
-//
-// Each letter link is one tier along the scope axis. Only two things are
-// tier-specific: which filter keys the tier "pins" from source (making
-// it meaningful to render even when FilterBar has none), and which keys
-// it drops from the carried state (the axis being broadened).
-
-export type SubscriptTier = 'e' | 't' | 's' | 'b'
-
-interface TierSpec {
-  /** SubscriptSource keys that define this tier — if any are present in
-   *  the source, the tier applies. Used by `activeTiers`. */
-  needsFromSource: (keyof SubscriptSource)[]
-  /** FILTER_KEYS that this tier clears (drops from the URL). Everything
-   *  NOT listed here rides through from the resolved bucket. */
-  drops: FilterKey[]
-}
-
-const TIER_SPECS: Record<SubscriptTier, TierSpec> = {
-  // Edition: this tournament's current season range. No drops — pins
-  // tournament + season from source; everything else (gender, team_type,
-  // filter_venue, plus rivalry if set) rides through.
-  e: { needsFromSource: ['tournament'], drops: [] },
-  // Tournament (all editions): clear the season range, keep tournament.
-  t: { needsFromSource: ['tournament'], drops: ['season_from', 'season_to'] },
-  // Series: rivalry pair + tournament + season. No drops — the pair is
-  // pinned from source, the rest rides through.
-  s: { needsFromSource: ['team1', 'team2'], drops: [] },
-  // Bilateral rivalry (all-time): clear tournament + season, keep pair.
-  b: { needsFromSource: ['team1', 'team2'], drops: ['tournament', 'season_from', 'season_to'] },
-}
-
 // ─── Page scope context ────────────────────────────────────────────────
 //
 // Some pages use path-like URL params as their primary identity — e.g.
@@ -133,8 +100,8 @@ export function useScopeFilters(): FilterParams {
 // ─── Bucket resolution ─────────────────────────────────────────────────
 
 /** Resolved scope: every FilterBar field, with SubscriptSource overrides
- *  merged on top. A letter link's URL is just this bucket minus the
- *  tier's drops. */
+ *  merged on top. Phrase subscript URLs are this bucket minus whichever
+ *  keys the tier wants to drop. */
 export type SubscriptBucket = { [K in FilterKey]: string | null | undefined }
 
 export function resolveBucket(
@@ -155,90 +122,30 @@ export function resolveBucket(
   return bucket as SubscriptBucket
 }
 
-// ─── Tier activation ───────────────────────────────────────────────────
+// ─── Name-link params ──────────────────────────────────────────────────
 
-/** Which tiers apply for the given bucket + source. Rivalry-axis letters
- *  (s, b) win over tournament-axis letters (e, t) when both apply — the
- *  rivalry × tournament overlap case is deferred; see design-decisions.md. */
-export function activeTiers(
-  bucket: SubscriptBucket,
-  source: SubscriptSource | undefined,
-): SubscriptTier[] {
-  const has = (srcKey: keyof SubscriptSource) => {
-    const val = source?.[srcKey]
-    if (val !== undefined && val !== null && val !== '') return true
-    // If source didn't set it, fall back to the bucket (which has the
-    // merged FilterBar value in the SOURCE_MAP-mapped filter key).
-    for (const fk of SOURCE_MAP[srcKey]) {
-      if (bucket[fk]) return true
-    }
-    return false
-  }
-  // Rivalry-axis takes precedence: both team1 AND team2 must be present.
-  if (has('team1') && has('team2')) return ['s', 'b']
-  if (has('tournament')) return ['e', 't']
-  return []
-}
-
-// ─── URL param builders ────────────────────────────────────────────────
-
-/** Name link params — intentionally minimal. All-time view; narrowing
- *  is the job of the letter links. Only gender carries because it's an
- *  invariant of the entity (player/team). */
-export function nameParams(filters: FilterParams): Record<string, string> {
-  const p: Record<string, string> = {}
-  if (filters.gender) p.gender = filters.gender
-  return p
-}
-
-/** Letter-link params. Carries every field in `FILTER_KEYS` from the
- *  resolved bucket EXCEPT those in the tier's drop list. No hand-listed
- *  per-field logic here — the tier's axis is fully declared in TIER_SPECS,
- *  so any new filter added to FILTER_KEYS rides through automatically.
+/** Name link params — carries only the entity's identity attributes.
+ *  Narrowings (tournament, season, venue, rivalry) are the job of the
+ *  phrase subscripts and are intentionally dropped here.
  *
- *  `swapForTeam`: TeamLink passes the linked team's name. When the linked
- *  team IS the rivalry's `filter_opponent`, we swap so the URL's
- *  `filter_team` matches the linked team (e.g. clicking "Australia" in
- *  an India-vs-Australia rivalry gives you filter_team=Australia). */
-export function tierParams(
-  bucket: SubscriptBucket,
-  tier: SubscriptTier,
-  swapForTeam?: string,
+ *  `identityKeys` differs by entity type: players have one identity
+ *  attribute (gender); teams have two (gender AND team_type, since
+ *  "Australia men's international side" is a distinct entity from
+ *  "Australia women" and there is no Australia club side).
+ *  PlayerLink uses the default; TeamLink passes ['gender','team_type']. */
+export function nameParams(
+  filters: FilterParams,
+  identityKeys: readonly FilterKey[] = ['gender'],
 ): Record<string, string> {
-  const { drops } = TIER_SPECS[tier]
-  const dropSet = new Set<FilterKey>(drops)
-  const shouldSwap = !!(
-    swapForTeam
-    && bucket.filter_team
-    && bucket.filter_opponent
-    && swapForTeam === bucket.filter_opponent
-  )
-
   const p: Record<string, string> = {}
-  for (const k of FILTER_KEYS) {
-    if (dropSet.has(k)) continue
-    let value = bucket[k]
-    if (shouldSwap) {
-      if (k === 'filter_team') value = bucket.filter_opponent
-      else if (k === 'filter_opponent') value = bucket.filter_team
-    }
-    if (value !== null && value !== undefined && value !== '') p[k] = value
+  for (const k of identityKeys) {
+    const v = filters[k]
+    if (v) p[k] = String(v)
   }
   return p
 }
 
-/** Same-URL check. When two letters resolve to the same params (e.g. (e)
- *  == (t) when season range is empty), the component hides one to avoid
- *  visual duplication. */
-export function sameParams(a: Record<string, string>, b: Record<string, string>): boolean {
-  const ak = Object.keys(a).sort()
-  const bk = Object.keys(b).sort()
-  if (ak.length !== bk.length) return false
-  for (const k of ak) if (a[k] !== b[k]) return false
-  return true
-}
-
-// ─── Tooltip text ──────────────────────────────────────────────────────
+// ─── Phrase-based subscript API ────────────────────────────────────────
 
 /** Human-readable season tag: "2024" if from==to, "2023–2024" if both
  *  set and different, "2023+" if only from, "≤2024" if only to. */
@@ -252,35 +159,194 @@ export function seasonTag(
   return ''
 }
 
-/** Tooltip text per tier. Pulls tournament / season / venue / rivalry
- *  from the bucket so the reader can tell at a glance what scope each
- *  letter will land them in. */
-export function tierTooltip(
+export interface PhraseTier {
+  /** Phrase text, e.g. "at T20 World Cup" or "vs Australia" or "at IPL, 2024 vs CSK". */
+  label: string
+  /** URL params for the destination page (player= / team= is added by the caller). */
+  params: Record<string, string>
+  /** Full tooltip for hover. */
+  tooltip: string
+}
+
+/** Generate scope phrases for a link rendered at a given scope.
+ *
+ * Two call-site flavours, driven by `keepRivalry`:
+ *
+ *   - `keepRivalry: false` (TeamLink default) — destination is a single-
+ *     team page, so the rivalry pair ALWAYS drops from the URL and the
+ *     subscript never says "vs X". Up to 2 tiers: container broad +
+ *     container narrow-with-season.
+ *
+ *   - `keepRivalry: true` (PlayerLink) — a player's "vs Opp" axis is
+ *     meaningful. Up to 3 tiers when rivalry + tournament + season are
+ *     all set: rivalry-only / container+rivalry broad / container+rivalry+season.
+ *     Tournament is kept as a container even when the rivalry pair is
+ *     present (the rivalry-specific-bilateral-series concern doesn't
+ *     apply to a player's own stats — see Series audit, 2026-04-20).
+ *
+ * Container resolution for TeamLink:
+ *   series_type=icc/club + tournament → "at <T>" (tournament kept in URL)
+ *   series_type=icc/club + no tournament → "at ICC events" / "in club tournaments"
+ *   series_type=bilateral → "in bilaterals" (tournament dropped — bilateral
+ *     tournaments are rivalry-specific and don't carry a single-team scope)
+ *   series_type unset/all + tournament + no rivalry → "at <T>"
+ *   series_type unset/all + rivalry pair set → no container (the tournament,
+ *     if any, is likely a rivalry-specific bilateral series)
+ *
+ * `swapForTeam` is used by TeamLink: when the linked team IS the bucket's
+ *   `filter_opponent`, the (rivalry-mode, unused for TeamLink today) swap
+ *   orients filter_team to the linked team. PlayerLink doesn't need it —
+ *   `rowSubscriptSource` pre-orients the bucket per row.
+ *
+ * Identity keys (gender, team_type) + filter_venue ride through silently
+ * on every tier URL. */
+export function resolveScopePhrases(
   bucket: SubscriptBucket,
-  tier: SubscriptTier,
-  swapForTeam?: string,
-): string {
+  options: {
+    swapForTeam?: string
+    seriesType?: string | null
+    /** Preserve rivalry pair in URL + emit "vs <Opp>" phrase (PlayerLink). */
+    keepRivalry?: boolean
+  } = {},
+): PhraseTier[] {
+  const seriesType = options.seriesType
+  const keepRivalry = options.keepRivalry ?? false
+  const hasTournament = !!bucket.tournament
+  const hasRivalryPair = !!(bucket.filter_team && bucket.filter_opponent)
   const season = seasonTag(bucket.season_from, bucket.season_to)
+  const hasSeason = !!season
+  const shouldKeepRivalry = keepRivalry && hasRivalryPair
+
+  // ── Container (tournament/series-type-based) ─────────────────────────
+  let containerLabel: string | null = null
+  let keepTournamentInUrl = false
+  let keepSeriesTypeInUrl = false
+
+  if (seriesType === 'icc' || seriesType === 'club') {
+    if (hasTournament) {
+      containerLabel = `at ${bucket.tournament}`
+      keepTournamentInUrl = true
+    } else {
+      containerLabel = seriesType === 'icc' ? 'at ICC events' : 'in club tournaments'
+      keepSeriesTypeInUrl = true
+    }
+  } else if (seriesType === 'bilateral') {
+    containerLabel = 'in bilaterals'
+    keepSeriesTypeInUrl = true
+  } else if (hasTournament && (shouldKeepRivalry || !hasRivalryPair)) {
+    // TeamLink drops the tournament when rivalry is set (bilateral-series
+    // concern). PlayerLink keeps it — "Kohli at IPL vs CSK" is meaningful.
+    containerLabel = `at ${bucket.tournament}`
+    keepTournamentInUrl = true
+  }
+
+  // ── Rivalry phrase ───────────────────────────────────────────────────
+  const swap = !!(
+    options.swapForTeam
+    && bucket.filter_team
+    && bucket.filter_opponent
+    && options.swapForTeam === bucket.filter_opponent
+  )
+  let rivalryLabel: string | null = null
+  if (shouldKeepRivalry) {
+    const opp = swap ? bucket.filter_team : bucket.filter_opponent
+    rivalryLabel = `vs ${opp}`
+  }
+
+  if (!containerLabel && !rivalryLabel && !hasSeason) return []
+
+  // ── URL param builder ────────────────────────────────────────────────
+  const buildParams = (spec: {
+    withSeason: boolean; withContainer: boolean; withRivalry: boolean
+  }): Record<string, string> => {
+    const p: Record<string, string> = {}
+    for (const k of FILTER_KEYS) {
+      if (!spec.withSeason && (k === 'season_from' || k === 'season_to')) continue
+      if (!spec.withRivalry && (k === 'filter_team' || k === 'filter_opponent')) continue
+      if (k === 'tournament' && (!spec.withContainer || !keepTournamentInUrl)) continue
+      let value: string | null | undefined = bucket[k]
+      if (spec.withRivalry && swap) {
+        if (k === 'filter_team') value = bucket.filter_opponent
+        else if (k === 'filter_opponent') value = bucket.filter_team
+      }
+      if (value) p[k] = String(value)
+    }
+    if (spec.withContainer && keepSeriesTypeInUrl && seriesType) p['series_type'] = seriesType
+    return p
+  }
+
+  // ── Label composer ───────────────────────────────────────────────────
+  const joinLabel = (
+    container: string | null,
+    rivalry: string | null,
+    seasonPart: string | null,
+  ): string => {
+    let base = ''
+    if (container) base = seasonPart ? `${container}, ${seasonPart}` : container
+    else if (seasonPart) base = `in ${seasonPart}`
+    return rivalry ? (base ? `${base} ${rivalry}` : rivalry) : base
+  }
+
   const atVenue = bucket.filter_venue ? ` at ${bucket.filter_venue}` : ''
-  if (tier === 'e') {
-    const t = bucket.tournament || 'tournament'
-    return season ? `${t} (${season})${atVenue} stats` : `${t}${atVenue} stats`
+  const tiers: PhraseTier[] = []
+
+  // Order: NARROWEST FIRST, then widening. The phrase immediately after
+  // a stat (e.g. PlayerLink with trailingContent="· 197 runs") must match
+  // the stat's scope, otherwise readers mis-attribute the number. After
+  // that anchor, subsequent phrases offer step-up broader alternatives.
+  //
+  // Tier A — narrow: container + rivalry + season
+  // Tier B — mid:    container + rivalry (drop season)
+  // Tier C — broad:  rivalry alone (drop container + season)
+  //
+  // TeamLink (keepRivalry: false) collapses to A and B only (no rivalry
+  // phrase). Empty axes are skipped, so a rivalry-only page (no
+  // container, no season) produces the single rivalry-only phrase via
+  // the fallback at the end.
+
+  // Tier A — narrowest (season + whatever else is set).
+  if (hasSeason) {
+    const label = joinLabel(containerLabel, rivalryLabel, season)
+    tiers.push({
+      label,
+      params: buildParams({
+        withSeason: true, withContainer: true, withRivalry: !!rivalryLabel,
+      }),
+      tooltip: `${label}${atVenue}`,
+    })
   }
-  if (tier === 't') {
-    return `${bucket.tournament || 'tournament'}${atVenue} stats (all editions)`
+
+  // Tier B — container broad (+ rivalry if kept).
+  if (containerLabel) {
+    const label = joinLabel(containerLabel, rivalryLabel, null)
+    tiers.push({
+      label,
+      params: buildParams({
+        withSeason: false, withContainer: true, withRivalry: !!rivalryLabel,
+      }),
+      tooltip: `${label}, all editions${atVenue}`,
+    })
   }
-  // s / b
-  let team1 = bucket.filter_team
-  let team2 = bucket.filter_opponent
-  if (swapForTeam && team1 && team2 && swapForTeam === team2) {
-    ;[team1, team2] = [team2, team1]
+
+  // Tier C — rivalry alone (drop container + season). Only emitted when
+  // there's a narrower tier above it — otherwise the rivalry-only label
+  // IS the single tier, added by the fallback below.
+  if (rivalryLabel && (containerLabel || hasSeason)) {
+    tiers.push({
+      label: rivalryLabel,
+      params: buildParams({ withSeason: false, withContainer: false, withRivalry: true }),
+      tooltip: `${rivalryLabel}, all-time${atVenue}`,
+    })
   }
-  const pair = team1 && team2 ? `${team1} vs ${team2}` : 'rivalry'
-  if (tier === 's') {
-    const t = bucket.tournament
-    return season
-      ? `${pair}, ${t || 'this series'} (${season})${atVenue} stats`
-      : t ? `${pair}, ${t}${atVenue} stats` : `${pair}${atVenue} stats`
+
+  // Fallback: rivalry alone with nothing to narrow against.
+  if (tiers.length === 0 && rivalryLabel) {
+    tiers.push({
+      label: rivalryLabel,
+      params: buildParams({ withSeason: false, withContainer: false, withRivalry: true }),
+      tooltip: `${rivalryLabel}, all-time${atVenue}`,
+    })
   }
-  return `${pair}${atVenue} stats (all-time)`
+
+  return tiers
 }

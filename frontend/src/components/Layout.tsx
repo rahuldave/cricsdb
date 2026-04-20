@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import FilterBar from './FilterBar'
+import ScopeStatusStrip from './ScopeStatusStrip'
 
 interface NavChild { to: string; label: string }
 interface NavItem {
@@ -177,6 +178,7 @@ export default function Layout() {
         )}
       </nav>
       {showFilters && <FilterBar />}
+      {showFilters && <ScopeStatusStrip />}
       <main className="max-w-7xl mx-auto px-4 py-6">
         <Outlet />
       </main>
