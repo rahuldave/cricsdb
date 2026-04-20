@@ -124,10 +124,6 @@ export default function ScopeStatusStrip() {
     filters, seriesType, pathTeam, pathVenue, pathPlayer, pathCompare, tab, page,
   )
 
-  // Nothing to show → don't render. Keeps the UI quiet on "all-time, all
-  // teams" pages that have nothing narrowed.
-  if (segments.length === 0) return null
-
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href)
@@ -138,25 +134,36 @@ export default function ScopeStatusStrip() {
     }
   }
 
+  // Outer wrapper carries the tinted bg + bottom rule so the strip spans
+  // the full viewport width. Inner element keeps the 80rem content
+  // constraint aligned with the rest of the page. Always rendered when
+  // FilterBar is visible — even on an unfiltered page, the copy-link
+  // button stays accessible and the empty-state reads "Scope: all-time".
   return (
-    <div className="wisden-scope-strip">
-      <span className="wisden-scope-strip-label">Showing:</span>
-      {segments.map((s, i) => (
-        <span key={`${s.label}-${i}`} className="wisden-scope-strip-seg">
-          {i > 0 && <span className="wisden-scope-strip-sep"> · </span>}
-          <span className="wisden-scope-strip-segLabel">{s.label}:</span>
-          {' '}
-          <span className="wisden-scope-strip-segValue">{s.value}</span>
-        </span>
-      ))}
-      <button
-        type="button"
-        className="wisden-scope-strip-copy"
-        onClick={handleCopy}
-        title="Copy shareable link to clipboard"
-      >
-        {copied ? 'copied ✓' : 'copy link'}
-      </button>
+    <div className="wisden-scope-strip-wrap">
+      <div className="wisden-scope-strip">
+        <span className="wisden-scope-strip-label">Showing:</span>
+        {segments.length === 0 ? (
+          <span className="wisden-scope-strip-seg">
+            <span className="wisden-scope-strip-segValue">all-time</span>
+          </span>
+        ) : segments.map((s, i) => (
+          <span key={`${s.label}-${i}`} className="wisden-scope-strip-seg">
+            {i > 0 && <span className="wisden-scope-strip-sep"> · </span>}
+            <span className="wisden-scope-strip-segLabel">{s.label}:</span>
+            {' '}
+            <span className="wisden-scope-strip-segValue">{s.value}</span>
+          </span>
+        ))}
+        <button
+          type="button"
+          className="wisden-scope-strip-copy"
+          onClick={handleCopy}
+          title="Copy shareable link to clipboard"
+        >
+          {copied ? 'copied ✓' : 'copy link'}
+        </button>
+      </div>
     </div>
   )
 }

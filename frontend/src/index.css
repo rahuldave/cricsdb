@@ -1641,6 +1641,14 @@ a { color: inherit; }
    `--bg-soft` tint visually separates the nav + filter chrome above
    from the page content below, so a dense dossier doesn't read as
    one uninterrupted wall. */
+/* Full-viewport-width wrapper carries the tinted background + bottom
+   rule so the strip visually sits flush with the FilterBar above. The
+   inner .wisden-scope-strip matches the content width of the rest of
+   the app (80rem). */
+.wisden-scope-strip-wrap {
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--rule-soft);
+}
 .wisden-scope-strip {
   max-width: 80rem;
   margin: 0 auto;
@@ -1652,8 +1660,6 @@ a { color: inherit; }
   align-items: baseline;
   flex-wrap: wrap;
   gap: 0 0.15rem;
-  background: var(--bg-soft);
-  border-bottom: 1px solid var(--rule-soft);
 }
 .wisden-scope-strip-label {
   font-variant: all-small-caps;
