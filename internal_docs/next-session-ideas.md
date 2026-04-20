@@ -1,8 +1,141 @@
 # Next-session ideas — Tournaments, team-to-team, H2H scope
 
-Capture of open design questions before the session closes. Pick up
-next time. Dates and paths here reflect repo state at
-commit b7634f1 (2026-04-14).
+> **NO DEPLOYS** until the Series + Teams + cross-tab audit (items 1–3
+> below) completes. Per session memory, last reaffirmed 2026-04-19.
+
+## NEXT SESSION agenda (in order)
+
+Lifted from CLAUDE.md on 2026-04-19 when CLAUDE.md was trimmed to keep
+only always-on instructions. Detail for items 1–3 lives in the Series +
+Teams deep-dive plan immediately below; items 4–6 are placeholders
+that expand when picked up.
+
+1. **Series tab deep dive — cell migrations.** TournamentDossier still
+   has 15+ `teamLinkHref` call sites (Knockouts, Participating teams
+   chips, Champions by season, Matches tab, Records `teamCell`,
+   Editions champion/runner-up, by-team tile headers, `renderVsTeams`
+   helpers). Convert each to `<TeamLink>` (`compact` for tile headers
+   where the tile already expresses scope; `inline` for tables where
+   each cell is a pivot). Also raw `/batting?player=` /
+   `/bowling?player=` links in Editions / Records / Partnerships →
+   `<PlayerLink>`. Same pattern for IPL + T20 WC dossiers. Walk:
+   India-vs-Australia (rivalry), IPL (club tournament), T20 World Cup
+   (Men) (ICC tournament) — three reference scenarios. See detail in
+   the next section.
+2. **Teams tab deep dive.** Apply the conventions to `/teams?team=X`
+   page: every team-mention should be a `<TeamLink>` (probably compact
+   for the H2 since the H2 is the team identity); every player-mention
+   a `<PlayerLink>`. Verify deep-links from Series carry through
+   (`?team=X&series_type=bilateral` etc.) and the page shows the right
+   counts. See detail in the next section.
+3. **Cross-tab name-link invariant audit.** Across every tab, the bare
+   name link must go to the entity's overall page (identity only —
+   gender + team_type for teams, gender for players). Current state:
+   probably violated in many places (raw inline `<Link>` calls with
+   extra scope params). Hunt them down one tab at a time. See detail
+   in the next section.
+4. **Venue-cell sweep** (deferred from 2026-04-18) — Series Knockouts +
+   Matches venue cells, HeadToHead by-match venue, anywhere else venue
+   text is plain. Link to `/venues?venue={venue}` (dossier) or
+   `?filter_venue={venue}` where contextual.
+5. **Scorecard linkability API batch** (deferred from 2026-04-18) —
+   `/api/v1/matches/{match_id}` response shapes for `player_of_match`,
+   dismissal text, did-not-bat, fall-of-wickets to return `PersonRef`s;
+   frontend wraps each in a compact `PlayerLink`. See
+   `internal_docs/design-decisions.md`.
+6. **filterDeps refactor (Option B)** — partially done.
+   `useFilterDeps()` returns `FILTER_KEYS.map(k => filters[k])`,
+   stable-memoized. Pages can gradually adopt it to replace their
+   hand-rolled arrays.
+
+## Series + Teams deep-dive plan (2026-04-19, what to do first next session)
+
+Now that `TeamLink` (phrase model) and the `FilterBarParams` /
+`AuxParams` split are in, the next session walks the Series and Teams
+tabs cell-by-cell to apply the conventions consistently.
+
+### Three reference scenarios
+
+The same three URLs should be revisited on every change. They cover
+the three container modes the design distinguishes:
+
+1. **Bilateral rivalry**: India vs Australia (or Aus vs India — same
+   page). URLs to test:
+   - `/series?filter_team=Australia&filter_opponent=India&series_type=all&gender=male&team_type=international` (no narrowing — no subscripts)
+   - `/series?...&series_type=bilateral` (1 subscript "in bilaterals" per team)
+   - `/series?...&series_type=bilateral&season_from=2025/26&season_to=2025/26` (auto-pins tournament; should still show "in bilaterals" + "in bilaterals, 2025/26", NOT "at India tour of Australia")
+   - `/series?...&series_type=icc&tournament=T20+World+Cup+(Men)&season_from=2024&season_to=2024` (2 subscripts "at T20 World Cup (Men)" + "at T20 World Cup (Men), 2024")
+
+2. **Club tournament — IPL**:
+   - `/series?tournament=Indian+Premier+League&gender=male&team_type=club` (tournament dossier; H2 "Indian Premier League" — no team links in H2; team cells in tables get "at IPL")
+   - `/series?...&season_from=2024&season_to=2024` (IPL 2024 — table team cells should subscript "at IPL" + "at IPL, 2024")
+
+3. **ICC tournament — T20 World Cup**:
+   - `/series?tournament=T20+World+Cup+(Men)&gender=male&team_type=international` (T20 WC dossier; team cells get "at T20 WC")
+   - `/series?...&season_from=2024&season_to=2024` (T20 WC 2024 — "at T20 WC" + "at T20 WC, 2024")
+
+### Series tab cell migrations (queued)
+
+In `frontend/src/components/tournaments/TournamentDossier.tsx`:
+
+- ~15 call sites use the local `teamLinkHref` helper instead of
+  `<TeamLink>`: H2 (already migrated, compact mode), by-team tile
+  headers, Knockouts table (team1/team2/winner), Participating-teams
+  chip grid, Champions-by-season, Matches tab (team1/team2/winner),
+  Records `teamCell` (highest totals / lowest all-out / biggest wins),
+  Editions champion/runner-up. Convert each to `<TeamLink>` with
+  appropriate layout: `inline` for table cells; `compact` for tile
+  headers where the tile body already expresses the page scope.
+- Raw `/batting?player=X` and `/bowling?player=X` `<Link>`s in
+  Editions (top scorer / top wicket-taker), Records (best bowling
+  figures), Partnerships (`renderBatter` helper) → convert to
+  `<PlayerLink>` so they get the existing letter-subscript treatment.
+- The local `teamLinkHref` helper itself can be retired once all call
+  sites are converted.
+
+### Teams tab walk
+
+`/teams?team=X` is a major destination from Series scope-link clicks.
+Verify:
+- The H2 of a Teams page should use a `<TeamLink compact>` (the H2 is
+  the team identity; subscripts redundant).
+- Every team-mention in a child cell (Match List opponent, vs
+  Opponent, Compare columns) should be a `<TeamLink>` with
+  appropriate layout.
+- Every player-mention should be a `<PlayerLink>`.
+- Deep-link arrival from Series with `series_type=bilateral` must
+  show the right narrowed counts (verified end-to-end by
+  `tests/integration/cross_cutting_aux_filters.sh`; extend the script
+  with more URL pairs if more pages need coverage).
+
+### Cross-tab name-link invariant
+
+Every bare-name link must go to the entity's overall page (identity
+only — gender + team_type for teams, gender for players). Hunt down
+inline `<Link>` calls with extra scope params and convert them.
+
+### Suspected follow-ups discovered along the way
+
+- The frontend's `useFilters` reads `series_type` as a special-case
+  outside `FILTER_KEYS`. Once a second aux filter exists (e.g.
+  `result_filter`), generalise into an `AUX_KEYS` registry so the
+  hook iterates uniformly.
+- Tournament metadata exposure — backend `/api/v1/tournaments`
+  doesn't currently return `series_type` per tournament. If
+  `TeamLink`'s container resolution starts hitting the
+  "all/unset + tournament-set" ambiguity often enough, add the field
+  so the frontend doesn't rely on the `series_type` filter being set.
+
+---
+
+## Original notes (2026-04-14) — Tournaments + H2H rollup design
+
+Capture of open design questions from the older session. Most of the
+tournaments/series rollup is now shipped via the Series-tab dossier.
+H2H team-vs-team mode is shipped. The team-pair scope discussion
+below is still relevant for thinking about future deep-dives.
+
+Dates and paths here reflect repo state at commit b7634f1 (2026-04-14).
 
 ## The core insight
 

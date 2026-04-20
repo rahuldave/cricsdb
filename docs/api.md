@@ -41,7 +41,8 @@ prod. Responses have been truncated to show shape, not full payloads.
 ## Common filter query params
 
 Applied across almost every endpoint below (enforced via
-`api/filters.py::FilterParams`). When omitted → no constraint on
+`api/filters.py::FilterBarParams` — formerly `FilterParams`, alias
+preserved for incremental migration). When omitted → no constraint on
 that axis.
 
 | Param | Type | What it filters | Example |
@@ -52,6 +53,27 @@ that axis.
 | `season_from` | string | `match.season >= ...` | `season_from=2024` |
 | `season_to` | string | `match.season <= ...` | `season_to=2024/25` |
 | `filter_venue` | string | `match.venue = ...` (exact canonical) | `filter_venue=Wankhede%20Stadium%2C%20Mumbai` |
+
+### Aux filters (page-local narrowings)
+
+A separate `AuxParams` class (`api/filters.py`) holds page-local
+filters that aren't driven by the FilterBar UI. Currently one entry:
+
+| Param | Type | What it filters | Example |
+|---|---|---|---|
+| `series_type` | `all`/`bilateral`/`icc`/`club` (default `all`) | Categorises the match — `bilateral` = international non-ICC; `icc` = ICC events (T20 WC etc.); `club` = `team_type=club` | `series_type=bilateral` |
+
+Aux filters are accepted by **every endpoint** that takes
+`FilterBarParams`. Routers declare both as FastAPI `Depends()` and
+pass the aux through `filters.build(aux=aux)`, which appends the
+relevant SQL clauses (e.g. `series_type_clause`) centrally so no
+router has to wire each one by hand. Practical effect: every
+`teams/...`, `batters/...`, `bowlers/...`, `fielders/...`, `matches`,
+`venues/...` endpoint now narrows correctly under `?series_type=icc`
+etc. (Pre-2026-04-19 they silently ignored it.)
+
+Legacy `bilateral_only` / `tournament_only` values map to `bilateral`
+/ `icc` for URL-bookmark compat.
 
 The `tournament` filter is canonicalization-aware everywhere. Pass
 `T20 World Cup (Men)` and FilterParams expands it to
@@ -1093,18 +1115,42 @@ curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_oppon
   "canonical": null, "variants": [],
   "matches": 37, "editions": 13,
   "run_rate": 8.68, "boundary_pct": 17.69, "dot_pct": 34.8,
-  "total_runs": "…", "total_wickets": "…", "total_sixes": 449,
+  "total_runs": "…", "total_wickets": "…",
+  "total_fours": 934, "total_sixes": 449,
   "most_titles": null,
   "champions_by_season": [],
-  "top_scorer_alltime":   { "person_id": "ba607b88", "name": "V Kohli",  "runs": 794 },
-  "top_wicket_taker_alltime": { "person_id": "462411b3", "name": "JJ Bumrah", "wickets": 20 },
-  "highest_team_total":   { "team": "India", "total": 235, "match_id": 1347,
-                            "opponent": "Australia", "date": "2023-11-26" },
-  "largest_partnership":  { "runs": 141, "match_id": 1348 },
-  "best_bowling": "…",
+  "top_scorer_alltime":     { "person_id": "ba607b88", "name": "V Kohli",
+                              "team": "India", "runs": 794 },
+  "top_wicket_taker_alltime": { "person_id": "462411b3", "name": "JJ Bumrah",
+                              "team": "India", "wickets": 20 },
+  "highest_individual":     { "person_id": "55d96c71", "name": "SR Watson",
+                              "team": "Australia", "runs": 120,
+                              "match_id": 1092, "date": "2016-03-27" },
+  "highest_team_total":     { "team": "India", "total": 235, "match_id": 1347,
+                              "opponent": "Australia", "date": "2023-11-26" },
+  "largest_partnership":    { "runs": 141, "match_id": 1348,
+                              "team": "India", "opponent": "Australia",
+                              "date": "2023-11-28",
+                              "batter1": { "person_id": "45a43fe2", "name": "RD Gaikwad" },
+                              "batter2": { "person_id": "8bfbd3a3", "name": "Tilak Varma" } },
+  "best_bowling":           { "person_id": "ecd3e89b", "name": "R Ashwin",
+                              "team": "India", "figures": "4/11",
+                              "wickets": 4, "runs": 11,
+                              "match_id": "…", "date": "…" },
+  "best_fielding":          { "person_id": "…", "name": "MS Dhoni",
+                              "team": "India",
+                              "catches": 5, "stumpings": 0,
+                              "run_outs": 0, "caught_bowled": 0,
+                              "total": 5, "match_id": "…", "date": "…" },
   "teams":  [ { "name": "India", "matches": 37 }, { "name": "Australia", "matches": 37 } ],
   "groups": [],
-  "knockouts": [ "…matches with event_stage in (Final, Semi Final, …)" ],
+  "knockouts": [
+    { "match_id": 2794, "season": "2007/08", "stage": "Semi Final",
+      "tournament": "ICC World Twenty20",
+      "team1": "Australia", "team2": "India",
+      "winner": "India", "margin": "15 runs",
+      "venue": "Kingsmead", "date": "2007-09-22" }
+  ],
   "by_team": {
     "India": {
       "top_scorer":      { "person_id": "ba607b88", "name": "V Kohli", "runs": 794 },

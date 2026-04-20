@@ -228,3 +228,41 @@ setTyping(null)   // release input back to URL truth
 
 If you find yourself writing a sync-`useEffect` to copy URL state
 into a `useState`, you're re-creating the bug. The fix is to derive.
+
+## Aux filters: `series_type` and how it flows
+
+Most URL params are FilterBar fields — driven by the FilterBar UI,
+listed in `FILTER_KEYS` (`components/scopeLinks.ts`), iterated by
+`useFilters()` to populate the canonical filters object every page
+consumes.
+
+`series_type` is the lone exception (so far): it's a **page-local aux
+filter**, set by the Series-tab pill but applied by every endpoint
+that uses `FilterBarParams.build(aux=aux)`. It rides on URLs the way
+any other filter does, but:
+
+- It's NOT in `FILTER_KEYS`. Adding it would mean it rides through
+  scope-link letter URLs for PlayerLink (which would change the
+  `(e, t, s, b)` semantics) and through `useFilterDeps`. Neither is
+  what we want — series_type is its own axis.
+- It IS surfaced by `useFilters()` as a special case — the hook reads
+  `params.get('series_type')` outside the `FILTER_KEYS` loop and adds
+  it to the returned `FilterParams` object (typed with an optional
+  `series_type?: string` field in `types.ts`). This is so consumers
+  like `Teams.tsx`, `Batting.tsx`, etc. don't have to remember to
+  read it themselves before calling `getTeamSummary(team, filters)`.
+- `TeamLink` reads it directly via `useSearchParams` (alongside
+  `useFilters`) because its container resolution logic is keyed on
+  `series_type` (icc/club → keep tournament in URL; bilateral →
+  drop). See `internal_docs/design-decisions.md` "TeamLink phrase
+  model + container resolution from Series tab".
+- The backend mirrors the split: `FilterBarParams` (8 fields) +
+  `AuxParams` (currently `series_type`). Routers take both as
+  `Depends()` and pass `aux` to `filters.build()` so the SQL gets the
+  `series_type_clause` automatically. See same doc: "FilterBarParams +
+  AuxParams: filter classification".
+
+Future page-local filters (result_filter, close_match, toss_decision
+from the roadmap) follow the same pattern: add to `AuxParams`,
+add to `useFilters` as a special-case read (or generalise into an
+`AUX_KEYS` registry once we have ≥2). Don't add to `FILTER_KEYS`.

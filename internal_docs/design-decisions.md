@@ -676,44 +676,344 @@ Teams sidesteps that. The primary's presence drives FilterBar's auto-narrow (`Fi
 
 The Compare identity line still reads from `profile.summary.matches` — same value conceptually now, but it's the match-level count (team_summary's `COUNT(*)` over filtered matches) vs the fielding endpoint's innings-derived `COUNT(DISTINCT m.id)`. The two can diverge by a handful of abandoned / no-result matches where a team never fielded; `summary.matches` is the canonical headline number.
 
-## Team-name link scope ambiguity — disambiguate via a `TeamLink` component (revisit)
+## TeamLink / PlayerLink phrase model + container resolution from Series tab
 
-As of 2026-04-18 the scope attached to a team-name hyperlink varies by the
-page that emits it:
+**Shipped 2026-04-19 (TeamLink). PlayerLink unified onto same model
+2026-04-20.** Both components now share `scopeLinks.ts::resolveScopePhrases`.
+Only two things differ at the call site:
 
-- **Teams landing / team tiles / FlagBadge linkTo:** `/teams?team=X&gender=&team_type=`.
-  Pure overall view.
-- **Matches list row, Scorecard header, Series dossier team cells:**
-  `/teams?team=X&tournament=Y&gender=&team_type=`. Tournament-scoped.
-- **Stray `<Link>`s without a helper:** sometimes just `?team=X`.
+- `nameParams(filters, ['gender'])` for players vs
+  `nameParams(filters, ['gender', 'team_type'])` for teams (identity attrs).
+- `keepRivalry: true` for PlayerLink, `false` for TeamLink.
 
-Clicking "India" therefore means three different things depending on where
-you click. For tournament events (e.g. T20 World Cup (Men)) the
-tournament-scoped link lands on "India across all editions" because
-`tournament` is the canonical event name — editions are keyed via
-`season_from` / `season_to`. For bilateral series, `tournament` is a
-transient series name ("Pakistan tour of New Zealand 2026"), and clicking
-a team link from a bilateral match lands on a scoped view that may show
-just the 1-3 matches of that tour. Feels broken.
+### Two call-site flavours
 
-The cleanest fix is a `TeamLink` component parallel to `PlayerLink`, with
-the same two-link name + context pattern:
+`TeamLink` renders **named-phrase** subscripts without rivalry. Rivalry is
+page identity on a rivalry dossier (the H2 already says "Australia v
+India"); a "vs India" subscript under "Australia" would be pure
+repetition. Instead, team subscripts express **further narrowing** beyond
+the page identity in human-readable phrases — `at T20 World Cup (Men), 2024`,
+`in bilaterals`, `in 2025/26`. Each subscript click leads to **that team's
+own page** scoped accordingly; the rivalry pair is always dropped from the
+URL.
 
-- Name link → `/teams?team=X&gender=&team_type=` (overall, always).
-- Context link (optional, faint italic suffix) → `/teams?team=X&...filter params`.
-  Context suffix should read "in {tournament} {season}" for
-  tournament-scoped views and "in {bilateral-series-name} {season}" for
-  bilaterals — the bilateral + season tuple disambiguates the specific
-  tour the same way tournament + season disambiguates a tournament
-  edition.
-- Dense contexts (scorecard h2) use a compact mode that skips the
-  context suffix; the tournament link in the meta line already carries
-  that affordance.
+`PlayerLink` renders the same phrases but DOES carry the rivalry phrase
+("vs Australia" / "vs India") because a player's rivalry-axis scope is
+meaningful — "Kohli vs Australia" is a legitimate leaderboard scope
+distinct from "Kohli overall" and "Kohli at IPL". For rivalry-mode
+leaderboards, `TournamentDossier.rowSubscriptSource` pre-orients the
+subscript bucket per row so the "vs Opp" phrase faces the row's own team.
+Up to three tiers when rivalry + tournament + season are all set,
+rendered **narrow → broad** (Tier A first, Tier C last):
 
-The `PlayerLink` pattern can't be reused verbatim because it's hard-coded
-to discipline routes. A dedicated `TeamLink` keeps the two-link rule
-consistent site-wide and eliminates the current ambiguity. Not done in
-this session — flagged for the next one.
+- Tier A (narrowest): `at ICC Men's T20 World Cup, 2024 vs Australia`
+- Tier B (mid): `at ICC Men's T20 World Cup vs Australia`
+- Tier C (broad): `vs Australia` (drops container + season)
+
+**Ordering note**: the first tier must match the scope of any
+stat-intrinsic number rendered adjacent to it. Overview tiles render
+`V Kohli · 197 runs <first phrase>` — if the first phrase were
+"vs Australia" (all-time) when the stat is actually "vs Australia in
+T20 WCs" (197 is the tournament-scoped number, not the 484 all-time
+number), readers mis-attribute the stat. Reversing to narrow-first fixes
+this and is also the more natural reading ("here's the specific cut,
+and here are broader alternatives to click").
+
+The old (e, t, s, b) letter model on PlayerLink is retired.
+`TIER_SPECS` / `activeTiers` / `tierParams` / `tierTooltip` / `sameParams`
+removed from `scopeLinks.ts`.
+
+### Container resolution
+
+`TeamLink` figures out the "container" — the tournament-level scope
+that the team link should carry — from the URL's `series_type` aux
+filter. Logic lives in `components/scopeLinks.ts::resolveScopePhrases`:
+
+| `series_type` | tournament filter? | container | URL keeps |
+|---|---|---|---|
+| `icc` | yes | `at <tournament>` | tournament (multi-team, kept) |
+| `icc` | no | `at ICC events` | series_type=icc |
+| `club` | yes | `at <tournament>` | tournament (multi-team, kept) |
+| `club` | no | `in club tournaments` | series_type=club |
+| `bilateral` | (any — usually a rivalry-specific name like "India tour of Australia") | `in bilaterals` | series_type=bilateral; tournament dropped |
+| unset/`all`, rivalry pair set | (often an auto-narrowed bilateral) | none | nothing aux; only season can carry |
+| unset/`all`, no rivalry | yes | `at <tournament>` | tournament (it's a tournament dossier — multi-team by virtue of no rivalry) |
+
+The principle: a tournament filter can either be a **multi-team event
+with independent meaning per team** (T20 WC, IPL — keep it) or a
+**rivalry-specific bilateral series** (India tour of Australia — drop
+it because "Australia at India tour of Australia" is just the page
+view). `series_type=bilateral` is the explicit signal for the latter.
+When `series_type` is `all`/unset and a rivalry pair is set, the
+tournament is most likely a bilateral (because the FilterBar
+auto-narrowed it) — drop without replacement.
+
+### Edition tier (when season set)
+
+A second subscript chains the container with season:
+
+- `at T20 World Cup (Men)` + season → `at T20 World Cup (Men), 2024`
+- `in bilaterals` + season → `in bilaterals, 2025/26`
+- no container + season → `in 2025/26` (just season)
+
+Both phrases collapse to one when their URLs would be identical
+(`sameParams` check).
+
+### Layout: inline vs block
+
+- `inline` (default, used in tables and cells): name + comma-separated
+  italic phrases after — `Australia, in bilaterals, in bilaterals 2025/26`.
+- `block` (used for H2 page titles): name with phrases stacked beneath
+  in small-caps. `.team-link-block` wrapper is `display: inline-block`
+  so the H2 stays single-line ("Australia v India") while the
+  `display: block` phrase children stack vertically under each name.
+
+### Compact mode
+
+`<TeamLink compact />` renders only the name link, no subscripts. Used
+on the rivalry H2 where the H2 itself expresses the scope and
+subscripts would be redundant repetition (the rivalry IS the page).
+Also appropriate for tile headers when the tile body already covers
+the scope.
+
+### Worked examples (Series tab)
+
+These are the four scenarios that drove the design:
+
+```
+1. /series?filter_team=Aus&filter_opponent=Ind&series_type=all
+   H2: "Australia v India men's"
+   No subscripts (no further narrowing beyond rivalry identity).
+
+2. /series?filter_team=Aus&filter_opponent=Ind&series_type=icc
+              &tournament=T20+World+Cup+(Men)
+   H2: "Australia v India men's · T20 World Cup (Men)"
+   Below Aus: AT T20 WORLD CUP (MEN)
+   Below Ind: AT T20 WORLD CUP (MEN)
+   Click → that team's page, narrowed to T20 WC.
+
+3. /series?...&series_type=icc&tournament=T20+WC&season_from=2024&season_to=2024
+   Below Aus: AT T20 WORLD CUP (MEN) / AT T20 WORLD CUP (MEN), 2024
+   Below Ind: same
+   Two subscripts; click → that team at T20 WC (all editions) or T20 WC 2024.
+
+4. /series?filter_team=Aus&filter_opponent=Ind&series_type=bilateral
+              &season_from=2025/26&season_to=2025/26
+              &tournament=India+tour+of+Australia (auto-narrowed)
+   H2: "Australia v India men's · India tour of Australia"
+   Below Aus: IN BILATERALS / IN BILATERALS, 2025/26
+   Below Ind: same
+   The "India tour of Australia" tournament is dropped from URLs;
+   destinations are "Aus's all bilaterals" and "Aus's bilaterals in 2025/26".
+
+5. /series?...&season_from=2025/26&season_to=2025/26
+              &tournament=India+tour+of+Australia (no series_type)
+   H2: "Australia v India men's · India tour of Australia"
+   Below Aus: IN 2025/26
+   Below Ind: IN 2025/26
+   No container (no series_type to disambiguate). Only season carries.
+   Destination: "Australia in 2025/26 across everything".
+```
+
+### PlayerLink unification (2026-04-20)
+
+`resolveScopePhrases` was extended with a `keepRivalry: boolean` option.
+PlayerLink now calls it with `true`, swapping its old single-letter
+subscripts `(e, t, s, b)` for the same phrase model TeamLink uses. The
+semantic asymmetry (TeamLink drops rivalry; PlayerLink keeps it) is
+preserved as a 1-bit call-site flag. Two additional changes fell out of
+the unification:
+
+1. **Container policy for PlayerLink in rivalry context**: when both a
+   rivalry pair and a tournament are set, PlayerLink keeps the tournament
+   as a container ("at IPL vs CSK"), whereas TeamLink drops it (because a
+   bilateral-series tournament like "India tour of Australia" is
+   rivalry-specific and not meaningful as a single-team scope). The
+   distinction is that a player's stats AT a tournament AGAINST an
+   opponent is a meaningful scope even for rivalry-specific tournaments.
+
+2. **Dead letter-model exports removed**: `TIER_SPECS`, `TierSpec`,
+   `SubscriptTier`, `activeTiers`, `tierParams`, `tierTooltip`,
+   `sameParams`, and the `PrimaryAxis` / `primary` option. Phrase tiers
+   have distinct URL params by construction, so the `sameParams` collapse
+   check isn't needed anymore.
+
+### Where the tournament-lookup info comes from
+
+`series_type` does the work of distinguishing multi-team tournaments
+from rivalry-specific bilaterals. The cleaner principled fix would be
+to have the backend tag each tournament with its `series_type` (icc /
+bilateral / club) and expose it via the `/api/v1/tournaments` response,
+so the frontend doesn't need a heuristic. We can add that when an edge
+case bites — for now, the `series_type` filter is sufficient signal in
+practice.
+
+## FilterBarParams + AuxParams: filter classification
+
+**Shipped 2026-04-19.** Backend `api/filters.py` separates filter
+parameters into two distinct classes.
+
+### Why the split
+
+The original `FilterParams` was a single FastAPI `Depends()` class
+with 8 fields, all driven by the FilterBar UI. When `series_type` (a
+Series-tab-local pill, NOT a FilterBar field) was added, no router
+remembered to wire it in by hand — `series_type=icc` silently dropped
+across teams, batting, bowling, fielding, keeping, venues, matches.
+Backend regression tests didn't catch this because the curl URLs in
+the inventories didn't systematically include series_type variants.
+The bug surfaced during the Series-tab audit: clicking "All" on the
+ICC-narrowed Aus-Ind dossier showed 6 matches (correct because
+tournament filter was also pinned) but `series_type=bilateral` on its
+own returned the unfiltered 224 instead of the expected 175.
+
+The structural fix is to recognise that **FilterBar fields and
+non-FilterBar narrowings are different in kind**:
+
+- **FilterBarParams** (the 8 fields): driven by the FilterBar UI,
+  participate in scope-link letter URLs (`FILTER_KEYS`), reflect
+  "what the user is currently looking at" identity-wise.
+- **AuxParams** (currently `series_type`, room for more): page-local
+  narrowings that ride through but don't appear on the FilterBar.
+  They're filters in the SQL sense (they go into the WHERE clause
+  via `series_type_clause`) but they don't drive the UI's identity
+  state.
+
+### How it works
+
+Routers that care about both take both dependencies:
+
+```python
+async def list_matches(
+    filters: FilterBarParams = Depends(),
+    aux: AuxParams = Depends(),
+    ...
+):
+    where, params = filters.build(has_innings_join=False, aux=aux)
+```
+
+`FilterBarParams.build(aux=aux)` threads aux clauses centrally — every
+caller gets the `series_type_clause` for free. No router has to
+remember to apply it. Helpers within routers (`_team_filter_clause`,
+`_batting_filter`, `_bowling_*`, `_fielding_filter`, `_keeping_filter`,
+`_strip_venue`, `_team_innings_clause`) all accept an optional `aux`
+parameter and pass it to `filters.build()`.
+
+`FilterParams` is preserved as an alias for `FilterBarParams` so
+existing call sites keep working — incremental rename when convenient.
+
+### Frontend mirror
+
+The frontend mirrors the same split conceptually but the runtime
+representation is flat (one `filters` object passed to every API
+call):
+
+- `useFilters()` (in `hooks/useFilters.ts`) iterates `FILTER_KEYS`
+  to read FilterBar fields, then **also** reads `series_type` as a
+  special case and includes it on the returned object. This way every
+  consumer (Teams.tsx, Batting.tsx, etc.) ships `series_type` to the
+  backend without each having to remember.
+- `series_type` is intentionally NOT in `FILTER_KEYS` because it's
+  not a scope-link axis and doesn't ride through letter-link URLs.
+  It's a separate URL param that gets surfaced.
+- `TeamLink` reads `series_type` directly via `useSearchParams`
+  (alongside `useFilters`) for its container resolution logic — see
+  the previous section.
+
+### Why this matters
+
+Two things are easier going forward:
+
+1. Adding a new page-local filter (e.g. `result_filter`,
+   `close_match`, `toss_decision` from the roadmap) is one edit to
+   `AuxParams` — the SQL clause helper plus that one class. Every
+   router that uses `filters.build(aux=aux)` picks it up automatically.
+2. UI-vs-aux distinction is now first-class. Future affordances like
+   "show only FilterBar-set filters in the chip row, but render aux
+   in a separate pill section" don't require grep-for-fields; they
+   iterate the right class.
+
+### Test coverage gap this exposed
+
+Backend regression tests (curl + md5-diff) cannot catch frontend
+wiring bugs. The matches-router silent-drop bug for `series_type` was
+backend, but the broader pattern (frontend's `useFilters` not passing
+the aux to API calls) was a frontend issue. We added
+`tests/integration/cross_cutting_aux_filters.sh` which asserts:
+
+- `/teams?team=Aus&series_type=bilateral` shows different match count
+  from plain (175 ≠ 224)
+- The three counts partition: plain = bilateral + icc (224 = 175 + 49)
+- Status strip surfaces the aux filter as "Show: bilateral T20Is"
+
+This is the right place for the test — backend regression covers SQL
+correctness, frontend integration covers URL → useFilters → API call →
+displayed-data. Both needed.
+
+### Aux threading in helpers (second incident, 2026-04-20)
+
+`_partnership_filter` in `api/routers/teams.py` was calling
+`filters.build(aux=aux)` but didn't declare `aux` as a parameter —
+Python let the free variable slide at import time, then 500'd at
+every request. All 5 Teams > Partnerships endpoints (by-wicket /
+best-pairs / heatmap / top / summary) were broken.
+
+**Discipline going forward:** every helper that calls `filters.build()`
+must take `aux: AuxParams | None = None` and pass it through. Every
+call site must pass `aux=aux` (or `aux=None`). Grep `filters\.build\(`
+in `api/` before shipping. The backend regression harness does not
+catch this (it only ran the matches router); the API sweep script at
+`/tmp/api_sweep.sh` (hit every `@router.get` × representative params
+including `series_type=icc` / `series_type=bilateral`) WOULD have
+caught it. Candidate to promote to a `tests/` smoke-test if we hit a
+third instance.
+
+## Tournament-dossier Overview: rich StatCards + Best moments (2026-04-20)
+
+The single-tournament Overview had four plain-text StatCards (Most
+titles / Top scorer / Top wicket-taker / Highest total) where the
+"value" was a name with no link and no scope phrase. User couldn't
+click through to "Kohli at IPL 2025" or "CSK at IPL across all
+editions". Fixed in three steps, each iterating from user feedback:
+
+1. **Linked value + narrowest phrase in subtitle** — made name a
+   PlayerLink/TeamLink compact, put scope phrase in the uppercase
+   `.wisden-stat-sub` slot. Value stays 2rem bold so it still "pops".
+
+2. **All tiers in subtitle** — user pointed out that showing only the
+   narrowest broke the scope rule. The subtitle now renders all
+   applicable tiers narrow→broad, comma-separated, same as PlayerLink
+   inline. On IPL 2024: "at IPL, 2024, at IPL" = edition + all-editions
+   destinations both one click away.
+
+3. **Orientation by player's team on rivalry scope** — backend now
+   returns `team` on `top_scorer_alltime` / `top_wicket_taker_alltime`
+   / `best_bowling`. Frontend passes a `subscriptSource` oriented to
+   the player's team so a batter playing FOR India reads "vs Australia"
+   (not "vs India"). Same pattern as the leaderboard tables'
+   `rowSubscriptSource`.
+
+Layout: three rows total.
+- **Row 1 (cols-6 on tournament dossier, cols-5 on rivalry with h2h)**:
+  Matches · Run rate · Boundary % · Dot % · Fours · Sixes. Fours added
+  parallel to Sixes per user request. Dynamic cols class switches
+  based on presence of h2h row above.
+- **Row 2 (cols-3)**: Most titles · Top scorer · Top wicket-taker.
+  Small leader-board summary. Most titles hidden on rivalry scope.
+- **Row 3 (prose section, NOT cards)**: "Best moments" — Best batting /
+  Best bowling / Highest partnership / Best fielding / Highest total.
+  Tried these as a 5th cols-5 card row first; user said "too many
+  tiles, page looks weird". Reverted to prose lines under a
+  `wisden-section-title`, using the same `wisden-tile-line` markup
+  the rivalry by-team tile body uses. PlayerLink's `trailingContent`
+  holds the stat between name and phrase: `V Kohli · 116 · date at
+  IPL, 2024, at IPL`.
+
+**Why this card/prose split:** big cards work for glanceable single
+values (Matches · Run rate · 235 highest total). They break down when
+the value is multi-part (name + stat + date + two-team context + phrase
+chain). For those, prose with the label as faint prefix reads cleaner.
+Tiles for numbers, lines for "moments".
 
 ## Scorecard linkability: API response-shape follow-up
 

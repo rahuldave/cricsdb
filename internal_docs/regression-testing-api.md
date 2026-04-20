@@ -332,3 +332,36 @@ keeping routers to use it instead of `build()` when applying
   match public career numbers.
 
 That gave concrete evidence the refactor was safe to ship.
+
+## What this harness CAN'T catch — frontend wiring bugs
+
+The harness curls API endpoints directly and md5-diffs responses. It
+proves backend correctness given the URLs in the inventory, but it
+cannot catch bugs where the **frontend doesn't construct the URL it
+should**. Concrete example from 2026-04-19:
+
+- Backend `/api/v1/teams/Australia/summary?series_type=bilateral`
+  correctly returned 175 matches (verified by curl).
+- Frontend `/teams?team=Australia&series_type=bilateral` rendered
+  224 (the unfiltered total) because `useFilters()` in
+  `frontend/src/hooks/useFilters.ts` only iterated `FILTER_KEYS` and
+  silently dropped `series_type` before it ever reached
+  `getTeamSummary(team, filters)`.
+- Backend regression suite: 9/9 byte-identical because the test URLs
+  didn't exercise `series_type` against the team-summary endpoint.
+  Even if they had, the test would still pass — the backend works
+  fine; it's the frontend that fails to send.
+
+The fix went into a new integration test:
+`tests/integration/cross_cutting_aux_filters.sh`. It loads
+`/teams?team=Australia` (plain) and `?series_type=bilateral` and
+`?series_type=icc` in a real browser via agent-browser, reads the
+visible "Matches NN" StatCard, and asserts the counts differ AND
+sum-partition (224 = 175 + 49). This is the right test layer for
+URL → useFilters → API call → render plumbing. Backend regression
+covers SQL transformation; frontend integration covers data flow.
+
+When adding a new aux filter (or any URL param that needs to flow
+through to API calls), add a similar pair-comparison assert to that
+script — it's cheap and catches the entire class of "frontend
+silently drops the param" bugs.

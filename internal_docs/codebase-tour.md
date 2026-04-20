@@ -11,7 +11,12 @@ api/
                          docs_url/redoc_url/openapi_url overridden to /api/docs, /api/redoc, /api/openapi.json
                          so the Vite dev-server proxy forwards them.
   dependencies.py     — Database init (WAL mode, PLASH_PRODUCTION-aware path)
-  filters.py          — FilterParams class (Depends), builds WHERE clauses with :param bind syntax
+  filters.py          — FilterBarParams (8 FilterBar UI fields) + AuxParams (page-local;
+                          currently series_type) classes for FastAPI Depends().
+                          FilterBarParams.build(aux=aux) threads aux clauses centrally so
+                          routers don't hand-wire series_type_clause individually. FilterParams
+                          alias preserved for incremental migration. See
+                          internal_docs/design-decisions.md "FilterBarParams + AuxParams".
   routers/
     reference.py      — /api/v1/tournaments (FilterBar dropdown; canonicalized,
                          accepts team + opponent for rivalry-pair intersection),
@@ -114,12 +119,31 @@ frontend/src/
                                     per mount via useRef). Writes to URL so FilterBar reflects.
   components/                  — Layout (now hosts a Players ▾ group with desktop hover-dropdown
                                    + persistent mobile sub-row while any /players, /batting,
-                                   /bowling, /fielding route is active), FilterBar, PlayerSearch
+                                   /bowling, /fielding route is active; mounts FilterBar +
+                                   ScopeStatusStrip below it on every non-home, non-scorecard,
+                                   non-help route), FilterBar, PlayerSearch
                                    (role prop now optional — omit for role-agnostic /players
                                    search), TeamSearch, StatCard, DataTable, Spinner, ErrorBanner,
-                                   Scorecard, InningsCard, PlayerLink (two-link name + context
-                                   pattern), ScopeIndicator (oxblood pill for filter_team/_opponent
-                                   lens on player pages), FlagBadge, charts/
+                                   Scorecard, InningsCard,
+                                   PlayerLink (letter-subscript model: name link + (e, t, s, b)
+                                   scoped variants — see internal_docs/design-decisions.md),
+                                   TeamLink (phrase-subscript model: name link + named-phrase
+                                   subscripts driven by series_type container resolution; layout
+                                   inline|block, compact mode for H2 / tile headers — see same
+                                   design doc),
+                                   ScopeStatusStrip (one-line read-mode mirror of active filters
+                                   below the FilterBar; SHOWING: GENDER/TYPE/TOURNAMENT/TEAM/...
+                                   prose summary + COPY LINK clipboard button; surfaces aux
+                                   filter series_type as "Show: bilateral T20Is" etc. on every
+                                   tab where it's set),
+                                   ScopeIndicator (oxblood pill for filter_team/_opponent
+                                   lens on player pages — narrowing-announcement banner, not
+                                   the same as ScopeStatusStrip), FlagBadge,
+                                   scopeLinks.ts (PlayerLink + TeamLink shared model:
+                                   FILTER_KEYS registry, ScopeContext for path identity,
+                                   nameParams + tierParams + tierTooltip for letters,
+                                   resolveScopePhrases for TeamLink phrases — series_type-driven
+                                   container resolution lives here), charts/
     charts/                    — BarChart, LineChart, ScatterChart, DonutChart wrappers (responsive),
                                    HeatmapChart, BubbleMatrix,
                                    WormChart, ManhattanChart, InningsGridChart, MatchupGridChart
