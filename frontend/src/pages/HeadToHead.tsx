@@ -6,6 +6,7 @@ import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import PlayerSearch from '../components/PlayerSearch'
 import TeamSearch from '../components/TeamSearch'
+import SeriesLink from '../components/SeriesLink'
 import FlagBadge from '../components/FlagBadge'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
@@ -123,8 +124,7 @@ function PlayerVsPlayer() {
         onClick={e => e.stopPropagation()}>{v || '-'}</Link>
     ) as unknown as string },
     { key: 'tournament', label: 'Tournament', format: (v: any) => v ? (
-      <Link to={`/series?tournament=${encodeURIComponent(v)}`}
-        className="comp-link" onClick={e => e.stopPropagation()}>{v}</Link>
+      <SeriesLink tournament={v} onClick={e => e.stopPropagation()}>{v}</SeriesLink>
     ) as unknown as string : '-' },
     { key: 'venue', label: 'Venue' },
     { key: 'balls', label: 'Balls', sortable: true },
