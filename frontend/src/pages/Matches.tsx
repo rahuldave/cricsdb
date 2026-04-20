@@ -10,6 +10,7 @@ import PlayerSearch from '../components/PlayerSearch'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import Score from '../components/Score'
+import TeamLink from '../components/TeamLink'
 import type { TeamInfo } from '../types'
 
 const PAGE_SIZE = 50
@@ -144,29 +145,44 @@ export default function Matches() {
             <tr>
               <th>Date</th>
               <th>Match</th>
-              <th className="hidden md:table-cell">Tournament</th>
+              <th className="hidden md:table-cell">Edition</th>
               <th className="hidden lg:table-cell">Venue</th>
               <th className="hidden sm:table-cell">Result</th>
             </tr>
           </thead>
           <tbody>
             {matches.map(m => {
-              // Row is clickable → scorecard. Team / tournament cells
-              // override the row click so they go to the team / tournament
+              // Row is clickable → scorecard. Team / edition cells
+              // override the row click so they go to the team / series
               // dossier instead. Preserves FilterBar context.
               const stop = (e: React.MouseEvent) => e.stopPropagation()
-              const teamHref = (t: string) => {
-                const p = new URLSearchParams({ team: t })
-                if (filters.gender) p.set('gender', filters.gender)
-                if (filters.team_type) p.set('team_type', filters.team_type)
-                if (m.tournament) p.set('tournament', m.tournament)
-                return `/teams?${p.toString()}`
-              }
-              const tournamentHref = (t: string) => {
-                const p = new URLSearchParams({ tournament: t })
-                if (filters.gender) p.set('gender', filters.gender)
-                if (filters.team_type) p.set('team_type', filters.team_type)
-                return `/series?${p.toString()}`
+              // Edition text — just the season when the FilterBar is
+              // already pinned to one tournament (the tournament repeats
+              // in every row), otherwise "Tournament, Season".
+              const editionText = filters.tournament
+                ? (m.season ?? '')
+                : [m.tournament, m.season].filter(Boolean).join(', ')
+              const editionHref = m.tournament
+                ? (() => {
+                    const p = new URLSearchParams({ tournament: m.tournament })
+                    if (filters.gender) p.set('gender', filters.gender)
+                    if (filters.team_type) p.set('team_type', filters.team_type)
+                    if (m.season) { p.set('season_from', m.season); p.set('season_to', m.season) }
+                    return `/series?${p.toString()}`
+                  })()
+                : null
+              // TeamLink subscriptSource pins the (ed) to THIS match's
+              // edition (tournament + season from the row), regardless
+              // of the FilterBar's season window. team1: null / team2:
+              // null explicitly clear any FilterBar rivalry pair so the
+              // bilateral-series concern doesn't strip the tournament
+              // from the (ed) URL. See design-decisions.md "Per-row
+              // '(ed)' tag" for the convention.
+              const edScope = {
+                tournament: m.tournament,
+                season: m.season,
+                team1: null,
+                team2: null,
               }
               return (
               <tr key={m.match_id}
@@ -179,10 +195,26 @@ export default function Matches() {
                   ) : '-'}
                 </td>
                 <td>
-                  <div style={{ fontFamily: 'var(--serif)', fontSize: '1rem', color: 'var(--ink)', fontVariationSettings: '"opsz" 14' }}>
-                    <Link to={teamHref(m.team1)} className="comp-link" onClick={stop}>{m.team1}</Link>
+                  <div
+                    onClick={stop}
+                    style={{ fontFamily: 'var(--serif)', fontSize: '1rem', color: 'var(--ink)', fontVariationSettings: '"opsz" 14' }}>
+                    <TeamLink
+                      teamName={m.team1}
+                      gender={filters.gender ?? null}
+                      team_type={filters.team_type ?? null}
+                      subscriptSource={edScope}
+                      maxTiers={1}
+                      phraseLabel="ed"
+                    />
                     {' '}<span style={{ fontStyle: 'italic', color: 'var(--ink-faint)' }}>v</span>{' '}
-                    <Link to={teamHref(m.team2)} className="comp-link" onClick={stop}>{m.team2}</Link>
+                    <TeamLink
+                      teamName={m.team2}
+                      gender={filters.gender ?? null}
+                      team_type={filters.team_type ?? null}
+                      subscriptSource={edScope}
+                      maxTiers={1}
+                      phraseLabel="ed"
+                    />
                   </div>
                   {(m.team1_score || m.team2_score) && (
                     <div style={{ fontSize: '0.78rem', color: 'var(--ink-faint)', marginTop: '0.15rem' }}>
@@ -190,12 +222,12 @@ export default function Matches() {
                     </div>
                   )}
                   <div className="sm:hidden" style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginTop: '0.15rem', fontFamily: 'var(--serif)' }}>{m.result_text}</div>
-                  <div className="md:hidden" style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.1rem' }}>{m.tournament || ''}</div>
+                  <div className="md:hidden" style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.1rem' }}>{editionText}</div>
                 </td>
-                <td className="hidden md:table-cell">
-                  {m.tournament
-                    ? <Link to={tournamentHref(m.tournament)} className="comp-link" onClick={stop}>{m.tournament}</Link>
-                    : '-'}
+                <td className="hidden md:table-cell" onClick={stop}>
+                  {editionHref
+                    ? <Link to={editionHref} className="comp-link">{editionText || '-'}</Link>
+                    : (editionText || '-')}
                 </td>
                 <td className="hidden lg:table-cell">
                   {m.venue ? (
