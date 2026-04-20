@@ -1242,7 +1242,9 @@ export interface TournamentSeason {
   season: string
   matches: number
   champion: string | null
+  champion_record: { played: number; won: number } | null
   runner_up: string | null
+  runner_up_record: { played: number; won: number } | null
   final_match_id: number | null
   run_rate: number | null
   boundary_pct: number | null

@@ -1296,6 +1296,34 @@ async def tournament_by_season(
             "person_id": r["person_id"], "name": r["name"], "wickets": r["wickets"]
         })
 
+    # Per-(season, team) played/won — used to annotate the champion +
+    # runner-up cells on the Editions tab with a bracketed fraction
+    # like "India (7/8)". Team appears as either team1 or team2, so
+    # union + group.
+    team_record_rows = await db.q(
+        f"""
+        WITH participations AS (
+          SELECT m.season AS season, m.team1 AS team,
+                 CASE WHEN m.outcome_winner = m.team1 THEN 1 ELSE 0 END AS won
+          FROM match m WHERE {where}
+          UNION ALL
+          SELECT m.season AS season, m.team2 AS team,
+                 CASE WHEN m.outcome_winner = m.team2 THEN 1 ELSE 0 END AS won
+          FROM match m WHERE {where}
+        )
+        SELECT season, team,
+               COUNT(*) AS played,
+               SUM(won) AS won
+        FROM participations
+        GROUP BY season, team
+        """,
+        params,
+    )
+    record_by_season_team: dict[tuple[str, str], dict] = {
+        (r["season"], r["team"]): {"played": r["played"], "won": r["won"]}
+        for r in team_record_rows
+    }
+
     seasons: list[dict] = []
     for sr in season_rows:
         season = sr["season"]
@@ -1305,11 +1333,15 @@ async def tournament_by_season(
         legal_balls = (b.get("legal_balls") or 0) if b else 0
         sixes = (b.get("sixes") or 0) if b else 0
         fours = (b.get("fours") or 0) if b else 0
+        champion = f.get("champion")
+        runner_up = f.get("runner_up")
         seasons.append({
             "season": season,
             "matches": sr["matches"],
-            "champion": f.get("champion"),
-            "runner_up": f.get("runner_up"),
+            "champion": champion,
+            "champion_record": record_by_season_team.get((season, champion)) if champion else None,
+            "runner_up": runner_up,
+            "runner_up_record": record_by_season_team.get((season, runner_up)) if runner_up else None,
             "final_match_id": f.get("final_match_id"),
             "run_rate": _safe_div(total_runs, legal_balls, 6),
             "boundary_pct": _safe_div(fours + sixes, legal_balls, 100),

@@ -382,6 +382,9 @@ export default function TournamentDossier({
           loading={bySeasonFetch.loading}
           error={bySeasonFetch.error}
           seasons={bySeasonFetch.data?.seasons ?? []}
+          tournament={tournament}
+          gender={filters.gender ?? null}
+          teamType={filters.team_type ?? null}
           onPickSeason={(s) => setUrlParams({
             season_from: s, season_to: s, tab: 'Overview',
           })}
@@ -1316,14 +1319,38 @@ function MatchesTab({
 }
 
 function EditionsTab({
-  loading, error, seasons, onPickSeason, refetch,
+  loading, error, seasons, tournament, gender, teamType, onPickSeason, refetch,
 }: {
   loading: boolean; error: string | null; seasons: TournamentSeason[]
+  tournament: string | null
+  gender: string | null
+  teamType: string | null
   onPickSeason: (s: string) => void; refetch: () => void
 }) {
   if (loading) return <Spinner label="Loading editions…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!seasons.length) return <div className="wisden-empty">No editions in scope.</div>
+
+  // Scoped-URL builders for the bracketed counts. The name links
+  // (TeamLink / PlayerLink compact) stay all-time per convention; only
+  // the bracketed fraction carries the "team/player at THIS edition"
+  // scope.
+  const scopedTeamUrl = (team: string, season: string): string => {
+    const qs = new URLSearchParams({ team })
+    if (tournament) qs.set('tournament', tournament)
+    if (gender) qs.set('gender', gender)
+    if (teamType) qs.set('team_type', teamType)
+    qs.set('season_from', season); qs.set('season_to', season)
+    return `/teams?${qs.toString()}`
+  }
+  const scopedPlayerUrl = (role: 'batting' | 'bowling', personId: string, season: string): string => {
+    const qs = new URLSearchParams({ player: personId })
+    if (tournament) qs.set('tournament', tournament)
+    if (gender) qs.set('gender', gender)
+    if (teamType) qs.set('team_type', teamType)
+    qs.set('season_from', season); qs.set('season_to', season)
+    return `/${role}?${qs.toString()}`
+  }
 
   const columns: Column<TournamentSeason>[] = [
     {
@@ -1339,23 +1366,66 @@ function EditionsTab({
     { key: 'matches', label: 'Matches', sortable: true },
     {
       key: 'champion', label: 'Champion', sortable: true,
-      format: (v: string | null) => v ? (
-        <Link to={`/teams?team=${encodeURIComponent(v)}`} className="comp-link">{v}</Link>
+      format: (v: string | null, r) => v ? (
+        <>
+          <TeamLink teamName={v} compact gender={gender} team_type={teamType} />
+          {r.champion_record && (
+            <>
+              {' ('}
+              <Link
+                to={scopedTeamUrl(v, r.season)}
+                className="comp-link"
+                title={`${v} at ${tournament}, ${r.season} — ${r.champion_record.won}/${r.champion_record.played}`}
+              >
+                {r.champion_record.won}/{r.champion_record.played}
+              </Link>
+              {')'}
+            </>
+          )}
+        </>
       ) as unknown as string : '-',
     },
     {
       key: 'runner_up', label: 'Runner-up',
-      format: (v: string | null) => v ? (
-        <Link to={`/teams?team=${encodeURIComponent(v)}`} className="comp-link">{v}</Link>
+      format: (v: string | null, r) => v ? (
+        <>
+          <TeamLink teamName={v} compact gender={gender} team_type={teamType} />
+          {r.runner_up_record && (
+            <>
+              {' ('}
+              <Link
+                to={scopedTeamUrl(v, r.season)}
+                className="comp-link"
+                title={`${v} at ${tournament}, ${r.season} — ${r.runner_up_record.won}/${r.runner_up_record.played}`}
+              >
+                {r.runner_up_record.won}/{r.runner_up_record.played}
+              </Link>
+              {')'}
+            </>
+          )}
+        </>
       ) as unknown as string : '-',
     },
     {
       key: 'top_scorer', label: 'Top scorer',
       format: (_v, r) => r.top_scorer ? (
         <>
-          <Link to={`/batting?player=${encodeURIComponent(r.top_scorer.person_id)}`}
-            className="comp-link">{r.top_scorer.name}</Link>
-          {` (${r.top_scorer.runs})`}
+          <PlayerLink
+            personId={r.top_scorer.person_id}
+            name={r.top_scorer.name}
+            role="batter"
+            gender={gender}
+            compact
+          />
+          {' ('}
+          <Link
+            to={scopedPlayerUrl('batting', r.top_scorer.person_id, r.season)}
+            className="comp-link"
+            title={`${r.top_scorer.name} at ${tournament}, ${r.season} — ${r.top_scorer.runs} runs`}
+          >
+            {r.top_scorer.runs}
+          </Link>
+          {')'}
         </>
       ) as unknown as string : '-',
     },
@@ -1363,9 +1433,22 @@ function EditionsTab({
       key: 'top_wicket_taker', label: 'Top wicket-taker',
       format: (_v, r) => r.top_wicket_taker ? (
         <>
-          <Link to={`/bowling?player=${encodeURIComponent(r.top_wicket_taker.person_id)}`}
-            className="comp-link">{r.top_wicket_taker.name}</Link>
-          {` (${r.top_wicket_taker.wickets})`}
+          <PlayerLink
+            personId={r.top_wicket_taker.person_id}
+            name={r.top_wicket_taker.name}
+            role="bowler"
+            gender={gender}
+            compact
+          />
+          {' ('}
+          <Link
+            to={scopedPlayerUrl('bowling', r.top_wicket_taker.person_id, r.season)}
+            className="comp-link"
+            title={`${r.top_wicket_taker.name} at ${tournament}, ${r.season} — ${r.top_wicket_taker.wickets} wickets`}
+          >
+            {r.top_wicket_taker.wickets}
+          </Link>
+          {')'}
         </>
       ) as unknown as string : '-',
     },
