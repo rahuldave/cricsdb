@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
 import { useUrlParam } from '../../hooks/useUrlState'
@@ -76,11 +77,15 @@ export default function VenueDossier({ venue }: { venue: string }) {
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Fielders'],
   )
+  const MATCHES_PAGE_SIZE = 50
+  const [matchesOffset, setMatchesOffset] = useState(0)
+  useEffect(() => { setMatchesOffset(0) }, filterDeps)
+
   const matchesFetch = useFetch<{ matches: MatchListItem[]; total: number } | null>(
     () => currentTab === 'Matches'
-      ? getMatches({ ...scopedFilters, limit: 50, offset: 0 })
+      ? getMatches({ ...scopedFilters, limit: MATCHES_PAGE_SIZE, offset: matchesOffset })
       : Promise.resolve(null),
-    [...filterDeps, currentTab === 'Matches'],
+    [...filterDeps, currentTab === 'Matches', matchesOffset],
   )
   // Tournament records endpoint works with a null tournament when other
   // filters (filter_venue here) are set — confirmed during planning.
@@ -177,6 +182,9 @@ export default function VenueDossier({ venue }: { venue: string }) {
           matches={matchesFetch.data?.matches ?? []}
           total={matchesFetch.data?.total ?? 0}
           refetch={matchesFetch.refetch}
+          pageSize={MATCHES_PAGE_SIZE}
+          offset={matchesOffset}
+          onOffsetChange={setMatchesOffset}
         />
       )}
       {currentTab === 'Records' && (
@@ -368,17 +376,25 @@ function FieldersTab({
 
 function MatchesTab({
   loading, error, matches, total, refetch,
+  pageSize, offset, onOffsetChange,
 }: {
   loading: boolean; error: string | null
   matches: MatchListItem[]; total: number; refetch: () => void
+  pageSize: number
+  offset: number
+  onOffsetChange: (o: number) => void
 }) {
   if (loading) return <Spinner label="Loading matches…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!matches.length) return <div className="wisden-empty">No matches in scope.</div>
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const currentPage = Math.floor(offset / pageSize) + 1
+  const rangeStart = offset + 1
+  const rangeEnd = Math.min(offset + matches.length, total)
   return (
     <div className="mt-4">
       <div className="wisden-tab-help">
-        Showing {matches.length} of {total.toLocaleString()} matches at this venue
+        Showing {rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()} of {total.toLocaleString()} matches at this venue
         in the current filter scope.
       </div>
       <DataTable
@@ -411,6 +427,25 @@ function MatchesTab({
         data={matches}
         rowKey={(r) => `m-${r.match_id}`}
       />
+      {totalPages > 1 && (
+        <div className="wisden-pagination">
+          <div className="wisden-pagination-buttons">
+            <button
+              onClick={() => onOffsetChange(Math.max(0, offset - pageSize))}
+              disabled={offset === 0}>
+              ← Previous
+            </button>
+          </div>
+          <span>Page <span className="num">{currentPage}</span> of <span className="num">{totalPages}</span></span>
+          <div className="wisden-pagination-buttons">
+            <button
+              onClick={() => onOffsetChange(offset + pageSize)}
+              disabled={offset + pageSize >= total}>
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

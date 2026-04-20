@@ -539,6 +539,14 @@ conventions for subsequent tabs. Commits `9107ca3`…`4d9f0e1`.
   bulk) and "Intentionally changed response shape?" docs hook under
   Keeping docs in sync — the regression runner reads HEAD-side
   `urls.txt`, so an uncommitted REG→NEW flip is invisible.
+- **Matches-tab pagination on Series + Venue dossiers.** Both tabs
+  previously hard-coded `limit: 50, offset: 0` with no controls, so a
+  334-match T20 World Cup or 178-match Wankhede Stadium silently
+  truncated. Added prev/next controls mirroring the `/matches` page
+  pattern: local `matchesOffset` state in each dossier, reset on
+  `filterDeps` change, range text now reads "Showing 51–100 of 334" not
+  just "Showing 50 of 334". Offset is component-local (not in URL)
+  matching Matches.tsx.
 
 ---
 
