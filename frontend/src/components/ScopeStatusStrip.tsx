@@ -33,6 +33,8 @@ function buildSegments(
   pathVenue: string | null,
   pathPlayer: string | null,
   pathCompare: string | null,
+  tab: string | null,
+  page: string | null,
 ): Segment[] {
   const segs: Segment[] = []
 
@@ -88,6 +90,13 @@ function buildSegments(
     segs.push({ label: 'Show', value: label })
   }
 
+  // Active tab + pagination — URL-driven, so both deep-link into the
+  // strip. "Overview" is the default tab across every dossier; show
+  // the segment only when it's something else. Page shown when > 1.
+  if (tab && tab !== 'Overview') segs.push({ label: 'Tab', value: tab })
+  const pageNum = page ? parseInt(page, 10) : 0
+  if (pageNum > 1) segs.push({ label: 'Page', value: String(pageNum) })
+
   return segs
 }
 
@@ -108,9 +117,11 @@ export default function ScopeStatusStrip() {
   const pathVenue = params.get('venue')
   const pathPlayer = params.get('player')
   const pathCompare = params.get('compare')
+  const tab = params.get('tab')
+  const page = params.get('page')
 
   const segments = buildSegments(
-    filters, seriesType, pathTeam, pathVenue, pathPlayer, pathCompare,
+    filters, seriesType, pathTeam, pathVenue, pathPlayer, pathCompare, tab, page,
   )
 
   // Nothing to show → don't render. Keeps the UI quiet on "all-time, all

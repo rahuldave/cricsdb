@@ -547,6 +547,26 @@ conventions for subsequent tabs. Commits `9107ca3`…`4d9f0e1`.
   `filterDeps` change, range text now reads "Showing 51–100 of 334" not
   just "Showing 50 of 334". Offset is component-local (not in URL)
   matching Matches.tsx.
+- **Matches-tab polish follow-ups.** Four tightly-scoped fixes:
+  (1) `/venues` viewport — the page was using `.wisden-page` (42rem
+  max) while every other data page uses `max-w-6xl` (72rem); swapped.
+  (2) Pagination now lives in the URL as `?page=N` on both dossiers —
+  tabs already URL-share, so pages should too. Deep-linked `?page=3`
+  survives via a prev-deps-key ref (a simple first-render skip ref
+  gets clobbered by React StrictMode's double effect-invocation in
+  dev, falsely treating the remount as a filter change and resetting
+  the page).
+  (3) `ScopeStatusStrip` gains Tab + Page segments so you can see
+  where you are without reading the URL bar, and the copy-link button
+  carries those parts too.
+  (4) New **per-row `(ed)` link** after each team name on both
+  dossiers' Matches tab — muted italic, scoped to THAT match's
+  tournament + season (independent of the FilterBar season window).
+  Essential for rivalries: an Ind vs Aus row inside T20 WC 2024
+  resolves its (ed) to "India at T20 World Cup, 2024", not to the
+  rivalry window. Rivalry `Tournament` column renamed `Edition` to
+  match this framing (dropped entirely in single-tournament context,
+  as before).
 
 ---
 

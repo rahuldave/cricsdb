@@ -48,7 +48,7 @@ export default function Venues() {
     // every PlayerLink / TeamLink inside the dossier carries "at <venue>"
     // through its letter links.
     return (
-      <div className="wisden-page">
+      <div className="max-w-6xl mx-auto">
         <ScopeContext.Provider value={{ filter_venue: venue }}>
           <VenueDossier venue={venue} />
         </ScopeContext.Provider>
@@ -57,7 +57,7 @@ export default function Venues() {
   }
 
   return (
-    <div className="wisden-page">
+    <div className="max-w-6xl mx-auto">
       <h1 className="wisden-page-title">Venues</h1>
       <VenuesLandingBoard filters={filters} filterDeps={filterDeps} />
     </div>

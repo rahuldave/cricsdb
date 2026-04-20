@@ -1227,3 +1227,42 @@ tree to pre-flip state for the HEAD capture — which reads the OLD
 documentation entry catches up after exactly that confusion on
 2026-04-20 (Editions-tab `champion_record` / `runner_up_record`
 extension).
+
+## Per-row "(ed)" tag uses row scope, not FilterBar scope
+
+On the Series / Venue dossier Matches tab, each team name in the
+Match and Winner cells is followed by a compact muted italic "ed"
+link (`.wisden-ed-tag`). Unlike TeamLink's phrase tiers — which
+inherit ambient FilterBar scope through `useFilters()` — the (ed)
+link reads from the row itself:
+
+```
+/teams?team=<r.team>&tournament=<r.tournament>
+      &season_from=<r.season>&season_to=<r.season>
+      &gender=<filter.gender>&team_type=<filter.team_type>
+```
+
+The distinction matters most for rivalries. On
+`/series?filter_team=Ind&filter_opponent=Aus&gender=male` with a
+FilterBar season window of 2024–2026, an Ind vs Aus row inside
+T20 WC 2024 resolves its (ed) to "India at T20 World Cup, 2024" —
+NOT to "India vs Australia, 2024–2026". The bilateral-tour rows in
+the same list resolve to each tour's own bilateral series. Each row
+describes its own edition; the (ed) link makes that edition directly
+clickable without the user reasoning about which of the many
+tournaments the row belongs to.
+
+Helper: `teamEdHref(team, row, scope)` — returns null when
+`row.tournament` is null (rare; cricsheet has a handful of matches
+without an event name). Don't reuse TeamLink for this — its tier
+chain is designed to be inherited from the page's scope, which is
+the opposite of what we want here. The helper lives duplicated in
+`TournamentDossier.tsx` and `VenueDossier.tsx` rather than hoisted
+to `components/` to avoid giving it more architectural weight than
+the single affordance it serves.
+
+The rivalry Matches tab's `Tournament` column is renamed **Edition**
+for consistency with this framing — each row's container IS an
+edition (bilateral tour OR ICC event season), not a generic
+"tournament". The column is dropped entirely in single-tournament
+context (every row would otherwise repeat the same name).

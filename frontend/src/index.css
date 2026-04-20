@@ -1897,6 +1897,23 @@ a { color: inherit; }
    innings scores in <Score /> stays muted so the numbers carry the
    weight. */
 .wisden-score-sep { color: var(--ink-faint); }
+
+/* "ed" tag — a compact per-row link that pins a team to the match's
+   specific edition (tournament + season of THAT match), distinct from
+   whatever the FilterBar season window happens to be. Rendered right
+   after a team name on the Matches tab's Match/Winner cells. */
+.wisden-ed-tag {
+  display: inline-block;
+  margin-left: 0.2em;
+  padding: 0 0.15em;
+  font-size: 0.72em;
+  font-style: italic;
+  color: var(--ink-faint);
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+  vertical-align: baseline;
+}
+.wisden-ed-tag:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .wisden-tile-vs {
   font-style: italic;
   color: var(--ink-faint);

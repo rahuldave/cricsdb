@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
 import { useUrlParam } from '../../hooks/useUrlState'
@@ -36,6 +36,29 @@ const matchLink = (matchId: number, label: string | number) => (
 const teamLink = (team: string) => (
   <Link to={`/teams?team=${encodeURIComponent(team)}`} className="comp-link">{team}</Link>
 )
+
+/** URL for the "ed" per-row link — team pinned to THAT match's edition
+ *  (tournament + season from the row). Mirrors TournamentDossier's
+ *  teamEdHref; kept local here to avoid hoisting a dossier-internal
+ *  convention into the shared components module. */
+function teamEdHref(
+  team: string,
+  row: { tournament: string | null; season: string | null },
+  scope: { gender: string | null | undefined; team_type?: string | null | undefined },
+): string | null {
+  if (!row.tournament) return null
+  const p = new URLSearchParams({ team, tournament: row.tournament })
+  if (row.season) { p.set('season_from', row.season); p.set('season_to', row.season) }
+  if (scope.gender) p.set('gender', scope.gender)
+  if (scope.team_type) p.set('team_type', scope.team_type)
+  return `/teams?${p.toString()}`
+}
+function EdTag({ href, team, tournament, season }: {
+  href: string; team: string; tournament: string; season: string | null
+}) {
+  const title = season ? `${team} at ${tournament}, ${season}` : `${team} at ${tournament}`
+  return <Link to={href} className="wisden-ed-tag" title={title}>ed</Link>
+}
 
 export default function VenueDossier({ venue }: { venue: string }) {
   const filters = useFilters()
@@ -79,8 +102,21 @@ export default function VenueDossier({ venue }: { venue: string }) {
     [...filterDeps, currentTab === 'Fielders'],
   )
   const MATCHES_PAGE_SIZE = 50
-  const [matchesOffset, setMatchesOffset] = useState(0)
-  useEffect(() => { setMatchesOffset(0) }, filterDeps)
+  const [pageParam, setPageParam] = useUrlParam('page', '1')
+  const matchesPage = Math.max(1, parseInt(pageParam, 10) || 1)
+  const matchesOffset = (matchesPage - 1) * MATCHES_PAGE_SIZE
+  // Reset pagination when the filter scope changes — but not on mount,
+  // so `?tab=Matches&page=3` deep-links survive. See the matching block
+  // in TournamentDossier for the StrictMode rationale.
+  const prevFilterKey = useRef<string | null>(null)
+  useEffect(() => {
+    const key = filterDeps.map(v => String(v ?? '')).join('|')
+    if (prevFilterKey.current === null) { prevFilterKey.current = key; return }
+    if (prevFilterKey.current !== key) {
+      prevFilterKey.current = key
+      if (pageParam && pageParam !== '1') setPageParam('', { replace: true })
+    }
+  }, filterDeps)
 
   const matchesFetch = useFetch<{ matches: MatchListItem[]; total: number } | null>(
     () => currentTab === 'Matches'
@@ -183,9 +219,11 @@ export default function VenueDossier({ venue }: { venue: string }) {
           matches={matchesFetch.data?.matches ?? []}
           total={matchesFetch.data?.total ?? 0}
           refetch={matchesFetch.refetch}
+          gender={filters.gender}
+          teamType={filters.team_type}
           pageSize={MATCHES_PAGE_SIZE}
           offset={matchesOffset}
-          onOffsetChange={setMatchesOffset}
+          onPageChange={(p) => setPageParam(p > 1 ? String(p) : '')}
         />
       )}
       {currentTab === 'Records' && (
@@ -377,13 +415,16 @@ function FieldersTab({
 
 function MatchesTab({
   loading, error, matches, total, refetch,
-  pageSize, offset, onOffsetChange,
+  gender, teamType,
+  pageSize, offset, onPageChange,
 }: {
   loading: boolean; error: string | null
   matches: MatchListItem[]; total: number; refetch: () => void
+  gender: string | null | undefined
+  teamType: string | null | undefined
   pageSize: number
   offset: number
-  onOffsetChange: (o: number) => void
+  onPageChange: (page: number) => void
 }) {
   if (loading) return <Spinner label="Loading matches…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
@@ -410,15 +451,32 @@ function MatchesTab({
           { key: 'season', label: 'Season' },
           {
             key: 'team1', label: 'Match',
-            format: (_v, r) => (
-              <>{teamLink(r.team1)}{' v '}{teamLink(r.team2)}</>
-            ) as unknown as string,
+            format: (_v, r) => {
+              const ed1 = teamEdHref(r.team1, r, { gender, team_type: teamType })
+              const ed2 = teamEdHref(r.team2, r, { gender, team_type: teamType })
+              return (
+                <>
+                  {teamLink(r.team1)}
+                  {ed1 && r.tournament && <EdTag href={ed1} team={r.team1} tournament={r.tournament} season={r.season} />}
+                  {' v '}
+                  {teamLink(r.team2)}
+                  {ed2 && r.tournament && <EdTag href={ed2} team={r.team2} tournament={r.tournament} season={r.season} />}
+                </>
+              ) as unknown as string
+            },
           },
           {
             key: 'winner', label: 'Winner',
-            format: (v: string | null, r) => v
-              ? (teamLink(v) as unknown as string)
-              : (r.result_text || '—'),
+            format: (v: string | null, r) => {
+              if (!v) return r.result_text || '—'
+              const ed = teamEdHref(v, r, { gender, team_type: teamType })
+              return (
+                <>
+                  {teamLink(v)}
+                  {ed && r.tournament && <EdTag href={ed} team={v} tournament={r.tournament} season={r.season} />}
+                </>
+              ) as unknown as string
+            },
           },
           {
             key: 'team1_score', label: 'Score',
@@ -434,15 +492,15 @@ function MatchesTab({
         <div className="wisden-pagination">
           <div className="wisden-pagination-buttons">
             <button
-              onClick={() => onOffsetChange(Math.max(0, offset - pageSize))}
-              disabled={offset === 0}>
+              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}>
               ← Previous
             </button>
           </div>
           <span>Page <span className="num">{currentPage}</span> of <span className="num">{totalPages}</span></span>
           <div className="wisden-pagination-buttons">
             <button
-              onClick={() => onOffsetChange(offset + pageSize)}
+              onClick={() => onPageChange(currentPage + 1)}
               disabled={offset + pageSize >= total}>
               Next →
             </button>
