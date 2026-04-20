@@ -6,7 +6,7 @@ import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import {
-  getTeams, getTeamSummary, getTeamByseason, getTeamVs, getTeamResults,
+  getTeamSummary, getTeamByseason, getTeamVs, getTeamResults,
   getTeamOpponentsMatrix, getTeamPlayersBySeason, getTeamsLanding,
   getTeamBattingSummary, getTeamBattingBySeason, getTeamBattingByPhase, getTeamTopBatters,
   getTeamBattingPhaseSeasonHeatmap,
@@ -16,6 +16,7 @@ import {
   getTeamPartnershipsByWicket, getTeamPartnershipsBestPairs, getTeamPartnershipsHeatmap, getTeamPartnershipsTop,
 } from '../api'
 import StatCard from '../components/StatCard'
+import TeamSearch from '../components/TeamSearch'
 import FlagBadge from '../components/FlagBadge'
 import PlayerLink from '../components/PlayerLink'
 import { ScopeContext } from '../components/scopeLinks'
@@ -29,7 +30,7 @@ import BubbleMatrix from '../components/charts/BubbleMatrix'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import type {
-  TeamInfo, TeamSummary, TeamSeasonRecord, TeamVsOpponent, TeamResult,
+  TeamSummary, TeamSeasonRecord, TeamVsOpponent, TeamResult,
   OpponentRollup, OpponentsMatrix, TeamPlayersBySeason, TeamsLanding,
   TeamBattingSummary, TeamBattingSeason, TeamBattingPhase, TeamTopBatter,
   BattingPhaseSeasonHeatmap, BowlingPhaseSeasonHeatmap,
@@ -77,24 +78,7 @@ export default function Teams() {
     }
   }, [compareCsv, selected])
 
-  const [teams, setTeams] = useState<TeamInfo[]>([])
-  // Transient typing buffer — `null` = not editing, the input falls
-  // through to `selected` (the URL truth). Back-nav changing the URL
-  // naturally updates the input because we derive, not mirror.
-  const [typing, setTyping] = useState<string | null>(null)
-  const [showDropdown, setShowDropdown] = useState(false)
   const [resultsOffset, setResultsOffset] = useState(0)
-
-  const searchValue = typing ?? selected ?? ''
-
-  // Team-search dropdown stays a plain useEffect — debounce-style and
-  // failure here is non-blocking. Fires only while the user is typing
-  // (typing !== null); any other state — URL-driven display, post-pick
-  // — skips the fetch and keeps the dropdown closed.
-  useEffect(() => {
-    if (typing === null || typing.length < 1) return
-    getTeams({ ...filters, q: typing }).then(d => { setTeams(d.teams); setShowDropdown(true) }).catch(() => {})
-  }, [filters.gender, filters.team_type, filters.tournament, typing])
 
   const filterDeps = [
     selected, filters.gender, filters.team_type, filters.tournament,
@@ -136,7 +120,6 @@ export default function Teams() {
     } else {
       setSelected(name)
     }
-    setTyping(null); setShowDropdown(false)
   }
 
   // Match-list convention (see CLAUDE.md): the `date` column is the
@@ -158,21 +141,11 @@ export default function Teams() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="mb-8 relative max-w-md wisden-playersearch">
-        <input type="text" value={searchValue}
-          onChange={e => { setTyping(e.target.value); setSelected(''); setShowDropdown(true) }}
+      <div className="mb-8 max-w-md">
+        <TeamSearch
+          onSelect={(name) => selectTeam(name)}
           placeholder="Search teams…"
-          className="wisden-playersearch-input" />
-        {showDropdown && teams.length > 0 && !selected && (
-          <ul className="wisden-playersearch-list">
-            {teams.slice(0, 20).map(t => (
-              <li key={t.name} onClick={() => selectTeam(t.name)}>
-                <span className="wisden-playersearch-name">{t.name}</span>
-                <span className="wisden-playersearch-meta num">{t.matches} matches</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        />
       </div>
 
       {!selected && (
