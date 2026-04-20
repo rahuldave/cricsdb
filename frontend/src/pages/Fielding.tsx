@@ -4,8 +4,8 @@ import { useFilters } from '../hooks/useFilters'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch, type FetchState } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { useDefaultSeasonWindow } from '../hooks/useDefaultSeasonWindow'
 import PlayerSearch from '../components/PlayerSearch'
+import SeriesLink from '../components/SeriesLink'
 import FlagBadge from '../components/FlagBadge'
 import ScopeIndicator from '../components/ScopeIndicator'
 import StatCard from '../components/StatCard'
@@ -170,8 +170,7 @@ export default function Fielding() {
         className="comp-link" onClick={e => e.stopPropagation()}>{v}</Link>
     ) as unknown as string : '-' },
     { key: 'tournament', label: 'Tournament', format: (v: any) => v ? (
-      <Link to={`/series?tournament=${encodeURIComponent(v)}`}
-        className="comp-link" onClick={e => e.stopPropagation()}>{v}</Link>
+      <SeriesLink tournament={v} onClick={e => e.stopPropagation()}>{v}</SeriesLink>
     ) as unknown as string : '-' },
     { key: 'stumpings', label: 'St', sortable: true },
     { key: 'catches', label: 'Ct', sortable: true },
@@ -198,8 +197,7 @@ export default function Fielding() {
         className="comp-link" onClick={e => e.stopPropagation()}>{v}</Link>
     ) as unknown as string : '-' },
     { key: 'tournament', label: 'Tournament', format: (v: any) => v ? (
-      <Link to={`/series?tournament=${encodeURIComponent(v)}`}
-        className="comp-link" onClick={e => e.stopPropagation()}>{v}</Link>
+      <SeriesLink tournament={v} onClick={e => e.stopPropagation()}>{v}</SeriesLink>
     ) as unknown as string : '-' },
     { key: 'catches', label: 'Catches' },
     { key: 'stumpings', label: 'Stumpings' },
@@ -434,8 +432,6 @@ interface FieldingLandingBoardProps {
 }
 
 function FieldingLandingBoard({ filters, filterDeps }: FieldingLandingBoardProps) {
-  useDefaultSeasonWindow(filters, true)
-
   const board = useFetch<FieldingLeaders | null>(
     () => getFieldingLeaders({ ...filters, limit: 10 }),
     filterDeps,

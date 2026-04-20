@@ -4,8 +4,8 @@ import { useFilters } from '../hooks/useFilters'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch, type FetchState } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { useDefaultSeasonWindow } from '../hooks/useDefaultSeasonWindow'
 import PlayerSearch from '../components/PlayerSearch'
+import SeriesLink from '../components/SeriesLink'
 import FlagBadge from '../components/FlagBadge'
 import ScopeIndicator from '../components/ScopeIndicator'
 import StatCard from '../components/StatCard'
@@ -142,8 +142,7 @@ export default function Batting() {
         className="comp-link" onClick={e => e.stopPropagation()}>{v}</Link>
     ) as unknown as string : '-' },
     { key: 'tournament', label: 'Tournament', format: (v: any) => v ? (
-      <Link to={`/series?tournament=${encodeURIComponent(v)}`}
-        className="comp-link" onClick={e => e.stopPropagation()}>{v}</Link>
+      <SeriesLink tournament={v} onClick={e => e.stopPropagation()}>{v}</SeriesLink>
     ) as unknown as string : '-' },
     { key: 'runs', label: 'Runs', sortable: true },
     { key: 'balls', label: 'Balls', sortable: true },
@@ -453,11 +452,6 @@ interface BattingLandingBoardProps {
 }
 
 function BattingLandingBoard({ filters, filterDeps }: BattingLandingBoardProps) {
-  // Default to last 3 seasons when no season filter is set. Writes to
-  // URL so FilterBar reflects the scope. One-shot per mount — user can
-  // clear via FilterBar reset buttons without re-triggering.
-  useDefaultSeasonWindow(filters, true)
-
   const board = useFetch<BattingLeaders | null>(
     () => getBattingLeaders({ ...filters, limit: 10 }),
     filterDeps,
