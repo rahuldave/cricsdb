@@ -1782,24 +1782,33 @@ function BowlersTab({
   const rowSrc = (r: BowlingLeaderEntry) =>
     rowSubscriptSource({ filterTeam, filterOpponent, rowTeam: r.team })
 
+  const bowlerCell = (r: BowlingLeaderEntry) => (
+    <PlayerLink
+      personId={r.person_id} name={r.name} role="bowler" gender={gender}
+      subscriptSource={rowSrc(r)}
+    />
+  ) as unknown as string
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+      <div>
+        <h3 className="wisden-section-title">By wickets taken</h3>
+        <DataTable
+          columns={[
+            { key: 'name', label: 'Bowler', format: (_v, r) => bowlerCell(r) },
+            { key: 'wickets', label: 'W', sortable: true },
+            { key: 'balls', label: 'Balls' },
+            { key: 'economy', label: 'Econ', format: (v) => fmt(v, 2) },
+          ]}
+          data={data.by_wickets}
+          rowKey={(r) => r.person_id}
+        />
+      </div>
       <div>
         <h3 className="wisden-section-title">By strike rate</h3>
         <DataTable
           columns={[
-            {
-              key: 'name', label: 'Bowler',
-              format: (_v, r) => {
-                const src = rowSrc(r)
-                return (
-                  <PlayerLink
-                    personId={r.person_id} name={r.name} role="bowler" gender={gender}
-                    subscriptSource={src}
-                  />
-                ) as unknown as string
-              },
-            },
+            { key: 'name', label: 'Bowler', format: (_v, r) => bowlerCell(r) },
             { key: 'strike_rate', label: 'SR', sortable: true, format: (v) => fmt(v, 2) },
             { key: 'wickets', label: 'W' },
             { key: 'balls', label: 'Balls' },
@@ -1812,18 +1821,7 @@ function BowlersTab({
         <h3 className="wisden-section-title">By economy</h3>
         <DataTable
           columns={[
-            {
-              key: 'name', label: 'Bowler',
-              format: (_v, r) => {
-                const src = rowSrc(r)
-                return (
-                  <PlayerLink
-                    personId={r.person_id} name={r.name} role="bowler" gender={gender}
-                    subscriptSource={src}
-                  />
-                ) as unknown as string
-              },
-            },
+            { key: 'name', label: 'Bowler', format: (_v, r) => bowlerCell(r) },
             { key: 'economy', label: 'Econ', sortable: true, format: (v) => fmt(v, 2) },
             { key: 'wickets', label: 'W' },
             { key: 'balls', label: 'Balls' },

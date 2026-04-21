@@ -2078,6 +2078,10 @@ async def tournament_bowlers_leaders(
             "strike_rate": _safe_div(balls, wickets) if wickets > 0 else None,
         })
 
+    wickets_top = sorted(
+        entries,
+        key=lambda e: (e["wickets"], -(e["economy"] or 0)), reverse=True,
+    )[:limit]
     # by_strike_rate: need min_wickets to exclude tiny-sample blazing SRs
     sr_top = sorted(
         (e for e in entries if e["wickets"] >= min_wickets and e["strike_rate"] is not None),
@@ -2088,7 +2092,11 @@ async def tournament_bowlers_leaders(
         key=lambda e: (e["economy"], -e["balls"]),
     )[:limit]
 
-    top_ids = {e["person_id"] for e in sr_top} | {e["person_id"] for e in econ_top}
+    top_ids = (
+        {e["person_id"] for e in wickets_top}
+        | {e["person_id"] for e in sr_top}
+        | {e["person_id"] for e in econ_top}
+    )
     name_map: dict[str, str] = {}
     team_map: dict[str, str] = {}
     if top_ids:
@@ -2120,6 +2128,9 @@ async def tournament_bowlers_leaders(
             if pid not in per_pid or n > per_pid[pid][1]:
                 per_pid[pid] = (team, n)
         team_map = {pid: v[0] for pid, v in per_pid.items()}
+    for e in wickets_top:
+        e["name"] = name_map.get(e["person_id"], e["person_id"])
+        e["team"] = team_map.get(e["person_id"])
     for e in sr_top:
         e["name"] = name_map.get(e["person_id"], e["person_id"])
         e["team"] = team_map.get(e["person_id"])
@@ -2128,6 +2139,7 @@ async def tournament_bowlers_leaders(
         e["team"] = team_map.get(e["person_id"])
 
     return {
+        "by_wickets": wickets_top,
         "by_strike_rate": sr_top,
         "by_economy": econ_top,
         "thresholds": {"min_balls": min_balls, "min_wickets": min_wickets},

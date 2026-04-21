@@ -180,6 +180,7 @@ export interface BowlingLeaderEntry {
 }
 
 export interface BowlingLeaders {
+  by_wickets: BowlingLeaderEntry[]
   by_strike_rate: BowlingLeaderEntry[]
   by_economy: BowlingLeaderEntry[]
   thresholds: { min_balls: number; min_wickets: number }
