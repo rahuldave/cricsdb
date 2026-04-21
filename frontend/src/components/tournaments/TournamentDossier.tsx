@@ -1088,7 +1088,12 @@ function OverviewTab({
                 format: (v: string | null, r) => v
                   ? (
                       <>
-                        <TeamWithEd team={v} row={r} gender={gender} team_type={teamType} />
+                        <TeamLink
+                          teamName={v}
+                          gender={gender ?? null}
+                          team_type={teamType ?? null}
+                          compact
+                        />
                         {` (${r.margin})`}
                       </>
                     ) as unknown as string
@@ -1111,11 +1116,12 @@ function OverviewTab({
                     ? `${r.team1} ${r.team1_score ?? '—'} vs ${r.team2} ${r.team2_score ?? '—'} — scorecard`
                     : undefined
                   return (
-                    <div>
+                    <>
                       {v && (
-                        <div>
-                          <Link to={`/matches/${r.match_id}`} className="comp-link">{v}</Link>
-                        </div>
+                        <Link to={`/matches/${r.match_id}`} className="comp-link">{v}</Link>
+                      )}
+                      {v && hasScore && (
+                        <span className="wisden-tile-faint">{' · '}</span>
                       )}
                       {hasScore && (
                         <Score
@@ -1125,7 +1131,7 @@ function OverviewTab({
                           title={scoreTitle}
                         />
                       )}
-                    </div>
+                    </>
                   ) as unknown as string
                 },
               },
@@ -1211,12 +1217,12 @@ function OverviewTab({
               },
               {
                 key: 'champion', label: 'Champion', sortable: true,
-                format: (v: string, r) => (
-                  <TeamWithEd
-                    team={v}
-                    row={{ tournament, season: r.season }}
-                    gender={gender}
-                    team_type={teamType}
+                format: (v: string) => (
+                  <TeamLink
+                    teamName={v}
+                    gender={gender ?? null}
+                    team_type={teamType ?? null}
+                    compact
                   />
                 ) as unknown as string,
               },
@@ -1227,11 +1233,12 @@ function OverviewTab({
                     ? `${r.team1} ${r.team1_score ?? '—'} vs ${r.team2} ${r.team2_score ?? '—'} — scorecard`
                     : undefined
                   return (
-                    <div>
+                    <>
                       {r.date && (
-                        <div>
-                          <Link to={`/matches/${r.match_id}`} className="comp-link">{r.date}</Link>
-                        </div>
+                        <Link to={`/matches/${r.match_id}`} className="comp-link">{r.date}</Link>
+                      )}
+                      {r.date && (r.team1_score || r.team2_score) && (
+                        <span className="wisden-tile-faint">{' · '}</span>
                       )}
                       <Score
                         team1Score={r.team1_score}
@@ -1239,7 +1246,7 @@ function OverviewTab({
                         matchId={r.match_id}
                         title={scoreTitle}
                       />
-                    </div>
+                    </>
                   ) as unknown as string
                 },
               },
