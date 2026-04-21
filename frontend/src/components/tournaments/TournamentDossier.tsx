@@ -191,7 +191,7 @@ export default function TournamentDossier({
   )
   const bowlingFetch = useFetch<BowlingLeaders | null>(
     () => currentTab === 'Bowlers'
-      ? getTournamentBowlersLeaders(tournament, { ...apiFilters, limit: 10 })
+      ? getTournamentBowlersLeaders(tournament, { ...apiFilters, limit: 20 })
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Bowlers'],
   )
