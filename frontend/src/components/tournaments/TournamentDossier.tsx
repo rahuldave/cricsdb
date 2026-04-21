@@ -197,7 +197,7 @@ export default function TournamentDossier({
   )
   const fieldingFetch = useFetch<FieldingLeaders | null>(
     () => currentTab === 'Fielders'
-      ? getTournamentFieldersLeaders(tournament, { ...apiFilters, limit: 10 })
+      ? getTournamentFieldersLeaders(tournament, { ...apiFilters, limit: 20 })
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Fielders'],
   )
