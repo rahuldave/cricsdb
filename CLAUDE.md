@@ -164,7 +164,17 @@ patterns:
 - Scope-link URLs → `frontend/src/components/scopeLinks.ts`
   (`FILTER_KEYS`, `SubscriptSource`, `resolveBucket`,
   `resolveScopePhrases`, `ScopeContext`)
-- Team / player rendering → `TeamLink.tsx` / `PlayerLink.tsx`
+- **Team / player / series rendering → `TeamLink.tsx` /
+  `PlayerLink.tsx` / `SeriesLink.tsx`. Before writing ANY navigation
+  to `/teams?…`, `/batting|bowling|fielding|players?…`, or
+  `/series?…` — including raw `<Link>` tags, local URL helpers
+  (`teamUrl`, `teamLinkHref`), or inline render helpers
+  (`renderBatter`, `renderVsTeams`) — READ `internal_docs/links.md`.
+  It documents the name-vs-phrase invariant, `subscriptSource`,
+  `phraseLabel` (compact token + bracketed-count override), the
+  decision tree, common patterns, and the anti-patterns. Nearly every
+  cell you think needs a raw `<Link>` is one or two props on the
+  existing component.**
 - Filter state → `useFilters()`, `FILTER_KEYS`
 - Tabular rendering → `DataTable.tsx`
 - Score rendering → `Score.tsx`

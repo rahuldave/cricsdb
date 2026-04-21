@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
 import { useFetch } from '../../hooks/useFetch'
 import { getTournamentsLanding, getTournamentOtherRivalries } from '../../api'
@@ -7,37 +6,6 @@ import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
 import SeriesLink from '../SeriesLink'
 import TeamLink from '../TeamLink'
-
-/** Build a /teams?team=X URL with whatever scope params are non-empty.
- *  Used on tile lines where natural-language phrasing puts the scope on
- *  the team NAME (e.g. "Winner: India" reads as "India won this edition"
- *  — the India link should land on India-at-this-edition, not all-time).
- *  TeamLink's contract is the opposite (name = all-time); these inline
- *  usages are intentional exceptions. */
-interface TeamScope {
-  team: string
-  gender?: string | null
-  team_type?: string | null
-  tournament?: string | null
-  season_from?: string | null
-  season_to?: string | null
-  filter_team?: string | null
-  filter_opponent?: string | null
-  series_type?: string | null
-}
-function teamUrl(s: TeamScope): string {
-  const qs = new URLSearchParams()
-  qs.set('team', s.team)
-  if (s.gender) qs.set('gender', s.gender)
-  if (s.team_type) qs.set('team_type', s.team_type)
-  if (s.tournament) qs.set('tournament', s.tournament)
-  if (s.season_from) qs.set('season_from', s.season_from)
-  if (s.season_to) qs.set('season_to', s.season_to)
-  if (s.filter_team) qs.set('filter_team', s.filter_team)
-  if (s.filter_opponent) qs.set('filter_opponent', s.filter_opponent)
-  if (s.series_type && s.series_type !== 'all') qs.set('series_type', s.series_type)
-  return `/teams?${qs.toString()}`
-}
 import type {
   TournamentsLanding as TLandingData,
   TournamentLandingEntry,
@@ -95,29 +63,22 @@ function TournamentTile({
       {entry.most_titles && (
         <div className="wisden-tile-line">
           Most titles:{' '}
-          <TeamLink
-            teamName={entry.most_titles.team}
-            compact
-            gender={rowGender ?? null}
-            team_type={rowTeamType ?? null}
-          />
-          {entry.most_titles.titles > 1 && (
-            <>
-              {' ('}
-              <Link
-                to={teamUrl({
-                  team: entry.most_titles.team,
-                  gender: rowGender,
-                  team_type: rowTeamType,
-                  tournament: entry.canonical,
-                })}
-                className="comp-link"
-                title={`${entry.most_titles.team} at ${entry.canonical}`}
-              >
-                {entry.most_titles.titles}
-              </Link>
-              {')'}
-            </>
+          {entry.most_titles.titles > 1 ? (
+            <TeamLink
+              teamName={entry.most_titles.team}
+              gender={rowGender ?? null}
+              team_type={rowTeamType ?? null}
+              subscriptSource={{ tournament: entry.canonical }}
+              maxTiers={1}
+              phraseLabel={`(${entry.most_titles.titles})`}
+            />
+          ) : (
+            <TeamLink
+              teamName={entry.most_titles.team}
+              compact
+              gender={rowGender ?? null}
+              team_type={rowTeamType ?? null}
+            />
           )}
         </div>
       )}
@@ -138,34 +99,19 @@ function TournamentTile({
           </div>
           {entry.latest_edition.champion && (
             <div className="wisden-tile-line">
-              <Link
-                to={teamUrl({
-                  team: entry.latest_edition.champion,
-                  gender: rowGender,
-                  team_type: rowTeamType,
+              Winner:{' '}
+              <TeamLink
+                teamName={entry.latest_edition.champion}
+                gender={rowGender ?? null}
+                team_type={rowTeamType ?? null}
+                subscriptSource={{
                   tournament: entry.canonical,
-                  season_from: entry.latest_edition.season,
-                  season_to: entry.latest_edition.season,
-                })}
-                className="comp-link"
-                title={`${entry.latest_edition.champion} at ${entry.canonical}, ${entry.latest_edition.season}`}
-              >
-                Winner: {entry.latest_edition.champion}
-              </Link>
-              <span className="scope-phrases-inline">
-                {' '}
-                <Link
-                  to={teamUrl({
-                    team: entry.latest_edition.champion,
-                    gender: rowGender,
-                    team_type: rowTeamType,
-                  })}
-                  className="comp-link scope-phrase"
-                  title={`${entry.latest_edition.champion}, all-time`}
-                >
-                  all-time
-                </Link>
-              </span>
+                  season: entry.latest_edition.season,
+                }}
+                maxTiers={1}
+                phraseLabel="ed"
+                phraseClassName="scope-phrase-ed"
+              />
             </div>
           )}
         </>
@@ -236,38 +182,25 @@ function RivalryTile({
           </div>
           {latest.winner && (() => {
             const opp = latest.winner === entry.team1 ? entry.team2 : entry.team1
-            const scopedHref = teamUrl({
-              team: latest.winner,
-              gender,
-              team_type: 'international',
-              tournament: latestIsBilateral ? null : latest.tournament,
-              season_from: latest.season,
-              season_to: latest.season,
-              filter_opponent: opp,
-              series_type: latestIsBilateral ? 'bilateral' : undefined,
-            })
-            const scopedDesc = latestIsBilateral
-              ? `${latest.winner} vs ${opp}, ${latest.season} bilateral`
-              : `${latest.winner} at ${latest.tournament}, ${latest.season} vs ${opp}`
             return (
               <div className="wisden-tile-line">
-                <Link to={scopedHref} className="comp-link" title={scopedDesc}>
-                  Winner: {latest.winner}
-                </Link>
-                <span className="scope-phrases-inline">
-                  {' '}
-                  <Link
-                    to={teamUrl({
-                      team: latest.winner,
-                      gender,
-                      team_type: 'international',
-                    })}
-                    className="comp-link scope-phrase"
-                    title={`${latest.winner}, all-time`}
-                  >
-                    all-time
-                  </Link>
-                </span>
+                Winner:{' '}
+                <TeamLink
+                  teamName={latest.winner}
+                  gender={gender}
+                  team_type="international"
+                  seriesType={latestIsBilateral ? 'bilateral' : null}
+                  subscriptSource={{
+                    tournament: latestIsBilateral ? null : latest.tournament,
+                    season: latest.season,
+                    team1: latest.winner,
+                    team2: opp,
+                  }}
+                  keepRivalry
+                  maxTiers={1}
+                  phraseLabel="ed"
+                  phraseClassName="scope-phrase-ed"
+                />
               </div>
             )
           })()}

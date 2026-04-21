@@ -57,37 +57,6 @@ const partnershipMatchLink = (
   )
 }
 
-type BatterLike = { person_id: string | null; name: string }
-const renderBatter = (b: BatterLike) => b.person_id
-  ? <Link to={`/batting?player=${encodeURIComponent(b.person_id)}`} className="comp-link">{b.name}</Link>
-  : <>{b.name}</>
-const renderBatterPair = (b1: BatterLike, b2: BatterLike) => (
-  <>{renderBatter(b1)}{' & '}{renderBatter(b2)}</>
-)
-
-const renderVsTeams = (team1: string, team2: string, sep = ' v ') => (
-  <>
-    <Link to={`/teams?team=${encodeURIComponent(team1)}`} className="comp-link">{team1}</Link>
-    {sep}
-    <Link to={`/teams?team=${encodeURIComponent(team2)}`} className="comp-link">{team2}</Link>
-  </>
-)
-
-
-/** Team-name link with the dossier's scope preserved. Teams are
- *  identity-bound to a tournament for clubs and narrow naturally via
- *  FilterBar on the team page, so one link (no name/context split) is
- *  sufficient. */
-function teamLinkHref(team: string, scope: {
-  tournament: string | null
-  gender: string | null | undefined
-}): string {
-  const p = new URLSearchParams({ team })
-  if (scope.tournament) p.set('tournament', scope.tournament)
-  if (scope.gender) p.set('gender', scope.gender)
-  return `/teams?${p.toString()}`
-}
-
 /** TeamLink scoped to the row's edition — (ed) token renders the
  *  compact phraseLabel while the href comes from resolveBucket with a
  *  per-row SubscriptSource override. See design-decisions.md
@@ -452,6 +421,10 @@ export default function TournamentDossier({
           error={pointsFetch.error}
           data={pointsFetch.data}
           refetch={pointsFetch.refetch}
+          tournament={tournament}
+          gender={filters.gender}
+          teamType={filters.team_type}
+          season={filters.season_from}
         />
       )}
       {currentTab === 'Batters' && (
@@ -523,6 +496,9 @@ export default function TournamentDossier({
           top={partnershipsTopFetch.data}
           topLoading={partnershipsTopFetch.loading}
           filterTeam={filters.team}
+          tournament={tournament}
+          gender={filters.gender}
+          teamType={filters.team_type}
         />
       )}
     </div>
@@ -919,13 +895,14 @@ function OverviewTab({
               return (
                 <div key={team} className="wisden-tile">
                   <div className="wisden-tile-title">
-                    <Link
-                      to={teamLinkHref(team, { tournament, gender })}
-                      className="comp-link"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      {team}
-                    </Link>
+                    <TeamLink
+                      teamName={team}
+                      gender={gender}
+                      team_type={teamType}
+                      subscriptSource={{ tournament, team1: team, team2: otherTeam }}
+                      keepRivalry
+                      maxTiers={1}
+                    />
                   </div>
                   <div className="wisden-tile-line mt-2">
                     {t.top_scorer && (
@@ -1013,31 +990,18 @@ function OverviewTab({
               <div key={`${g.season}-${g.group}`} className="wisden-tile" style={{ cursor: 'default' }}>
                 <div className="wisden-tile-title">Group {g.group}</div>
                 <div className="wisden-tile-line mt-1">
-                  {g.teams.map(t => {
-                    const qs = new URLSearchParams({ team: t.team, tournament })
-                    if (gender) qs.set('gender', gender)
-                    if (teamType) qs.set('team_type', teamType)
-                    qs.set('season_from', g.season)
-                    qs.set('season_to', g.season)
-                    return (
-                      <div key={t.team}>
-                        <TeamLink
-                          teamName={t.team}
-                          compact
-                          gender={gender}
-                          team_type={teamType}
-                        />
-                        <span className="wisden-tile-faint"> · </span>
-                        <Link
-                          to={`/teams?${qs.toString()}`}
-                          className="comp-link wisden-tile-faint"
-                          title={`${t.team} at ${tournament}, ${g.season} — ${t.matches} matches`}
-                        >
-                          {t.matches} m
-                        </Link>
-                      </div>
-                    )
-                  })}
+                  {g.teams.map(t => (
+                    <div key={t.team}>
+                      <TeamLink
+                        teamName={t.team}
+                        gender={gender}
+                        team_type={teamType}
+                        subscriptSource={{ tournament, season: g.season }}
+                        maxTiers={1}
+                        phraseLabel={`${t.matches} m`}
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
@@ -1162,32 +1126,18 @@ function OverviewTab({
               Teams {scopeLabel} ({summary.teams.length})
             </h3>
             <div className="flex flex-wrap gap-2">
-              {summary.teams.map(t => {
-                const scopedQs = new URLSearchParams({ team: t.name })
-                scopedQs.set('tournament', tournament)
-                if (gender) scopedQs.set('gender', gender)
-                if (teamType) scopedQs.set('team_type', teamType)
-                if (filters.season_from) scopedQs.set('season_from', filters.season_from)
-                if (filters.season_to) scopedQs.set('season_to', filters.season_to)
-                return (
-                  <span key={t.name} className="wisden-chip">
-                    <TeamLink
-                      teamName={t.name}
-                      compact
-                      gender={gender}
-                      team_type={teamType}
-                    />
-                    <span className="wisden-tile-faint"> · </span>
-                    <Link
-                      to={`/teams?${scopedQs.toString()}`}
-                      className="comp-link"
-                      title={`${t.name} ${scopeLabel} — ${t.matches} matches`}
-                    >
-                      {t.matches}
-                    </Link>
-                  </span>
-                )
-              })}
+              {summary.teams.map(t => (
+                <span key={t.name} className="wisden-chip">
+                  <TeamLink
+                    teamName={t.name}
+                    gender={gender}
+                    team_type={teamType}
+                    subscriptSource={{ tournament }}
+                    maxTiers={1}
+                    phraseLabel={`(${t.matches})`}
+                  />
+                </span>
+              ))}
             </div>
           </div>
         )
@@ -1264,13 +1214,50 @@ function OverviewTab({
 
 function PartnershipsTab({
   byWicket, byWicketLoading, top, topLoading, filterTeam,
+  tournament, gender, teamType,
 }: {
   byWicket: TournamentPartnershipsByWicket | null
   byWicketLoading: boolean
   top: TournamentPartnershipsTop | null
   topLoading: boolean
   filterTeam: string | null | undefined
+  tournament: string | null
+  gender: string | null | undefined
+  teamType: string | null | undefined
 }) {
+  const batterPair = (
+    b1: { person_id: string | null; name: string },
+    b2: { person_id: string | null; name: string },
+    scope: { tournament: string | null; season: string | null; battingTeam: string; opponent: string },
+  ) => (
+    <>
+      <PlayerLink
+        personId={b1.person_id} name={b1.name} role="batter" gender={gender}
+        subscriptSource={{
+          tournament: scope.tournament, season: scope.season,
+          team1: scope.battingTeam, team2: scope.opponent,
+        }}
+        compact
+      />
+      {' & '}
+      <PlayerLink
+        personId={b2.person_id} name={b2.name} role="batter" gender={gender}
+        subscriptSource={{
+          tournament: scope.tournament, season: scope.season,
+          team1: scope.battingTeam, team2: scope.opponent,
+        }}
+        compact
+      />
+    </>
+  )
+  const matchTeams = (row: { tournament: string | null; season: string | null; battingTeam: string; opponent: string }) => (
+    <>
+      <TeamWithEd team={row.battingTeam} row={row} gender={gender} team_type={teamType} />
+      {' v '}
+      <TeamWithEd team={row.opponent} row={row} gender={gender} team_type={teamType} />
+    </>
+  )
+
   return (
     <div className="mt-4">
       {filterTeam ? (
@@ -1293,6 +1280,7 @@ function PartnershipsTab({
           number were aggregated in scope. Best stand disambiguates the
           single best partnership in the current filter.
         </div>
+        <EdHelp />
         {byWicketLoading ? (
           <Spinner label="Loading by-wicket…" />
         ) : !byWicket?.by_wicket?.length ? (
@@ -1313,15 +1301,25 @@ function PartnershipsTab({
               { key: 'best_runs', label: 'Best', sortable: true },
               {
                 key: 'best_partnership', label: 'Best stand',
-                format: (_v, r) => r.best_partnership
-                  ? (renderBatterPair(r.best_partnership.batter1, r.best_partnership.batter2) as unknown as string)
-                  : '-',
+                format: (_v, r) => {
+                  const bp = r.best_partnership
+                  if (!bp) return '-'
+                  return batterPair(bp.batter1, bp.batter2, {
+                    tournament, season: bp.season,
+                    battingTeam: bp.batting_team, opponent: bp.opponent,
+                  }) as unknown as string
+                },
               },
               {
                 key: 'best_partnership', label: 'Match',
-                format: (_v, r) => r.best_partnership
-                  ? (renderVsTeams(r.best_partnership.batting_team, r.best_partnership.opponent) as unknown as string)
-                  : '-',
+                format: (_v, r) => {
+                  const bp = r.best_partnership
+                  if (!bp) return '-'
+                  return matchTeams({
+                    tournament, season: bp.season,
+                    battingTeam: bp.batting_team, opponent: bp.opponent,
+                  }) as unknown as string
+                },
               },
               {
                 key: 'best_partnership', label: 'Season',
@@ -1350,6 +1348,7 @@ function PartnershipsTab({
         <h3 className="wisden-section-title">
           Top partnerships{filterTeam ? ` (${filterTeam})` : ''}
         </h3>
+        <EdHelp />
         {topLoading ? (
           <Spinner label="Loading top…" />
         ) : !top?.partnerships?.length ? (
@@ -1362,12 +1361,18 @@ function PartnershipsTab({
               {
                 key: 'batter1', label: 'Batters',
                 format: (_v, r: TournamentPartnershipTopEntry) =>
-                  renderBatterPair(r.batter1, r.batter2) as unknown as string,
+                  batterPair(r.batter1, r.batter2, {
+                    tournament: r.tournament ?? tournament, season: r.season,
+                    battingTeam: r.batting_team, opponent: r.opponent,
+                  }) as unknown as string,
               },
               {
                 key: 'batting_team', label: 'Match',
                 format: (_v, r: TournamentPartnershipTopEntry) =>
-                  renderVsTeams(r.batting_team, r.opponent) as unknown as string,
+                  matchTeams({
+                    tournament: r.tournament ?? tournament, season: r.season,
+                    battingTeam: r.batting_team, opponent: r.opponent,
+                  }) as unknown as string,
               },
               { key: 'season', label: 'Season' },
               {
@@ -1502,27 +1507,6 @@ function EditionsTab({
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!seasons.length) return <div className="wisden-empty">No editions in scope.</div>
 
-  // Scoped-URL builders for the bracketed counts. The name links
-  // (TeamLink / PlayerLink compact) stay all-time per convention; only
-  // the bracketed fraction carries the "team/player at THIS edition"
-  // scope.
-  const scopedTeamUrl = (team: string, season: string): string => {
-    const qs = new URLSearchParams({ team })
-    if (tournament) qs.set('tournament', tournament)
-    if (gender) qs.set('gender', gender)
-    if (teamType) qs.set('team_type', teamType)
-    qs.set('season_from', season); qs.set('season_to', season)
-    return `/teams?${qs.toString()}`
-  }
-  const scopedPlayerUrl = (role: 'batting' | 'bowling', personId: string, season: string): string => {
-    const qs = new URLSearchParams({ player: personId })
-    if (tournament) qs.set('tournament', tournament)
-    if (gender) qs.set('gender', gender)
-    if (teamType) qs.set('team_type', teamType)
-    qs.set('season_from', season); qs.set('season_to', season)
-    return `/${role}?${qs.toString()}`
-  }
-
   const columns: Column<TournamentSeason>[] = [
     {
       key: 'season', label: 'Season', sortable: true,
@@ -1538,89 +1522,61 @@ function EditionsTab({
     {
       key: 'champion', label: 'Champion', sortable: true,
       format: (v: string | null, r) => v ? (
-        <>
+        r.champion_record ? (
+          <TeamLink
+            teamName={v}
+            gender={gender} team_type={teamType}
+            subscriptSource={{ tournament, season: r.season }}
+            maxTiers={1}
+            phraseLabel={`(${r.champion_record.won}/${r.champion_record.played})`}
+          />
+        ) : (
           <TeamLink teamName={v} compact gender={gender} team_type={teamType} />
-          {r.champion_record && (
-            <>
-              {' ('}
-              <Link
-                to={scopedTeamUrl(v, r.season)}
-                className="comp-link"
-                title={`${v} at ${tournament}, ${r.season} — ${r.champion_record.won}/${r.champion_record.played}`}
-              >
-                {r.champion_record.won}/{r.champion_record.played}
-              </Link>
-              {')'}
-            </>
-          )}
-        </>
+        )
       ) as unknown as string : '-',
     },
     {
       key: 'runner_up', label: 'Runner-up',
       format: (v: string | null, r) => v ? (
-        <>
+        r.runner_up_record ? (
+          <TeamLink
+            teamName={v}
+            gender={gender} team_type={teamType}
+            subscriptSource={{ tournament, season: r.season }}
+            maxTiers={1}
+            phraseLabel={`(${r.runner_up_record.won}/${r.runner_up_record.played})`}
+          />
+        ) : (
           <TeamLink teamName={v} compact gender={gender} team_type={teamType} />
-          {r.runner_up_record && (
-            <>
-              {' ('}
-              <Link
-                to={scopedTeamUrl(v, r.season)}
-                className="comp-link"
-                title={`${v} at ${tournament}, ${r.season} — ${r.runner_up_record.won}/${r.runner_up_record.played}`}
-              >
-                {r.runner_up_record.won}/{r.runner_up_record.played}
-              </Link>
-              {')'}
-            </>
-          )}
-        </>
+        )
       ) as unknown as string : '-',
     },
     {
       key: 'top_scorer', label: 'Top scorer',
       format: (_v, r) => r.top_scorer ? (
-        <>
-          <PlayerLink
-            personId={r.top_scorer.person_id}
-            name={r.top_scorer.name}
-            role="batter"
-            gender={gender}
-            compact
-          />
-          {' ('}
-          <Link
-            to={scopedPlayerUrl('batting', r.top_scorer.person_id, r.season)}
-            className="comp-link"
-            title={`${r.top_scorer.name} at ${tournament}, ${r.season} — ${r.top_scorer.runs} runs`}
-          >
-            {r.top_scorer.runs}
-          </Link>
-          {')'}
-        </>
+        <PlayerLink
+          personId={r.top_scorer.person_id}
+          name={r.top_scorer.name}
+          role="batter"
+          gender={gender}
+          subscriptSource={{ tournament, season: r.season }}
+          maxTiers={1}
+          phraseLabel={`(${r.top_scorer.runs})`}
+        />
       ) as unknown as string : '-',
     },
     {
       key: 'top_wicket_taker', label: 'Top wicket-taker',
       format: (_v, r) => r.top_wicket_taker ? (
-        <>
-          <PlayerLink
-            personId={r.top_wicket_taker.person_id}
-            name={r.top_wicket_taker.name}
-            role="bowler"
-            gender={gender}
-            compact
-          />
-          {' ('}
-          <Link
-            to={scopedPlayerUrl('bowling', r.top_wicket_taker.person_id, r.season)}
-            className="comp-link"
-            title={`${r.top_wicket_taker.name} at ${tournament}, ${r.season} — ${r.top_wicket_taker.wickets} wickets`}
-          >
-            {r.top_wicket_taker.wickets}
-          </Link>
-          {')'}
-        </>
+        <PlayerLink
+          personId={r.top_wicket_taker.person_id}
+          name={r.top_wicket_taker.name}
+          role="bowler"
+          gender={gender}
+          subscriptSource={{ tournament, season: r.season }}
+          maxTiers={1}
+          phraseLabel={`(${r.top_wicket_taker.wickets})`}
+        />
       ) as unknown as string : '-',
     },
     {
@@ -1655,10 +1611,14 @@ function EditionsTab({
 }
 
 function PointsTab({
-  loading, error, data, refetch,
+  loading, error, data, refetch, tournament, gender, teamType, season,
 }: {
   loading: boolean; error: string | null
   data: TournamentPointsTableResponse | null; refetch: () => void
+  tournament: string | null
+  gender: string | null | undefined
+  teamType: string | null | undefined
+  season: string | null | undefined
 }) {
   if (loading) return <Spinner label="Loading points table…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
@@ -1675,7 +1635,19 @@ function PointsTab({
   }
 
   const columns: Column<PointsTableRow>[] = [
-    { key: 'team', label: 'Team' },
+    {
+      key: 'team', label: 'Team',
+      format: (v: string) => (
+        <TeamLink
+          teamName={v}
+          gender={gender} team_type={teamType}
+          subscriptSource={{ tournament, season }}
+          maxTiers={1}
+          phraseLabel="ed"
+          phraseClassName="scope-phrase-ed"
+        />
+      ) as unknown as string,
+    },
     { key: 'played', label: 'P', sortable: true },
     { key: 'wins', label: 'W', sortable: true },
     { key: 'losses', label: 'L', sortable: true },
@@ -2080,10 +2052,31 @@ function RecordsTab({
             { key: 'runs', label: 'Runs', sortable: true },
             {
               key: 'batter1', label: 'Batters',
-              format: (_v, r: TournamentRecordPartnership) =>
-                (r.batter1 && r.batter2
-                  ? renderBatterPair(r.batter1, r.batter2)
-                  : '-') as unknown as string,
+              format: (_v, r: TournamentRecordPartnership) => {
+                if (!r.batter1 || !r.batter2) return '-'
+                const src = {
+                  tournament: r.tournament, season: r.season,
+                  team1: r.batting_team,
+                  team2: r.batting_team === r.team1 ? r.team2 : r.team1,
+                }
+                return (
+                  <>
+                    <PlayerLink
+                      personId={r.batter1.person_id} name={r.batter1.name}
+                      role="batter" gender={gender}
+                      subscriptSource={src}
+                      compact
+                    />
+                    {' & '}
+                    <PlayerLink
+                      personId={r.batter2.person_id} name={r.batter2.name}
+                      role="batter" gender={gender}
+                      subscriptSource={src}
+                      compact
+                    />
+                  </>
+                ) as unknown as string
+              },
             },
             {
               key: 'team1', label: 'Match',
@@ -2114,8 +2107,14 @@ function RecordsTab({
             {
               key: 'name', label: 'Bowler',
               format: (_v, r: TournamentRecordBowling) => (
-                <Link to={`/bowling?player=${encodeURIComponent(r.person_id)}`}
-                  className="comp-link">{r.name}</Link>
+                <PlayerLink
+                  personId={r.person_id} name={r.name}
+                  role="bowler" gender={gender}
+                  subscriptSource={{ tournament: r.tournament, season: r.season }}
+                  maxTiers={1}
+                  phraseLabel="ed"
+                  phraseClassName="scope-phrase-ed"
+                />
               ) as unknown as string,
             },
             editionCol,
