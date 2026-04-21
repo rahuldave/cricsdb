@@ -1169,16 +1169,30 @@ function OverviewTab({
           <h3 className="wisden-section-title">Champions by season</h3>
           <DataTable
             columns={[
-              { key: 'season', label: 'Season', sortable: true },
+              { key: 'season', label: 'Edition', sortable: true },
               {
                 key: 'champion', label: 'Champion', sortable: true,
-                format: (v: string) => (
-                  <Link to={teamLinkHref(v, { tournament, gender })} className="comp-link">{v}</Link>
+                format: (v: string, r) => (
+                  <TeamWithEd
+                    team={v}
+                    row={{ tournament, season: r.season }}
+                    gender={gender}
+                    team_type={teamType}
+                  />
                 ) as unknown as string,
               },
               {
                 key: 'match_id', label: 'Final',
-                format: (v: number) => matchLink(v, 'scorecard →') as unknown as string,
+                format: (_v, r) => (
+                  <Score
+                    team1Score={r.team1_score}
+                    team2Score={r.team2_score}
+                    matchId={r.match_id}
+                    title={r.team1 && r.team2
+                      ? `${r.team1} ${r.team1_score ?? '—'} vs ${r.team2} ${r.team2_score ?? '—'} — scorecard`
+                      : undefined}
+                  />
+                ) as unknown as string,
               },
             ]}
             data={summary.champions_by_season}

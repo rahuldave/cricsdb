@@ -653,9 +653,33 @@ async def tournament_summary(
     total_wickets = wkt_rows[0]["wickets"] if wkt_rows else 0
 
     # ── Champions + most-titles ──
+    # Include the final's team1/team2 + per-innings scores so the
+    # frontend Champions-by-season table can render a <Score /> instead
+    # of a bare "scorecard →" link. Scalar subqueries mirror the pattern
+    # in /series/by-season::finals_rows (see design-decisions.md on
+    # avoiding delivery × wicket LEFT JOIN overcount).
     finals_rows = await db.q(
         f"""
-        SELECT m.season AS season, m.outcome_winner AS winner, m.id AS match_id
+        SELECT m.season AS season, m.outcome_winner AS winner, m.id AS match_id,
+               m.team1, m.team2,
+               (SELECT COALESCE(SUM(d.runs_total), 0)
+                  FROM innings i JOIN delivery d ON d.innings_id = i.id
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_runs,
+               (SELECT COUNT(*) FROM wicket w
+                  JOIN delivery d ON d.id = w.delivery_id
+                  JOIN innings i ON i.id = d.innings_id
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_wkts,
+               (SELECT COALESCE(SUM(d.runs_total), 0)
+                  FROM innings i JOIN delivery d ON d.innings_id = i.id
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_runs,
+               (SELECT COUNT(*) FROM wicket w
+                  JOIN delivery d ON d.id = w.delivery_id
+                  JOIN innings i ON i.id = d.innings_id
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_wkts,
+               (SELECT COUNT(*) FROM innings i
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_has,
+               (SELECT COUNT(*) FROM innings i
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_has
         FROM match m
         WHERE {where} AND m.event_stage = 'Final' AND m.outcome_winner IS NOT NULL
         ORDER BY m.season DESC
@@ -663,7 +687,15 @@ async def tournament_summary(
         params,
     )
     champions_by_season = [
-        {"season": r["season"], "champion": r["winner"], "match_id": r["match_id"]}
+        {
+            "season": r["season"],
+            "champion": r["winner"],
+            "match_id": r["match_id"],
+            "team1": r["team1"],
+            "team2": r["team2"],
+            "team1_score": f"{r['t1_runs']}/{r['t1_wkts']}" if r["t1_has"] else None,
+            "team2_score": f"{r['t2_runs']}/{r['t2_wkts']}" if r["t2_has"] else None,
+        }
         for r in finals_rows
     ]
     title_counts: dict[str, int] = {}

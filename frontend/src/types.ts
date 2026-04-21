@@ -1181,7 +1181,15 @@ export interface TournamentSummary {
   boundary_pct: number | null
   dot_pct: number | null
   most_titles: { team: string; titles: number } | null
-  champions_by_season: { season: string; champion: string; match_id: number }[]
+  champions_by_season: {
+    season: string
+    champion: string
+    match_id: number
+    team1: string
+    team2: string
+    team1_score: string | null
+    team2_score: string | null
+  }[]
   top_scorer_alltime: (PersonRef & { team: string | null; runs: number }) | null
   top_wicket_taker_alltime: (PersonRef & { team: string | null; wickets: number }) | null
   highest_individual: (PersonRef & {
