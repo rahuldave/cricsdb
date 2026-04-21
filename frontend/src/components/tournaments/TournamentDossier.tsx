@@ -1169,7 +1169,7 @@ function OverviewTab({
           <h3 className="wisden-section-title">Champions by season</h3>
           <DataTable
             columns={[
-              { key: 'season', label: 'Edition', sortable: true },
+              { key: 'season', label: 'Season', sortable: true },
               {
                 key: 'champion', label: 'Champion', sortable: true,
                 format: (v: string, r) => (
