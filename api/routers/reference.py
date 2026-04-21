@@ -304,27 +304,38 @@ async def search_players(
 
     if role == "fielder":
         if has_scope:
+            # Fielding is universal — every XI member fields, even if
+            # they never take a catch/stumping/run-out. Scoping via
+            # `fieldingcredit` (like batter scopes via delivery) would
+            # exclude players who were in the squad but had no
+            # dismissals in scope — e.g. Jadeja played 11 T20 WC Men
+            # matches 2021/22+ but registered 0 fielding credits.
+            # Use `matchplayer` instead so the picker surfaces everyone
+            # who was in an XI in scope; the scope-stats endpoint
+            # returns zero-filled entries for squad members with no
+            # credits rather than {entry: null}.
+            scope_match_where, scope_match_params = filters.build_side_neutral(
+                has_innings_join=False, aux=aux,
+            )
             rows = await db.q(
                 f"""
                 SELECT p.id, p.name, p.unique_name,
-                       COUNT(DISTINCT i.id) as innings
+                       COUNT(DISTINCT mp.match_id) as innings
                 FROM person p
-                JOIN fieldingcredit fc ON fc.fielder_id = p.id
-                JOIN delivery d ON d.id = fc.delivery_id
-                JOIN innings i ON i.id = d.innings_id
-                JOIN match m ON m.id = i.match_id
+                JOIN matchplayer mp ON mp.person_id = p.id
+                JOIN match m ON m.id = mp.match_id
                 WHERE (p.name LIKE :q || '%'
                        OR p.unique_name LIKE '%' || :q || '%'
                        OR p.id IN (
                            SELECT pn.person_id FROM personname pn
                            WHERE pn.name LIKE '%' || :q || '%'
                        ))
-                  AND {scope_where}
+                  AND {scope_match_where}
                 GROUP BY p.id
                 ORDER BY innings DESC
                 LIMIT :limit
                 """,
-                params,
+                {**params, **scope_match_params},
             )
         else:
             rows = await db.q(

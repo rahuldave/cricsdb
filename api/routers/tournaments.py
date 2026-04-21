@@ -2468,9 +2468,16 @@ async def tournament_fielder_scope_stats(
 ):
     """Scoped fielding stats for one picked player.
 
-    Sibling of /series/{batter,bowler}-scope-stats — returns a
-    FieldingLeaderEntry for the given person_id in scope, or
-    {"entry": null} when they have no fielding credits in scope.
+    Sibling of /series/{batter,bowler}-scope-stats. Fielding is
+    universal (every XI member fields), so this endpoint differs
+    from the batter / bowler siblings in one way: when the player
+    took 0 credits in scope BUT was in the XI for at least one
+    scope match (matchplayer check), it returns a zero-filled entry
+    rather than {"entry": null}. That lets the Series > Fielders
+    picker render "Jadeja · 0 · 0 · 0 · 0 · 0" for an all-rounder
+    who fielded every match but took no catches/stumpings/run-outs.
+    Truly out-of-scope players (no matchplayer entry at all) still
+    return {"entry": null}.
     """
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
@@ -2493,8 +2500,48 @@ async def tournament_fielder_scope_stats(
         params,
     )
     row = disp_rows[0] if disp_rows else None
-    if not row or not row["total"]:
-        return {"entry": None}
+    has_credits = bool(row and row["total"])
+
+    # If no fielding credits in scope, the player may still have been
+    # in the XI for scope matches — check matchplayer. Use a match-level
+    # where (no innings join) since matchplayer is keyed off matches.
+    if not has_credits:
+        mp_where, mp_params = _tournament_scope_where(
+            filters, tournament, series_type=series_type,
+        )
+        # _tournament_scope_where always includes match-level clauses,
+        # no innings join — safe to reuse for a matchplayer lookup.
+        mp_params["person_id"] = person_id
+        mp_rows = await db.q(
+            f"""
+            SELECT COUNT(DISTINCT mp.match_id) AS n,
+                   mp.team AS team
+            FROM matchplayer mp
+            JOIN match m ON m.id = mp.match_id
+            WHERE mp.person_id = :person_id
+              AND {mp_where}
+            GROUP BY mp.team
+            ORDER BY n DESC
+            LIMIT 1
+            """,
+            mp_params,
+        )
+        if not mp_rows or not mp_rows[0]["n"]:
+            return {"entry": None}
+        name_rows = await db.q(
+            "SELECT name FROM person WHERE id = :pid",
+            {"pid": person_id},
+        )
+        name = name_rows[0]["name"] if name_rows else person_id
+        return {
+            "entry": {
+                "person_id": person_id,
+                "name": name,
+                "total": 0, "catches": 0, "stumpings": 0,
+                "run_outs": 0, "c_and_b": 0,
+                "team": mp_rows[0]["team"],
+            },
+        }
 
     name_rows = await db.q(
         "SELECT name FROM person WHERE id = :pid",

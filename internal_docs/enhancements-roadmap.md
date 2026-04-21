@@ -727,6 +727,19 @@ surfaces row-specific context. Commits `74c5666` … `5708f56`.
   in the Fielders tab lower-right slot, completing the 2x2 grid.
   REG flip for `series_fielders_leaders_ipl` (REG→NEW) was landed
   in a preceding commit per the project convention on shape changes.
+- **Fielder scoped search: broadened to matchplayer (post-deploy
+  fix).** Issue caught on prod: typing "jadeja" in Fielders picker
+  at T20 WC Men 2021/22+ returned no results, because the scoped
+  `/players?role=fielder` path required ≥1 `fieldingcredit` in
+  scope and Jadeja's 11 WC matches yielded zero dismissals. Fix:
+  for `has_scope=True` fielder searches, join `matchplayer` instead
+  (fielding is universal — everyone in the XI fields regardless of
+  whether they took a catch). `/series/fielder-scope-stats` now
+  zero-fills the entry for squad members with no credits rather
+  than returning `{entry: null}`. Out-of-scope players (no
+  matchplayer entry at all) still null. Batter/bowler scope logic
+  unchanged — role-specific activity is still the natural universe
+  there.
 
 ### Shipped 2026-04-21 (Series tab refactor + Partnerships/Records expansion)
 

@@ -1349,8 +1349,14 @@ curl "http://localhost:8000/api/v1/series/fielders-leaders?tournament=Indian+Pre
 
 Aggregate fielding stats for one picked player in the current scope —
 sibling of `batter-scope-stats` and `bowler-scope-stats`. Backs the
-Series > Fielders "Picked fielder" tile. Returns `{"entry": null}`
-when the player has no fielding credits in scope.
+Series > Fielders "Picked fielder" tile. Fielding is universal
+(every XI member fields), so this endpoint differs from its batter /
+bowler siblings in one way: when the player took 0 credits in scope
+BUT was in the XI for ≥1 scope match (matchplayer check), it returns
+a zero-filled entry rather than `{"entry": null}`. That way the
+picker can render e.g. "Jadeja · 0 · 0 · 0 · 0 · 0" for an all-
+rounder who fielded every match but took no catches / run-outs.
+Truly out-of-scope players (no matchplayer entry) still return null.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/fielder-scope-stats?person_id=ba607b88&tournament=T20+World+Cup+%28Men%29&gender=male&team_type=international&season_from=2022%2F23&season_to=2025%2F26"
