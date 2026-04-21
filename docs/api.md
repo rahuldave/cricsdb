@@ -295,14 +295,25 @@ Chinnaswamy), ≥ 50 on spin-friendly grounds (Chepauk).
 Player search. Params: `q` (≥2 chars), `role` (`batter`/`bowler`/
 `fielder`, optional), `limit` (default 20).
 
+Optional FilterBar + aux scope params — when any of `gender`, `team_type`,
+`tournament`, `season_from`, `season_to`, `filter_team`, `filter_opponent`,
+`filter_venue`, or `series_type` is set, the endpoint narrows to people
+who appeared on either team in scope matches (same match-level filter
+as the `/series/*-leaders` endpoints). Used by the Series tab's
+discipline-picker typeaheads so e.g. "AB" on T20 WC Men 2022/23-2025/26
+doesn't surface AB de Villiers.
+
 ```bash
 curl "http://localhost:8000/api/v1/players?q=Kohli&limit=3"
+
+# Scoped: only Kohlis with deliveries in T20 WC Men 2022/23-2025/26
+curl "http://localhost:8000/api/v1/players?q=Kohli&role=batter&tournament=T20+World+Cup+%28Men%29&gender=male&team_type=international&season_from=2022%2F23&season_to=2025%2F26"
 ```
 
 ```json
 {
   "players": [
-    { "id": "ba607b88", "name": "V Kohli", "unique_name": "V Kohli", "innings": 378 },
+    { "id": "ba607b88", "name": "V Kohli", "unique_name": "V Kohli", "innings": 375 },
     { "id": "40caa465", "name": "T Kohli", "unique_name": "T Kohli", "innings": 29 }
   ]
 }
@@ -1314,6 +1325,34 @@ curl "http://localhost:8000/api/v1/series/batters-leaders?tournament=T20+World+C
   "by_average":     [ { "person_id": "…", "name": "ML Hayden", "team": "Australia", "runs": 259, "balls": 132, "dismissals": 3, "average": 86.33, "strike_rate": 196.21 } ],
   "by_strike_rate": [ { "person_id": "…", "name": "SV Samson", "team": "India", "strike_rate": 199.38, "runs": 321, "balls": 161 } ],
   "thresholds": { "min_balls": 100, "min_dismissals": 3 }
+}
+```
+
+## `GET /api/v1/series/batter-scope-stats`
+
+Aggregate batting stats for one specific player in the current
+match-set scope. Backs the Series > Batters "Picked batter" tile: the
+user picks a player from the scope-aware typeahead; this returns the
+same row shape as `/series/batters-leaders` so the card reuses the
+leaderboard cell renderers. Returns `{"entry": null}` when the
+picked player has no deliveries in scope (e.g. filter tweaked after
+picking).
+
+Params: `person_id` (required), `tournament`, `series_type`, + full
+FilterBar.
+
+```bash
+curl "http://localhost:8000/api/v1/series/batter-scope-stats?person_id=ba607b88&tournament=T20+World+Cup+%28Men%29&gender=male&team_type=international&season_from=2022%2F23&season_to=2025%2F26"
+```
+
+```json
+{
+  "entry": {
+    "person_id": "ba607b88", "name": "V Kohli",
+    "runs": 416, "balls": 324, "dismissals": 10,
+    "average": 41.6, "strike_rate": 128.4,
+    "team": "India"
+  }
 }
 ```
 

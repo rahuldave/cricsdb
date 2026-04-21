@@ -2020,6 +2020,94 @@ async def tournament_batters_leaders(
     }
 
 
+@router.get("/series/batter-scope-stats")
+async def tournament_batter_scope_stats(
+    person_id: str = Query(..., description="Person ID to fetch scoped stats for"),
+    tournament: str | None = Query(None),
+    series_type: str | None = Query(None),
+    filters: FilterParams = Depends(),
+):
+    """Scoped batting stats for one picked player.
+
+    Return shape matches BattingLeaderEntry so the Series > Batters
+    picker card reuses the same cell renderers as the leaderboard
+    rows. Returns `{"entry": null}` when the player has no deliveries
+    in the current scope (filter out-of-scope case).
+    """
+    db = get_db()
+    where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    params["person_id"] = person_id
+
+    agg_rows = await db.q(
+        f"""
+        SELECT SUM(d.runs_batter) AS runs, COUNT(*) AS balls
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE d.batter_id = :person_id
+          AND d.extras_wides = 0 AND d.extras_noballs = 0
+          AND i.super_over = 0 AND {where}
+        """,
+        params,
+    )
+    row = agg_rows[0] if agg_rows else None
+    if not row or not row["balls"]:
+        return {"entry": None}
+    runs = row["runs"] or 0
+    balls = row["balls"] or 0
+
+    dism_rows = await db.q(
+        f"""
+        SELECT COUNT(*) AS dismissals
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE w.player_out_id = :person_id
+          AND w.kind NOT IN ('retired hurt', 'retired out')
+          AND i.super_over = 0 AND {where}
+        """,
+        params,
+    )
+    dism = (dism_rows[0]["dismissals"] or 0) if dism_rows else 0
+
+    name_rows = await db.q(
+        "SELECT name FROM person WHERE id = :pid",
+        {"pid": person_id},
+    )
+    name = name_rows[0]["name"] if name_rows else person_id
+
+    team_rows = await db.q(
+        f"""
+        SELECT i.team AS team, COUNT(*) AS n
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE d.batter_id = :person_id
+          AND d.extras_wides = 0 AND d.extras_noballs = 0
+          AND i.super_over = 0 AND {where}
+        GROUP BY i.team
+        ORDER BY n DESC
+        LIMIT 1
+        """,
+        params,
+    )
+    team = team_rows[0]["team"] if team_rows else None
+
+    return {
+        "entry": {
+            "person_id": person_id,
+            "name": name,
+            "runs": runs,
+            "balls": balls,
+            "dismissals": dism,
+            "average": _safe_div(runs, dism) if dism > 0 else None,
+            "strike_rate": _safe_div(runs, balls, 100),
+            "team": team,
+        },
+    }
+
+
 @router.get("/series/bowlers-leaders")
 async def tournament_bowlers_leaders(
     tournament: str | None = Query(None),

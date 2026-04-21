@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams
+from ..filters import FilterParams, AuxParams
 from ..tournament_canonical import (
     canonicalize, variants as canonical_variants,
     is_canonical_with_variants, event_name_in_clause,
@@ -267,18 +267,122 @@ async def search_players(
     q: str = Query(..., min_length=2),
     role: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=100),
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
+    """Name-typeahead for players, optionally narrowed to a scope.
+
+    Without scope (no FilterBar / aux params set), returns global ranking
+    by total innings in the requested role.
+
+    With scope, narrows to people who appeared on either team in scope
+    matches — consistent with how /series/*-leaders scope (match-level
+    team filter). This keeps the Series tab's picker from surfacing
+    e.g. AB de Villiers when the dossier is scoped to T20 WC 2022-2026.
+    """
     db = get_db()
     params: dict = {"q": q, "limit": limit}
 
+    # Detect scope from raw filter fields — NOT from the WHERE clause,
+    # because `build(has_innings_join=True)` always emits the baseline
+    # `i.super_over = 0` clause, which would falsely route every
+    # unscoped request through the slower innings-joined path AND
+    # exclude super-over deliveries (changing `innings` counts
+    # compared to the legacy query).
+    has_scope = bool(
+        filters.gender or filters.team_type or filters.tournament
+        or filters.season_from or filters.season_to
+        or filters.team or filters.opponent or filters.venue
+        or (aux.series_type and aux.series_type != 'all')
+    )
+    scope_where = ""
+    if has_scope:
+        scope_where, scope_params = filters.build_side_neutral(
+            has_innings_join=True, aux=aux,
+        )
+        params.update(scope_params)
+
     if role == "fielder":
-        # Fielder search: ranked by total dismissals from fielding_credit
+        if has_scope:
+            rows = await db.q(
+                f"""
+                SELECT p.id, p.name, p.unique_name,
+                       COUNT(DISTINCT i.id) as innings
+                FROM person p
+                JOIN fieldingcredit fc ON fc.fielder_id = p.id
+                JOIN delivery d ON d.id = fc.delivery_id
+                JOIN innings i ON i.id = d.innings_id
+                JOIN match m ON m.id = i.match_id
+                WHERE (p.name LIKE :q || '%'
+                       OR p.unique_name LIKE '%' || :q || '%'
+                       OR p.id IN (
+                           SELECT pn.person_id FROM personname pn
+                           WHERE pn.name LIKE '%' || :q || '%'
+                       ))
+                  AND {scope_where}
+                GROUP BY p.id
+                ORDER BY innings DESC
+                LIMIT :limit
+                """,
+                params,
+            )
+        else:
+            rows = await db.q(
+                """
+                SELECT p.id, p.name, p.unique_name,
+                       COUNT(*) as innings
+                FROM person p
+                JOIN fieldingcredit fc ON fc.fielder_id = p.id
+                WHERE p.name LIKE :q || '%'
+                   OR p.unique_name LIKE '%' || :q || '%'
+                   OR p.id IN (
+                       SELECT pn.person_id FROM personname pn
+                       WHERE pn.name LIKE '%' || :q || '%'
+                   )
+                GROUP BY p.id
+                ORDER BY innings DESC
+                LIMIT :limit
+                """,
+                params,
+            )
+        return {"players": rows}
+
+    if role == "batter":
+        join_col = "d.batter_id"
+    elif role == "bowler":
+        join_col = "d.bowler_id"
+    else:
+        join_col = "d.batter_id"
+
+    if has_scope:
         rows = await db.q(
-            """
+            f"""
             SELECT p.id, p.name, p.unique_name,
-                   COUNT(*) as innings
+                   COUNT(DISTINCT d.innings_id) as innings
             FROM person p
-            JOIN fieldingcredit fc ON fc.fielder_id = p.id
+            JOIN delivery d ON {join_col} = p.id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE (p.name LIKE :q || '%'
+                   OR p.unique_name LIKE '%' || :q || '%'
+                   OR p.id IN (
+                       SELECT pn.person_id FROM personname pn
+                       WHERE pn.name LIKE '%' || :q || '%'
+                   ))
+              AND {scope_where}
+            GROUP BY p.id
+            ORDER BY innings DESC
+            LIMIT :limit
+            """,
+            params,
+        )
+    else:
+        rows = await db.q(
+            f"""
+            SELECT p.id, p.name, p.unique_name,
+                   COUNT(DISTINCT d.innings_id) as innings
+            FROM person p
+            JOIN delivery d ON {join_col} = p.id
             WHERE p.name LIKE :q || '%'
                OR p.unique_name LIKE '%' || :q || '%'
                OR p.id IN (
@@ -291,31 +395,4 @@ async def search_players(
             """,
             params,
         )
-        return {"players": rows}
-
-    if role == "batter":
-        join_col = "d.batter_id"
-    elif role == "bowler":
-        join_col = "d.bowler_id"
-    else:
-        join_col = "d.batter_id"
-
-    rows = await db.q(
-        f"""
-        SELECT p.id, p.name, p.unique_name,
-               COUNT(DISTINCT d.innings_id) as innings
-        FROM person p
-        JOIN delivery d ON {join_col} = p.id
-        WHERE p.name LIKE :q || '%'
-           OR p.unique_name LIKE '%' || :q || '%'
-           OR p.id IN (
-               SELECT pn.person_id FROM personname pn
-               WHERE pn.name LIKE '%' || :q || '%'
-           )
-        GROUP BY p.id
-        ORDER BY innings DESC
-        LIMIT :limit
-        """,
-        params,
-    )
     return {"players": rows}

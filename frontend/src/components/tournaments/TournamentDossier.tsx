@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
 import { useUrlParam, useSetUrlParams } from '../../hooks/useUrlState'
@@ -8,12 +8,14 @@ import {
   getTournamentSummary, getTournamentBySeason, getTournamentPointsTable,
   getTournamentRecords,
   getTournamentBattersLeaders, getTournamentBowlersLeaders, getTournamentFieldersLeaders,
+  getTournamentBatterScopeStats,
   getTournamentPartnershipsByWicket, getTournamentPartnershipsTop,
   getTournamentPartnershipsTopByWicket,
   getMatches,
 } from '../../api'
 import StatCard from '../StatCard'
 import PlayerLink from '../PlayerLink'
+import PlayerSearch from '../PlayerSearch'
 import TeamLink from '../TeamLink'
 import SeriesLink from '../SeriesLink'
 import Score from '../Score'
@@ -194,6 +196,21 @@ export default function TournamentDossier({
       ? getTournamentBattersLeaders(tournament, { ...apiFilters, limit: 20 })
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Batters'],
+  )
+
+  // Picker URL state — the picked player's scoped stats are rendered
+  // in the upper-left slot of each subtab's 2x2 grid. The fetch returns
+  // `{entry: null}` when the pick is out of scope (e.g. user narrowed
+  // season after picking) — BattersTab/BowlersTab/FieldersTab render
+  // an empty-state card in that case (option (ii) from the design).
+  const [seriesBatter, setSeriesBatter] = useUrlParam('series_batter', '')
+  const batterScopeFetch = useFetch<
+    { entry: BattingLeaderEntry | null } | null
+  >(
+    () => currentTab === 'Batters' && seriesBatter
+      ? getTournamentBatterScopeStats(tournament, seriesBatter, apiFilters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Batters', seriesBatter],
   )
   const bowlingFetch = useFetch<BowlingLeaders | null>(
     () => currentTab === 'Bowlers'
@@ -449,6 +466,11 @@ export default function TournamentDossier({
           filterTeam={filterTeam}
           filterOpponent={filterOpponent}
           gender={filters.gender}
+          scope={apiFilters}
+          pickedId={seriesBatter}
+          onPick={(id) => setSeriesBatter(id)}
+          pickedEntry={batterScopeFetch.data?.entry ?? null}
+          pickedLoading={batterScopeFetch.loading}
         />
       )}
       {currentTab === 'Bowlers' && (
@@ -1766,6 +1788,7 @@ function rowSubscriptSource(opts: {
 
 function BattersTab({
   loading, error, data, refetch, filterTeam, filterOpponent, gender,
+  scope, pickedId, onPick, pickedEntry, pickedLoading,
 }: {
   loading: boolean; error: string | null
   data: BattingLeaders | null; refetch: () => void
@@ -1773,6 +1796,11 @@ function BattersTab({
   filterTeam: string | null | undefined
   filterOpponent: string | null | undefined
   gender: string | null | undefined
+  scope: import('../../types').FilterParams & { series_type?: string }
+  pickedId: string
+  onPick: (id: string) => void
+  pickedEntry: BattingLeaderEntry | null
+  pickedLoading: boolean
 }) {
   if (loading) return <Spinner label="Loading batters…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
@@ -1793,6 +1821,31 @@ function BattersTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+      <PickerSlot
+        title="Picked batter"
+        role="batter"
+        scope={scope}
+        pickedId={pickedId}
+        onPick={onPick}
+        loading={pickedLoading}
+        empty={!!pickedId && !pickedEntry && !pickedLoading}
+        onClear={() => onPick('')}
+      >
+        {pickedEntry && (
+          <DataTable
+            columns={[
+              { key: 'name', label: 'Batter', format: (_v, r) => batterCell(r) },
+              { key: 'runs', label: 'Runs' },
+              { key: 'balls', label: 'Balls' },
+              { key: 'dismissals', label: 'Outs' },
+              { key: 'average', label: 'Avg', format: (v) => fmt(v, 2) },
+              { key: 'strike_rate', label: 'SR', format: (v) => fmt(v, 2) },
+            ]}
+            data={[pickedEntry]}
+            rowKey={(r) => r.person_id}
+          />
+        )}
+      </PickerSlot>
       <div>
         <h3 className="wisden-section-title">By runs scored</h3>
         <DataTable
@@ -1833,6 +1886,52 @@ function BattersTab({
           rowKey={(r) => r.person_id}
         />
       </div>
+    </div>
+  )
+}
+
+/** Shared upper-left picker slot. PlayerSearch scoped to `scope` (so
+ *  the typeahead excludes people with no data in the current scope);
+ *  empty-state when the picked player has no data after filter tweaks.
+ *  Keeps the 2x2 grid coherent by owning one grid cell — `children` is
+ *  the scoped result card (picker-specific columns). */
+function PickerSlot({
+  title, role, scope, pickedId, onPick, loading, empty, onClear, children,
+}: {
+  title: string
+  role: 'batter' | 'bowler' | 'fielder'
+  scope: import('../../types').FilterParams & { series_type?: string }
+  pickedId: string
+  onPick: (id: string) => void
+  loading: boolean
+  empty: boolean
+  onClear: () => void
+  children: ReactNode
+}) {
+  return (
+    <div>
+      <h3 className="wisden-section-title">{title}</h3>
+      <div style={{ marginBottom: '1rem' }}>
+        <PlayerSearch
+          role={role}
+          scope={scope}
+          onSelect={(p) => onPick(p.id)}
+          placeholder={`Search ${role}s in scope…`}
+        />
+      </div>
+      {pickedId && loading && <Spinner label="Loading picked stats…" />}
+      {empty && (
+        <div className="wisden-tab-help" style={{ fontStyle: 'italic' }}>
+          No data for the picked player in the current filter scope.
+          {' '}
+          <button
+            onClick={onClear}
+            className="comp-link"
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+          >× clear</button>
+        </div>
+      )}
+      {children}
     </div>
   )
 }

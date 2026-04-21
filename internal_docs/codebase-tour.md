@@ -42,12 +42,17 @@ api/
                           bilateral-rivalry tiles bilateral-only, club leagues, other)
                          /api/v1/series/{summary,by-season,records,
                           batters-leaders,bowlers-leaders,fielders-leaders,
+                          batter-scope-stats,
                           partnerships/by-wicket,partnerships/top,partnerships/heatmap}
                          — all accept optional tournament + series_type
                           (all/bilateral_only/tournament_only) + filter_team/filter_opponent.
                           Leaders rows carry `team` (dominant side) so rivalry-dossier
                           context links flip filter_team/filter_opponent per row.
                           Summary returns by_team per-team breakdowns when team-pair set.
+                         /api/v1/series/batter-scope-stats (person_id + same scope
+                          params) returns one BattingLeaderEntry row for the picked
+                          player, or {entry:null} if out of scope — backs the Series
+                          > Batters "Picked batter" tile.
                          /api/v1/series/points-table (single-season; tournament required)
                          /api/v1/series/other-rivalries (lazy-load expander)
                          /api/v1/rivalries/summary (legacy; new code uses dossier endpoints)
@@ -122,8 +127,11 @@ frontend/src/
                                    /bowling, /fielding route is active; mounts FilterBar +
                                    ScopeStatusStrip below it on every non-home, non-scorecard,
                                    non-help route), FilterBar, PlayerSearch
-                                   (role prop now optional — omit for role-agnostic /players
-                                   search), TeamSearch, StatCard, DataTable, Spinner, ErrorBanner,
+                                   (role prop optional; `scope` prop passes FilterBar + aux
+                                   through to the server so the Series-tab discipline pickers
+                                   exclude players with no data in the current match-set —
+                                   e.g. "AB" on T20 WC Men 2022-2026 won't surface de Villiers),
+                                   TeamSearch, StatCard, DataTable, Spinner, ErrorBanner,
                                    Scorecard, InningsCard,
                                    PlayerLink + TeamLink (unified phrase-subscript model: name
                                    link = all-time identity; named-phrase subscripts driven by

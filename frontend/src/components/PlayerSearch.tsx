@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { searchPlayers } from '../api'
-import type { PlayerSearchResult } from '../types'
+import type { PlayerSearchResult, FilterParams } from '../types'
 
 interface PlayerSearchProps {
   /** Omit for role-agnostic search (the /players tab). When set, the
@@ -13,9 +13,14 @@ interface PlayerSearchProps {
    *  Omit for pickers where the input should reset after each pick
    *  (e.g. AddComparePicker). */
   value?: string
+  /** Optional FilterBar + aux scope. When any field is non-empty, the
+   *  server narrows results to people active in that match-set — e.g.
+   *  typing "AB" on the Series > Batters picker at T20 WC Men won't
+   *  surface AB de Villiers because he has no deliveries in that scope. */
+  scope?: FilterParams & { series_type?: string }
 }
 
-export default function PlayerSearch({ role, onSelect, placeholder, value }: PlayerSearchProps) {
+export default function PlayerSearch({ role, onSelect, placeholder, value, scope }: PlayerSearchProps) {
   // Transient typing buffer. `null` = not editing; the input falls
   // through to `value` (the source of truth in the parent). Non-null
   // means the user is mid-keystroke — we show what they've typed and
@@ -46,7 +51,7 @@ export default function PlayerSearch({ role, onSelect, placeholder, value }: Pla
     let cancelled = false
     timerRef.current = setTimeout(async () => {
       try {
-        const data = await searchPlayers(typing, role)
+        const data = await searchPlayers(typing, role, scope)
         if (cancelled) return
         setResults(data.players)
         setOpen(true)
@@ -62,7 +67,8 @@ export default function PlayerSearch({ role, onSelect, placeholder, value }: Pla
       cancelled = true
       clearTimeout(timerRef.current)
     }
-  }, [typing, role])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typing, role, JSON.stringify(scope)])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

@@ -666,6 +666,47 @@ surfaces row-specific context. Commits `74c5666` … `5708f56`.
   tile. Reference document for comparing future work against the
   established conventions.
 
+### Shipped 2026-04-21 (later — Series > Batters "Picked batter" tile)
+
+- **Series dossier Batters subtab gained a "Picked batter" slot** in
+  the upper-left of a new 2×2 grid. Restructured from a 3-cell
+  asymmetric grid (By runs / By average / By strike rate) to 4 cells:
+  Picked batter · By runs · By average · By strike rate.
+- **Picker UX:** scope-aware typeahead feeds the upper-left card; once
+  a batter is picked, the search input empties and the player's
+  scoped stats render as a one-row `DataTable` with the same columns
+  as the leaderboards (Runs / Balls / Outs / Avg / SR). URL param
+  `series_batter=<person_id>` makes the pick share-linkable.
+  Out-of-scope case (user tweaks filters after picking) renders an
+  italic empty-state card with an "× clear" affordance, keeping the
+  pick addressable rather than silently dropping it.
+- **Backend — scope-aware player search.** `/api/v1/players` extended
+  to accept FilterBar + aux scope (same param set as
+  `/series/*-leaders`). When any field is set, narrows to people who
+  appeared on either team in scope matches. `scope_where` is computed
+  from raw filter fields (not the WHERE clause) because
+  `filters.build(has_innings_join=True)` emits a baseline
+  `i.super_over = 0` clause; treating a baseline-only clause as
+  "scoped" would have slowed every unscoped search AND flipped
+  `innings` counts vs the legacy query (Kohli 378 → 375 on the first
+  pass — REG harness caught it before ship).
+- **Backend — new `GET /api/v1/series/batter-scope-stats`** (person_id
+  required + the same scope params). Returns one BattingLeaderEntry
+  row, or `{entry: null}` when the player has no deliveries in scope.
+  Shaped identically to `/series/batters-leaders` rows so the
+  frontend card reuses the leaderboard cell renderers.
+- **Frontend — `PlayerSearch` gained optional `scope` prop.** Forwarded
+  to `searchPlayers(q, role, scope)` → `/api/v1/players` querystring.
+  Scope is `JSON.stringify`-keyed in the debounce effect so mid-type
+  scope changes (e.g. filter tweak while dropdown open) refetch.
+- **Regression: 25/25 REG matched on players suite, 16/16 REG on
+  series suite.** Picker browser-verified end-to-end (scope exclusion
+  for "Villiers" on T20 WC 2022-2026, deep-link round-trip,
+  out-of-scope empty state, clear button).
+- **Bowlers + Fielders tabs deliberately unchanged this commit** —
+  follow-on commits 2/3/4 will add the matching pickers there, plus
+  the fielders layout reshuffle and a new by-run-outs leaderboard.
+
 ### Shipped 2026-04-21 (Series tab refactor + Partnerships/Records expansion)
 
 Continuation of 2026-04-20's (ed)/phraseLabel arc. Two arcs this day:

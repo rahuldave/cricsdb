@@ -50,8 +50,15 @@ export const getSeasons = (ctx?: ReferenceCtx) =>
   fetchApi<{ seasons: string[] }>('/api/v1/seasons', ctx as Record<string, string>)
 export const getTeams = (filters?: F & { q?: string }) =>
   fetchApi<{ teams: TeamInfo[] }>('/api/v1/teams', filters as Record<string, string>)
-export const searchPlayers = (q: string, role?: string, limit = 20) =>
-  fetchApi<{ players: PlayerSearchResult[] }>('/api/v1/players', { q, role, limit })
+export const searchPlayers = (
+  q: string, role?: string,
+  scope?: F & { series_type?: string },
+  limit = 20,
+) =>
+  fetchApi<{ players: PlayerSearchResult[] }>('/api/v1/players', {
+    q, role, limit,
+    ...(scope as Record<string, string | undefined> | undefined),
+  })
 
 // Venues (Phase 2)
 export const getVenues = (filters?: F & { q?: string; limit?: number }) =>
@@ -275,6 +282,13 @@ export const getRivalrySummary = (team1: string, team2: string, filters?: F) =>
 export const getTournamentBattersLeaders = (tournament: string | null, filters?: TF & { limit?: number }) =>
   fetchApi<import('./types').BattingLeaders>(
     '/api/v1/series/batters-leaders', tparams(tournament, filters))
+export const getTournamentBatterScopeStats = (
+  tournament: string | null, personId: string, filters?: TF,
+) =>
+  fetchApi<{ entry: import('./types').BattingLeaderEntry | null }>(
+    '/api/v1/series/batter-scope-stats',
+    { ...tparams(tournament, filters), person_id: personId },
+  )
 export const getTournamentBowlersLeaders = (tournament: string | null, filters?: TF & { limit?: number }) =>
   fetchApi<import('./types').BowlingLeaders>(
     '/api/v1/series/bowlers-leaders', tparams(tournament, filters))

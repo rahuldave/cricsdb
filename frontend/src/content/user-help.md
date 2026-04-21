@@ -24,6 +24,16 @@ sit inside a **Players ▾** group — hover on desktop, sub-row on mobile):
 ![India vs Australia rivalry dossier](/social/08-rivalry-dossier.png)
 *A bilateral rivalry dossier — 37 meetings, by-team breakdowns below the unified summary.*
 
+On the Series dossier's **Batters** subtab, the upper-left slot has a
+**Picked batter** typeahead scoped to the current match-set. Pick any
+player who features in the scope — the card fills with their
+in-scope runs / balls / outs / average / strike rate, alongside the
+three leaderboards in the other quadrants. The pick rides the URL
+(`series_batter=<id>`) so a share link takes the other side straight
+to the same card. If you narrow filters after picking and your choice
+no longer has data in the new scope, the card shows an "× clear" note
+rather than silently dropping the pick.
+
 - **Teams** — win/loss records, team batting/bowling/fielding,
   partnerships, roster by season, plus a **Compare** tab that stacks
   up to three teams side by side across Results / Batting / Bowling /
