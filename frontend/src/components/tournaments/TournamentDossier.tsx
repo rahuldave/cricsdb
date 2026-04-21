@@ -233,6 +233,88 @@ export default function TournamentDossier({
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Fielders', seriesFielder],
   )
+
+  // Active-URL / dormant-session picker model — URL carries ONLY the
+  // current tab's pick; the other two live in sessionStorage so they
+  // survive tab ping-pong but not tab close. See user-help.md + the
+  // url-state.md "Picker memory" section.
+  //
+  // Two mechanisms keep URL ↔ session in sync:
+  //   1. Session-aware setters (below) — on pick or clear, mirror the
+  //      URL change into session immediately. User action, pushes
+  //      history (same as other facets).
+  //   2. Tab-switch migration effect — on currentTab change, strip
+  //      non-current-tab picks from URL (stashing to session) and
+  //      restore current-tab's pick from session if the URL dropped
+  //      it on a prior switch. Auto-correction, replace mode.
+  const SESSION_KEYS: Record<'Batters' | 'Bowlers' | 'Fielders', string> = {
+    Batters: 'cricsdb:series_batter',
+    Bowlers: 'cricsdb:series_bowler',
+    Fielders: 'cricsdb:series_fielder',
+  }
+  const URL_KEYS: Record<'Batters' | 'Bowlers' | 'Fielders', string> = {
+    Batters: 'series_batter',
+    Bowlers: 'series_bowler',
+    Fielders: 'series_fielder',
+  }
+  const writeSession = (key: string, val: string) => {
+    if (val) sessionStorage.setItem(key, val)
+    else sessionStorage.removeItem(key)
+  }
+  const pickBatter = (id: string) => {
+    setSeriesBatter(id)
+    writeSession(SESSION_KEYS.Batters, id)
+  }
+  const pickBowler = (id: string) => {
+    setSeriesBowler(id)
+    writeSession(SESSION_KEYS.Bowlers, id)
+  }
+  const pickFielder = (id: string) => {
+    setSeriesFielder(id)
+    writeSession(SESSION_KEYS.Fielders, id)
+  }
+
+  useEffect(() => {
+    // Tab-switch migration. Runs on every currentTab change (including
+    // first mount — which also handles the deep-link-with-wrong-params
+    // self-correcting case). Replace mode: this is cleanup finishing
+    // the tab-switch, not a new history entry.
+    const tabName = currentTab as 'Batters' | 'Bowlers' | 'Fielders'
+    const activeUrlKey = URL_KEYS[tabName]  // may be undefined for non-picker tabs
+    const params = new URLSearchParams(window.location.search)
+    const updates: Record<string, string> = {}
+    let changed = false
+
+    // 1. Strip any picker param that doesn't belong to the current tab,
+    //    stashing to session first so the pick isn't lost.
+    for (const tab of ['Batters', 'Bowlers', 'Fielders'] as const) {
+      if (tab === tabName) continue
+      const urlKey = URL_KEYS[tab]
+      const val = params.get(urlKey)
+      if (val) {
+        sessionStorage.setItem(SESSION_KEYS[tab], val)
+        updates[urlKey] = ''
+        changed = true
+      }
+    }
+
+    // 2. If we're on a picker tab and the URL is missing its pick,
+    //    restore from session (if we have a memory of it).
+    if (activeUrlKey && !params.get(activeUrlKey)) {
+      const fromSession = sessionStorage.getItem(SESSION_KEYS[tabName]) ?? ''
+      if (fromSession) {
+        updates[activeUrlKey] = fromSession
+        changed = true
+      }
+    }
+
+    if (changed) setUrlParams(updates, { replace: true })
+    // Only react to tab changes — URL-state.md rule: user-initiated
+    // picks go through pickBatter/Bowler/Fielder setters which both
+    // update URL (push) and write session. This effect is only the
+    // tab-switch side of the bargain.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTab])
   const bowlingFetch = useFetch<BowlingLeaders | null>(
     () => currentTab === 'Bowlers'
       ? getTournamentBowlersLeaders(tournament, { ...apiFilters, limit: 20 })
@@ -489,7 +571,7 @@ export default function TournamentDossier({
           gender={filters.gender}
           scope={apiFilters}
           pickedId={seriesBatter}
-          onPick={(id) => setSeriesBatter(id)}
+          onPick={pickBatter}
           pickedEntry={batterScopeFetch.data?.entry ?? null}
           pickedLoading={batterScopeFetch.loading}
         />
@@ -506,7 +588,7 @@ export default function TournamentDossier({
           gender={filters.gender}
           scope={apiFilters}
           pickedId={seriesBowler}
-          onPick={(id) => setSeriesBowler(id)}
+          onPick={pickBowler}
           pickedEntry={bowlerScopeFetch.data?.entry ?? null}
           pickedLoading={bowlerScopeFetch.loading}
         />
@@ -523,7 +605,7 @@ export default function TournamentDossier({
           gender={filters.gender}
           scope={apiFilters}
           pickedId={seriesFielder}
-          onPick={(id) => setSeriesFielder(id)}
+          onPick={pickFielder}
           pickedEntry={fielderScopeFetch.data?.entry ?? null}
           pickedLoading={fielderScopeFetch.loading}
         />
@@ -1942,24 +2024,32 @@ function PickerSlot({
   return (
     <div>
       <h3 className="wisden-section-title">{title}</h3>
-      <div style={{ marginBottom: '1rem' }}>
-        <PlayerSearch
-          role={role}
-          scope={scope}
-          onSelect={(p) => onPick(p.id)}
-          placeholder={`Search ${role}s in scope…`}
-        />
+      <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ flex: 1 }}>
+          <PlayerSearch
+            role={role}
+            scope={scope}
+            onSelect={(p) => onPick(p.id)}
+            placeholder={`Search ${role}s in scope…`}
+          />
+        </div>
+        {pickedId && (
+          <button
+            onClick={onClear}
+            className="comp-link"
+            style={{
+              background: 'none', border: 'none', padding: '0 0.25rem',
+              cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+            title={`Clear picked ${role}`}
+            aria-label={`Clear picked ${role}`}
+          >× clear</button>
+        )}
       </div>
       {pickedId && loading && <Spinner label="Loading picked stats…" />}
       {empty && (
         <div className="wisden-tab-help" style={{ fontStyle: 'italic' }}>
           No data for the picked player in the current filter scope.
-          {' '}
-          <button
-            onClick={onClear}
-            className="comp-link"
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-          >× clear</button>
         </div>
       )}
       {children}

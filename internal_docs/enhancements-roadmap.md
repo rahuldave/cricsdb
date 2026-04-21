@@ -740,6 +740,27 @@ surfaces row-specific context. Commits `74c5666` … `5708f56`.
   matchplayer entry at all) still null. Batter/bowler scope logic
   unchanged — role-specific activity is still the natural universe
   there.
+- **Active-URL / dormant-session picker model.** User observation:
+  `series_batter`/`series_bowler`/`series_fielder` were all
+  co-habiting the URL regardless of which subtab was active, leaking
+  inactive picks into share links. New model: the URL carries ONLY
+  the active tab's pick; the other two live in `sessionStorage`
+  (keys `cricsdb:series_{batter,bowler,fielder}`). Tab-switch
+  migration effect (keyed on `currentTab`, `replace` mode — it's
+  finishing the tab-switch, not a new history step) strips
+  non-current picks from URL (stashing to session) and restores
+  the incoming tab's pick from session. User-initiated picks /
+  clears push the URL AND mirror to session via the
+  `pickBatter`/`pickBowler`/`pickFielder` wrappers. Back-button
+  walks every real user step with no dupe dead-entries. Deep-link
+  self-correction: a URL carrying picks for the wrong tab (e.g.
+  `?tab=Fielders&series_batter=X`) has the non-current param
+  stripped on mount, stashed to session so it's still there if the
+  recipient clicks Batters. New `× clear` affordance always visible
+  next to the search input when a pick is active (was previously
+  only in the out-of-scope empty state). Documented in
+  `internal_docs/url-state.md` under "Active-URL / dormant-session
+  state (the Series picker model)".
 
 ### Shipped 2026-04-21 (Series tab refactor + Partnerships/Records expansion)
 

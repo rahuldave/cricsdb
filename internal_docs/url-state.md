@@ -130,7 +130,7 @@ auto-correcting effect should extend this list.
 | `pages/Batting.tsx`, `Bowling.tsx`, `Fielding.tsx` | `gender`-from-nationalities self-correcting deep link. |
 | `pages/Tournaments.tsx` | Legacy `?rivalry=A,B` → modern params migration. |
 | `pages/HeadToHead.tsx` | Invalid `series_type` auto-reset (now in a useEffect, was setState-during-render). |
-| `components/tournaments/TournamentDossier.tsx` | Same invalid `series_type` auto-reset. |
+| `components/tournaments/TournamentDossier.tsx` | Same invalid `series_type` auto-reset. Also the tab-switch URL↔session migration effect (strips non-current-tab picker params, restores current tab's pick from session) — see "Active-URL / dormant-session state" below. |
 
 ## Testing the back button
 
@@ -266,3 +266,51 @@ Future page-local filters (result_filter, close_match, toss_decision
 from the roadmap) follow the same pattern: add to `AuxParams`,
 add to `useFilters` as a special-case read (or generalise into an
 `AUX_KEYS` registry once we have ≥2). Don't add to `FILTER_KEYS`.
+
+## Active-URL / dormant-session state (the Series picker model)
+
+The Series dossier's Batters/Bowlers/Fielders subtabs each own a
+picker whose pick lives in `series_batter` / `series_bowler` /
+`series_fielder`. Leaving all three in the URL at once would clutter
+the share link with inactive-tab state. Dropping picks entirely on
+tab-switch would lose them.
+
+The "active-URL / dormant-session" model:
+
+- **URL** carries only the current tab's pick. Shareable, deep-linkable,
+  back-button walks each pick/clear/tab action.
+- **`sessionStorage`** (keys `cricsdb:series_batter`, `…_bowler`,
+  `…_fielder`) holds the dormant tabs' picks. Survives reload in the
+  same tab (you refresh, tab-round-trip still has your picks).
+  Dies when the tab closes — picks are session-scoped, not
+  cross-session, so you don't get stale stuff from yesterday.
+
+**Two mechanisms keep URL ↔ session in sync**, and the split maps
+cleanly onto the push/replace rule:
+
+1. **Session-aware setters** (`pickBatter`, `pickBowler`, `pickFielder`
+   in `TournamentDossier.tsx`) — on a user pick or × clear, push the
+   URL change AND mirror it to session in one shot. User action →
+   push (like every other facet).
+2. **Tab-switch migration effect** (`useEffect` keyed on `currentTab`)
+   — on tab change, strip non-current-tab picks from URL (stashing
+   to session first) and restore the current tab's pick from session
+   if the URL lost it on a prior switch. Auto-correcting → replace,
+   so back-walk doesn't get stuck in "URL cleanup" dead entries.
+
+Back-button behaviour round-trips:
+
+- User picks Kohli on Batters → `push` state A (`series_batter=X`).
+- Clicks Bowlers tab → `push` state B (`tab=Bowlers&series_batter=X`)
+  → effect `replace` to B' (`tab=Bowlers`, session has X).
+- Picks Jadeja on Bowlers → `push` state C (`tab=Bowlers&series_bowler=Y`).
+- Back → lands on B' (Bowlers empty). Back → A (Batters+Kohli). Back →
+  initial. Every entry is a real user step; no dupes, no ghosts.
+
+Deep-link self-correction: if someone opens a share URL like
+`?tab=Fielders&series_batter=X`, the effect strips `series_batter`
+(stashing to session) on first mount, so the Batters pick is still
+there if the recipient clicks Batters — but the URL bar stays clean.
+
+× clear removes both URL param AND session key (not "park for later"),
+because × means "I'm done with this pick." Undo is via back button.

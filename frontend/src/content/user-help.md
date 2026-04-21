@@ -29,12 +29,21 @@ subtabs, the upper-left slot has a scope-aware typeahead (**Picked
 batter** / **Picked bowler** / **Picked fielder**). Pick any player
 who features in the current match-set — the card fills with their
 in-scope runs / wickets / dismissals / economy / SR / average,
-alongside the leaderboards in the other quadrants. The pick rides
-the URL (`series_batter=<id>`, `series_bowler=<id>`,
-`series_fielder=<id>`) so a share link takes the other side straight
-to the same card. If you narrow filters after picking and your choice
-no longer has data in the new scope, the card shows an "× clear" note
-rather than silently dropping the pick.
+alongside the leaderboards in the other quadrants.
+
+Each tab's pick is independent and sticky for the session. Pick
+Kohli on Batters, switch to Bowlers and pick Jadeja, then click
+back to Batters — Kohli is still there. Only the active tab's pick
+shows up in the URL (as `series_batter` / `series_bowler` /
+`series_fielder`), so share links stay clean; the other two tabs'
+picks are held in session storage until you return to their tab or
+close the browser tab. Share a Batters URL with a friend and they
+see only your Batters pick — your Bowlers pick doesn't leak.
+
+An inline **× clear** button next to the search input removes the
+current tab's pick. If you narrow filters after picking and your
+choice no longer has data in the new scope, the card shows a "No
+data…" note until you clear or pick someone else.
 
 - **Teams** — win/loss records, team batting/bowling/fielding,
   partnerships, roster by season, plus a **Compare** tab that stacks
