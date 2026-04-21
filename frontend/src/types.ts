@@ -1342,6 +1342,21 @@ export interface TournamentRecordBowling {
   season: string | null
 }
 
+export interface TournamentRecordBatting {
+  person_id: string
+  name: string
+  runs: number
+  balls: number
+  fours: number
+  sixes: number
+  not_out: boolean
+  figures: string
+  match_id: number
+  date: string | null
+  tournament: string | null
+  season: string | null
+}
+
 export interface TournamentRecordMatchSixes {
   match_id: number
   sixes: number
@@ -1360,6 +1375,7 @@ export interface TournamentRecords {
   biggest_wins_by_runs: TournamentRecordWin[]
   biggest_wins_by_wickets: TournamentRecordWin[]
   largest_partnerships: TournamentRecordPartnership[]
+  best_individual_batting: TournamentRecordBatting[]
   best_bowling_figures: TournamentRecordBowling[]
   most_sixes_in_a_match: TournamentRecordMatchSixes[]
 }

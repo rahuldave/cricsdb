@@ -29,7 +29,7 @@ import type {
   TournamentSummary, TournamentSeason, TournamentPointsTableResponse,
   PointsTableRow, TournamentRecords,
   TournamentRecordTeamTotal, TournamentRecordWin,
-  TournamentRecordPartnership, TournamentRecordBowling, TournamentRecordMatchSixes,
+  TournamentRecordPartnership, TournamentRecordBatting, TournamentRecordBowling, TournamentRecordMatchSixes,
   BattingLeaders, BattingLeaderEntry,
   BowlingLeaders, BowlingLeaderEntry,
   FieldingLeaders, FieldingLeaderEntry,
@@ -204,7 +204,7 @@ export default function TournamentDossier({
 
   const recordsFetch = useFetch<TournamentRecords | null>(
     () => currentTab === 'Records'
-      ? getTournamentRecords(tournament, { ...apiFilters, limit: 5 })
+      ? getTournamentRecords(tournament, { ...apiFilters, limit: 10 })
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Records'],
   )
@@ -2097,6 +2097,38 @@ function RecordsTab({
           ]}
           data={data.largest_partnerships}
           rowKey={(r) => `lp-${r.match_id}-${r.batting_team}`}
+        />
+      </div>
+      <div>
+        <h3 className="wisden-section-title">Best individual batting</h3>
+        <DataTable
+          columns={[
+            {
+              key: 'figures', label: 'Score', sortable: true,
+              format: (_v, r: TournamentRecordBatting) => r.figures,
+            },
+            {
+              key: 'name', label: 'Batter',
+              format: (_v, r: TournamentRecordBatting) => (
+                <PlayerLink
+                  personId={r.person_id} name={r.name}
+                  role="batter" gender={gender}
+                  subscriptSource={{ tournament: r.tournament, season: r.season }}
+                  maxTiers={1}
+                  phraseLabel="ed"
+                  phraseClassName="scope-phrase-ed"
+                />
+              ) as unknown as string,
+            },
+            editionCol,
+            {
+              key: 'date', label: 'Date',
+              format: (_v, r: TournamentRecordBatting) =>
+                r.date ? (matchLink(r.match_id, r.date) as unknown as string) : '-',
+            },
+          ]}
+          data={data.best_individual_batting}
+          rowKey={(r) => `bi-${r.match_id}-${r.person_id}`}
         />
       </div>
       <div>

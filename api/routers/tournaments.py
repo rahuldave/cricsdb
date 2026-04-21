@@ -1727,6 +1727,45 @@ async def tournament_records(
         params,
     )
 
+    # Best individual batting (single innings — top score, tie-break by
+    # balls ASC so 87(40) ranks above 87(60)).
+    bi_rows = await db.q(
+        f"""
+        WITH per_innings_batter AS (
+          SELECT d.batter_id,
+                 d.innings_id,
+                 m.id AS match_id,
+                 SUM(d.runs_batter) AS runs,
+                 SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
+                          THEN 1 ELSE 0 END) AS balls,
+                 SUM(CASE WHEN d.runs_batter = 4 THEN 1 ELSE 0 END) AS fours,
+                 SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes
+          FROM delivery d
+          JOIN innings i ON i.id = d.innings_id
+          JOIN match m ON m.id = i.match_id
+          WHERE i.super_over = 0 AND {where}
+            AND d.batter_id IS NOT NULL
+          GROUP BY d.batter_id, d.innings_id, m.id
+        )
+        SELECT pi.batter_id AS person_id, p.name,
+               pi.runs, pi.balls, pi.fours, pi.sixes,
+               CASE WHEN EXISTS (
+                 SELECT 1 FROM wicket w
+                 JOIN delivery d2 ON d2.id = w.delivery_id
+                 WHERE d2.innings_id = pi.innings_id
+                   AND w.player_out_id = pi.batter_id
+               ) THEN 0 ELSE 1 END AS not_out,
+               pi.match_id,
+               m2.event_name AS tournament, m2.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = pi.match_id) AS date
+        FROM per_innings_batter pi
+        LEFT JOIN person p ON p.id = pi.batter_id
+        LEFT JOIN match m2 ON m2.id = pi.match_id
+        ORDER BY pi.runs DESC, pi.balls ASC LIMIT :lim
+        """,
+        params,
+    )
+
     # Best bowling figures (single match)
     bb_rows = await db.q(
         f"""
@@ -1813,6 +1852,16 @@ async def tournament_records(
              "match_id": r["match_id"], "date": r["date"],
              "tournament": r["tournament"], "season": r["season"]}
             for r in lp_rows
+        ],
+        "best_individual_batting": [
+            {"person_id": r["person_id"], "name": r["name"],
+             "runs": r["runs"], "balls": r["balls"],
+             "fours": r["fours"], "sixes": r["sixes"],
+             "not_out": bool(r["not_out"]),
+             "figures": f"{r['runs']}{'*' if r['not_out'] else ''} ({r['balls']})",
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
+            for r in bi_rows
         ],
         "best_bowling_figures": [
             {"person_id": r["person_id"], "name": r["name"],
