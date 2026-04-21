@@ -250,7 +250,7 @@ export default function TournamentDossier({
   )
   const partnershipsTopFetch = useFetch<TournamentPartnershipsTop | null>(
     () => currentTab === 'Partnerships'
-      ? getTournamentPartnershipsTop(tournament, { ...apiFilters, side: 'batting', limit: 10 })
+      ? getTournamentPartnershipsTop(tournament, { ...apiFilters, side: 'batting', limit: 20 })
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Partnerships'],
   )
