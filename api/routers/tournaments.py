@@ -2460,6 +2460,91 @@ async def tournament_partnerships_top(
     }
 
 
+@router.get("/series/partnerships/top-by-wicket")
+async def tournament_partnerships_top_by_wicket(
+    tournament: str | None = Query(None),
+    series_type: str | None = Query(None),
+    filters: FilterParams = Depends(),
+    side: str = Query("batting"),
+    per_wicket: int = Query(10, ge=1, le=20),
+):
+    """Top-N partnerships per wicket number (1–10), in the tournament scope.
+
+    Returns ten sub-lists, one per wicket number, each capped at
+    `per_wicket`. Ordered by runs DESC, balls ASC.
+    """
+    if side not in ("batting", "bowling"):
+        side = "batting"
+    db = get_db()
+    where, params = _partnership_tournament_where(
+        filters, tournament, side, series_type=series_type,
+    )
+    params["pw"] = per_wicket
+
+    rows = await db.q(
+        f"""
+        WITH ranked AS (
+          SELECT p.id AS partnership_id,
+                 p.partnership_runs AS runs,
+                 p.partnership_balls AS balls,
+                 p.wicket_number, p.unbroken, p.ended_by_kind,
+                 p.batter1_id, p.batter1_name, p.batter1_runs, p.batter1_balls,
+                 p.batter2_id, p.batter2_name, p.batter2_runs, p.batter2_balls,
+                 m.id AS match_id, m.season, m.event_name AS event_name_raw,
+                 (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date,
+                 i.team AS batting_team,
+                 CASE WHEN i.team = m.team1 THEN m.team2 ELSE m.team1 END AS opponent,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY p.wicket_number
+                   ORDER BY p.partnership_runs DESC, p.partnership_balls ASC
+                 ) AS rnk
+          FROM partnership p
+          JOIN innings i ON i.id = p.innings_id
+          JOIN match m ON m.id = i.match_id
+          WHERE {where} AND p.wicket_number IS NOT NULL
+        )
+        SELECT * FROM ranked WHERE rnk <= :pw
+        ORDER BY wicket_number ASC, rnk ASC
+        """,
+        params,
+    )
+    by_wicket: dict[int, list[dict]] = {}
+    for r in rows:
+        wn = r["wicket_number"]
+        by_wicket.setdefault(wn, []).append({
+            "partnership_id": r["partnership_id"],
+            "runs": r["runs"],
+            "balls": r["balls"],
+            "wicket_number": wn,
+            "unbroken": bool(r["unbroken"]),
+            "ended_by_kind": r["ended_by_kind"],
+            "match_id": r["match_id"],
+            "season": r["season"],
+            "tournament": canonicalize(r["event_name_raw"]),
+            "date": r["date"],
+            "batting_team": r["batting_team"],
+            "opponent": r["opponent"],
+            "batter1": {
+                "person_id": r["batter1_id"], "name": r["batter1_name"],
+                "runs": r["batter1_runs"], "balls": r["batter1_balls"],
+            },
+            "batter2": {
+                "person_id": r["batter2_id"], "name": r["batter2_name"],
+                "runs": r["batter2_runs"], "balls": r["batter2_balls"],
+            },
+        })
+    return {
+        "tournament": tournament,
+        "side": side,
+        "filter_team": filters.team,
+        "per_wicket": per_wicket,
+        "by_wicket": [
+            {"wicket_number": wn, "partnerships": by_wicket[wn]}
+            for wn in sorted(by_wicket.keys())
+        ],
+    }
+
+
 @router.get("/series/partnerships/heatmap")
 async def tournament_partnerships_heatmap(
     tournament: str | None = Query(None),

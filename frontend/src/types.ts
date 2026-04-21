@@ -1432,6 +1432,17 @@ export interface TournamentPartnershipsTop {
   partnerships: TournamentPartnershipTopEntry[]
 }
 
+export interface TournamentPartnershipsTopByWicket {
+  tournament: string
+  side: 'batting' | 'bowling'
+  filter_team: string | null
+  per_wicket: number
+  by_wicket: {
+    wicket_number: number
+    partnerships: TournamentPartnershipTopEntry[]
+  }[]
+}
+
 export interface TournamentPartnershipsHeatmap {
   tournament: string
   side: 'batting' | 'bowling'

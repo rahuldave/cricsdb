@@ -1372,6 +1372,41 @@ curl "http://localhost:8000/api/v1/series/partnerships/top?tournament=Indian+Pre
 }
 ```
 
+## `GET /api/v1/series/partnerships/top-by-wicket`
+
+Top-N partnerships **per wicket number** (1–10). Same filters as
+`top`; replaces `limit` with `per_wicket` (default 10, max 20).
+Returns ten grouped sub-lists.
+
+```bash
+curl "http://localhost:8000/api/v1/series/partnerships/top-by-wicket?tournament=Indian+Premier+League&per_wicket=2&gender=male&team_type=club"
+```
+
+```json
+{
+  "tournament": "Indian Premier League",
+  "side": "batting", "filter_team": null, "per_wicket": 2,
+  "by_wicket": [
+    { "wicket_number": 1, "partnerships": [
+      { "runs": 210, "batter1": { "name": "B Sai Sudharsan" },
+        "batter2": { "name": "Shubman Gill" },
+        "batting_team": "Gujarat Titans", "opponent": "Chennai Super Kings",
+        "season": "2024", "date": "2024-05-10", "match_id": 5933,
+        "tournament": "Indian Premier League" },
+      "…"
+    ] },
+    { "wicket_number": 2, "partnerships": [
+      { "runs": 229, "batter1": { "name": "V Kohli" },
+        "batter2": { "name": "AB de Villiers" },
+        "batting_team": "Royal Challengers Bengaluru", "opponent": "Gujarat Lions",
+        "season": "2016", "date": "2016-05-14", "match_id": 6586,
+        "tournament": "Indian Premier League" },
+      "…"
+    ] }
+  ]
+}
+```
+
 ## `GET /api/v1/series/partnerships/heatmap`
 
 Season × wicket-number average-runs matrix.

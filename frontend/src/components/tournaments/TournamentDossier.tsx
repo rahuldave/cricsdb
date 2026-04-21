@@ -9,6 +9,7 @@ import {
   getTournamentRecords,
   getTournamentBattersLeaders, getTournamentBowlersLeaders, getTournamentFieldersLeaders,
   getTournamentPartnershipsByWicket, getTournamentPartnershipsTop,
+  getTournamentPartnershipsTopByWicket,
   getMatches,
 } from '../../api'
 import StatCard from '../StatCard'
@@ -35,11 +36,16 @@ import type {
   FieldingLeaders, FieldingLeaderEntry,
   MatchListItem,
   TournamentPartnershipsByWicket, TournamentPartnershipsTop,
-  TournamentPartnershipTopEntry,
+  TournamentPartnershipsTopByWicket, TournamentPartnershipTopEntry,
 } from '../../types'
 
 const fmt = (v: number | null | undefined, d = 2) =>
   v == null ? '-' : typeof v === 'number' ? v.toFixed(d) : v
+
+const ordinal = (n: number) => {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`
+}
 
 const matchLink = (matchId: number, label: string | number) => (
   <Link to={`/matches/${matchId}`} className="comp-link">{label}</Link>
@@ -251,6 +257,12 @@ export default function TournamentDossier({
   const partnershipsTopFetch = useFetch<TournamentPartnershipsTop | null>(
     () => currentTab === 'Partnerships'
       ? getTournamentPartnershipsTop(tournament, { ...apiFilters, side: 'batting', limit: 20 })
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Partnerships'],
+  )
+  const partnershipsTopByWicketFetch = useFetch<TournamentPartnershipsTopByWicket | null>(
+    () => currentTab === 'Partnerships'
+      ? getTournamentPartnershipsTopByWicket(tournament, { ...apiFilters, side: 'batting', per_wicket: 10 })
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Partnerships'],
   )
@@ -495,6 +507,8 @@ export default function TournamentDossier({
           byWicketLoading={partnershipsByWicketFetch.loading}
           top={partnershipsTopFetch.data}
           topLoading={partnershipsTopFetch.loading}
+          topByWicket={partnershipsTopByWicketFetch.data}
+          topByWicketLoading={partnershipsTopByWicketFetch.loading}
           filterTeam={filters.team}
           tournament={tournament}
           gender={filters.gender}
@@ -1213,13 +1227,16 @@ function OverviewTab({
 }
 
 function PartnershipsTab({
-  byWicket, byWicketLoading, top, topLoading, filterTeam,
-  tournament, gender, teamType,
+  byWicket, byWicketLoading, top, topLoading,
+  topByWicket, topByWicketLoading,
+  filterTeam, tournament, gender, teamType,
 }: {
   byWicket: TournamentPartnershipsByWicket | null
   byWicketLoading: boolean
   top: TournamentPartnershipsTop | null
   topLoading: boolean
+  topByWicket: TournamentPartnershipsTopByWicket | null
+  topByWicketLoading: boolean
   filterTeam: string | null | undefined
   tournament: string | null
   gender: string | null | undefined
@@ -1390,6 +1407,57 @@ function PartnershipsTab({
             data={top.partnerships}
             rowKey={(r) => `p-${r.partnership_id}`}
           />
+        )}
+      </div>
+
+      {/* ── Top partnerships per wicket (one table per wicket 1–10) ── */}
+      <div className="mt-8">
+        <h3 className="wisden-section-title">Top partnerships by wicket</h3>
+        {topByWicketLoading ? (
+          <Spinner label="Loading per-wicket partnerships…" />
+        ) : !topByWicket?.by_wicket?.length ? (
+          <div className="wisden-empty">No partnerships in scope.</div>
+        ) : (
+          <div className="space-y-6 mt-2">
+            {topByWicket.by_wicket.map(group => (
+              <div key={`tpw-${group.wicket_number}`}>
+                <h4 className="wisden-section-title" style={{ fontSize: '1rem' }}>
+                  {ordinal(group.wicket_number)} wicket
+                </h4>
+                <DataTable
+                  columns={[
+                    { key: 'runs', label: 'Runs', sortable: true },
+                    {
+                      key: 'batter1', label: 'Batters',
+                      format: (_v, r: TournamentPartnershipTopEntry) =>
+                        batterPair(r.batter1, r.batter2, {
+                          tournament: r.tournament ?? tournament, season: r.season,
+                          battingTeam: r.batting_team, opponent: r.opponent,
+                        }) as unknown as string,
+                    },
+                    {
+                      key: 'batting_team', label: 'Match',
+                      format: (_v, r: TournamentPartnershipTopEntry) =>
+                        matchTeams({
+                          tournament: r.tournament ?? tournament, season: r.season,
+                          battingTeam: r.batting_team, opponent: r.opponent,
+                        }) as unknown as string,
+                    },
+                    { key: 'season', label: 'Season' },
+                    {
+                      key: 'date', label: 'Date',
+                      format: (v: string | null, r: TournamentPartnershipTopEntry) =>
+                        v ? (partnershipMatchLink(
+                            r.match_id, v, r.batter1.person_id, r.batter2.person_id,
+                          ) as unknown as string) : '-',
+                    },
+                  ]}
+                  data={group.partnerships}
+                  rowKey={(r) => `tpw${group.wicket_number}-${r.partnership_id}`}
+                />
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

@@ -290,6 +290,10 @@ export const getTournamentPartnershipsTop = (
   tournament: string | null, filters?: TF & { side?: 'batting' | 'bowling'; limit?: number },
 ) => fetchApi<import('./types').TournamentPartnershipsTop>(
   '/api/v1/series/partnerships/top', tparams(tournament, filters))
+export const getTournamentPartnershipsTopByWicket = (
+  tournament: string | null, filters?: TF & { side?: 'batting' | 'bowling'; per_wicket?: number },
+) => fetchApi<import('./types').TournamentPartnershipsTopByWicket>(
+  '/api/v1/series/partnerships/top-by-wicket', tparams(tournament, filters))
 export const getTournamentPartnershipsHeatmap = (
   tournament: string | null, filters?: TF & { side?: 'batting' | 'bowling' },
 ) => fetchApi<import('./types').TournamentPartnershipsHeatmap>(
