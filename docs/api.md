@@ -1124,7 +1124,12 @@ curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_oppon
   "total_runs": "…", "total_wickets": "…",
   "total_fours": 934, "total_sixes": 449,
   "most_titles": null,
-  "champions_by_season": [],
+  "champions_by_season": [
+    { "season": "2024", "champion": "India", "match_id": 1551,
+      "team1": "India", "team2": "South Africa",
+      "team1_score": "176/7", "team2_score": "169/8",
+      "date": "2024-06-29" }
+  ],
   "top_scorer_alltime":     { "person_id": "ba607b88", "name": "V Kohli",
                               "team": "India", "runs": 794 },
   "top_wicket_taker_alltime": { "person_id": "462411b3", "name": "JJ Bumrah",
@@ -1155,7 +1160,8 @@ curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_oppon
       "tournament": "ICC World Twenty20",
       "team1": "Australia", "team2": "India",
       "winner": "India", "margin": "15 runs",
-      "venue": "Kingsmead", "date": "2007-09-22" }
+      "venue": "Kingsmead", "date": "2007-09-22",
+      "team1_score": "141/7", "team2_score": "142/6" }
   ],
   "by_team": {
     "India": {
@@ -1198,6 +1204,8 @@ curl "http://localhost:8000/api/v1/series/by-season?tournament=Indian+Premier+Le
       "runner_up": "Sunrisers Hyderabad",
       "runner_up_record": { "played": 16, "won": 9 },
       "final_match_id": 5945,
+      "final_team1": "Sunrisers Hyderabad", "final_team2": "Kolkata Knight Riders",
+      "final_team1_score": "113/10", "final_team2_score": "114/2",
       "run_rate": 9.56, "boundary_pct": 21.07, "total_sixes": 1261,
       "top_scorer":      { "person_id": "ba607b88", "name": "V Kohli", "runs": 741 },
       "top_wicket_taker":{ "person_id": "f986ca1a", "name": "HV Patel", "wickets": 24 } }
@@ -1247,19 +1255,37 @@ curl "http://localhost:8000/api/v1/series/records?tournament=Indian+Premier+Leag
 ```json
 {
   "canonical": "Indian Premier League",
-  "highest_team_totals":   [ { "team": "Sunrisers Hyderabad", "runs": 287, "opponent": "Royal Challengers Bengaluru", "match_id": 5904, "date": "2024-04-15" } ],
+  "highest_team_totals":   [ { "team": "Sunrisers Hyderabad", "runs": 287, "opponent": "Royal Challengers Bengaluru",
+                                "match_id": 5904, "date": "2024-04-15",
+                                "tournament": "Indian Premier League", "season": "2024" } ],
   "lowest_all_out_totals": [ "…" ],
-  "biggest_wins_by_runs":   [ { "winner": "Mumbai Indians", "loser": "Delhi Capitals", "margin": 146, "match_id": 5471, "date": "2017-05-06" } ],
+  "biggest_wins_by_runs":   [ { "winner": "Mumbai Indians", "loser": "Delhi Capitals", "margin": 146,
+                                 "match_id": 5471, "date": "2017-05-06",
+                                 "tournament": "Indian Premier League", "season": "2017" } ],
   "biggest_wins_by_wickets":[ "…" ],
   "largest_partnerships":   [ { "runs": 229, "batter1": { "name": "V Kohli" }, "batter2": { "name": "AB de Villiers" },
                                  "teams": "Royal Challengers Bengaluru v Gujarat Lions",
+                                 "team1": "Royal Challengers Bengaluru", "team2": "Gujarat Lions",
                                  "batting_team": "Royal Challengers Bengaluru",
-                                 "match_id": 6586, "date": "2016-05-14" } ],
+                                 "match_id": 6586, "date": "2016-05-14",
+                                 "tournament": "Indian Premier League", "season": "2016" } ],
   "best_bowling_figures":   [ { "name": "AS Joseph", "wickets": 6, "runs": 14, "balls": 22,
-                                 "figures": "6/14", "match_id": 5565, "date": "2019-04-06" } ],
-  "most_sixes_in_a_match":  [ "…" ]
+                                 "figures": "6/14", "match_id": 5565, "date": "2019-04-06",
+                                 "tournament": "Indian Premier League", "season": "2019" } ],
+  "most_sixes_in_a_match":  [ { "match_id": "…", "sixes": 42,
+                                 "teams": "Kolkata Knight Riders v Punjab Kings",
+                                 "team1": "Kolkata Knight Riders", "team2": "Punjab Kings",
+                                 "date": "2024-04-26",
+                                 "tournament": "Indian Premier League", "season": "2024" } ]
 }
 ```
+
+Every row carries `tournament` + `season` so the frontend Records tab
+can render an Edition column + per-row `(ed)` team subscripts that
+point at that specific tournament+season rather than the FilterBar's
+ambient season window. Partnership + most-sixes rows additionally
+split `teams` into explicit `team1` / `team2` for clean link
+rendering.
 
 ## `GET /api/v1/series/{batters,bowlers,fielders}-leaders`
 

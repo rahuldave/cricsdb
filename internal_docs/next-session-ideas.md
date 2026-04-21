@@ -5,9 +5,16 @@
 
 ## NEXT SESSION agenda (in order)
 
-Series tab deep-dive completed 2026-04-20 (pm) — SeriesLink shipped,
-tile conventions set, TournamentDossier Overview/Editions/Groups/
-Knockouts/Participating-teams cells converted. Next tabs to walk:
+Series tab deep-dive completed 2026-04-20 (pm + evening) — SeriesLink
+shipped, tile conventions set, TournamentDossier Overview/Editions/
+Groups/Knockouts/Participating-teams cells converted. Evening arc:
+Score + EdHelp components, TeamLink/PlayerLink `phraseLabel` prop,
+(ed) row-scope convention adopted across Matches tab, Records tab,
+Overview Knockouts + Champions by season, `/matches`, Venue Matches.
+Small-caps ED styling applied. Pagination URL-shared. Status strip
+full-width + always rendered. Comprehensive link audit saved to
+`internal_docs/link-audit.md` — use as reference when walking
+remaining tabs. Next tabs to walk:
 
 1. **Head-to-Head tab walk.** `/head-to-head` is the polymorphic tab
    with `mode=player` and `mode=team`. Verify that:

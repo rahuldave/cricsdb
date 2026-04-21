@@ -127,10 +127,21 @@ frontend/src/
                                    Scorecard, InningsCard,
                                    PlayerLink + TeamLink (unified phrase-subscript model: name
                                    link = all-time identity; named-phrase subscripts driven by
-                                   series_type container resolution. TeamLink has keepRivalry,
-                                   team_type, seriesType, maxTiers opt-in props for tile
-                                   surfaces; layout inline|block, compact mode for H2 / tile
+                                   series_type container resolution. Both components take the
+                                   same prop surface — subscriptSource (per-row override),
+                                   keepRivalry, team_type, seriesType, maxTiers, phraseLabel
+                                   (string or function that replaces rendered phrase text while
+                                   keeping the computed href, used for compact "ed" tokens),
+                                   phraseClassName (e.g. "scope-phrase-ed" for small-caps
+                                   styling); layout inline|block, compact mode for H2 / tile
                                    headers — see internal_docs/design-decisions.md),
+                                   Score (compact two-score renderer "185/6 │ 180/5" with muted
+                                   U+2502 separator; optional matchId makes the whole score a
+                                   scorecard link. Used on Matches tab, Records Final, Champions
+                                   by season Final, Knockouts Date+Score cells),
+                                   EdHelp (small italic-serif caption explaining the per-row
+                                   "ed" subscript — mounted above any DataTable whose columns
+                                   carry TeamLink phraseLabel="ed"),
                                    SeriesLink (thin Link wrapper that builds /series?... URLs
                                    from an explicit scope spec — tournament, season, seriesType,
                                    team1, team2, gender, team_type, filter_venue. Used by tile

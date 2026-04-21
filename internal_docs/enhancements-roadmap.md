@@ -568,6 +568,104 @@ conventions for subsequent tabs. Commits `9107ca3`…`4d9f0e1`.
   match this framing (dropped entirely in single-tournament context,
   as before).
 
+### Shipped 2026-04-20 (evening — Matches + Records + row-scope polish)
+
+Follow-up arc on the (ed) convention, unified through TeamLink /
+PlayerLink phraseLabel, propagated into every dense table that
+surfaces row-specific context. Commits `74c5666` … `5708f56`.
+
+- **Score component.** Shared `<Score team1Score team2Score matchId?
+  title?>` renderer ("185/6 │ 180/5" with a muted U+2502 vertical).
+  Replaces ad-hoc score strings across `/matches`, dossier Matches
+  tabs, Records Final column, Champions Final column, Knockouts
+  Date-and-Score cell. When `matchId` is passed the whole score is
+  a scorecard link; when it isn't (row is already inside a
+  click-through `<tr>`) the score is plain text. Score separator
+  gets its own muted class so the numbers carry the weight.
+- **(ed) unified through TeamLink.phraseLabel.** Initial `teamEdHref`
+  + `EdTag` sibling helpers retired after user pushback on mechanism
+  proliferation. TeamLink grows a `phraseLabel` prop (string OR
+  `(tier, i) => string`) that swaps the rendered phrase text while
+  keeping the href + tooltip from `resolveScopePhrases`. `TeamWithEd`
+  local wrappers in TournamentDossier + VenueDossier call TeamLink
+  with `{ subscriptSource: { tournament, season, team1: null, team2:
+  null }, maxTiers: 1, phraseLabel: "ed", phraseClassName:
+  "scope-phrase-ed" }`. The explicit `team1/team2: null` clears any
+  FilterBar rivalry pair — without it, the bilateral-series concern
+  in `resolveScopePhrases` drops the tournament from the URL in
+  rivalry mode (wrong for a single-team destination). New CSS
+  `.scope-phrase.scope-phrase-ed` renders small-caps +
+  letter-spacing, mirroring the H2 block-subscript style that already
+  reads as a scope marker ("AT INDIAN PREMIER LEAGUE").
+- **Pagination in URL.** Matches tab offset moved from component
+  `useState` to `useUrlParam('page')`. Deep-linked `?page=3` survives
+  because the filter-change reset uses a prev-deps-key ref (a naive
+  `isFirstRender` boolean gets clobbered by React StrictMode's dev
+  double effect-invocation and wipes the page).
+- **ScopeStatusStrip always-render + full-width.** Was hidden when no
+  filter was narrowed (the copy-link button disappeared alongside);
+  now always renders when FilterBar is visible, empty state reads
+  "Showing: all-time". Outer `.wisden-scope-strip-wrap` carries the
+  tinted bg so the strip sits flush at any viewport. Tab + Page
+  segments added.
+- **/venues viewport.** Was `.wisden-page` (42rem, editorial) while
+  every other data page uses `max-w-6xl` (72rem); swapped.
+- **Records tab.** Backend `/series/records` rows gain `tournament`
+  + `season` per row (scalar additions to each SELECT; best-bowling
+  gets a new outer `LEFT JOIN match m2` since its CTE didn't carry
+  event_name). Partnership + most-sixes rows additionally split
+  `teams` into explicit `team1`/`team2`. Frontend adds an **Edition**
+  column (season alone in single-tournament mode, "Tournament,
+  Season" in rivalry) + `(ed)` after every team name in all 7 tables
+  via the same `TeamWithEd` helper.
+- **Overview Knockouts + Champions by season.** Knockouts now carries
+  `team1_score` / `team2_score` per row (scalar subqueries, same
+  pattern as records). Date column renamed "Date and Score" —
+  single-cell `<date-link> · <Score>` inline composition with a muted
+  middle-dot separator, both linked to the scorecard. Champions by
+  season gains `team1` / `team2` / `team1_score` / `team2_score` /
+  `date` on every row. Table columns settled at Season · **Final**
+  (team1 ED v team2 ED) · Champion · **Date and Score**. Champion /
+  Winner cells drop the (ed) subscript — those teams already appear
+  in the Match column's (ed) pair, so duplication is removed.
+- **/matches Edition column + (ed).** The md+ Tournament column
+  renamed Edition (cell is season alone when FilterBar has a
+  tournament pinned, otherwise `Tournament, Season`, linked to that
+  edition's `/series?tournament=X&season_from=Y&season_to=Y`). Team
+  links swap to TeamLink with the same subscriptSource +
+  phraseLabel="ed" pattern. Wrapping span `onClick={stop}` preserves
+  row-click-to-scorecard.
+- **EdHelp caption.** New `<EdHelp />` component emits a small
+  italic-serif-muted caption explaining the convention ("<ed> after a
+  team name opens that team's page scoped to the row's edition…").
+  Mounted under Knockouts / Champions H3s, at the top of the Records
+  tab (covers all 7 tables), below the Matches-tab pagination line,
+  and above the /matches table.
+- **PlayerLink structural parity with TeamLink.** PlayerLink gains
+  the four TeamLink props it didn't have: `maxTiers`, `phraseLabel`,
+  `phraseClassName`, `seriesType`, `keepRivalry` (default true to
+  preserve prior behavior). Defaults preserve every existing call
+  site; the addition primes Batters / Bowlers / Fielders per-row
+  (ed) when we walk those tabs.
+- **Cross-cutting principle written down.** New top-level section in
+  `internal_docs/design-decisions.md`: *Filters scope the summary;
+  rows link to their own edition.* FilterBar narrows cumulative
+  stats; row-specific cells raise to their own nearest edition. Also
+  saved as a feedback auto-memory entry.
+- **Regression choreography.** Four REG↔NEW flips landed as separate
+  earlier commits ahead of each shape change: `7013f1d` (records
+  REG→NEW, by_season NEW→REG), `8912c67` (3 tournament summaries
+  REG→NEW for champions_by_season + knockouts extensions),
+  `f2eb5d7` (3 rivalry summaries REG→NEW once knockouts populated).
+  `./tests/regression/run.sh series` final report: 21 REG matched,
+  0 drifted, 6 NEW changed, 0 NEW unchanged.
+- **Link audit.** End of session: `internal_docs/link-audit.md`
+  — complete page-by-page walk of every main tab + subtab, what
+  every Link/navigate() target is, what scope it carries, whether
+  the scope flows from ambient FilterBar / row override / hard-coded
+  tile. Reference document for comparing future work against the
+  established conventions.
+
 ---
 
 ## Known issues / live TODO

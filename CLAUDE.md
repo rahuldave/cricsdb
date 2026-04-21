@@ -33,6 +33,8 @@ recurring entry points:
 - `frontend/public/social/` — 18 curated screenshots used by the Help page AND as attachments for the launch `tweet-thread.md` (in the same folder). Paired with `frontend/scripts/assets-source/` where the HTML sources for `favicon.svg`, the apple-touch / 192 / 512 icon PNGs and the 1200×630 `og-card.png` live (regen via headless Chrome — see the sibling README).
 - `frontend/src/api.ts` + `types.ts` — endpoint clients + response types
 - `frontend/src/components/charts/` — Semiotic wrappers (BarChart, LineChart, ScatterChart, HeatmapChart, BubbleMatrix, WormChart, etc.)
+- `frontend/src/components/{Score,EdHelp}.tsx` — shared row-context primitives used across every Matches/Records surface. `Score` renders "185/6 │ 180/5" with optional scorecard link; `EdHelp` emits the standard italic-serif caption explaining the per-row `(ed)` subscript. Mount `<EdHelp />` above any DataTable whose columns carry `TeamLink phraseLabel="ed"`.
+- `frontend/src/components/{TeamLink,PlayerLink}.tsx` — both expose the same prop surface for structural parity: `subscriptSource` per-row scope override, `phraseLabel` / `phraseClassName` rendering overrides (use `phraseClassName="scope-phrase-ed"` + `phraseLabel="ed"` for compact small-caps row-edition markers), `maxTiers`, `seriesType`, `keepRivalry`, `compact`, `layout`.
 - `frontend/src/index.css` — Wisden editorial styles (see `internal_docs/visual-identity.md`)
 
 ## Running Locally

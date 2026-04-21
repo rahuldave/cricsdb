@@ -126,7 +126,13 @@ Two modes (picker at the top of the page):
   and Matches.
 - **Matches** — searchable list of every match. Click any row for
   the full scorecard, ball-by-ball innings grid, worm chart, and
-  per-batter / per-bowler matchup grid.
+  per-batter / per-bowler matchup grid. Every team name in a row
+  is followed by a small italic "ed" link — that opens the team's
+  page scoped to THIS match's edition (tournament + season),
+  independent of whatever season range your FilterBar has set. The
+  same "ed" convention appears on every dense table in the app
+  (Series Records, Series Overview Knockouts / Champions, Venue
+  Matches) — a caption explaining it sits above each such table.
 
 ![2024 T20 World Cup Final scorecard](/social/17-scorecard-full.png)
 *Full match page — scorecard for both innings, worm chart, innings grid, fall of wickets, matchup grid.*
