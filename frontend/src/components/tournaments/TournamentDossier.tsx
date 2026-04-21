@@ -16,6 +16,7 @@ import PlayerLink from '../PlayerLink'
 import TeamLink from '../TeamLink'
 import SeriesLink from '../SeriesLink'
 import Score from '../Score'
+import EdHelp from '../EdHelp'
 import {
   resolveBucket, resolveScopePhrases, seasonTag,
   type PhraseTier, type SubscriptSource,
@@ -1048,6 +1049,7 @@ function OverviewTab({
       {summary.knockouts.length > 0 && (
         <div className="mt-8">
           <h3 className="wisden-section-title">Knockouts</h3>
+          <EdHelp />
           <DataTable
             columns={[
               {
@@ -1108,7 +1110,7 @@ function OverviewTab({
                   : '-',
               },
               {
-                key: 'date', label: 'Date',
+                key: 'date', label: 'Date and Score',
                 format: (v: string | null, r) => {
                   const hasScore = r.team1_score != null || r.team2_score != null
                   if (!v && !hasScore) return '-'
@@ -1194,11 +1196,12 @@ function OverviewTab({
       {tournament && summary.champions_by_season.length > 0 && (
         <div className="mt-8">
           <h3 className="wisden-section-title">Champions by season</h3>
+          <EdHelp />
           <DataTable
             columns={[
               { key: 'season', label: 'Season', sortable: true },
               {
-                key: 'team1', label: 'Match',
+                key: 'team1', label: 'Final',
                 format: (_v, r) => (
                   <>
                     <TeamWithEd
@@ -1227,7 +1230,7 @@ function OverviewTab({
                 ) as unknown as string,
               },
               {
-                key: 'match_id', label: 'Final',
+                key: 'match_id', label: 'Date and Score',
                 format: (_v, r) => {
                   const scoreTitle = r.team1 && r.team2
                     ? `${r.team1} ${r.team1_score ?? '—'} vs ${r.team2} ${r.team2_score ?? '—'} — scorecard`
@@ -1457,6 +1460,7 @@ function MatchesTab({
         Showing {rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()} of {total.toLocaleString()} matches in scope.
         Filters (gender, team type, seasons) respected.
       </div>
+      <EdHelp />
       <DataTable
         columns={columns}
         data={matches}
@@ -1970,7 +1974,9 @@ function RecordsTab({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+    <>
+      <EdHelp className="mt-4" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div>
         <h3 className="wisden-section-title">Highest team totals</h3>
         <DataTable
@@ -2150,5 +2156,6 @@ function RecordsTab({
         />
       </div>
     </div>
+    </>
   )
 }

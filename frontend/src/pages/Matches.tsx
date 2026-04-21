@@ -11,6 +11,7 @@ import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import Score from '../components/Score'
 import TeamLink from '../components/TeamLink'
+import EdHelp from '../components/EdHelp'
 import type { TeamInfo } from '../types'
 
 const PAGE_SIZE = 50
@@ -139,6 +140,7 @@ export default function Matches() {
       )}
 
       {/* Match list */}
+      <EdHelp />
       <div className="overflow-x-auto">
         <table className="wisden-table">
           <thead>

@@ -22,6 +22,7 @@ import DataTable from '../DataTable'
 import PlayerLink from '../PlayerLink'
 import TeamLink from '../TeamLink'
 import Score from '../Score'
+import EdHelp from '../EdHelp'
 import VenueOverviewPanel from './VenueOverviewPanel'
 
 const TABS = ['Overview', 'Batters', 'Bowlers', 'Fielders', 'Matches', 'Records'] as const
@@ -446,6 +447,7 @@ function MatchesTab({
         Showing {rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()} of {total.toLocaleString()} matches at this venue
         in the current filter scope.
       </div>
+      <EdHelp />
       <DataTable
         columns={[
           {
