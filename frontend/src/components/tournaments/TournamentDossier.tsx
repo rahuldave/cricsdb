@@ -1229,27 +1229,31 @@ function PartnershipsTab({
     b1: { person_id: string | null; name: string },
     b2: { person_id: string | null; name: string },
     scope: { tournament: string | null; season: string | null; battingTeam: string; opponent: string },
-  ) => (
-    <>
-      <PlayerLink
-        personId={b1.person_id} name={b1.name} role="batter" gender={gender}
-        subscriptSource={{
-          tournament: scope.tournament, season: scope.season,
-          team1: scope.battingTeam, team2: scope.opponent,
-        }}
-        compact
-      />
-      {' & '}
-      <PlayerLink
-        personId={b2.person_id} name={b2.name} role="batter" gender={gender}
-        subscriptSource={{
-          tournament: scope.tournament, season: scope.season,
-          team1: scope.battingTeam, team2: scope.opponent,
-        }}
-        compact
-      />
-    </>
-  )
+  ) => {
+    const src = {
+      tournament: scope.tournament, season: scope.season,
+      team1: scope.battingTeam, team2: scope.opponent,
+    }
+    return (
+      <>
+        <PlayerLink
+          personId={b1.person_id} name={b1.name} role="batter" gender={gender}
+          subscriptSource={src}
+          maxTiers={1}
+          phraseLabel="(ed)"
+          phraseClassName="scope-phrase-ed"
+        />
+        {' & '}
+        <PlayerLink
+          personId={b2.person_id} name={b2.name} role="batter" gender={gender}
+          subscriptSource={src}
+          maxTiers={1}
+          phraseLabel="(ed)"
+          phraseClassName="scope-phrase-ed"
+        />
+      </>
+    )
+  }
   const matchTeams = (row: { tournament: string | null; season: string | null; battingTeam: string; opponent: string }) => (
     <>
       <TeamWithEd team={row.battingTeam} row={row} gender={gender} team_type={teamType} />
