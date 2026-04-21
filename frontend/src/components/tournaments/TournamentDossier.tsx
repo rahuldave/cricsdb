@@ -185,7 +185,7 @@ export default function TournamentDossier({
 
   const battingFetch = useFetch<BattingLeaders | null>(
     () => currentTab === 'Batters'
-      ? getTournamentBattersLeaders(tournament, { ...apiFilters, limit: 10 })
+      ? getTournamentBattersLeaders(tournament, { ...apiFilters, limit: 20 })
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Batters'],
   )
