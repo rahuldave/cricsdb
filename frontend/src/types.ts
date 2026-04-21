@@ -1189,6 +1189,7 @@ export interface TournamentSummary {
     team2: string
     team1_score: string | null
     team2_score: string | null
+    date: string | null
   }[]
   top_scorer_alltime: (PersonRef & { team: string | null; runs: number }) | null
   top_wicket_taker_alltime: (PersonRef & { team: string | null; wickets: number }) | null
@@ -1234,6 +1235,8 @@ export interface TournamentSummary {
     margin: string
     venue: string | null
     date: string | null
+    team1_score: string | null
+    team2_score: string | null
   }[]
   by_team: Record<string, TournamentSummaryByTeam> | null
   head_to_head: {

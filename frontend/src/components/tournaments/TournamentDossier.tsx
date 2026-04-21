@@ -1104,9 +1104,30 @@ function OverviewTab({
               },
               {
                 key: 'date', label: 'Date',
-                format: (v: string | null, r) => v
-                  ? (matchLink(r.match_id, v) as unknown as string)
-                  : '-',
+                format: (v: string | null, r) => {
+                  const hasScore = r.team1_score != null || r.team2_score != null
+                  if (!v && !hasScore) return '-'
+                  const scoreTitle = r.team1 && r.team2
+                    ? `${r.team1} ${r.team1_score ?? '—'} vs ${r.team2} ${r.team2_score ?? '—'} — scorecard`
+                    : undefined
+                  return (
+                    <div>
+                      {v && (
+                        <div>
+                          <Link to={`/matches/${r.match_id}`} className="comp-link">{v}</Link>
+                        </div>
+                      )}
+                      {hasScore && (
+                        <Score
+                          team1Score={r.team1_score}
+                          team2Score={r.team2_score}
+                          matchId={r.match_id}
+                          title={scoreTitle}
+                        />
+                      )}
+                    </div>
+                  ) as unknown as string
+                },
               },
             ]}
             data={summary.knockouts}
@@ -1171,6 +1192,24 @@ function OverviewTab({
             columns={[
               { key: 'season', label: 'Season', sortable: true },
               {
+                key: 'team1', label: 'Match',
+                format: (_v, r) => (
+                  <>
+                    <TeamWithEd
+                      team={r.team1}
+                      row={{ tournament, season: r.season }}
+                      gender={gender} team_type={teamType}
+                    />
+                    {' v '}
+                    <TeamWithEd
+                      team={r.team2}
+                      row={{ tournament, season: r.season }}
+                      gender={gender} team_type={teamType}
+                    />
+                  </>
+                ) as unknown as string,
+              },
+              {
                 key: 'champion', label: 'Champion', sortable: true,
                 format: (v: string, r) => (
                   <TeamWithEd
@@ -1183,16 +1222,26 @@ function OverviewTab({
               },
               {
                 key: 'match_id', label: 'Final',
-                format: (_v, r) => (
-                  <Score
-                    team1Score={r.team1_score}
-                    team2Score={r.team2_score}
-                    matchId={r.match_id}
-                    title={r.team1 && r.team2
-                      ? `${r.team1} ${r.team1_score ?? '—'} vs ${r.team2} ${r.team2_score ?? '—'} — scorecard`
-                      : undefined}
-                  />
-                ) as unknown as string,
+                format: (_v, r) => {
+                  const scoreTitle = r.team1 && r.team2
+                    ? `${r.team1} ${r.team1_score ?? '—'} vs ${r.team2} ${r.team2_score ?? '—'} — scorecard`
+                    : undefined
+                  return (
+                    <div>
+                      {r.date && (
+                        <div>
+                          <Link to={`/matches/${r.match_id}`} className="comp-link">{r.date}</Link>
+                        </div>
+                      )}
+                      <Score
+                        team1Score={r.team1_score}
+                        team2Score={r.team2_score}
+                        matchId={r.match_id}
+                        title={scoreTitle}
+                      />
+                    </div>
+                  ) as unknown as string
+                },
               },
             ]}
             data={summary.champions_by_season}

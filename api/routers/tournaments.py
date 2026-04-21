@@ -662,6 +662,7 @@ async def tournament_summary(
         f"""
         SELECT m.season AS season, m.outcome_winner AS winner, m.id AS match_id,
                m.team1, m.team2,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date,
                (SELECT COALESCE(SUM(d.runs_total), 0)
                   FROM innings i JOIN delivery d ON d.innings_id = i.id
                  WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_runs,
@@ -695,6 +696,7 @@ async def tournament_summary(
             "team2": r["team2"],
             "team1_score": f"{r['t1_runs']}/{r['t1_wkts']}" if r["t1_has"] else None,
             "team2_score": f"{r['t2_runs']}/{r['t2_wkts']}" if r["t2_has"] else None,
+            "date": r["date"],
         }
         for r in finals_rows
     ]
@@ -999,7 +1001,25 @@ async def tournament_summary(
                m.team1, m.team2, m.outcome_winner,
                m.outcome_by_runs, m.outcome_by_wickets, m.outcome_result,
                m.venue,
-               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date,
+               (SELECT COALESCE(SUM(d.runs_total), 0)
+                  FROM innings i JOIN delivery d ON d.innings_id = i.id
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_runs,
+               (SELECT COUNT(*) FROM wicket w
+                  JOIN delivery d ON d.id = w.delivery_id
+                  JOIN innings i ON i.id = d.innings_id
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_wkts,
+               (SELECT COALESCE(SUM(d.runs_total), 0)
+                  FROM innings i JOIN delivery d ON d.innings_id = i.id
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_runs,
+               (SELECT COUNT(*) FROM wicket w
+                  JOIN delivery d ON d.id = w.delivery_id
+                  JOIN innings i ON i.id = d.innings_id
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_wkts,
+               (SELECT COUNT(*) FROM innings i
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_has,
+               (SELECT COUNT(*) FROM innings i
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_has
         FROM match m
         WHERE {where} AND m.event_stage IN (
           'Final', 'Semi Final', 'Semi-Final', 'Semi-final',
@@ -1033,6 +1053,8 @@ async def tournament_summary(
                        else r["outcome_result"] or "—"),
             "venue": r["venue"],
             "date": r["date"],
+            "team1_score": f"{r['t1_runs']}/{r['t1_wkts']}" if r["t1_has"] else None,
+            "team2_score": f"{r['t2_runs']}/{r['t2_wkts']}" if r["t2_has"] else None,
         }
         for r in ko_rows
     ]
