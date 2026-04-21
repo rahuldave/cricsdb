@@ -1328,6 +1328,28 @@ curl "http://localhost:8000/api/v1/series/batters-leaders?tournament=T20+World+C
 }
 ```
 
+## `GET /api/v1/series/bowler-scope-stats`
+
+Aggregate bowling stats for one picked player in the current scope —
+sibling of `batter-scope-stats`. Backs the Series > Bowlers "Picked
+bowler" tile. Returns `{"entry": null}` when the player has no
+deliveries as bowler in scope. Same param set as the batter variant.
+
+```bash
+curl "http://localhost:8000/api/v1/series/bowler-scope-stats?person_id=462411b3&tournament=T20+World+Cup+%28Men%29&gender=male&team_type=international&season_from=2022%2F23&season_to=2025%2F26"
+```
+
+```json
+{
+  "entry": {
+    "person_id": "462411b3", "name": "JJ Bumrah",
+    "runs": 302, "balls": 322, "wickets": 26,
+    "economy": 5.63, "strike_rate": 12.38,
+    "team": "India"
+  }
+}
+```
+
 ## `GET /api/v1/series/batter-scope-stats`
 
 Aggregate batting stats for one specific player in the current

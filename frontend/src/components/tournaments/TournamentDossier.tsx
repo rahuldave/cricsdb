@@ -8,7 +8,7 @@ import {
   getTournamentSummary, getTournamentBySeason, getTournamentPointsTable,
   getTournamentRecords,
   getTournamentBattersLeaders, getTournamentBowlersLeaders, getTournamentFieldersLeaders,
-  getTournamentBatterScopeStats,
+  getTournamentBatterScopeStats, getTournamentBowlerScopeStats,
   getTournamentPartnershipsByWicket, getTournamentPartnershipsTop,
   getTournamentPartnershipsTopByWicket,
   getMatches,
@@ -211,6 +211,16 @@ export default function TournamentDossier({
       ? getTournamentBatterScopeStats(tournament, seriesBatter, apiFilters)
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Batters', seriesBatter],
+  )
+
+  const [seriesBowler, setSeriesBowler] = useUrlParam('series_bowler', '')
+  const bowlerScopeFetch = useFetch<
+    { entry: BowlingLeaderEntry | null } | null
+  >(
+    () => currentTab === 'Bowlers' && seriesBowler
+      ? getTournamentBowlerScopeStats(tournament, seriesBowler, apiFilters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Bowlers', seriesBowler],
   )
   const bowlingFetch = useFetch<BowlingLeaders | null>(
     () => currentTab === 'Bowlers'
@@ -483,6 +493,11 @@ export default function TournamentDossier({
           filterTeam={filterTeam}
           filterOpponent={filterOpponent}
           gender={filters.gender}
+          scope={apiFilters}
+          pickedId={seriesBowler}
+          onPick={(id) => setSeriesBowler(id)}
+          pickedEntry={bowlerScopeFetch.data?.entry ?? null}
+          pickedLoading={bowlerScopeFetch.loading}
         />
       )}
       {currentTab === 'Fielders' && (
@@ -1938,6 +1953,7 @@ function PickerSlot({
 
 function BowlersTab({
   loading, error, data, refetch, filterTeam, filterOpponent, gender,
+  scope, pickedId, onPick, pickedEntry, pickedLoading,
 }: {
   loading: boolean; error: string | null
   data: BowlingLeaders | null; refetch: () => void
@@ -1945,6 +1961,11 @@ function BowlersTab({
   filterTeam: string | null | undefined
   filterOpponent: string | null | undefined
   gender: string | null | undefined
+  scope: import('../../types').FilterParams & { series_type?: string }
+  pickedId: string
+  onPick: (id: string) => void
+  pickedEntry: BowlingLeaderEntry | null
+  pickedLoading: boolean
 }) {
   if (loading) return <Spinner label="Loading bowlers…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
@@ -1962,6 +1983,30 @@ function BowlersTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+      <PickerSlot
+        title="Picked bowler"
+        role="bowler"
+        scope={scope}
+        pickedId={pickedId}
+        onPick={onPick}
+        loading={pickedLoading}
+        empty={!!pickedId && !pickedEntry && !pickedLoading}
+        onClear={() => onPick('')}
+      >
+        {pickedEntry && (
+          <DataTable
+            columns={[
+              { key: 'name', label: 'Bowler', format: (_v, r) => bowlerCell(r) },
+              { key: 'wickets', label: 'W' },
+              { key: 'balls', label: 'Balls' },
+              { key: 'economy', label: 'Econ', format: (v) => fmt(v, 2) },
+              { key: 'strike_rate', label: 'SR', format: (v) => fmt(v, 2) },
+            ]}
+            data={[pickedEntry]}
+            rowKey={(r) => r.person_id}
+          />
+        )}
+      </PickerSlot>
       <div>
         <h3 className="wisden-section-title">By wickets taken</h3>
         <DataTable

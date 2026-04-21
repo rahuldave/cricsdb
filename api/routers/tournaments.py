@@ -2234,6 +2234,93 @@ async def tournament_bowlers_leaders(
     }
 
 
+@router.get("/series/bowler-scope-stats")
+async def tournament_bowler_scope_stats(
+    person_id: str = Query(..., description="Person ID to fetch scoped stats for"),
+    tournament: str | None = Query(None),
+    series_type: str | None = Query(None),
+    filters: FilterParams = Depends(),
+):
+    """Scoped bowling stats for one picked player.
+
+    Sibling of /series/batter-scope-stats — returns a BowlingLeaderEntry
+    for the given person_id in scope, or {"entry": null} when they have
+    no deliveries as bowler in scope.
+    """
+    db = get_db()
+    where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    params["person_id"] = person_id
+
+    agg_rows = await db.q(
+        f"""
+        SELECT SUM(d.runs_total) AS runs,
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS balls
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE d.bowler_id = :person_id
+          AND i.super_over = 0 AND {where}
+        """,
+        params,
+    )
+    row = agg_rows[0] if agg_rows else None
+    if not row or not row["balls"]:
+        return {"entry": None}
+    runs = row["runs"] or 0
+    balls = row["balls"] or 0
+
+    wkt_rows = await db.q(
+        f"""
+        SELECT COUNT(*) AS wickets
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE d.bowler_id = :person_id
+          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+          AND i.super_over = 0 AND {where}
+        """,
+        params,
+    )
+    wickets = (wkt_rows[0]["wickets"] or 0) if wkt_rows else 0
+
+    name_rows = await db.q(
+        "SELECT name FROM person WHERE id = :pid",
+        {"pid": person_id},
+    )
+    name = name_rows[0]["name"] if name_rows else person_id
+
+    team_rows = await db.q(
+        f"""
+        SELECT CASE WHEN i.team = m.team1 THEN m.team2 ELSE m.team1 END AS team,
+               COUNT(*) AS n
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE d.bowler_id = :person_id
+          AND i.super_over = 0 AND {where}
+        GROUP BY team
+        ORDER BY n DESC
+        LIMIT 1
+        """,
+        params,
+    )
+    team = team_rows[0]["team"] if team_rows else None
+
+    return {
+        "entry": {
+            "person_id": person_id,
+            "name": name,
+            "runs": runs,
+            "balls": balls,
+            "wickets": wickets,
+            "economy": _safe_div(runs, balls, 6),
+            "strike_rate": _safe_div(balls, wickets) if wickets > 0 else None,
+            "team": team,
+        },
+    }
+
+
 @router.get("/series/fielders-leaders")
 async def tournament_fielders_leaders(
     tournament: str | None = Query(None),

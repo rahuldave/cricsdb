@@ -706,6 +706,12 @@ surfaces row-specific context. Commits `74c5666` … `5708f56`.
 - **Bowlers + Fielders tabs deliberately unchanged this commit** —
   follow-on commits 2/3/4 will add the matching pickers there, plus
   the fielders layout reshuffle and a new by-run-outs leaderboard.
+- **Bowlers picker (follow-on commit).** Same shape as Batters:
+  2x2 grid (Picked bowler + By wickets + By strike rate + By
+  economy); URL param `series_bowler`; new endpoint
+  `/api/v1/series/bowler-scope-stats`. `PickerSlot` component
+  factored out in the previous commit handles the UI; only a new
+  endpoint + URL-wire + 2x2 restructure needed here.
 
 ### Shipped 2026-04-21 (Series tab refactor + Partnerships/Records expansion)
 

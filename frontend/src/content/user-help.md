@@ -24,12 +24,13 @@ sit inside a **Players ▾** group — hover on desktop, sub-row on mobile):
 ![India vs Australia rivalry dossier](/social/08-rivalry-dossier.png)
 *A bilateral rivalry dossier — 37 meetings, by-team breakdowns below the unified summary.*
 
-On the Series dossier's **Batters** subtab, the upper-left slot has a
-**Picked batter** typeahead scoped to the current match-set. Pick any
-player who features in the scope — the card fills with their
-in-scope runs / balls / outs / average / strike rate, alongside the
-three leaderboards in the other quadrants. The pick rides the URL
-(`series_batter=<id>`) so a share link takes the other side straight
+On the Series dossier's **Batters** and **Bowlers** subtabs, the
+upper-left slot has a scope-aware typeahead (**Picked batter** /
+**Picked bowler**). Pick any player who features in the current
+match-set — the card fills with their in-scope runs / wickets /
+economy / SR / average, alongside the three leaderboards in the
+other quadrants. The pick rides the URL (`series_batter=<id>`,
+`series_bowler=<id>`) so a share link takes the other side straight
 to the same card. If you narrow filters after picking and your choice
 no longer has data in the new scope, the card shows an "× clear" note
 rather than silently dropping the pick.
