@@ -1240,7 +1240,7 @@ function PartnershipsTab({
           personId={b1.person_id} name={b1.name} role="batter" gender={gender}
           subscriptSource={src}
           maxTiers={1}
-          phraseLabel="(ed)"
+          phraseLabel="ed"
           phraseClassName="scope-phrase-ed"
         />
         {' & '}
@@ -1248,7 +1248,7 @@ function PartnershipsTab({
           personId={b2.person_id} name={b2.name} role="batter" gender={gender}
           subscriptSource={src}
           maxTiers={1}
-          phraseLabel="(ed)"
+          phraseLabel="ed"
           phraseClassName="scope-phrase-ed"
         />
       </>
