@@ -35,17 +35,17 @@ NEW series_summary_t20wc_men          /api/v1/series/summary?tournament=T20%20Wo
 REG series_batters_t20wc_men          /api/v1/series/batters-leaders?tournament=T20%20World%20Cup%20%28Men%29&gender=male&limit=5
 
 # ── bilateral rivalry (filter_team + filter_opponent) ────────────
-REG series_summary_ind_vs_aus         /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male
+NEW series_summary_ind_vs_aus         /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male
 REG series_by_season_ind_vs_aus       /api/v1/series/by-season?filter_team=India&filter_opponent=Australia&gender=male
 REG series_records_ind_vs_aus         /api/v1/series/records?filter_team=India&filter_opponent=Australia&gender=male&limit=3
 REG series_batters_ind_vs_aus         /api/v1/series/batters-leaders?filter_team=India&filter_opponent=Australia&gender=male&limit=5
 
 # ── series_type variants ─────────────────────────────────────────
 REG series_summary_ind_aus_bilateral  /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male&series_type=bilateral_only
-REG series_summary_ind_aus_tournament /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male&series_type=tournament_only
+NEW series_summary_ind_aus_tournament /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male&series_type=tournament_only
 
 # ── team-pair inside a tournament ────────────────────────────────
-REG series_summary_ind_aus_at_t20wc   /api/v1/series/summary?tournament=T20%20World%20Cup%20%28Men%29&filter_team=India&filter_opponent=Australia&gender=male
+NEW series_summary_ind_aus_at_t20wc   /api/v1/series/summary?tournament=T20%20World%20Cup%20%28Men%29&filter_team=India&filter_opponent=Australia&gender=male
 
 # ── other-rivalries (lazy load) ──────────────────────────────────
 REG series_other_rivalries_men        /api/v1/series/other-rivalries?gender=male
