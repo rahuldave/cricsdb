@@ -16,9 +16,9 @@ REG series_landing_men                /api/v1/series/landing?gender=male
 REG series_landing_women              /api/v1/series/landing?gender=female
 
 # ── tournament dossier: IPL all-time ─────────────────────────────
-REG series_summary_ipl                /api/v1/series/summary?tournament=Indian%20Premier%20League
+NEW series_summary_ipl                /api/v1/series/summary?tournament=Indian%20Premier%20League
 REG series_by_season_ipl              /api/v1/series/by-season?tournament=Indian%20Premier%20League&gender=male&team_type=club
-NEW series_records_ipl                /api/v1/series/records?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
+REG series_records_ipl                /api/v1/series/records?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
 REG series_batters_leaders_ipl        /api/v1/series/batters-leaders?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
 REG series_bowlers_leaders_ipl        /api/v1/series/bowlers-leaders?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
 REG series_fielders_leaders_ipl       /api/v1/series/fielders-leaders?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
@@ -28,16 +28,16 @@ REG series_partnerships_heatmap_ipl   /api/v1/series/partnerships/heatmap?tourna
 
 # ── single-season (points table) ─────────────────────────────────
 REG series_points_table_ipl_2024      /api/v1/series/points-table?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&gender=male&team_type=club
-REG series_summary_ipl_2024           /api/v1/series/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&gender=male&team_type=club
+NEW series_summary_ipl_2024           /api/v1/series/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&gender=male&team_type=club
 
 # ── ICC event canonicalization (IN-variant expansion) ────────────
-REG series_summary_t20wc_men          /api/v1/series/summary?tournament=T20%20World%20Cup%20%28Men%29&gender=male
+NEW series_summary_t20wc_men          /api/v1/series/summary?tournament=T20%20World%20Cup%20%28Men%29&gender=male
 REG series_batters_t20wc_men          /api/v1/series/batters-leaders?tournament=T20%20World%20Cup%20%28Men%29&gender=male&limit=5
 
 # ── bilateral rivalry (filter_team + filter_opponent) ────────────
 REG series_summary_ind_vs_aus         /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male
 REG series_by_season_ind_vs_aus       /api/v1/series/by-season?filter_team=India&filter_opponent=Australia&gender=male
-NEW series_records_ind_vs_aus         /api/v1/series/records?filter_team=India&filter_opponent=Australia&gender=male&limit=3
+REG series_records_ind_vs_aus         /api/v1/series/records?filter_team=India&filter_opponent=Australia&gender=male&limit=3
 REG series_batters_ind_vs_aus         /api/v1/series/batters-leaders?filter_team=India&filter_opponent=Australia&gender=male&limit=5
 
 # ── series_type variants ─────────────────────────────────────────
