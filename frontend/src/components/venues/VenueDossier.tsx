@@ -62,6 +62,7 @@ function TeamWithEd({ team, row, gender, team_type }: {
       }}
       maxTiers={1}
       phraseLabel="ed"
+      phraseClassName="scope-phrase-ed"
     />
   )
 }

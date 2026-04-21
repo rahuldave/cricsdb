@@ -75,18 +75,25 @@ interface TeamLinkProps {
    *  resolveBucket → resolveScopePhrases pipeline — this prop is
    *  rendering-only. */
   phraseLabel?: string | ((tier: { label: string }, index: number) => string)
+  /** Extra class appended to the phrase's `comp-link scope-phrase` base
+   *  class. Intended for rendering variants like `.scope-phrase-ed`
+   *  (small-caps + letter-spacing, matching the block-layout H2
+   *  subscript convention) when the compact "ed" token needs to read
+   *  as a scope marker rather than an italic qualifier. */
+  phraseClassName?: string
 }
 
 export default function TeamLink({
   teamName, subscriptSource, gender, team_type, compact, layout = 'inline',
   keepRivalry = false, seriesType: seriesTypeProp, maxTiers,
-  phraseLabel,
+  phraseLabel, phraseClassName,
 }: TeamLinkProps) {
   const renderPhraseLabel = (origLabel: string, index: number): string => {
     if (phraseLabel === undefined) return origLabel
     if (typeof phraseLabel === 'string') return phraseLabel
     return phraseLabel({ label: origLabel }, index)
   }
+  const phraseCls = `comp-link scope-phrase${phraseClassName ? ' ' + phraseClassName : ''}`
   const filters = useScopeFilters()
   const [searchParams] = useSearchParams()
   // series_type is a Series-tab-local URL param (mirrors the backend's
@@ -137,7 +144,7 @@ export default function TeamLink({
         <Link to={nameHref} className="comp-link">{teamName}</Link>
         <span className="scope-phrases-block">
           {subs.map((s, i) => (
-            <Link key={s.key} to={s.href} className="comp-link scope-phrase" title={s.tooltip}>
+            <Link key={s.key} to={s.href} className={phraseCls} title={s.tooltip}>
               {renderPhraseLabel(s.label, i)}
             </Link>
           ))}
@@ -153,7 +160,7 @@ export default function TeamLink({
         {subs.map((s, i) => (
           <span key={s.key}>
             {i === 0 ? ' ' : <span className="scope-phrases-sep">, </span>}
-            <Link to={s.href} className="comp-link scope-phrase" title={s.tooltip}>
+            <Link to={s.href} className={phraseCls} title={s.tooltip}>
               {renderPhraseLabel(s.label, i)}
             </Link>
           </span>

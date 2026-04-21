@@ -1609,6 +1609,18 @@ a { color: inherit; }
   letter-spacing: 0.01em;
 }
 .scope-phrase:hover { color: var(--accent); border-bottom-color: var(--accent); }
+/* Compact scope-marker variant — same small-caps / letter-spacing
+   aesthetic as the block-layout H2 subscripts, but inline and tiny so
+   it fits inside dense table cells as a pure marker (no scope-phrase
+   prose). Applied via TeamLink's `phraseClassName` prop when
+   phraseLabel is a short token like "ed". */
+.scope-phrase.scope-phrase-ed {
+  font-style: normal;
+  font-variant: all-small-caps;
+  letter-spacing: 0.08em;
+  font-size: 0.72em;
+  margin-left: 0.2em;
+}
 .scope-phrases-inline { margin-left: 0.1em; }
 .scope-phrases-sep { font-size: 0.68em; color: var(--ink-faint); font-style: italic; }
 /* TeamLink block-layout wrapper — inline-block so the H2 flow doesn't

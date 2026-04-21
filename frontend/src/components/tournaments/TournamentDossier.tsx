@@ -119,6 +119,7 @@ function TeamWithEd({ team, row, gender, team_type }: {
       }}
       maxTiers={1}
       phraseLabel="ed"
+      phraseClassName="scope-phrase-ed"
     />
   )
 }
@@ -1076,9 +1077,9 @@ function OverviewTab({
                 key: 'team1', label: 'Match',
                 format: (_v, r) => (
                   <>
-                    <Link to={teamLinkHref(r.team1, { tournament, gender })} className="comp-link">{r.team1}</Link>
+                    <TeamWithEd team={r.team1} row={r} gender={gender} team_type={teamType} />
                     {' v '}
-                    <Link to={teamLinkHref(r.team2, { tournament, gender })} className="comp-link">{r.team2}</Link>
+                    <TeamWithEd team={r.team2} row={r} gender={gender} team_type={teamType} />
                   </>
                 ) as unknown as string,
               },
@@ -1087,7 +1088,7 @@ function OverviewTab({
                 format: (v: string | null, r) => v
                   ? (
                       <>
-                        <Link to={teamLinkHref(v, { tournament, gender })} className="comp-link">{v}</Link>
+                        <TeamWithEd team={v} row={r} gender={gender} team_type={teamType} />
                         {` (${r.margin})`}
                       </>
                     ) as unknown as string

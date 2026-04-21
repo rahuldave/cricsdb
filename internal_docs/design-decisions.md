@@ -1228,6 +1228,51 @@ documentation entry catches up after exactly that confusion on
 2026-04-20 (Editions-tab `champion_record` / `runner_up_record`
 extension).
 
+## Filters scope the summary; rows link to their own edition
+
+Working principle for scope flow across every data page:
+
+**The FilterBar intersects SUMMARY STATISTICS. Individual rows link
+UP to their own nearest edition.**
+
+A list like "Top batters, men's, IPL, 2014–2018" means the AVERAGES,
+HIGHEST SCORES, strike rates, ranks — the cumulative numbers — are
+computed over exactly that window. That's what the user asked for by
+setting those filters.
+
+But each of the N rows that surface in that list represents a
+specific batter's specific in-window performances. When the user
+clicks into one, the UX shouldn't send them to a 5-year filter
+window they didn't ask to explore; it should raise them to the
+nearest natural edition — the tournament + season of the row. For a
+leaderboard this is usually ambiguous (a batter played across many
+editions), so leaderboards may retain the filter scope. For a
+records row — "229-run partnership, IPL, 2016" — the row already
+names a single edition, and the (ed) link pins there.
+
+Rule of thumb: if the cell/row value is row-specific (a match date,
+a partnership, a best-bowling figure, an innings), its links point
+to the row's specific edition — NOT to the ambient filter window.
+If the cell is a cumulative number (career average, season strike
+rate, win count across the filter window), it belongs to the
+filtered scope.
+
+This principle drives:
+
+- The Matches tab's per-row "(ed)" token (→ row's edition).
+- The Records tab's "(ed)" on each team cell (→ row's edition).
+- The Editions tab's Champion/Runner-up/Top-scorer bracketed counts
+  (→ single-edition scope, since each row IS one edition).
+- Scorecard-linked date cells carry the row's match_id, not a
+  season-filtered summary URL.
+
+What it does NOT drive (yet, intentionally):
+
+- Leaderboard tile clicks from Home / Batting landing — they DO
+  carry the filter scope through, because the leaderboard-in-scope
+  is the user's explicit question. A future "raise to edition"
+  toggle could exist but isn't shipped.
+
 ## Per-row "(ed)" tag uses row scope, routed through TeamLink
 
 On the Series / Venue dossier Matches + Records tabs, each team name

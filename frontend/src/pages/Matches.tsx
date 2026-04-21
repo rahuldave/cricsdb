@@ -205,6 +205,7 @@ export default function Matches() {
                       subscriptSource={edScope}
                       maxTiers={1}
                       phraseLabel="ed"
+                      phraseClassName="scope-phrase-ed"
                     />
                     {' '}<span style={{ fontStyle: 'italic', color: 'var(--ink-faint)' }}>v</span>{' '}
                     <TeamLink
@@ -214,6 +215,7 @@ export default function Matches() {
                       subscriptSource={edScope}
                       maxTiers={1}
                       phraseLabel="ed"
+                      phraseClassName="scope-phrase-ed"
                     />
                   </div>
                   {(m.team1_score || m.team2_score) && (
