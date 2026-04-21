@@ -720,6 +720,13 @@ surfaces row-specific context. Commits `74c5666` … `5708f56`.
   param `series_fielder`; new endpoint
   `/api/v1/series/fielder-scope-stats` returning a
   FieldingLeaderEntry with the full breakdown (Total / C / St / RO / C&B).
+- **By run-outs leaderboard (follow-on commit).** `fielders-leaders`
+  response gains a `by_run_outs` array — same aggregate shape as
+  `by_dismissals`, sorted by `run_outs DESC` with tiebreak on total,
+  HAVING `run_outs > 0` so the tail isn't padded with zeros. Lands
+  in the Fielders tab lower-right slot, completing the 2x2 grid.
+  REG flip for `series_fielders_leaders_ipl` (REG→NEW) was landed
+  in a preceding commit per the project convention on shape changes.
 
 ### Shipped 2026-04-21 (Series tab refactor + Partnerships/Records expansion)
 

@@ -2354,6 +2354,31 @@ async def tournament_fielders_leaders(
         params,
     )
 
+    # By run-outs — same aggregate shape as by_dismissals but sorted
+    # by run_outs DESC. HAVING run_outs > 0 so the tail isn't padded
+    # with zeros from everyone who's ever fielded without a run-out.
+    run_out_rows = await db.q(
+        f"""
+        SELECT fc.fielder_id AS person_id,
+               COUNT(*) AS total,
+               SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+               SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+               SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+               SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS c_and_b
+        FROM fieldingcredit fc
+        JOIN delivery d ON d.id = fc.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE fc.fielder_id IS NOT NULL
+          AND i.super_over = 0 AND {where}
+        GROUP BY fc.fielder_id
+        HAVING run_outs > 0
+        ORDER BY run_outs DESC, total DESC
+        LIMIT :lim
+        """,
+        params,
+    )
+
     # By keeper dismissals — credit catches/stumpings to the designated
     # keeper (via keeper_assignment) for the fielding innings. Join
     # fielding_credit through delivery → innings to match ka.innings_id.
@@ -2379,7 +2404,11 @@ async def tournament_fielders_leaders(
         params,
     )
 
-    top_ids = {r["person_id"] for r in disp_rows} | {r["person_id"] for r in keeper_rows}
+    top_ids = (
+        {r["person_id"] for r in disp_rows}
+        | {r["person_id"] for r in keeper_rows}
+        | {r["person_id"] for r in run_out_rows}
+    )
     name_map: dict[str, str] = {}
     team_map: dict[str, str] = {}
     if top_ids:
@@ -2426,6 +2455,7 @@ async def tournament_fielders_leaders(
     return {
         "by_dismissals": _pack(disp_rows),
         "by_keeper_dismissals": _pack(keeper_rows),
+        "by_run_outs": _pack(run_out_rows),
     }
 
 

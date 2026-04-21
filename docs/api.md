@@ -1316,8 +1316,15 @@ uses this to flip `filter_team` / `filter_opponent` per row so the
 "vs <opponent>" context link points the player at their actual
 opponent, not the dossier's verbatim `filter_opponent`.
 
+`fielders-leaders` returns three top-N lists: `by_dismissals`
+(catches + stumpings + run-outs + c&b), `by_keeper_dismissals`
+(keeper-only — catches + stumpings sourced via `keeper_assignment`),
+and `by_run_outs` (run-outs alone, sorted DESC, tiebreak on total;
+excludes fielders with zero run-outs so the list isn't padded).
+
 ```bash
 curl "http://localhost:8000/api/v1/series/batters-leaders?tournament=T20+World+Cup+%28Men%29&gender=male&limit=3"
+curl "http://localhost:8000/api/v1/series/fielders-leaders?tournament=Indian+Premier+League&gender=male&team_type=club&limit=3"
 ```
 
 ```json
@@ -1325,6 +1332,16 @@ curl "http://localhost:8000/api/v1/series/batters-leaders?tournament=T20+World+C
   "by_average":     [ { "person_id": "…", "name": "ML Hayden", "team": "Australia", "runs": 259, "balls": 132, "dismissals": 3, "average": 86.33, "strike_rate": 196.21 } ],
   "by_strike_rate": [ { "person_id": "…", "name": "SV Samson", "team": "India", "strike_rate": 199.38, "runs": 321, "balls": 161 } ],
   "thresholds": { "min_balls": 100, "min_dismissals": 3 }
+}
+```
+
+`fielders-leaders` response abbreviated:
+
+```json
+{
+  "by_dismissals":         [ { "person_id": "4a8a2e3b", "name": "MS Dhoni", "total": 258, "catches": 158, "stumpings": 47, "run_outs": 53, "c_and_b": 0 } ],
+  "by_keeper_dismissals":  [ { "person_id": "4a8a2e3b", "name": "MS Dhoni", "total": 189, "catches": 142, "stumpings": 47 } ],
+  "by_run_outs":           [ { "person_id": "4a8a2e3b", "name": "MS Dhoni", "total": 258, "catches": 158, "stumpings": 47, "run_outs": 53, "c_and_b": 0 } ]
 }
 ```
 

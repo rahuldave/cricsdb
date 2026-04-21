@@ -2153,6 +2153,20 @@ function FieldersTab({
           rowKey={(r) => r.person_id}
         />
       </div>
+      <div>
+        <h3 className="wisden-section-title">By run-outs</h3>
+        <DataTable
+          columns={[
+            { key: 'name', label: 'Fielder', format: (_v, r) => fielderCell(r) },
+            { key: 'run_outs', label: 'RO', sortable: true },
+            { key: 'total', label: 'Total' },
+            { key: 'catches', label: 'C' },
+            { key: 'stumpings', label: 'St' },
+          ]}
+          data={data.by_run_outs ?? []}
+          rowKey={(r) => r.person_id}
+        />
+      </div>
     </div>
   )
 }

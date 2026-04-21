@@ -200,6 +200,9 @@ export interface FieldingLeaderEntry {
 export interface FieldingLeaders {
   by_dismissals: FieldingLeaderEntry[]
   by_keeper_dismissals: FieldingLeaderEntry[]
+  /** Present on /series/fielders-leaders only — top fielders by run-out
+   *  count in scope. Absent on the batters-landing-style /fielders/leaders. */
+  by_run_outs?: FieldingLeaderEntry[]
 }
 
 export interface TeamVsOpponent {
