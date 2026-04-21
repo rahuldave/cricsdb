@@ -1,20 +1,33 @@
 # Next-session ideas — Head-to-Head tab walk, Teams tab, cross-tab audit
 
 > **NO DEPLOYS** until the Series + Teams + H2H deep-dive completes.
-> Per session memory, last reaffirmed 2026-04-20.
+> Per session memory, last reaffirmed 2026-04-21.
 
 ## NEXT SESSION agenda (in order)
 
-Series tab deep-dive completed 2026-04-20 (pm + evening) — SeriesLink
-shipped, tile conventions set, TournamentDossier Overview/Editions/
-Groups/Knockouts/Participating-teams cells converted. Evening arc:
-Score + EdHelp components, TeamLink/PlayerLink `phraseLabel` prop,
-(ed) row-scope convention adopted across Matches tab, Records tab,
-Overview Knockouts + Champions by season, `/matches`, Venue Matches.
-Small-caps ED styling applied. Pagination URL-shared. Status strip
-full-width + always rendered. Comprehensive link audit saved to
-`internal_docs/link-audit.md` — use as reference when walking
-remaining tabs. Next tabs to walk:
+Series tab deep-dive **fully done 2026-04-20 (pm + evening) + 2026-04-21**:
+- 2026-04-20: SeriesLink + Score + EdHelp + phraseLabel + (ed) across
+  Matches / Records / Champions / Knockouts / /matches / Venue
+  Matches; link-audit.md written.
+- 2026-04-21 arc 1: Series tab migrated every remaining raw `<Link>`
+  to `TeamLink`/`PlayerLink`/`SeriesLink` with `phraseLabel` +
+  `subscriptSource`. Landing tile inversions dropped. Rivalry by-team
+  tile title, Points tab team column, Partnerships whole tab, Records
+  Largest-partnerships batters + Best-bowling bowler all cleaned up.
+  Dead helpers (`renderBatter`, `renderVsTeams`, `teamLinkHref`, etc.)
+  deleted.
+- 2026-04-21 arc 2: feature expansion on each Series subtab. Records
+  gained `best_individual_batting` table; Batters gained "By runs
+  scored"; Bowlers gained "By wickets taken"; Partnerships gained
+  "top 10 per wicket" (10 sub-tables from one backend query).
+  Leaderboard caps standardized at 20 (batting/bowling/fielding/
+  partnerships); Records stays at 10.
+- **`internal_docs/links.md`** is the canonical contract for
+  TeamLink / PlayerLink / SeriesLink and their `phraseLabel` +
+  `subscriptSource` mechanisms — CLAUDE.md points future sessions at
+  it. Read it before touching any `/teams` / player / `/series` link.
+
+Next tabs to walk:
 
 1. **Head-to-Head tab walk.** `/head-to-head` is the polymorphic tab
    with `mode=player` and `mode=team`. Verify that:
@@ -55,6 +68,40 @@ remaining tabs. Next tabs to walk:
    `useFilterDeps()` returns `FILTER_KEYS.map(k => filters[k])`,
    stable-memoized. Pages can gradually adopt it to replace their
    hand-rolled arrays.
+
+## Known deviations outside the Series tab (from 2026-04-21 spot-check)
+
+Flagged at the top of `internal_docs/link-audit.md` as the same
+pattern the Series refactor fixed. Pick these off as each tab gets
+its turn — one commit per deviation, following `internal_docs/links.md`
+as the contract:
+
+- **`Home.tsx:20–87`** locally defines `TeamLink` + `PlayerLink`
+  components that shadow the real ones. Raw `<Link>` with hand-rolled
+  URL building; no `subscriptSource`, no phrases; the local
+  `TeamLink` also inverts the name-is-all-time contract.
+- **`venues/VenueDossier.tsx:38–40` + `VenueOverviewPanel.tsx:14`**
+  have a local `teamLink()` helper used 10+ times in Records tables
+  and Overview summary lines. Same pre-refactor pattern the Series
+  dossier had. Fix: replace with `TeamWithEd`-style `TeamLink` with
+  per-row edition subscriptSource.
+- **`venues/VenueDossier.tsx:598–622`** — Records Largest-partnerships
+  batter pair and Best-bowling bowler use `PlayerLink` but no
+  `subscriptSource` so no (ed) phrase surfaces.
+- **`Batting.tsx` / `Bowling.tsx` / `Fielding.tsx`** innings-list
+  Opponent columns and matchup columns (bowler/batter cells) use raw
+  `<Link>`. Tournament column is already `SeriesLink`. Team + player
+  cells need the same conversion.
+- **`Batting.tsx:507` / `Bowling.tsx:491` / `Fielding.tsx:487, 523`**
+  landing-board leaderboards use raw `<Link>` via a local
+  `playerLink()` URL helper, not `PlayerLink`.
+- **`Teams.tsx:216, 755` (keeper lists), `1051–1054, 1083–1086,
+  1178–1188` (partnerships), `1289–1296` (Players-tab roster)** —
+  raw `<Link>` for player names throughout. Should be `PlayerLink`
+  with compact (roster) or edition subscriptSource (partnerships).
+- **`Teams.tsx` Match List columns (lines 135–139)** — Opponent /
+  Venue / Tournament / Result are plain text, no links. Convention
+  calls for TeamLink / venue link / SeriesLink respectively.
 
 ## Series deep-dive — DONE 2026-04-20 (kept as reference scenarios)
 

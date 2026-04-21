@@ -666,6 +666,101 @@ surfaces row-specific context. Commits `74c5666` … `5708f56`.
   tile. Reference document for comparing future work against the
   established conventions.
 
+### Shipped 2026-04-21 (Series tab refactor + Partnerships/Records expansion)
+
+Continuation of 2026-04-20's (ed)/phraseLabel arc. Two arcs this day:
+first a cleanup pass where the Series tab dropped every remaining raw
+`<Link>` in favour of TeamLink / PlayerLink / SeriesLink, then a
+feature pass on Records + Batters + Bowlers + Fielders + Partnerships
+subtabs. Commits `5179683` … `ca0b785`.
+
+- **`internal_docs/links.md` — canonical link-component contract.**
+  New reference doc pinning the "name-is-all-time, phrase-is-scoped"
+  invariant, the `SubscriptSource` per-row override model, and the
+  `phraseLabel` rendering-only override (used for `"ed"`, `"(6)"`
+  bracketed counts, `"N m"` Groups counts, `"(won/played)"` Editions
+  counts, etc.). Documents anti-patterns: raw `<Link to="/teams…">`,
+  local URL helpers, inverting the name/phrase direction. CLAUDE.md
+  gained a pointer directing future sessions to read it before
+  touching any `/teams` / player / `/series` navigation.
+- **Series refactor.** Migrated every remaining non-TeamLink/PlayerLink
+  cell on `/series` to the shared components. Specifically:
+  - Landing `TournamentTile` "Most titles (N)" and "Winner: X" —
+    inversions retired; name goes all-time, bracketed-count / (ed)
+    rides `phraseLabel`. Same fix on `RivalryTile` Winner.
+  - Overview rivalry by-team tile title (was `teamLinkHref` + raw
+    Link) → `TeamLink` with `keepRivalry` + rivalry-oriented source.
+  - Overview Groups "N m" and Participating-teams "(N)" use
+    `phraseLabel`.
+  - Editions "(won/played)" + "(runs)" + "(wickets)" → phraseLabel.
+  - Points tab team column (was plain text) → `TeamLink` with
+    phraseLabel="ed".
+  - Partnerships tab (biggest deviation pre-refactor): both tables
+    now render batter pair via `PlayerLink compact` × 2 and match
+    teams via `TeamWithEd` × 2 through two local closures
+    `batterPair()` / `matchTeams()` that share scope computation.
+  - Records: Largest-partnerships batter pair → `PlayerLink` × 2
+    rivalry-oriented; Best bowling bowler cell → `PlayerLink` with
+    edition subscriptSource + phraseLabel="ed".
+  - Dead helpers deleted: `renderBatter`, `renderBatterPair`,
+    `renderVsTeams`, `teamLinkHref`, `teamUrl`. File-level comment
+    at `TournamentsLanding.tsx:11–16` that defended the inversion
+    removed along with it.
+- **Records — best individual batting + cap bump.** New backend SQL
+  in `/series/records` returns `best_individual_batting` (top-N
+  single-innings scores, tie-break by balls ASC so 87(40) ranks above
+  87(60), formatted as `"175* (65)"` with not-out asterisk). Frontend
+  renders a sibling table in RecordsTab mirroring Best bowling's
+  column shape (Score | Batter | Edition | Date). Records top-N cap
+  bumped 5 → 10 so the tab reads more as a leaderboard than a
+  podium.
+- **Series subtab caps standardized at 20 (up from 10).** Batters,
+  Bowlers, Fielders, Partnerships-top all pushed to 20 rows. Records
+  stays at 10 — it's still a podium-feel table. Rationale captured in
+  `design-decisions.md`.
+- **Batters tab — "By runs scored".** New primary table, placed first
+  in BattersTab to match the Orange-Cap mental model. Same
+  min_balls=100 threshold as the other two lists, tie-break by balls
+  ASC. Extract `batterCell()` closure so all three tables share the
+  `PlayerLink` render.
+- **Bowlers tab — "By wickets taken".** Mirror of Batters' By-runs:
+  placed first, Purple-Cap framing. Tie-break by economy ASC.
+  `bowlerCell()` closure extracted.
+- **Partnerships tab — top 10 per wicket.** New backend endpoint
+  `/series/partnerships/top-by-wicket` returns the top-N partnerships
+  **per wicket number** (1–10) in a single round-trip using
+  `ROW_NUMBER() OVER (PARTITION BY wicket_number)`. Rendered as ten
+  h4 sub-tables ("1st wicket" through "10th wicket") below the
+  existing "Top partnerships" section. All sub-tables share the
+  `batterPair()` / `matchTeams()` closures so the per-row ed phrase
+  applies identically.
+- **Partnerships polish.** "Avg" column header expanded to "Average".
+  Batter-pair cells gained the `ed` phrase after each name (matching
+  the team-pair `ed` convention on the same row); initial parens
+  were removed on user feedback for visual symmetry — row now reads
+  `V Kohli ed & AB de Villiers ed | RCB ed v Gujarat Lions ed`.
+- **`internal_docs/link-audit.md` re-audit (Series section only).**
+  Previous audit was stale against the refactor; rewrote the Series
+  section line-cited against current files. Top of doc gained a
+  verification-status banner + a grep-only spot-check of parallel
+  deviations STILL live outside Series — Home.tsx's locally-shadowed
+  `TeamLink`/`PlayerLink`, Venues dossier's `teamLink()` helper,
+  Batting/Bowling/Fielding innings-list Opponent + matchup cells,
+  Teams.tsx partnerships + roster. Flagged for the next session.
+- **Regression discipline.** Missed the REG→NEW flip before shipping
+  shape changes (three endpoints gained new top-level keys: records
+  `best_individual_batting`, batters-leaders `by_runs`, bowlers-
+  leaders `by_wickets`). Verified retroactively by
+  `git checkout <pre-session> -- api/routers/tournaments.py`, curl
+  capture, Python dict diff → stripped-of-new-keys HEAD == OLD for
+  all three. Harness run with realigned urls.txt: 16 REG matched, 0
+  drifted. Next backend change: flip REG→NEW in a preceding commit.
+- **Commit cadence.** User flagged twice that batched commits weren't
+  landing per-feature. Ten+ clean commits landed after that, one
+  logical change per commit. `git add -p` (or revert-restore when the
+  commits share a file) is the splitting mechanism going forward
+  — not large end-of-session dump commits.
+
 ---
 
 ## Known issues / live TODO

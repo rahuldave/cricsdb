@@ -1313,3 +1313,60 @@ context (every row would otherwise repeat the same name). On the
 Records tab the Edition column shows just the season in single-
 tournament mode (2024, 2025, …) and "Tournament, Season" in rivalry
 mode (multiple tournaments may appear).
+
+## Series-tab leaderboard caps: 20 for leaderboards, 10 for Records
+
+Decided 2026-04-21. Every leaderboard subtab on `/series` (Batters /
+Bowlers / Fielders / Partnerships-top) caps at 20 rows per table;
+the Records tab caps at 10.
+
+The split is about the framing that each tab implies:
+
+- A **leaderboard** (Batters / Bowlers / Fielders / Partnerships top-N)
+  wants enough depth to scan past the headline names into the
+  mid-field. Three tables deep on one subtab (By runs / By avg / By SR
+  on Batters, etc.); 20 rows each gives readers 60 different players
+  per tab to compare on different axes. Ten felt like a highlight reel.
+- **Records** (Highest team totals, Lowest all-out, Best bowling, etc.)
+  reads as a podium — "these are the extreme entries for this
+  tournament". Ten is a natural "top-10 best ever" feel. Twenty would
+  surface entries that barely count as records.
+
+Partnerships tab has both: Top partnerships caps at 20 (leaderboard),
+top-per-wicket caps at 10 per wicket (sub-podiums). The by-wicket
+averages table is inherently fixed at 10 rows (one per wicket number
+1–10) so its cap question never arose.
+
+Implementation: the cap lives on the frontend caller —
+`getTournamentBattersLeaders(..., { limit: 20 })` etc. — not the
+backend default. Backend endpoints still cap hard at 20 (batters/
+bowlers/fielders) or 50 (records) to prevent abuse. Callers not on
+the Series tab (e.g. VenueDossier) still request 5/10 per their own
+framing.
+
+## Link-component contract lives in `internal_docs/links.md`
+
+Decided 2026-04-21. The "name-is-all-time, phrase-is-scoped" invariant
+for `TeamLink` + `PlayerLink`, plus the `SubscriptSource` per-row
+override model and the `phraseLabel` rendering-only text override,
+are canonical. The contract is now written up in `internal_docs/links.md`
+and CLAUDE.md points every future session there before touching a
+`/teams` / player / `/series` link.
+
+The rule that drove the Series-tab refactor: **before writing any
+raw `<Link to="/teams…">` or local URL helper, read `links.md`.**
+`phraseLabel` alone covers all the historical "intentional
+exceptions" — the landing tile "Winner: X" inversion, the bracketed
+scoped-count convention ("Most titles: CSK (6)"), the compact "ed"
+token. No new helper needed.
+
+Retired in this session as a consequence:
+
+- `teamUrl()` in TournamentsLanding.tsx
+- `teamLinkHref()` in TournamentDossier.tsx
+- `renderBatter()` / `renderBatterPair()` / `renderVsTeams()` in
+  TournamentDossier.tsx
+
+The same pattern is still live in other files (listed in
+`internal_docs/link-audit.md`'s "Known deviations outside the Series
+tab" block) and will be cleaned up as each tab gets walked.
