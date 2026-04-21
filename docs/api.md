@@ -1328,6 +1328,28 @@ curl "http://localhost:8000/api/v1/series/batters-leaders?tournament=T20+World+C
 }
 ```
 
+## `GET /api/v1/series/fielder-scope-stats`
+
+Aggregate fielding stats for one picked player in the current scope —
+sibling of `batter-scope-stats` and `bowler-scope-stats`. Backs the
+Series > Fielders "Picked fielder" tile. Returns `{"entry": null}`
+when the player has no fielding credits in scope.
+
+```bash
+curl "http://localhost:8000/api/v1/series/fielder-scope-stats?person_id=ba607b88&tournament=T20+World+Cup+%28Men%29&gender=male&team_type=international&season_from=2022%2F23&season_to=2025%2F26"
+```
+
+```json
+{
+  "entry": {
+    "person_id": "ba607b88", "name": "V Kohli",
+    "total": 4, "catches": 4, "stumpings": 0,
+    "run_outs": 0, "c_and_b": 0,
+    "team": "India"
+  }
+}
+```
+
 ## `GET /api/v1/series/bowler-scope-stats`
 
 Aggregate bowling stats for one picked player in the current scope —

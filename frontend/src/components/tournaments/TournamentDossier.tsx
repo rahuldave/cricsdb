@@ -9,6 +9,7 @@ import {
   getTournamentRecords,
   getTournamentBattersLeaders, getTournamentBowlersLeaders, getTournamentFieldersLeaders,
   getTournamentBatterScopeStats, getTournamentBowlerScopeStats,
+  getTournamentFielderScopeStats,
   getTournamentPartnershipsByWicket, getTournamentPartnershipsTop,
   getTournamentPartnershipsTopByWicket,
   getMatches,
@@ -221,6 +222,16 @@ export default function TournamentDossier({
       ? getTournamentBowlerScopeStats(tournament, seriesBowler, apiFilters)
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Bowlers', seriesBowler],
+  )
+
+  const [seriesFielder, setSeriesFielder] = useUrlParam('series_fielder', '')
+  const fielderScopeFetch = useFetch<
+    { entry: FieldingLeaderEntry | null } | null
+  >(
+    () => currentTab === 'Fielders' && seriesFielder
+      ? getTournamentFielderScopeStats(tournament, seriesFielder, apiFilters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Fielders', seriesFielder],
   )
   const bowlingFetch = useFetch<BowlingLeaders | null>(
     () => currentTab === 'Bowlers'
@@ -510,6 +521,11 @@ export default function TournamentDossier({
           filterTeam={filterTeam}
           filterOpponent={filterOpponent}
           gender={filters.gender}
+          scope={apiFilters}
+          pickedId={seriesFielder}
+          onPick={(id) => setSeriesFielder(id)}
+          pickedEntry={fielderScopeFetch.data?.entry ?? null}
+          pickedLoading={fielderScopeFetch.loading}
         />
       )}
       {currentTab === 'Records' && (
@@ -2052,6 +2068,7 @@ function BowlersTab({
 
 function FieldersTab({
   loading, error, data, refetch, filterTeam, filterOpponent, gender,
+  scope, pickedId, onPick, pickedEntry, pickedLoading,
 }: {
   loading: boolean; error: string | null
   data: FieldingLeaders | null; refetch: () => void
@@ -2059,6 +2076,11 @@ function FieldersTab({
   filterTeam: string | null | undefined
   filterOpponent: string | null | undefined
   gender: string | null | undefined
+  scope: import('../../types').FilterParams & { series_type?: string }
+  pickedId: string
+  onPick: (id: string) => void
+  pickedEntry: FieldingLeaderEntry | null
+  pickedLoading: boolean
 }) {
   if (loading) return <Spinner label="Loading fielders…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
@@ -2067,24 +2089,48 @@ function FieldersTab({
   const rowSrc = (r: FieldingLeaderEntry) =>
     rowSubscriptSource({ filterTeam, filterOpponent, rowTeam: r.team })
 
+  const fielderCell = (r: FieldingLeaderEntry) => {
+    const src = rowSrc(r)
+    return (
+      <PlayerLink
+        personId={r.person_id} name={r.name} role="fielder" gender={gender}
+        subscriptSource={src}
+      />
+    ) as unknown as string
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+      <PickerSlot
+        title="Picked fielder"
+        role="fielder"
+        scope={scope}
+        pickedId={pickedId}
+        onPick={onPick}
+        loading={pickedLoading}
+        empty={!!pickedId && !pickedEntry && !pickedLoading}
+        onClear={() => onPick('')}
+      >
+        {pickedEntry && (
+          <DataTable
+            columns={[
+              { key: 'name', label: 'Fielder', format: (_v, r) => fielderCell(r) },
+              { key: 'total', label: 'Total' },
+              { key: 'catches', label: 'C' },
+              { key: 'stumpings', label: 'St' },
+              { key: 'run_outs', label: 'RO' },
+              { key: 'c_and_b', label: 'C&B' },
+            ]}
+            data={[pickedEntry]}
+            rowKey={(r) => r.person_id}
+          />
+        )}
+      </PickerSlot>
       <div>
         <h3 className="wisden-section-title">By dismissals (all)</h3>
         <DataTable
           columns={[
-            {
-              key: 'name', label: 'Fielder',
-              format: (_v, r) => {
-                const src = rowSrc(r)
-                return (
-                  <PlayerLink
-                    personId={r.person_id} name={r.name} role="fielder" gender={gender}
-                    subscriptSource={src}
-                  />
-                ) as unknown as string
-              },
-            },
+            { key: 'name', label: 'Fielder', format: (_v, r) => fielderCell(r) },
             { key: 'total', label: 'Total', sortable: true },
             { key: 'catches', label: 'C' },
             { key: 'stumpings', label: 'St' },
@@ -2098,18 +2144,7 @@ function FieldersTab({
         <h3 className="wisden-section-title">By keeper dismissals</h3>
         <DataTable
           columns={[
-            {
-              key: 'name', label: 'Keeper',
-              format: (_v, r) => {
-                const src = rowSrc(r)
-                return (
-                  <PlayerLink
-                    personId={r.person_id} name={r.name} role="fielder" gender={gender}
-                    subscriptSource={src}
-                  />
-                ) as unknown as string
-              },
-            },
+            { key: 'name', label: 'Keeper', format: (_v, r) => fielderCell(r) },
             { key: 'total', label: 'Total', sortable: true },
             { key: 'catches', label: 'C' },
             { key: 'stumpings', label: 'St' },

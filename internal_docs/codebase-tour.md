@@ -53,7 +53,8 @@ api/
                           params) returns one BattingLeaderEntry row for the picked
                           player, or {entry:null} if out of scope — backs the Series
                           > Batters "Picked batter" tile. /api/v1/series/bowler-scope-stats
-                          is the sibling for the Series > Bowlers picker.
+                          and /api/v1/series/fielder-scope-stats are the siblings for
+                          the Bowlers / Fielders pickers.
                          /api/v1/series/points-table (single-season; tournament required)
                          /api/v1/series/other-rivalries (lazy-load expander)
                          /api/v1/rivalries/summary (legacy; new code uses dossier endpoints)

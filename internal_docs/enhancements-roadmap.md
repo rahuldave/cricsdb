@@ -712,6 +712,14 @@ surfaces row-specific context. Commits `74c5666` … `5708f56`.
   `/api/v1/series/bowler-scope-stats`. `PickerSlot` component
   factored out in the previous commit handles the UI; only a new
   endpoint + URL-wire + 2x2 restructure needed here.
+- **Fielders picker + layout reshuffle (follow-on commit).** Picker
+  upper-left; "By dismissals (all)" moved from its previous row-1-left
+  slot to row-1-right; "By keeper dismissals" moved from row-1-right
+  to row-2-left. Row-2-right is intentionally blank in this commit —
+  the next commit adds a new "By run-outs" leaderboard there. URL
+  param `series_fielder`; new endpoint
+  `/api/v1/series/fielder-scope-stats` returning a
+  FieldingLeaderEntry with the full breakdown (Total / C / St / RO / C&B).
 
 ### Shipped 2026-04-21 (Series tab refactor + Partnerships/Records expansion)
 

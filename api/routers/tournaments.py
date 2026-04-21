@@ -2429,6 +2429,81 @@ async def tournament_fielders_leaders(
     }
 
 
+@router.get("/series/fielder-scope-stats")
+async def tournament_fielder_scope_stats(
+    person_id: str = Query(..., description="Person ID to fetch scoped stats for"),
+    tournament: str | None = Query(None),
+    series_type: str | None = Query(None),
+    filters: FilterParams = Depends(),
+):
+    """Scoped fielding stats for one picked player.
+
+    Sibling of /series/{batter,bowler}-scope-stats — returns a
+    FieldingLeaderEntry for the given person_id in scope, or
+    {"entry": null} when they have no fielding credits in scope.
+    """
+    db = get_db()
+    where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    params["person_id"] = person_id
+
+    disp_rows = await db.q(
+        f"""
+        SELECT COUNT(*) AS total,
+               SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+               SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+               SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+               SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS c_and_b
+        FROM fieldingcredit fc
+        JOIN delivery d ON d.id = fc.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE fc.fielder_id = :person_id
+          AND i.super_over = 0 AND {where}
+        """,
+        params,
+    )
+    row = disp_rows[0] if disp_rows else None
+    if not row or not row["total"]:
+        return {"entry": None}
+
+    name_rows = await db.q(
+        "SELECT name FROM person WHERE id = :pid",
+        {"pid": person_id},
+    )
+    name = name_rows[0]["name"] if name_rows else person_id
+
+    team_rows = await db.q(
+        f"""
+        SELECT CASE WHEN i.team = m.team1 THEN m.team2 ELSE m.team1 END AS team,
+               COUNT(*) AS n
+        FROM fieldingcredit fc
+        JOIN delivery d ON d.id = fc.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE fc.fielder_id = :person_id
+          AND i.super_over = 0 AND {where}
+        GROUP BY team
+        ORDER BY n DESC
+        LIMIT 1
+        """,
+        params,
+    )
+    team = team_rows[0]["team"] if team_rows else None
+
+    return {
+        "entry": {
+            "person_id": person_id,
+            "name": name,
+            "total": row["total"] or 0,
+            "catches": row["catches"] or 0,
+            "stumpings": row["stumpings"] or 0,
+            "run_outs": row["run_outs"] or 0,
+            "c_and_b": row["c_and_b"] or 0,
+            "team": team,
+        },
+    }
+
+
 # ─── Partnership endpoints ────────────────────────────────────────────
 #
 # Tournament-scoped partnership aggregates. These serve two use cases:

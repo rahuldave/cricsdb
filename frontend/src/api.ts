@@ -302,6 +302,13 @@ export const getTournamentBowlerScopeStats = (
 export const getTournamentFieldersLeaders = (tournament: string | null, filters?: TF & { limit?: number }) =>
   fetchApi<import('./types').FieldingLeaders>(
     '/api/v1/series/fielders-leaders', tparams(tournament, filters))
+export const getTournamentFielderScopeStats = (
+  tournament: string | null, personId: string, filters?: TF,
+) =>
+  fetchApi<{ entry: import('./types').FieldingLeaderEntry | null }>(
+    '/api/v1/series/fielder-scope-stats',
+    { ...tparams(tournament, filters), person_id: personId },
+  )
 
 export const getTournamentPartnershipsByWicket = (
   tournament: string | null, filters?: TF & { side?: 'batting' | 'bowling' },
