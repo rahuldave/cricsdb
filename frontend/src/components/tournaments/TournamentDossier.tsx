@@ -1291,7 +1291,7 @@ function PartnershipsTab({
               { key: 'wicket_number', label: 'Wkt', sortable: true },
               { key: 'n', label: 'N', sortable: true },
               {
-                key: 'avg_runs', label: 'Avg', sortable: true,
+                key: 'avg_runs', label: 'Average', sortable: true,
                 format: (v: number | null) => fmt(v, 1),
               },
               {
