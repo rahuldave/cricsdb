@@ -162,6 +162,7 @@ export interface BattingLeaderEntry {
 }
 
 export interface BattingLeaders {
+  by_runs: BattingLeaderEntry[]
   by_average: BattingLeaderEntry[]
   by_strike_rate: BattingLeaderEntry[]
   thresholds: { min_balls: number; min_dismissals: number }

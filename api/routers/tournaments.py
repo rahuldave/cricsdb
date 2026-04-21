@@ -1951,6 +1951,10 @@ async def tournament_batters_leaders(
             "strike_rate": _safe_div(runs, balls, 100),
         })
 
+    runs_top = sorted(
+        entries,
+        key=lambda e: (e["runs"], -e["balls"]), reverse=True,
+    )[:limit]
     avg_top = sorted(
         (e for e in entries if e["dismissals"] >= min_dismissals and e["average"] is not None),
         key=lambda e: (e["average"], e["runs"]), reverse=True,
@@ -1960,7 +1964,11 @@ async def tournament_batters_leaders(
         key=lambda e: (e["strike_rate"], e["runs"]), reverse=True,
     )[:limit]
 
-    top_ids = {e["person_id"] for e in avg_top} | {e["person_id"] for e in sr_top}
+    top_ids = (
+        {e["person_id"] for e in runs_top}
+        | {e["person_id"] for e in avg_top}
+        | {e["person_id"] for e in sr_top}
+    )
     name_map: dict[str, str] = {}
     team_map: dict[str, str] = {}
     if top_ids:
@@ -1994,6 +2002,9 @@ async def tournament_batters_leaders(
             if pid not in per_pid or n > per_pid[pid][1]:
                 per_pid[pid] = (team, n)
         team_map = {pid: v[0] for pid, v in per_pid.items()}
+    for e in runs_top:
+        e["name"] = name_map.get(e["person_id"], e["person_id"])
+        e["team"] = team_map.get(e["person_id"])
     for e in avg_top:
         e["name"] = name_map.get(e["person_id"], e["person_id"])
         e["team"] = team_map.get(e["person_id"])
@@ -2002,6 +2013,7 @@ async def tournament_batters_leaders(
         e["team"] = team_map.get(e["person_id"])
 
     return {
+        "by_runs": runs_top,
         "by_average": avg_top,
         "by_strike_rate": sr_top,
         "thresholds": {"min_balls": min_balls, "min_dismissals": min_dismissals},
