@@ -75,12 +75,15 @@ Full pipeline + dry-run format documented in **`internal_docs/data-pipeline.md`*
 
 ```bash
 uv run python download_data.py                      # fetches zips + people/names CSVs
+uv run python download_data.py --force              # force-refresh when dry-run flags CSVs stale
 uv run python import_data.py                        # full rebuild (~15 min, drops cricket.db)
 uv run python update_recent.py --dry-run --days 30  # check what's new
 uv run python update_recent.py --days 30            # incremental import
 ```
 
 Both `import_data.py` and `update_recent.py` auto-populate `fielding_credit`, `keeper_assignment`, and `partnership`. After a DB update, push to plash with `bash deploy.sh --first` (plain `deploy.sh` skips the DB upload).
+
+**Registry refresh diff pattern.** When `update_recent.py --dry-run` reports `people.csv` / `names.csv` as STALE, snapshot the current copies (`cp data/people.csv /tmp/people-before.csv`) before running `download_data.py --force`, then classify the diff into three buckets: **pure additions** (new debutants — expected), **modifications** (same person_id on both sides — almost always cricsheet populating additional external keys like `key_nvplay` / `key_cricinfo_2`; names and core IDs don't change), **pure removals** (id in old but not new — rare, usually cricsheet collapsing a duplicate person_id; check whether the removed id has any references in `matchplayer`/`delivery` before worrying — zero references = harmless orphan). `names.csv` in practice only grows.
 
 To smoke-test `update_recent.py` against a copy of the prod DB before deploying, use `--db /tmp/cricket-prod-test.db` after copying the Downloads snapshot — see **`internal_docs/testing-update-recent.md`** for the copy-to-tmp workflow and what not to do.
 
