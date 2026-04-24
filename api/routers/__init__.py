@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from .reference import router as reference_router
 from .teams import router as teams_router
+from .scope_averages import router as scope_averages_router
 from .batting import router as batting_router
 from .bowling import router as bowling_router
 from .fielding import router as fielding_router
@@ -18,6 +19,7 @@ def register_routers(app: FastAPI):
     """Register all API routers."""
     app.include_router(reference_router)
     app.include_router(teams_router)
+    app.include_router(scope_averages_router)
     app.include_router(batting_router)
     app.include_router(bowling_router)
     app.include_router(fielding_router)

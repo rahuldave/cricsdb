@@ -1,0 +1,66 @@
+# Scope averages — URL inventory for the new /api/v1/scope/averages/*
+# router family that powers the "average team" column on the Teams >
+# Compare tab. See internal_docs/spec-team-compare-average.md.
+#
+# All scope-averages URLs are NEW — they don't exist in HEAD, so
+# byte-identical between HEAD and patched is suspicious (means the
+# new router didn't actually register).
+#
+# A few REG entries hit existing team endpoints to confirm that the
+# `_team_innings_clause` and `_partnership_filter` refactor (those
+# helpers now accept team=None) is behaviour-preserving when team is
+# given — the team endpoints stay byte-identical.
+#
+# Filter combos — match what the new router needs to handle:
+#   - unfiltered (whole DB)
+#   - tournament-scoped (IPL)
+#   - season-scoped (2024)
+#   - mixed (tournament + season + venue)
+#   - team_type / gender combos (women's club)
+
+# ── /scope/averages/summary (results) ────────────────────────────
+NEW scope_summary_unfiltered                /api/v1/scope/averages/summary
+NEW scope_summary_ipl_2024                  /api/v1/scope/averages/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW scope_summary_men_intl_2024             /api/v1/scope/averages/summary?gender=male&team_type=international&season_from=2024&season_to=2024
+
+# ── /scope/averages/batting/* ────────────────────────────────────
+NEW scope_batting_summary_ipl_2024          /api/v1/scope/averages/batting/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW scope_batting_summary_women_club_2024   /api/v1/scope/averages/batting/summary?gender=female&team_type=club&season_from=2024&season_to=2024
+NEW scope_batting_by_phase_ipl_2024         /api/v1/scope/averages/batting/by-phase?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW scope_batting_by_phase_men_intl         /api/v1/scope/averages/batting/by-phase?gender=male&team_type=international
+NEW scope_batting_by_season_ipl             /api/v1/scope/averages/batting/by-season?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024
+NEW scope_batting_by_season_men_intl        /api/v1/scope/averages/batting/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
+
+# ── /scope/averages/bowling/* ────────────────────────────────────
+NEW scope_bowling_summary_ipl_2024          /api/v1/scope/averages/bowling/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW scope_bowling_by_phase_ipl_2024         /api/v1/scope/averages/bowling/by-phase?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW scope_bowling_by_season_ipl             /api/v1/scope/averages/bowling/by-season?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024
+
+# ── /scope/averages/fielding/* ───────────────────────────────────
+NEW scope_fielding_summary_ipl_2024         /api/v1/scope/averages/fielding/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW scope_fielding_by_season_ipl            /api/v1/scope/averages/fielding/by-season?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024
+
+# ── /scope/averages/partnerships/* ───────────────────────────────
+NEW scope_partnerships_summary_ipl_2024     /api/v1/scope/averages/partnerships/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW scope_partnerships_by_wicket_ipl_2024   /api/v1/scope/averages/partnerships/by-wicket?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW scope_partnerships_by_season_ipl        /api/v1/scope/averages/partnerships/by-season?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024
+
+# ── new team-side sibling: /teams/{team}/partnerships/by-season ──
+NEW team_partnerships_by_season_mi_ipl      /api/v1/teams/Mumbai%20Indians/partnerships/by-season?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024
+NEW team_partnerships_by_season_india       /api/v1/teams/India/partnerships/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
+
+# ── REG controls — team endpoints whose helpers were refactored ──
+# These hit the `_team_innings_clause` and `_partnership_filter`
+# helpers via the team-given path. The refactor adds team=None
+# support without changing team-given behaviour; expect byte-
+# identical between HEAD and patched.
+REG team_batting_summary_mi_ipl_2024        /api/v1/teams/Mumbai%20Indians/batting/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+REG team_bowling_summary_mi_ipl_2024        /api/v1/teams/Mumbai%20Indians/bowling/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+REG team_fielding_summary_mi_ipl_2024       /api/v1/teams/Mumbai%20Indians/fielding/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+REG team_partnerships_summary_mi_ipl_2024   /api/v1/teams/Mumbai%20Indians/partnerships/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+REG team_batting_by_phase_mi_ipl_2024       /api/v1/teams/Mumbai%20Indians/batting/by-phase?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+REG team_partnerships_by_wicket_mi_ipl_2024 /api/v1/teams/Mumbai%20Indians/partnerships/by-wicket?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+REG team_summary_india_men_intl             /api/v1/teams/India/summary?gender=male&team_type=international
+REG team_batting_summary_india              /api/v1/teams/India/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2024
+REG team_bowling_by_season_india            /api/v1/teams/India/bowling/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
+REG team_fielding_by_season_india           /api/v1/teams/India/fielding/by-season?gender=male&team_type=international&season_from=2022&season_to=2024

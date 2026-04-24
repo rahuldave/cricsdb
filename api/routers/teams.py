@@ -766,7 +766,7 @@ def _safe_div(a, b, mul=1, ndigits=2):
 
 
 def _team_innings_clause(
-    filters: FilterParams, team: str, side: str = "batting",
+    filters: FilterParams, team: str | None, side: str = "batting",
     aux: AuxParams | None = None,
 ) -> tuple[str, dict]:
     """Build WHERE clause for team-scoped innings queries.
@@ -775,28 +775,42 @@ def _team_innings_clause(
     side='fielding' → innings where :team was in the field (i.team != :team
                       AND :team is one of the match teams)
 
+    When `team` is None, the team-specific clauses are dropped entirely
+    and the result is a pure scope filter — used by `/scope/averages/*`
+    endpoints. The same SQL surface stays in one place; both code paths
+    agree on filter injection.
+
     The path :team takes precedence over any filter_team query param.
     """
     # Null out filter_team so our :team bind isn't clobbered. Each request
     # gets a fresh FilterParams via Depends() so this mutation is safe.
     filters.team = None
     where, params = filters.build(has_innings_join=True, aux=aux)
-    params["team"] = team
-    if side == "batting":
-        parts = ["i.team = :team"]
-    else:
-        parts = ["i.team != :team", "(m.team1 = :team OR m.team2 = :team)"]
+    parts: list[str] = []
+    if team is not None:
+        params["team"] = team
+        if side == "batting":
+            parts.append("i.team = :team")
+        else:
+            parts.extend(["i.team != :team", "(m.team1 = :team OR m.team2 = :team)"])
     if where:
         parts.append(where)
+    if not parts:
+        # filters.build() returns "" when no filters are active; the
+        # scope-avg "no filter, no team" code path needs a tautology
+        # so the WHERE clause builds.
+        parts.append("1=1")
     return " AND ".join(parts), params
 
 
-@router.get("/{team}/batting/summary")
-async def team_batting_summary(
-    team: str,
-    filters: FilterParams = Depends(),
-    aux: AuxParams = Depends(),
-):
+async def _compute_batting_summary(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict:
+    """Shared compute used by `/teams/{team}/batting/summary` and
+    `/scope/averages/batting/summary`. team=None drops the team filter
+    and produces the league-scope baseline."""
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
 
@@ -909,6 +923,15 @@ async def team_batting_summary(
         "highest_total": highest_total,
         "lowest_all_out_total": lowest_all_out,
     }
+
+
+@router.get("/{team}/batting/summary")
+async def team_batting_summary(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    return await _compute_batting_summary(team, filters, aux)
 
 
 @router.get("/{team}/batting/by-season")
@@ -1878,7 +1901,7 @@ async def team_top_fielders(
 
 
 def _partnership_filter(
-    filters: FilterParams, team: str, side: str,
+    filters: FilterParams, team: str | None, side: str,
     aux: AuxParams | None = None,
 ):
     """Build WHERE clause for partnership table queries.
@@ -1886,16 +1909,25 @@ def _partnership_filter(
     side='batting' → partnerships when :team batted (i.team = :team)
     side='bowling' → partnerships against :team's bowling
                      (i.team != :team AND :team in match)
+
+    When `team` is None, the team-specific clauses are dropped entirely
+    and the result is a pure scope filter — used by `/scope/averages/*`
+    endpoints. `side` is irrelevant in that case (every partnership
+    counts toward the league average regardless of which side faced it).
     """
     filters.team = None
     where, params = filters.build(has_innings_join=True, aux=aux)
-    params["team"] = team
-    if side == "batting":
-        parts = ["i.team = :team"]
-    else:
-        parts = ["i.team != :team", "(m.team1 = :team OR m.team2 = :team)"]
+    parts: list[str] = []
+    if team is not None:
+        params["team"] = team
+        if side == "batting":
+            parts.append("i.team = :team")
+        else:
+            parts.extend(["i.team != :team", "(m.team1 = :team OR m.team2 = :team)"])
     if where:
         parts.append(where)
+    if not parts:
+        parts.append("1=1")
     return " AND ".join(parts), params
 
 
@@ -2355,4 +2387,54 @@ async def team_partnerships_summary(
         "highest": highest,
         "avg_runs": agg.get("avg_runs"),
         "best_pair": best_pair,
+    }
+
+
+@router.get("/{team}/partnerships/by-season")
+async def team_partnerships_by_season(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    side: str = Query("batting"),
+):
+    """Per-season partnership aggregates for a team. Sibling of
+    `/scope/averages/partnerships/by-season`. Drives the partnership
+    band on the season-trajectory strip in the Compare tab.
+    """
+    side = _validate_side(side)
+    db = get_db()
+    where, params = _partnership_filter(filters, team, side, aux=aux)
+
+    rows = await db.q(
+        f"""
+        SELECT m.season,
+               COUNT(*) as total,
+               SUM(CASE WHEN p.partnership_runs >= 50 THEN 1 ELSE 0 END) as count_50_plus,
+               SUM(CASE WHEN p.partnership_runs >= 100 THEN 1 ELSE 0 END) as count_100_plus,
+               ROUND(AVG(p.partnership_runs), 1) as avg_runs,
+               MAX(p.partnership_runs) as best_runs
+        FROM partnership p
+        JOIN innings i ON i.id = p.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+          AND p.ended_by_kind NOT IN ('retired hurt', 'retired not out')
+        GROUP BY m.season
+        ORDER BY m.season
+        """,
+        params,
+    )
+    return {
+        "team": team,
+        "side": side,
+        "by_season": [
+            {
+                "season": r["season"],
+                "total": r["total"] or 0,
+                "count_50_plus": r["count_50_plus"] or 0,
+                "count_100_plus": r["count_100_plus"] or 0,
+                "avg_runs": r["avg_runs"],
+                "best_runs": r["best_runs"],
+            }
+            for r in rows
+        ],
     }
