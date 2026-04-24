@@ -296,6 +296,14 @@ async def main():
                 )
                 await partnerships_incr(db, new_match_ids)
 
+                # player_scope_stats — denormalized per-player rollups.
+                # Recomputes the (person, scope_key) cells touched by
+                # the new matches. Built but not consumed in Spec 1.
+                from scripts.populate_player_scope_stats import (
+                    populate_incremental as pss_incr,
+                )
+                await pss_incr(db, new_match_ids)
+
                 # Refresh query planner stats and ensure leaderboard
                 # indexes exist. Index CREATE is a no-op if already
                 # there; ANALYZE is cheap and keeps bowling-leader

@@ -1370,3 +1370,46 @@ Retired in this session as a consequence:
 The same pattern is still live in other files (listed in
 `internal_docs/link-audit.md`'s "Known deviations outside the Series
 tab" block) and will be cleaned up as each tab gets walked.
+
+## `player_scope_stats` populated but not consumed in Spec 1 (Path A)
+
+Decided 2026-04-24 alongside the `spec-team-compare-average.md` Phase 1
+build. `scripts/populate_player_scope_stats.py` builds a denormalized
+per-(person, scope_key) aggregate table (~65K rows) and is auto-called
+by `import_data.py` (full) and `update_recent.py` (incremental). No
+endpoint in Spec 1 reads it. The table exists so that Spec 2
+(`internal_docs/outlook-comparisons.md`) — particularly position-
+matched player compare ("Kohli at #3 vs the average #3 batter in
+scope") — starts from a hot schema rather than a cold design.
+
+**Why now and not later:** the populate-script + incremental-update
+plumbing is being touched anyway during the Teams Compare work. Adding
+one more table to the cycle is one populate script + ~22 upserts per
+new match — well under the existing `update_recent.py` budget. Coming
+back to it cold in a month would mean re-acquiring the populate-script
+context. The table sits unused behind the Spec 1 endpoints; if Spec 2
+slips by months, it's still cheap to keep maintaining (incremental
+cost is ~milliseconds per match).
+
+**Pool-conservation invariant:** SUM over PSS rows of any aggregate
+(runs, legal_balls, runs_conceded, wickets, dismissals) equals the
+SUM over `delivery` / `wicket` in the same scope. Verified by
+`tests/sanity/test_player_scope_stats.py`. Any future change to the
+populate logic must keep this passing — it's the load-bearing
+correctness check.
+
+**Scope-key shape:** stable hash of
+`(tournament || season || gender || team_type)` via blake2b / 12-hex.
+Coarser scopes (e.g. "all men's club matches across seasons") are
+computed by SUM-ing rows that match the relevant axes — the table
+stores the finest-grain rows. NULL `event_name` (international
+bilaterals with no tournament label) hashes as the empty string for
+the tournament axis; gender + team_type carry the discrimination.
+
+**Incremental strategy:** when matches in scopes {A, B} are added,
+the populate_incremental path identifies the touched scope_keys,
+deletes every row for those scope_keys, and re-aggregates from
+scratch over ALL matches in those scopes (not just the new ones).
+This is exact and avoids the trickier delta-upsert path where a
+match correction would silently drift values. Cross-scope isolation
+is verified by sanity test 3.

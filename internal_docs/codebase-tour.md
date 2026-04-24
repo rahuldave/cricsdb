@@ -87,7 +87,14 @@ scripts/populate_fielding_credits.py  — Builds fielding_credit table (auto-cal
 scripts/populate_keeper_assignments.py — Builds keeper_assignment table + writes ambiguous worklist partitions (auto on import + update)
 scripts/apply_keeper_resolutions.py   — Applies manual resolutions from docs/keeper-ambiguous/*.csv back into the DB
 scripts/populate_partnerships.py      — Builds partnership table (auto on import + update)
+scripts/populate_player_scope_stats.py — Builds player_scope_stats table — denormalized per-(person, scope_key) aggregates. Built but NOT consumed by any endpoint in Spec 1 of internal_docs/spec-team-compare-average.md; exists as Path-A infrastructure for Spec 2 (internal_docs/outlook-comparisons.md). Auto on import + update.
 ```
+
+Sanity / data-layer tests live in `tests/sanity/` (separate from
+`tests/regression/` URL md5-diff and `tests/integration/`
+agent-browser flows). One per denormalized table; assert
+pool-conservation + populate_full ↔ populate_incremental
+round-trip. Run after any change to a populate script.
 
 ## Pipelines
 
@@ -96,7 +103,7 @@ download_data.py      — Fetches cricsheet zips + people/names CSVs
 import_data.py        — Full rebuild: downloads + imports into SQLite
                         (canonicalizes via team_aliases + event_aliases + venue_aliases
                          [soft-fail — unknown venues logged to docs/venue-worklist/unknowns-<date>.csv],
-                         populates fielding_credit + keeper_assignment + partnership)
+                         populates fielding_credit + keeper_assignment + partnership + player_scope_stats)
 update_recent.py      — Incremental: imports new T20 matches + re-runs
                         all populate_* scripts on just those matches.
                         Same venue canonicalization + unknown-logging hook as import_data.py.

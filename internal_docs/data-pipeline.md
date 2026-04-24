@@ -72,7 +72,7 @@ uv run python import_data.py
 `import_data.py` deletes any existing `cricket.db`, recreates the
 schema, and imports everything in `data/`. The schema is created from
 `models.py` via deebase. At the end of the import, it automatically
-populates two denormalized tables:
+populates four denormalized tables:
 
 1. `fielding_credit` (~118K rows) via
    `scripts/populate_fielding_credits.py:populate_full()`.
@@ -82,16 +82,31 @@ populates two denormalized tables:
    Manual resolutions live in `docs/keeper-ambiguous/*.csv` partitions
    (gitted) and are re-applied on every full rebuild so corrections
    survive.
+3. `partnership` (~250K rows, one per on-field batting partnership)
+   via `scripts/populate_partnerships.py:populate_full()`. Drives the
+   Teams > Partnerships tab — see `internal_docs/spec-team-stats.md`.
+4. `player_scope_stats` (~65K rows, one per `(person, scope_key)`
+   where scope_key encodes tournament/season/gender/team_type) via
+   `scripts/populate_player_scope_stats.py:populate_full()`. Built but
+   NOT consumed by any endpoint in Spec 1 of
+   `internal_docs/spec-team-compare-average.md` — exists as
+   infrastructure for Spec 2 (`internal_docs/outlook-comparisons.md`),
+   particularly position-matched player compare. Sanity tests:
+   `tests/sanity/test_player_scope_stats.py`.
 
 ### Incremental updates
 
 `update_recent.py` pulls cricsheet's "recently added" bulk zip,
 filters to T20/IT20 (international + club), dedupes against
 `match.filename`, and imports only what's new. After importing, it
-automatically adds fielding credits AND keeper assignments for the
-new matches only (via `populate_incremental()` on each denormalized
-table) — no separate step needed. New ambiguous keeper innings get
-appended to today's partition CSV under `docs/keeper-ambiguous/`.
+automatically adds fielding credits, keeper assignments,
+partnerships, AND player_scope_stats for the new matches only (via
+`populate_incremental()` on each denormalized table) — no separate
+step needed. New ambiguous keeper innings get appended to today's
+partition CSV under `docs/keeper-ambiguous/`. The
+`player_scope_stats` incremental path recomputes only the
+`(person, scope_key)` cells whose scope is touched by the new
+matches; an unrelated scope's rows stay byte-identical.
 
 ```bash
 uv run python update_recent.py --dry-run --days 7   # check status

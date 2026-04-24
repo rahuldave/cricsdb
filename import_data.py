@@ -404,6 +404,15 @@ async def main():
     from scripts.populate_partnerships import populate_full as partnerships_full
     await partnerships_full(db)
 
+    # Populate player_scope_stats — denormalized per-player aggregates.
+    # Built but not consumed by any endpoint in Spec 1; lives here so
+    # Spec 2 (cross-app comparisons, esp. position-matched player
+    # compare) starts with a hot schema. See
+    # internal_docs/spec-team-compare-average.md.
+    print("\nPopulating player_scope_stats…")
+    from scripts.populate_player_scope_stats import populate_full as pss_full
+    await pss_full(db)
+
     # Composite covering indexes + analyze for the leaderboard queries
     # on the Batting/Bowling landing pages. Without these, an unfiltered
     # SELECT … GROUP BY batter_id scan is 3s+; with them it drops to

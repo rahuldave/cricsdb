@@ -857,6 +857,72 @@ subtabs. Commits `5179683` … `ca0b785`.
   commits share a file) is the splitting mechanism going forward
   — not large end-of-session dump commits.
 
+### Shipped 2026-04-24 (Teams Compare — Spec 1 / Phase 1: schema + populate)
+
+- **Two specs written first.** `internal_docs/spec-team-compare-average.md`
+  (build-ready, ~560 lines) covers the Teams Compare average-team
+  column, phase bands, season-by-season trajectory, response envelope
+  (`value` + `scope_avg` + `delta_pct` + `direction` + `sample_size`),
+  the `METRIC_DIRECTIONS` single-source-of-truth module, and the
+  three-commit rollout. `internal_docs/outlook-comparisons.md` (~240
+  lines) is the looser doc collecting the six cross-app surfaces
+  (player compare with position matching, leaderboard Δ columns,
+  venues baseline, H2H baseline, scorecard expected-SR, tournament
+  era framing) that share the same baseline API. Path A chosen for
+  scheduling: Spec-1 schema + populate landed alongside, Spec-1 API
+  + UI to follow.
+- **`player_scope_stats` table.** New deebase table with composite PK
+  `(person_id, scope_key)`, where scope_key = blake2b/12-hex hash of
+  `(tournament || season || gender || team_type)`. Covers batting
+  (runs, legal_balls, dots, 4s, 6s, dismissals, avg_batting_position,
+  innings_by_position_json), bowling (balls, runs_conceded, wickets,
+  dots, boundaries, powerplay/middle/death overs), fielding (catches,
+  runouts, stumpings, catches_as_keeper, matches_as_keeper). Indexes
+  on `(scope_key, avg_batting_position)` + `scope_key`.
+- **`scripts/populate_player_scope_stats.py`** with `populate_full()`
+  + `populate_incremental()`. Auto-called by `import_data.py` (after
+  partnerships) and `update_recent.py` (after partnership_incr).
+  Position derivation: per innings, position N is the order of
+  appearance — striker on first delivery is position 1, non-striker
+  is 2, each subsequent newcomer is N+1. Bowler `wickets` excludes
+  run out / retired hurt / retired out / obstructing the field;
+  batter `dismissals` excludes retired hurt / retired out — matches
+  existing batting/bowling routers.
+- **Incremental strategy: scope-replace, not delta-upsert.** When
+  matches in scopes {A, B} are added, identify the touched
+  scope_keys, delete every PSS row for those scope_keys, and
+  re-aggregate from scratch over ALL matches in those scopes. Exact
+  and avoids drift if a future match correction lands in an already-
+  populated scope. Cost: ~22 affected (person, scope_key) cells per
+  new match — negligible against the existing `update_recent.py`
+  budget.
+- **NOT consumed by any endpoint in Spec 1.** The table is built and
+  maintained but no API code reads it. Spec 1's user-visible feature
+  (Teams Compare average-team column + phase bands + season
+  trajectory) runs entirely on the existing delivery + partnership
+  + covering indexes. The table exists so Spec 2 (cross-app
+  comparisons) starts with hot schema. Documented in
+  `internal_docs/design-decisions.md` under "Path A".
+- **Sanity tests.** New `tests/sanity/` subdir for data-layer
+  pool-conservation + round-trip tests on denormalized tables (sibling
+  to `tests/regression/` URL md5-diff and `tests/integration/`
+  agent-browser flows). `tests/sanity/test_player_scope_stats.py`
+  covers (a) pool conservation across batting runs / legal balls /
+  runs_conceded / bowler wickets / dismissals — verified PSS sum
+  equals delivery+wicket sum byte-for-byte; (b) populate_incremental
+  on a scope's match_ids reproduces populate_full's rows exactly;
+  (c) cross-scope isolation — touching scopes A,B leaves an
+  unrelated scope C byte-identical. All-pass on prod-snapshot DB
+  copied to /tmp.
+- **Validated against prod snapshot.** Copied
+  `~/Downloads/t20-cricket-db_download/data/cricket.db` to
+  `/tmp/cricket-prod-test.db`, ran populate_full → 65,026 rows in
+  20.4s. Pool conservation matched on all 5 metrics. Round-trip and
+  cross-scope isolation pass. Cross-checked V Kohli's IPL 2016: PSS
+  reports 966 runs / 637 balls; existing batting-router-equivalent
+  SQL agrees byte-identical (the 7-run delta from the popular 973
+  record is in cricsheet's source, not our code path).
+
 ---
 
 ## Known issues / live TODO

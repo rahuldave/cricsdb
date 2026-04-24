@@ -163,6 +163,69 @@ class KeeperAssignment:
     candidate_ids_json: Optional[dict] = None  # JSON list of competing person_ids when ambiguous
 
 
+class PlayerScopeStats:
+    """One row per (person, scope) — denormalized per-player aggregates.
+
+    `scope_key` is a stable hash of (tournament || season || gender ||
+    team_type). The grain is the finest practical scope; queries that
+    need a coarser scope (e.g. "all men's club matches across seasons")
+    aggregate by SUM-ing rows whose other axes match.
+
+    Built and maintained by `scripts/populate_player_scope_stats.py`,
+    auto-called from `import_data.py` (full) and `update_recent.py`
+    (incremental). Spec 1 of `internal_docs/spec-team-compare-average.md`
+    populates this table but does NOT consume it from any endpoint —
+    it exists as the foundation for Spec 2 (cross-app comparisons,
+    `internal_docs/outlook-comparisons.md`), particularly position-
+    matched player compare.
+
+    Phase boundaries match `api/routers/teams.py`:
+        powerplay = over 0-5, middle = 6-14, death = 15-19.
+    Bowler `wickets` excludes run out / retired hurt / retired out /
+    obstructing the field, matching `api/routers/bowling.py`.
+
+    Position derivation: per innings, position N is the order of
+    appearance — striker on the first delivery is position 1,
+    non_striker is 2, each subsequent newcomer is position N+1.
+    `avg_batting_position` is innings-weighted; `innings_by_position_json`
+    is a length-12 array indexed by position (index 0 unused, indices
+    1..11 carry counts; index 11 absorbs anything that falls outside
+    the 11-batter convention).
+    """
+    person_id: ForeignKey[str, "person"]
+    scope_key: str  # stable hash of tournament || season || gender || team_type
+    tournament: Optional[str] = None
+    season: str = ""
+    gender: str = ""
+    team_type: str = ""
+    matches: int = 0  # distinct matches in XI (from matchplayer)
+    # batting
+    innings_batted: int = 0
+    runs: int = 0
+    legal_balls: int = 0
+    dots: int = 0
+    fours: int = 0
+    sixes: int = 0
+    dismissals: int = 0
+    avg_batting_position: Optional[float] = None
+    innings_by_position_json: Optional[dict] = None  # JSON array, length 12
+    # bowling
+    balls_bowled: int = 0
+    runs_conceded: int = 0
+    wickets: int = 0
+    bowling_dots: int = 0
+    boundaries_conceded: int = 0
+    powerplay_overs: float = 0.0
+    middle_overs: float = 0.0
+    death_overs: float = 0.0
+    # fielding
+    catches: int = 0
+    runouts: int = 0
+    stumpings: int = 0
+    catches_as_keeper: int = 0
+    matches_as_keeper: int = 0
+
+
 class Partnership:
     """One row per on-field batting partnership.
 
