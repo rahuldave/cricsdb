@@ -1,4 +1,4 @@
-import type { FilterParams, TeamProfile } from '../../types'
+import type { FilterParams, TeamProfile, ScopeAverageProfile } from '../../types'
 
 export type TeamDiscipline =
   | 'results' | 'batting' | 'bowling' | 'fielding' | 'partnerships'
@@ -17,6 +17,50 @@ export function teamDisciplineHasData(
     return (f.catches + f.stumpings + f.run_outs) > 0
   }
   return (profile.partnerships?.total ?? 0) > 0
+}
+
+/** Same gate but for the league-average column. */
+export function avgDisciplineHasData(
+  discipline: TeamDiscipline, profile: ScopeAverageProfile,
+): boolean {
+  if (discipline === 'results')      return (profile.summary?.matches ?? 0) > 0
+  if (discipline === 'batting')      return (profile.batting?.innings_batted ?? 0) > 0
+  if (discipline === 'bowling')      return (profile.bowling?.innings_bowled ?? 0) > 0
+  if (discipline === 'fielding') {
+    const f = profile.fielding
+    if (!f) return false
+    return (f.catches + f.stumpings + f.run_outs) > 0
+  }
+  return (profile.partnerships?.total ?? 0) > 0
+}
+
+/** Scope-computed label for the average column header. Constructs a
+ *  short phrase from the active FilterBar fields — "IPL 2024 avg",
+ *  "Men's T20I 2024 avg", or just "League avg" when nothing's set. */
+export function scopeAvgLabel(filters: FilterParams): string {
+  const parts: string[] = []
+  if (filters.tournament) {
+    parts.push(filters.tournament)
+  } else if (filters.team_type === 'international') {
+    if (filters.gender === 'male')   parts.push("Men's T20I")
+    else if (filters.gender === 'female') parts.push("Women's T20I")
+    else parts.push('Internationals')
+  } else if (filters.team_type === 'club') {
+    if (filters.gender === 'male')   parts.push("Men's club")
+    else if (filters.gender === 'female') parts.push("Women's club")
+    else parts.push('Club')
+  }
+  if (filters.season_from && filters.season_to) {
+    parts.push(filters.season_from === filters.season_to
+      ? filters.season_from
+      : `${filters.season_from}-${filters.season_to}`)
+  } else if (filters.season_from) {
+    parts.push(`${filters.season_from}+`)
+  } else if (filters.season_to) {
+    parts.push(`-${filters.season_to}`)
+  }
+  if (parts.length === 0) return 'League avg'
+  return `${parts.join(' ')} avg`
 }
 
 /** Filter-scoped match count for the column identity line. Uses

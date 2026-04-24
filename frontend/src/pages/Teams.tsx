@@ -62,6 +62,8 @@ export default function Teams() {
   const [activeTab, setActiveTab] = useUrlParam('tab', 'By Season')
   const [opponent, setOpponent] = useUrlParam('vs')
   const [compareCsv] = useUrlParam('compare')
+  const [avgSlotParam] = useUrlParam('avg_slot')
+  const avgSlotPresent = avgSlotParam === '1'
   // Split CSV, trim, drop empties, cap at 2 extra teams (primary + 2 = 3 total).
   const compareTeams = compareCsv
     ? compareCsv.split(',').map(s => s.trim()).filter(Boolean).slice(0, 2)
@@ -281,6 +283,7 @@ export default function Teams() {
                 <AddTeamComparePicker
                   currentTeams={[selected, ...compareTeams]}
                   filters={filters}
+                  avgSlotPresent={avgSlotPresent}
                 />
               </>
             )}

@@ -52,6 +52,14 @@ data…" note until you clear or pick someone else.
   Comparison is single-gender and single-type (international teams
   only compare with internationals; club teams only with clubs) —
   both constraints are enforced automatically via the filter bar.
+  Inside the Compare tab, **+ Add league average** adds a fourth
+  column showing the pool-weighted league baseline scoped to the
+  current filters — "is MI's powerplay run rate above or below the
+  IPL 2024 average?" answered at a glance. Each discipline expands
+  into phase bands (PP / Middle / Death), the partnerships row
+  expands into 10 sub-rows (1st-wicket through 10th-wicket), and a
+  season-trajectory strip below the grid charts batting RR + bowling
+  economy across the seasons in scope.
 
 ![India team dossier — summary stats + tabs](/social/03-team-overview.png)
 *A team dossier — summary row, keepers used, By Season / vs Opponent / Compare / Batting / Bowling / Fielding / Partnerships / Players / Match List tabs.*

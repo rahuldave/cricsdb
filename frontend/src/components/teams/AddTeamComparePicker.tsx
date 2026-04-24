@@ -12,14 +12,20 @@ interface Props {
    *  probed against this — teams with zero matches in scope are
    *  refused in-place rather than silently added as empty columns. */
   filters: FilterParams
+  /** True when the league-average column is already in the grid;
+   *  hides the "+ Add league average" button. */
+  avgSlotPresent: boolean
 }
 
-export default function AddTeamComparePicker({ currentTeams, filters }: Props) {
+export default function AddTeamComparePicker({ currentTeams, filters, avgSlotPresent }: Props) {
   const setUrlParams = useSetUrlParams()
   const [err, setErr] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
 
-  if (currentTeams.length >= 3) return null   // cap at three total
+  const teamSlotsFull = currentTeams.length >= 3
+  // If both team slots are full AND avg is already in, picker has
+  // nothing to offer — hide entirely.
+  if (teamSlotsFull && avgSlotPresent) return null
 
   const handleSelect = async (name: string) => {
     setErr(null)
@@ -53,15 +59,39 @@ export default function AddTeamComparePicker({ currentTeams, filters }: Props) {
     setUrlParams({ compare: compares.join(',') })
   }
 
+  const handleAddAvg = () => {
+    setUrlParams({ avg_slot: '1' })
+  }
+
   const label = currentTeams.length === 1
     ? 'Compare with another team…'
     : '+ Add another team to compare…'
 
   return (
     <div className="wisden-compare-picker">
-      <TeamSearch onSelect={handleSelect} placeholder={label} />
+      {!teamSlotsFull && (
+        <TeamSearch onSelect={handleSelect} placeholder={label} />
+      )}
       {checking && <div className="wisden-compare-picker-err">Checking…</div>}
       {err && <div className="wisden-compare-picker-err">{err}</div>}
+      {!avgSlotPresent && (
+        <button
+          type="button"
+          className="comp-link wisden-compare-picker-avg-btn"
+          onClick={handleAddAvg}
+          title="Add a league-average column scoped to the current filters"
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '0.4rem 0',
+            cursor: 'pointer',
+            textAlign: 'left',
+            font: 'inherit',
+          }}
+        >
+          + Add league average
+        </button>
+      )}
     </div>
   )
 }

@@ -233,20 +233,105 @@ export const getTeamPartnershipsSummary = (team: string, filters?: F & { side?: 
   fetchApi<import('./types').TeamPartnershipsSummary>(
     `/api/v1/teams/${te(team)}/partnerships/summary`, filters as Record<string, string>)
 
-// Composed team overview — five summary endpoints in parallel. Mirrors
+export const getTeamPartnershipsBySeason = (team: string, filters?: F & { side?: 'batting' | 'bowling' }) =>
+  fetchApi<{ team: string; side: 'batting' | 'bowling'; by_season: import('./types').TeamPartnershipsSeason[] }>(
+    `/api/v1/teams/${te(team)}/partnerships/by-season`, filters as Record<string, string>)
+
+// Composed team overview — summary endpoints + deep-lens (by-phase /
+// by-wicket / by-season) endpoints in parallel. Mirrors
 // getPlayerProfile: `.catch(() => null)` per sub-fetch so a scope that
 // yields zero results in one discipline (e.g. a defunct team with no
 // recent partnerships) doesn't blow up the whole column. Consumed by
 // TeamCompareGrid which hides rows where every column is null.
+//
+// 12 fetches per team-column. Two bundles' worth of data so the grid
+// can render summary + phase bands + partnership-by-wicket + season
+// trajectory without a second composer round-trip.
 export const getTeamProfile = async (team: string, filters?: F) => {
-  const [summary, batting, bowling, fielding, partnerships] = await Promise.all([
+  const [
+    summary, batting, bowling, fielding, partnerships,
+    batting_by_phase, bowling_by_phase, partnerships_by_wicket,
+    batting_by_season, bowling_by_season, fielding_by_season, partnerships_by_season,
+  ] = await Promise.all([
     getTeamSummary(team, filters).catch(() => null),
     getTeamBattingSummary(team, filters).catch(() => null),
     getTeamBowlingSummary(team, filters).catch(() => null),
     getTeamFieldingSummary(team, filters).catch(() => null),
     getTeamPartnershipsSummary(team, filters).catch(() => null),
+    getTeamBattingByPhase(team, filters).catch(() => null),
+    getTeamBowlingByPhase(team, filters).catch(() => null),
+    getTeamPartnershipsByWicket(team, filters).catch(() => null),
+    getTeamBattingBySeason(team, filters).catch(() => null),
+    getTeamBowlingBySeason(team, filters).catch(() => null),
+    getTeamFieldingBySeason(team, filters).catch(() => null),
+    getTeamPartnershipsBySeason(team, filters).catch(() => null),
   ])
-  return { summary, batting, bowling, fielding, partnerships } as import('./types').TeamProfile
+  return {
+    summary, batting, bowling, fielding, partnerships,
+    batting_by_phase, bowling_by_phase, partnerships_by_wicket,
+    batting_by_season, bowling_by_season, fielding_by_season, partnerships_by_season,
+  } as import('./types').TeamProfile
+}
+
+// ─── Scope averages — pool-weighted league baselines ─────────────────
+// The "average team" counterpart to getTeam* — same FilterBar scope,
+// no team filter. Drives the average column on the Teams > Compare tab
+// + phase-band / per-wicket / season-trajectory expansions.
+// See internal_docs/spec-team-compare-average.md.
+
+export const getScopeSummary = (filters?: F) =>
+  fetchApi<import('./types').ScopeSummary>('/api/v1/scope/averages/summary', filters as Record<string, string>)
+export const getScopeBattingSummary = (filters?: F) =>
+  fetchApi<import('./types').ScopeBattingSummary>('/api/v1/scope/averages/batting/summary', filters as Record<string, string>)
+export const getScopeBattingByPhase = (filters?: F) =>
+  fetchApi<{ by_phase: import('./types').TeamBattingPhase[] }>('/api/v1/scope/averages/batting/by-phase', filters as Record<string, string>)
+export const getScopeBattingBySeason = (filters?: F) =>
+  fetchApi<{ by_season: import('./types').ScopeBattingSeason[] }>('/api/v1/scope/averages/batting/by-season', filters as Record<string, string>)
+export const getScopeBowlingSummary = (filters?: F) =>
+  fetchApi<import('./types').ScopeBowlingSummary>('/api/v1/scope/averages/bowling/summary', filters as Record<string, string>)
+export const getScopeBowlingByPhase = (filters?: F) =>
+  fetchApi<{ by_phase: import('./types').TeamBowlingPhase[] }>('/api/v1/scope/averages/bowling/by-phase', filters as Record<string, string>)
+export const getScopeBowlingBySeason = (filters?: F) =>
+  fetchApi<{ by_season: import('./types').ScopeBowlingSeason[] }>('/api/v1/scope/averages/bowling/by-season', filters as Record<string, string>)
+export const getScopeFieldingSummary = (filters?: F) =>
+  fetchApi<import('./types').ScopeFieldingSummary>('/api/v1/scope/averages/fielding/summary', filters as Record<string, string>)
+export const getScopeFieldingBySeason = (filters?: F) =>
+  fetchApi<{ by_season: import('./types').ScopeFieldingSeason[] }>('/api/v1/scope/averages/fielding/by-season', filters as Record<string, string>)
+export const getScopePartnershipsSummary = (filters?: F) =>
+  fetchApi<import('./types').ScopePartnershipsSummary>('/api/v1/scope/averages/partnerships/summary', filters as Record<string, string>)
+export const getScopePartnershipsByWicket = (filters?: F) =>
+  fetchApi<{ by_wicket: import('./types').ScopePartnershipByWicket[] }>('/api/v1/scope/averages/partnerships/by-wicket', filters as Record<string, string>)
+export const getScopePartnershipsBySeason = (filters?: F) =>
+  fetchApi<{ by_season: import('./types').ScopePartnershipsSeason[] }>('/api/v1/scope/averages/partnerships/by-season', filters as Record<string, string>)
+
+// Parallel composer mirroring getTeamProfile so the avg slot in
+// TeamCompareGrid uses the same fetch shape as a team slot.
+// 12 fetches — same shape as getTeamProfile so the grid can drive
+// both with identical band logic.
+export const getScopeAverageProfile = async (filters?: F) => {
+  const [
+    summary, batting, bowling, fielding, partnerships,
+    batting_by_phase, bowling_by_phase, partnerships_by_wicket,
+    batting_by_season, bowling_by_season, fielding_by_season, partnerships_by_season,
+  ] = await Promise.all([
+    getScopeSummary(filters).catch(() => null),
+    getScopeBattingSummary(filters).catch(() => null),
+    getScopeBowlingSummary(filters).catch(() => null),
+    getScopeFieldingSummary(filters).catch(() => null),
+    getScopePartnershipsSummary(filters).catch(() => null),
+    getScopeBattingByPhase(filters).catch(() => null),
+    getScopeBowlingByPhase(filters).catch(() => null),
+    getScopePartnershipsByWicket(filters).catch(() => null),
+    getScopeBattingBySeason(filters).catch(() => null),
+    getScopeBowlingBySeason(filters).catch(() => null),
+    getScopeFieldingBySeason(filters).catch(() => null),
+    getScopePartnershipsBySeason(filters).catch(() => null),
+  ])
+  return {
+    summary, batting, bowling, fielding, partnerships,
+    batting_by_phase, bowling_by_phase, partnerships_by_wicket,
+    batting_by_season, bowling_by_season, fielding_by_season, partnerships_by_season,
+  } as import('./types').ScopeAverageProfile
 }
 
 // Tournaments / match-set dossier — `tournament` is optional; omit for

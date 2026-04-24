@@ -650,6 +650,9 @@ partnerships are FOR or AGAINST the team).
 - `.../summary?side=batting` — aggregate counts (total / 50+ / 100+),
   highest single partnership, avg runs, and the all-time top pair.
   Powers the Teams → Compare tab's partnerships row.
+- `.../by-season?side=batting` — per-season partnership rollup (total,
+  50+, 100+, avg, best). Drives the partnerships band on the Compare
+  tab's season-trajectory strip.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/partnerships/top?gender=male&team_type=international&season_from=2024&limit=1&side=batting"
@@ -683,6 +686,78 @@ curl "http://localhost:8000/api/v1/teams/India/partnerships/summary?gender=male&
   }
 }
 ```
+
+---
+
+# Scope averages (`/api/v1/scope/averages/…`)
+
+Source: `api/routers/scope_averages.py`. The "average team" / league-
+baseline counterpart to the team endpoints. Same FilterBar scope,
+no team filter — pool-weighted aggregates across every team in the
+filtered window. Drives the Average column on the Teams > Compare
+tab plus the phase-bands and season-trajectory expansions.
+
+All endpoints accept the standard FilterBar params (`gender`,
+`team_type`, `tournament`, `season_from`, `season_to`,
+`filter_venue`) and the page-local `series_type`.
+
+The response shape mirrors the team siblings, with two differences:
+
+1. No `team` field on top-level (no team identity).
+2. Identity-bearing nested objects are kept where meaningful at scope
+   level. `highest_total` carries the team that scored it; the
+   league's `best_partnership` at each wicket carries pair identity.
+   The "average team's best pair" doesn't exist, so summary-level
+   `best_pair` is omitted from the partnerships endpoint.
+
+| Endpoint | Mirrors |
+|---|---|
+| `/scope/averages/summary` | `/teams/{team}/summary` (results) |
+| `/scope/averages/batting/summary` | `/teams/{team}/batting/summary` |
+| `/scope/averages/batting/by-phase` | `/teams/{team}/batting/by-phase` |
+| `/scope/averages/batting/by-season` | `/teams/{team}/batting/by-season` |
+| `/scope/averages/bowling/summary` | `/teams/{team}/bowling/summary` |
+| `/scope/averages/bowling/by-phase` | `/teams/{team}/bowling/by-phase` |
+| `/scope/averages/bowling/by-season` | `/teams/{team}/bowling/by-season` |
+| `/scope/averages/fielding/summary` | `/teams/{team}/fielding/summary` |
+| `/scope/averages/fielding/by-season` | `/teams/{team}/fielding/by-season` |
+| `/scope/averages/partnerships/summary` | `/teams/{team}/partnerships/summary` |
+| `/scope/averages/partnerships/by-wicket` | `/teams/{team}/partnerships/by-wicket` |
+| `/scope/averages/partnerships/by-season` | `/teams/{team}/partnerships/by-season` |
+
+```bash
+curl "http://localhost:8000/api/v1/scope/averages/batting/summary?tournament=Indian+Premier+League&season_from=2024&season_to=2024"
+```
+
+```json
+{
+  "innings_batted": 142,
+  "total_runs": 25971,
+  "legal_balls": 16299,
+  "run_rate": 9.56,
+  "boundary_pct": 21.1,
+  "dot_pct": 32.9,
+  "fours": 2174,
+  "sixes": 1261,
+  "avg_1st_innings_total": 189.6,
+  "avg_2nd_innings_total": 176.2,
+  "highest_total": {
+    "runs": 287,
+    "team": "Sunrisers Hyderabad",
+    "match_id": 5904,
+    "innings_number": 1
+  }
+}
+```
+
+```bash
+curl "http://localhost:8000/api/v1/scope/averages/summary?tournament=Indian+Premier+League&season_from=2024&season_to=2024"
+```
+
+Returns `{ matches, decided, ties, no_results, toss_decided,
+bat_first_wins, field_first_wins, bat_first_win_pct }`. The
+`bat_first_win_pct` is the most informative league-level signal —
+"bat first wins X% of matches in this scope."
 
 ---
 

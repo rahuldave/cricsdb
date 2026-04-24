@@ -88,6 +88,8 @@ scripts/populate_keeper_assignments.py — Builds keeper_assignment table + writ
 scripts/apply_keeper_resolutions.py   — Applies manual resolutions from docs/keeper-ambiguous/*.csv back into the DB
 scripts/populate_partnerships.py      — Builds partnership table (auto on import + update)
 scripts/populate_player_scope_stats.py — Builds player_scope_stats table — denormalized per-(person, scope_key) aggregates. Built but NOT consumed by any endpoint in Spec 1 of internal_docs/spec-team-compare-average.md; exists as Path-A infrastructure for Spec 2 (internal_docs/outlook-comparisons.md). Auto on import + update.
+
+api/routers/scope_averages.py        — 12 endpoints under /api/v1/scope/averages/* mirroring the team siblings with team=None — pool-weighted league baselines for the Teams > Compare tab's average column. See internal_docs/spec-team-compare-average.md.
 ```
 
 Sanity / data-layer tests live in `tests/sanity/` (separate from
@@ -210,15 +212,27 @@ frontend/src/
                                    TeamSummaryRow        one discipline band — Results / Batting /
                                                           Bowling / Fielding / Partnerships —
                                                           compact label/value layout only
-                                   AddTeamComparePicker  TeamSearch wrapper, refuses candidates
-                                                          whose in-scope match count is zero
-                                                          (FilterBar auto-narrow is the upstream
-                                                          cross-type/cross-gender gate)
-                                   teamUtils.ts          teamDisciplineHasData (drives per-row
-                                                          band visibility + placeholders),
-                                                          teamMatchesInScope (uses summary.matches
-                                                          as canonical — fielding.matches is
-                                                          currently unfiltered), carryTeamFilters
+                                   AddTeamComparePicker  TeamSearch wrapper + "+ Add league average"
+                                                          button. Refuses candidates whose in-scope
+                                                          match count is zero (FilterBar auto-narrow
+                                                          is the upstream cross-type/cross-gender gate)
+                                   AvgSummaryRow         league-baseline counterpart to TeamSummaryRow
+                                                          for the average column (avg_slot=1) — same
+                                                          row labels for vertical alignment, "-" where
+                                                          a metric doesn't apply at scope
+                                   PhaseBandsRow         PP/Mid/Death sub-rows under Batting + Bowling
+                                                          for both team and avg columns, pool-weighted
+                                   PartnershipByWicketRows 1st-10th wicket partnership sub-rows under
+                                                          Partnerships, with small-sample suppression
+                                                          (n<30) on the avg column only
+                                   SeasonTrajectoryStrip 2-panel LineChart (Batting RR + Bowling Econ
+                                                          by season) below the grid, hidden when scope
+                                                          spans <2 seasons
+                                   teamUtils.ts          teamDisciplineHasData + avgDisciplineHasData
+                                                          (drives per-row band visibility + placeholders),
+                                                          teamMatchesInScope, carryTeamFilters,
+                                                          scopeAvgLabel ("Indian Premier League 2024 avg"
+                                                          built from active filters)
   pages/                       — Home, Teams, Players, Batting, Bowling, Fielding, Tournaments,
                                    HeadToHead (mode=player|team), Matches, MatchScorecard,
                                    Venues (Phase 2 landing — country-grouped tile grid;

@@ -947,13 +947,211 @@ export interface TeamPartnershipsSummary {
 
 /** Bundle fetched for each column in the Teams → Compare tab. Each
  *  sub-fetch is wrapped in `.catch(() => null)` so a single 404 or
- *  scope-empty discipline doesn't sink the whole column. */
+ *  scope-empty discipline doesn't sink the whole column.
+ *
+ *  Includes both the summary endpoints (top-of-column rows) and the
+ *  expansion-row data (phase bands under batting/bowling, partnership-
+ *  by-wicket sub-rows, season-trajectory inputs). All fetched in
+ *  parallel as a single composer call so the grid only waits once. */
 export interface TeamProfile {
   summary: TeamSummary | null
   batting: TeamBattingSummary | null
   bowling: TeamBowlingSummary | null
   fielding: TeamFieldingSummary | null
   partnerships: TeamPartnershipsSummary | null
+  batting_by_phase: { phases: TeamBattingPhase[] } | null
+  bowling_by_phase: { phases: TeamBowlingPhase[] } | null
+  partnerships_by_wicket: { team: string; side: 'batting' | 'bowling'; by_wicket: PartnershipByWicket[] } | null
+  batting_by_season: { seasons: TeamBattingSeason[] } | null
+  bowling_by_season: { seasons: TeamBowlingSeason[] } | null
+  fielding_by_season: { seasons: TeamFieldingSeason[] } | null
+  partnerships_by_season: { team: string; side: 'batting' | 'bowling'; by_season: TeamPartnershipsSeason[] } | null
+}
+
+/** Per-season partnership aggregates returned by
+ *  /teams/{team}/partnerships/by-season + /scope/averages/partnerships/by-season. */
+export interface TeamPartnershipsSeason {
+  season: string
+  total: number
+  count_50_plus: number
+  count_100_plus: number
+  avg_runs: number | null
+  best_runs: number | null
+}
+
+// ─── Scope averages — pool-weighted league baselines ─────────────────
+// The "average team" counterpart to the team interfaces above. Same
+// fields where applicable; per-team identity-bearing stuff (captain,
+// home ground, list of keepers, "best pair") is dropped or replaced
+// with scope-level identity (highest team total carries the team
+// that scored it; league's record partnership at each wicket carries
+// pair identity).
+//
+// Rendered in the Teams > Compare tab's "Average" column —
+// see TeamCompareGrid + ScopeAverageColumn.
+
+export interface ScopeSummary {
+  matches: number
+  decided: number
+  ties: number
+  no_results: number
+  toss_decided: number
+  bat_first_wins: number
+  field_first_wins: number
+  bat_first_win_pct: number | null
+}
+
+export interface ScopeBattingSummary {
+  innings_batted: number
+  total_runs: number
+  legal_balls: number
+  run_rate: number | null
+  boundary_pct: number | null
+  dot_pct: number | null
+  fours: number
+  sixes: number
+  avg_1st_innings_total: number | null
+  avg_2nd_innings_total: number | null
+  highest_total: {
+    runs: number
+    team: string | null
+    match_id: number
+    innings_number: number
+  } | null
+}
+
+export interface ScopeBattingSeason {
+  season: string
+  innings_batted: number
+  total_runs: number
+  legal_balls: number
+  run_rate: number | null
+  boundary_pct: number | null
+  dot_pct: number | null
+  fours: number
+  sixes: number
+}
+
+export interface ScopeBowlingSummary {
+  innings_bowled: number
+  matches: number
+  runs_conceded: number
+  legal_balls: number
+  overs: number
+  wickets: number
+  economy: number | null
+  strike_rate: number | null
+  average: number | null
+  dot_pct: number | null
+  fours_conceded: number
+  sixes_conceded: number
+  wides: number
+  noballs: number
+  wides_per_match: number | null
+  noballs_per_match: number | null
+}
+
+export interface ScopeBowlingSeason {
+  season: string
+  innings_bowled: number
+  runs_conceded: number
+  legal_balls: number
+  overs: number
+  wickets: number
+  economy: number | null
+  dot_pct: number | null
+  boundaries_conceded: number
+}
+
+export interface ScopeFieldingSummary {
+  matches: number
+  catches: number
+  caught_and_bowled: number
+  stumpings: number
+  run_outs: number
+  total_dismissals_contributed: number
+  catches_per_match: number | null
+  stumpings_per_match: number | null
+  run_outs_per_match: number | null
+}
+
+export interface ScopeFieldingSeason {
+  season: string
+  matches: number
+  catches: number
+  stumpings: number
+  run_outs: number
+  total_dismissals_contributed: number
+  catches_per_match: number | null
+  stumpings_per_match: number | null
+  run_outs_per_match: number | null
+}
+
+export interface ScopePartnershipsSummary {
+  total: number
+  count_50_plus: number
+  count_100_plus: number
+  avg_runs: number | null
+  /** League-wide highest single partnership in scope — has identity
+   *  (specific pair, match, team that scored it). */
+  highest: {
+    runs: number
+    balls: number
+    match_id: number
+    date: string | null
+    team: string | null
+    batter1: { person_id: string; name: string | null }
+    batter2: { person_id: string; name: string | null }
+  } | null
+}
+
+export interface ScopePartnershipByWicket {
+  wicket_number: number
+  n: number
+  avg_runs: number | null
+  avg_balls: number | null
+  best_runs: number | null
+  /** League's record partnership at this wicket position — carries
+   *  pair + match identity (different from the team-side endpoint:
+   *  no team filter, so the holder can be any team in scope). */
+  best_partnership: {
+    partnership_id: number
+    match_id: number
+    date: string | null
+    season: string | null
+    tournament: string | null
+    team: string | null
+    runs: number
+    balls: number
+    batter1: { person_id: string; name: string | null }
+    batter2: { person_id: string; name: string | null }
+  } | null
+}
+
+export interface ScopePartnershipsSeason {
+  season: string
+  total: number
+  count_50_plus: number
+  count_100_plus: number
+  avg_runs: number | null
+  best_runs: number | null
+}
+
+/** Bundle fetched for the Average column in the Teams > Compare tab.
+ *  Mirrors TeamProfile shape so columns can be rendered side-by-side. */
+export interface ScopeAverageProfile {
+  summary: ScopeSummary | null
+  batting: ScopeBattingSummary | null
+  bowling: ScopeBowlingSummary | null
+  fielding: ScopeFieldingSummary | null
+  partnerships: ScopePartnershipsSummary | null
+  batting_by_phase: { by_phase: TeamBattingPhase[] } | null
+  bowling_by_phase: { by_phase: TeamBowlingPhase[] } | null
+  partnerships_by_wicket: { by_wicket: ScopePartnershipByWicket[] } | null
+  batting_by_season: { by_season: ScopeBattingSeason[] } | null
+  bowling_by_season: { by_season: ScopeBowlingSeason[] } | null
+  fielding_by_season: { by_season: ScopeFieldingSeason[] } | null
+  partnerships_by_season: { by_season: ScopePartnershipsSeason[] } | null
 }
 
 export interface TeamFieldingSeason {

@@ -857,6 +857,60 @@ subtabs. Commits `5179683` … `ca0b785`.
   commits share a file) is the splitting mechanism going forward
   — not large end-of-session dump commits.
 
+### Shipped 2026-04-24 (Teams Compare — Spec 1 / Phases 2A + 3: API + UI)
+
+- **Phase 2A — `/api/v1/scope/averages/*` router family** (12 new
+  endpoints) mirrors `/teams/{team}/*` with the team filter dropped —
+  pool-weighted league baselines for the same FilterBar scope. Plus
+  the missing `/teams/{team}/partnerships/by-season`. Helpers
+  `_team_innings_clause` + `_partnership_filter` in `teams.py`
+  refactored to accept `team: str | None`; team=None drops the team
+  clause cleanly. Behaviour-preserving when team is given: regression
+  10/10 REG matched byte-identical, 19/19 NEW changed.
+- **Phase 3 — Average-team column on Teams > Compare.** New URL param
+  `avg_slot=1` adds a fourth column whose label is scope-computed
+  ("Indian Premier League 2024 avg"). `AddTeamComparePicker` gets a
+  "+ Add league average" button. `getScopeAverageProfile()` mirrors
+  `getTeamProfile()`, fetching all 12 endpoints in parallel.
+  `AvgSummaryRow.tsx` renders rows with the same labels as
+  `TeamSummaryRow.tsx` so columns vertically align — fields that
+  don't apply at scope (Wins, Losses, Best pair) render `-`. The
+  "Win %" row in the avg column is repurposed to bat-first win
+  percentage — the most informative league-level signal at that row
+  position.
+- **Phase 3 — Phase bands** (PP / Mid / Death) render as sub-rows
+  under Batting and Bowling in every column via
+  `PhaseBandsRow.tsx`. Backed by existing
+  `/teams/{team}/{batting,bowling}/by-phase` + new scope-avg
+  siblings.
+- **Phase 3 — Partnership-by-wicket expansion** (1st-10th wicket)
+  renders as 10 sub-rows under the Partnerships row in every column
+  via `PartnershipByWicketRows.tsx`. Small-sample suppression: when
+  fewer than 30 partnerships at a wicket position have formed in
+  scope, the average column shows `—` (with tooltip explaining); team
+  columns never suppress.
+- **Phase 3 — Season-trajectory strip** (`SeasonTrajectoryStrip.tsx`)
+  renders below the grid: two `LineChart` panels — Batting RR by
+  season and Bowling Econ by season — with one line per compare
+  column (teams + avg). Hidden under single-season filters (no
+  trajectory to draw). Multi-season scope via `season_from <
+  season_to` lights it up.
+- **No envelope migration in Spec 1.** Each metric on the 5 existing
+  compare endpoints stays flat (`run_rate: 9.59` not
+  `run_rate: {value: 9.59, scope_avg: 9.56, …}`). Phase 1 UI doesn't
+  render `delta_pct` / `direction` / `sample_size`, and migrating
+  envelope would touch every existing UI consumer of the 5 endpoints
+  for zero rendered benefit. Phase 2B (envelope migration + REG→NEW
+  flip + frontend consumer updates) sequences before Spec 2 starts —
+  see `internal_docs/outlook-comparisons.md` for the consumers that
+  will need it.
+- **Test coverage**: `tests/regression/scope-averages/urls.txt`
+  (29 entries, 19 NEW + 10 REG control); `tests/integration/team-
+  compare-average.sh` (16/16 asserts pass) — exercises base compare
+  grid, avg-add via picker, phase bands, partnership-by-wicket,
+  trajectory strip visibility under single vs multi-season,
+  scope-computed label respecting gender + team_type.
+
 ### Shipped 2026-04-24 (Teams Compare — Spec 1 / Phase 1: schema + populate)
 
 - **Two specs written first.** `internal_docs/spec-team-compare-average.md`
