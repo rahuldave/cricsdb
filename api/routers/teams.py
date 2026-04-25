@@ -897,9 +897,101 @@ async def _batting_aggregates(
     """Flat-shape batting aggregates (no envelope). Called twice by
     `_compute_batting_summary`: once with team, once with team=None
     (to compute scope_avg). Identity-bearing fields (`highest_total`,
-    `lowest_all_out_total`) are returned but only used by the team
-    side — the league scope's "highest" is a different question
-    answered by /scope/averages/batting/summary."""
+    `lowest_all_out_total`) are only consumed by the team side."""
+    from .bucket_baseline_dispatch import is_precomputed_scope
+    if is_precomputed_scope(filters, aux):
+        return await _batting_aggregates_baseline(team, filters, aux)
+    return await _batting_aggregates_live(team, filters, aux)
+
+
+async def _batting_aggregates_baseline(team, filters, aux):
+    from .bucket_baseline_dispatch import baseline_where, LEAGUE_TEAM_KEY
+    db = get_db()
+    table_team = team if team else LEAGUE_TEAM_KEY
+    where, params = baseline_where(filters, aux, team=table_team)
+    rows = await db.q(
+        f"""
+        SELECT
+          SUM(innings_batted) AS innings_batted,
+          SUM(total_runs) AS total_runs,
+          SUM(legal_balls) AS legal_balls,
+          SUM(fours) AS fours, SUM(sixes) AS sixes, SUM(dots) AS dots,
+          SUM(fifties) AS fifties, SUM(hundreds) AS hundreds,
+          SUM(first_inn_runs_sum) AS first_inn_runs_sum,
+          SUM(first_inn_count) AS first_inn_count,
+          SUM(second_inn_runs_sum) AS second_inn_runs_sum,
+          SUM(second_inn_count) AS second_inn_count
+        FROM bucketbaselinebatting {where}
+        """,
+        params,
+    )
+    r = rows[0] if rows else {}
+    total_runs = r.get("total_runs") or 0
+    legal_balls = r.get("legal_balls") or 0
+    fours = r.get("fours") or 0
+    sixes = r.get("sixes") or 0
+    dots = r.get("dots") or 0
+    boundaries = fours + sixes
+    fic = r.get("first_inn_count") or 0
+    sic = r.get("second_inn_count") or 0
+    avg_1st = round((r.get("first_inn_runs_sum") or 0) / fic, 1) if fic else None
+    avg_2nd = round((r.get("second_inn_runs_sum") or 0) / sic, 1) if sic else None
+
+    # Highest single innings — pick row with max highest_inn_runs.
+    hi_rows = await db.q(
+        f"""
+        SELECT highest_inn_runs, highest_inn_match_id, highest_inn_innings_number
+        FROM bucketbaselinebatting {where} AND highest_inn_runs > 0
+        ORDER BY highest_inn_runs DESC, highest_inn_match_id LIMIT 1
+        """,
+        params,
+    )
+    highest_total = None
+    if hi_rows:
+        h = hi_rows[0]
+        highest_total = {
+            "runs": h["highest_inn_runs"] or 0,
+            "match_id": h["highest_inn_match_id"],
+            "innings_number": (h["highest_inn_innings_number"] or 0) + 1,
+        }
+    # Lowest all-out total.
+    lo_rows = await db.q(
+        f"""
+        SELECT lowest_all_out_runs, lowest_all_out_match_id, lowest_all_out_innings_number
+        FROM bucketbaselinebatting {where} AND lowest_all_out_runs IS NOT NULL
+        ORDER BY lowest_all_out_runs ASC, lowest_all_out_match_id LIMIT 1
+        """,
+        params,
+    )
+    lowest_all_out = None
+    if lo_rows:
+        lo = lo_rows[0]
+        lowest_all_out = {
+            "runs": lo["lowest_all_out_runs"] or 0,
+            "match_id": lo["lowest_all_out_match_id"],
+            "innings_number": (lo["lowest_all_out_innings_number"] or 0) + 1,
+        }
+    return {
+        "innings_batted": r.get("innings_batted") or 0,
+        "total_runs": total_runs,
+        "legal_balls": legal_balls,
+        "run_rate": _safe_div(total_runs, legal_balls, 6),
+        "boundary_pct": _safe_div(boundaries, legal_balls, 100, 1),
+        "bat_dot_pct": _safe_div(dots, legal_balls, 100, 1),
+        "fours": fours,
+        "sixes": sixes,
+        "fifties": r.get("fifties") or 0,
+        "hundreds": r.get("hundreds") or 0,
+        "avg_1st_innings_total": avg_1st,
+        "avg_2nd_innings_total": avg_2nd,
+        "highest_total": highest_total,
+        "lowest_all_out_total": lowest_all_out,
+    }
+
+
+async def _batting_aggregates_live(
+    team: str | None, filters: FilterParams, aux: AuxParams,
+) -> dict:
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
 
@@ -1057,12 +1149,64 @@ async def team_batting_summary(
     return await _compute_batting_summary(team, filters, aux)
 
 
+async def _team_batting_by_season_baseline(team, filters, aux):
+    """One row per season — SUM-over-tournaments since cells split per
+    (tournament, season, team)."""
+    from .bucket_baseline_dispatch import baseline_where
+    db = get_db()
+    where, params = baseline_where(filters, aux, team=team)
+    rows = await db.q(
+        f"""
+        SELECT season,
+               SUM(innings_batted) AS innings_batted,
+               SUM(total_runs) AS total_runs,
+               SUM(legal_balls) AS legal_balls,
+               SUM(fours) AS fours,
+               SUM(sixes) AS sixes,
+               SUM(dots) AS dots,
+               COALESCE(MAX(highest_inn_runs), 0) AS highest_total,
+               MIN(lowest_all_out_runs) AS lowest_all_out_total
+        FROM bucketbaselinebatting {where}
+        GROUP BY season ORDER BY season
+        """,
+        params,
+    )
+    out = []
+    for r in rows:
+        runs = r["total_runs"] or 0
+        balls = r["legal_balls"] or 0
+        innings = r["innings_batted"] or 0
+        fours = r["fours"] or 0
+        sixes = r["sixes"] or 0
+        dots = r["dots"] or 0
+        boundaries = fours + sixes
+        out.append({
+            "season": r["season"],
+            "innings_batted": innings,
+            "total_runs": runs,
+            "legal_balls": balls,
+            "avg_innings_total": _safe_div(runs, innings, 1, 1),
+            "run_rate": _safe_div(runs, balls, 6),
+            "boundary_pct": _safe_div(boundaries, balls, 100, 1),
+            "dot_pct": _safe_div(dots, balls, 100, 1),
+            "fours": fours,
+            "sixes": sixes,
+            "highest_total": r["highest_total"],
+            "lowest_all_out_total": r["lowest_all_out_total"],
+        })
+    return {"seasons": out}
+
+
 @router.get("/{team}/batting/by-season")
 async def team_batting_by_season(
     team: str,
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
 ):
+    from .bucket_baseline_dispatch import is_precomputed_scope, baseline_where
+    if is_precomputed_scope(filters, aux):
+        return await _team_batting_by_season_baseline(team, filters, aux)
+
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
 
@@ -1485,6 +1629,128 @@ async def _bowling_aggregates(
     `_compute_bowling_summary` (team + None for scope_avg). When team is
     None, identity-bearing fields (worst_conceded, best_defence) are
     null."""
+    from .bucket_baseline_dispatch import is_precomputed_scope
+    if is_precomputed_scope(filters, aux):
+        return await _bowling_aggregates_baseline(team, filters, aux)
+    return await _bowling_aggregates_live(team, filters, aux)
+
+
+async def _bowling_aggregates_baseline(team, filters, aux):
+    from .bucket_baseline_dispatch import baseline_where, LEAGUE_TEAM_KEY
+    db = get_db()
+    table_team = team if team else LEAGUE_TEAM_KEY
+    where, params = baseline_where(filters, aux, team=table_team)
+    rows = await db.q(
+        f"""
+        SELECT
+          SUM(innings_bowled) AS innings_bowled,
+          SUM(matches) AS matches,
+          SUM(runs_conceded) AS runs_conceded,
+          SUM(legal_balls) AS legal_balls,
+          SUM(wide_runs) AS wides,
+          SUM(noball_runs) AS noballs,
+          SUM(fours_conceded) AS fours_conceded,
+          SUM(sixes_conceded) AS sixes_conceded,
+          SUM(dots) AS dots,
+          SUM(wickets) AS wickets
+        FROM bucketbaselinebowling {where}
+        """,
+        params,
+    )
+    r = rows[0] if rows else {}
+    runs_conceded = r.get("runs_conceded") or 0
+    legal_balls = r.get("legal_balls") or 0
+    matches = r.get("matches") or 0
+    wickets = r.get("wickets") or 0
+
+    # avg_opposition_total = runs_conceded / innings_bowled (per-innings).
+    innings_bowled = r.get("innings_bowled") or 0
+    avg_opp_total = round(runs_conceded / innings_bowled, 1) if innings_bowled else None
+
+    # worst_conceded identity — find the cell with largest worst_inn_runs.
+    worst = None
+    if team is not None:  # only meaningful per-team
+        worst_rows = await db.q(
+            f"""
+            SELECT worst_inn_runs FROM bucketbaselinebowling {where}
+              AND worst_inn_runs > 0
+            ORDER BY worst_inn_runs DESC LIMIT 1
+            """,
+            params,
+        )
+        if worst_rows:
+            # Identity columns (match_id, innings_number) NOT in schema —
+            # one tiny live SELECT to find the matching innings row.
+            wp_where, wp_params = _team_innings_clause(filters, team, side="fielding", aux=aux)
+            wid_rows = await db.q(
+                f"""
+                SELECT i.id AS innings_id, i.match_id, i.innings_number,
+                       SUM(d.runs_total) AS runs
+                FROM delivery d
+                JOIN innings i ON i.id = d.innings_id
+                JOIN match m ON m.id = i.match_id
+                WHERE {wp_where}
+                GROUP BY i.id ORDER BY runs DESC LIMIT 1
+                """,
+                wp_params,
+            )
+            if wid_rows:
+                w = wid_rows[0]
+                worst = {
+                    "runs": w["runs"] or 0,
+                    "match_id": w["match_id"],
+                    "innings_number": (w["innings_number"] or 0) + 1,
+                }
+
+    # best_defence — only meaningful per-team. Stays live (rare query,
+    # not in baseline schema).
+    best_defence = None
+    if team is not None:
+        wp_where, wp_params = _team_innings_clause(filters, team, side="fielding", aux=aux)
+        defended_rows = await db.q(
+            f"""
+            SELECT i.match_id, SUM(d.runs_total) AS runs
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {wp_where} AND m.outcome_winner = :team AND i.innings_number = 1
+            GROUP BY i.id, i.match_id ORDER BY runs ASC LIMIT 1
+            """,
+            {**wp_params, "team": team},
+        )
+        if defended_rows:
+            d = defended_rows[0]
+            best_defence = {
+                "runs": d["runs"] or 0,
+                "match_id": d["match_id"],
+            }
+
+    return {
+        "innings_bowled": innings_bowled,
+        "matches": matches,
+        "runs_conceded": runs_conceded,
+        "legal_balls": legal_balls,
+        "overs": round(legal_balls / 6, 1) if legal_balls else 0,
+        "wickets": wickets,
+        "economy": _safe_div(runs_conceded, legal_balls, 6),
+        "strike_rate": _safe_div(legal_balls, wickets),
+        "average": _safe_div(runs_conceded, wickets),
+        "bowl_dot_pct": _safe_div(r.get("dots") or 0, legal_balls, 100, 1),
+        "fours_conceded": r.get("fours_conceded") or 0,
+        "sixes_conceded": r.get("sixes_conceded") or 0,
+        "wides": r.get("wides") or 0,
+        "noballs": r.get("noballs") or 0,
+        "wides_per_match": _safe_div(r.get("wides") or 0, matches, 1, 2),
+        "noballs_per_match": _safe_div(r.get("noballs") or 0, matches, 1, 2),
+        "avg_opposition_total": avg_opp_total,
+        "worst_conceded": worst,
+        "best_defence": best_defence,
+    }
+
+
+async def _bowling_aggregates_live(
+    team: str | None, filters: FilterParams, aux: AuxParams,
+) -> dict:
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
@@ -1672,6 +1938,9 @@ async def team_bowling_by_season(
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
 ):
+    from .bucket_baseline_dispatch import is_precomputed_scope
+    if is_precomputed_scope(filters, aux):
+        return await _team_bowling_by_season_baseline(team, filters, aux)
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
@@ -1758,6 +2027,50 @@ async def team_bowling_by_season(
         })
 
     return {"seasons": seasons}
+
+
+async def _team_bowling_by_season_baseline(team, filters, aux):
+    """Per-season bowling — SUM-over-tournament cells. worst_conceded
+    identity (match_id) gets one tiny live SELECT per season since the
+    schema only stores the runs value."""
+    from .bucket_baseline_dispatch import baseline_where
+    db = get_db()
+    where, params = baseline_where(filters, aux, team=team)
+    rows = await db.q(
+        f"""
+        SELECT season,
+               SUM(innings_bowled) AS innings_bowled,
+               SUM(runs_conceded) AS runs_conceded,
+               SUM(legal_balls) AS legal_balls,
+               SUM(fours_conceded + sixes_conceded) AS boundaries_conceded,
+               SUM(dots) AS dots,
+               SUM(wickets) AS wickets,
+               COALESCE(MAX(worst_inn_runs), 0) AS worst_inn_runs
+        FROM bucketbaselinebowling {where}
+        GROUP BY season ORDER BY season
+        """,
+        params,
+    )
+    out = []
+    for r in rows:
+        runs = r["runs_conceded"] or 0
+        balls = r["legal_balls"] or 0
+        innings = r["innings_bowled"] or 0
+        avg_opp = round(runs / innings, 1) if innings else None
+        out.append({
+            "season": r["season"],
+            "innings_bowled": innings,
+            "runs_conceded": runs,
+            "legal_balls": balls,
+            "overs": round(balls / 6, 1) if balls else 0,
+            "wickets": r["wickets"] or 0,
+            "economy": _safe_div(runs, balls, 6),
+            "avg_opposition_total": avg_opp,
+            "dot_pct": _safe_div(r["dots"] or 0, balls, 100, 1),
+            "boundaries_conceded": r["boundaries_conceded"] or 0,
+            "worst_conceded": r["worst_inn_runs"],
+        })
+    return {"seasons": out}
 
 
 async def _bowling_by_phase_aggregates(
@@ -2079,6 +2392,65 @@ async def _fielding_aggregates(
     aux: AuxParams,
 ) -> dict:
     """Flat-shape fielding aggregates."""
+    from .bucket_baseline_dispatch import is_precomputed_scope
+    if is_precomputed_scope(filters, aux):
+        return await _fielding_aggregates_baseline(team, filters, aux)
+    return await _fielding_aggregates_live(team, filters, aux)
+
+
+async def _fielding_aggregates_baseline(team, filters, aux):
+    from .bucket_baseline_dispatch import baseline_where, LEAGUE_TEAM_KEY
+    db = get_db()
+    table_team = team if team else LEAGUE_TEAM_KEY
+    where, params = baseline_where(filters, aux, team=table_team)
+    rows = await db.q(
+        f"""
+        SELECT SUM(matches) AS matches,
+               SUM(catches) AS catches_only,
+               SUM(caught_and_bowled) AS caught_and_bowled,
+               SUM(stumpings) AS stumpings,
+               SUM(run_outs) AS run_outs
+        FROM bucketbaselinefielding {where}
+        """,
+        params,
+    )
+    r = rows[0] if rows else {}
+    catches_only = r.get("catches_only") or 0
+    cnb = r.get("caught_and_bowled") or 0
+    stumpings = r.get("stumpings") or 0
+    run_outs = r.get("run_outs") or 0
+    # Per-team live semantic: response.catches excludes c_a_b (NOT the
+    # same as scope/averages/fielding/summary which includes it).
+    # matches denominator: live uses COUNT(DISTINCT m.id) over innings
+    # the team fielded; baseline.matches stores COUNT(DISTINCT i.id)
+    # which can drift when fielding had no credits in a match. Fall
+    # back to a tiny live SELECT for matches denominator.
+    where_live, params_live = _team_innings_clause(filters, team, side="fielding", aux=aux)
+    match_rows = await db.q(
+        f"""
+        SELECT COUNT(DISTINCT m.id) as matches
+        FROM innings i JOIN match m ON m.id = i.match_id
+        WHERE {where_live}
+        """,
+        params_live,
+    )
+    matches = match_rows[0]["matches"] if match_rows else 0
+    return {
+        "matches": matches,
+        "catches": catches_only,
+        "caught_and_bowled": cnb,
+        "stumpings": stumpings,
+        "run_outs": run_outs,
+        "total_dismissals_contributed": catches_only + cnb + stumpings + run_outs,
+        "catches_per_match": _safe_div(catches_only + cnb, matches, 1, 2),
+        "stumpings_per_match": _safe_div(stumpings, matches, 1, 2),
+        "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
+    }
+
+
+async def _fielding_aggregates_live(
+    team: str | None, filters: FilterParams, aux: AuxParams,
+) -> dict:
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
@@ -2156,6 +2528,57 @@ async def team_fielding_by_season(
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
 ):
+    from .bucket_baseline_dispatch import is_precomputed_scope, baseline_where
+    if is_precomputed_scope(filters, aux):
+        db = get_db()
+        bw, bp = baseline_where(filters, aux, team=team)
+        rows = await db.q(
+            f"""
+            SELECT season,
+                   SUM(catches) AS catches,
+                   SUM(caught_and_bowled) AS caught_and_bowled,
+                   SUM(stumpings) AS stumpings,
+                   SUM(run_outs) AS run_outs
+            FROM bucketbaselinefielding {bw}
+            GROUP BY season ORDER BY season
+            """,
+            bp,
+        )
+        # Matches per season — fielding-side requires the live count.
+        match_rows = await db.q(
+            """
+            SELECT m.season, COUNT(DISTINCT m.id) as matches
+            FROM innings i JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0
+              AND i.team != :team
+              AND (m.team1 = :team OR m.team2 = :team)
+            GROUP BY m.season
+            """,
+            {"team": team},
+        )
+        match_map = {r["season"]: r["matches"] for r in match_rows}
+        seasons = []
+        for r in rows:
+            s = r["season"]
+            catches = r["catches"] or 0
+            cnb = r["caught_and_bowled"] or 0
+            stumpings = r["stumpings"] or 0
+            run_outs = r["run_outs"] or 0
+            matches = match_map.get(s, 0)
+            seasons.append({
+                "season": s,
+                "catches": catches,
+                "caught_and_bowled": cnb,
+                "stumpings": stumpings,
+                "run_outs": run_outs,
+                "matches": matches,
+                "catches_per_match": _safe_div(catches + cnb, matches, 1, 2),
+                "stumpings_per_match": _safe_div(stumpings, matches, 1, 2),
+                "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
+                "total_dismissals_contributed": catches + cnb + stumpings + run_outs,
+            })
+        return {"seasons": seasons}
+
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
@@ -2327,6 +2750,37 @@ async def _partnerships_by_wicket_aggregates(
     aux: AuxParams,
 ) -> dict[int, dict]:
     """Flat per-wicket partnership aggregates keyed by wicket_number."""
+    from .bucket_baseline_dispatch import is_precomputed_scope, baseline_where, LEAGUE_TEAM_KEY
+    if is_precomputed_scope(filters, aux) and side == "batting":
+        # Baseline path — only valid for side='batting' (the team batting
+        # in the partnership). side='bowling' uses an opposition-side
+        # aggregate not in the schema.
+        db = get_db()
+        table_team = team if team else LEAGUE_TEAM_KEY
+        bw, bp = baseline_where(filters, aux, team=table_team)
+        bl_rows = await db.q(
+            f"""
+            SELECT wicket_number,
+                   SUM(n) AS n,
+                   ROUND(SUM(total_runs) * 1.0 / NULLIF(SUM(n), 0), 1) AS avg_runs,
+                   ROUND(SUM(total_balls) * 1.0 / NULLIF(SUM(n), 0), 1) AS avg_balls,
+                   COALESCE(MAX(best_runs), 0) AS best_runs
+            FROM bucketbaselinepartnership {bw}
+            GROUP BY wicket_number ORDER BY wicket_number
+            """,
+            bp,
+        )
+        return {
+            r["wicket_number"]: {
+                "wicket_number": r["wicket_number"],
+                "n": r["n"] or 0,
+                "avg_runs": r["avg_runs"],
+                "avg_balls": r["avg_balls"],
+                "best_runs": r["best_runs"],
+            }
+            for r in bl_rows
+        }
+
     db = get_db()
     where, params = _partnership_filter(filters, team, side, aux=aux)
     rows = await db.q(
@@ -2820,11 +3274,41 @@ async def team_partnerships_by_season(
     aux: AuxParams = Depends(),
     side: str = Query("batting"),
 ):
-    """Per-season partnership aggregates for a team. Sibling of
-    `/scope/averages/partnerships/by-season`. Drives the partnership
-    band on the season-trajectory strip in the Compare tab.
-    """
+    """Per-season partnership aggregates for a team."""
     side = _validate_side(side)
+    from .bucket_baseline_dispatch import is_precomputed_scope, baseline_where
+    if is_precomputed_scope(filters, aux) and side == "batting":
+        db = get_db()
+        bw, bp = baseline_where(filters, aux, team=team)
+        rows = await db.q(
+            f"""
+            SELECT season,
+                   SUM(n) AS total,
+                   SUM(count_50_plus) AS count_50_plus,
+                   SUM(count_100_plus) AS count_100_plus,
+                   ROUND(SUM(total_runs) * 1.0 / NULLIF(SUM(n), 0), 1) AS avg_runs,
+                   COALESCE(MAX(best_runs), 0) AS best_runs
+            FROM bucketbaselinepartnership {bw}
+            GROUP BY season ORDER BY season
+            """,
+            bp,
+        )
+        return {
+            "team": team,
+            "side": side,
+            "by_season": [
+                {
+                    "season": r["season"],
+                    "total": r["total"] or 0,
+                    "count_50_plus": r["count_50_plus"] or 0,
+                    "count_100_plus": r["count_100_plus"] or 0,
+                    "avg_runs": r["avg_runs"],
+                    "best_runs": r["best_runs"],
+                }
+                for r in rows
+            ],
+        }
+
     db = get_db()
     where, params = _partnership_filter(filters, team, side, aux=aux)
 

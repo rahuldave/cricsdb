@@ -478,7 +478,7 @@ async def _populate_bowling(db, cells=None):
         INSERT INTO bucketbaselinebowling (
             gender, team_type, tournament, season, team,
             innings_bowled, matches, runs_conceded, legal_balls,
-            wides, noballs, fours_conceded, sixes_conceded, dots, wickets
+            wides, noballs, wide_runs, noball_runs, fours_conceded, sixes_conceded, dots, wickets
         )
         SELECT
             m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, '{LEAGUE_TEAM}',
@@ -488,6 +488,8 @@ async def _populate_bowling(db, cells=None):
             SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
             SUM(CASE WHEN d.extras_wides > 0 THEN 1 ELSE 0 END) AS wides,
             SUM(CASE WHEN d.extras_noballs > 0 THEN 1 ELSE 0 END) AS noballs,
+            COALESCE(SUM(d.extras_wides), 0) AS wide_runs,
+            COALESCE(SUM(d.extras_noballs), 0) AS noball_runs,
             SUM(CASE WHEN d.runs_batter = 4 AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS fours_conceded,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes_conceded,
             SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots,
@@ -511,7 +513,7 @@ async def _populate_bowling(db, cells=None):
         INSERT INTO bucketbaselinebowling (
             gender, team_type, tournament, season, team,
             innings_bowled, matches, runs_conceded, legal_balls,
-            wides, noballs, fours_conceded, sixes_conceded, dots, wickets
+            wides, noballs, wide_runs, noball_runs, fours_conceded, sixes_conceded, dots, wickets
         )
         SELECT
             m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, mt.team,
@@ -521,6 +523,8 @@ async def _populate_bowling(db, cells=None):
             SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
             SUM(CASE WHEN d.extras_wides > 0 THEN 1 ELSE 0 END) AS wides,
             SUM(CASE WHEN d.extras_noballs > 0 THEN 1 ELSE 0 END) AS noballs,
+            COALESCE(SUM(d.extras_wides), 0) AS wide_runs,
+            COALESCE(SUM(d.extras_noballs), 0) AS noball_runs,
             SUM(CASE WHEN d.runs_batter = 4 AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS fours_conceded,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes_conceded,
             SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots,
@@ -546,7 +550,7 @@ async def _populate_bowling(db, cells=None):
             JOIN innings i ON i.id = d.innings_id
             JOIN match m ON m.id = i.match_id
             WHERE i.super_over = 0
-              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field', 'retired not out')
               {cf}
             GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season
         )
@@ -581,7 +585,7 @@ async def _populate_bowling(db, cells=None):
             JOIN match m ON m.id = i.match_id
             JOIN match_teams mt ON mt.match_id = m.id AND mt.team != i.team
             WHERE i.super_over = 0
-              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field', 'retired not out')
               {cf}
             GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, mt.team
         )
@@ -883,7 +887,7 @@ async def _populate_phase(db, cells=None):
             JOIN match m ON m.id = i.match_id
             WHERE i.super_over = 0
               AND d2.over_number BETWEEN 0 AND 19
-              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field', 'retired not out')
               {cf}
             GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, phase
         )
@@ -926,7 +930,7 @@ async def _populate_phase(db, cells=None):
             JOIN match_teams mt ON mt.match_id = m.id AND mt.team != i.team
             WHERE i.super_over = 0
               AND d2.over_number BETWEEN 0 AND 19
-              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field', 'retired not out')
               {cf}
             GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, mt.team, phase
         )

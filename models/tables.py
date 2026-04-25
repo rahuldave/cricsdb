@@ -338,8 +338,10 @@ class BucketBaselineBowling:
     matches: int = 0  # COUNT(DISTINCT m.id) where this side bowled
     runs_conceded: int = 0
     legal_balls: int = 0
-    wides: int = 0
-    noballs: int = 0
+    wides: int = 0   # count of wide deliveries (scope_averages semantic)
+    noballs: int = 0 # count of noball deliveries
+    wide_runs: int = 0    # SUM(extras_wides) — RUNS from wides (team-side)
+    noball_runs: int = 0  # SUM(extras_noballs) — RUNS from noballs
     fours_conceded: int = 0
     sixes_conceded: int = 0
     dots: int = 0
