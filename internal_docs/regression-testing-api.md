@@ -47,6 +47,28 @@ rule").
    patched side-by-side — so you know the fix moves numbers in the
    right direction, not just *some* direction.
 
+## Three-commit shape-change workflow
+
+For shape changes (e.g. wrapping fields in an envelope), run a
+three-commit dance so the harness validates the migration:
+
+1. **Pre-commit: REG → NEW flip.** Find every REG entry that hits
+   the soon-to-shape-change endpoints; flip them to NEW. The runner
+   keys on the HEAD-side `kind` column, so the flip MUST be in HEAD
+   when the runner stashes. An uncommitted flip has no effect.
+2. **Main commit: ship the shape change.** Run regression — expect
+   `0 REG drifted` (other endpoints stable) and `N NEW changed`
+   (the migrated ones).
+3. **Post-commit: NEW → REG flip.** Once the shape change is in HEAD
+   and validated, flip everything back to REG so the next future
+   shape change can use the same workflow against a clean baseline.
+
+Worked example: `spec-team-compare-average.md` Phase 2B (envelope
+migration on the 5 team-compare endpoints) used commits `ee78b7f`
+(flip 15 URLs REG→NEW), `af9eab4` (migration), `862755e` (flip
+back). Final state: 38 REG / 0 NEW in teams/, 29 REG / 0 NEW in
+scope-averages/.
+
 ## Prerequisites
 
 - `uvicorn api.app:app --reload --port 8000` running. The `--reload`

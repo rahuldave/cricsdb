@@ -456,7 +456,9 @@ Source: `api/routers/teams.py`. `{team}` is URL-encoded team name
 ## `GET /api/v1/teams/{team}/summary`
 
 Win/loss totals, toss stats, gender-breakdown banner, and Tier-2
-keeper list.
+keeper list. Each numeric metric is wrapped in the per-metric
+envelope (see "Compare metric envelope" below); identity-bearing
+fields (`gender_breakdown`, `keepers`) stay flat.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/summary?gender=male&team_type=international"
@@ -465,9 +467,14 @@ curl "http://localhost:8000/api/v1/teams/India/summary?gender=male&team_type=int
 ```json
 {
   "team": "India",
-  "matches": 266, "wins": 180, "losses": 75, "ties": 6, "no_results": 5,
-  "win_pct": 67.7,
-  "toss_wins": 122, "bat_first_wins": 98, "field_first_wins": 82,
+  "matches": { "value": 266, "scope_avg": 14872, "delta_pct": null, "direction": null, "sample_size": 14872 },
+  "wins":    { "value": 180, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 266 },
+  "win_pct": { "value": 67.7, "scope_avg": 49.8, "delta_pct": 35.9, "direction": "higher_better", "sample_size": 266 },
+  "ties": { "value": 6, ... },
+  "no_results": { "value": 5, ... },
+  "toss_wins": { "value": 122, ... },
+  "bat_first_wins": { "value": 98, ... },
+  "field_first_wins": { "value": 82, ... },
   "gender_breakdown": null,
   "keepers": [
     { "person_id": "4a8a2e3b", "name": "MS Dhoni", "innings_kept": 74 },
@@ -608,10 +615,15 @@ design. Shape follows a consistent pattern:
 curl "http://localhost:8000/api/v1/teams/India/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2025"
 ```
 
-Returns: `{ team, innings_batted, total_runs, legal_balls, run_rate,
-balls_per_boundary, balls_per_dismissal, dot_pct, highest_total,
-lowest_total, avg_1st_innings, avg_2nd_innings }`. Subroutes:
-`/by-season`, `/by-phase`, `/top-batters`, `/phase-season-heatmap`.
+Each numeric metric is wrapped in the per-metric envelope (see
+"Compare metric envelope" below). Returns:
+`{ team, innings_batted, total_runs, legal_balls, run_rate,
+boundary_pct, dot_pct, fours, sixes, fifties, hundreds,
+avg_1st_innings_total, avg_2nd_innings_total,
+highest_total, lowest_all_out_total }`. Identity-bearing fields
+(`highest_total`, `lowest_all_out_total`) stay flat. Subroutes:
+`/by-season`, `/by-phase`, `/top-batters`, `/phase-season-heatmap`
+(unchanged shapes).
 
 ### Bowling
 
@@ -619,11 +631,14 @@ lowest_total, avg_1st_innings, avg_2nd_innings }`. Subroutes:
 curl "http://localhost:8000/api/v1/teams/India/bowling/summary?gender=male&team_type=international&season_from=2024&season_to=2025"
 ```
 
-Returns: `{ innings_bowled, total_runs_conceded, legal_balls_bowled,
-wickets, economy, bowling_strike_rate, boundary_pct_conceded,
-dot_pct_conceded, highest_conceded, lowest_conceded,
-avg_1st_innings_conceded, avg_2nd_innings_conceded }`. Subroutes as
-per batting — with `/top-bowlers` instead of `/top-batters`.
+Each numeric metric envelope-wrapped. Returns:
+`{ team, innings_bowled, matches, runs_conceded, legal_balls, overs,
+wickets, economy, strike_rate, average, dot_pct, fours_conceded,
+sixes_conceded, wides, noballs, wides_per_match, noballs_per_match,
+avg_opposition_total, worst_conceded, best_defence }`.
+Identity-bearing fields (`worst_conceded`, `best_defence`) stay flat.
+Subroutes as per batting — with `/top-bowlers` instead of
+`/top-batters`.
 
 ### Fielding
 
@@ -631,10 +646,12 @@ per batting — with `/top-bowlers` instead of `/top-batters`.
 curl "http://localhost:8000/api/v1/teams/India/fielding/summary?gender=male&team_type=international&season_from=2024&season_to=2025"
 ```
 
-Returns: `{ innings_fielded, catches, stumpings, run_outs,
-caught_and_bowled, total_dismissals, substitute_catches,
-catches_per_match, dismissals_per_match }`. Subroutes: `/by-season`,
-`/top-fielders`.
+Each numeric metric envelope-wrapped. Returns:
+`{ team, matches, catches, caught_and_bowled, stumpings, run_outs,
+total_dismissals_contributed, catches_per_match, stumpings_per_match,
+run_outs_per_match }`. Per-match rates' `scope_avg` is halved server-
+side (each match has 2 fielding sides — team-side comparable is /2).
+Subroutes: `/by-season`, `/top-fielders`.
 
 ### Partnerships
 
@@ -668,14 +685,17 @@ ended_by_kind }`.
 curl "http://localhost:8000/api/v1/teams/India/partnerships/summary?gender=male&team_type=international"
 ```
 
+Numeric metrics envelope-wrapped; identity-bearing `highest` +
+`best_pair` stay flat.
+
 ```json
 {
   "team": "India",
   "side": "batting",
-  "total": 1404,
-  "count_50_plus": 226,
-  "count_100_plus": 43,
-  "avg_runs": 26.4,
+  "total":          { "value": 1404, "scope_avg": 32145, "delta_pct": null, "direction": null, "sample_size": 1404 },
+  "count_50_plus":  { "value": 226, ... },
+  "count_100_plus": { "value": 43, ... },
+  "avg_runs":       { "value": 26.4, "scope_avg": 25.1, "delta_pct": 5.2, "direction": "higher_better", "sample_size": 1404 },
   "highest": {
     "runs": 176, "balls": 85, "match_id": 795, "date": "2022-06-28",
     "batter1": { "person_id": "a4cc73aa", "name": "SV Samson" },

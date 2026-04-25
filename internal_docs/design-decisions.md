@@ -1413,3 +1413,66 @@ scratch over ALL matches in those scopes (not just the new ones).
 This is exact and avoids the trickier delta-upsert path where a
 match correction would silently drift values. Cross-scope isolation
 is verified by sanity test 3.
+
+## Per-metric envelope on the 5 team-compare endpoints
+
+Decided 2026-04-24 (Spec 1 / Phase 2B of
+`spec-team-compare-average.md`). Each numeric metric on
+`team_summary`, `team_batting_summary`, `team_bowling_summary`,
+`team_fielding_summary`, and `team_partnerships_summary` is wrapped
+in `{value, scope_avg, delta_pct, direction, sample_size}` rather
+than returned as a flat number.
+
+**Why ship the envelope when only `value` is rendered today.** Spec 1
+UI doesn't render `delta_pct` / `direction` / `sample_size` — those
+are for Spec 2 surfaces (player compare with position-matched
+baseline, leaderboard delta columns, H2H baseline,
+`outlook-comparisons.md`). Putting the envelope in place now means
+those surfaces consume the same fields when they ship — no second
+endpoint migration. The cost (every consumer of these endpoints
+reads `.value`) is paid once in Phase 2B; the benefit accrues at
+every Spec-2 surface.
+
+**Counts get `direction=null`, rates get a real direction.** A
+team's count metric (fours, wickets, total_runs, fifties) is ~10x
+smaller than the league pool. Computing `delta_pct` against the
+league total produces a nonsense -90% percentage. Solution: per-
+metric `direction` lives in `api/metrics_metadata.py::METRIC_DIRECTIONS`;
+counts get `None`, rates / averages get `higher_better` /
+`lower_better`. `wrap_metric()` returns `delta_pct=null` when
+direction is null, so consumers naturally suppress the indicator
+on counts.
+
+**Identity-bearing nested objects stay flat.** `highest_total`,
+`best_pair`, `keepers`, `gender_breakdown`, `worst_conceded`,
+`best_defence` aren't metrics — they're identity-bearing facts
+(specific innings, pair, person). They keep their original shape;
+the envelope only wraps numeric fields.
+
+**Per-match fielding rates' scope_avg is halved server-side.** Each
+match has 2 fielding sides. The league pool of catches divided by
+distinct matches counts both sides combined (~9.07/match in IPL
+2024); the team-side comparable is half (~4.54). Without halving,
+MI's 4.21 catches/match would render as -54% below the league pool;
+with halving it's just -7% below the team-equivalent baseline. The
+`_half()` helper applies inside `team_fielding_summary` only; the
+standalone `/scope/averages/fielding/summary` keeps its raw league
+pool number (a different consumer, different framing).
+
+**Single SQL surface via team=None on the helpers.**
+`_team_innings_clause` and `_partnership_filter` accept
+`team: str | None`. team=None drops the team-specific clauses,
+producing a pure scope filter. Each envelope-aware endpoint extracts
+its body into a flat-shape `_<discipline>_aggregates(team, ...)`
+helper and calls it twice: once with team for `value`, once with
+team=None for `scope_avg`. The two code paths can never disagree on
+filter injection.
+
+**Regression workflow: REG → NEW (preceding commit) → shape change → NEW → REG (cleanup).**
+Per CLAUDE.md "regression harness — flip REG→NEW BEFORE shape
+change". The runner keys on the HEAD-side `kind` column, so the
+flip must be in HEAD when the runner stashes. Phase 2B's commit
+sequence: (1) `ee78b7f` flips 15 affected URLs REG→NEW, (2)
+`af9eab4` ships envelope migration, validation pass — 0 REG drifted,
+all NEW changed, (3) `862755e` flips back NEW→REG since both sides
+now stable. Clean state for future shape changes.

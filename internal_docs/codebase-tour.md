@@ -17,6 +17,14 @@ api/
                           routers don't hand-wire series_type_clause individually. FilterParams
                           alias preserved for incremental migration. See
                           internal_docs/design-decisions.md "FilterBarParams + AuxParams".
+  metrics_metadata.py — METRIC_DIRECTIONS map (per-metric higher_better /
+                          lower_better / null) + wrap_metric() helper that
+                          produces the {value, scope_avg, delta_pct,
+                          direction, sample_size} envelope. Single source
+                          of truth — UIs consume `direction` directly so a
+                          new metric joining the team-compare endpoints
+                          updates here, not in every consumer. See
+                          internal_docs/spec-team-compare-average.md Phase 2B.
   routers/
     reference.py      — /api/v1/tournaments (FilterBar dropdown; canonicalized,
                          accepts team + opponent for rivalry-pair intersection),
@@ -24,7 +32,18 @@ api/
     teams.py          — /api/v1/teams/landing (two-column directory, filter-sensitive)
                          /api/v1/teams/{team}/summary|results|vs/{opponent}|by-season
                          /api/v1/teams/{team}/players-by-season (roster + bat avg + bowl SR + turnover)
-                         plus batting/bowling/fielding/partnerships endpoints + opponents-matrix
+                         plus batting/bowling/fielding/partnerships endpoints + opponents-matrix.
+                         The 5 compare summary endpoints (team_summary,
+                         team_batting_summary, team_bowling_summary,
+                         team_fielding_summary, team_partnerships_summary) wrap
+                         each numeric metric in the per-metric envelope from
+                         metrics_metadata.py; identity-bearing nested objects
+                         (highest_total, best_pair, keepers, gender_breakdown,
+                         worst_conceded, best_defence) stay flat. Each
+                         envelope-aware endpoint runs an extra "scope_avg" SQL
+                         pass via the team=None code path of
+                         _team_innings_clause / _partnership_filter — single
+                         SQL surface, two code paths.
     batting.py        — /api/v1/batters/leaders (top 10 by avg + by SR, filter-sensitive)
                          /api/v1/batters/{id}/summary|by-innings|vs-bowlers|by-over|by-phase|by-season|dismissals|inter-wicket
     bowling.py        — /api/v1/bowlers/leaders (top 10 by SR + by economy, filter-sensitive)

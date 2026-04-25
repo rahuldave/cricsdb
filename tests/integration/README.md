@@ -21,6 +21,9 @@ a `cross_cutting_` prefix so their nature is obvious at a glance.
 integration/
   README.md
   teams.sh          — Teams landing, tabs, Compare, match list
+  team-compare-average.sh — Compare tab average-team column + phase bands
+                            + partnership-by-wicket + season trajectory
+                            (Spec 1 of spec-team-compare-average.md)
   batting.sh        — Batting leaders, player page, tabs, innings-list highlight
   bowling.sh        — Bowling leaders, player page, tabs, innings-list highlight
   fielding.sh       — Fielders, Keeping tab (conditional), filter_team auto-narrow
@@ -32,6 +35,7 @@ integration/
   venues.sh         — Venues landing + filter_venue fan-out
   cross_cutting_url_state.sh       — ScopeIndicator + PlayerLink across tabs
   cross_cutting_mount_unmount.sh   — React hygiene on rapid nav / fetch cancel
+  cross_cutting_aux_filters.sh     — series_type aux filter end-to-end
 ```
 
 ## When to write one here
