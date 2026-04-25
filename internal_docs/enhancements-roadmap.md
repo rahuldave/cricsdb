@@ -857,6 +857,68 @@ subtabs. Commits `5179683` … `ca0b785`.
   commits share a file) is the splitting mechanism going forward
   — not large end-of-session dump commits.
 
+### Shipped 2026-04-25 (Teams Compare — Scoped Slots: per-column scope override)
+
+Implementation of `internal_docs/spec-team-compare-scoped-slots.md`
+in five clean commits:
+
+- **Commit 1** (`82b8538`) — `useCompareSlots` hook + URL parsing +
+  legacy migration. New `compareN` / `compareN_<filter>` URL shape
+  resolved into per-slot `{kind, entity, scope, overrides}`. Legacy
+  `compare=A,B` / `avg_slot=1` URLs auto-rewrite via a one-shot
+  useRef-gated useEffect (`replace:true`). Slot contiguity also
+  normalized (`compare2` alone shifts to `compare1`). 3-column cap
+  enforced in the picker.
+- **Commit 2** (`ed231b8`) — TeamCompareGrid refactor + unified
+  `CompareSlotColumn`. Drops the old `CompareColumn` /
+  `AvgCompareColumn` split; one component handles both kinds.
+  Three useFetch slots iterating over `[primary, slot1, slot2]`,
+  each fetcher discriminating on `slot.kind`. Each slot fetches
+  against its RESOLVED scope, not primary's — wiring in place for
+  per-slot scope override without further refactoring. Legend
+  reworded to "in each column's scope".
+- **Commit 3a** (`53d1e2a`) — `SlotHeaderChip` diff rendering.
+  Italic sub-line under team-slot names showing what differs from
+  primary (e.g. "· 2025" or "· IPL 2025 · @ Wankhede"). Avg slots
+  suppress chip (label already encodes scope).
+- **Commit 3b** (`8d28c9c`) — Default first-load auto-fill
+  `compare1=__avg__`. Once-per-mount via useRef gate; ✕ within
+  session does NOT bring it back; reload re-fires.
+- **Commit 3c** (`737b6c3`) — `AddCompareSlot` (replaces
+  `AddTeamComparePicker`) with 4 quick-picks + "Different team"
+  TeamSearch. `SlotScopeEditor` inline panel with the 5
+  overridable filters mounted under each non-primary column when
+  ✎ is clicked. End-to-end: load-bearing canary verified —
+  Australia at ICC Men's T20 World Cup primary 2024 → "Same team,
+  previous season" lands at `compare1_season_from=2022/23` (NOT
+  calendar-prior 2023). The "previous season" lookup walks
+  `/api/v1/seasons` backward by one — handles biennial events,
+  BBL `2024/25` strings, sparse associate teams uniformly.
+
+**Backend zero-touch.** Every endpoint already takes `FilterParams`
+per-request via `Depends`; each slot's request is independent and
+computes its own `scope_avg` against the slot's scope. No new SQL,
+no new endpoints, no envelope shape changes.
+
+**Tests**: `tests/integration/team-compare-average.sh` 16/16
+(Test 2 retargeted to walk the new add-panel: open the picker,
+click the quick-pick). All four pre-flight regressions and
+integration suites green.
+
+**Known follow-ups**:
+- `SlotScopeEditor`'s tournament dropdown uses
+  `/api/v1/tournaments?team=X` which can return a different
+  canonical `event_name` than the URL carries (e.g. "T20 World Cup
+  (Men)" vs "ICC Men's T20 World Cup"). Pre-existing data
+  inconsistency the editor surfaces but doesn't cause; non-blocking.
+- The picker's "Custom" form (type toggle + 5-field scope editor
+  in the SAME panel as quick-picks) was deferred to a follow-up.
+  Today's flow: add via quick-pick (e.g. Different team), then
+  click ✎ to override scope. Two clicks instead of one but covers
+  every workflow.
+- Docs sync for this commit also touched CLAUDE.md, codebase-tour,
+  design-decisions, url-state, user-help.
+
 ### Shipped 2026-04-25 (Teams tabs — delta chips on StatCards + by-phase / by-wicket envelope)
 
 Two post-Spec-1 quick wins exploiting the per-metric envelope shipped
@@ -1076,11 +1138,8 @@ Integration: 16/16 still pass.
 
 ## Build-ready specs (queue)
 
-- **`internal_docs/spec-team-compare-scoped-slots.md`** (2026-04-25,
-  build-ready). Per-column scope override on Teams Compare. 3-commit
-  rollout, backend zero-touch, 5 design decisions locked. Pick-up
-  notes in the `project_next_session.md` memory. Implements the
-  "RCB 2024 vs RCB 2025 vs IPL 2025 avg" use case.
+(Empty — `spec-team-compare-scoped-slots.md` shipped 2026-04-25,
+see session log.)
 
 ## Known issues / live TODO
 

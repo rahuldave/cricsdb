@@ -152,6 +152,11 @@ frontend/src/
   hooks/useDefaultSeasonWindow.ts — Batting/Bowling/Fielding landings auto-default to last 3
                                     seasons in scope when no season filter is set (one-shot
                                     per mount via useRef). Writes to URL so FilterBar reflects.
+  hooks/useCompareSlots.ts     — Resolves Teams > Compare slots (compare1, compare2,
+                                    compareN_<filter>) into per-slot {kind, entity, scope,
+                                    overrides}. Reads new compareN params, falls back to legacy
+                                    compare=A,B / avg_slot=1 (one-shot migration in Teams.tsx
+                                    rewrites legacy with replace:true). Memoed by URL qs.
   components/                  — Layout (now hosts a Players ▾ group with desktop hover-dropdown
                                    + persistent mobile sub-row while any /players, /batting,
                                    /bowling, /fielding route is active; mounts FilterBar +
@@ -224,21 +229,38 @@ frontend/src/
                                                           matchesInScope
     teams/                     — Teams → Compare tab internals (sibling of players/ with a
                                    one-for-one structural parity):
-                                   TeamCompareGrid       N-column side-by-side grid, fixed-arity
-                                                          useFetch on getTeamProfile(team, filters)
-                                                          per slot, FlagBadge on each column head
-                                                          (null for franchise sides)
+                                   TeamCompareGrid       3-column slot grid (primary + slot1 + slot2),
+                                                          fixed-arity useFetch per slot. Each slot is
+                                                          a {kind, entity, scope, overrides} resolved
+                                                          via useCompareSlots — fetcher discriminates
+                                                          on kind (team → getTeamProfile, avg →
+                                                          getScopeAverageProfile)
+                                   CompareSlotColumn     one column for either kind. Mounts ✎ edit
+                                                          pencil + ✕ remove on non-primary slots;
+                                                          inline SlotScopeEditor opens under the
+                                                          column when ✎ is clicked
                                    TeamSummaryRow        one discipline band — Results / Batting /
                                                           Bowling / Fielding / Partnerships —
                                                           compact label/value layout only
-                                   AddTeamComparePicker  TeamSearch wrapper + "+ Add league average"
-                                                          button. Refuses candidates whose in-scope
-                                                          match count is zero (FilterBar auto-narrow
-                                                          is the upstream cross-type/cross-gender gate)
+                                   AddCompareSlot        toggleable picker panel: 4 quick-picks
+                                                          (League avg / Same team prev season /
+                                                          Different team / Same team all-time) +
+                                                          team typeahead behind "Different team".
+                                                          "Previous season" walks /api/v1/seasons
+                                                          backward by one — handles biennial WCs +
+                                                          BBL "2024/25" strings without specials
+                                   SlotScopeEditor       inline form with 5 overridable filter
+                                                          fields (tournament / season_from /
+                                                          season_to / filter_venue / series_type).
+                                                          Apply writes only fields differing from
+                                                          primary so slot.overrides stays a true diff
+                                   SlotHeaderChip        italic sub-line under non-primary team-slot
+                                                          names showing the scope diff (e.g. "· 2025"
+                                                          or "· IPL 2025 · @ Wankhede")
                                    AvgSummaryRow         league-baseline counterpart to TeamSummaryRow
-                                                          for the average column (avg_slot=1) — same
-                                                          row labels for vertical alignment, "-" where
-                                                          a metric doesn't apply at scope
+                                                          for avg-kind slots — same row labels for
+                                                          vertical alignment, "-" where a metric
+                                                          doesn't apply at scope
                                    PhaseBandsRow         PP/Mid/Death sub-rows under Batting + Bowling
                                                           for both team and avg columns, pool-weighted
                                    PartnershipByWicketRows 1st-10th wicket partnership sub-rows under

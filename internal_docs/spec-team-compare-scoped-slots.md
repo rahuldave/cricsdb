@@ -1,6 +1,6 @@
 # Spec: Teams Compare — Scoped Slots (Per-Column Filter Override)
 
-Status: build-ready.
+Status: SHIPPED 2026-04-25 (5 commits — see roadmap).
 Depends on: `spec-team-compare-average.md` (the avg-column + envelope
 infrastructure this builds on top of). All Phases 1, 2A, 2B, 3 of
 that spec are shipped.

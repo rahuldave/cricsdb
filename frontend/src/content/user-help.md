@@ -47,19 +47,30 @@ data…" note until you clear or pick someone else.
 
 - **Teams** — win/loss records, team batting/bowling/fielding,
   partnerships, roster by season, plus a **Compare** tab that stacks
-  up to three teams side by side across Results / Batting / Bowling /
-  Fielding / Partnerships — same shape as the player comparison.
-  Comparison is single-gender and single-type (international teams
-  only compare with internationals; club teams only with clubs) —
-  both constraints are enforced automatically via the filter bar.
-  Inside the Compare tab, **+ Add league average** adds a fourth
-  column showing the pool-weighted league baseline scoped to the
-  current filters — "is MI's powerplay run rate above or below the
-  IPL 2024 average?" answered at a glance. Each discipline expands
-  into phase bands (PP / Middle / Death), the partnerships row
-  expands into 10 sub-rows (1st-wicket through 10th-wicket), and a
-  season-trajectory strip below the grid charts batting RR + bowling
-  economy across the seasons in scope.
+  up to three columns side by side across Results / Batting / Bowling /
+  Fielding / Partnerships. Each compare column is independently
+  scoped, so you can ask:
+  - **MI vs CSK in IPL 2024** (two teams, same scope — the basic case).
+  - **RCB IPL 2024 vs RCB IPL 2025 — what changed?** (same team, two
+    scopes side-by-side.) Click **+ Add a column** and use the
+    "Same team, previous season" quick-pick.
+  - **Australia at the T20 World Cup vs IPL 2025 league average**
+    (a team's snapshot vs a moving baseline). Use "+ League avg in
+    current scope" to add the league baseline.
+  - To override a column's scope after adding it, click the **✎**
+    pencil on its header — opens an inline editor with tournament,
+    season range, venue, and series-type fields.
+  - Comparison is single-gender and single-type (international vs
+    international; club vs club) — enforced automatically via the
+    filter bar.
+  - Each discipline expands into phase bands (PP / Middle / Death);
+    the partnerships row expands into 10 sub-rows (1st through
+    10th wicket); a season-trajectory strip below the grid charts
+    batting RR + bowling economy across the seasons in scope. The
+    chips below each metric (↑ +X% / ↓ −Y%) compare against the
+    league baseline scoped to **that column** — slots with overridden
+    scope get their own narrower baseline, surfaced in the italic
+    sub-line under the team name.
 
 ![India team dossier — summary stats + tabs](/social/03-team-overview.png)
 *A team dossier — summary row, keepers used, By Season / vs Opponent / Compare / Batting / Bowling / Fielding / Partnerships / Players / Match List tabs.*

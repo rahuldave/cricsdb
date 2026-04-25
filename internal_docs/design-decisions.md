@@ -1476,3 +1476,50 @@ sequence: (1) `ee78b7f` flips 15 affected URLs REG→NEW, (2)
 `af9eab4` ships envelope migration, validation pass — 0 REG drifted,
 all NEW changed, (3) `862755e` flips back NEW→REG since both sides
 now stable. Clean state for future shape changes.
+
+## Teams Compare scoped slots: bind gender + team_type, free 5 axes, 3-column cap
+
+Shipped 2026-04-25 as `spec-team-compare-scoped-slots.md`. Each
+compare-grid column is now an independently-scoped "slot" with its
+own `(kind, entity, scope, overrides)` tuple. The five locked
+design decisions (don't re-litigate):
+
+1. **`gender` + `team_type` are bound across slots; the other 5 are
+   free.** Cross-mode comparison (men's vs women's, club vs
+   international) is a category error in this UI — different match
+   structures, different sample sizes, different metrics
+   semantically. The few users who genuinely want it can use two
+   browser tabs. Tournament + season_from + season_to + filter_venue
+   + series_type are the axes worth comparing across.
+2. **3-column cap (primary + 2 compare slots).** Adding the per-
+   slot scope-override panels widens each column's header. 4
+   columns crowd a 13" laptop; 3 fits the screen budget for both
+   the column grid and the inline editor.
+3. **Default first-load auto-fills `compare1=__avg__`.** Primary +
+   same-scope avg renders immediately, so the user sees the most-
+   asked comparison without clicking. useRef gate makes this
+   once-per-mount; ✕'ing it does NOT bring it back within the same
+   SPA session. Only fresh mount re-fires.
+4. **Picker UX: quick-picks above + "Different team" team picker
+   below.** Casual users get one-click value; advanced users get the
+   ✎ edit pencil + SlotScopeEditor for arbitrary scope construction.
+5. **"Previous season" = lookup against bound scope's seasons list,
+   NOT calendar-prior-year.** Critical for biennial events (Aus T20
+   WC 2024 → 2022/23, NOT 2023). Same algorithm handles BBL
+   "2024/25" strings, calendar-continuous internationals, sparse
+   associate teams. Pure index arithmetic on `/api/v1/seasons`.
+
+**Backend zero-touch.** Every endpoint already takes `FilterParams`
+per-request via `Depends`, so each slot's request is independent
+and computes its own `scope_avg` envelope against that slot's
+scope. No new endpoints, no SQL changes. The whole feature ships
+behind a frontend hook (`useCompareSlots`) + 3 components
+(`AddCompareSlot`, `SlotScopeEditor`, `SlotHeaderChip`) + a
+TeamCompareGrid refactor.
+
+**Why URL params and not React state.** Per the
+URL-as-default principle (`url-state.md`): a third party opening
+the URL must reconstruct the same view. "RCB IPL 2024 vs RCB IPL
+2025" is a comparison worth sharing. The new `compareN_<filter>`
+URL pattern follows the same per-key shape as primary FilterBar
+params for consistency.

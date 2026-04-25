@@ -314,3 +314,63 @@ there if the recipient clicks Batters — but the URL bar stays clean.
 
 × clear removes both URL param AND session key (not "park for later"),
 because × means "I'm done with this pick." Undo is via back button.
+
+## Per-slot scope override: `compareN_<filter>` URL pattern
+
+Shipped 2026-04-25 in `spec-team-compare-scoped-slots.md`. The
+Teams > Compare tab encodes per-column scope overrides as flat
+URL params:
+
+```
+compare1                 // team name OR __avg__
+compare1_tournament      // overrides primary's tournament for slot 1
+compare1_season_from
+compare1_season_to
+compare1_filter_venue
+compare1_series_type
+compare2                 // mirror for slot 2
+compare2_tournament
+…
+```
+
+5 fields per slot are overridable; `gender` + `team_type` always
+inherit from primary (cross-mode comparison is a category error
+in this UI — see `design-decisions.md`). The resolution rule is
+field-by-field: `slot[N].scope[field] = url.compareN_<field> ??
+primary[field]`.
+
+**Why this URL shape:**
+- One key per (slot, field) keeps each axis independently
+  overridable. A user editing season alone doesn't need to write
+  tournament too.
+- The pattern mirrors how primary FilterBar params live at the
+  top level — flat, greppable, easy to compose into a share URL
+  by hand.
+- Backend zero-touch: each slot's request just passes its
+  resolved scope to the existing `FilterParams` Depends.
+
+**Migration from the legacy shape (`compare=A,B` + `avg_slot=1`)**
+runs as a one-shot useEffect in `Teams.tsx` (useRef-gated,
+`replace:true`). `useCompareSlots()` reads new params first and
+falls back to legacy reading so the grid renders correctly
+between mount and the migration's first run. After migration,
+picker / remove buttons write directly to the new shape so
+migration never re-fires.
+
+**Slot contiguity normalization**: a share URL with `compare2=X`
+but no `compare1` self-corrects to `compare1=X` on mount (also
+`replace:true`). Picker writes always fill the leftmost empty
+slot, so contiguity is maintained going forward.
+
+**Picker / editor write rule**: only fields that actually differ
+from primary land in the URL. `SlotScopeEditor` initialises each
+field to `override ?? primary[field]` and `Apply` filters to
+diverging fields before writing. Keeps URL minimal; makes
+`slot.overrides` a true diff (drives `SlotHeaderChip`'s "what's
+different" display).
+
+**Default first-load auto-fill**: landing on `?team=X&tab=Compare`
+with no compare params auto-fills `compare1=__avg__` once per
+mount (useRef gate, `replace:true`). ✕ clears compare1; reload
+re-fires. See `Teams.tsx` `autoFillAvgRef` block for the exact
+discipline.
