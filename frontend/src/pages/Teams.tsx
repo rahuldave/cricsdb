@@ -138,6 +138,26 @@ export default function Teams() {
     }
   }, [hasCompareSlot, selected])
 
+  // Default first-load auto-fill — landing on the Compare tab with a
+  // primary team and no compare slots fills compare1=__avg__ so the
+  // user immediately sees primary + same-scope league average. Gated
+  // by useRef so ✕'ing the auto-fill doesn't bring it back within
+  // the same SPA session — only a fresh mount (hard reload, route
+  // away + back) re-fires.
+  const autoFillAvgRef = useRef(false)
+  useEffect(() => {
+    if (autoFillAvgRef.current) return
+    if (activeTab !== 'Compare' || !selected) return
+    if (slots.slot1 || slots.slot2) {
+      // Compare state already loaded from URL — gate so a later ✕
+      // doesn't trigger fill.
+      autoFillAvgRef.current = true
+      return
+    }
+    autoFillAvgRef.current = true
+    setUrlParams({ compare1: AVG_SENTINEL }, { replace: true })
+  }, [activeTab, selected, slots.slot1, slots.slot2])
+
   // Add / remove callbacks for the compare grid + picker. Each writes
   // directly to the new compareN params (no legacy compare CSV).
   const slot1 = slots.slot1
