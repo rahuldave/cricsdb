@@ -276,3 +276,12 @@ the dedicated docs:
   `internal_docs/enhancements-roadmap.md`.
 - **"(revisit)" follow-ups + non-obvious decisions worth a paper
   trail**: `internal_docs/design-decisions.md`.
+
+### Build-ready specs (pick up next session)
+
+- **`internal_docs/spec-team-compare-scoped-slots.md`** — per-column
+  scope override on Teams Compare so users can do "RCB 2024 vs RCB
+  2025 vs IPL 2025 avg". 5 design decisions locked, 3-commit
+  rollout plan in the spec, backend zero-touch. Pick-up notes
+  (pre-flight checks, gotchas, international test scenarios) live
+  in the `project_next_session.md` memory.

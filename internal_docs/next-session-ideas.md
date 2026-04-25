@@ -1,9 +1,42 @@
-# Next-session ideas — Head-to-Head tab walk, Teams tab, cross-tab audit
+# Next-session ideas — scoped-slots compare, then H2H + cross-tab audit
 
-> **NO DEPLOYS** until the Series + Teams + H2H deep-dive completes.
-> Per session memory, last reaffirmed 2026-04-21.
+> **NO DEPLOYS gate is OFF** as of 2026-04-21. Resume normal deploy
+> cadence.
 
-## NEXT SESSION agenda (in order)
+## NEXT SESSION — primary agenda
+
+**Implement `internal_docs/spec-team-compare-scoped-slots.md`.**
+Build-ready, 5 design decisions locked, 3-commit rollout plan in
+the spec. Per-column scope override on Teams Compare so users can
+do "RCB 2024 vs RCB 2025 vs IPL 2025 avg".
+
+Pick-up notes (pre-flight checks, gotchas, international test
+scenarios with the load-bearing Australia T20 WC biennial canary)
+live in the `project_next_session.md` memory. Read that first; then
+the spec.
+
+3-commit rollout (in spec):
+
+1. `useCompareSlots` hook + URL parsing + legacy migration (no UI
+   change yet). Browser smoke: legacy URLs work identically.
+2. TeamCompareGrid refactor + unified `CompareSlotColumn` + 3-col
+   cap. Drop `t2`. SlotHeaderChip rendered always-empty.
+3. `AddCompareSlot` picker + `SlotScopeEditor` + per-slot scope
+   override end-to-end. Quick-picks (League-avg-current /
+   Same-team-previous-season / Different-team-current /
+   Same-team-all-time). Integration test additions.
+
+Backend ZERO changes. Frontend-only feature.
+
+## NEXT SESSION — secondary (after scoped-slots)
+
+Compare-tab avg-column work **fully done 2026-04-24 + 2026-04-25**:
+Spec 1 of `internal_docs/spec-team-compare-average.md` shipped end-
+to-end across 4 phases + 2 quick wins + delta chips + halve-fielding-
+rates fix. See `internal_docs/enhancements-roadmap.md` "Shipped
+2026-04-24" + "Shipped 2026-04-25" entries. Tests green: regression
+38+29 REG matched / 0 drifted, integration 16/16, sanity 5/5
+(player_scope_stats pool conservation). NOT deployed to prod yet.
 
 Series tab deep-dive **fully done 2026-04-20 (pm + evening) + 2026-04-21**:
 - 2026-04-20: SeriesLink + Score + EdHelp + phraseLabel + (ed) across

@@ -1074,6 +1074,14 @@ Integration: 16/16 still pass.
 
 ---
 
+## Build-ready specs (queue)
+
+- **`internal_docs/spec-team-compare-scoped-slots.md`** (2026-04-25,
+  build-ready). Per-column scope override on Teams Compare. 3-commit
+  rollout, backend zero-touch, 5 design decisions locked. Pick-up
+  notes in the `project_next_session.md` memory. Implements the
+  "RCB 2024 vs RCB 2025 vs IPL 2025 avg" use case.
+
 ## Known issues / live TODO
 
 Lifted from CLAUDE.md L182-189 on 2026-04-19. Items here are
