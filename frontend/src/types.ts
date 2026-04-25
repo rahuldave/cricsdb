@@ -837,10 +837,10 @@ export interface TeamBattingPhase {
   overs_range: number[]
   runs: number
   balls: number
-  run_rate: number | null
+  run_rate: MetricEnvelope
   wickets_lost: number
-  boundary_pct: number | null
-  dot_pct: number | null
+  boundary_pct: MetricEnvelope
+  dot_pct: MetricEnvelope
   fours: number
   sixes: number
 }
@@ -898,10 +898,10 @@ export interface TeamBowlingPhase {
   overs_range: number[]
   runs_conceded: number
   balls: number
-  economy: number | null
+  economy: MetricEnvelope
   wickets: number
-  boundary_pct: number | null
-  dot_pct: number | null
+  boundary_pct: MetricEnvelope
+  dot_pct: MetricEnvelope
   fours_conceded: number
   sixes_conceded: number
 }
@@ -1118,6 +1118,36 @@ export interface ScopePartnershipsSummary {
   } | null
 }
 
+/** Flat-shape phase rows from /scope/averages/batting/by-phase
+ *  (scope-side endpoint kept flat — it IS the baseline, no
+ *  delta-against-itself to compute). The team-side
+ *  TeamBattingPhase has envelope-wrapped fields. */
+export interface ScopeBattingPhaseFlat {
+  phase: string
+  overs_range: number[]
+  runs: number
+  balls: number
+  run_rate: number | null
+  wickets_lost: number
+  boundary_pct: number | null
+  dot_pct: number | null
+  fours: number
+  sixes: number
+}
+
+export interface ScopeBowlingPhaseFlat {
+  phase: string
+  overs_range: number[]
+  runs_conceded: number
+  balls: number
+  economy: number | null
+  wickets: number
+  boundary_pct: number | null
+  dot_pct: number | null
+  fours_conceded: number
+  sixes_conceded: number
+}
+
 export interface ScopePartnershipByWicket {
   wicket_number: number
   n: number
@@ -1158,8 +1188,8 @@ export interface ScopeAverageProfile {
   bowling: ScopeBowlingSummary | null
   fielding: ScopeFieldingSummary | null
   partnerships: ScopePartnershipsSummary | null
-  batting_by_phase: { by_phase: TeamBattingPhase[] } | null
-  bowling_by_phase: { by_phase: TeamBowlingPhase[] } | null
+  batting_by_phase: { by_phase: ScopeBattingPhaseFlat[] } | null
+  bowling_by_phase: { by_phase: ScopeBowlingPhaseFlat[] } | null
   partnerships_by_wicket: { by_wicket: ScopePartnershipByWicket[] } | null
   batting_by_season: { by_season: ScopeBattingSeason[] } | null
   bowling_by_season: { by_season: ScopeBowlingSeason[] } | null
@@ -1212,8 +1242,8 @@ export interface PartnershipRefInfo {
 
 export interface PartnershipByWicket {
   wicket_number: number
-  n: number
-  avg_runs: number | null
+  n: MetricEnvelope
+  avg_runs: MetricEnvelope
   avg_balls: number | null
   best_runs: number
   best_partnership: PartnershipRefInfo | null

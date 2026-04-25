@@ -284,13 +284,13 @@ export const getScopeSummary = (filters?: F) =>
 export const getScopeBattingSummary = (filters?: F) =>
   fetchApi<import('./types').ScopeBattingSummary>('/api/v1/scope/averages/batting/summary', filters as Record<string, string>)
 export const getScopeBattingByPhase = (filters?: F) =>
-  fetchApi<{ by_phase: import('./types').TeamBattingPhase[] }>('/api/v1/scope/averages/batting/by-phase', filters as Record<string, string>)
+  fetchApi<{ by_phase: import('./types').ScopeBattingPhaseFlat[] }>('/api/v1/scope/averages/batting/by-phase', filters as Record<string, string>)
 export const getScopeBattingBySeason = (filters?: F) =>
   fetchApi<{ by_season: import('./types').ScopeBattingSeason[] }>('/api/v1/scope/averages/batting/by-season', filters as Record<string, string>)
 export const getScopeBowlingSummary = (filters?: F) =>
   fetchApi<import('./types').ScopeBowlingSummary>('/api/v1/scope/averages/bowling/summary', filters as Record<string, string>)
 export const getScopeBowlingByPhase = (filters?: F) =>
-  fetchApi<{ by_phase: import('./types').TeamBowlingPhase[] }>('/api/v1/scope/averages/bowling/by-phase', filters as Record<string, string>)
+  fetchApi<{ by_phase: import('./types').ScopeBowlingPhaseFlat[] }>('/api/v1/scope/averages/bowling/by-phase', filters as Record<string, string>)
 export const getScopeBowlingBySeason = (filters?: F) =>
   fetchApi<{ by_season: import('./types').ScopeBowlingSeason[] }>('/api/v1/scope/averages/bowling/by-season', filters as Record<string, string>)
 export const getScopeFieldingSummary = (filters?: F) =>

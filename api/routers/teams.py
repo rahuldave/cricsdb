@@ -1117,12 +1117,13 @@ async def team_batting_by_season(
     return {"seasons": seasons}
 
 
-@router.get("/{team}/batting/by-phase")
-async def team_batting_by_phase(
-    team: str,
-    filters: FilterParams = Depends(),
-    aux: AuxParams = Depends(),
-):
+async def _batting_by_phase_aggregates(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict[str, dict]:
+    """Flat per-phase batting aggregates keyed by phase name. Called
+    twice by team_batting_by_phase (team + None for scope_avg)."""
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
 
@@ -1150,9 +1151,6 @@ async def team_batting_by_phase(
         """,
         params,
     )
-
-    # Wickets lost per phase (same filter scope, but via wicket join)
-    wicket_where, wicket_params = _team_innings_clause(filters, team, side="batting", aux=aux)
     wicket_rows = await db.q(
         f"""
         SELECT
@@ -1166,20 +1164,15 @@ async def team_batting_by_phase(
         JOIN delivery d ON d.id = w.delivery_id
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE {wicket_where}
+        WHERE {where}
           AND w.kind NOT IN ('retired hurt', 'retired not out')
         GROUP BY phase
         """,
-        wicket_params,
+        params,
     )
     wicket_map = {r["phase"]: r["wickets_lost"] for r in wicket_rows}
 
-    phase_ranges = {
-        "powerplay": [1, 6],
-        "middle": [7, 15],
-        "death": [16, 20],
-    }
-    phases = []
+    out: dict[str, dict] = {}
     for r in rows:
         phase = r["phase"]
         balls = r["balls"] or 0
@@ -1187,17 +1180,53 @@ async def team_batting_by_phase(
         fours = r["fours"] or 0
         sixes = r["sixes"] or 0
         boundaries = fours + sixes
-        phases.append({
+        out[phase] = {
             "phase": phase,
-            "overs_range": phase_ranges.get(phase, []),
             "runs": runs,
             "balls": balls,
             "run_rate": _safe_div(runs, balls, 6),
             "wickets_lost": wicket_map.get(phase, 0),
             "boundary_pct": _safe_div(boundaries, balls, 100, 1),
-            "dot_pct": _safe_div(r["dots"] or 0, balls, 100, 1),
+            "bat_dot_pct": _safe_div(r["dots"] or 0, balls, 100, 1),
             "fours": fours,
             "sixes": sixes,
+        }
+    return out
+
+
+@router.get("/{team}/batting/by-phase")
+async def team_batting_by_phase(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    t = await _batting_by_phase_aggregates(team, filters, aux)
+    s = await _batting_by_phase_aggregates(None, filters, aux)
+
+    phase_ranges = {
+        "powerplay": [1, 6],
+        "middle": [7, 15],
+        "death": [16, 20],
+    }
+    phases = []
+    # Stable order, regardless of SQL ordering.
+    for phase in ("powerplay", "middle", "death"):
+        tr = t.get(phase)
+        if tr is None:
+            continue
+        sr = s.get(phase, {})
+        balls = tr["balls"]
+        phases.append({
+            "phase": phase,
+            "overs_range": phase_ranges.get(phase, []),
+            "runs": tr["runs"],
+            "balls": balls,
+            "run_rate":     wrap_metric(tr["run_rate"], sr.get("run_rate"), "run_rate", sample_size=balls),
+            "wickets_lost": tr["wickets_lost"],
+            "boundary_pct": wrap_metric(tr["boundary_pct"], sr.get("boundary_pct"), "boundary_pct", sample_size=balls),
+            "dot_pct":      wrap_metric(tr["bat_dot_pct"], sr.get("bat_dot_pct"), "bat_dot_pct", sample_size=balls),
+            "fours": tr["fours"],
+            "sixes": tr["sixes"],
         })
     return {"phases": phases}
 
@@ -1625,12 +1654,12 @@ async def team_bowling_by_season(
     return {"seasons": seasons}
 
 
-@router.get("/{team}/bowling/by-phase")
-async def team_bowling_by_phase(
-    team: str,
-    filters: FilterParams = Depends(),
-    aux: AuxParams = Depends(),
-):
+async def _bowling_by_phase_aggregates(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict[str, dict]:
+    """Flat per-phase bowling aggregates keyed by phase name."""
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
@@ -1658,7 +1687,6 @@ async def team_bowling_by_phase(
         """,
         params,
     )
-
     w_rows = await db.q(
         f"""
         SELECT
@@ -1679,29 +1707,59 @@ async def team_bowling_by_phase(
     )
     wicket_map = {r["phase"]: r["wickets"] for r in w_rows}
 
-    phase_ranges = {
-        "powerplay": [1, 6],
-        "middle": [7, 15],
-        "death": [16, 20],
-    }
-    phases = []
+    out: dict[str, dict] = {}
     for r in rows:
         phase = r["phase"]
         balls = r["balls"] or 0
         runs = r["runs"] or 0
         fours = r["fours"] or 0
         sixes = r["sixes"] or 0
-        phases.append({
+        out[phase] = {
             "phase": phase,
-            "overs_range": phase_ranges.get(phase, []),
             "runs_conceded": runs,
             "balls": balls,
             "economy": _safe_div(runs, balls, 6),
             "wickets": wicket_map.get(phase, 0),
             "boundary_pct": _safe_div(fours + sixes, balls, 100, 1),
-            "dot_pct": _safe_div(r["dots"] or 0, balls, 100, 1),
+            "bowl_dot_pct": _safe_div(r["dots"] or 0, balls, 100, 1),
             "fours_conceded": fours,
             "sixes_conceded": sixes,
+        }
+    return out
+
+
+@router.get("/{team}/bowling/by-phase")
+async def team_bowling_by_phase(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    t = await _bowling_by_phase_aggregates(team, filters, aux)
+    s = await _bowling_by_phase_aggregates(None, filters, aux)
+
+    phase_ranges = {
+        "powerplay": [1, 6],
+        "middle": [7, 15],
+        "death": [16, 20],
+    }
+    phases = []
+    for phase in ("powerplay", "middle", "death"):
+        tr = t.get(phase)
+        if tr is None:
+            continue
+        sr = s.get(phase, {})
+        balls = tr["balls"]
+        phases.append({
+            "phase": phase,
+            "overs_range": phase_ranges.get(phase, []),
+            "runs_conceded": tr["runs_conceded"],
+            "balls": balls,
+            "economy":      wrap_metric(tr["economy"], sr.get("economy"), "economy", sample_size=balls),
+            "wickets": tr["wickets"],
+            "boundary_pct": wrap_metric(tr["boundary_pct"], sr.get("boundary_pct"), "boundary_pct", sample_size=balls),
+            "dot_pct":      wrap_metric(tr["bowl_dot_pct"], sr.get("bowl_dot_pct"), "bowl_dot_pct", sample_size=balls),
+            "fours_conceded": tr["fours_conceded"],
+            "sixes_conceded": tr["sixes_conceded"],
         })
     return {"phases": phases}
 
@@ -2097,17 +2155,15 @@ def _validate_side(side: str) -> str:
     return side if side in ("batting", "bowling") else "batting"
 
 
-@router.get("/{team}/partnerships/by-wicket")
-async def team_partnerships_by_wicket(
-    team: str,
-    filters: FilterParams = Depends(),
-    aux: AuxParams = Depends(),
-    side: str = Query("batting"),
-):
-    side = _validate_side(side)
+async def _partnerships_by_wicket_aggregates(
+    team: str | None,
+    filters: FilterParams,
+    side: str,
+    aux: AuxParams,
+) -> dict[int, dict]:
+    """Flat per-wicket partnership aggregates keyed by wicket_number."""
     db = get_db()
     where, params = _partnership_filter(filters, team, side, aux=aux)
-
     rows = await db.q(
         f"""
         SELECT p.wicket_number,
@@ -2126,11 +2182,30 @@ async def team_partnerships_by_wicket(
         """,
         params,
     )
+    return {r["wicket_number"]: r for r in rows}
 
-    # Best partnership detail per wicket (one extra query, indexed lookup)
+
+@router.get("/{team}/partnerships/by-wicket")
+async def team_partnerships_by_wicket(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    side: str = Query("batting"),
+):
+    side = _validate_side(side)
+    db = get_db()
+    where, params = _partnership_filter(filters, team, side, aux=aux)
+
+    t = await _partnerships_by_wicket_aggregates(team, filters, side, aux)
+    s = await _partnerships_by_wicket_aggregates(None, filters, side, aux)
+
+    # Best partnership detail per wicket (identity-bearing — only
+    # fetched for the team side; the league's record at each wicket
+    # is in /scope/averages/partnerships/by-wicket).
     by_wicket = []
-    for r in rows:
-        wn = r["wicket_number"]
+    for wn in sorted(t.keys()):
+        r = t[wn]
+        sr = s.get(wn, {})
         best_rows = await db.q(
             f"""
             SELECT p.id as partnership_id, p.partnership_runs as runs,
@@ -2155,8 +2230,8 @@ async def team_partnerships_by_wicket(
         best = best_rows[0] if best_rows else None
         by_wicket.append({
             "wicket_number": wn,
-            "n": r["n"],
-            "avg_runs": r["avg_runs"],
+            "n":         wrap_metric(r["n"], sr.get("n"), "total", sample_size=r["n"]),
+            "avg_runs":  wrap_metric(r["avg_runs"], sr.get("avg_runs"), "avg_runs", sample_size=r["n"]),
             "avg_balls": r["avg_balls"],
             "best_runs": r["best_runs"],
             "best_partnership": (
