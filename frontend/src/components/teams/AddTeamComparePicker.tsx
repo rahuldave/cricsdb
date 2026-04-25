@@ -42,7 +42,7 @@ export default function AddTeamComparePicker({ currentTeams, filters, avgSlotPre
     setChecking(true)
     try {
       const s = await getTeamSummary(name, filters)
-      if ((s.matches ?? 0) < 1) {
+      if ((s.matches?.value ?? 0) < 1) {
         setErr(
           `${name} has no matches in the current filter scope — ` +
           'check gender, team-type, tournament, and season filters.',

@@ -7,6 +7,7 @@ from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
+from ..metrics_metadata import wrap_metric
 from ..tournament_canonical import series_type as series_type_for
 
 router = APIRouter(prefix="/api/v1/teams", tags=["Teams"])
@@ -196,6 +197,49 @@ async def team_summary(
     wins = row.get("wins", 0) or 0
     win_pct = round(wins * 100 / matches, 1) if matches > 0 else 0
 
+    # Scope-avg counterpart: same query without the team filter. Used
+    # to populate the per-metric envelope's `scope_avg` field. Wins
+    # become "matches-with-a-winner" at scope level (every team's win
+    # is some other team's loss; total wins == total losses == decided
+    # matches). bat_first_wins / field_first_wins at scope level count
+    # bat-first / field-first results across the field.
+    scope_filt, scope_params = filters.build(has_innings_join=False, aux=aux)
+    scope_filt = scope_filt or "1=1"
+    scope_rows = await db.q(
+        f"""
+        SELECT
+            COUNT(*) as matches,
+            SUM(CASE WHEN m.outcome_winner IS NOT NULL THEN 1 ELSE 0 END) as decided,
+            SUM(CASE WHEN m.outcome_result = 'tie' THEN 1 ELSE 0 END) as ties,
+            SUM(CASE WHEN m.outcome_result = 'no result' THEN 1 ELSE 0 END) as no_results,
+            SUM(CASE WHEN m.toss_winner IS NOT NULL THEN 1 ELSE 0 END) as toss_decided,
+            SUM(CASE WHEN m.toss_decision = 'bat'
+                     AND m.toss_winner = m.outcome_winner THEN 1
+                     WHEN m.toss_decision = 'field'
+                     AND m.outcome_winner IS NOT NULL
+                     AND m.toss_winner != m.outcome_winner THEN 1
+                     ELSE 0 END) as bat_first_wins,
+            SUM(CASE WHEN m.toss_decision = 'field'
+                     AND m.toss_winner = m.outcome_winner THEN 1
+                     WHEN m.toss_decision = 'bat'
+                     AND m.outcome_winner IS NOT NULL
+                     AND m.toss_winner != m.outcome_winner THEN 1
+                     ELSE 0 END) as field_first_wins
+        FROM match m
+        WHERE {scope_filt}
+        """,
+        scope_params,
+    )
+    sr = scope_rows[0] if scope_rows else {}
+    s_matches = sr.get("matches", 0) or 0
+    s_decided = sr.get("decided", 0) or 0
+    s_bf = sr.get("bat_first_wins", 0) or 0
+    s_ff = sr.get("field_first_wins", 0) or 0
+    # Scope-avg win_pct collapses to ~50% by construction (every win
+    # is some team's loss). Render as the bat-first share — the
+    # informative league signal.
+    s_win_pct = round(s_bf * 100 / s_decided, 1) if s_decided > 0 else None
+
     # Gender breakdown — only when no gender filter is active. Lets the
     # frontend warn the user when a team has matches in both men's and
     # women's cricket and they're seeing combined stats. Identical
@@ -267,15 +311,15 @@ async def team_summary(
 
     return {
         "team": team,
-        "matches": matches,
-        "wins": wins,
-        "losses": row.get("losses", 0) or 0,
-        "ties": row.get("ties", 0) or 0,
-        "no_results": row.get("no_results", 0) or 0,
-        "win_pct": win_pct,
-        "toss_wins": row.get("toss_wins", 0) or 0,
-        "bat_first_wins": row.get("bat_first_wins", 0) or 0,
-        "field_first_wins": row.get("field_first_wins", 0) or 0,
+        "matches":          wrap_metric(matches, s_matches, "matches", sample_size=s_matches),
+        "wins":             wrap_metric(wins, None, "wins", sample_size=matches),
+        "losses":           wrap_metric(row.get("losses", 0) or 0, None, "losses", sample_size=matches),
+        "ties":             wrap_metric(row.get("ties", 0) or 0, sr.get("ties", 0) or 0, "ties", sample_size=matches),
+        "no_results":       wrap_metric(row.get("no_results", 0) or 0, sr.get("no_results", 0) or 0, "no_results", sample_size=matches),
+        "win_pct":          wrap_metric(win_pct, s_win_pct, "win_pct", sample_size=matches),
+        "toss_wins":        wrap_metric(row.get("toss_wins", 0) or 0, sr.get("toss_decided", 0) or 0, "toss_wins", sample_size=matches),
+        "bat_first_wins":   wrap_metric(row.get("bat_first_wins", 0) or 0, s_bf, "bat_first_wins", sample_size=matches),
+        "field_first_wins": wrap_metric(row.get("field_first_wins", 0) or 0, s_ff, "field_first_wins", sample_size=matches),
         "gender_breakdown": gender_breakdown,
         "keepers": keepers,
         "keeper_ambiguous_innings": keeper_ambiguous,
@@ -803,14 +847,17 @@ def _team_innings_clause(
     return " AND ".join(parts), params
 
 
-async def _compute_batting_summary(
+async def _batting_aggregates(
     team: str | None,
     filters: FilterParams,
     aux: AuxParams,
 ) -> dict:
-    """Shared compute used by `/teams/{team}/batting/summary` and
-    `/scope/averages/batting/summary`. team=None drops the team filter
-    and produces the league-scope baseline."""
+    """Flat-shape batting aggregates (no envelope). Called twice by
+    `_compute_batting_summary`: once with team, once with team=None
+    (to compute scope_avg). Identity-bearing fields (`highest_total`,
+    `lowest_all_out_total`) are returned but only used by the team
+    side — the league scope's "highest" is a different question
+    answered by /scope/averages/batting/summary."""
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
 
@@ -907,13 +954,12 @@ async def _compute_batting_summary(
     hundreds = sum(1 for r in player_inn_rows if (r["r"] or 0) >= 100)
 
     return {
-        "team": team,
         "innings_batted": innings_batted,
         "total_runs": total_runs,
         "legal_balls": legal_balls,
         "run_rate": _safe_div(total_runs, legal_balls, 6),
         "boundary_pct": _safe_div(boundaries, legal_balls, 100, 1),
-        "dot_pct": _safe_div(dots, legal_balls, 100, 1),
+        "bat_dot_pct": _safe_div(dots, legal_balls, 100, 1),
         "fours": fours,
         "sixes": sixes,
         "fifties": fifties,
@@ -922,6 +968,41 @@ async def _compute_batting_summary(
         "avg_2nd_innings_total": avg_2nd,
         "highest_total": highest_total,
         "lowest_all_out_total": lowest_all_out,
+    }
+
+
+async def _compute_batting_summary(
+    team: str,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict:
+    """Per-metric envelope team-batting summary. Runs the flat-shape
+    aggregator twice (team, then team=None for scope_avg) and wraps
+    each numeric metric in the {value, scope_avg, delta_pct,
+    direction, sample_size} envelope. Identity-bearing nested objects
+    (highest_total, lowest_all_out_total) stay flat — they're not
+    metrics."""
+    t = await _batting_aggregates(team, filters, aux)
+    s = await _batting_aggregates(None, filters, aux)
+    legal = t.get("legal_balls") or 0
+    return {
+        "team": team,
+        "innings_batted": wrap_metric(t["innings_batted"], s["innings_batted"], "innings_batted", sample_size=t["innings_batted"]),
+        "total_runs": wrap_metric(t["total_runs"], s["total_runs"], "total_runs", sample_size=legal),
+        "legal_balls": wrap_metric(t["legal_balls"], s["legal_balls"], "legal_balls", sample_size=legal),
+        "run_rate": wrap_metric(t["run_rate"], s["run_rate"], "run_rate", sample_size=legal),
+        "boundary_pct": wrap_metric(t["boundary_pct"], s["boundary_pct"], "boundary_pct", sample_size=legal),
+        # Server-side field is "dot_pct"; metadata key is "bat_dot_pct"
+        # to disambiguate from bowling dot_pct (opposite direction).
+        "dot_pct": wrap_metric(t["bat_dot_pct"], s["bat_dot_pct"], "bat_dot_pct", sample_size=legal),
+        "fours": wrap_metric(t["fours"], s["fours"], "fours", sample_size=legal),
+        "sixes": wrap_metric(t["sixes"], s["sixes"], "sixes", sample_size=legal),
+        "fifties": wrap_metric(t["fifties"], s["fifties"], "fifties", sample_size=t["innings_batted"]),
+        "hundreds": wrap_metric(t["hundreds"], s["hundreds"], "hundreds", sample_size=t["innings_batted"]),
+        "avg_1st_innings_total": wrap_metric(t["avg_1st_innings_total"], s["avg_1st_innings_total"], "avg_1st_innings_total", sample_size=t["innings_batted"]),
+        "avg_2nd_innings_total": wrap_metric(t["avg_2nd_innings_total"], s["avg_2nd_innings_total"], "avg_2nd_innings_total", sample_size=t["innings_batted"]),
+        "highest_total": t["highest_total"],
+        "lowest_all_out_total": t["lowest_all_out_total"],
     }
 
 
@@ -1246,12 +1327,15 @@ async def team_batting_phase_season_heatmap(
 BOWLER_WICKET_EXCLUDE = "('run out', 'retired hurt', 'retired out', 'obstructing the field', 'retired not out')"
 
 
-@router.get("/{team}/bowling/summary")
-async def team_bowling_summary(
-    team: str,
-    filters: FilterParams = Depends(),
-    aux: AuxParams = Depends(),
-):
+async def _bowling_aggregates(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict:
+    """Flat-shape bowling aggregates. Called twice by
+    `_compute_bowling_summary` (team + None for scope_avg). When team is
+    None, identity-bearing fields (worst_conceded, best_defence) are
+    null."""
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
@@ -1351,19 +1435,19 @@ async def team_bowling_summary(
     # WON (outcome_winner = :team), innings_number = 1 (chase failed),
     # lowest opposition runs.
     best_defence = None
-    defended = [
-        r for r in opp_innings
-        if r["outcome_winner"] == team and r["innings_number"] == 1
-    ]
-    if defended:
-        lo = min(defended, key=lambda r: r["runs"] or 0)
-        best_defence = {
-            "runs": lo["runs"] or 0,
-            "match_id": lo["match_id"],
-        }
+    if team is not None:
+        defended = [
+            r for r in opp_innings
+            if r["outcome_winner"] == team and r["innings_number"] == 1
+        ]
+        if defended:
+            lo = min(defended, key=lambda r: r["runs"] or 0)
+            best_defence = {
+                "runs": lo["runs"] or 0,
+                "match_id": lo["match_id"],
+            }
 
     return {
-        "team": team,
         "innings_bowled": innings_bowled,
         "matches": matches,
         "runs_conceded": runs_conceded,
@@ -1373,7 +1457,7 @@ async def team_bowling_summary(
         "economy": _safe_div(runs_conceded, legal_balls, 6),
         "strike_rate": _safe_div(legal_balls, wickets),
         "average": _safe_div(runs_conceded, wickets),
-        "dot_pct": _safe_div(dots, legal_balls, 100, 1),
+        "bowl_dot_pct": _safe_div(dots, legal_balls, 100, 1),
         "fours_conceded": fours,
         "sixes_conceded": sixes,
         "wides": c.get("wides") or 0,
@@ -1384,6 +1468,50 @@ async def team_bowling_summary(
         "worst_conceded": worst,
         "best_defence": best_defence,
     }
+
+
+async def _compute_bowling_summary(
+    team: str,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict:
+    """Per-metric envelope team-bowling summary."""
+    t = await _bowling_aggregates(team, filters, aux)
+    s = await _bowling_aggregates(None, filters, aux)
+    legal = t.get("legal_balls") or 0
+    matches = t.get("matches") or 0
+    return {
+        "team": team,
+        "innings_bowled": wrap_metric(t["innings_bowled"], s["innings_bowled"], "innings_bowled", sample_size=t["innings_bowled"]),
+        "matches": wrap_metric(t["matches"], s["matches"], "matches", sample_size=matches),
+        "runs_conceded": wrap_metric(t["runs_conceded"], s["runs_conceded"], "runs_conceded", sample_size=legal),
+        "legal_balls": wrap_metric(t["legal_balls"], s["legal_balls"], "legal_balls", sample_size=legal),
+        "overs": wrap_metric(t["overs"], s["overs"], "overs", sample_size=legal),
+        "wickets": wrap_metric(t["wickets"], s["wickets"], "wickets", sample_size=legal),
+        "economy": wrap_metric(t["economy"], s["economy"], "economy", sample_size=legal),
+        "strike_rate": wrap_metric(t["strike_rate"], s["strike_rate"], "strike_rate", sample_size=legal),
+        "average": wrap_metric(t["average"], s["average"], "average", sample_size=t["wickets"]),
+        # Server-side field "dot_pct" — bowling direction (higher is better) via key "bowl_dot_pct".
+        "dot_pct": wrap_metric(t["bowl_dot_pct"], s["bowl_dot_pct"], "bowl_dot_pct", sample_size=legal),
+        "fours_conceded": wrap_metric(t["fours_conceded"], s["fours_conceded"], "fours_conceded", sample_size=legal),
+        "sixes_conceded": wrap_metric(t["sixes_conceded"], s["sixes_conceded"], "sixes_conceded", sample_size=legal),
+        "wides": wrap_metric(t["wides"], s["wides"], "wides", sample_size=matches),
+        "noballs": wrap_metric(t["noballs"], s["noballs"], "noballs", sample_size=matches),
+        "wides_per_match": wrap_metric(t["wides_per_match"], s["wides_per_match"], "wides_per_match", sample_size=matches),
+        "noballs_per_match": wrap_metric(t["noballs_per_match"], s["noballs_per_match"], "noballs_per_match", sample_size=matches),
+        "avg_opposition_total": wrap_metric(t["avg_opposition_total"], s["avg_opposition_total"], "avg_opposition_total", sample_size=t["innings_bowled"]),
+        "worst_conceded": t["worst_conceded"],
+        "best_defence": t["best_defence"],
+    }
+
+
+@router.get("/{team}/bowling/summary")
+async def team_bowling_summary(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    return await _compute_bowling_summary(team, filters, aux)
 
 
 @router.get("/{team}/bowling/by-season")
@@ -1710,17 +1838,15 @@ async def team_bowling_phase_season_heatmap(
     }
 
 
-@router.get("/{team}/fielding/summary")
-async def team_fielding_summary(
-    team: str,
-    filters: FilterParams = Depends(),
-    aux: AuxParams = Depends(),
-):
+async def _fielding_aggregates(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict:
+    """Flat-shape fielding aggregates."""
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
-    # fielding_credit aggregation — fc joins via delivery, so we can reuse
-    # the delivery-level clause directly.
     kind_rows = await db.q(
         f"""
         SELECT fc.kind, COUNT(*) as cnt
@@ -1739,12 +1865,6 @@ async def team_fielding_summary(
     stumpings = by_kind.get("stumped", 0)
     run_outs = by_kind.get("run_out", 0)
 
-    # Match count when this team was in the field — reuse the same
-    # fielding-side `where` + params as the kind aggregation above so
-    # every active FilterBar param (gender, team_type, tournament,
-    # season range) applies here too. Feeds `catches_per_match` etc.
-    # as the denominator, so a scope-ignorant count silently flattens
-    # per-match rates.
     match_rows = await db.q(
         f"""
         SELECT COUNT(DISTINCT m.id) as matches
@@ -1757,7 +1877,6 @@ async def team_fielding_summary(
     matches = match_rows[0]["matches"] if match_rows else 0
 
     return {
-        "team": team,
         "matches": matches,
         "catches": catches,
         "caught_and_bowled": caught_and_bowled,
@@ -1767,6 +1886,42 @@ async def team_fielding_summary(
         "catches_per_match": _safe_div(catches + caught_and_bowled, matches, 1, 2),
         "stumpings_per_match": _safe_div(stumpings, matches, 1, 2),
         "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
+    }
+
+
+def _half(v: float | int | None) -> float | None:
+    """Halve a per-match league rate to per-team-equivalent. Each
+    match has 2 fielding sides, so league total catches / matches
+    counts both sides; the team-side comparable is half. Used for
+    scope_avg's of catches_per_match etc."""
+    if v is None:
+        return None
+    return round(v / 2, 2)
+
+
+@router.get("/{team}/fielding/summary")
+async def team_fielding_summary(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    t = await _fielding_aggregates(team, filters, aux)
+    s = await _fielding_aggregates(None, filters, aux)
+    matches = t.get("matches") or 0
+    return {
+        "team": team,
+        "matches":             wrap_metric(t["matches"], s["matches"], "matches", sample_size=matches),
+        "catches":             wrap_metric(t["catches"], s["catches"], "catches", sample_size=matches),
+        "caught_and_bowled":   wrap_metric(t["caught_and_bowled"], s["caught_and_bowled"], "caught_and_bowled", sample_size=matches),
+        "stumpings":           wrap_metric(t["stumpings"], s["stumpings"], "stumpings", sample_size=matches),
+        "run_outs":            wrap_metric(t["run_outs"], s["run_outs"], "run_outs", sample_size=matches),
+        "total_dismissals_contributed": wrap_metric(t["total_dismissals_contributed"], s["total_dismissals_contributed"], "total_dismissals_contributed", sample_size=matches),
+        # per-match rates: scope_avg halved because the league pool
+        # counts both fielding sides per match; the team-side
+        # comparable is /2.
+        "catches_per_match":   wrap_metric(t["catches_per_match"], _half(s["catches_per_match"]), "catches_per_match", sample_size=matches),
+        "stumpings_per_match": wrap_metric(t["stumpings_per_match"], _half(s["stumpings_per_match"]), "stumpings_per_match", sample_size=matches),
+        "run_outs_per_match":  wrap_metric(t["run_outs_per_match"], _half(s["run_outs_per_match"]), "run_outs_per_match", sample_size=matches),
     }
 
 
@@ -2378,14 +2533,35 @@ async def team_partnerships_summary(
                 "best_runs": r["best_runs"],
             }
 
+    # Scope-avg counterpart — same query, team=None. Identity-bearing
+    # nested objects (highest, best_pair) are dropped here; only the
+    # numeric metrics are needed.
+    s_where, s_params = _partnership_filter(filters, None, side, aux=aux)
+    s_rows = await db.q(
+        f"""
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN p.partnership_runs >= 50  THEN 1 ELSE 0 END) as count_50_plus,
+            SUM(CASE WHEN p.partnership_runs >= 100 THEN 1 ELSE 0 END) as count_100_plus,
+            ROUND(AVG(p.partnership_runs * 1.0), 1) as avg_runs
+        FROM partnership p
+        JOIN innings i ON i.id = p.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {s_where}
+          AND p.ended_by_kind NOT IN ('retired hurt', 'retired not out')
+        """,
+        s_params,
+    )
+    sa = s_rows[0] if s_rows else {}
+
     return {
         "team": team,
         "side": side,
-        "total": total,
-        "count_50_plus": agg.get("count_50_plus", 0) or 0,
-        "count_100_plus": agg.get("count_100_plus", 0) or 0,
+        "total":          wrap_metric(total, sa.get("total") or 0, "total", sample_size=total),
+        "count_50_plus":  wrap_metric(agg.get("count_50_plus", 0) or 0, sa.get("count_50_plus") or 0, "count_50_plus", sample_size=total),
+        "count_100_plus": wrap_metric(agg.get("count_100_plus", 0) or 0, sa.get("count_100_plus") or 0, "count_100_plus", sample_size=total),
+        "avg_runs":       wrap_metric(agg.get("avg_runs"), sa.get("avg_runs"), "avg_runs", sample_size=total),
         "highest": highest,
-        "avg_runs": agg.get("avg_runs"),
         "best_pair": best_pair,
     }
 

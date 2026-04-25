@@ -649,7 +649,9 @@ partnerships are FOR or AGAINST the team).
 - `.../top?side=batting&limit=10` — top-N individual partnerships.
 - `.../summary?side=batting` — aggregate counts (total / 50+ / 100+),
   highest single partnership, avg runs, and the all-time top pair.
-  Powers the Teams → Compare tab's partnerships row.
+  Powers the Teams → Compare tab's partnerships row. Each numeric
+  metric is wrapped in the per-metric envelope (see "Compare metric
+  envelope" below).
 - `.../by-season?side=batting` — per-season partnership rollup (total,
   50+, 100+, avg, best). Drives the partnerships band on the Compare
   tab's season-trajectory strip.
@@ -686,6 +688,51 @@ curl "http://localhost:8000/api/v1/teams/India/partnerships/summary?gender=male&
   }
 }
 ```
+
+## Compare metric envelope
+
+The 5 team-compare summary endpoints —
+`/teams/{team}/{summary,batting/summary,bowling/summary,fielding/summary,partnerships/summary}` —
+wrap each numeric metric in a per-metric envelope:
+
+```json
+{
+  "value":       8.52,
+  "scope_avg":   7.94,
+  "delta_pct":   7.3,
+  "direction":   "higher_better",
+  "sample_size": 1606
+}
+```
+
+- `value` — the team's raw value.
+- `scope_avg` — the league baseline in the same FilterBar scope
+  (computed server-side via the same SQL with `team=None`). For
+  per-match fielding rates, the league pool is halved to be
+  per-team comparable (each match has 2 fielding sides).
+- `delta_pct` — signed `(value - scope_avg) / scope_avg × 100`,
+  rounded to 1 decimal. Returns `null` for count metrics (`fours`,
+  `wickets`, `total_runs`, etc.) where league total dwarfs team
+  total — the percentage is mathematically computable but not
+  meaningfully interpretable as "above/below average."
+- `direction` — `"higher_better"` / `"lower_better"` / `null`.
+  Per-metric constant in `api/metrics_metadata.py::METRIC_DIRECTIONS`.
+- `sample_size` — the denominator that makes the comparison
+  defensible (legal_balls for batting rates, balls_bowled for
+  bowling rates, partnerships for partnership stats, matches for
+  outcome rates).
+
+Identity-bearing nested objects (`highest_total`, `lowest_all_out_total`,
+`worst_conceded`, `best_defence`, `best_pair`, `keepers`,
+`gender_breakdown`) stay flat — they're not metrics.
+
+The envelope is consumed lightly by the Teams > Compare UI today
+(`value` only). The other fields are shipped for Spec-2 surfaces
+(player compare, leaderboard delta columns, H2H baseline) — see
+`internal_docs/outlook-comparisons.md`.
+
+The new `/scope/averages/*` endpoints below stay flat — they're the
+baseline data, not a per-entity-with-baseline view.
 
 ---
 

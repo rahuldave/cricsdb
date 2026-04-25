@@ -4,19 +4,20 @@ export type TeamDiscipline =
   | 'results' | 'batting' | 'bowling' | 'fielding' | 'partnerships'
 
 /** Each discipline's "has meaningful data in scope" gate. Drives both
- *  per-column band visibility and the grid-wide anyHasData mask. */
+ *  per-column band visibility and the grid-wide anyHasData mask.
+ *  Reads `.value` off the envelope. */
 export function teamDisciplineHasData(
   discipline: TeamDiscipline, profile: TeamProfile,
 ): boolean {
-  if (discipline === 'results')      return (profile.summary?.matches ?? 0) > 0
-  if (discipline === 'batting')      return (profile.batting?.innings_batted ?? 0) > 0
-  if (discipline === 'bowling')      return (profile.bowling?.innings_bowled ?? 0) > 0
+  if (discipline === 'results')      return (profile.summary?.matches?.value ?? 0) > 0
+  if (discipline === 'batting')      return (profile.batting?.innings_batted?.value ?? 0) > 0
+  if (discipline === 'bowling')      return (profile.bowling?.innings_bowled?.value ?? 0) > 0
   if (discipline === 'fielding') {
     const f = profile.fielding
     if (!f) return false
-    return (f.catches + f.stumpings + f.run_outs) > 0
+    return ((f.catches.value ?? 0) + (f.stumpings.value ?? 0) + (f.run_outs.value ?? 0)) > 0
   }
-  return (profile.partnerships?.total ?? 0) > 0
+  return (profile.partnerships?.total?.value ?? 0) > 0
 }
 
 /** Same gate but for the league-average column. */
@@ -70,8 +71,8 @@ export function scopeAvgLabel(filters: FilterParams): string {
  *  of abandoned / no-result matches where a team never fielded or
  *  bowled — correct for their own stats, misleading as a headline. */
 export function teamMatchesInScope(profile: TeamProfile): number {
-  return profile.summary?.matches
-    ?? profile.bowling?.matches
+  return profile.summary?.matches?.value
+    ?? profile.bowling?.matches?.value
     ?? 0
 }
 

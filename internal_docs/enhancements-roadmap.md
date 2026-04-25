@@ -857,6 +857,46 @@ subtabs. Commits `5179683` … `ca0b785`.
   commits share a file) is the splitting mechanism going forward
   — not large end-of-session dump commits.
 
+### Shipped 2026-04-24 (Teams Compare — Spec 1 / Phase 2B: envelope migration)
+
+- **`api/metrics_metadata.py`** — single-source-of-truth direction
+  map + `wrap_metric()` helper that produces the per-metric envelope
+  `{value, scope_avg, delta_pct, direction, sample_size}`. Counts
+  (`fours`, `wickets`, `total_runs`, etc.) get `direction=null` so
+  delta_pct stays null — team-count-vs-league-total is ~10x scaled
+  and the percentage misleads. Rates / averages (`run_rate`,
+  `economy`, `boundary_pct`, etc.) get the real direction.
+- **5 team-compare summary endpoints migrated** to envelope shape:
+  `team_summary`, `team_batting_summary`, `team_bowling_summary`,
+  `team_fielding_summary`, `team_partnerships_summary`. Each runs an
+  extra "scope_avg" SQL pass (helpers extracted into
+  `_batting_aggregates`, `_bowling_aggregates`, `_fielding_aggregates`
+  that take `team: str | None`; team=None produces the league pool).
+  Identity-bearing nested objects stay flat. Per-match fielding rates'
+  `scope_avg` is halved (`_half()` helper) because the league pool
+  counts both fielding sides per match — team-side comparable is /2.
+- **Frontend types + every consumer updated**: `types.ts` adds the
+  `MetricEnvelope` interface and wraps the 5 summary interfaces' metric
+  fields. Consumers (`TeamSummaryRow`, `Teams.tsx` per-discipline
+  tabs, `AddTeamComparePicker` probe, `teamUtils.ts` discipline gates)
+  read `.value` off the envelope. Mechanical `s.field` → `s.field.value`
+  refactor surfaced ~50 call sites via the typechecker; `tsc -b`
+  green.
+- **Regression**: REG→NEW flip on 15 affected URLs landed in a
+  preceding commit (`ee78b7f`). Teams suite: 29 REG matched, 9 NEW
+  changed, 0 drifted, 0 NEW unchanged. Scope-averages suite: 4 REG
+  matched, 6 NEW changed (the team-control URLs that just shape-
+  changed), 0 drifted; 19 "NEW unchanged" entries are Phase 2A
+  introductions that are now stable in HEAD — flipped to REG in a
+  follow-up cleanup commit.
+- **Integration**: `tests/integration/team-compare-average.sh`
+  16/16 still pass — the UI consumes `.value` everywhere now and
+  renders identically (envelope is invisible to Spec-1 UI).
+- **Spec 2 ready**: every consumer can now read `delta_pct` /
+  `direction` / `sample_size` off the envelope without an endpoint
+  migration. Player compare with position-matched baseline (Surface
+  1 of `outlook-comparisons.md`) is the next natural pickup.
+
 ### Shipped 2026-04-24 (Teams Compare — Spec 1 / Phases 2A + 3: API + UI)
 
 - **Phase 2A — `/api/v1/scope/averages/*` router family** (12 new

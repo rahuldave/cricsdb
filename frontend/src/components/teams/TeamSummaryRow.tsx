@@ -79,18 +79,25 @@ function renderStats(discipline: TeamDiscipline, profile: TeamProfile) {
   )
 }
 
+// Pull `.value` off an envelope, treating null/undefined as null.
+const v = (e: { value: number | null } | null | undefined): number | null =>
+  e?.value ?? null
+
 function statsFor(
   discipline: TeamDiscipline, profile: TeamProfile,
 ): [string, string | number][] | null {
   if (discipline === 'results') {
     const s = profile.summary
     if (!s) return null
-    const tossPct = s.matches > 0 ? (s.toss_wins * 100 / s.matches).toFixed(1) : '-'
+    const matches = v(s.matches) ?? 0
+    const tossWins = v(s.toss_wins) ?? 0
+    const tossPct = matches > 0 ? (tossWins * 100 / matches).toFixed(1) : '-'
+    const winPct = v(s.win_pct)
     return [
-      ['Matches',     s.matches.toLocaleString()],
-      ['W',           s.wins],
-      ['L',           s.losses],
-      ['Win %',       s.win_pct == null ? '-' : `${s.win_pct.toFixed(1)}`],
+      ['Matches',     matches.toLocaleString()],
+      ['W',           v(s.wins) ?? 0],
+      ['L',           v(s.losses) ?? 0],
+      ['Win %',       winPct == null ? '-' : winPct.toFixed(1)],
       ['Toss won %',  tossPct],
     ]
   }
@@ -98,33 +105,40 @@ function statsFor(
     const b = profile.batting
     if (!b) return null
     const hi = b.highest_total?.runs != null ? b.highest_total.runs.toString() : '-'
+    const bound = v(b.boundary_pct)
+    const avg1 = v(b.avg_1st_innings_total)
+    const fifties = v(b.fifties) ?? 0
+    const hundreds = v(b.hundreds) ?? 0
     return [
-      ['Run rate',        fmt(b.run_rate)],
-      ['Boundary %',      b.boundary_pct == null ? '-' : `${b.boundary_pct.toFixed(1)}`],
-      ['Avg 1st-inn',     b.avg_1st_innings_total == null ? '-' : b.avg_1st_innings_total.toFixed(1)],
+      ['Run rate',        fmt(v(b.run_rate))],
+      ['Boundary %',      bound == null ? '-' : bound.toFixed(1)],
+      ['Avg 1st-inn',     avg1 == null ? '-' : avg1.toFixed(1)],
       ['Highest',         hi],
-      ['100s + 50s',      b.hundreds + b.fifties],
+      ['100s + 50s',      hundreds + fifties],
     ]
   }
   if (discipline === 'bowling') {
     const b = profile.bowling
     if (!b) return null
+    const dotp = v(b.dot_pct)
+    const avgOpp = v(b.avg_opposition_total)
+    const wkts = v(b.wickets) ?? 0
     return [
-      ['Economy',         fmt(b.economy)],
-      ['SR',              fmt(b.strike_rate)],
-      ['Dot %',           b.dot_pct == null ? '-' : `${b.dot_pct.toFixed(1)}`],
-      ['Avg opp. total',  b.avg_opposition_total == null ? '-' : b.avg_opposition_total.toFixed(1)],
-      ['Wickets',         b.wickets.toLocaleString()],
+      ['Economy',         fmt(v(b.economy))],
+      ['SR',              fmt(v(b.strike_rate))],
+      ['Dot %',           dotp == null ? '-' : dotp.toFixed(1)],
+      ['Avg opp. total',  avgOpp == null ? '-' : avgOpp.toFixed(1)],
+      ['Wickets',         wkts.toLocaleString()],
     ]
   }
   if (discipline === 'fielding') {
     const f = profile.fielding
     if (!f) return null
     return [
-      ['Catches',    f.catches],
-      ['Stumpings',  f.stumpings],
-      ['Run-outs',   f.run_outs],
-      ['C / match',  fmt(f.catches_per_match)],
+      ['Catches',    v(f.catches) ?? 0],
+      ['Stumpings',  v(f.stumpings) ?? 0],
+      ['Run-outs',   v(f.run_outs) ?? 0],
+      ['C / match',  fmt(v(f.catches_per_match))],
     ]
   }
   // partnerships
@@ -133,11 +147,12 @@ function statsFor(
   const pairName = p.best_pair
     ? `${shortName(p.best_pair.batter1.name)} · ${shortName(p.best_pair.batter2.name)}`
     : '-'
+  const avgRuns = v(p.avg_runs)
   return [
     ['Highest',     p.highest?.runs ?? '-'],
-    ['50+',         p.count_50_plus],
-    ['100+',        p.count_100_plus],
-    ['Avg',         p.avg_runs == null ? '-' : p.avg_runs.toFixed(1)],
+    ['50+',         v(p.count_50_plus) ?? 0],
+    ['100+',        v(p.count_100_plus) ?? 0],
+    ['Avg',         avgRuns == null ? '-' : avgRuns.toFixed(1)],
     ['Best pair',   pairName],
   ]
 }

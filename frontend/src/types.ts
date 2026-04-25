@@ -44,17 +44,30 @@ export interface PlayerSearchResult {
   innings: number
 }
 
+/** Per-metric envelope on the 5 team-compare summary endpoints.
+ *  See `api/metrics_metadata.py` for direction map. Spec-1 UI renders
+ *  only `value`; the other fields are shipped for Spec-2 surfaces
+ *  (player compare, leaderboard delta columns, H2H baseline).
+ *  See `internal_docs/outlook-comparisons.md`. */
+export interface MetricEnvelope {
+  value: number | null
+  scope_avg: number | null
+  delta_pct: number | null
+  direction: 'higher_better' | 'lower_better' | null
+  sample_size: number | null
+}
+
 export interface TeamSummary {
   team: string
-  matches: number
-  wins: number
-  losses: number
-  ties: number
-  no_results: number
-  win_pct: number | null
-  toss_wins: number
-  bat_first_wins: number
-  field_first_wins: number
+  matches: MetricEnvelope
+  wins: MetricEnvelope
+  losses: MetricEnvelope
+  ties: MetricEnvelope
+  no_results: MetricEnvelope
+  win_pct: MetricEnvelope
+  toss_wins: MetricEnvelope
+  bat_first_wins: MetricEnvelope
+  field_first_wins: MetricEnvelope
   /** Present only when no gender filter is active AND the team has
    *  matches in BOTH genders within the current filter scope. */
   gender_breakdown: { male: number; female: number } | null
@@ -788,18 +801,18 @@ export interface TeamInningsTotal {
 
 export interface TeamBattingSummary {
   team: string
-  innings_batted: number
-  total_runs: number
-  legal_balls: number
-  run_rate: number | null
-  boundary_pct: number | null
-  dot_pct: number | null
-  fours: number
-  sixes: number
-  fifties: number
-  hundreds: number
-  avg_1st_innings_total: number | null
-  avg_2nd_innings_total: number | null
+  innings_batted: MetricEnvelope
+  total_runs: MetricEnvelope
+  legal_balls: MetricEnvelope
+  run_rate: MetricEnvelope
+  boundary_pct: MetricEnvelope
+  dot_pct: MetricEnvelope
+  fours: MetricEnvelope
+  sixes: MetricEnvelope
+  fifties: MetricEnvelope
+  hundreds: MetricEnvelope
+  avg_1st_innings_total: MetricEnvelope
+  avg_2nd_innings_total: MetricEnvelope
   highest_total: TeamInningsTotal | null
   lowest_all_out_total: TeamInningsTotal | null
 }
@@ -845,23 +858,23 @@ export interface TeamTopBatter {
 
 export interface TeamBowlingSummary {
   team: string
-  innings_bowled: number
-  matches: number
-  runs_conceded: number
-  legal_balls: number
-  overs: number
-  wickets: number
-  economy: number | null
-  strike_rate: number | null
-  average: number | null
-  dot_pct: number | null
-  fours_conceded: number
-  sixes_conceded: number
-  wides: number
-  noballs: number
-  wides_per_match: number | null
-  noballs_per_match: number | null
-  avg_opposition_total: number | null
+  innings_bowled: MetricEnvelope
+  matches: MetricEnvelope
+  runs_conceded: MetricEnvelope
+  legal_balls: MetricEnvelope
+  overs: MetricEnvelope
+  wickets: MetricEnvelope
+  economy: MetricEnvelope
+  strike_rate: MetricEnvelope
+  average: MetricEnvelope
+  dot_pct: MetricEnvelope
+  fours_conceded: MetricEnvelope
+  sixes_conceded: MetricEnvelope
+  wides: MetricEnvelope
+  noballs: MetricEnvelope
+  wides_per_match: MetricEnvelope
+  noballs_per_match: MetricEnvelope
+  avg_opposition_total: MetricEnvelope
   worst_conceded: TeamInningsTotal | null
   best_defence: { runs: number; match_id: number } | null
 }
@@ -908,15 +921,15 @@ export interface TeamTopBowler {
 
 export interface TeamFieldingSummary {
   team: string
-  matches: number
-  catches: number
-  caught_and_bowled: number
-  stumpings: number
-  run_outs: number
-  total_dismissals_contributed: number
-  catches_per_match: number | null
-  stumpings_per_match: number | null
-  run_outs_per_match: number | null
+  matches: MetricEnvelope
+  catches: MetricEnvelope
+  caught_and_bowled: MetricEnvelope
+  stumpings: MetricEnvelope
+  run_outs: MetricEnvelope
+  total_dismissals_contributed: MetricEnvelope
+  catches_per_match: MetricEnvelope
+  stumpings_per_match: MetricEnvelope
+  run_outs_per_match: MetricEnvelope
 }
 
 /** Aggregate partnership stats for a team in the current filter scope.
@@ -924,10 +937,10 @@ export interface TeamFieldingSummary {
 export interface TeamPartnershipsSummary {
   team: string
   side: 'batting' | 'bowling'
-  total: number
-  count_50_plus: number
-  count_100_plus: number
-  avg_runs: number | null
+  total: MetricEnvelope
+  count_50_plus: MetricEnvelope
+  count_100_plus: MetricEnvelope
+  avg_runs: MetricEnvelope
   highest: {
     runs: number
     balls: number

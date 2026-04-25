@@ -202,10 +202,10 @@ export default function Teams() {
             </div>
           )}
           <div className="wisden-statrow">
-            <StatCard label="Matches" value={summary.matches} />
-            <StatCard label="Wins" value={summary.wins} />
-            <StatCard label="Losses" value={summary.losses} />
-            <StatCard label="Win %" value={summary.win_pct != null ? `${summary.win_pct}%` : '-'} />
+            <StatCard label="Matches" value={summary.matches.value ?? 0} />
+            <StatCard label="Wins" value={summary.wins.value ?? 0} />
+            <StatCard label="Losses" value={summary.losses.value ?? 0} />
+            <StatCard label="Win %" value={summary.win_pct.value != null ? `${summary.win_pct.value}%` : '-'} />
           </div>
 
           {/* Tier 2 — keepers used by this team, if any identified. */}
@@ -386,34 +386,34 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
           page (Batting.tsx). Combined 50s/100s + Highest/Lowest cards
           let us pack 15 stats into 3 evenly-wide rows. */}
       <div className="wisden-statrow cols-5">
-        <StatCard label="Innings" value={s.innings_batted} />
-        <StatCard label="Runs" value={s.total_runs.toLocaleString()} />
-        <StatCard label="Run rate" value={s.run_rate != null ? s.run_rate.toFixed(2) : '-'} />
-        <StatCard label="Boundary %" value={s.boundary_pct != null ? `${s.boundary_pct}%` : '-'} />
-        <StatCard label="Dot %" value={s.dot_pct != null ? `${s.dot_pct}%` : '-'} />
+        <StatCard label="Innings" value={s.innings_batted.value ?? 0} />
+        <StatCard label="Runs" value={(s.total_runs.value ?? 0).toLocaleString()} />
+        <StatCard label="Run rate" value={s.run_rate.value != null ? s.run_rate.value.toFixed(2) : '-'} />
+        <StatCard label="Boundary %" value={s.boundary_pct.value != null ? `${s.boundary_pct.value}%` : '-'} />
+        <StatCard label="Dot %" value={s.dot_pct.value != null ? `${s.dot_pct.value}%` : '-'} />
       </div>
       <div className="wisden-statrow cols-5">
-        <StatCard label="4s" value={s.fours.toLocaleString()} />
-        <StatCard label="6s" value={s.sixes.toLocaleString()} />
-        <StatCard label="50s" value={s.fifties} />
-        <StatCard label="100s" value={s.hundreds} />
+        <StatCard label="4s" value={(s.fours.value ?? 0).toLocaleString()} />
+        <StatCard label="6s" value={(s.sixes.value ?? 0).toLocaleString()} />
+        <StatCard label="50s" value={s.fifties.value ?? 0} />
+        <StatCard label="100s" value={s.hundreds.value ?? 0} />
         <StatCard label="50s / 100s per inn"
-          value={s.innings_batted > 0
-            ? `${((s.fifties + s.hundreds) / s.innings_batted).toFixed(2)}`
+          value={(s.innings_batted.value ?? 0) > 0
+            ? `${(((s.fifties.value ?? 0) + (s.hundreds.value ?? 0)) / (s.innings_batted.value ?? 1)).toFixed(2)}`
             : '-'} />
       </div>
       <div className="wisden-statrow cols-5">
         <StatCard label="Avg 1st-inn total"
-          value={s.avg_1st_innings_total != null ? s.avg_1st_innings_total.toFixed(1) : '-'} />
+          value={s.avg_1st_innings_total.value != null ? s.avg_1st_innings_total.value.toFixed(1) : '-'} />
         <StatCard label="Avg 2nd-inn total"
-          value={s.avg_2nd_innings_total != null ? s.avg_2nd_innings_total.toFixed(1) : '-'} />
+          value={s.avg_2nd_innings_total.value != null ? s.avg_2nd_innings_total.value.toFixed(1) : '-'} />
         <StatCard label="Highest total"
           value={s.highest_total ? String(s.highest_total.runs) : '-'} />
         <StatCard label="Lowest all-out"
           value={s.lowest_all_out_total ? String(s.lowest_all_out_total.runs) : '-'} />
         <StatCard label="Avg innings total"
-          value={s.innings_batted > 0
-            ? (s.total_runs / s.innings_batted).toFixed(1)
+          value={(s.innings_batted.value ?? 0) > 0
+            ? ((s.total_runs.value ?? 0) / (s.innings_batted.value ?? 1)).toFixed(1)
             : '-'} />
       </div>
 
@@ -449,8 +449,8 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
           <BarChart
             data={byPhase.data.phases.map(p => ({
               ...p,
-              wickets_per_innings: s.innings_batted > 0
-                ? +(p.wickets_lost / s.innings_batted).toFixed(2)
+              wickets_per_innings: (s.innings_batted.value ?? 0) > 0
+                ? +(p.wickets_lost / (s.innings_batted.value ?? 1)).toFixed(2)
                 : 0,
             }))}
             categoryAccessor="phase" valueAccessor="wickets_per_innings"
@@ -552,26 +552,26 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
   return (
     <div className="space-y-6">
       <div className="wisden-statrow">
-        <StatCard label="Innings" value={s.innings_bowled} />
-        <StatCard label="Overs" value={s.overs.toFixed(1)} />
-        <StatCard label="Wickets" value={s.wickets.toLocaleString()} />
-        <StatCard label="Runs conceded" value={s.runs_conceded.toLocaleString()} />
+        <StatCard label="Innings" value={s.innings_bowled.value ?? 0} />
+        <StatCard label="Overs" value={(s.overs.value ?? 0).toFixed(1)} />
+        <StatCard label="Wickets" value={(s.wickets.value ?? 0).toLocaleString()} />
+        <StatCard label="Runs conceded" value={(s.runs_conceded.value ?? 0).toLocaleString()} />
       </div>
       <div className="wisden-statrow">
-        <StatCard label="Economy" value={s.economy != null ? s.economy.toFixed(2) : '-'} />
-        <StatCard label="Average" value={s.average != null ? s.average.toFixed(2) : '-'} />
-        <StatCard label="Strike rate" value={s.strike_rate != null ? s.strike_rate.toFixed(2) : '-'} />
-        <StatCard label="Dot %" value={s.dot_pct != null ? `${s.dot_pct}%` : '-'} />
+        <StatCard label="Economy" value={s.economy.value != null ? s.economy.value.toFixed(2) : '-'} />
+        <StatCard label="Average" value={s.average.value != null ? s.average.value.toFixed(2) : '-'} />
+        <StatCard label="Strike rate" value={s.strike_rate.value != null ? s.strike_rate.value.toFixed(2) : '-'} />
+        <StatCard label="Dot %" value={s.dot_pct.value != null ? `${s.dot_pct.value}%` : '-'} />
       </div>
       <div className="wisden-statrow">
         <StatCard label="Avg opp total"
-          value={s.avg_opposition_total != null ? s.avg_opposition_total.toFixed(1) : '-'} />
+          value={s.avg_opposition_total.value != null ? s.avg_opposition_total.value.toFixed(1) : '-'} />
         <StatCard label="Worst conceded"
           value={s.worst_conceded ? String(s.worst_conceded.runs) : '-'} />
         <StatCard label="Best defence"
           value={s.best_defence ? String(s.best_defence.runs) : '-'} />
         <StatCard label="Wides/match"
-          value={s.wides_per_match != null ? s.wides_per_match.toFixed(1) : '-'} />
+          value={s.wides_per_match.value != null ? s.wides_per_match.value.toFixed(1) : '-'} />
       </div>
 
       {bySeason.data && bySeason.data.seasons.length >= 2 && (
@@ -604,8 +604,8 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
           <BarChart
             data={byPhase.data.phases.map(p => ({
               ...p,
-              wickets_per_innings: s.innings_bowled > 0
-                ? +(p.wickets / s.innings_bowled).toFixed(2)
+              wickets_per_innings: (s.innings_bowled.value ?? 0) > 0
+                ? +(p.wickets / (s.innings_bowled.value ?? 1)).toFixed(2)
                 : 0,
             }))}
             categoryAccessor="phase" valueAccessor="wickets_per_innings"
@@ -703,19 +703,19 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
   return (
     <div className="space-y-6">
       <div className="wisden-statrow">
-        <StatCard label="Matches" value={s.matches} />
-        <StatCard label="Catches" value={s.catches.toLocaleString()} />
-        <StatCard label="Stumpings" value={s.stumpings} />
-        <StatCard label="Run-outs" value={s.run_outs} />
+        <StatCard label="Matches" value={s.matches.value ?? 0} />
+        <StatCard label="Catches" value={(s.catches.value ?? 0).toLocaleString()} />
+        <StatCard label="Stumpings" value={s.stumpings.value ?? 0} />
+        <StatCard label="Run-outs" value={s.run_outs.value ?? 0} />
       </div>
       <div className="wisden-statrow">
         <StatCard label="Catches/match"
-          value={s.catches_per_match != null ? s.catches_per_match.toFixed(2) : '-'} />
+          value={s.catches_per_match.value != null ? s.catches_per_match.value.toFixed(2) : '-'} />
         <StatCard label="Stumpings/match"
-          value={s.stumpings_per_match != null ? s.stumpings_per_match.toFixed(2) : '-'} />
+          value={s.stumpings_per_match.value != null ? s.stumpings_per_match.value.toFixed(2) : '-'} />
         <StatCard label="Run-outs/match"
-          value={s.run_outs_per_match != null ? s.run_outs_per_match.toFixed(2) : '-'} />
-        <StatCard label="C&B" value={s.caught_and_bowled} />
+          value={s.run_outs_per_match.value != null ? s.run_outs_per_match.value.toFixed(2) : '-'} />
+        <StatCard label="C&B" value={s.caught_and_bowled.value ?? 0} />
       </div>
 
       {bySeason.data && bySeason.data.seasons.length >= 2 && (
