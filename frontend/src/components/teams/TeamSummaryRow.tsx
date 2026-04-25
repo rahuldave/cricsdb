@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { FilterParams, MetricEnvelope, TeamProfile } from '../../types'
+import MetricDelta from '../MetricDelta'
 import { carryTeamFilters, type TeamDiscipline } from './teamUtils'
 
 interface Props {
@@ -15,37 +16,15 @@ interface Props {
 const fmt = (v: number | null | undefined, d = 2) =>
   v == null ? '-' : v.toFixed(d)
 
-/** Tiny chip rendered next to a numeric value showing its delta vs
- *  the in-scope league baseline. Color-coded by direction so the
- *  reader doesn't have to remember which way is "good" for each
- *  metric (econ lower = good, RR higher = good, etc.). */
+/** Compact-cell delta chip for the compare grid — a thin wrapper
+ *  around the shared MetricDelta that tightens the styling for
+ *  inline use next to a stat value (smaller font, no scope_avg
+ *  prefix). The single-team tabs use MetricDelta directly with
+ *  withScopeAvg + larger sizing. */
 function DeltaChip({ env }: { env: MetricEnvelope | null | undefined }) {
-  if (!env || env.delta_pct == null || env.direction == null) return null
-  const d = env.delta_pct
-  const aligned =
-    (env.direction === 'higher_better' && d > 0) ||
-    (env.direction === 'lower_better' && d < 0)
-  // For lower_better metrics, a negative delta is GOOD — but the
-  // arrow shows numerical direction (↑ for positive value vs avg),
-  // not goodness. Color carries the goodness.
-  const color = d === 0
-    ? 'rgb(120,120,120)'
-    : aligned ? 'rgb(36,128,68)' : 'rgb(170,52,52)'
-  const arrow = d > 0 ? '↑' : d < 0 ? '↓' : '·'
-  const sign = d > 0 ? '+' : ''
-  const tip = `${env.value} vs scope avg ${env.scope_avg} — ${sign}${d.toFixed(1)}% ${aligned ? '(better)' : '(worse)'}`
   return (
-    <span
-      title={tip}
-      style={{
-        fontSize: '0.75em',
-        marginLeft: '0.4rem',
-        color,
-        whiteSpace: 'nowrap',
-        fontWeight: 500,
-      }}
-    >
-      {arrow} {sign}{d.toFixed(1)}%
+    <span style={{ fontSize: '0.75em', marginLeft: '0.4rem' }}>
+      <MetricDelta env={env} />
     </span>
   )
 }

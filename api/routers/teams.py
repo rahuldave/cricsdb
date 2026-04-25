@@ -809,6 +809,20 @@ def _safe_div(a, b, mul=1, ndigits=2):
     return round(a * mul / b, ndigits)
 
 
+def _half(v: float | int | None) -> float | None:
+    """Halve a per-match league rate to per-team-equivalent. Each
+    match has 2 fielding/bowling sides, so league total catches /
+    matches counts both sides; the team-side comparable is half.
+    Used for scope_avg's of catches_per_match, stumpings_per_match,
+    run_outs_per_match, wides_per_match, noballs_per_match — every
+    rate computed as (fielding-side count / matches) where the
+    league-side denominator counts each match once but the league-
+    side numerator counts both sides."""
+    if v is None:
+        return None
+    return round(v / 2, 2)
+
+
 def _team_innings_clause(
     filters: FilterParams, team: str | None, side: str = "batting",
     aux: AuxParams | None = None,
@@ -1497,8 +1511,11 @@ async def _compute_bowling_summary(
         "sixes_conceded": wrap_metric(t["sixes_conceded"], s["sixes_conceded"], "sixes_conceded", sample_size=legal),
         "wides": wrap_metric(t["wides"], s["wides"], "wides", sample_size=matches),
         "noballs": wrap_metric(t["noballs"], s["noballs"], "noballs", sample_size=matches),
-        "wides_per_match": wrap_metric(t["wides_per_match"], s["wides_per_match"], "wides_per_match", sample_size=matches),
-        "noballs_per_match": wrap_metric(t["noballs_per_match"], s["noballs_per_match"], "noballs_per_match", sample_size=matches),
+        # Per-match league rates halved to per-team-equivalent (each
+        # match has 2 bowling sides; league total wides / matches
+        # counts both teams' bowling).
+        "wides_per_match": wrap_metric(t["wides_per_match"], _half(s["wides_per_match"]), "wides_per_match", sample_size=matches),
+        "noballs_per_match": wrap_metric(t["noballs_per_match"], _half(s["noballs_per_match"]), "noballs_per_match", sample_size=matches),
         "avg_opposition_total": wrap_metric(t["avg_opposition_total"], s["avg_opposition_total"], "avg_opposition_total", sample_size=t["innings_bowled"]),
         "worst_conceded": t["worst_conceded"],
         "best_defence": t["best_defence"],
@@ -1887,16 +1904,6 @@ async def _fielding_aggregates(
         "stumpings_per_match": _safe_div(stumpings, matches, 1, 2),
         "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
     }
-
-
-def _half(v: float | int | None) -> float | None:
-    """Halve a per-match league rate to per-team-equivalent. Each
-    match has 2 fielding sides, so league total catches / matches
-    counts both sides; the team-side comparable is half. Used for
-    scope_avg's of catches_per_match etc."""
-    if v is None:
-        return None
-    return round(v / 2, 2)
 
 
 @router.get("/{team}/fielding/summary")
