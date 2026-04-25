@@ -111,16 +111,25 @@ export default function TeamCompareGrid({ teams, filters }: Props) {
         className="wisden-compare-legend"
         style={{
           fontSize: '0.85em',
-          opacity: 0.65,
+          opacity: 0.7,
           fontStyle: 'italic',
           marginBottom: '0.75rem',
+          lineHeight: 1.5,
         }}
-        title="Compact substats appear after the primary number on phase + partnership-by-wicket rows."
       >
-        Substats: <strong>b</strong> = boundary % · <strong>d</strong> = dot % ·
-        <strong> w</strong> = wickets ·
-        <strong> n</strong> = partnerships in scope ·
-        <strong> hi</strong> = highest single partnership
+        <div title="Each chip is the team's value vs the league baseline computed for the SAME FilterBar scope above (tournament + season + gender + team_type + venue). Narrow the filters and every chip recomputes against the narrower baseline.">
+          <strong>↑/↓ ±X%</strong> = team value vs league baseline in the active
+          FilterBar scope. Arrow shows numerical direction (↑ above league, ↓
+          below); colour shows good/bad — <span style={{ color: 'rgb(36,128,68)', fontWeight: 500 }}>green = better</span>,
+          <span style={{ color: 'rgb(170,52,52)', fontWeight: 500 }}> red = worse</span>{' '}
+          (econ lower-better, RR higher-better — colour bakes that in).
+        </div>
+        <div style={{ marginTop: '0.2rem' }}>
+          Substats: <strong>b</strong> = boundary % · <strong>d</strong> = dot % ·
+          <strong> w</strong> = wickets ·
+          <strong> n</strong> = partnerships in scope ·
+          <strong> hi</strong> = highest single partnership
+        </div>
       </div>
 
       <div
