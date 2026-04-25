@@ -671,7 +671,7 @@ async def _bowling_summary_live(filters, aux):
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE {where}
-          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field', 'retired not out')
         """,
         params,
     )
@@ -801,7 +801,7 @@ async def _bowling_by_phase_live(filters, aux):
         JOIN match m ON m.id = i.match_id
         WHERE {where}
           AND d.over_number BETWEEN 0 AND 19
-          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field', 'retired not out')
         GROUP BY phase
         """,
         params,
@@ -902,7 +902,7 @@ async def _bowling_by_season_live(filters, aux):
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE {where}
-          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field', 'retired not out')
         GROUP BY m.season
         """,
         params,
