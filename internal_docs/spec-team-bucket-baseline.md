@@ -1,7 +1,32 @@
 # Spec: Team / Bucket Avg Baselines (Phase 2 of Compare-tab perf)
 
-Status: build-ready (pending review).
+Status: SHIPPED 2026-04-25 (commits 614b309, 8bf1151, 9c812ef, 501b23e).
 Depends on: `spec-team-compare-scoped-slots.md` Phase 1 (commit `6c5b416`).
+
+End-to-end speedup measured on `?team=RCB&gender=male&team_type=club&tab=Compare&compare1=__avg__`:
+prod build went from **~4s → 1.7s** (2.4x). Dev (with StrictMode
+double-mount) went from ~5s → 2.9s.
+
+What shipped vs spec:
+- 8 of 12 `/scope/averages/*` endpoints dispatch via baseline.
+  Skipped: `/batting/summary`, `/partnerships/summary`,
+  `/partnerships/by-wicket`, `/partnerships/by-season` — first three
+  return identity-bearing payloads (highest_total / best_pair) needing
+  schema additions; last needs `count_50_plus` / `count_100_plus`
+  cell counters.
+- 2 of ~12 `/teams/{team}/*` endpoints dispatch (the by-phase pair).
+  Per-team summary + by-season endpoints stay live for the same
+  identity-payload reasons.
+- These cover the heaviest endpoints (3+ second by-phase queries).
+  The deferred endpoints are <600ms each and don't dominate the
+  page-load.
+
+Future work to push prod < 1s: extend BucketBaselineBatting with
+identity columns (`highest_inn_match_id`, `highest_inn_team`,
+`highest_inn_innings_number`) + analogous additions for
+partnerships → swap the remaining 4 scope-avg + 4 team endpoints.
+Then async-deebase connection pooling (note in this spec) for
+parallel SQLite reads.
 
 ## Why
 
