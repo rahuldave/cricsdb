@@ -8,6 +8,7 @@ import AvgSummaryRow from './AvgSummaryRow'
 import PhaseBandsRow from './PhaseBandsRow'
 import PartnershipByWicketRows from './PartnershipByWicketRows'
 import SeasonTrajectoryStrip from './SeasonTrajectoryStrip'
+import SlotHeaderChip from './SlotHeaderChip'
 import {
   teamDisciplineHasData, teamMatchesInScope, carryTeamFilters,
   avgDisciplineHasData, scopeAvgLabel,
@@ -16,21 +17,14 @@ import {
 import { useFetch, type FetchState } from '../../hooks/useFetch'
 import { getTeamProfile, getScopeAverageProfile } from '../../api'
 import type { TeamProfile, ScopeAverageProfile, FilterParams } from '../../types'
+import type { SlotState, CompareSlots } from '../../hooks/useCompareSlots'
 
 interface Props {
-  /** [primary, ...compareTeams] length 1, 2 or 3. Single-column is
-   *  used on the Compare tab before the user has added any compare. */
-  teams: string[]
-  filters: FilterParams
-  /** Whether the league-average column is mounted. Sourced from the
-   *  parent's compare-slot resolution so this component doesn't have
-   *  to know which slot holds the avg. */
-  avgSlotPresent: boolean
-  /** Clear primary + all compare slots — invoked by the ✕ on column 0. */
+  primaryTeam: string
+  primaryFilters: FilterParams
+  slots: CompareSlots
   onClearPrimary: () => void
-  /** Remove a team-kind compare slot by name. */
   onRemoveTeam: (name: string) => void
-  /** Remove the avg-kind compare slot (whichever slot holds it). */
   onRemoveAvg: () => void
 }
 
@@ -38,77 +32,102 @@ const DISCIPLINES: TeamDiscipline[] = [
   'results', 'batting', 'bowling', 'fielding', 'partnerships',
 ]
 
+type AnyProfile = TeamProfile | ScopeAverageProfile
+type ProfileFetch = FetchState<AnyProfile | null>
+
+// Synthesize a primary "slot" so column 0 fits the same iteration as
+// the two compare slots. Primary is always kind='team', no overrides.
+function primarySlotOf(team: string, filters: FilterParams): SlotState {
+  return {
+    kind: 'team',
+    entity: team,
+    scope: {
+      gender: filters.gender,
+      team_type: filters.team_type,
+      tournament: filters.tournament,
+      season_from: filters.season_from,
+      season_to: filters.season_to,
+      filter_venue: filters.filter_venue,
+      series_type: filters.series_type,
+    },
+    overrides: {},
+  }
+}
+
+// Stable string fingerprint per slot so useFetch deps stay primitive
+// across renders (slots is rebuilt on every URL change but its inner
+// shape only differs when user actually edits scope).
+function slotKey(s: SlotState | null): string {
+  if (!s) return ''
+  return `${s.kind}|${s.entity ?? ''}|${JSON.stringify(s.scope)}`
+}
+
+function fetchSlot(slot: SlotState | null): Promise<AnyProfile | null> {
+  if (!slot) return Promise.resolve(null)
+  if (slot.kind === 'avg') return getScopeAverageProfile(slot.scope)
+  return getTeamProfile(slot.entity!, slot.scope)
+}
+
+function disciplineHasData(slot: SlotState, profile: AnyProfile, d: TeamDiscipline): boolean {
+  if (slot.kind === 'avg') return avgDisciplineHasData(d, profile as ScopeAverageProfile)
+  return teamDisciplineHasData(d, profile as TeamProfile)
+}
+
+function slotMatches(slot: SlotState, profile: AnyProfile): number {
+  if (slot.kind === 'avg') return (profile as ScopeAverageProfile).summary?.matches ?? 0
+  return teamMatchesInScope(profile as TeamProfile)
+}
+
+function slotLabel(slot: SlotState): string {
+  if (slot.kind === 'avg') return scopeAvgLabel(slot.scope)
+  return slot.entity ?? ''
+}
+
 export default function TeamCompareGrid({
-  teams, filters, avgSlotPresent,
+  primaryTeam, primaryFilters, slots,
   onClearPrimary, onRemoveTeam, onRemoveAvg,
 }: Props) {
-  const avgSlot = avgSlotPresent
+  const primary = primarySlotOf(primaryTeam, primaryFilters)
+  const slot1 = slots.slot1
+  const slot2 = slots.slot2
 
-  const filterDeps = [
-    filters.gender, filters.team_type, filters.tournament,
-    filters.season_from, filters.season_to,
-    filters.filter_venue,
+  // Fixed-arity useFetch calls: one per slot. Discriminate kind inside
+  // the fetcher so the same hook position serves both team and avg.
+  const f0 = useFetch<AnyProfile | null>(() => fetchSlot(primary), [slotKey(primary)])
+  const f1 = useFetch<AnyProfile | null>(() => fetchSlot(slot1),  [slotKey(slot1)])
+  const f2 = useFetch<AnyProfile | null>(() => fetchSlot(slot2),  [slotKey(slot2)])
+
+  const renderColumns: { slot: SlotState; fetch: ProfileFetch; isPrimary: boolean }[] = [
+    { slot: primary, fetch: f0, isPrimary: true },
   ]
+  if (slot1) renderColumns.push({ slot: slot1, fetch: f1, isPrimary: false })
+  if (slot2) renderColumns.push({ slot: slot2, fetch: f2, isPrimary: false })
 
-  // Fixed-arity slots so React sees the same number of useFetch calls
-  // across renders. Empty slots resolve to null and are skipped at
-  // render time. Mirrors PlayerCompareGrid.
-  const t0 = teams[0] ?? ''
-  const t1 = teams[1] ?? ''
-  const t2 = teams[2] ?? ''
-  const f0 = useFetch<TeamProfile | null>(
-    () => t0 ? getTeamProfile(t0, filters) : Promise.resolve(null),
-    [t0, ...filterDeps],
-  )
-  const f1 = useFetch<TeamProfile | null>(
-    () => t1 ? getTeamProfile(t1, filters) : Promise.resolve(null),
-    [t1, ...filterDeps],
-  )
-  const f2 = useFetch<TeamProfile | null>(
-    () => t2 ? getTeamProfile(t2, filters) : Promise.resolve(null),
-    [t2, ...filterDeps],
-  )
-  const fAvg = useFetch<ScopeAverageProfile | null>(
-    () => avgSlot ? getScopeAverageProfile(filters) : Promise.resolve(null),
-    [avgSlot, ...filterDeps],
-  )
-  const fetches: FetchState<TeamProfile | null>[] =
-    [f0, f1, f2].slice(0, teams.length)
+  const anyLoading = renderColumns.some(c => c.fetch.loading && !c.fetch.data)
+  const firstError = renderColumns.find(c => c.fetch.error)
 
-  const anyLoading = fetches.some(f => f.loading && !f.data) || (avgSlot && fAvg.loading && !fAvg.data)
-  const firstError = fetches.find(f => f.error) ?? (avgSlot ? (fAvg.error ? fAvg : undefined) : undefined)
-
-  const removeAt = (idx: number) => {
-    if (idx === 0) onClearPrimary()
-    else onRemoveTeam(teams[idx])
-  }
-
-  const removeAvgSlot = onRemoveAvg
-
-  // Which disciplines have ANY column with data in scope — drives
-  // row visibility. Columns lacking that discipline render a dim
-  // placeholder so every row stays vertically aligned across columns.
+  // Drive row visibility — a discipline renders if ANY column has data.
   const anyHasData: Record<TeamDiscipline, boolean> = {
     results: false, batting: false, bowling: false, fielding: false, partnerships: false,
   }
-  for (const f of fetches) {
-    if (!f.data) continue
+  for (const c of renderColumns) {
+    if (!c.fetch.data) continue
     for (const d of DISCIPLINES) {
-      if (teamDisciplineHasData(d, f.data)) anyHasData[d] = true
-    }
-  }
-  if (avgSlot && fAvg.data) {
-    for (const d of DISCIPLINES) {
-      if (avgDisciplineHasData(d, fAvg.data)) anyHasData[d] = true
+      if (disciplineHasData(c.slot, c.fetch.data, d)) anyHasData[d] = true
     }
   }
 
-  const totalColumns = teams.length + (avgSlot ? 1 : 0)
-  const avgLabel = scopeAvgLabel(filters)
+  const totalColumns = renderColumns.length
+
+  const handleRemove = (slot: SlotState, isPrimary: boolean) => {
+    if (isPrimary) onClearPrimary()
+    else if (slot.kind === 'avg') onRemoveAvg()
+    else if (slot.entity) onRemoveTeam(slot.entity)
+  }
 
   return (
     <div>
-      <ScopeIndicator filters={filters} />
+      <ScopeIndicator filters={primaryFilters} />
 
       <div
         className="wisden-compare-legend"
@@ -120,9 +139,9 @@ export default function TeamCompareGrid({
           lineHeight: 1.5,
         }}
       >
-        <div title="Each chip is the team's value vs the league baseline computed for the SAME FilterBar scope above (tournament + season + gender + team_type + venue). Narrow the filters and every chip recomputes against the narrower baseline.">
-          <strong>↑/↓ ±X%</strong> = team value vs league baseline in the active
-          FilterBar scope. Arrow shows numerical direction (↑ above league, ↓
+        <div title="Each chip is the team's value vs the league baseline computed for that COLUMN's scope. Slots that don't override scope inherit from the FilterBar above; slots that do (look for the scope chip below the team name, once enabled) baseline against their own narrower scope.">
+          <strong>↑/↓ ±X%</strong> = team value vs league baseline in each
+          column's scope. Arrow shows numerical direction (↑ above league, ↓
           below); colour shows good/bad — <span style={{ color: 'rgb(36,128,68)', fontWeight: 500 }}>green = better</span>,
           <span style={{ color: 'rgb(170,52,52)', fontWeight: 500 }}> red = worse</span>{' '}
           (econ lower-better, RR higher-better — colour bakes that in).
@@ -144,67 +163,53 @@ export default function TeamCompareGrid({
           alignItems: 'start',
         }}
       >
-        {teams.map((name, idx) => (
-          <CompareColumn
-            key={name}
-            team={name}
-            fetch={fetches[idx]}
-            isPrimary={idx === 0}
-            onRemove={() => removeAt(idx)}
+        {renderColumns.map((c, idx) => (
+          <CompareSlotColumn
+            key={c.isPrimary ? `__primary__${c.slot.entity}` : `slot${idx}-${c.slot.kind}-${c.slot.entity ?? 'avg'}`}
+            slot={c.slot}
+            fetch={c.fetch}
+            isPrimary={c.isPrimary}
             anyHasData={anyHasData}
-            filters={filters}
+            onRemove={() => handleRemove(c.slot, c.isPrimary)}
           />
         ))}
-        {avgSlot && (
-          <AvgCompareColumn
-            key="__avg__"
-            label={avgLabel}
-            fetch={fAvg}
-            anyHasData={anyHasData}
-            onRemove={removeAvgSlot}
-          />
-        )}
       </div>
 
-      {anyLoading && !fetches.every(f => f.data) && (
+      {anyLoading && !renderColumns.every(c => c.fetch.data) && (
         <Spinner label="Loading teams…" />
       )}
       {firstError && !anyLoading && (
         <ErrorBanner
-          message={`Could not load one of the columns: ${firstError.error}`}
-          onRetry={firstError.refetch}
+          message={`Could not load one of the columns: ${firstError.fetch.error}`}
+          onRetry={firstError.fetch.refetch}
         />
       )}
 
       <SeasonTrajectoryStrip
-        columns={[
-          ...teams.map((name, idx) => ({
-            label: name,
-            profile: fetches[idx]?.data,
-            isAverage: false,
-          })).filter((c): c is { label: string; profile: TeamProfile; isAverage: boolean } => !!c.profile),
-          ...(avgSlot && fAvg.data
-            ? [{ label: avgLabel, profile: fAvg.data, isAverage: true }]
-            : []),
-        ]}
+        columns={renderColumns
+          .filter(c => !!c.fetch.data)
+          .map(c => ({
+            label: slotLabel(c.slot),
+            profile: c.fetch.data!,
+            isAverage: c.slot.kind === 'avg',
+          }))}
       />
     </div>
   )
 }
 
-// ─── one column ─────────────────────────────────────────────────────
+// ─── one column (team or avg) ───────────────────────────────────────
 
 interface ColumnProps {
-  team: string
-  fetch: FetchState<TeamProfile | null>
+  slot: SlotState
+  fetch: ProfileFetch
   isPrimary: boolean
-  onRemove: () => void
   anyHasData: Record<TeamDiscipline, boolean>
-  filters: FilterParams
+  onRemove: () => void
 }
 
-function CompareColumn({
-  team, fetch, isPrimary, onRemove, anyHasData, filters,
+function CompareSlotColumn({
+  slot, fetch, isPrimary, anyHasData, onRemove,
 }: ColumnProps) {
   const profile = fetch.data
 
@@ -219,134 +224,105 @@ function CompareColumn({
     )
   }
 
-  const matches = teamMatchesInScope(profile)
-  // FlagBadge returns null for unmappable club sides so this line
-  // naturally degrades for franchise teams — no extra guard needed.
-  const gender = filters.gender || null
+  const matches = slotMatches(slot, profile)
+  const isTeam = slot.kind === 'team'
+  const teamName = slot.entity ?? ''
+  const gender = slot.scope.gender || null
 
-  const qs = new URLSearchParams({ team, ...carryTeamFilters(filters) })
-  const soloLink = `/teams?${qs}`
-
-  return (
-    <div className="wisden-compare-col">
-      <div className="wisden-compare-col-head">
-        <h2 className="wisden-compare-col-name">
-          <span style={{ marginRight: '0.35rem' }}>
-            <FlagBadge team={team} gender={gender} size="sm" />
-          </span>
-          <Link to={soloLink} className="wisden-compare-col-namelink">{team}</Link>
-        </h2>
-        <button
-          type="button"
-          className="wisden-compare-col-remove"
-          onClick={onRemove}
-          aria-label={isPrimary ? 'Clear comparison' : `Remove ${team}`}
-          title={isPrimary ? 'Clear comparison — back to landing' : `Remove ${team}`}
-        >
-          ✕
-        </button>
-      </div>
-      <div className="wisden-player-identity">
-        {matches > 0 && <><span className="num">{matches}</span> matches</>}
-        {matches === 0 && <em>no matches in scope</em>}
-      </div>
-
-      {DISCIPLINES.map(d => {
-        if (!anyHasData[d]) return null
-        const has = teamDisciplineHasData(d, profile)
-        return (
-          <div key={d}>
-            <TeamSummaryRow
-              discipline={d}
-              profile={profile}
-              team={team}
-              filters={filters}
-              placeholder={!has}
-            />
-            {(d === 'batting' || d === 'bowling') && (
-              <PhaseBandsRow profile={profile} discipline={d} placeholder={!has} />
-            )}
-            {d === 'partnerships' && (
-              <PartnershipByWicketRows profile={profile} placeholder={!has} />
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// ─── league-average column ──────────────────────────────────────────
-
-interface AvgColumnProps {
-  label: string
-  fetch: FetchState<ScopeAverageProfile | null>
-  anyHasData: Record<TeamDiscipline, boolean>
-  onRemove: () => void
-}
-
-function AvgCompareColumn({
-  label, fetch, anyHasData, onRemove,
-}: AvgColumnProps) {
-  const profile = fetch.data
-
-  if (fetch.loading && !profile) {
-    return <div className="wisden-compare-col"><Spinner label="…" /></div>
-  }
-  if (!profile) {
-    return (
-      <div className="wisden-compare-col">
-        <div className="wisden-empty">No data.</div>
-      </div>
-    )
-  }
-
-  const matches = profile.summary?.matches ?? 0
+  const soloLink = isTeam
+    ? `/teams?${new URLSearchParams({ team: teamName, ...carryTeamFilters(slot.scope as FilterParams) })}`
+    : null
 
   return (
     <div className="wisden-compare-col">
       <div className="wisden-compare-col-head">
         <h2 className="wisden-compare-col-name">
-          {/* FlagBadge null-render: no flag for the league average. */}
-          <span
-            className="wisden-compare-col-namelink"
-            title="Pool-weighted league baseline scoped to the active filters"
-            style={{ fontStyle: 'italic' }}
-          >
-            {label}
-          </span>
+          {isTeam && (
+            <>
+              <span style={{ marginRight: '0.35rem' }}>
+                <FlagBadge team={teamName} gender={gender} size="sm" />
+              </span>
+              <Link to={soloLink!} className="wisden-compare-col-namelink">{teamName}</Link>
+            </>
+          )}
+          {!isTeam && (
+            <span
+              className="wisden-compare-col-namelink"
+              title="Pool-weighted league baseline scoped to the active filters"
+              style={{ fontStyle: 'italic' }}
+            >
+              {scopeAvgLabel(slot.scope)}
+            </span>
+          )}
         </h2>
         <button
           type="button"
           className="wisden-compare-col-remove"
           onClick={onRemove}
-          aria-label="Remove league average"
-          title="Remove league average column"
+          aria-label={
+            isPrimary ? 'Clear comparison'
+              : isTeam ? `Remove ${teamName}`
+              : 'Remove league average'
+          }
+          title={
+            isPrimary ? 'Clear comparison — back to landing'
+              : isTeam ? `Remove ${teamName}`
+              : 'Remove league average column'
+          }
         >
           ✕
         </button>
       </div>
+
+      <SlotHeaderChip overrides={slot.overrides} />
+
       <div className="wisden-player-identity">
-        {matches > 0 && <><span className="num">{matches}</span> matches in scope</>}
+        {matches > 0 && (
+          <>
+            <span className="num">{matches}</span>{' '}
+            {isTeam ? 'matches' : 'matches in scope'}
+          </>
+        )}
         {matches === 0 && <em>no matches in scope</em>}
       </div>
 
       {DISCIPLINES.map(d => {
         if (!anyHasData[d]) return null
-        const has = avgDisciplineHasData(d, profile)
+        const has = disciplineHasData(slot, profile, d)
+        if (isTeam) {
+          const tp = profile as TeamProfile
+          return (
+            <div key={d}>
+              <TeamSummaryRow
+                discipline={d}
+                profile={tp}
+                team={teamName}
+                filters={slot.scope as FilterParams}
+                placeholder={!has}
+              />
+              {(d === 'batting' || d === 'bowling') && (
+                <PhaseBandsRow profile={tp} discipline={d} placeholder={!has} />
+              )}
+              {d === 'partnerships' && (
+                <PartnershipByWicketRows profile={tp} placeholder={!has} />
+              )}
+            </div>
+          )
+        }
+        const ap = profile as ScopeAverageProfile
         return (
           <div key={d}>
             <AvgSummaryRow
               discipline={d}
-              profile={profile}
+              profile={ap}
               placeholder={!has}
             />
             {(d === 'batting' || d === 'bowling') && (
-              <PhaseBandsRow profile={profile} discipline={d} placeholder={!has} />
+              <PhaseBandsRow profile={ap} discipline={d} placeholder={!has} />
             )}
             {d === 'partnerships' && (
               <PartnershipByWicketRows
-                profile={profile}
+                profile={ap}
                 isAverage
                 placeholder={!has}
               />

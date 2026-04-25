@@ -373,9 +373,9 @@ export default function Teams() {
             {activeTab === 'Compare' && selected && (
               <>
                 <TeamCompareGrid
-                  teams={[selected, ...compareTeams]}
-                  filters={filters}
-                  avgSlotPresent={avgSlotPresent}
+                  primaryTeam={selected}
+                  primaryFilters={filters}
+                  slots={slots}
                   onClearPrimary={onClearCompareAll}
                   onRemoveTeam={onRemoveTeam}
                   onRemoveAvg={onRemoveAvg}
