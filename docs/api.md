@@ -602,8 +602,12 @@ Partnerships tabs on `/teams`. See `docs/spec-team-stats.md` for the
 design. Shape follows a consistent pattern:
 
 - `.../summary` — top-line ball-level stats (runs/balls/avg/SR/etc.).
+  Each numeric metric envelope-wrapped — see "Compare metric envelope".
 - `.../by-season` — season rows for the line/bar charts.
-- `.../by-phase` — powerplay / middle / death split.
+- `.../by-phase` — powerplay / middle / death split. Per-phase
+  numeric metrics (run_rate / economy / boundary_pct / dot_pct)
+  envelope-wrapped against the in-scope league baseline; counts
+  (runs / balls / wickets_lost / fours / sixes) stay flat.
 - `.../top-batters` `.../top-bowlers` `.../top-fielders` — top-N
   players for that team. Params: `limit` (default 5).
 - `.../phase-season-heatmap` — phase × season matrix for run rate +
@@ -660,7 +664,9 @@ same filter scope plus `side` (`batting`/`bowling` — whether
 partnerships are FOR or AGAINST the team).
 
 - `.../by-wicket?side=batting` — stats per wicket-number (1st-wicket
-  avg partnership, 2nd, …, 10th).
+  avg partnership, 2nd, …, 10th). Numeric metrics (n, avg_runs)
+  envelope-wrapped per wicket; identity-bearing best_partnership
+  stays flat.
 - `.../best-pairs` — top-3 pairs per wicket by total runs together.
 - `.../heatmap` — wicket × season matrix for avg partnership.
 - `.../top?side=batting&limit=10` — top-N individual partnerships.

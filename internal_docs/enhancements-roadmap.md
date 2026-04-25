@@ -857,6 +857,61 @@ subtabs. Commits `5179683` … `ca0b785`.
   commits share a file) is the splitting mechanism going forward
   — not large end-of-session dump commits.
 
+### Shipped 2026-04-25 (Teams tabs — delta chips on StatCards + by-phase / by-wicket envelope)
+
+Two post-Spec-1 quick wins exploiting the per-metric envelope shipped
+in Phase 2B:
+
+**Quick Win 1 — single-team Teams tab StatCards.** Previously the
+delta_pct + scope_avg fields on the 5 compare endpoints were only
+consumed by the Compare grid. Wired up `MetricDelta` (new shared
+component, frontend/src/components/MetricDelta.tsx) as StatCard
+subtitles on the per-discipline tabs (Batting / Bowling / Fielding /
+default summary). Single-team views now show "vs avg X.YZ ↑ +N.N%"
+under each rate / average StatCard, color-coded by direction. Counts
+(Wickets, Catches, Hundreds) stay flat — direction=null on the
+envelope, MetricDelta returns null.
+
+Backend bug fix surfaced: wides_per_match + noballs_per_match's
+scope_avg was double the team-comparable value (league pool counts
+both bowling sides per match). Moved `_half()` helper to module-
+level near `_safe_div`, applied it to wides/noballs in addition to
+catches/stumpings/run_outs. RCB IPL 2024 wides went from -44% delta
+to a sensible +11.2%.
+
+**Quick Win 2 — by-phase + by-wicket envelope.** Migrated
+`/teams/{team}/batting/by-phase`, `/bowling/by-phase`, and
+`/partnerships/by-wicket` to envelope-shape per phase / wicket row.
+Each row's numeric rate metrics (run_rate / economy / boundary_pct /
+dot_pct / avg_runs / n) wrap_metric'd against the in-scope league
+baseline. Counts on those rows (runs / balls / wickets / fours /
+sixes / best_runs) stay flat — same direction-null treatment as the
+summary endpoints' counts. New per-phase / per-wicket aggregator
+helpers (`_batting_by_phase_aggregates`, `_bowling_by_phase_aggregates`,
+`_partnerships_by_wicket_aggregates`) take `team: str | None` and
+get called twice per endpoint for team + scope_avg.
+
+Frontend types split: TeamBattingPhase / TeamBowlingPhase /
+PartnershipByWicket gain MetricEnvelope on metric fields; new
+ScopeBattingPhaseFlat / ScopeBowlingPhaseFlat preserve the unchanged
+flat shape on `/scope/averages/*/by-phase` (which intentionally
+stays flat — it IS the baseline). PhaseBandsRow + PartnershipByWicketRows
+handle both shapes via `rv()` (read value) + `env()` (extract
+envelope) helpers — same component renders team chips AND avg-column
+raw numbers without dispatch.
+
+Verified RCB IPL 2024 Compare:
+- PP RR 9.73 ↑+2.7%, Mid RR 9.26 ↑+4.9%, Death RR 12.55 ↑+12.0%
+- PP Econ 9.77 ↑+3.2%, Mid Econ 9.53 ↑+7.9%, Death Econ 10.93 ↓-2.5%
+- 1st wkt 47.1 ↑+33.1% (RCB openers way above league)
+- 3rd wkt 46.7 ↑+41.1% (Kohli at 3 — strong)
+- 2nd wkt 17.1 ↓-38.3%, 8th wkt 7.6 ↓-27.6% (clear weakness)
+
+Regression: REG→NEW flip on 5 affected URLs (commit `e03aaff`),
+shape change (`2d9e335`), NEW→REG cleanup (`12424c3`). Final state:
+38 REG / 0 NEW in teams/, 29 REG / 0 NEW in scope-averages/.
+Integration: 16/16 still pass.
+
 ### Shipped 2026-04-24 (Teams Compare — Spec 1 / Phase 2B: envelope migration)
 
 - **`api/metrics_metadata.py`** — single-source-of-truth direction
