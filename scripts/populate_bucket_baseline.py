@@ -218,27 +218,44 @@ async def _populate_match(db, cells=None):
 
 
 async def _populate_batting(db, cells=None):
+    """Build batting baseline rows + identity columns. Uses a temp
+    table of per-innings stats so identity UPDATEs don't have to
+    re-aggregate over delivery."""
     cf, cfp = _cell_filter_clause(cells, "m")
 
-    # League rows — every batting innings in the cell.
+    # Build per-innings temp table once; reused by INSERTs + UPDATEs.
+    await db.q("DROP TABLE IF EXISTS _bb_batting_inn")
     await db.q(
         f"""
-        WITH inn AS (
-            SELECT
-                m.gender, m.team_type, COALESCE(m.event_name, '') AS tournament,
-                m.season, i.team AS innings_team, i.id AS innings_id,
-                i.innings_number,
-                SUM(d.runs_total) AS runs,
-                SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
-                SUM(CASE WHEN d.runs_batter = 4 AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS fours,
-                SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
-                SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots
-            FROM delivery d
-            JOIN innings i ON i.id = d.innings_id
-            JOIN match m ON m.id = i.match_id
-            WHERE i.super_over = 0 {cf}
-            GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, i.team, i.id, i.innings_number
-        )
+        CREATE TEMP TABLE _bb_batting_inn AS
+        SELECT
+            m.gender, m.team_type, COALESCE(m.event_name, '') AS tournament,
+            m.season, i.team AS innings_team, i.id AS innings_id,
+            m.id AS match_id, i.innings_number,
+            SUM(d.runs_total) AS runs,
+            SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
+            SUM(CASE WHEN d.runs_batter = 4 AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS fours,
+            SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
+            SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots,
+            COALESCE((
+                SELECT COUNT(*) FROM wicket w
+                JOIN delivery d2 ON d2.id = w.delivery_id
+                WHERE d2.innings_id = i.id
+                  AND w.kind NOT IN ('retired hurt', 'retired not out')
+            ), 0) AS wickets_lost
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE i.super_over = 0 {cf}
+        GROUP BY m.id, i.id
+        """,
+        cfp,
+    )
+    await db.q("CREATE INDEX _bb_batting_inn_cell ON _bb_batting_inn (gender, team_type, tournament, season, innings_team)")
+
+    # League rows.
+    await db.q(
+        f"""
         INSERT INTO bucketbaselinebatting (
             gender, team_type, tournament, season, team,
             innings_batted, total_runs, legal_balls, fours, sixes, dots,
@@ -259,31 +276,14 @@ async def _populate_batting(db, cells=None):
             SUM(CASE WHEN innings_number = 1 THEN runs ELSE 0 END) AS second_inn_runs_sum,
             SUM(CASE WHEN innings_number = 1 THEN 1 ELSE 0 END) AS second_inn_count,
             COALESCE(MAX(runs), 0) AS highest_inn_runs
-        FROM inn
+        FROM _bb_batting_inn
         GROUP BY gender, team_type, tournament, season
-        """,
-        cfp,
+        """
     )
 
-    # Per-team rows — innings where i.team = team.
+    # Per-team rows.
     await db.q(
         f"""
-        WITH inn AS (
-            SELECT
-                m.gender, m.team_type, COALESCE(m.event_name, '') AS tournament,
-                m.season, i.team AS team, i.id AS innings_id,
-                i.innings_number,
-                SUM(d.runs_total) AS runs,
-                SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
-                SUM(CASE WHEN d.runs_batter = 4 AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS fours,
-                SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
-                SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots
-            FROM delivery d
-            JOIN innings i ON i.id = d.innings_id
-            JOIN match m ON m.id = i.match_id
-            WHERE i.super_over = 0 {cf}
-            GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, i.team, i.id, i.innings_number
-        )
         INSERT INTO bucketbaselinebatting (
             gender, team_type, tournament, season, team,
             innings_batted, total_runs, legal_balls, fours, sixes, dots,
@@ -292,23 +292,177 @@ async def _populate_batting(db, cells=None):
             highest_inn_runs
         )
         SELECT
-            gender, team_type, tournament, season, team,
-            COUNT(*) AS innings_batted,
-            SUM(runs) AS total_runs,
-            SUM(legal_balls) AS legal_balls,
-            SUM(fours) AS fours,
-            SUM(sixes) AS sixes,
-            SUM(dots) AS dots,
-            SUM(CASE WHEN innings_number = 0 THEN runs ELSE 0 END) AS first_inn_runs_sum,
-            SUM(CASE WHEN innings_number = 0 THEN 1 ELSE 0 END) AS first_inn_count,
-            SUM(CASE WHEN innings_number = 1 THEN runs ELSE 0 END) AS second_inn_runs_sum,
-            SUM(CASE WHEN innings_number = 1 THEN 1 ELSE 0 END) AS second_inn_count,
-            COALESCE(MAX(runs), 0) AS highest_inn_runs
-        FROM inn
-        GROUP BY gender, team_type, tournament, season, team
+            gender, team_type, tournament, season, innings_team,
+            COUNT(*), SUM(runs), SUM(legal_balls), SUM(fours), SUM(sixes), SUM(dots),
+            SUM(CASE WHEN innings_number = 0 THEN runs ELSE 0 END),
+            SUM(CASE WHEN innings_number = 0 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN innings_number = 1 THEN runs ELSE 0 END),
+            SUM(CASE WHEN innings_number = 1 THEN 1 ELSE 0 END),
+            COALESCE(MAX(runs), 0)
+        FROM _bb_batting_inn
+        GROUP BY gender, team_type, tournament, season, innings_team
+        """
+    )
+
+    # UPDATE highest_inn identity (league + per-team).
+    # Pick ONE innings per cell with MAX(runs) — ROW_NUMBER ties broken
+    # by innings_id (stable). UPDATE ... FROM requires SQLite 3.33+.
+    await db.q(
+        f"""
+        WITH ranked AS (
+            SELECT *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY gender, team_type, tournament, season
+                    ORDER BY runs DESC, innings_id
+                ) AS rn
+            FROM _bb_batting_inn
+        )
+        UPDATE bucketbaselinebatting AS b
+        SET highest_inn_match_id       = r.match_id,
+            highest_inn_team           = r.innings_team,
+            highest_inn_innings_number = r.innings_number
+        FROM ranked r
+        WHERE r.rn = 1
+          AND b.team = '{LEAGUE_TEAM}'
+          AND b.gender = r.gender AND b.team_type = r.team_type
+          AND b.tournament = r.tournament AND b.season = r.season
+        """
+    )
+    await db.q(
+        f"""
+        WITH ranked AS (
+            SELECT *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY gender, team_type, tournament, season, innings_team
+                    ORDER BY runs DESC, innings_id
+                ) AS rn
+            FROM _bb_batting_inn
+        )
+        UPDATE bucketbaselinebatting AS b
+        SET highest_inn_match_id       = r.match_id,
+            highest_inn_team           = r.innings_team,
+            highest_inn_innings_number = r.innings_number
+        FROM ranked r
+        WHERE r.rn = 1
+          AND b.team != '{LEAGUE_TEAM}'
+          AND b.team = r.innings_team
+          AND b.gender = r.gender AND b.team_type = r.team_type
+          AND b.tournament = r.tournament AND b.season = r.season
+        """
+    )
+
+    # UPDATE lowest_all_out (league + per-team) — only innings where
+    # the team lost ≥10 wickets.
+    await db.q(
+        f"""
+        WITH ranked AS (
+            SELECT *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY gender, team_type, tournament, season
+                    ORDER BY runs ASC, innings_id
+                ) AS rn
+            FROM _bb_batting_inn
+            WHERE wickets_lost >= 10
+        )
+        UPDATE bucketbaselinebatting AS b
+        SET lowest_all_out_runs           = r.runs,
+            lowest_all_out_match_id       = r.match_id,
+            lowest_all_out_team           = r.innings_team,
+            lowest_all_out_innings_number = r.innings_number
+        FROM ranked r
+        WHERE r.rn = 1
+          AND b.team = '{LEAGUE_TEAM}'
+          AND b.gender = r.gender AND b.team_type = r.team_type
+          AND b.tournament = r.tournament AND b.season = r.season
+        """
+    )
+    await db.q(
+        f"""
+        WITH ranked AS (
+            SELECT *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY gender, team_type, tournament, season, innings_team
+                    ORDER BY runs ASC, innings_id
+                ) AS rn
+            FROM _bb_batting_inn
+            WHERE wickets_lost >= 10
+        )
+        UPDATE bucketbaselinebatting AS b
+        SET lowest_all_out_runs           = r.runs,
+            lowest_all_out_match_id       = r.match_id,
+            lowest_all_out_team           = r.innings_team,
+            lowest_all_out_innings_number = r.innings_number
+        FROM ranked r
+        WHERE r.rn = 1
+          AND b.team != '{LEAGUE_TEAM}'
+          AND b.team = r.innings_team
+          AND b.gender = r.gender AND b.team_type = r.team_type
+          AND b.tournament = r.tournament AND b.season = r.season
+        """
+    )
+
+    # UPDATE fifties/hundreds — per (batter, innings) score in the cell.
+    # Compute via separate aggregation over delivery.
+    await db.q("DROP TABLE IF EXISTS _bb_batting_pi")
+    await db.q(
+        f"""
+        CREATE TEMP TABLE _bb_batting_pi AS
+        SELECT m.gender, m.team_type, COALESCE(m.event_name, '') AS tournament,
+               m.season, i.team AS innings_team,
+               d.batter_id, i.id AS innings_id,
+               SUM(d.runs_batter) AS runs_batter
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE i.super_over = 0
+          AND d.extras_wides = 0 AND d.extras_noballs = 0
+          {cf}
+        GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season,
+                 i.team, d.batter_id, i.id
         """,
         cfp,
     )
+    # League fifties/hundreds.
+    await db.q(
+        f"""
+        WITH agg AS (
+            SELECT gender, team_type, tournament, season,
+                   SUM(CASE WHEN runs_batter BETWEEN 50 AND 99 THEN 1 ELSE 0 END) AS fifties,
+                   SUM(CASE WHEN runs_batter >= 100 THEN 1 ELSE 0 END) AS hundreds
+            FROM _bb_batting_pi
+            GROUP BY gender, team_type, tournament, season
+        )
+        UPDATE bucketbaselinebatting AS b
+        SET fifties = COALESCE(agg.fifties, 0),
+            hundreds = COALESCE(agg.hundreds, 0)
+        FROM agg
+        WHERE b.team = '{LEAGUE_TEAM}'
+          AND b.gender = agg.gender AND b.team_type = agg.team_type
+          AND b.tournament = agg.tournament AND b.season = agg.season
+        """
+    )
+    # Per-team fifties/hundreds.
+    await db.q(
+        f"""
+        WITH agg AS (
+            SELECT gender, team_type, tournament, season, innings_team,
+                   SUM(CASE WHEN runs_batter BETWEEN 50 AND 99 THEN 1 ELSE 0 END) AS fifties,
+                   SUM(CASE WHEN runs_batter >= 100 THEN 1 ELSE 0 END) AS hundreds
+            FROM _bb_batting_pi
+            GROUP BY gender, team_type, tournament, season, innings_team
+        )
+        UPDATE bucketbaselinebatting AS b
+        SET fifties = COALESCE(agg.fifties, 0),
+            hundreds = COALESCE(agg.hundreds, 0)
+        FROM agg
+        WHERE b.team != '{LEAGUE_TEAM}'
+          AND b.team = agg.innings_team
+          AND b.gender = agg.gender AND b.team_type = agg.team_type
+          AND b.tournament = agg.tournament AND b.season = agg.season
+        """
+    )
+    await db.q("DROP TABLE _bb_batting_inn")
+    await db.q("DROP TABLE _bb_batting_pi")
 
 
 async def _populate_bowling(db, cells=None):
@@ -445,6 +599,85 @@ async def _populate_bowling(db, cells=None):
                         AND wkt.tournament = bucketbaselinebowling.tournament
                         AND wkt.season = bucketbaselinebowling.season
                         AND wkt.bowling_team = bucketbaselinebowling.team)
+        """,
+        cfp,
+    )
+
+    # worst_inn_runs — MAX of opposition per-innings runs against this
+    # bowling side. League: max of any innings. Per-team: max where team
+    # was bowling (i.team != team).
+    await db.q(
+        f"""
+        WITH inn_runs AS (
+            SELECT m.gender, m.team_type, COALESCE(m.event_name, '') AS tournament,
+                   m.season, i.team AS batting_team, i.id AS innings_id,
+                   SUM(d.runs_total) AS runs
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0 {cf}
+            GROUP BY m.id, i.id
+        ),
+        league_max AS (
+            SELECT gender, team_type, tournament, season,
+                   COALESCE(MAX(runs), 0) AS worst_inn_runs
+            FROM inn_runs GROUP BY gender, team_type, tournament, season
+        )
+        UPDATE bucketbaselinebowling
+        SET worst_inn_runs = (
+            SELECT worst_inn_runs FROM league_max
+            WHERE league_max.gender = bucketbaselinebowling.gender
+              AND league_max.team_type = bucketbaselinebowling.team_type
+              AND league_max.tournament = bucketbaselinebowling.tournament
+              AND league_max.season = bucketbaselinebowling.season
+        )
+        WHERE team = '{LEAGUE_TEAM}'
+          AND EXISTS (SELECT 1 FROM league_max
+                      WHERE league_max.gender = bucketbaselinebowling.gender
+                        AND league_max.team_type = bucketbaselinebowling.team_type
+                        AND league_max.tournament = bucketbaselinebowling.tournament
+                        AND league_max.season = bucketbaselinebowling.season)
+        """,
+        cfp,
+    )
+    await db.q(
+        f"""
+        WITH match_teams AS (
+            SELECT DISTINCT match_id, team FROM matchplayer
+        ),
+        inn_runs AS (
+            SELECT m.gender, m.team_type, COALESCE(m.event_name, '') AS tournament,
+                   m.season, i.team AS batting_team, mt.team AS bowling_team,
+                   SUM(d.runs_total) AS runs
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            JOIN match_teams mt ON mt.match_id = m.id AND mt.team != i.team
+            WHERE i.super_over = 0 {cf}
+            GROUP BY m.id, i.id, mt.team
+        ),
+        team_max AS (
+            SELECT gender, team_type, tournament, season, bowling_team,
+                   COALESCE(MAX(runs), 0) AS worst_inn_runs
+            FROM inn_runs
+            GROUP BY gender, team_type, tournament, season, bowling_team
+        )
+        UPDATE bucketbaselinebowling
+        SET worst_inn_runs = (
+            SELECT worst_inn_runs FROM team_max
+            WHERE team_max.gender = bucketbaselinebowling.gender
+              AND team_max.team_type = bucketbaselinebowling.team_type
+              AND team_max.tournament = bucketbaselinebowling.tournament
+              AND team_max.season = bucketbaselinebowling.season
+              AND team_max.bowling_team = bucketbaselinebowling.team
+        )
+        WHERE team != '{LEAGUE_TEAM}'
+          AND EXISTS (SELECT 1 FROM team_max
+                      WHERE team_max.gender = bucketbaselinebowling.gender
+                        AND team_max.team_type = bucketbaselinebowling.team_type
+                        AND team_max.tournament = bucketbaselinebowling.tournament
+                        AND team_max.season = bucketbaselinebowling.season
+                        AND team_max.bowling_team = bucketbaselinebowling.team)
         """,
         cfp,
     )
@@ -728,20 +961,16 @@ async def _populate_partnership(db, cells=None):
     (matches the convention in api/routers/teams.py)."""
     cf, cfp = _cell_filter_clause(cells, "m")
 
-    # League rows: every partnership in the cell, grouped by wicket_number.
+    # Build per-cell-per-wicket per-partnership temp table once for
+    # both inserts + identity UPDATE.
+    await db.q("DROP TABLE IF EXISTS _bb_pship")
     await db.q(
         f"""
-        INSERT INTO bucketbaselinepartnership (
-            gender, team_type, tournament, season, team, wicket_number,
-            n, total_runs, total_balls, best_runs
-        )
-        SELECT
-            m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, '{LEAGUE_TEAM}',
-            p.wicket_number,
-            COUNT(*) AS n,
-            SUM(p.partnership_runs) AS total_runs,
-            SUM(p.partnership_balls) AS total_balls,
-            COALESCE(MAX(p.partnership_runs), 0) AS best_runs
+        CREATE TEMP TABLE _bb_pship AS
+        SELECT m.gender, m.team_type, COALESCE(m.event_name, '') AS tournament,
+               m.season, i.team AS batting_team, p.wicket_number,
+               p.id AS partnership_id, p.partnership_runs AS runs,
+               p.partnership_balls AS balls
         FROM partnership p
         JOIN innings i ON i.id = p.innings_id
         JOIN match m ON m.id = i.match_id
@@ -750,37 +979,93 @@ async def _populate_partnership(db, cells=None):
           AND (p.ended_by_kind IS NULL
                OR p.ended_by_kind NOT IN ('retired hurt', 'retired not out'))
           {cf}
-        GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, p.wicket_number
         """,
         cfp,
+    )
+    await db.q("CREATE INDEX _bb_pship_cell ON _bb_pship (gender, team_type, tournament, season, batting_team, wicket_number)")
+
+    # League rows.
+    await db.q(
+        f"""
+        INSERT INTO bucketbaselinepartnership (
+            gender, team_type, tournament, season, team, wicket_number,
+            n, total_runs, total_balls, best_runs,
+            count_50_plus, count_100_plus
+        )
+        SELECT
+            gender, team_type, tournament, season, '{LEAGUE_TEAM}', wicket_number,
+            COUNT(*),
+            SUM(runs),
+            SUM(balls),
+            COALESCE(MAX(runs), 0),
+            SUM(CASE WHEN runs >= 50 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN runs >= 100 THEN 1 ELSE 0 END)
+        FROM _bb_pship
+        GROUP BY gender, team_type, tournament, season, wicket_number
+        """
     )
 
-    # Per-team rows: i.team = batting team for the partnership.
+    # Per-team rows.
     await db.q(
         f"""
         INSERT INTO bucketbaselinepartnership (
             gender, team_type, tournament, season, team, wicket_number,
-            n, total_runs, total_balls, best_runs
+            n, total_runs, total_balls, best_runs,
+            count_50_plus, count_100_plus
         )
         SELECT
-            m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, i.team,
-            p.wicket_number,
+            gender, team_type, tournament, season, batting_team, wicket_number,
             COUNT(*),
-            SUM(p.partnership_runs),
-            SUM(p.partnership_balls),
-            COALESCE(MAX(p.partnership_runs), 0)
-        FROM partnership p
-        JOIN innings i ON i.id = p.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0
-          AND p.wicket_number IS NOT NULL
-          AND (p.ended_by_kind IS NULL
-               OR p.ended_by_kind NOT IN ('retired hurt', 'retired not out'))
-          {cf}
-        GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, i.team, p.wicket_number
-        """,
-        cfp,
+            SUM(runs),
+            SUM(balls),
+            COALESCE(MAX(runs), 0),
+            SUM(CASE WHEN runs >= 50 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN runs >= 100 THEN 1 ELSE 0 END)
+        FROM _bb_pship
+        GROUP BY gender, team_type, tournament, season, batting_team, wicket_number
+        """
     )
+
+    # UPDATE best_pair_partnership_id (league + per-team) — pick the
+    # partnership row holding MAX(runs) per (cell, wicket_number).
+    await db.q(
+        f"""
+        WITH ranked AS (
+            SELECT *, ROW_NUMBER() OVER (
+                PARTITION BY gender, team_type, tournament, season, wicket_number
+                ORDER BY runs DESC, partnership_id
+            ) AS rn FROM _bb_pship
+        )
+        UPDATE bucketbaselinepartnership AS b
+        SET best_pair_partnership_id = r.partnership_id
+        FROM ranked r
+        WHERE r.rn = 1
+          AND b.team = '{LEAGUE_TEAM}'
+          AND b.gender = r.gender AND b.team_type = r.team_type
+          AND b.tournament = r.tournament AND b.season = r.season
+          AND b.wicket_number = r.wicket_number
+        """
+    )
+    await db.q(
+        f"""
+        WITH ranked AS (
+            SELECT *, ROW_NUMBER() OVER (
+                PARTITION BY gender, team_type, tournament, season, batting_team, wicket_number
+                ORDER BY runs DESC, partnership_id
+            ) AS rn FROM _bb_pship
+        )
+        UPDATE bucketbaselinepartnership AS b
+        SET best_pair_partnership_id = r.partnership_id
+        FROM ranked r
+        WHERE r.rn = 1
+          AND b.team != '{LEAGUE_TEAM}'
+          AND b.team = r.batting_team
+          AND b.gender = r.gender AND b.team_type = r.team_type
+          AND b.tournament = r.tournament AND b.season = r.season
+          AND b.wicket_number = r.wicket_number
+        """
+    )
+    await db.q("DROP TABLE _bb_pship")
 
 
 # ─── Public modes ───────────────────────────────────────────────────────

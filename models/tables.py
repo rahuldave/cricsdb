@@ -311,6 +311,20 @@ class BucketBaselineBatting:
     second_inn_count: int = 0
     # MAX over per-innings totals — combine via MAX(MAX) across cells.
     highest_inn_runs: int = 0
+    # Identity of the cell's highest single-innings total — combine via
+    # picking the cell with MAX(highest_inn_runs) when SUMing over cells.
+    highest_inn_match_id: Optional[int] = None
+    highest_inn_team: Optional[str] = None
+    highest_inn_innings_number: Optional[int] = None
+    # Lowest all-out total in cell — MIN over per-innings totals where
+    # the team lost ≥10 wickets. NULL if no all-out innings in cell.
+    lowest_all_out_runs: Optional[int] = None
+    lowest_all_out_match_id: Optional[int] = None
+    lowest_all_out_team: Optional[str] = None
+    lowest_all_out_innings_number: Optional[int] = None
+    # Per-batter-innings 50+/100+ counts. SUM cleanly across cells.
+    fifties: int = 0
+    hundreds: int = 0
 
 
 class BucketBaselineBowling:
@@ -330,6 +344,10 @@ class BucketBaselineBowling:
     sixes_conceded: int = 0
     dots: int = 0
     wickets: int = 0  # bowler-credited (excludes run out / retired / obstructing)
+    # MAX of opposition per-innings totals against this side. Combine
+    # via MAX(MAX) across cells. Drives /teams/{team}/bowling/by-season
+    # `worst_conceded`.
+    worst_inn_runs: int = 0
 
 
 class BucketBaselineFielding:
@@ -375,3 +393,11 @@ class BucketBaselinePartnership:
     total_runs: int = 0
     total_balls: int = 0
     best_runs: int = 0  # MAX over partnerships in cell
+    # 50+/100+ counts — sum cleanly across cells. Drives partnerships/
+    # summary + by-season + by-wicket count_50_plus / count_100_plus.
+    count_50_plus: int = 0
+    count_100_plus: int = 0
+    # Identity of the cell's best partnership — read-side picks the
+    # cell with MAX(best_runs) and joins back to partnership for full
+    # identity (batters, date, balls). NULL when n=0.
+    best_pair_partnership_id: Optional[int] = None

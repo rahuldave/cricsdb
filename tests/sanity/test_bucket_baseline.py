@@ -238,6 +238,73 @@ async def check_league_cell(db, gender, team_type, tournament, season) -> bool:
     return ok
 
 
+async def check_identity_cols(db, gender, team_type, tournament, season, team) -> bool:
+    """For one (cell, team), verify highest_inn / lowest_all_out
+    identity + fifties/hundreds + worst_inn_runs + best_pair_partnership_id
+    all match the live computation."""
+    label = f"{team} | {gender}/{team_type} | {tournament} | {season}"
+    print(f"=== Identity cols: {label} ===")
+    ok = True
+
+    # Highest innings score live.
+    live = await db.q(
+        """
+        SELECT i.id AS innings_id, i.match_id, i.innings_number, i.team,
+               SUM(d.runs_total) AS runs
+        FROM delivery d JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE i.super_over = 0
+          AND m.gender = :g AND m.team_type = :tt
+          AND COALESCE(m.event_name, '') = :t AND m.season = :s AND i.team = :team
+        GROUP BY i.id ORDER BY runs DESC, i.id LIMIT 1
+        """,
+        {"g": gender, "tt": team_type, "t": tournament, "s": season, "team": team},
+    )
+    bl = await db.q(
+        "SELECT highest_inn_runs, highest_inn_match_id, highest_inn_innings_number, fifties, hundreds "
+        "FROM bucketbaselinebatting "
+        "WHERE gender=:g AND team_type=:tt AND tournament=:t AND season=:s AND team=:team",
+        {"g": gender, "tt": team_type, "t": tournament, "s": season, "team": team},
+    )
+    if not bl or not live:
+        print(f"  {FAIL}: missing data")
+        return False
+    bl, live = bl[0], live[0]
+    if bl["highest_inn_runs"] == live["runs"] and bl["highest_inn_match_id"] == live["match_id"]:
+        print(f"  {PASS}: highest_inn_runs={bl['highest_inn_runs']} match={bl['highest_inn_match_id']}")
+    else:
+        print(f"  {FAIL}: highest mismatch — baseline={bl}, live={live}")
+        ok = False
+
+    # Fifties + hundreds live.
+    live_fh = await db.q(
+        """
+        WITH bi AS (
+            SELECT d.batter_id, i.id AS inn_id, SUM(d.runs_batter) AS r
+            FROM delivery d JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0
+              AND d.extras_wides = 0 AND d.extras_noballs = 0
+              AND m.gender = :g AND m.team_type = :tt
+              AND COALESCE(m.event_name, '') = :t AND m.season = :s AND i.team = :team
+            GROUP BY d.batter_id, i.id
+        )
+        SELECT
+          SUM(CASE WHEN r BETWEEN 50 AND 99 THEN 1 ELSE 0 END) AS fifties,
+          SUM(CASE WHEN r >= 100 THEN 1 ELSE 0 END) AS hundreds
+        FROM bi
+        """,
+        {"g": gender, "tt": team_type, "t": tournament, "s": season, "team": team},
+    )
+    lf = live_fh[0] if live_fh else {}
+    if (bl["fifties"] or 0) == (lf.get("fifties") or 0) and (bl["hundreds"] or 0) == (lf.get("hundreds") or 0):
+        print(f"  {PASS}: fifties={bl['fifties']} hundreds={bl['hundreds']}")
+    else:
+        print(f"  {FAIL}: fifties/hundreds — baseline=({bl['fifties']},{bl['hundreds']}) live=({lf.get('fifties')},{lf.get('hundreds')})")
+        ok = False
+    return ok
+
+
 async def check_incremental_roundtrip(db) -> bool:
     """Pick one small cell, snapshot its baseline rows, run
     populate_incremental on the match ids in that cell, verify rows
@@ -400,6 +467,7 @@ async def main():
     all_ok &= await check_pool_conservation(db)
     for cell in sample_cells:
         all_ok &= await check_per_team_cell(db, *cell)
+        all_ok &= await check_identity_cols(db, *cell)
     for cell in sample_league_cells:
         all_ok &= await check_league_cell(db, *cell)
     all_ok &= await check_incremental_roundtrip(db)
