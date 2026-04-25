@@ -274,7 +274,7 @@ function CompareSlotColumn({
         </button>
       </div>
 
-      <SlotHeaderChip overrides={slot.overrides} />
+      <SlotHeaderChip slot={slot} />
 
       <div className="wisden-player-identity">
         {matches > 0 && (
