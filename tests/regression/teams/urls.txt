@@ -16,9 +16,9 @@ REG teams_landing_men_club_ipl_2024   /api/v1/teams/landing?gender=male&team_typ
 REG teams_landing_women               /api/v1/teams/landing?gender=female
 
 # ── team summary / headline endpoints ────────────────────────────
-NEW team_summary_india                /api/v1/teams/India/summary?gender=male&team_type=international
-NEW team_summary_india_recent         /api/v1/teams/India/summary?gender=male&team_type=international&season_from=2024&season_to=2025
-NEW team_summary_mi                   /api/v1/teams/Mumbai%20Indians/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG team_summary_india                /api/v1/teams/India/summary?gender=male&team_type=international
+REG team_summary_india_recent         /api/v1/teams/India/summary?gender=male&team_type=international&season_from=2024&season_to=2025
+REG team_summary_mi                   /api/v1/teams/Mumbai%20Indians/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
 REG team_results_india                /api/v1/teams/India/results?gender=male&team_type=international&limit=5
 REG team_results_india_offset         /api/v1/teams/India/results?gender=male&team_type=international&limit=5&offset=5
 REG team_by_season_india              /api/v1/teams/India/by-season?gender=male&team_type=international
@@ -28,36 +28,36 @@ REG team_opponents_matrix_india       /api/v1/teams/India/opponents-matrix?gende
 REG team_vs_opponent_ind_aus          /api/v1/teams/India/vs/Australia?gender=male&team_type=international&season_from=2024&season_to=2025
 
 # ── ball-level tabs: Batting ─────────────────────────────────────
-NEW team_batting_summary_india        /api/v1/teams/India/batting/summary?gender=male&team_type=international
+REG team_batting_summary_india        /api/v1/teams/India/batting/summary?gender=male&team_type=international
 REG team_batting_by_season_india      /api/v1/teams/India/batting/by-season?gender=male&team_type=international
 REG team_batting_by_phase_india       /api/v1/teams/India/batting/by-phase?gender=male&team_type=international
 REG team_batting_top_batters_india    /api/v1/teams/India/batting/top-batters?gender=male&team_type=international&limit=5
 REG team_batting_heatmap_india        /api/v1/teams/India/batting/phase-season-heatmap?gender=male&team_type=international
 
 # ── Bowling ──────────────────────────────────────────────────────
-NEW team_bowling_summary_india        /api/v1/teams/India/bowling/summary?gender=male&team_type=international
+REG team_bowling_summary_india        /api/v1/teams/India/bowling/summary?gender=male&team_type=international
 REG team_bowling_by_season_india      /api/v1/teams/India/bowling/by-season?gender=male&team_type=international
 REG team_bowling_by_phase_india       /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international
 REG team_bowling_top_bowlers_india    /api/v1/teams/India/bowling/top-bowlers?gender=male&team_type=international&limit=5
 REG team_bowling_heatmap_india        /api/v1/teams/India/bowling/phase-season-heatmap?gender=male&team_type=international
 
 # ── Fielding ─────────────────────────────────────────────────────
-NEW team_fielding_summary_india       /api/v1/teams/India/fielding/summary?gender=male&team_type=international
+REG team_fielding_summary_india       /api/v1/teams/India/fielding/summary?gender=male&team_type=international
 REG team_fielding_by_season_india     /api/v1/teams/India/fielding/by-season?gender=male&team_type=international
 REG team_fielding_top_fielders_india  /api/v1/teams/India/fielding/top-fielders?gender=male&team_type=international&limit=5
 
 # ── Partnerships ─────────────────────────────────────────────────
-NEW team_partnerships_summary_india   /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=batting
+REG team_partnerships_summary_india   /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=batting
 REG team_partnerships_by_wicket_india /api/v1/teams/India/partnerships/by-wicket?gender=male&team_type=international&side=batting
 REG team_partnerships_best_pairs_ind  /api/v1/teams/India/partnerships/best-pairs?gender=male&team_type=international&side=batting
 REG team_partnerships_heatmap_india   /api/v1/teams/India/partnerships/heatmap?gender=male&team_type=international&side=batting
 REG team_partnerships_top_india       /api/v1/teams/India/partnerships/top?gender=male&team_type=international&side=batting&limit=5
 
 # ── bowling-side partnerships (against the team) ────────────────
-NEW team_partnerships_bowling_summary /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=bowling
+REG team_partnerships_bowling_summary /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=bowling
 
 # ── club-team variant (Mumbai Indians) ───────────────────────────
-NEW team_mi_batting_summary           /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG team_mi_batting_summary           /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
 REG team_mi_bowling_top               /api/v1/teams/Mumbai%20Indians/bowling/top-bowlers?gender=male&team_type=club&tournament=Indian%20Premier%20League&limit=3
 
 # ── reference (FilterBar support) ────────────────────────────────
