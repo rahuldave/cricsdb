@@ -64,3 +64,36 @@ REG team_summary_india_men_intl             /api/v1/teams/India/summary?gender=m
 REG team_batting_summary_india              /api/v1/teams/India/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2024
 REG team_bowling_by_season_india            /api/v1/teams/India/bowling/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
 REG team_fielding_by_season_india           /api/v1/teams/India/fielding/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
+REG team_bowling_by_phase_mi_ipl            /api/v1/teams/Mumbai%20Indians/bowling/by-phase?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+REG team_bowling_by_phase_india             /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international&season_from=2024&season_to=2024
+
+# ── live-fallback paths (filter_venue / rivalry / series_type) ───
+# These force is_precomputed_scope=False so the dispatch falls back
+# to the live aggregator. Same URLs hit unchanged code; expect
+# byte-identical between HEAD and patched. Catches accidental
+# regressions in the live path during refactors.
+
+# filter_venue forces live (venue not in baseline schema).
+REG live_team_batting_summary_wankhede      /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+REG live_team_bowling_summary_wankhede      /api/v1/teams/Mumbai%20Indians/bowling/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+REG live_team_fielding_summary_wankhede     /api/v1/teams/Mumbai%20Indians/fielding/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+REG live_team_batting_by_phase_wankhede     /api/v1/teams/Mumbai%20Indians/batting/by-phase?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+REG live_team_bowling_by_phase_wankhede     /api/v1/teams/Mumbai%20Indians/bowling/by-phase?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+REG live_team_batting_by_season_wankhede    /api/v1/teams/Mumbai%20Indians/batting/by-season?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+REG live_team_bowling_by_season_wankhede    /api/v1/teams/Mumbai%20Indians/bowling/by-season?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+REG live_team_fielding_by_season_wankhede   /api/v1/teams/Mumbai%20Indians/fielding/by-season?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+REG live_team_partnerships_by_wicket_wank   /api/v1/teams/Mumbai%20Indians/partnerships/by-wicket?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai&side=batting
+REG live_team_partnerships_by_season_wank   /api/v1/teams/Mumbai%20Indians/partnerships/by-season?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai&side=batting
+REG live_scope_summary_wankhede             /api/v1/scope/averages/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+REG live_scope_batting_summary_wankhede     /api/v1/scope/averages/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+REG live_scope_bowling_by_phase_wankhede    /api/v1/scope/averages/bowling/by-phase?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+REG live_scope_partnerships_by_wicket_wank  /api/v1/scope/averages/partnerships/by-wicket?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium,%20Mumbai
+
+# series_type=bilateral_only forces live (aux filter excluded from baseline regime).
+REG live_team_batting_summary_bilat         /api/v1/teams/Australia/batting/summary?gender=male&team_type=international&series_type=bilateral_only
+REG live_scope_summary_bilat                /api/v1/scope/averages/summary?gender=male&team_type=international&series_type=bilateral_only
+REG live_scope_batting_by_phase_bilat       /api/v1/scope/averages/batting/by-phase?gender=male&team_type=international&series_type=bilateral_only
+
+# filter_team + filter_opponent (rivalry context) forces live.
+REG live_team_batting_summary_ind_v_aus     /api/v1/teams/India/batting/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+REG live_scope_partnerships_summary_rivalry /api/v1/scope/averages/partnerships/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
