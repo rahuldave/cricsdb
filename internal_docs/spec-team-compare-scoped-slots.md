@@ -105,44 +105,128 @@ A "slot" is a compact, self-describing column with:
 The primary is conceptually slot 0 — same shape, just sourced from
 the FilterBar above instead of `compareN_*` params.
 
-### Default first-load
+### Default first-load (auto-fill same-scope avg)
 
 Landing on `/teams?team=RCB&tab=Compare` with no `compare1` /
-`compare2` params: render the primary column alone. The picker
-shows two prominent affordances:
+`compare2` params: **auto-fill `compare1=__avg__`** on mount so the
+user immediately sees primary + same-scope league average — two
+columns visible, the most-asked comparison rendered without any
+clicks.
 
-- `+ Compare with team`
-- `+ Compare with league avg`  ← prefer this — same as today's "+
-  Add league average" default. Sets `compare1=__avg__` (no scope
-  override), inheriting primary's scope. This produces the
-  current default-mode behaviour: primary + same-scope avg.
+Implementation discipline:
 
-The third button — `+ Compare with custom scope` — opens the full
-slot editor for users who want to scope-override at add-time. It's
-visually de-emphasised vs the first two; advanced users find it,
-casual users don't trip over it.
+- Auto-fill **fires once per mount, gated by a `useRef`**. After
+  the first render, user state is law: clicking ✕ on the auto-
+  filled avg slot does NOT bring it back on the next render. Only
+  a fresh page load with no `compareN_*` params at all triggers the
+  auto-fill again.
+- The first-render URL update uses `replace: true` so the back
+  button doesn't accumulate auto-fill steps. Share URLs that
+  someone copies after first-load capture the avg slot explicitly.
+- Aus men's no-tournament case (and analogous): the auto-filled
+  avg's scope inherits primary's bound axes (`gender=male`,
+  `team_type=international`) plus whatever else primary has set.
+  `scopeAvgLabel` renders "Men's T20I avg" for that case — already
+  correct today.
+
+The picker only shows up when the user wants to ADD a 3rd column or
+REPLACE a removed slot. Default-mode users see 2 columns and may
+never click the picker.
 
 ### Adding a slot
 
-The picker is one logical UI:
+The picker is one logical UI with **quick-picks above + custom
+form below** so casual users get one-click value AND advanced users
+have full freedom:
 
 ```
-+ Add compare column ▾
-  ┌─────────────────────────────────────┐
-  │ Type:  ◉ Team   ○ League avg        │
-  │                                     │
-  │ Team:  [search teams …]             │
-  │                                     │
-  │ Scope (default: inherit from        │
-  │  primary)                           │
-  │   Tournament:  [Indian Premier L…]  │
-  │   Season:      [ 2024 ] – [ 2024 ]  │
-  │   Venue:       [—]                  │
-  │   Series type: [—]                  │
-  │                                     │
-  │  [ Reset scope ]  [ Add column ]    │
-  └─────────────────────────────────────┘
++ Add a column ▾
+
+  ┌─────────────────────────────────────────┐
+  │  Quick add (1 click):                   │
+  │   » League avg in current scope         │
+  │   » Same team, previous season          │
+  │   » Different team — current scope      │
+  │   » Same team, all-time                 │
+  │                                         │
+  │  ─── or build a custom column ───       │
+  │                                         │
+  │  Type:    ◉ Team   ○ League avg         │
+  │  Team:    [search teams …]              │
+  │  Scope (defaults inherit from primary): │
+  │    Tournament:  [Indian Premier L…]     │
+  │    Season:      [ 2024 ] – [ 2024 ]     │
+  │    Venue:       [—]                     │
+  │    Series type: [—]                     │
+  │  [ Reset scope ]              [ Add ]   │
+  └─────────────────────────────────────────┘
 ```
+
+Quick-picks fire on a single click — the URL writes the slot's
+params directly, the column appears, the picker closes. The user
+sees what changed (new column rendered with appropriate scope
+chip below the team name) and learns the affordance.
+
+The custom panel is the escape hatch — type toggle (team/avg) +
+the same 5-field scope editor used at slot-edit time. Defaults
+inherit from primary; user overrides what they want.
+
+#### Quick-pick semantics
+
+| Quick-pick | Slot kind | Slot entity | Scope override | Hidden when |
+|---|---|---|---|---|
+| **League avg in current scope** | `avg` | null | none (inherit) | already an avg slot with same scope present |
+| **Same team, previous season** | `team` | `<primary>` | `season_from = season_to = <previous>` (see below) | primary has no season set, OR no preceding season exists in scope |
+| **Different team — current scope** | `team` | (opens team picker on click) | none | both compare slots are filled |
+| **Same team, all-time** | `team` | `<primary>` | clears tournament + season_from + season_to | primary has neither tournament nor season set (no diff) |
+
+**Definition of "previous season"** — the season immediately
+before `primary.season_from` in the **bound scope's seasons list**:
+
+```ts
+// On click of "Same team, previous season":
+const seasons = await getSeasons({
+  team: primary.team,
+  gender: primary.gender,
+  team_type: primary.team_type,
+  tournament: primary.tournament,  // empty for no-tournament internationals
+})
+// seasons is sorted ascending, e.g. ["2016", "2017", …, "2024"]
+const idx = seasons.indexOf(primary.season_from)
+const prev = idx > 0 ? seasons[idx - 1] : null
+if (prev == null) return  // no previous; quick-pick should have been hidden
+setUrlParams({
+  compare1: primary.team,
+  compare1_season_from: prev,
+  compare1_season_to: prev,
+})
+```
+
+This handles all team types uniformly without special cases:
+
+- **RCB IPL 2024** → seasons `[…, 2022, 2023, 2024]` → previous =
+  `2023`. ✓
+- **India men's T20I, no tournament, primary 2024** → seasons
+  `[…, 2022, 2023, 2024, 2025]` → previous = `2023`. ✓ (calendar-
+  year continuity for unbound-tournament internationals.)
+- **Australia at T20 World Cup, primary 2024** → seasons
+  `[…, 2016, 2021, 2022, 2024]` (no 2023 — no WC that year) →
+  previous = `2022`. ✓ (the actual previous World Cup, NOT the
+  calendar-prior year.)
+- **Cricsheet's `2024/25` BBL format** → the `/seasons` endpoint
+  returns these as strings; `indexOf` on the string works. ✓
+- **Primary has no season filter** → `primary.season_from` is null,
+  the quick-pick is hidden. ✓
+- **Associate team (Nepal, USA) with sparse data** → the seasons
+  list returns only seasons where they actually have matches; if
+  the previous season exists, the lookup works; if not, hidden.
+
+The algorithm doesn't care about tournament binding, calendar
+continuity, or string format — it walks the actual seasons list
+backward by one. Pure index arithmetic on whatever the scope-
+narrowing endpoint already returns.
+
+#### Validation gates (unchanged from today)
 
 When `kind=team` and the user hasn't touched scope: candidate's
 in-scope match-count is probed against the inherited scope. Zero
@@ -278,6 +362,22 @@ slot[N].scope.team_type = primary.team_type   // bound, no override
 The bound fields (`gender`, `team_type`) come from primary
 unconditionally; there's no `compareN_gender` URL param.
 
+### Slot contiguity normalization
+
+Share URLs in the wild may carry `compare2=X` without `compare1`
+(e.g. user removed slot 1 but the URL captured slot 2 first). On
+mount, normalize so the leftmost compare slot is always slot 1:
+
+- If `compare1` is empty/absent AND `compare2` is set → rewrite
+  `compare2_*` keys to `compare1_*`, drop `compare2*`. Use
+  `replace: true` so back button stays clean.
+- If both `compare1` and `compare2` are set → no normalization
+  (already contiguous).
+- If both empty → auto-fill triggers (default first-load).
+
+This is part of the same self-correcting `useEffect` that handles
+legacy migration; both run on mount.
+
 ### Legacy migration
 
 Existing share URLs use `compare=A,B` (CSV) + `avg_slot=1`. A
@@ -393,18 +493,72 @@ Zero changes. Stress-tested by reasoning:
 - Existing 16 asserts continue to pass after URL migration (the
   `avg_slot=1` legacy path now maps to `compare1=__avg__` via the
   self-correcting effect; the test's URLs work either way).
-- Add 5+ new asserts for scoped-slot behaviour:
-  - Add a same-team scoped slot via the picker (RCB 2024 +
-    RCB 2025); verify the column header shows "RCB · 2025" diff
-    chip; verify chips on the slot column compare against IPL 2025
-    avg (number-spot-check).
+- Add club-team asserts for scoped-slot behaviour:
+  - Default first-load: navigate to `/teams?team=RCB&tab=Compare`
+    with no compare params; verify URL self-corrects to
+    `compare1=__avg__` AND grid renders with 2 columns (primary +
+    avg).
+  - ✕ the auto-filled avg slot; reload page; verify URL re-auto-
+    fills (fresh load is a fresh mount). ✕ again WITHOUT reload;
+    verify it stays gone (useRef gate holds within session).
+  - Same-team scoped slot via the "Same team, previous season"
+    quick-pick (RCB 2024 → RCB 2023); verify the column header
+    shows "RCB · 2023" diff chip; verify chips on the slot column
+    compare against IPL 2023 avg (number-spot-check).
   - Edit a slot's scope via the ✎ panel; verify URL updates with
     `compareN_*` params.
   - Reset a slot to primary; verify `compareN_*` params drop.
   - 3-column scenario: primary + RCB 2025 + IPL 2025 avg; verify
     all three render.
   - Legacy URL: `?team=RCB&compare=CSK&avg_slot=1` → verify
-    self-correcting redirect lands at `?team=RCB&compare1=CSK&compare2=__avg__`.
+    self-correcting redirect lands at
+    `?team=RCB&compare1=CSK&compare2=__avg__`.
+  - Slot contiguity: `?team=RCB&compare2=CSK` → verify URL
+    rewrites to `?team=RCB&compare1=CSK`.
+
+#### International team scenarios (failure-mode hunting)
+
+Internationals exercise edge cases that club teams hide because
+international "season" semantics aren't tournament-bound. Test
+each in agent-browser:
+
+- **India men's T20I, no tournament, primary 2024** → "Same team,
+  previous season" quick-pick → expect compare slot resolves to
+  India 2023 (calendar-prior year). Chips compute against
+  international men's T20I 2023 avg.
+- **Australia at T20 World Cup, primary 2024** → "Same team,
+  previous season" → expect 2022 (the actual previous WC, NOT
+  2023 which doesn't exist for that tournament). This is the load-
+  bearing test for the lookup-against-scoped-seasons-list
+  algorithm; calendar-prior-year would give the wrong answer
+  here.
+- **New Zealand women's, no tournament/season set** → "Same team,
+  previous season" link should be **hidden** (no season to be
+  previous to).
+- **Pakistan at Asia Cup with primary at the latest cycle** → "Same
+  team, previous season" → expect the cycle before, which may not
+  be the calendar-prior year (Asia Cup is biennial-ish).
+- **Associate team — Nepal at Asia Cup or USA at T20 WC** with
+  sparse historical data: navigate to a season the team played in,
+  click "Same team, previous season". If a previous season exists
+  in scope, expect it to render. If not, the link is hidden — no
+  empty-column ghost.
+- **BBL `2024/25` season string** → on a club view (Sydney Sixers
+  primary), "Same team, previous season" should resolve to
+  `2023/24` via string-match indexOf on the seasons list. Verify
+  the slot's URL params carry the slash-format string verbatim.
+- **"Different team — current scope" with bound team_type=
+  international** → typeahead surfaces only internationals (today's
+  auto-narrow). Confirm club teams don't slip in.
+- **Cross-mode: India men's T20I primary + IPL 2024 avg slot** —
+  this would require team_type override which we've explicitly
+  disallowed. The picker's "Custom" path doesn't expose
+  team_type as an editable field; verify the cross-type compare
+  is impossible to construct via the UI.
+
+Run all of these via agent-browser with screenshots captured for
+spot-checks. Surfacing a single broken case in any of these is
+worth more than 50 club-team asserts.
 
 ### Regression
 
@@ -477,39 +631,47 @@ commit cadence — one logical change per commit.
 
 ## Open questions
 
-1. **Avg slot label when scope-overridden.** Currently
-   `scopeAvgLabel(filters)` produces "Indian Premier League 2024
-   avg". When a slot is `kind='avg'` with overridden tournament=IPL
-   + season=2025, the label becomes "Indian Premier League 2025
-   avg" — informative. When ONLY the season is overridden (primary
-   has no tournament), label becomes "Men's club 2025 avg" — fine.
-   Edge case: if the avg slot's overrides match primary's filters
-   exactly, the label collapses to today's default. No special
-   casing needed.
-2. **Picker UX for same-team scoped compare.** "+ Add team" with
-   the team-search picker showing only OTHER teams (today's
-   behaviour) breaks the "RCB vs RCB 2025" use case. Two options:
-   (a) extend the picker to allow the primary team itself when the
-   user has overridden scope, OR (b) add a dedicated "+ Add same
-   team with different scope" affordance that pre-fills the team
-   and opens the scope editor. Option (b) is more discoverable; go
-   with it for v1, revisit if usage analytics show otherwise.
-3. **Save scoped-compare presets.** "RCB 2024 vs RCB 2025 in IPL"
+1. **Avg slot label when scope-overridden.** `scopeAvgLabel(filters)`
+   produces "Indian Premier League 2024 avg" today. When a slot is
+   `kind='avg'` with overridden tournament=IPL + season=2025, the
+   label becomes "Indian Premier League 2025 avg" — informative.
+   When ONLY the season is overridden (primary has no tournament),
+   label becomes "Men's club 2025 avg" — fine. Edge case: if the
+   avg slot's overrides match primary's filters exactly, the label
+   collapses to today's default. No special casing needed.
+2. **Save scoped-compare presets.** "RCB 2024 vs RCB 2025 in IPL"
    is a multi-param URL the user might want to bookmark. The
    share-URL approach (copy link) already works — the URL
    captures everything. Explicit presets are deferred.
-4. **Legend rewording when no slot has overrides.** The new
+3. **Legend rewording when no slot has overrides.** The new
    "in each column's scope" phrasing is technically accurate even
    when no slot overrides — every column's scope just happens to
-   equal primary's. But it might confuse default-mode users who
-   never override. Decision: ship the new phrasing unconditionally
-   — it's more accurate and the 99% case where scopes match means
-   "each column's scope" = "primary scope" anyway.
-5. **Cross-format (T20 vs ODI vs Test) compare.** Out of scope —
-   the platform is T20-only. Mentioned for completeness; will
-   never apply.
-6. **Three-way compare default.** Should "default first-load" with
-   no `compareN_*` auto-fill `compare1=__avg__` (today's
-   `avg_slot=1` default behaviour) or stay at primary-only? Today
-   the avg slot is opt-in via the button. Keeping it opt-in is
-   consistent. Decision: stay opt-in.
+   equal primary's. Ship unconditionally — the 99% case where
+   scopes match means "each column's scope" = "primary scope"
+   anyway.
+4. **Cross-format (T20 vs ODI vs Test) compare.** Out of scope —
+   the platform is T20-only. Mentioned for completeness.
+
+## Resolved decisions (2026-04-25 review)
+
+- **Default first-load auto-fills `compare1=__avg__`** — primary +
+  same-scope avg renders immediately, demonstrating the feature
+  without requiring a click.
+- **Auto-fill is once-per-mount via useRef gate** — ✕'ing the
+  default avg slot does NOT bring it back on re-render. Fresh page
+  load with no compareN params re-fires.
+- **First-render URL update uses `replace: true`** — share URLs
+  copied after first-load capture the avg slot explicitly, but the
+  back button doesn't accumulate auto-fill steps.
+- **Picker UX = quick-picks above + custom form below** — single
+  picker with three (or four) one-click affordances and an escape
+  hatch for advanced scope construction.
+- **Quick-pick set v1**: League-avg-current / Same-team-previous-
+  season / Different-team-current / Same-team-all-time. May extend
+  later based on usage.
+- **"Previous season" defined as lookup-against-bound-scope's-
+  seasons-list** — uniform handling of club seasons, calendar
+  internationals, biennial WCs, and BBL's `2024/25` strings; no
+  per-team-type special cases.
+- **Slot contiguity**: `?compare2=X` without `compare1` self-
+  corrects to `?compare1=X` on mount.
