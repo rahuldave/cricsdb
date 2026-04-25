@@ -823,6 +823,28 @@ def _half(v: float | int | None) -> float | None:
     return round(v / 2, 2)
 
 
+def _scope_to_team_clause(
+    aux: AuxParams | None, filters: FilterParams,
+) -> tuple[str, dict]:
+    """Subquery clause narrowing m.event_name to the primary team's
+    tournament universe. Applied only when:
+      - aux.scope_to_team is set (avg-slot fetch), AND
+      - the request hasn't explicitly narrowed by tournament.
+
+    Returns ("", {}) if the gate doesn't apply. Caller decides where
+    to splice the clause + extend its params dict.
+    """
+    if aux is None or not aux.scope_to_team or filters.tournament:
+        return "", {}
+    return (
+        "m.event_name IN ("
+        "SELECT DISTINCT m_st.event_name FROM matchplayer mp_st "
+        "JOIN match m_st ON mp_st.match_id = m_st.id "
+        "WHERE mp_st.team = :scope_to_team)",
+        {"scope_to_team": aux.scope_to_team},
+    )
+
+
 def _team_innings_clause(
     filters: FilterParams, team: str | None, side: str = "batting",
     aux: AuxParams | None = None,
@@ -853,6 +875,12 @@ def _team_innings_clause(
             parts.extend(["i.team != :team", "(m.team1 = :team OR m.team2 = :team)"])
     if where:
         parts.append(where)
+    # Auto-scope: only meaningful for the scope-averages path (team is None).
+    if team is None:
+        st_clause, st_params = _scope_to_team_clause(aux, filters)
+        if st_clause:
+            parts.append(st_clause)
+            params.update(st_params)
     if not parts:
         # filters.build() returns "" when no filters are active; the
         # scope-avg "no filter, no team" code path needs a tautology
@@ -2146,6 +2174,11 @@ def _partnership_filter(
             parts.extend(["i.team != :team", "(m.team1 = :team OR m.team2 = :team)"])
     if where:
         parts.append(where)
+    if team is None:
+        st_clause, st_params = _scope_to_team_clause(aux, filters)
+        if st_clause:
+            parts.append(st_clause)
+            params.update(st_params)
     if not parts:
         parts.append("1=1")
     return " AND ".join(parts), params

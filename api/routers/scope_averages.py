@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends, Query
 from ..filters import FilterParams, AuxParams
 from ..dependencies import get_db
 from .teams import (
-    _team_innings_clause, _partnership_filter, _safe_div,
+    _team_innings_clause, _partnership_filter, _scope_to_team_clause, _safe_div,
 )
 
 router = APIRouter(prefix="/api/v1/scope/averages", tags=["Scope-Averages"])
@@ -56,6 +56,11 @@ async def scope_summary(
     # Match-level filter only (no innings join).
     filters.team = None
     where, params = filters.build(has_innings_join=False, aux=aux)
+    # Avg slot's auto-narrow to primary team's tournament universe.
+    st_clause, st_params = _scope_to_team_clause(aux, filters)
+    if st_clause:
+        where = f"{where} AND {st_clause}" if where else st_clause
+        params.update(st_params)
     where = where or "1=1"
 
     rows = await db.q(

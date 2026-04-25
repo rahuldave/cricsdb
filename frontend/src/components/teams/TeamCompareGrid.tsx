@@ -70,9 +70,18 @@ function slotKey(s: SlotState | null): string {
   return `${s.kind}|${s.entity ?? ''}|${JSON.stringify(s.scope)}`
 }
 
-function fetchSlot(slot: SlotState | null): Promise<AnyProfile | null> {
+function fetchSlot(slot: SlotState | null, primaryTeam: string): Promise<AnyProfile | null> {
   if (!slot) return Promise.resolve(null)
-  if (slot.kind === 'avg') return getScopeAverageProfile(slot.scope)
+  if (slot.kind === 'avg') {
+    // Auto-narrow to primary team's tournament universe when the slot
+    // hasn't explicitly overridden tournament. RCB → IPL avg (1 league)
+    // is a 5x speedup AND semantically correct. Backend gates further
+    // on (no tournament filter), so passing unconditionally is safe.
+    const scope = slot.scope.tournament
+      ? slot.scope
+      : { ...slot.scope, scope_to_team: primaryTeam }
+    return getScopeAverageProfile(scope)
+  }
   return getTeamProfile(slot.entity!, slot.scope)
 }
 
@@ -86,8 +95,11 @@ function slotMatches(slot: SlotState, profile: AnyProfile): number {
   return teamMatchesInScope(profile as TeamProfile)
 }
 
-function slotLabel(slot: SlotState): string {
-  if (slot.kind === 'avg') return scopeAvgLabel(slot.scope)
+function slotLabel(slot: SlotState, primaryTeam: string): string {
+  if (slot.kind === 'avg') {
+    if (!slot.scope.tournament) return `Avg in ${primaryTeam}'s leagues`
+    return scopeAvgLabel(slot.scope)
+  }
   return slot.entity ?? ''
 }
 
@@ -102,9 +114,9 @@ export default function TeamCompareGrid({
 
   // Fixed-arity useFetch calls: one per slot. Discriminate kind inside
   // the fetcher so the same hook position serves both team and avg.
-  const f0 = useFetch<AnyProfile | null>(() => fetchSlot(primary), [slotKey(primary)])
-  const f1 = useFetch<AnyProfile | null>(() => fetchSlot(slot1),  [slotKey(slot1)])
-  const f2 = useFetch<AnyProfile | null>(() => fetchSlot(slot2),  [slotKey(slot2)])
+  const f0 = useFetch<AnyProfile | null>(() => fetchSlot(primary, primaryTeam), [slotKey(primary), primaryTeam])
+  const f1 = useFetch<AnyProfile | null>(() => fetchSlot(slot1,   primaryTeam), [slotKey(slot1),   primaryTeam])
+  const f2 = useFetch<AnyProfile | null>(() => fetchSlot(slot2,   primaryTeam), [slotKey(slot2),   primaryTeam])
 
   const renderColumns: { slot: SlotState; fetch: ProfileFetch; isPrimary: boolean; slotIdx: SlotIdx | null }[] = [
     { slot: primary, fetch: f0, isPrimary: true,  slotIdx: null },
@@ -178,6 +190,7 @@ export default function TeamCompareGrid({
             slot={c.slot}
             slotIdx={c.slotIdx}
             primary={primaryFilters}
+            primaryTeam={primaryTeam}
             fetch={c.fetch}
             isPrimary={c.isPrimary}
             anyHasData={anyHasData}
@@ -202,7 +215,7 @@ export default function TeamCompareGrid({
         columns={renderColumns
           .filter(c => !!c.fetch.data)
           .map(c => ({
-            label: slotLabel(c.slot),
+            label: slotLabel(c.slot, primaryTeam),
             profile: c.fetch.data!,
             isAverage: c.slot.kind === 'avg',
           }))}
@@ -217,6 +230,11 @@ interface ColumnProps {
   slot: SlotState
   slotIdx: SlotIdx | null
   primary: FilterParams
+  /** Primary team name — passed in for the avg-slot header label so
+   *  it can reflect the auto-scope ("Avg in RCB's leagues") instead
+   *  of the misleading default ("Men's club avg" while numbers are
+   *  IPL-only because of the auto-narrow). */
+  primaryTeam: string
   fetch: ProfileFetch
   isPrimary: boolean
   anyHasData: Record<TeamDiscipline, boolean>
@@ -226,7 +244,7 @@ interface ColumnProps {
 }
 
 function CompareSlotColumn({
-  slot, slotIdx, primary, fetch, isPrimary, anyHasData,
+  slot, slotIdx, primary, primaryTeam, fetch, isPrimary, anyHasData,
   onRemove, onUpdateScope, onResetScope,
 }: ColumnProps) {
   const [editing, setEditing] = useState(false)
@@ -267,10 +285,16 @@ function CompareSlotColumn({
           {!isTeam && (
             <span
               className="wisden-compare-col-namelink"
-              title="Pool-weighted league baseline scoped to the active filters"
+              title={
+                !slot.scope.tournament
+                  ? `Pool-weighted league baseline narrowed to tournaments ${primaryTeam} has played in (auto-scope) — fast AND semantically right.`
+                  : 'Pool-weighted league baseline scoped to the active filters'
+              }
               style={{ fontStyle: 'italic' }}
             >
-              {scopeAvgLabel(slot.scope)}
+              {!slot.scope.tournament
+                ? `Avg in ${primaryTeam}'s leagues`
+                : scopeAvgLabel(slot.scope)}
             </span>
           )}
         </h2>

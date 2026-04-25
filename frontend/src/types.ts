@@ -20,6 +20,13 @@ export interface FilterParams {
    *  every endpoint consumer can pass it through to the backend, where
    *  it lands in AuxParams. Mirror of api/filters.py::AuxParams. */
   series_type?: string
+  /** Aux hint sent only by the Compare-tab avg slot's fetcher. Tells
+   *  the backend's /scope/averages/* endpoints to narrow the universe
+   *  to event_names where this team has appeared — so "RCB vs avg"
+   *  means "RCB vs IPL avg", not "RCB vs all-club-cricket avg". Gated
+   *  backend-side on (team is None AND no explicit tournament filter).
+   *  Backed by ix_matchplayer_team for fast subquery. */
+  scope_to_team?: string
 }
 
 export interface Tournament {

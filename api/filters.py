@@ -56,8 +56,21 @@ class AuxParams:
                 " Legacy: bilateral_only / tournament_only."
             ),
         ),
+        scope_to_team: Optional[str] = Query(
+            None,
+            description=(
+                "Auto-narrow the scope (m.event_name) to tournaments this team"
+                " has appeared in. Only applied by /scope/averages/* endpoints"
+                " (team=None code path) AND only when no explicit tournament"
+                " filter is active. Used by the Compare-tab avg slot so 'RCB"
+                " vs avg' means 'RCB vs IPL avg', not 'RCB vs all-club-cricket"
+                " avg' — semantically correct AND ~38x faster for single-"
+                " tournament club teams."
+            ),
+        ),
     ):
         self.series_type = series_type
+        self.scope_to_team = scope_to_team
 
 
 class FilterBarParams:

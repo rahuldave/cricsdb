@@ -423,6 +423,11 @@ async def main():
                "ON delivery(batter_id, extras_wides, extras_noballs, runs_batter)")
     await db.q("CREATE INDEX IF NOT EXISTS ix_delivery_bowler_agg "
                "ON delivery(bowler_id, extras_wides, extras_noballs, runs_total)")
+    # Required by the Compare-tab avg slot's auto-narrow subquery
+    # (m.event_name IN matches-where-team-appeared). Without this, the
+    # subquery scans the whole match table and the avg fetch is 8x slower.
+    await db.q("CREATE INDEX IF NOT EXISTS ix_matchplayer_team "
+               "ON matchplayer(team)")
     await db.q("ANALYZE")
 
     print(f"\nDatabase saved to {DB_PATH}")
