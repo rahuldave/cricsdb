@@ -157,12 +157,87 @@ async def scope_batting_summary(
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
 ):
-    """Pool-weighted league-scope batting aggregates.
+    """Pool-weighted league-scope batting aggregates."""
+    if is_precomputed_scope(filters, aux):
+        return await _batting_summary_from_baseline(filters, aux)
+    return await _batting_summary_live(filters, aux)
 
-    Mirrors `/teams/{team}/batting/summary` but with team=None — every
-    delivery in scope contributes to the pool. Rates (RR, boundary%,
-    dot%) are pool-weighted (SUM/SUM) rather than mean-of-team-means.
-    """
+
+def _format_batting_summary(
+    innings_batted, total_runs, legal_balls, fours, sixes, dots,
+    first_inn_runs_sum, first_inn_count,
+    second_inn_runs_sum, second_inn_count,
+    highest_total,
+):
+    runs = total_runs or 0
+    balls = legal_balls or 0
+    fours = fours or 0
+    sixes = sixes or 0
+    dots = dots or 0
+    boundaries = fours + sixes
+    avg_1st = round((first_inn_runs_sum or 0) / first_inn_count, 1) if first_inn_count else None
+    avg_2nd = round((second_inn_runs_sum or 0) / second_inn_count, 1) if second_inn_count else None
+    return {
+        "innings_batted": innings_batted or 0,
+        "total_runs": runs,
+        "legal_balls": balls,
+        "run_rate": _safe_div(runs, balls, 6),
+        "boundary_pct": _safe_div(boundaries, balls, 100, 1),
+        "dot_pct": _safe_div(dots, balls, 100, 1),
+        "fours": fours,
+        "sixes": sixes,
+        "avg_1st_innings_total": avg_1st,
+        "avg_2nd_innings_total": avg_2nd,
+        "highest_total": highest_total,
+    }
+
+
+async def _batting_summary_from_baseline(filters, aux):
+    db = get_db()
+    where, params = baseline_where(filters, aux, team=LEAGUE_TEAM_KEY)
+    rows = await db.q(
+        f"""
+        SELECT
+          SUM(innings_batted) AS innings_batted,
+          SUM(total_runs) AS total_runs,
+          SUM(legal_balls) AS legal_balls,
+          SUM(fours) AS fours, SUM(sixes) AS sixes, SUM(dots) AS dots,
+          SUM(first_inn_runs_sum) AS first_inn_runs_sum,
+          SUM(first_inn_count) AS first_inn_count,
+          SUM(second_inn_runs_sum) AS second_inn_runs_sum,
+          SUM(second_inn_count) AS second_inn_count
+        FROM bucketbaselinebatting {where}
+        """,
+        params,
+    )
+    r = rows[0] if rows else {}
+    # Highest_total: pick the cell row with the largest highest_inn_runs.
+    hi_rows = await db.q(
+        f"""
+        SELECT highest_inn_runs AS runs, highest_inn_match_id AS match_id,
+               highest_inn_team AS team, highest_inn_innings_number AS innings_number
+        FROM bucketbaselinebatting {where} AND highest_inn_runs > 0
+        ORDER BY highest_inn_runs DESC, highest_inn_match_id LIMIT 1
+        """,
+        params,
+    )
+    highest = None
+    if hi_rows:
+        h = hi_rows[0]
+        highest = {
+            "runs": h["runs"],
+            "team": h["team"],
+            "match_id": h["match_id"],
+            "innings_number": (h["innings_number"] or 0) + 1,
+        }
+    return _format_batting_summary(highest_total=highest, **{k: r.get(k) for k in (
+        "innings_batted", "total_runs", "legal_balls", "fours", "sixes", "dots",
+        "first_inn_runs_sum", "first_inn_count",
+        "second_inn_runs_sum", "second_inn_count",
+    )})
+
+
+async def _batting_summary_live(filters, aux):
     db = get_db()
     where, params = _team_innings_clause(filters, None, side="batting", aux=aux)
 
@@ -1056,13 +1131,97 @@ async def scope_partnerships_summary(
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
 ):
-    """Pool-weighted partnership aggregates across the whole league.
+    """Pool-weighted partnership aggregates across the whole league."""
+    if is_precomputed_scope(filters, aux):
+        return await _partnerships_summary_from_baseline(filters, aux)
+    return await _partnerships_summary_live(filters, aux)
 
-    Mirrors `/teams/{team}/partnerships/summary` but `side` is irrelevant
-    (every partnership counts toward the league baseline). The "best
-    pair" lookup retains identity — there's a specific scope-wide
-    leading pair.
-    """
+
+async def _fetch_partnership_identity(db, partnership_id: int) -> dict | None:
+    """One small SELECT against partnership table for identity payload —
+    same shape as the live endpoint's `highest` / `best_partnership`."""
+    if partnership_id is None:
+        return None
+    rows = await db.q(
+        """
+        SELECT p.id AS partnership_id, p.partnership_runs AS runs,
+               p.partnership_balls AS balls,
+               p.batter1_id, p.batter1_name, p.batter2_id, p.batter2_name,
+               m.id AS match_id, m.season, m.event_name AS tournament,
+               i.team AS team,
+               (SELECT MIN(date) FROM matchdate md WHERE md.match_id = m.id) AS date
+        FROM partnership p
+        JOIN innings i ON i.id = p.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE p.id = :pid
+        """,
+        {"pid": partnership_id},
+    )
+    if not rows:
+        return None
+    r = rows[0]
+    return {
+        "partnership_id": r["partnership_id"],
+        "match_id": r["match_id"],
+        "date": r["date"],
+        "season": r["season"],
+        "tournament": r["tournament"],
+        "team": r["team"],
+        "batter1": {"person_id": r["batter1_id"], "name": r["batter1_name"]},
+        "batter2": {"person_id": r["batter2_id"], "name": r["batter2_name"]},
+        "runs": r["runs"],
+        "balls": r["balls"],
+    }
+
+
+async def _partnerships_summary_from_baseline(filters, aux):
+    db = get_db()
+    where, params = baseline_where(filters, aux, team=LEAGUE_TEAM_KEY)
+    rows = await db.q(
+        f"""
+        SELECT SUM(n) AS total,
+               SUM(count_50_plus) AS count_50_plus,
+               SUM(count_100_plus) AS count_100_plus,
+               SUM(total_runs) AS total_runs
+        FROM bucketbaselinepartnership {where}
+        """,
+        params,
+    )
+    r = rows[0] if rows else {}
+    total = r.get("total") or 0
+    avg_runs = round((r.get("total_runs") or 0) / total, 1) if total else None
+    # Highest: pick row with MAX(best_runs); fetch identity by partnership_id.
+    hi_rows = await db.q(
+        f"""
+        SELECT best_runs, best_pair_partnership_id
+        FROM bucketbaselinepartnership {where} AND best_runs > 0
+        ORDER BY best_runs DESC, best_pair_partnership_id LIMIT 1
+        """,
+        params,
+    )
+    highest = None
+    if hi_rows:
+        highest_full = await _fetch_partnership_identity(db, hi_rows[0]["best_pair_partnership_id"])
+        if highest_full:
+            # /partnerships/summary live shape strips tournament/season/
+            # partnership_id from the identity payload — match it.
+            highest = {
+                "runs": highest_full["runs"], "balls": highest_full["balls"],
+                "match_id": highest_full["match_id"], "date": highest_full["date"],
+                "team": highest_full["team"],
+                "batter1": highest_full["batter1"],
+                "batter2": highest_full["batter2"],
+            }
+    return {
+        "total": total,
+        "count_50_plus": r.get("count_50_plus") or 0,
+        "count_100_plus": r.get("count_100_plus") or 0,
+        "avg_runs": avg_runs,
+        "highest": highest,
+    }
+
+
+async def _partnerships_summary_live(filters, aux):
     db = get_db()
     where, params = _partnership_filter(filters, None, "batting", aux=aux)
 
@@ -1133,6 +1292,59 @@ async def scope_partnerships_by_wicket(
     """Per-wicket league averages — runs / partnership at each wicket
     position. The `best_partnership` per wicket carries identity
     (specific pair + match)."""
+    if is_precomputed_scope(filters, aux):
+        return await _partnerships_by_wicket_from_baseline(filters, aux)
+    return await _partnerships_by_wicket_live(filters, aux)
+
+
+async def _partnerships_by_wicket_from_baseline(filters, aux):
+    db = get_db()
+    where, params = baseline_where(filters, aux, team=LEAGUE_TEAM_KEY)
+    # Aggregate per wicket_number: SUM counters, MAX best_runs.
+    agg_rows = await db.q(
+        f"""
+        SELECT wicket_number,
+               SUM(n) AS n,
+               SUM(total_runs) AS total_runs,
+               SUM(total_balls) AS total_balls,
+               COALESCE(MAX(best_runs), 0) AS best_runs
+        FROM bucketbaselinepartnership {where}
+        GROUP BY wicket_number ORDER BY wicket_number
+        """,
+        params,
+    )
+    # Per wicket, find the cell holding MAX(best_runs); then
+    # _fetch_partnership_identity. One small SELECT per wicket
+    # position (max 10 calls).
+    by_wicket = []
+    for r in agg_rows:
+        wn = r["wicket_number"]
+        best = None
+        if r["best_runs"]:
+            id_rows = await db.q(
+                f"""
+                SELECT best_pair_partnership_id
+                FROM bucketbaselinepartnership {where}
+                  AND wicket_number = :_wn AND best_runs > 0
+                ORDER BY best_runs DESC, best_pair_partnership_id LIMIT 1
+                """,
+                {**params, "_wn": wn},
+            )
+            if id_rows:
+                best = await _fetch_partnership_identity(db, id_rows[0]["best_pair_partnership_id"])
+        n = r["n"] or 0
+        by_wicket.append({
+            "wicket_number": wn,
+            "n": n,
+            "avg_runs": round((r["total_runs"] or 0) / n, 1) if n else None,
+            "avg_balls": round((r["total_balls"] or 0) / n, 1) if n else None,
+            "best_runs": r["best_runs"] or 0,
+            "best_partnership": best,
+        })
+    return {"by_wicket": by_wicket}
+
+
+async def _partnerships_by_wicket_live(filters, aux):
     db = get_db()
     where, params = _partnership_filter(filters, None, "batting", aux=aux)
 
@@ -1211,6 +1423,41 @@ async def scope_partnerships_by_season(
     aux: AuxParams = Depends(),
 ):
     """Per-season partnership aggregates across the whole league."""
+    if is_precomputed_scope(filters, aux):
+        return await _partnerships_by_season_from_baseline(filters, aux)
+    return await _partnerships_by_season_live(filters, aux)
+
+
+async def _partnerships_by_season_from_baseline(filters, aux):
+    db = get_db()
+    where, params = baseline_where(filters, aux, team=LEAGUE_TEAM_KEY)
+    rows = await db.q(
+        f"""
+        SELECT season,
+               SUM(n) AS total,
+               SUM(count_50_plus) AS count_50_plus,
+               SUM(count_100_plus) AS count_100_plus,
+               SUM(total_runs) AS total_runs,
+               COALESCE(MAX(best_runs), 0) AS best_runs
+        FROM bucketbaselinepartnership {where}
+        GROUP BY season ORDER BY season
+        """,
+        params,
+    )
+    return {"by_season": [
+        {
+            "season": r["season"],
+            "total": r["total"] or 0,
+            "count_50_plus": r["count_50_plus"] or 0,
+            "count_100_plus": r["count_100_plus"] or 0,
+            "avg_runs": round((r["total_runs"] or 0) / r["total"], 1) if r["total"] else None,
+            "best_runs": r["best_runs"],
+        }
+        for r in rows
+    ]}
+
+
+async def _partnerships_by_season_live(filters, aux):
     db = get_db()
     where, params = _partnership_filter(filters, None, "batting", aux=aux)
 
