@@ -74,7 +74,14 @@ assert_snapshot_contains "10th wkt" "partnership-by-wicket: 10th wkt row"
 # ──────────────────────────────────────────────────────────────────
 echo
 echo "Test 2: + Add league average → compareN=__avg__, label rendered"
-agent-browser eval 'document.querySelector("button.wisden-compare-picker-avg-btn")?.click()' >/dev/null 2>&1
+# Open the AddCompareSlot panel, then click the "League avg in current scope" quick-pick.
+agent-browser eval 'document.querySelector("button.wisden-compare-add-btn")?.click()' >/dev/null 2>&1
+sleep 1
+agent-browser eval --stdin <<'EVALEOF' >/dev/null 2>&1
+const btns = Array.from(document.querySelectorAll(".wisden-compare-add-panel button"));
+const tgt = btns.find(b => /league avg in current scope/i.test(b.textContent || ""));
+tgt?.click();
+EVALEOF
 sleep 2
 # Slot 1 already holds CSK; the avg lands in slot 2.
 assert_url_contains "compare2=__avg__"

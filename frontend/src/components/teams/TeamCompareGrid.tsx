@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import FlagBadge from '../FlagBadge'
 import Spinner from '../Spinner'
@@ -9,6 +10,7 @@ import PhaseBandsRow from './PhaseBandsRow'
 import PartnershipByWicketRows from './PartnershipByWicketRows'
 import SeasonTrajectoryStrip from './SeasonTrajectoryStrip'
 import SlotHeaderChip from './SlotHeaderChip'
+import SlotScopeEditor from './SlotScopeEditor'
 import {
   teamDisciplineHasData, teamMatchesInScope, carryTeamFilters,
   avgDisciplineHasData, scopeAvgLabel,
@@ -17,7 +19,9 @@ import {
 import { useFetch, type FetchState } from '../../hooks/useFetch'
 import { getTeamProfile, getScopeAverageProfile } from '../../api'
 import type { TeamProfile, ScopeAverageProfile, FilterParams } from '../../types'
-import type { SlotState, CompareSlots } from '../../hooks/useCompareSlots'
+import type { SlotState, CompareSlots, SlotOverrides } from '../../hooks/useCompareSlots'
+
+type SlotIdx = 1 | 2
 
 interface Props {
   primaryTeam: string
@@ -26,6 +30,10 @@ interface Props {
   onClearPrimary: () => void
   onRemoveTeam: (name: string) => void
   onRemoveAvg: () => void
+  /** Replace a slot's overrides wholesale. */
+  onUpdateSlotScope: (slotIdx: SlotIdx, overrides: SlotOverrides) => void
+  /** Drop all overrides on a slot — slot inherits primary again. */
+  onResetSlotScope: (slotIdx: SlotIdx) => void
 }
 
 const DISCIPLINES: TeamDiscipline[] = [
@@ -86,6 +94,7 @@ function slotLabel(slot: SlotState): string {
 export default function TeamCompareGrid({
   primaryTeam, primaryFilters, slots,
   onClearPrimary, onRemoveTeam, onRemoveAvg,
+  onUpdateSlotScope, onResetSlotScope,
 }: Props) {
   const primary = primarySlotOf(primaryTeam, primaryFilters)
   const slot1 = slots.slot1
@@ -97,11 +106,11 @@ export default function TeamCompareGrid({
   const f1 = useFetch<AnyProfile | null>(() => fetchSlot(slot1),  [slotKey(slot1)])
   const f2 = useFetch<AnyProfile | null>(() => fetchSlot(slot2),  [slotKey(slot2)])
 
-  const renderColumns: { slot: SlotState; fetch: ProfileFetch; isPrimary: boolean }[] = [
-    { slot: primary, fetch: f0, isPrimary: true },
+  const renderColumns: { slot: SlotState; fetch: ProfileFetch; isPrimary: boolean; slotIdx: SlotIdx | null }[] = [
+    { slot: primary, fetch: f0, isPrimary: true,  slotIdx: null },
   ]
-  if (slot1) renderColumns.push({ slot: slot1, fetch: f1, isPrimary: false })
-  if (slot2) renderColumns.push({ slot: slot2, fetch: f2, isPrimary: false })
+  if (slot1) renderColumns.push({ slot: slot1, fetch: f1, isPrimary: false, slotIdx: 1 })
+  if (slot2) renderColumns.push({ slot: slot2, fetch: f2, isPrimary: false, slotIdx: 2 })
 
   const anyLoading = renderColumns.some(c => c.fetch.loading && !c.fetch.data)
   const firstError = renderColumns.find(c => c.fetch.error)
@@ -167,10 +176,14 @@ export default function TeamCompareGrid({
           <CompareSlotColumn
             key={c.isPrimary ? `__primary__${c.slot.entity}` : `slot${idx}-${c.slot.kind}-${c.slot.entity ?? 'avg'}`}
             slot={c.slot}
+            slotIdx={c.slotIdx}
+            primary={primaryFilters}
             fetch={c.fetch}
             isPrimary={c.isPrimary}
             anyHasData={anyHasData}
             onRemove={() => handleRemove(c.slot, c.isPrimary)}
+            onUpdateScope={onUpdateSlotScope}
+            onResetScope={onResetSlotScope}
           />
         ))}
       </div>
@@ -202,15 +215,21 @@ export default function TeamCompareGrid({
 
 interface ColumnProps {
   slot: SlotState
+  slotIdx: SlotIdx | null
+  primary: FilterParams
   fetch: ProfileFetch
   isPrimary: boolean
   anyHasData: Record<TeamDiscipline, boolean>
   onRemove: () => void
+  onUpdateScope: (slotIdx: SlotIdx, overrides: SlotOverrides) => void
+  onResetScope: (slotIdx: SlotIdx) => void
 }
 
 function CompareSlotColumn({
-  slot, fetch, isPrimary, anyHasData, onRemove,
+  slot, slotIdx, primary, fetch, isPrimary, anyHasData,
+  onRemove, onUpdateScope, onResetScope,
 }: ColumnProps) {
+  const [editing, setEditing] = useState(false)
   const profile = fetch.data
 
   if (fetch.loading && !profile) {
@@ -255,6 +274,22 @@ function CompareSlotColumn({
             </span>
           )}
         </h2>
+        {!isPrimary && slotIdx != null && (
+          <button
+            type="button"
+            className="wisden-compare-col-edit"
+            onClick={() => setEditing(e => !e)}
+            aria-label={editing ? 'Close scope editor' : 'Edit slot scope'}
+            title={editing ? 'Close scope editor' : 'Override this column\'s scope (tournament / season / venue / series)'}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: '0.95em', padding: '0 0.25rem', marginRight: '0.1rem',
+              opacity: 0.7,
+            }}
+          >
+            ✎
+          </button>
+        )}
         <button
           type="button"
           className="wisden-compare-col-remove"
@@ -275,6 +310,17 @@ function CompareSlotColumn({
       </div>
 
       <SlotHeaderChip slot={slot} />
+
+      {editing && slotIdx != null && (
+        <SlotScopeEditor
+          primary={primary}
+          team={isTeam ? teamName : undefined}
+          initial={slot.overrides}
+          onApply={(o) => { onUpdateScope(slotIdx, o); setEditing(false) }}
+          onReset={() => { onResetScope(slotIdx); setEditing(false) }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
 
       <div className="wisden-player-identity">
         {matches > 0 && (

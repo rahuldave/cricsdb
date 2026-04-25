@@ -22,9 +22,10 @@ import FlagBadge from '../components/FlagBadge'
 import PlayerLink from '../components/PlayerLink'
 import { ScopeContext } from '../components/scopeLinks'
 import TeamCompareGrid from '../components/teams/TeamCompareGrid'
-import AddTeamComparePicker from '../components/teams/AddTeamComparePicker'
+import AddCompareSlot from '../components/teams/AddCompareSlot'
 import {
   useCompareSlots, AVG_SENTINEL, OVERRIDABLE_SLOT_KEYS, clearSlotUpdates,
+  type SlotOverrides,
 } from '../hooks/useCompareSlots'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
@@ -70,13 +71,6 @@ export default function Teams() {
   // legacy compare=A,B / avg_slot=1 fallback while the migration
   // useEffect below has not yet rewritten the URL).
   const slots = useCompareSlots(filters)
-  const compareTeams: string[] = []
-  let avgSlotPresent = false
-  for (const slot of [slots.slot1, slots.slot2]) {
-    if (!slot) continue
-    if (slot.kind === 'team' && slot.entity) compareTeams.push(slot.entity)
-    if (slot.kind === 'avg') avgSlotPresent = true
-  }
   const hasCompareSlot = !!(slots.slot1 || slots.slot2)
 
   // One-shot migration on mount: legacy compare=A,B / avg_slot=1 →
@@ -158,18 +152,33 @@ export default function Teams() {
     setUrlParams({ compare1: AVG_SENTINEL }, { replace: true })
   }, [activeTab, selected, slots.slot1, slots.slot2])
 
-  // Add / remove callbacks for the compare grid + picker. Each writes
-  // directly to the new compareN params (no legacy compare CSV).
+  // Add / remove / scope callbacks for the compare grid + picker. Each
+  // writes directly to the compareN params (no legacy compare CSV).
   const slot1 = slots.slot1
   const slot2 = slots.slot2
-  const onAddTeam = useCallback((name: string) => {
+  const onAddSlot = useCallback((entity: string, overrides: SlotOverrides) => {
     const targetSlot: 1 | 2 = !slot1 ? 1 : 2
-    setUrlParams({ [`compare${targetSlot}`]: name })
+    const updates: Record<string, string> = { [`compare${targetSlot}`]: entity }
+    for (const k of OVERRIDABLE_SLOT_KEYS) {
+      if (k in overrides) updates[`compare${targetSlot}_${k}`] = overrides[k] ?? ''
+    }
+    setUrlParams(updates)
   }, [slot1, setUrlParams])
-  const onAddAvg = useCallback(() => {
-    const targetSlot: 1 | 2 = !slot1 ? 1 : 2
-    setUrlParams({ [`compare${targetSlot}`]: AVG_SENTINEL })
-  }, [slot1, setUrlParams])
+  const onUpdateSlotScope = useCallback((slotIdx: 1 | 2, overrides: SlotOverrides) => {
+    // Replace overrides wholesale: set keys that are in overrides, clear
+    // every other override key on this slot so applying { season_from }
+    // alone doesn't leave a stale tournament override behind.
+    const updates: Record<string, string> = {}
+    for (const k of OVERRIDABLE_SLOT_KEYS) {
+      updates[`compare${slotIdx}_${k}`] = k in overrides ? (overrides[k] ?? '') : ''
+    }
+    setUrlParams(updates)
+  }, [setUrlParams])
+  const onResetSlotScope = useCallback((slotIdx: 1 | 2) => {
+    const updates: Record<string, string> = {}
+    for (const k of OVERRIDABLE_SLOT_KEYS) updates[`compare${slotIdx}_${k}`] = ''
+    setUrlParams(updates)
+  }, [setUrlParams])
   const onRemoveTeam = useCallback((name: string) => {
     const idx: 1 | 2 | null =
       (slot1?.kind === 'team' && slot1.entity === name) ? 1 :
@@ -399,13 +408,14 @@ export default function Teams() {
                   onClearPrimary={onClearCompareAll}
                   onRemoveTeam={onRemoveTeam}
                   onRemoveAvg={onRemoveAvg}
+                  onUpdateSlotScope={onUpdateSlotScope}
+                  onResetSlotScope={onResetSlotScope}
                 />
-                <AddTeamComparePicker
-                  currentTeams={[selected, ...compareTeams]}
-                  filters={filters}
-                  avgSlotPresent={avgSlotPresent}
-                  onAddTeam={onAddTeam}
-                  onAddAvg={onAddAvg}
+                <AddCompareSlot
+                  primaryTeam={selected}
+                  primaryFilters={filters}
+                  slots={slots}
+                  onAddSlot={onAddSlot}
                 />
               </>
             )}
