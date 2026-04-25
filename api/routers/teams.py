@@ -1151,7 +1151,85 @@ async def _batting_by_phase_aggregates(
     aux: AuxParams,
 ) -> dict[str, dict]:
     """Flat per-phase batting aggregates keyed by phase name. Called
-    twice by team_batting_by_phase (team + None for scope_avg)."""
+    twice by team_batting_by_phase (team + None for scope_avg).
+    Dispatches to bucket_baseline_phase + a small live wkt query for
+    precomputed scopes; full live aggregation otherwise."""
+    from .bucket_baseline_dispatch import is_precomputed_scope, baseline_where, LEAGUE_TEAM_KEY
+    if is_precomputed_scope(filters, aux):
+        return await _batting_by_phase_aggregates_baseline(team, filters, aux)
+    return await _batting_by_phase_aggregates_live(team, filters, aux)
+
+
+async def _batting_by_phase_aggregates_baseline(
+    team: str | None, filters: FilterParams, aux: AuxParams,
+) -> dict[str, dict]:
+    from .bucket_baseline_dispatch import baseline_where, LEAGUE_TEAM_KEY
+    db = get_db()
+    table_team = team if team else LEAGUE_TEAM_KEY
+    bw, bp = baseline_where(filters, aux, team=table_team)
+    rows = await db.q(
+        f"""
+        SELECT phase,
+               SUM(legal_balls) AS balls,
+               SUM(runs) AS runs,
+               SUM(fours) AS fours,
+               SUM(sixes) AS sixes,
+               SUM(dots) AS dots
+        FROM bucketbaselinephase {bw} AND side='batting'
+        GROUP BY phase
+        """,
+        bp,
+    )
+    # wickets_lost uses retired-only exclusion; baseline.wickets is
+    # bowler-credited (excludes more). Small live query for the diff.
+    where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
+    wicket_rows = await db.q(
+        f"""
+        SELECT
+            CASE
+                WHEN d.over_number BETWEEN 0 AND 5 THEN 'powerplay'
+                WHEN d.over_number BETWEEN 6 AND 14 THEN 'middle'
+                WHEN d.over_number BETWEEN 15 AND 19 THEN 'death'
+            END as phase,
+            COUNT(*) as wickets_lost
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+          AND w.kind NOT IN ('retired hurt', 'retired not out')
+        GROUP BY phase
+        """,
+        params,
+    )
+    wicket_map = {r["phase"]: r["wickets_lost"] for r in wicket_rows}
+    out: dict[str, dict] = {}
+    for r in rows:
+        phase = r["phase"]
+        if not phase:
+            continue
+        balls = r["balls"] or 0
+        runs = r["runs"] or 0
+        fours = r["fours"] or 0
+        sixes = r["sixes"] or 0
+        boundaries = fours + sixes
+        out[phase] = {
+            "phase": phase,
+            "runs": runs,
+            "balls": balls,
+            "run_rate": _safe_div(runs, balls, 6),
+            "wickets_lost": wicket_map.get(phase, 0),
+            "boundary_pct": _safe_div(boundaries, balls, 100, 1),
+            "bat_dot_pct": _safe_div(r["dots"] or 0, balls, 100, 1),
+            "fours": fours,
+            "sixes": sixes,
+        }
+    return out
+
+
+async def _batting_by_phase_aggregates_live(
+    team: str | None, filters: FilterParams, aux: AuxParams,
+) -> dict[str, dict]:
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
 
@@ -1687,7 +1765,61 @@ async def _bowling_by_phase_aggregates(
     filters: FilterParams,
     aux: AuxParams,
 ) -> dict[str, dict]:
-    """Flat per-phase bowling aggregates keyed by phase name."""
+    """Flat per-phase bowling aggregates keyed by phase name. Dispatches
+    to bucket_baseline_phase for precomputed scopes; live otherwise."""
+    from .bucket_baseline_dispatch import is_precomputed_scope
+    if is_precomputed_scope(filters, aux):
+        return await _bowling_by_phase_aggregates_baseline(team, filters, aux)
+    return await _bowling_by_phase_aggregates_live(team, filters, aux)
+
+
+async def _bowling_by_phase_aggregates_baseline(
+    team: str | None, filters: FilterParams, aux: AuxParams,
+) -> dict[str, dict]:
+    from .bucket_baseline_dispatch import baseline_where, LEAGUE_TEAM_KEY
+    db = get_db()
+    table_team = team if team else LEAGUE_TEAM_KEY
+    bw, bp = baseline_where(filters, aux, team=table_team)
+    rows = await db.q(
+        f"""
+        SELECT phase,
+               SUM(legal_balls) AS balls,
+               SUM(runs) AS runs,
+               SUM(fours) AS fours,
+               SUM(sixes) AS sixes,
+               SUM(dots) AS dots,
+               SUM(wickets) AS wickets
+        FROM bucketbaselinephase {bw} AND side='bowling'
+        GROUP BY phase
+        """,
+        bp,
+    )
+    out: dict[str, dict] = {}
+    for r in rows:
+        phase = r["phase"]
+        if not phase:
+            continue
+        balls = r["balls"] or 0
+        runs = r["runs"] or 0
+        fours = r["fours"] or 0
+        sixes = r["sixes"] or 0
+        out[phase] = {
+            "phase": phase,
+            "runs_conceded": runs,
+            "balls": balls,
+            "economy": _safe_div(runs, balls, 6),
+            "wickets": r["wickets"] or 0,
+            "boundary_pct": _safe_div(fours + sixes, balls, 100, 1),
+            "bowl_dot_pct": _safe_div(r["dots"] or 0, balls, 100, 1),
+            "fours_conceded": fours,
+            "sixes_conceded": sixes,
+        }
+    return out
+
+
+async def _bowling_by_phase_aggregates_live(
+    team: str | None, filters: FilterParams, aux: AuxParams,
+) -> dict[str, dict]:
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
 
