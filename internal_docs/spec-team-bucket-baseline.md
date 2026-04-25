@@ -1,32 +1,43 @@
 # Spec: Team / Bucket Avg Baselines (Phase 2 of Compare-tab perf)
 
-Status: SHIPPED 2026-04-25 (commits 614b309, 8bf1151, 9c812ef, 501b23e).
+Status: SHIPPED 2026-04-25 (commits 614b309, 8bf1151, 9c812ef, 501b23e,
+b31520a, a36d8e2, 6a9e475).
+
 Depends on: `spec-team-compare-scoped-slots.md` Phase 1 (commit `6c5b416`).
 
 End-to-end speedup measured on `?team=RCB&gender=male&team_type=club&tab=Compare&compare1=__avg__`:
-prod build went from **~4s → 1.7s** (2.4x). Dev (with StrictMode
-double-mount) went from ~5s → 2.9s.
+prod build went from **~4s → 0.81s** (5x). Dev (with StrictMode
+double-mount) went from ~5s → ~2.5s.
 
 What shipped vs spec:
-- 8 of 12 `/scope/averages/*` endpoints dispatch via baseline.
-  Skipped: `/batting/summary`, `/partnerships/summary`,
-  `/partnerships/by-wicket`, `/partnerships/by-season` — first three
-  return identity-bearing payloads (highest_total / best_pair) needing
-  schema additions; last needs `count_50_plus` / `count_100_plus`
-  cell counters.
-- 2 of ~12 `/teams/{team}/*` endpoints dispatch (the by-phase pair).
-  Per-team summary + by-season endpoints stay live for the same
-  identity-payload reasons.
-- These cover the heaviest endpoints (3+ second by-phase queries).
-  The deferred endpoints are <600ms each and don't dominate the
-  page-load.
+- All 12 `/scope/averages/*` endpoints dispatch via baseline.
+- 11 of 12 `/teams/{team}/*` endpoints dispatch via baseline. Only
+  `/teams/{team}/partnerships/summary` stays live — its `best_pair`
+  field (top pair by total runs together) needs per-(batter1,
+  batter2) aggregation not in current schema.
 
-Future work to push prod < 1s: extend BucketBaselineBatting with
-identity columns (`highest_inn_match_id`, `highest_inn_team`,
-`highest_inn_innings_number`) + analogous additions for
-partnerships → swap the remaining 4 scope-avg + 4 team endpoints.
-Then async-deebase connection pooling (note in this spec) for
-parallel SQLite reads.
+Schema additions to support identity-bearing payloads (P2-D):
+- BucketBaselineBatting: highest_inn_match_id/team/innings_number,
+  lowest_all_out_runs/match_id/team/innings_number, fifties, hundreds.
+- BucketBaselineBowling: worst_inn_runs, wide_runs, noball_runs.
+  (wide_runs/noball_runs added because per-team and scope-averages
+  endpoints have inconsistent semantics for `wides`/`noballs` —
+  one returns counts of wide deliveries, the other returns SUM of
+  extras_wides. Pre-existing inconsistency; both supported.)
+- BucketBaselinePartnership: count_50_plus, count_100_plus,
+  best_pair_partnership_id (FK to partnership.id; identity lookup
+  at query time keeps the schema narrow).
+
+Bug fixed in populate during P2-F: bowler_wicket exclusion list
+was missing 'retired not out' (live has 5 kinds, populate had 4).
+Caught by team_bowling_summary regression — 5 wickets off in
+scope_avg.
+
+Future work to push prod < 0.5s: async-deebase connection pooling
+for parallel SQLite reads. Backend 24-endpoint parallel sum is
+~610ms today (still serialized through one sqlite3 connection
+behind aiosqlite). With N=4 readers: ~150ms. Composes
+multiplicatively with bucket_baseline.
 
 ## Why
 
