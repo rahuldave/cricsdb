@@ -304,6 +304,14 @@ async def main():
                 )
                 await pss_incr(db, new_match_ids)
 
+                # bucket_baseline_* — per-cell precomputed team / league
+                # baselines for the Compare tab and team endpoints.
+                # Recomputes only cells touched by new matches.
+                from scripts.populate_bucket_baseline import (
+                    populate_incremental as bb_incr,
+                )
+                await bb_incr(db, new_match_ids)
+
                 # Refresh query planner stats and ensure leaderboard
                 # indexes exist. Index CREATE is a no-op if already
                 # there; ANALYZE is cheap and keeps bowling-leader

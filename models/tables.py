@@ -255,3 +255,123 @@ class Partnership:
     end_delivery_id: ForeignKey[int, "delivery"] = 0
     unbroken: bool = False
     ended_by_kind: Optional[str] = None  # wicket.kind of the terminating wicket
+
+
+# ─── bucket_baseline_* — Phase 2 of Compare-tab perf ────────────────────
+#
+# Six narrow tables holding per-(gender, team_type, tournament, season,
+# team) aggregates. team='__league__' rows are the pool-weighted league
+# baselines; every other row is per-team. SUM-then-divide over cells at
+# query time gives byte-identical numbers to the live aggregator.
+#
+# Built and maintained by `scripts/populate_bucket_baseline.py`,
+# auto-called from `import_data.py` (full) and `update_recent.py`
+# (incremental). Spec: `internal_docs/spec-team-bucket-baseline.md`.
+#
+# `tournament=''` represents NULL event_name (bilateral matches without
+# an explicit tournament). Stored as empty string for SQL convenience.
+
+LEAGUE_TEAM_KEY = "__league__"
+
+
+class BucketBaselineMatch:
+    id: int
+    gender: str
+    team_type: str
+    tournament: str
+    season: str
+    team: str  # team name, OR LEAGUE_TEAM_KEY for the pool-weighted row
+    matches: int = 0
+    decided: int = 0
+    ties: int = 0
+    no_results: int = 0
+    toss_decided: int = 0
+    bat_first_wins: int = 0
+    field_first_wins: int = 0
+
+
+class BucketBaselineBatting:
+    id: int
+    gender: str
+    team_type: str
+    tournament: str
+    season: str
+    team: str
+    innings_batted: int = 0
+    total_runs: int = 0
+    legal_balls: int = 0
+    fours: int = 0
+    sixes: int = 0
+    dots: int = 0
+    # Per-innings stats — stored as sums + counts so SUM-over-cells
+    # gives the right combined avg (per-innings weights cancel).
+    first_inn_runs_sum: int = 0
+    first_inn_count: int = 0
+    second_inn_runs_sum: int = 0
+    second_inn_count: int = 0
+    # MAX over per-innings totals — combine via MAX(MAX) across cells.
+    highest_inn_runs: int = 0
+
+
+class BucketBaselineBowling:
+    id: int
+    gender: str
+    team_type: str
+    tournament: str
+    season: str
+    team: str
+    innings_bowled: int = 0
+    matches: int = 0  # COUNT(DISTINCT m.id) where this side bowled
+    runs_conceded: int = 0
+    legal_balls: int = 0
+    wides: int = 0
+    noballs: int = 0
+    fours_conceded: int = 0
+    sixes_conceded: int = 0
+    dots: int = 0
+    wickets: int = 0  # bowler-credited (excludes run out / retired / obstructing)
+
+
+class BucketBaselineFielding:
+    id: int
+    gender: str
+    team_type: str
+    tournament: str
+    season: str
+    team: str
+    matches: int = 0  # innings the team was on the field
+    catches: int = 0  # cricsheet kind='caught'
+    caught_and_bowled: int = 0
+    stumpings: int = 0  # cricsheet kind='stumped'
+    run_outs: int = 0
+
+
+class BucketBaselinePhase:
+    id: int
+    gender: str
+    team_type: str
+    tournament: str
+    season: str
+    team: str
+    phase: str  # 'powerplay' | 'middle' | 'death'
+    side: str   # 'batting' | 'bowling'
+    runs: int = 0
+    legal_balls: int = 0
+    fours: int = 0
+    sixes: int = 0
+    dots: int = 0
+    wickets: int = 0  # only meaningful when side='bowling'; 0 otherwise
+
+
+class BucketBaselinePartnership:
+    id: int
+    gender: str
+    team_type: str
+    tournament: str
+    season: str
+    team: str
+    wicket_number: int  # 0..9 (cricsheet); API exposes 1..10
+    n: int = 0
+    total_runs: int = 0
+    total_balls: int = 0
+    best_runs: int = 0  # MAX over partnerships in cell

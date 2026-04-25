@@ -413,6 +413,12 @@ async def main():
     from scripts.populate_player_scope_stats import populate_full as pss_full
     await pss_full(db)
 
+    # Phase 2 of Compare-tab perf — per-cell precomputed baselines.
+    # See internal_docs/spec-team-bucket-baseline.md.
+    print("\nPopulating bucket_baseline_*…")
+    from scripts.populate_bucket_baseline import populate_full as bb_full
+    await bb_full(db)
+
     # Composite covering indexes + analyze for the leaderboard queries
     # on the Batting/Bowling landing pages. Without these, an unfiltered
     # SELECT … GROUP BY batter_id scan is 3s+; with them it drops to
