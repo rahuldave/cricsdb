@@ -58,8 +58,8 @@ REG team_batting_summary_mi_ipl_2024        /api/v1/teams/Mumbai%20Indians/batti
 REG team_bowling_summary_mi_ipl_2024        /api/v1/teams/Mumbai%20Indians/bowling/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
 REG team_fielding_summary_mi_ipl_2024       /api/v1/teams/Mumbai%20Indians/fielding/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
 REG team_partnerships_summary_mi_ipl_2024   /api/v1/teams/Mumbai%20Indians/partnerships/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
-NEW team_batting_by_phase_mi_ipl_2024       /api/v1/teams/Mumbai%20Indians/batting/by-phase?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
-NEW team_partnerships_by_wicket_mi_ipl_2024 /api/v1/teams/Mumbai%20Indians/partnerships/by-wicket?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+REG team_batting_by_phase_mi_ipl_2024       /api/v1/teams/Mumbai%20Indians/batting/by-phase?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+REG team_partnerships_by_wicket_mi_ipl_2024 /api/v1/teams/Mumbai%20Indians/partnerships/by-wicket?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
 REG team_summary_india_men_intl             /api/v1/teams/India/summary?gender=male&team_type=international
 REG team_batting_summary_india              /api/v1/teams/India/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2024
 REG team_bowling_by_season_india            /api/v1/teams/India/bowling/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
