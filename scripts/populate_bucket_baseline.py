@@ -688,14 +688,14 @@ async def _populate_bowling(db, cells=None):
 
 
 async def _populate_fielding(db, cells=None):
-    """Fielding aggregates from fieldingcredit. fc has no team column —
-    fielding-side team = the team in match that's NOT batting in this
-    innings. Match → matchplayer gives the (match, team) pairs; pair
-    that with i.team != team to get fielding-side rows."""
+    """Fielding aggregates. Drives ROW EMISSION from match (not from
+    fieldingcredit) so cells with no credits still get a row with
+    counters=0 and matches=actual_count. Critical for DBs where
+    fieldingcredit hasn't been populated yet (live endpoint correctly
+    returns matches=N from the match table)."""
     cf, cfp = _cell_filter_clause(cells, "m")
 
-    # League rows. Counts every fielding credit in the cell. Matches
-    # count: distinct innings touched (mirrors _fielding_aggregates).
+    # League rows.
     await db.q(
         f"""
         INSERT INTO bucketbaselinefielding (
@@ -704,32 +704,22 @@ async def _populate_fielding(db, cells=None):
         )
         SELECT
             m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, '{LEAGUE_TEAM}',
-            -- "matches" denominator for the per-match rates: distinct
-            -- match ids in scope (NOT distinct innings — every match
-            -- has 2 fielding sides; per-match pool isn't 2x inflated).
-            (SELECT COUNT(DISTINCT m2.id)
-             FROM match m2 JOIN innings i2 ON i2.match_id = m2.id
-             WHERE i2.super_over = 0
-               AND m2.gender = m.gender AND m2.team_type = m.team_type
-               AND COALESCE(m2.event_name, '') = COALESCE(m.event_name, '')
-               AND m2.season = m.season) AS matches,
+            COUNT(DISTINCT m.id) AS matches,
             SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
             SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS caught_and_bowled,
             SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
             SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs
-        FROM fieldingcredit fc
-        JOIN delivery d ON d.id = fc.delivery_id
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
+        FROM match m
+        JOIN innings i ON i.match_id = m.id
+        LEFT JOIN delivery d ON d.innings_id = i.id
+        LEFT JOIN fieldingcredit fc ON fc.delivery_id = d.id
         WHERE i.super_over = 0 {cf}
         GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season
         """,
         cfp,
     )
 
-    # Per-team rows. Fielding side = the (match, team) pair where
-    # i.team != team. Pre-derive (match, team) via matchplayer to keep
-    # the join surface narrow.
+    # Per-team rows.
     await db.q(
         f"""
         WITH match_teams AS (
@@ -741,16 +731,16 @@ async def _populate_fielding(db, cells=None):
         )
         SELECT
             m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, mt.team,
-            COUNT(DISTINCT i.id) AS matches,
+            COUNT(DISTINCT m.id) AS matches,
             SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
             SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS caught_and_bowled,
             SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
             SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs
-        FROM fieldingcredit fc
-        JOIN delivery d ON d.id = fc.delivery_id
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        JOIN match_teams mt ON mt.match_id = m.id AND mt.team != i.team
+        FROM match m
+        JOIN match_teams mt ON mt.match_id = m.id
+        JOIN innings i ON i.match_id = m.id AND i.team != mt.team
+        LEFT JOIN delivery d ON d.innings_id = i.id
+        LEFT JOIN fieldingcredit fc ON fc.delivery_id = d.id
         WHERE i.super_over = 0 {cf}
         GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, mt.team
         """,

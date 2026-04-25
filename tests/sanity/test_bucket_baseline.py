@@ -91,7 +91,7 @@ async def check_pool_conservation(db) -> bool:
         "SELECT COUNT(*) AS w FROM wicket w "
         "JOIN delivery d ON d.id = w.delivery_id "
         "JOIN innings i ON i.id = d.innings_id "
-        "WHERE i.super_over = 0 AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')"
+        "WHERE i.super_over = 0 AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field', 'retired not out')"
     ))[0]["w"]
     if (a or 0) == (b or 0):
         print(f"  {PASS}: whole-DB bowler wickets match ({a})")
@@ -224,7 +224,7 @@ async def check_league_cell(db, gender, team_type, tournament, season) -> bool:
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE i.super_over = 0
-          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field', 'retired not out')
           AND m.gender = :g AND m.team_type = :tt
           AND COALESCE(m.event_name, '') = :t AND m.season = :s
         """,

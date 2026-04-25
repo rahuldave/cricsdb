@@ -1062,7 +1062,9 @@ async def _fielding_by_season_from_baseline(filters, aux):
                SUM(stumpings) AS stumpings,
                SUM(run_outs) AS run_outs
         FROM bucketbaselinefielding {where}
-        GROUP BY season ORDER BY season
+        GROUP BY season
+        HAVING SUM(catches + caught_and_bowled + stumpings + run_outs) > 0
+        ORDER BY season
         """,
         params,
     )
