@@ -108,6 +108,22 @@ export default function TeamCompareGrid({ teams, filters }: Props) {
       <ScopeIndicator filters={filters} />
 
       <div
+        className="wisden-compare-legend"
+        style={{
+          fontSize: '0.85em',
+          opacity: 0.65,
+          fontStyle: 'italic',
+          marginBottom: '0.75rem',
+        }}
+        title="Compact substats appear after the primary number on phase + partnership-by-wicket rows."
+      >
+        Substats: <strong>b</strong> = boundary % · <strong>d</strong> = dot % ·
+        <strong> w</strong> = wickets ·
+        <strong> n</strong> = partnerships in scope ·
+        <strong> hi</strong> = highest single partnership
+      </div>
+
+      <div
         className="wisden-compare-columns"
         style={{
           display: 'grid',

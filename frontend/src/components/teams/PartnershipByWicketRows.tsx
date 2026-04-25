@@ -68,7 +68,7 @@ export default function PartnershipByWicketRows({
             <dd className="num">
               {fmt1(r.avg_runs)}
               <span style={{ opacity: 0.55, marginLeft: '0.4rem', fontSize: '0.85em' }}>
-                · n{r.n} / hi{r.best_runs ?? '-'}
+                · n {r.n} / hi {r.best_runs ?? '-'}
               </span>
             </dd>
           </div>

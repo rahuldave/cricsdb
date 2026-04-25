@@ -60,7 +60,7 @@ export default function PhaseBandsRow({ profile, discipline, placeholder = false
               <dd className="num">
                 {fmt2(b.run_rate)}
                 <span style={{ opacity: 0.55, marginLeft: '0.4rem', fontSize: '0.85em' }}>
-                  · b{fmt1(b.boundary_pct)}% / d{fmt1(b.dot_pct)}%
+                  · b {fmt1(b.boundary_pct)}% / d {fmt1(b.dot_pct)}%
                 </span>
               </dd>
             </div>
@@ -73,7 +73,7 @@ export default function PhaseBandsRow({ profile, discipline, placeholder = false
             <dd className="num">
               {fmt2(b.economy)}
               <span style={{ opacity: 0.55, marginLeft: '0.4rem', fontSize: '0.85em' }}>
-                · w{b.wickets} / d{fmt1(b.dot_pct)}%
+                · w {b.wickets} / d {fmt1(b.dot_pct)}%
               </span>
             </dd>
           </div>
