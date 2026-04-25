@@ -14,26 +14,35 @@ import {
   type TeamDiscipline,
 } from './teamUtils'
 import { useFetch, type FetchState } from '../../hooks/useFetch'
-import { useSetUrlParams, useUrlParam } from '../../hooks/useUrlState'
 import { getTeamProfile, getScopeAverageProfile } from '../../api'
 import type { TeamProfile, ScopeAverageProfile, FilterParams } from '../../types'
 
 interface Props {
-  /** [primary, ...compareTeams] length 2 or 3. Single-column (length
-   *  1) is also supported — used on the Compare tab before the user
-   *  has added any compare. */
+  /** [primary, ...compareTeams] length 1, 2 or 3. Single-column is
+   *  used on the Compare tab before the user has added any compare. */
   teams: string[]
   filters: FilterParams
+  /** Whether the league-average column is mounted. Sourced from the
+   *  parent's compare-slot resolution so this component doesn't have
+   *  to know which slot holds the avg. */
+  avgSlotPresent: boolean
+  /** Clear primary + all compare slots — invoked by the ✕ on column 0. */
+  onClearPrimary: () => void
+  /** Remove a team-kind compare slot by name. */
+  onRemoveTeam: (name: string) => void
+  /** Remove the avg-kind compare slot (whichever slot holds it). */
+  onRemoveAvg: () => void
 }
 
 const DISCIPLINES: TeamDiscipline[] = [
   'results', 'batting', 'bowling', 'fielding', 'partnerships',
 ]
 
-export default function TeamCompareGrid({ teams, filters }: Props) {
-  const setUrlParams = useSetUrlParams()
-  const [avgSlotParam] = useUrlParam('avg_slot')
-  const avgSlot = avgSlotParam === '1'
+export default function TeamCompareGrid({
+  teams, filters, avgSlotPresent,
+  onClearPrimary, onRemoveTeam, onRemoveAvg,
+}: Props) {
+  const avgSlot = avgSlotPresent
 
   const filterDeps = [
     filters.gender, filters.team_type, filters.tournament,
@@ -70,17 +79,11 @@ export default function TeamCompareGrid({ teams, filters }: Props) {
   const firstError = fetches.find(f => f.error) ?? (avgSlot ? (fAvg.error ? fAvg : undefined) : undefined)
 
   const removeAt = (idx: number) => {
-    if (idx === 0) {
-      // Removing primary clears compare AND drops the tab param so the
-      // landing doesn't render under a stale `tab=Compare` URL residue.
-      setUrlParams({ team: '', compare: '', tab: '', avg_slot: '' })
-      return
-    }
-    const compares = teams.slice(1).filter((_, i) => i + 1 !== idx)
-    setUrlParams({ compare: compares.join(',') })
+    if (idx === 0) onClearPrimary()
+    else onRemoveTeam(teams[idx])
   }
 
-  const removeAvgSlot = () => setUrlParams({ avg_slot: '' })
+  const removeAvgSlot = onRemoveAvg
 
   // Which disciplines have ANY column with data in scope — drives
   // row visibility. Columns lacking that discipline render a dim

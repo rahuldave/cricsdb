@@ -1,5 +1,5 @@
 import type React from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
@@ -23,6 +23,9 @@ import PlayerLink from '../components/PlayerLink'
 import { ScopeContext } from '../components/scopeLinks'
 import TeamCompareGrid from '../components/teams/TeamCompareGrid'
 import AddTeamComparePicker from '../components/teams/AddTeamComparePicker'
+import {
+  useCompareSlots, AVG_SENTINEL, OVERRIDABLE_SLOT_KEYS, clearSlotUpdates,
+} from '../hooks/useCompareSlots'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
 import LineChart from '../components/charts/LineChart'
@@ -62,24 +65,112 @@ export default function Teams() {
   useDocumentTitle(selected || 'Teams')
   const [activeTab, setActiveTab] = useUrlParam('tab', 'By Season')
   const [opponent, setOpponent] = useUrlParam('vs')
-  const [compareCsv] = useUrlParam('compare')
-  const [avgSlotParam] = useUrlParam('avg_slot')
-  const avgSlotPresent = avgSlotParam === '1'
-  // Split CSV, trim, drop empties, cap at 2 extra teams (primary + 2 = 3 total).
-  const compareTeams = compareCsv
-    ? compareCsv.split(',').map(s => s.trim()).filter(Boolean).slice(0, 2)
-    : []
 
-  // Self-correcting deep link — if a share URL arrives with `compare=`
-  // set but no `tab`, the default "By Season" would silently hide the
-  // compare columns. Auto-switch to the Compare tab (replace, no new
-  // history entry, matching the tournament deep-link pattern in
-  // FilterBar.tsx:82-93).
+  // Compare slots — derived from compareN/compareN_* URL params (with
+  // legacy compare=A,B / avg_slot=1 fallback while the migration
+  // useEffect below has not yet rewritten the URL).
+  const slots = useCompareSlots(filters)
+  const compareTeams: string[] = []
+  let avgSlotPresent = false
+  for (const slot of [slots.slot1, slots.slot2]) {
+    if (!slot) continue
+    if (slot.kind === 'team' && slot.entity) compareTeams.push(slot.entity)
+    if (slot.kind === 'avg') avgSlotPresent = true
+  }
+  const hasCompareSlot = !!(slots.slot1 || slots.slot2)
+
+  // One-shot migration on mount: legacy compare=A,B / avg_slot=1 →
+  // compareN params; slot contiguity (compare2 alone → compare1).
+  // useRef gate so subsequent URL changes don't re-fire (writes from
+  // the picker / remove buttons go straight to compareN).
+  const migratedRef = useRef(false)
   useEffect(() => {
-    if (compareCsv && selected && activeTab !== 'Compare') {
+    if (migratedRef.current) return
+    migratedRef.current = true
+    const url = new URL(window.location.href)
+    const params = url.searchParams
+    const legacyCompare = params.get('compare')
+    const legacyAvg = params.get('avg_slot')
+    const c1 = params.get('compare1')
+    const c2 = params.get('compare2')
+    const hasLegacy = legacyCompare !== null || legacyAvg !== null
+    const needsContiguity = !c1 && !!c2
+    if (!hasLegacy && !needsContiguity) return
+
+    const updates: Record<string, string> = {}
+    if (hasLegacy) {
+      const compares = legacyCompare
+        ? legacyCompare.split(',').map(s => s.trim()).filter(Boolean)
+        : []
+      const wantsAvg = legacyAvg === '1'
+      const desired: string[] = compares.slice(0, 2)
+      if (wantsAvg) {
+        if (desired.length < 2) desired.push(AVG_SENTINEL)
+        else console.warn('[teams] legacy compare URL had 2 teams + avg_slot; dropped avg to fit 3-column cap.')
+      }
+      if (compares.length > 2) {
+        console.warn(`[teams] legacy compare URL had ${compares.length} teams; capped at 2.`)
+      }
+      updates.compare = ''
+      updates.avg_slot = ''
+      updates.compare1 = desired[0] ?? ''
+      updates.compare2 = desired[1] ?? ''
+    } else if (needsContiguity) {
+      updates.compare1 = c2 ?? ''
+      updates.compare2 = ''
+      for (const k of OVERRIDABLE_SLOT_KEYS) {
+        const v = params.get(`compare2_${k}`)
+        if (v != null) {
+          updates[`compare1_${k}`] = v
+          updates[`compare2_${k}`] = ''
+        }
+      }
+    }
+    setUrlParams(updates, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Self-correcting deep link — share URL with a compare slot but no
+  // `tab` would default to "By Season" and silently hide the grid.
+  useEffect(() => {
+    if (hasCompareSlot && selected && activeTab !== 'Compare') {
       setActiveTab('Compare', { replace: true })
     }
-  }, [compareCsv, selected])
+  }, [hasCompareSlot, selected])
+
+  // Add / remove callbacks for the compare grid + picker. Each writes
+  // directly to the new compareN params (no legacy compare CSV).
+  const slot1 = slots.slot1
+  const slot2 = slots.slot2
+  const onAddTeam = useCallback((name: string) => {
+    const targetSlot: 1 | 2 = !slot1 ? 1 : 2
+    setUrlParams({ [`compare${targetSlot}`]: name })
+  }, [slot1, setUrlParams])
+  const onAddAvg = useCallback(() => {
+    const targetSlot: 1 | 2 = !slot1 ? 1 : 2
+    setUrlParams({ [`compare${targetSlot}`]: AVG_SENTINEL })
+  }, [slot1, setUrlParams])
+  const onRemoveTeam = useCallback((name: string) => {
+    const idx: 1 | 2 | null =
+      (slot1?.kind === 'team' && slot1.entity === name) ? 1 :
+      (slot2?.kind === 'team' && slot2.entity === name) ? 2 : null
+    if (idx == null) return
+    setUrlParams(clearSlotUpdates(idx))
+  }, [slot1, slot2, setUrlParams])
+  const onRemoveAvg = useCallback(() => {
+    const idx: 1 | 2 | null =
+      slot1?.kind === 'avg' ? 1 :
+      slot2?.kind === 'avg' ? 2 : null
+    if (idx == null) return
+    setUrlParams(clearSlotUpdates(idx))
+  }, [slot1, slot2, setUrlParams])
+  const onClearCompareAll = useCallback(() => {
+    setUrlParams({
+      team: '', tab: '',
+      compare: '', avg_slot: '',
+      ...clearSlotUpdates(1), ...clearSlotUpdates(2),
+    })
+  }, [setUrlParams])
 
   const [resultsOffset, setResultsOffset] = useState(0)
 
@@ -284,11 +375,17 @@ export default function Teams() {
                 <TeamCompareGrid
                   teams={[selected, ...compareTeams]}
                   filters={filters}
+                  avgSlotPresent={avgSlotPresent}
+                  onClearPrimary={onClearCompareAll}
+                  onRemoveTeam={onRemoveTeam}
+                  onRemoveAvg={onRemoveAvg}
                 />
                 <AddTeamComparePicker
                   currentTeams={[selected, ...compareTeams]}
                   filters={filters}
                   avgSlotPresent={avgSlotPresent}
+                  onAddTeam={onAddTeam}
+                  onAddAvg={onAddAvg}
                 />
               </>
             )}

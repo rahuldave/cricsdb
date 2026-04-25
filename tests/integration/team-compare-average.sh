@@ -73,10 +73,11 @@ assert_snapshot_contains "10th wkt" "partnership-by-wicket: 10th wkt row"
 # Test 2 — Add league average via the picker button.
 # ──────────────────────────────────────────────────────────────────
 echo
-echo "Test 2: + Add league average → avg_slot=1, label rendered"
+echo "Test 2: + Add league average → compareN=__avg__, label rendered"
 agent-browser eval 'document.querySelector("button.wisden-compare-picker-avg-btn")?.click()' >/dev/null 2>&1
 sleep 2
-assert_url_contains "avg_slot=1"
+# Slot 1 already holds CSK; the avg lands in slot 2.
+assert_url_contains "compare2=__avg__"
 assert_snapshot_contains "Indian Premier League 2024 avg" "scope-computed avg label"
 # Avg column shows aggregate counts much larger than single team's.
 # League IPL 2024 had 71 matches per smoke test.
@@ -108,10 +109,10 @@ echo "Test 4: remove avg column via ✕"
 agent-browser eval 'document.querySelector("button[aria-label=\"Remove league average\"]")?.click()' >/dev/null 2>&1
 sleep 2
 got=$(agent-browser get url 2>/dev/null)
-if [[ "$got" != *"avg_slot=1"* ]]; then
-  printf "  ✓ avg_slot dropped from URL\n"; PASS=$((PASS + 1))
+if [[ "$got" != *"avg_slot=1"* && "$got" != *"compare1=__avg__"* && "$got" != *"compare2=__avg__"* ]]; then
+  printf "  ✓ avg slot dropped from URL\n"; PASS=$((PASS + 1))
 else
-  printf "  ✗ avg_slot still in URL: %s\n" "$got"; FAIL=$((FAIL + 1))
+  printf "  ✗ avg slot still in URL: %s\n" "$got"; FAIL=$((FAIL + 1))
 fi
 assert_snapshot_missing "Indian Premier League 2020-2024 avg" "avg column gone"
 

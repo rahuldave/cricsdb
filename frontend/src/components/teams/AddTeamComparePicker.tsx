@@ -1,31 +1,37 @@
 import { useState } from 'react'
 import TeamSearch from '../TeamSearch'
-import { useSetUrlParams } from '../../hooks/useUrlState'
 import { getTeamSummary } from '../../api'
 import type { FilterParams } from '../../types'
 
 interface Props {
-  /** Currently-compared team names (incl. primary). Used to dedupe
-   *  and cap additions at 3 total. */
+  /** Currently-rendered team names incl. primary. Used to dedupe
+   *  and cap additions at 3 columns total (primary + 2 compares). */
   currentTeams: string[]
-  /** Current FilterBar scope. The candidate's scope-match count is
-   *  probed against this — teams with zero matches in scope are
-   *  refused in-place rather than silently added as empty columns. */
+  /** Current FilterBar scope — used to probe the candidate's
+   *  in-scope match count before adding. */
   filters: FilterParams
-  /** True when the league-average column is already in the grid;
+  /** True when the league-average column already occupies a slot;
    *  hides the "+ Add league average" button. */
   avgSlotPresent: boolean
+  /** Add a team-kind compare slot; parent decides which slot
+   *  (1 or 2) to write to. */
+  onAddTeam: (name: string) => void
+  /** Add an avg-kind compare slot in the next empty slot. */
+  onAddAvg: () => void
 }
 
-export default function AddTeamComparePicker({ currentTeams, filters, avgSlotPresent }: Props) {
-  const setUrlParams = useSetUrlParams()
+export default function AddTeamComparePicker({
+  currentTeams, filters, avgSlotPresent, onAddTeam, onAddAvg,
+}: Props) {
   const [err, setErr] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
 
-  const teamSlotsFull = currentTeams.length >= 3
-  // If both team slots are full AND avg is already in, picker has
-  // nothing to offer — hide entirely.
-  if (teamSlotsFull && avgSlotPresent) return null
+  // Total columns = primary + filled compare slots. Cap at 3.
+  const totalColumns = currentTeams.length + (avgSlotPresent ? 1 : 0)
+  const slotsFull = totalColumns >= 3
+  if (slotsFull) return null
+
+  const teamSlotsFull = currentTeams.length >= 3 - (avgSlotPresent ? 1 : 0)
 
   const handleSelect = async (name: string) => {
     setErr(null)
@@ -33,12 +39,6 @@ export default function AddTeamComparePicker({ currentTeams, filters, avgSlotPre
       setErr('Team already in comparison.')
       return
     }
-    // Defence-in-depth: the TeamSearch dropdown already inherits the
-    // FilterBar scope (gender + team_type), so cross-type / cross-gender
-    // teams can't be surfaced in the results. But a URL-paste or a
-    // race between mount and FilterBar auto-narrow could slip through.
-    // Probe scope-match count — zero matches means the team exists but
-    // not in the current filter scope.
     setChecking(true)
     try {
       const s = await getTeamSummary(name, filters)
@@ -54,13 +54,7 @@ export default function AddTeamComparePicker({ currentTeams, filters, avgSlotPre
     } finally {
       setChecking(false)
     }
-    // Primary stays in `team`; compares go in `compare` CSV.
-    const compares = [...currentTeams.slice(1), name]
-    setUrlParams({ compare: compares.join(',') })
-  }
-
-  const handleAddAvg = () => {
-    setUrlParams({ avg_slot: '1' })
+    onAddTeam(name)
   }
 
   const label = currentTeams.length === 1
@@ -78,7 +72,7 @@ export default function AddTeamComparePicker({ currentTeams, filters, avgSlotPre
         <button
           type="button"
           className="comp-link wisden-compare-picker-avg-btn"
-          onClick={handleAddAvg}
+          onClick={onAddAvg}
           title="Add a league-average column scoped to the current filters"
           style={{
             background: 'none',
