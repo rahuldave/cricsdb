@@ -979,12 +979,19 @@ def _scope_to_team_clause(
 
     Returns ("", {}) if the gate doesn't apply. Caller decides where
     to splice the clause + extend its params dict.
+
+    `COALESCE(event_name, '')` on both sides matches the bucket_baseline
+    convention (Convention 4 in perf-bucket-baselines.md): NULL
+    event_name (bilaterals) is stored as '' in the precomputed tables.
+    Without COALESCE, `IN (NULL)` evaluates to UNKNOWN and excludes
+    bilaterals from the scope — diverging from the baseline path's
+    narrowing.
     """
     if aux is None or not aux.scope_to_team or filters.tournament:
         return "", {}
     return (
-        "m.event_name IN ("
-        "SELECT DISTINCT m_st.event_name FROM matchplayer mp_st "
+        "COALESCE(m.event_name, '') IN ("
+        "SELECT DISTINCT COALESCE(m_st.event_name, '') FROM matchplayer mp_st "
         "JOIN match m_st ON mp_st.match_id = m_st.id "
         "WHERE mp_st.team = :scope_to_team)",
         {"scope_to_team": aux.scope_to_team},
