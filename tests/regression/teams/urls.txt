@@ -59,7 +59,8 @@ REG team_partnerships_top_india       /api/v1/teams/India/partnerships/top?gende
 NEW team_partnerships_bowling_summary /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=bowling
 
 # ── club-team variant (Mumbai Indians) ───────────────────────────
-NEW team_mi_batting_summary           /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+# tournament=IPL pre-set → scope_to_team is no-op for Commit 3 → REG.
+REG team_mi_batting_summary           /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
 REG team_mi_bowling_top               /api/v1/teams/Mumbai%20Indians/bowling/top-bowlers?gender=male&team_type=club&tournament=Indian%20Premier%20League&limit=3
 
 # ── reference (FilterBar support) ────────────────────────────────
