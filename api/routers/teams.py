@@ -918,6 +918,23 @@ def _apply_partnerships_per_innings(d: dict, innings_batted: int) -> dict:
     return d
 
 
+def _league_aux(team: str | None, aux: AuxParams) -> AuxParams:
+    """Return a copy of `aux` with `scope_to_team` synthesized to
+    `team` so the league-side call inside `_compute_xxx_summary` /
+    by-phase / by-wicket handlers baselines against the team's
+    tournament universe (matching the avg-slot's auto-narrow).
+
+    No-op when team is None or when aux already has scope_to_team
+    set explicitly (request-supplied scope overrides synthesis).
+    Spec: spec-avg-column-per-innings.md Commit 3."""
+    if team is None or aux.scope_to_team:
+        return aux
+    from copy import copy
+    new = copy(aux)
+    new.scope_to_team = team
+    return new
+
+
 def _phase_dict_per_innings(by_phase: dict, innings_count: int) -> dict:
     """Apply per-innings to a {phase: row} dict. Used by team-side
     `_batting_by_phase_aggregates(team=None, …)` /
@@ -1257,7 +1274,7 @@ async def _compute_batting_summary(
     (highest_total, lowest_all_out_total) stay flat — they're not
     metrics."""
     t = await _batting_aggregates(team, filters, aux)
-    s = await _batting_aggregates(None, filters, aux)
+    s = await _batting_aggregates(None, filters, _league_aux(team, aux))
     legal = t.get("legal_balls") or 0
     return {
         "team": team,
@@ -1595,7 +1612,7 @@ async def team_batting_by_phase(
     aux: AuxParams = Depends(),
 ):
     t = await _batting_by_phase_aggregates(team, filters, aux)
-    s = await _batting_by_phase_aggregates(None, filters, aux)
+    s = await _batting_by_phase_aggregates(None, filters, _league_aux(team, aux))
 
     phase_ranges = {
         "powerplay": [1, 6],
@@ -2042,7 +2059,7 @@ async def _compute_bowling_summary(
 ) -> dict:
     """Per-metric envelope team-bowling summary."""
     t = await _bowling_aggregates(team, filters, aux)
-    s = await _bowling_aggregates(None, filters, aux)
+    s = await _bowling_aggregates(None, filters, _league_aux(team, aux))
     legal = t.get("legal_balls") or 0
     matches = t.get("matches") or 0
     return {
@@ -2363,7 +2380,7 @@ async def team_bowling_by_phase(
     aux: AuxParams = Depends(),
 ):
     t = await _bowling_by_phase_aggregates(team, filters, aux)
-    s = await _bowling_by_phase_aggregates(None, filters, aux)
+    s = await _bowling_by_phase_aggregates(None, filters, _league_aux(team, aux))
 
     phase_ranges = {
         "powerplay": [1, 6],
@@ -2664,7 +2681,7 @@ async def team_fielding_summary(
     aux: AuxParams = Depends(),
 ):
     t = await _fielding_aggregates(team, filters, aux)
-    s = await _fielding_aggregates(None, filters, aux)
+    s = await _fielding_aggregates(None, filters, _league_aux(team, aux))
     matches = t.get("matches") or 0
     return {
         "team": team,
@@ -2992,7 +3009,7 @@ async def team_partnerships_by_wicket(
     where, params = _partnership_filter(filters, team, side, aux=aux)
 
     t = await _partnerships_by_wicket_aggregates(team, filters, side, aux)
-    s = await _partnerships_by_wicket_aggregates(None, filters, side, aux)
+    s = await _partnerships_by_wicket_aggregates(None, filters, side, _league_aux(team, aux))
 
     # Best partnership detail per wicket (identity-bearing — only
     # fetched for the team side; the league's record at each wicket
@@ -3410,10 +3427,12 @@ async def team_partnerships_summary(
                 "best_runs": r["best_runs"],
             }
 
-    # Scope-avg counterpart — same query, team=None. Identity-bearing
-    # nested objects (highest, best_pair) are dropped here; only the
-    # numeric metrics are needed.
-    s_where, s_params = _partnership_filter(filters, None, side, aux=aux)
+    # Scope-avg counterpart — same query, team=None, but with
+    # scope_to_team synthesized so the league-side baselines against
+    # the team's tournament universe (matching the avg endpoint's
+    # auto-narrow). Spec-avg-column-per-innings.md Commit 3.
+    league_aux = _league_aux(team, aux)
+    s_where, s_params = _partnership_filter(filters, None, side, aux=league_aux)
     s_rows = await db.q(
         f"""
         SELECT
@@ -3439,7 +3458,7 @@ async def team_partnerships_summary(
         "avg_runs": sa_raw.get("avg_runs"),
     }
     sa = _apply_partnerships_per_innings(
-        sa, await _innings_count_for_phase(filters, aux, side="batting"),
+        sa, await _innings_count_for_phase(filters, league_aux, side="batting"),
     )
 
     return {
