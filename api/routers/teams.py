@@ -813,14 +813,143 @@ def _half(v: float | int | None) -> float | None:
     """Halve a per-match league rate to per-team-equivalent. Each
     match has 2 fielding/bowling sides, so league total catches /
     matches counts both sides; the team-side comparable is half.
-    Used for scope_avg's of catches_per_match, stumpings_per_match,
-    run_outs_per_match, wides_per_match, noballs_per_match — every
-    rate computed as (fielding-side count / matches) where the
-    league-side denominator counts each match once but the league-
-    side numerator counts both sides."""
+
+    DEPRECATED for use in `_compute_xxx_summary` chip wrappers — as of
+    spec-avg-column-per-innings.md Commit 2, the team-side
+    `_xxx_aggregates(team=None, …)` helper halves per-match rates at
+    source so the chip's `scope_avg` matches the avg endpoint's
+    displayed value. Wrapping `_half(s["..._per_match"])` would
+    double-halve. Still exported for the standalone helper."""
     if v is None:
         return None
     return round(v / 2, 2)
+
+
+# ── Per-innings transform helpers ─────────────────────────────────
+# spec-avg-column-per-innings.md (2026-04-26): the avg column on the
+# Compare tab + every chip's `scope_avg` must express a per-INNINGS
+# average, not a pool aggregate. Pool sums across both fielding/bowling
+# sides per match are misleading next to a per-team value.
+# These helpers divide absolute counts by an innings_count, halve
+# per-match rates that aggregate both sides per match, and (for
+# bowling) recompute `overs` from the new per-innings `legal_balls`.
+
+# Keys touched by the per-innings transform per discipline.
+BATTING_COUNT_KEYS = (
+    "total_runs", "legal_balls", "fours", "sixes", "fifties", "hundreds",
+)
+BOWLING_COUNT_KEYS = (
+    "runs_conceded", "legal_balls", "wickets",
+    "fours_conceded", "sixes_conceded", "wides", "noballs",
+)
+BOWLING_HALF_KEYS = ("wides_per_match", "noballs_per_match")
+FIELDING_COUNT_KEYS = (
+    "catches", "caught_and_bowled", "stumpings", "run_outs",
+    "total_dismissals_contributed",
+)
+FIELDING_HALF_KEYS = ("catches_per_match", "stumpings_per_match", "run_outs_per_match")
+PARTNERSHIPS_COUNT_KEYS = ("total", "count_50_plus", "count_100_plus")
+
+
+def _apply_batting_per_innings(d: dict, innings_batted: int, *, drop_divisor: bool = False) -> dict:
+    """Divide batting absolute counts by innings_batted. Rates
+    (run_rate, boundary_pct, dot_pct, avg_*_innings_total) and
+    identity (highest_total, lowest_all_out_total) untouched.
+
+    `drop_divisor`: pop innings_batted from the result. Set True for
+    the avg endpoint (spec recommendation); False for the team-side
+    league call where `_compute_batting_summary` reads s["innings_batted"]
+    when constructing the envelope."""
+    if not innings_batted:
+        return d
+    for k in BATTING_COUNT_KEYS:
+        v = d.get(k)
+        if v is not None:
+            d[k] = round(v / innings_batted, 2)
+    if drop_divisor:
+        d.pop("innings_batted", None)
+    return d
+
+
+def _apply_bowling_per_innings(d: dict, innings_bowled: int, *, drop_divisor: bool = False) -> dict:
+    """Divide bowling absolute counts by innings_bowled, halve
+    per-match rates (wides_per_match, noballs_per_match), recompute
+    `overs` from the new per-innings legal_balls."""
+    if innings_bowled:
+        for k in BOWLING_COUNT_KEYS:
+            v = d.get(k)
+            if v is not None:
+                d[k] = round(v / innings_bowled, 2)
+        if d.get("legal_balls") is not None:
+            d["overs"] = round(d["legal_balls"] / 6, 2)
+    for k in BOWLING_HALF_KEYS:
+        v = d.get(k)
+        if v is not None:
+            d[k] = round(v / 2, 2)
+    if drop_divisor:
+        d.pop("innings_bowled", None)
+    return d
+
+
+def _apply_fielding_per_innings(d: dict, fielding_innings: int) -> dict:
+    """Divide fielding counts by fielding_innings (= matches × 2),
+    halve per-match rates. `matches` stays as scope-context."""
+    if fielding_innings:
+        for k in FIELDING_COUNT_KEYS:
+            v = d.get(k)
+            if v is not None:
+                d[k] = round(v / fielding_innings, 2)
+    for k in FIELDING_HALF_KEYS:
+        v = d.get(k)
+        if v is not None:
+            d[k] = round(v / 2, 2)
+    return d
+
+
+def _apply_partnerships_per_innings(d: dict, innings_batted: int) -> dict:
+    """Divide partnership counts by innings_batted. avg_runs is a
+    per-partnership rate (untouched); highest is identity."""
+    if not innings_batted:
+        return d
+    for k in PARTNERSHIPS_COUNT_KEYS:
+        v = d.get(k)
+        if v is not None:
+            d[k] = round(v / innings_batted, 2)
+    return d
+
+
+def _phase_dict_per_innings(by_phase: dict, innings_count: int) -> dict:
+    """Apply per-innings to a {phase: row} dict. Used by team-side
+    `_batting_by_phase_aggregates(team=None, …)` /
+    `_bowling_by_phase_aggregates(team=None, …)`. Mutates and returns."""
+    if not innings_count:
+        return by_phase
+    keys = ("runs", "runs_conceded", "balls", "wickets_lost", "wickets",
+            "fours", "sixes", "fours_conceded", "sixes_conceded")
+    for r in by_phase.values():
+        for k in keys:
+            v = r.get(k)
+            if v is not None:
+                r[k] = round(v / innings_count, 2)
+    return by_phase
+
+
+async def _innings_count_for_phase(filters, aux, *, side: str) -> int:
+    """Quick count of distinct innings in scope (no team), batting or
+    bowling side. Used by the team-side phase aggregator's team=None
+    branch to compute the per-innings divisor."""
+    db = get_db()
+    where, params = _team_innings_clause(filters, None, side=side, aux=aux)
+    rows = await db.q(
+        f"""
+        SELECT COUNT(DISTINCT i.id) AS n
+        FROM innings i
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+        """,
+        params,
+    )
+    return (rows[0].get("n") if rows else 0) or 0
 
 
 def _scope_to_team_clause(
@@ -971,7 +1100,7 @@ async def _batting_aggregates_baseline(team, filters, aux):
             "match_id": lo["lowest_all_out_match_id"],
             "innings_number": (lo["lowest_all_out_innings_number"] or 0) + 1,
         }
-    return {
+    out = {
         "innings_batted": r.get("innings_batted") or 0,
         "total_runs": total_runs,
         "legal_balls": legal_balls,
@@ -987,6 +1116,14 @@ async def _batting_aggregates_baseline(team, filters, aux):
         "highest_total": highest_total,
         "lowest_all_out_total": lowest_all_out,
     }
+    # Spec-avg-column-per-innings.md Commit 2 part B: when called with
+    # team=None for the chip's scope_avg, return per-innings averages so
+    # chip_scope_avg numerically matches `/scope/averages/*`'s displayed
+    # value. Team-given path stays pool (the team-side response is a
+    # fact about THIS team's pool counts).
+    if team is None:
+        return _apply_batting_per_innings(out, out["innings_batted"])
+    return out
 
 
 async def _batting_aggregates_live(
@@ -1087,7 +1224,7 @@ async def _batting_aggregates_live(
     fifties = sum(1 for r in player_inn_rows if 50 <= (r["r"] or 0) < 100)
     hundreds = sum(1 for r in player_inn_rows if (r["r"] or 0) >= 100)
 
-    return {
+    out = {
         "innings_batted": innings_batted,
         "total_runs": total_runs,
         "legal_balls": legal_balls,
@@ -1103,6 +1240,9 @@ async def _batting_aggregates_live(
         "highest_total": highest_total,
         "lowest_all_out_total": lowest_all_out,
     }
+    if team is None:
+        return _apply_batting_per_innings(out, innings_batted)
+    return out
 
 
 async def _compute_batting_summary(
@@ -1368,6 +1508,8 @@ async def _batting_by_phase_aggregates_baseline(
             "fours": fours,
             "sixes": sixes,
         }
+    if team is None:
+        out = _phase_dict_per_innings(out, await _innings_count_for_phase(filters, aux, side="batting"))
     return out
 
 
@@ -1441,6 +1583,8 @@ async def _batting_by_phase_aggregates_live(
             "fours": fours,
             "sixes": sixes,
         }
+    if team is None:
+        out = _phase_dict_per_innings(out, await _innings_count_for_phase(filters, aux, side="batting"))
     return out
 
 
@@ -1725,7 +1869,7 @@ async def _bowling_aggregates_baseline(team, filters, aux):
                 "match_id": d["match_id"],
             }
 
-    return {
+    out = {
         "innings_bowled": innings_bowled,
         "matches": matches,
         "runs_conceded": runs_conceded,
@@ -1746,6 +1890,9 @@ async def _bowling_aggregates_baseline(team, filters, aux):
         "worst_conceded": worst,
         "best_defence": best_defence,
     }
+    if team is None:
+        return _apply_bowling_per_innings(out, innings_bowled)
+    return out
 
 
 async def _bowling_aggregates_live(
@@ -1862,7 +2009,7 @@ async def _bowling_aggregates_live(
                 "match_id": lo["match_id"],
             }
 
-    return {
+    out = {
         "innings_bowled": innings_bowled,
         "matches": matches,
         "runs_conceded": runs_conceded,
@@ -1883,6 +2030,9 @@ async def _bowling_aggregates_live(
         "worst_conceded": worst,
         "best_defence": best_defence,
     }
+    if team is None:
+        return _apply_bowling_per_innings(out, innings_bowled)
+    return out
 
 
 async def _compute_bowling_summary(
@@ -1912,11 +2062,12 @@ async def _compute_bowling_summary(
         "sixes_conceded": wrap_metric(t["sixes_conceded"], s["sixes_conceded"], "sixes_conceded", sample_size=legal),
         "wides": wrap_metric(t["wides"], s["wides"], "wides", sample_size=matches),
         "noballs": wrap_metric(t["noballs"], s["noballs"], "noballs", sample_size=matches),
-        # Per-match league rates halved to per-team-equivalent (each
-        # match has 2 bowling sides; league total wides / matches
-        # counts both teams' bowling).
-        "wides_per_match": wrap_metric(t["wides_per_match"], _half(s["wides_per_match"]), "wides_per_match", sample_size=matches),
-        "noballs_per_match": wrap_metric(t["noballs_per_match"], _half(s["noballs_per_match"]), "noballs_per_match", sample_size=matches),
+        # Per-match league rates: `s` is already halved at source by
+        # `_apply_bowling_per_innings(out, innings_bowled)` when called
+        # with team=None (spec-avg-column-per-innings.md Commit 2).
+        # Don't wrap with _half() — that would double-halve.
+        "wides_per_match": wrap_metric(t["wides_per_match"], s["wides_per_match"], "wides_per_match", sample_size=matches),
+        "noballs_per_match": wrap_metric(t["noballs_per_match"], s["noballs_per_match"], "noballs_per_match", sample_size=matches),
         "avg_opposition_total": wrap_metric(t["avg_opposition_total"], s["avg_opposition_total"], "avg_opposition_total", sample_size=t["innings_bowled"]),
         "worst_conceded": t["worst_conceded"],
         "best_defence": t["best_defence"],
@@ -2127,6 +2278,8 @@ async def _bowling_by_phase_aggregates_baseline(
             "fours_conceded": fours,
             "sixes_conceded": sixes,
         }
+    if team is None:
+        out = _phase_dict_per_innings(out, await _innings_count_for_phase(filters, aux, side="fielding"))
     return out
 
 
@@ -2198,6 +2351,8 @@ async def _bowling_by_phase_aggregates_live(
             "fours_conceded": fours,
             "sixes_conceded": sixes,
         }
+    if team is None:
+        out = _phase_dict_per_innings(out, await _innings_count_for_phase(filters, aux, side="fielding"))
     return out
 
 
@@ -2435,7 +2590,7 @@ async def _fielding_aggregates_baseline(team, filters, aux):
         params_live,
     )
     matches = match_rows[0]["matches"] if match_rows else 0
-    return {
+    out = {
         "matches": matches,
         "catches": catches_only,
         "caught_and_bowled": cnb,
@@ -2446,6 +2601,9 @@ async def _fielding_aggregates_baseline(team, filters, aux):
         "stumpings_per_match": _safe_div(stumpings, matches, 1, 2),
         "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
     }
+    if team is None:
+        return _apply_fielding_per_innings(out, matches * 2)
+    return out
 
 
 async def _fielding_aggregates_live(
@@ -2483,7 +2641,7 @@ async def _fielding_aggregates_live(
     )
     matches = match_rows[0]["matches"] if match_rows else 0
 
-    return {
+    out = {
         "matches": matches,
         "catches": catches,
         "caught_and_bowled": caught_and_bowled,
@@ -2494,6 +2652,9 @@ async def _fielding_aggregates_live(
         "stumpings_per_match": _safe_div(stumpings, matches, 1, 2),
         "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
     }
+    if team is None:
+        return _apply_fielding_per_innings(out, matches * 2)
+    return out
 
 
 @router.get("/{team}/fielding/summary")
@@ -2513,12 +2674,12 @@ async def team_fielding_summary(
         "stumpings":           wrap_metric(t["stumpings"], s["stumpings"], "stumpings", sample_size=matches),
         "run_outs":            wrap_metric(t["run_outs"], s["run_outs"], "run_outs", sample_size=matches),
         "total_dismissals_contributed": wrap_metric(t["total_dismissals_contributed"], s["total_dismissals_contributed"], "total_dismissals_contributed", sample_size=matches),
-        # per-match rates: scope_avg halved because the league pool
-        # counts both fielding sides per match; the team-side
-        # comparable is /2.
-        "catches_per_match":   wrap_metric(t["catches_per_match"], _half(s["catches_per_match"]), "catches_per_match", sample_size=matches),
-        "stumpings_per_match": wrap_metric(t["stumpings_per_match"], _half(s["stumpings_per_match"]), "stumpings_per_match", sample_size=matches),
-        "run_outs_per_match":  wrap_metric(t["run_outs_per_match"], _half(s["run_outs_per_match"]), "run_outs_per_match", sample_size=matches),
+        # Per-match rates: `s` is already halved at source by
+        # `_apply_fielding_per_innings(out, matches*2)` when called with
+        # team=None (spec-avg-column-per-innings.md Commit 2).
+        "catches_per_match":   wrap_metric(t["catches_per_match"], s["catches_per_match"], "catches_per_match", sample_size=matches),
+        "stumpings_per_match": wrap_metric(t["stumpings_per_match"], s["stumpings_per_match"], "stumpings_per_match", sample_size=matches),
+        "run_outs_per_match":  wrap_metric(t["run_outs_per_match"], s["run_outs_per_match"], "run_outs_per_match", sample_size=matches),
     }
 
 
@@ -2772,7 +2933,7 @@ async def _partnerships_by_wicket_aggregates(
             """,
             bp,
         )
-        return {
+        out = {
             r["wicket_number"]: {
                 "wicket_number": r["wicket_number"],
                 "n": r["n"] or 0,
@@ -2782,6 +2943,12 @@ async def _partnerships_by_wicket_aggregates(
             }
             for r in bl_rows
         }
+        if team is None:
+            innings_batted = await _innings_count_for_phase(filters, aux, side="batting")
+            for row in out.values():
+                if innings_batted:
+                    row["n"] = round((row["n"] or 0) / innings_batted, 2)
+        return out
 
     db = get_db()
     where, params = _partnership_filter(filters, team, side, aux=aux)
@@ -2803,7 +2970,14 @@ async def _partnerships_by_wicket_aggregates(
         """,
         params,
     )
-    return {r["wicket_number"]: r for r in rows}
+    out = {r["wicket_number"]: dict(r) for r in rows}
+    if team is None:
+        # `dict(r)` to make rows mutable; sqlite Row is read-only.
+        innings_batted = await _innings_count_for_phase(filters, aux, side="batting")
+        for row in out.values():
+            if innings_batted:
+                row["n"] = round((row["n"] or 0) / innings_batted, 2)
+    return out
 
 
 @router.get("/{team}/partnerships/by-wicket")
@@ -3255,7 +3429,18 @@ async def team_partnerships_summary(
         """,
         s_params,
     )
-    sa = s_rows[0] if s_rows else {}
+    sa_raw = s_rows[0] if s_rows else {}
+    # Per-innings transform on the league-side dict — chip's scope_avg
+    # must match `/scope/averages/partnerships/summary`'s response.
+    sa = {
+        "total": sa_raw.get("total") or 0,
+        "count_50_plus": sa_raw.get("count_50_plus") or 0,
+        "count_100_plus": sa_raw.get("count_100_plus") or 0,
+        "avg_runs": sa_raw.get("avg_runs"),
+    }
+    sa = _apply_partnerships_per_innings(
+        sa, await _innings_count_for_phase(filters, aux, side="batting"),
+    )
 
     return {
         "team": team,

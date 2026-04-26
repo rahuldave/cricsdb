@@ -30,12 +30,99 @@ from ..filters import FilterParams, AuxParams
 from ..dependencies import get_db
 from .teams import (
     _team_innings_clause, _partnership_filter, _scope_to_team_clause, _safe_div,
+    _apply_batting_per_innings, _apply_bowling_per_innings,
+    _apply_fielding_per_innings, _apply_partnerships_per_innings,
 )
 from .bucket_baseline_dispatch import (
     is_precomputed_scope, baseline_where, LEAGUE_TEAM_KEY,
 )
 
 router = APIRouter(prefix="/api/v1/scope/averages", tags=["Scope-Averages"])
+
+
+# ── per-innings divisors ──────────────────────────────────────────
+# Each scope-averages endpoint needs an innings_count (or matches × 2
+# for fielding) to divide absolute counts by. Baseline path reads
+# from bucketbaselinebatting / bucketbaselinebowling / bucketbaselinematch;
+# live path runs a small COUNT(DISTINCT i.id) query against the
+# delivery + innings + match tables.
+
+async def _baseline_innings_batted(filters, aux) -> int:
+    db = get_db()
+    where, params = baseline_where(filters, aux, team=LEAGUE_TEAM_KEY)
+    rows = await db.q(
+        f"SELECT SUM(innings_batted) AS innings_batted FROM bucketbaselinebatting {where}",
+        params,
+    )
+    return (rows[0].get("innings_batted") if rows else 0) or 0
+
+
+async def _baseline_innings_bowled(filters, aux) -> int:
+    db = get_db()
+    where, params = baseline_where(filters, aux, team=LEAGUE_TEAM_KEY)
+    rows = await db.q(
+        f"SELECT SUM(innings_bowled) AS innings_bowled FROM bucketbaselinebowling {where}",
+        params,
+    )
+    return (rows[0].get("innings_bowled") if rows else 0) or 0
+
+
+async def _baseline_matches(filters, aux) -> int:
+    db = get_db()
+    where, params = baseline_where(filters, aux, team=LEAGUE_TEAM_KEY)
+    rows = await db.q(
+        f"SELECT SUM(matches) AS matches FROM bucketbaselinematch {where}",
+        params,
+    )
+    return (rows[0].get("matches") if rows else 0) or 0
+
+
+async def _live_innings_batted(filters, aux) -> int:
+    db = get_db()
+    where, params = _team_innings_clause(filters, None, side="batting", aux=aux)
+    rows = await db.q(
+        f"""
+        SELECT COUNT(DISTINCT i.id) AS innings_batted
+        FROM innings i
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+        """,
+        params,
+    )
+    return (rows[0].get("innings_batted") if rows else 0) or 0
+
+
+async def _live_innings_bowled(filters, aux) -> int:
+    """Same as innings_batted but counts innings where the team was
+    fielding. For league-scope (team=None), this equals innings_batted
+    since every batting innings has a corresponding fielding innings."""
+    db = get_db()
+    where, params = _team_innings_clause(filters, None, side="fielding", aux=aux)
+    rows = await db.q(
+        f"""
+        SELECT COUNT(DISTINCT i.id) AS innings_bowled
+        FROM innings i
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+        """,
+        params,
+    )
+    return (rows[0].get("innings_bowled") if rows else 0) or 0
+
+
+async def _live_match_count(filters, aux) -> int:
+    db = get_db()
+    where, params = _team_innings_clause(filters, None, side="batting", aux=aux)
+    rows = await db.q(
+        f"""
+        SELECT COUNT(DISTINCT m.id) AS matches
+        FROM match m
+        JOIN innings i ON i.match_id = m.id
+        WHERE {where}
+        """,
+        params,
+    )
+    return (rows[0].get("matches") if rows else 0) or 0
 
 
 # ============================================================
@@ -230,11 +317,12 @@ async def _batting_summary_from_baseline(filters, aux):
             "match_id": h["match_id"],
             "innings_number": (h["innings_number"] or 0) + 1,
         }
-    return _format_batting_summary(highest_total=highest, **{k: r.get(k) for k in (
+    out = _format_batting_summary(highest_total=highest, **{k: r.get(k) for k in (
         "innings_batted", "total_runs", "legal_balls", "fours", "sixes", "dots",
         "first_inn_runs_sum", "first_inn_count",
         "second_inn_runs_sum", "second_inn_count",
     )})
+    return _apply_batting_per_innings(out, out.get("innings_batted") or 0, drop_divisor=True)
 
 
 async def _batting_summary_live(filters, aux):
@@ -298,7 +386,7 @@ async def _batting_summary_live(filters, aux):
             "innings_number": top["innings_number"] + 1,
         }
 
-    return {
+    out = {
         "innings_batted": c.get("innings_batted") or 0,
         "total_runs": total_runs,
         "legal_balls": legal_balls,
@@ -311,6 +399,7 @@ async def _batting_summary_live(filters, aux):
         "avg_2nd_innings_total": avg_2nd,
         "highest_total": highest_total,
     }
+    return _apply_batting_per_innings(out, out.get("innings_batted") or 0, drop_divisor=True)
 
 
 @router.get("/batting/by-phase")
@@ -406,7 +495,21 @@ async def _batting_by_phase_from_baseline(filters, aux):
             "fours": fours,
             "sixes": sixes,
         })
-    return {"by_phase": out}
+    return _phase_per_innings(out, await _baseline_innings_batted(filters, aux))
+
+
+def _phase_per_innings(rows: list[dict], innings_count: int) -> dict:
+    """Divide phase-row absolute counts by innings_count. Per-innings
+    treatment for the avg endpoint (rates stay pool ≡ per-innings)."""
+    if innings_count and innings_count > 0:
+        keys = ("runs", "runs_conceded", "balls", "wickets_lost", "wickets",
+                "fours", "sixes", "fours_conceded", "sixes_conceded")
+        for r in rows:
+            for k in keys:
+                v = r.get(k)
+                if v is not None:
+                    r[k] = round(v / innings_count, 2)
+    return {"by_phase": rows}
 
 
 async def _batting_by_phase_live(filters, aux):
@@ -482,7 +585,7 @@ async def _batting_by_phase_live(filters, aux):
             "fours": fours,
             "sixes": sixes,
         })
-    return {"by_phase": out}
+    return _phase_per_innings(out, await _live_innings_batted(filters, aux))
 
 
 @router.get("/batting/by-season")
@@ -504,9 +607,10 @@ def _format_batting_season_row(season, innings_batted, total_runs, legal_balls, 
     sixes = sixes or 0
     dots = dots or 0
     boundaries = fours + sixes
-    return {
+    inn = innings_batted or 0
+    out = {
         "season": season,
-        "innings_batted": innings_batted or 0,
+        "innings_batted": inn,
         "total_runs": runs,
         "legal_balls": balls,
         "run_rate": _safe_div(runs, balls, 6),
@@ -515,6 +619,7 @@ def _format_batting_season_row(season, innings_batted, total_runs, legal_balls, 
         "fours": fours,
         "sixes": sixes,
     }
+    return _apply_batting_per_innings(out, inn, drop_divisor=True)
 
 
 async def _batting_by_season_from_baseline(filters, aux):
@@ -588,8 +693,9 @@ def _format_bowling_summary(
     dots = dots or 0
     matches = matches or 0
     wickets = wickets or 0
-    return {
-        "innings_bowled": innings_bowled or 0,
+    inn = innings_bowled or 0
+    out = {
+        "innings_bowled": inn,
         "matches": matches,
         "runs_conceded": runs,
         "legal_balls": balls,
@@ -606,6 +712,7 @@ def _format_bowling_summary(
         "wides_per_match": _safe_div(wides or 0, matches, 1, 2),
         "noballs_per_match": _safe_div(noballs or 0, matches, 1, 2),
     }
+    return _apply_bowling_per_innings(out, inn, drop_divisor=True)
 
 
 async def _bowling_summary_from_baseline(filters, aux):
@@ -742,7 +849,7 @@ async def _bowling_by_phase_from_baseline(filters, aux):
         params,
     )
     by_phase = {r["phase"]: r for r in rows if r["phase"]}
-    return {"by_phase": [
+    out = [
         _format_bowling_phase_row(
             phase=phase, ranges=ranges,
             runs_conceded=(by_phase.get(phase) or {}).get("runs_conceded"),
@@ -753,7 +860,8 @@ async def _bowling_by_phase_from_baseline(filters, aux):
             wickets=(by_phase.get(phase) or {}).get("wickets"),
         )
         for phase, ranges in OVER_RANGES
-    ]}
+    ]
+    return _phase_per_innings(out, await _baseline_innings_bowled(filters, aux))
 
 
 async def _bowling_by_phase_live(filters, aux):
@@ -808,7 +916,7 @@ async def _bowling_by_phase_live(filters, aux):
     )
     wkt_by_phase = {r["phase"]: r["wickets"] for r in wkt_rows if r["phase"]}
 
-    return {"by_phase": [
+    out = [
         _format_bowling_phase_row(
             phase=phase, ranges=ranges,
             runs_conceded=(by_phase.get(phase) or {}).get("runs_conceded"),
@@ -819,7 +927,8 @@ async def _bowling_by_phase_live(filters, aux):
             wickets=wkt_by_phase.get(phase, 0),
         )
         for phase, ranges in OVER_RANGES
-    ]}
+    ]
+    return _phase_per_innings(out, await _live_innings_bowled(filters, aux))
 
 
 @router.get("/bowling/by-season")
@@ -836,9 +945,10 @@ async def scope_bowling_by_season(
 def _format_bowling_season_row(season, innings_bowled, runs_conceded, legal_balls, boundaries_conceded, dots, wickets):
     runs = runs_conceded or 0
     balls = legal_balls or 0
-    return {
+    inn = innings_bowled or 0
+    out = {
         "season": season,
-        "innings_bowled": innings_bowled or 0,
+        "innings_bowled": inn,
         "runs_conceded": runs,
         "legal_balls": balls,
         "overs": round(balls / 6, 1) if balls else 0,
@@ -847,6 +957,11 @@ def _format_bowling_season_row(season, innings_bowled, runs_conceded, legal_ball
         "dot_pct": _safe_div(dots or 0, balls, 100, 1),
         "boundaries_conceded": boundaries_conceded or 0,
     }
+    # `boundaries_conceded` isn't in BOWLING_COUNT_KEYS — divide it
+    # explicitly per spec by-season transform.
+    if inn:
+        out["boundaries_conceded"] = round((boundaries_conceded or 0) / inn, 2)
+    return _apply_bowling_per_innings(out, inn, drop_divisor=True)
 
 
 async def _bowling_by_season_from_baseline(filters, aux):
@@ -941,7 +1056,7 @@ def _format_fielding_summary(matches, catches_only, caught_and_bowled, stumpings
     stumpings = stumpings or 0
     run_outs = run_outs or 0
     catches = catches_only + cnb  # response.catches includes c_a_b
-    return {
+    out = {
         "matches": matches,
         "catches": catches,
         "caught_and_bowled": cnb,
@@ -952,6 +1067,7 @@ def _format_fielding_summary(matches, catches_only, caught_and_bowled, stumpings
         "stumpings_per_match": _safe_div(stumpings, matches, 1, 2),
         "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
     }
+    return _apply_fielding_per_innings(out, matches * 2)
 
 
 async def _fielding_summary_from_baseline(filters, aux):
@@ -1037,7 +1153,7 @@ def _format_fielding_season_row(season, matches, catches, stumpings, run_outs):
     catches = catches or 0
     stumpings = stumpings or 0
     run_outs = run_outs or 0
-    return {
+    out = {
         "season": season,
         "matches": matches,
         "catches": catches,
@@ -1048,6 +1164,7 @@ def _format_fielding_season_row(season, matches, catches, stumpings, run_outs):
         "stumpings_per_match": _safe_div(stumpings, matches, 1, 2),
         "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
     }
+    return _apply_fielding_per_innings(out, matches * 2)
 
 
 async def _fielding_by_season_from_baseline(filters, aux):
@@ -1214,13 +1331,14 @@ async def _partnerships_summary_from_baseline(filters, aux):
                 "batter1": highest_full["batter1"],
                 "batter2": highest_full["batter2"],
             }
-    return {
+    out = {
         "total": total,
         "count_50_plus": r.get("count_50_plus") or 0,
         "count_100_plus": r.get("count_100_plus") or 0,
         "avg_runs": avg_runs,
         "highest": highest,
     }
+    return _apply_partnerships_per_innings(out, await _baseline_innings_batted(filters, aux))
 
 
 async def _partnerships_summary_live(filters, aux):
@@ -1277,13 +1395,14 @@ async def _partnerships_summary_live(filters, aux):
                 "batter2": {"person_id": r["batter2_id"], "name": r["batter2_name"]},
             }
 
-    return {
+    out = {
         "total": total,
         "count_50_plus": c.get("count_50_plus") or 0,
         "count_100_plus": c.get("count_100_plus") or 0,
         "avg_runs": c.get("avg_runs"),
         "highest": highest,
     }
+    return _apply_partnerships_per_innings(out, await _live_innings_batted(filters, aux))
 
 
 @router.get("/partnerships/by-wicket")
@@ -1343,7 +1462,18 @@ async def _partnerships_by_wicket_from_baseline(filters, aux):
             "best_runs": r["best_runs"] or 0,
             "best_partnership": best,
         })
-    return {"by_wicket": by_wicket}
+    return _by_wicket_per_innings(by_wicket, await _baseline_innings_batted(filters, aux))
+
+
+def _by_wicket_per_innings(rows: list[dict], innings_batted: int) -> dict:
+    """Divide each by-wicket row's `n` count by innings_batted —
+    spec-avg-column-per-innings.md `/scope/averages/partnerships/by-wicket`."""
+    if innings_batted and innings_batted > 0:
+        for r in rows:
+            v = r.get("n")
+            if v is not None:
+                r["n"] = round(v / innings_batted, 2)
+    return {"by_wicket": rows}
 
 
 async def _partnerships_by_wicket_live(filters, aux):
@@ -1416,7 +1546,7 @@ async def _partnerships_by_wicket_live(filters, aux):
             "best_runs": r["best_runs"],
             "best_partnership": best,
         })
-    return {"by_wicket": by_wicket}
+    return _by_wicket_per_innings(by_wicket, await _live_innings_batted(filters, aux))
 
 
 @router.get("/partnerships/by-season")
@@ -1446,17 +1576,27 @@ async def _partnerships_by_season_from_baseline(filters, aux):
         """,
         params,
     )
-    return {"by_season": [
-        {
-            "season": r["season"],
-            "total": r["total"] or 0,
+    # Per-season innings_batted divisor from bucketbaselinebatting (same scope).
+    where_b, params_b = baseline_where(filters, aux, team=LEAGUE_TEAM_KEY)
+    inn_rows = await db.q(
+        f"SELECT season, SUM(innings_batted) AS innings_batted FROM bucketbaselinebatting {where_b} GROUP BY season",
+        params_b,
+    )
+    inn_by_season = {r["season"]: r["innings_batted"] or 0 for r in inn_rows}
+    out = []
+    for r in rows:
+        total = r["total"] or 0
+        season = r["season"]
+        row = {
+            "season": season,
+            "total": total,
             "count_50_plus": r["count_50_plus"] or 0,
             "count_100_plus": r["count_100_plus"] or 0,
-            "avg_runs": round((r["total_runs"] or 0) / r["total"], 1) if r["total"] else None,
+            "avg_runs": round((r["total_runs"] or 0) / total, 1) if total else None,
             "best_runs": r["best_runs"],
         }
-        for r in rows
-    ]}
+        out.append(_apply_partnerships_per_innings(row, inn_by_season.get(season, 0)))
+    return {"by_season": out}
 
 
 async def _partnerships_by_season_live(filters, aux):
@@ -1481,16 +1621,29 @@ async def _partnerships_by_season_live(filters, aux):
         """,
         params,
     )
-    return {
-        "by_season": [
-            {
-                "season": r["season"],
-                "total": r["total"] or 0,
-                "count_50_plus": r["count_50_plus"] or 0,
-                "count_100_plus": r["count_100_plus"] or 0,
-                "avg_runs": r["avg_runs"],
-                "best_runs": r["best_runs"],
-            }
-            for r in rows
-        ],
-    }
+    # Per-season innings_batted divisor — same scope, side='batting'.
+    where_inn, params_inn = _team_innings_clause(filters, None, side="batting", aux=aux)
+    inn_rows = await db.q(
+        f"""
+        SELECT m.season, COUNT(DISTINCT i.id) AS innings_batted
+        FROM innings i
+        JOIN match m ON m.id = i.match_id
+        WHERE {where_inn}
+        GROUP BY m.season
+        """,
+        params_inn,
+    )
+    inn_by_season = {r["season"]: r["innings_batted"] or 0 for r in inn_rows}
+    out = []
+    for r in rows:
+        season = r["season"]
+        row = {
+            "season": season,
+            "total": r["total"] or 0,
+            "count_50_plus": r["count_50_plus"] or 0,
+            "count_100_plus": r["count_100_plus"] or 0,
+            "avg_runs": r["avg_runs"],
+            "best_runs": r["best_runs"],
+        }
+        out.append(_apply_partnerships_per_innings(row, inn_by_season.get(season, 0)))
+    return {"by_season": out}
