@@ -54,11 +54,11 @@ REG team_bowling_by_season_india            /api/v1/teams/India/bowling/by-seaso
 REG team_fielding_by_season_india           /api/v1/teams/India/fielding/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
 REG team_bowling_by_phase_mi_ipl            /api/v1/teams/Mumbai%20Indians/bowling/by-phase?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
 
-# These have NO `tournament=` set, so Commit 3's scope-alignment
-# narrows the league baseline (e.g. India's tournament universe ≠
-# all men_intl). Stays NEW for this commit.
-NEW team_batting_summary_india              /api/v1/teams/India/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2024
-NEW team_bowling_by_phase_india             /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international&season_from=2024&season_to=2024
+# These have NO `tournament=` set, so Commit 3 narrowed them via
+# baseline_where(scope_to_team). Locked from Commit 3 — REG for
+# subsequent commits unless their values change again.
+REG team_batting_summary_india              /api/v1/teams/India/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2024
+REG team_bowling_by_phase_india             /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international&season_from=2024&season_to=2024
 
 # ── live-fallback paths (filter_venue / rivalry / series_type) ───
 # All Wankhede URLs have `tournament=IPL` set → scope_to_team is
