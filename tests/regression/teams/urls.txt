@@ -32,14 +32,14 @@ REG team_vs_opponent_ind_aus          /api/v1/teams/India/vs/Australia?gender=ma
 # `scope_avg` baseline becomes per-innings (spec-avg-column-per-innings.md).
 NEW team_batting_summary_india        /api/v1/teams/India/batting/summary?gender=male&team_type=international
 REG team_batting_by_season_india      /api/v1/teams/India/batting/by-season?gender=male&team_type=international
-REG team_batting_by_phase_india       /api/v1/teams/India/batting/by-phase?gender=male&team_type=international
+NEW team_batting_by_phase_india       /api/v1/teams/India/batting/by-phase?gender=male&team_type=international
 REG team_batting_top_batters_india    /api/v1/teams/India/batting/top-batters?gender=male&team_type=international&limit=5
 REG team_batting_heatmap_india        /api/v1/teams/India/batting/phase-season-heatmap?gender=male&team_type=international
 
 # ── Bowling ──────────────────────────────────────────────────────
 NEW team_bowling_summary_india        /api/v1/teams/India/bowling/summary?gender=male&team_type=international
 REG team_bowling_by_season_india      /api/v1/teams/India/bowling/by-season?gender=male&team_type=international
-REG team_bowling_by_phase_india       /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international
+NEW team_bowling_by_phase_india       /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international
 REG team_bowling_top_bowlers_india    /api/v1/teams/India/bowling/top-bowlers?gender=male&team_type=international&limit=5
 REG team_bowling_heatmap_india        /api/v1/teams/India/bowling/phase-season-heatmap?gender=male&team_type=international
 
