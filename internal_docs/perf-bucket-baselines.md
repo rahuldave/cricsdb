@@ -50,6 +50,90 @@ the 2.95M-delivery / 160K-wicket source tables.
   `partnership_id`; reader does ONE SELECT against `partnership`
   table for the full identity payload. Cheap.
 
+## What "average" means in this codebase (CRITICAL)
+
+The avg column on the Compare tab and every chip's `scope_avg`
+field represents the **per-innings average** in scope — what one
+innings (one team's batting / bowling / fielding stint) typically
+yields. NOT a pool aggregate.
+
+This was changed 2026-04-26 (spec: `spec-avg-column-per-innings.md`)
+after a user-reported bug where the avg column showed pool catches
+per match (= 2x the per-team-per-match rate because each match has
+2 fielding sides) while chips compared against a different
+per-team baseline. After the fix, both the displayed avg column
+value and the chip's `scope_avg` express the same per-innings
+quantity.
+
+### Per-innings-by-context table
+
+| Metric family | Innings unit | Cardinality per match | Notes |
+|---|---|---|---|
+| Batting (per-team) | one batting innings | 2 per match | Per-innings = `pool_field / SUM(innings_batted)` |
+| Bowling (per-team) | one bowling innings | 2 per match | Per-innings = `pool_field / SUM(innings_bowled)` |
+| Fielding (per-team) | one fielding innings | 2 per match | Same as bowling — fielding innings == bowling innings (same physical event) |
+| Partnerships | one batting innings | 2 per match | Per-innings = `total_partnerships / SUM(innings_batted)` |
+| Match-level (results, toss) | one match | 1 per match | Pool == per-match-equivalent; no division needed |
+
+### When the fields are stored vs computed per-innings
+
+The `bucketbaseline_*` tables themselves still store **cell-level
+pool sums** at populate time (this is the right atomic granularity
+for SUM-over-cells composition). The per-innings transformation
+happens at READ time inside the `_xxx_from_baseline` helpers in
+`api/routers/scope_averages.py` and the equivalent in
+`api/routers/teams.py`.
+
+So: schema = pool. Response = per-innings. Don't confuse them.
+
+### When pool == per-innings (no transformation needed)
+
+Rates whose numerator and denominator both scale linearly with
+innings count are ALREADY per-innings:
+
+- `run_rate` = `SUM(runs) × 6 / SUM(legal_balls)` — both halve when
+  you divide by innings count.
+- `economy` = `SUM(runs_conceded) × 6 / SUM(balls)` — same.
+- `strike_rate` = `SUM(balls) / SUM(wickets)` — same.
+- `boundary_pct`, `dot_pct` — ratios.
+- `avg_runs` (partnership) — already a per-partnership average.
+- `avg_1st_innings_total` — already a per-batting-innings average
+  (computed as `SUM(first_inn_runs) / SUM(first_inn_count)` which
+  is `pool_runs / pool_innings_in_first_position`).
+
+These return the same value whether you frame them as pool or
+per-innings. No transformation needed in the read-side.
+
+### When per-innings ≠ pool (transformation needed)
+
+1. **Absolute counts** (catches, total_runs, fours, sixes, dots,
+   wickets, wides, noballs, etc.) — divide by the appropriate
+   innings_count.
+
+2. **Per-match rates that aggregate both fielding/bowling sides**
+   per match in the numerator while the denominator counts each
+   match once: `catches_per_match`, `stumpings_per_match`,
+   `run_outs_per_match`, `wides_per_match`, `noballs_per_match`.
+   Each match has 2 fielding sides and 2 bowling sides; pool /
+   matches = ~2x what a single team contributes per match. Halve
+   at the read-side (= divide by 2).
+
+### The "chip-direction invariant" — what tests enforce
+
+For every chip-bearing metric M:
+- Chip's `scope_avg` numerically equals the avg column's displayed
+  value for the same metric AND the same scope.
+- If chip renders GREEN (better than baseline), team's value is on
+  the correct side of the displayed avg per the metric's `direction`
+  (`higher_better` ⇒ team_value > avg; `lower_better` ⇒ team_value
+  < avg). Symmetric for RED.
+
+Validated by `tests/sanity/test_chip_direction_invariant.py` (~525
+assertions per run across the test matrix). If this test fails,
+either the chip's baseline scope diverges from the avg column's,
+or the metric's direction tag is wrong, or `wrap_metric` math has
+drifted. Don't ship a Compare-tab change without a green run.
+
 ## Conventions baked into the schema
 
 These are non-obvious decisions that future contributors would
@@ -110,6 +194,24 @@ those as `tournament=''` (empty string) for SQL convenience —
 exact-match WHERE clauses work without `IS NULL` handling. The
 populate uses `COALESCE(m.event_name, '')` consistently; the read
 side does the same via `baseline_where()`.
+
+### Convention 6 — Avg endpoint returns per-innings averages, NEVER pool
+
+The `bucketbaseline_*` tables store cell-level pool sums (correct
+atomic granularity for cross-cell SUM composition). The read-side
+`_xxx_from_baseline` helpers in `api/routers/scope_averages.py`
+divide every absolute count by innings_count and halve every
+per-match rate that aggregates both sides per match. See "What
+'average' means" section above for the per-metric table.
+
+Same applies to `_xxx_aggregates_baseline` in `api/routers/teams.py`
+when the helper is called with team=None (the league-side call
+inside `_compute_xxx_summary` for the chip's `scope_avg`).
+
+Don't reintroduce pool returns. The `test_chip_direction_invariant.py`
+sanity test catches direct bypasses; `test_dispatch_equivalence.py`
+catches divergence between the live and baseline paths (both must
+return per-innings).
 
 ### Convention 5 — Empty-fielding cells get a row with counters=0
 
