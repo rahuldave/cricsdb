@@ -49,13 +49,6 @@ export default function SlotHeaderChip({ slot }: Props) {
   return (
     <div
       className="wisden-compare-slot-chip"
-      style={{
-        fontSize: '0.85em',
-        fontStyle: 'italic',
-        opacity: 0.7,
-        marginTop: '-0.15rem',
-        marginBottom: '0.4rem',
-      }}
       title="This slot's scope differs from the FilterBar above. Chip values baseline against the slot's scope."
     >
       · {parts.join(' · ')}

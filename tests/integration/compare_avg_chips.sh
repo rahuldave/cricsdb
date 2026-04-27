@@ -296,8 +296,8 @@ EXPECTED_B=$(cat <<'PYEXPECT'
       ("BOWLING", "Economy"):     {"chip_value": 9.24, "chip_avg": 9.63},
     },
   },
-  "Avg in Royal Challengers Bengaluru's leagues": {
-    "_match_header": "leagues",
+  "Men's club 2025 avg": {
+    "_match_header": "Men's club 2025 avg",
     "matches_text": "74",
     "rows": {
       ("BATTING", "Run rate"):    {"value": 9.63},

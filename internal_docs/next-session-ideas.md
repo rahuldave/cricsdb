@@ -68,6 +68,37 @@ numbers from the running API.
   material — no implementation. Read it before starting Batch 1
   so the per-script structure is consistent.
 
+### Step 3 (deferred — long-term refactor) — Compare-grid CSS subgrid
+
+Today the Compare grid uses three independent column blocks; alignment
+across columns is forced by reserving fixed `min-height` on the column
+header (`2.4em`) and on the chip-area sub-line slot (`1.4em`). It
+works, but breaks down on edge cases — e.g. a slot with multiple
+override fields (`SlotHeaderChip` accumulating "· 2025 · @ Wankhede ·
+bilaterals · full members only") would make that column's chip-area
+exceed the reserved space and push the body rows down.
+
+The clean fix is **CSS subgrid**: hoist all rows (header, chip-area,
+identity, RESULTS heading, Matches, W, L, …) to be top-level grid
+children of the `.wisden-compare-columns` container, with each column
+spanning all rows via `grid-row: 1 / -1`. Each row sizes to its tallest
+cell across all columns, so when the avg col adds a column, all
+columns advance to the next row in lockstep.
+
+Why deferred:
+- ~80 lines of structural refactor in `TeamCompareGrid` + `CompareSlotColumn`.
+- Adding a 3rd compare slot must force a recompute of the row tracks
+  (cheap with `display: grid` but worth verifying — React doesn't need
+  changes; CSS handles it).
+- Browser support: Safari 16+, Chrome 117+, Firefox 71+ — all green
+  for 2026, but worth a survey before starting.
+- Not blocking — pragmatic min-height fix above is visually
+  indistinguishable for the canonical 1-line / 2-line cases. Subgrid
+  is the right tool when we hit a 3rd or 4th edge case.
+
+When picking this up: the spec is in this file's commit history; no
+separate spec doc needed for an ~80-line CSS-and-JSX restructure.
+
 ## DONE 2026-04-27 — avg-col baseline correction for internationals
 
 Mechanism A (gate `scope_to_team` synthesis on `team_type='club'`)

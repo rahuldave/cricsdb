@@ -126,17 +126,13 @@ function slotMatches(slot: SlotState, profile: AnyProfile): number {
   return teamMatchesInScope(profile as TeamProfile)
 }
 
-function slotLabel(slot: SlotState, primaryTeam: string): string {
-  if (slot.kind === 'avg') {
-    // The "Avg in X's leagues" label is only honest when the auto-
-    // narrow actually fired — i.e. clubs without an explicit tournament
-    // override. Internationals (or any path where scope_to_team isn't
-    // synthesized) get the scope-computed label.
-    const isClub = slot.scope.team_type === 'club'
-    const usesTeamNarrow = isClub && !slot.scope.tournament
-    if (usesTeamNarrow) return `Avg in ${primaryTeam}'s leagues`
-    return scopeAvgLabel(slot.scope)
-  }
+function slotLabel(slot: SlotState, _primaryTeam: string): string {
+  // Single source of truth for the avg-slot label across the column
+  // header AND the season-trajectory strip's legend. The auto-narrow
+  // (clubs, no tournament filter) is surfaced as a sub-line under the
+  // column header — not folded into the label — so this function stays
+  // a pure function of `slot.scope`.
+  if (slot.kind === 'avg') return scopeAvgLabel(slot.scope)
   return slot.entity ?? ''
 }
 
@@ -326,25 +322,19 @@ function CompareSlotColumn({
               <Link to={soloLink!} className="wisden-compare-col-namelink">{teamName}</Link>
             </>
           )}
-          {!isTeam && (() => {
-            const isClub = slot.scope.team_type === 'club'
-            const usesTeamNarrow = isClub && !slot.scope.tournament
-            const title = usesTeamNarrow
-              ? `Pool-weighted league baseline narrowed to tournaments ${primaryTeam} has played in (auto-scope) — fast AND semantically right for closed leagues.`
-              : 'Pool-weighted league baseline scoped to the active filters'
-            const label = usesTeamNarrow
-              ? `Avg in ${primaryTeam}'s leagues`
-              : scopeAvgLabel(slot.scope)
-            return (
-              <span
-                className="wisden-compare-col-namelink"
-                title={title}
-                style={{ fontStyle: 'italic' }}
-              >
-                {label}
-              </span>
-            )
-          })()}
+          {!isTeam && (
+            <span
+              className="wisden-compare-col-namelink"
+              title={
+                slot.scope.team_type === 'club' && !slot.scope.tournament
+                  ? `Pool-weighted league baseline narrowed to tournaments ${primaryTeam} has played in (auto-scope) — fast AND semantically right for closed leagues.`
+                  : 'Pool-weighted league baseline scoped to the active filters'
+              }
+              style={{ fontStyle: 'italic' }}
+            >
+              {scopeAvgLabel(slot.scope)}
+            </span>
+          )}
         </h2>
         {!isPrimary && slotIdx != null && (
           <button
@@ -381,7 +371,27 @@ function CompareSlotColumn({
         </button>
       </div>
 
-      <SlotHeaderChip slot={slot} />
+      {/* Chip-area: fixed-height placeholder so columns stay row-aligned
+       *  whether or not a sub-line renders. Holds the team-slot scope-
+       *  diff chip (SlotHeaderChip) AND the avg-slot's auto-narrow
+       *  hint, exactly one of which ever renders content per column. */}
+      <div className="wisden-compare-chip-area">
+        {isTeam && <SlotHeaderChip slot={slot} />}
+        {/* Avg slot auto-narrow hint: when scope_to_team is implicit
+         *  (clubs, no tournament filter), the column header reads the
+         *  user's filter-bar scope (e.g. "Men's club 2024-2026 avg")
+         *  but the underlying data is narrowed to `${primaryTeam}`'s
+         *  tournaments. The sub-line keeps that visible without
+         *  bloating the column title to two lines. */}
+        {!isTeam && slot.scope.team_type === 'club' && !slot.scope.tournament && (
+          <div
+            className="wisden-compare-slot-chip"
+            title={`The avg pool is narrowed to tournaments ${primaryTeam} has appeared in.`}
+          >
+            · in {primaryTeam}'s tournaments
+          </div>
+        )}
+      </div>
 
       {editing && slotIdx != null && (
         <SlotScopeEditor
