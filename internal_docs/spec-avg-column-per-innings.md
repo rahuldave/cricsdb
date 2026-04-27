@@ -1,6 +1,12 @@
 # Spec: Avg-column per-innings semantic + chip baseline alignment
 
-Status: build-ready (pending implementation).
+Status: SHIPPED 2026-04-26. All 6 commits landed + 2 fix-ups
+(`_scope_to_team_clause` NULL-event_name, Convention 2+3 unification).
+End-to-end mechanism + helper map: `internal_docs/perf-bucket-baselines.md`
+sections "What 'average' means" / "Chip-baseline scope alignment" /
+"Read-side mechanism — end-to-end data flow" / "Per-innings transform
+helpers". Session log: `internal_docs/enhancements-roadmap.md`
+"Shipped 2026-04-26".
 
 Surfaces a class of pre-existing bugs in the Compare-tab avg
 column made visible by Phase 1 (auto-scope-team) + Phase 2

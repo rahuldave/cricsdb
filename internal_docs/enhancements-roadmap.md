@@ -1136,10 +1136,89 @@ Integration: 16/16 still pass.
 
 ---
 
+### Shipped 2026-04-26 (avg-column per-innings + chip-baseline alignment)
+
+User-reported bug on the Teams Compare URL `?team=RCB&...&compare1=
+__avg__&compare2=SRH&season_from=2025&season_to=2025`: "Catches/match
+4.60 ↑+2.0%" chip read green next to an avg column saying 8.42 —
+visually contradicting itself. Three problems compounded, fixed
+across 6 backend commits + 1 frontend commit.
+
+Spec: `internal_docs/spec-avg-column-per-innings.md` (build-ready
+through Commit 6, all shipped). Mechanism reference:
+`internal_docs/perf-bucket-baselines.md` (sections "What 'average'
+means", "Chip-baseline scope alignment", "Read-side mechanism —
+end-to-end data flow").
+
+**The three bugs:**
+
+1. **Pool aggregation in avg col.** `/scope/averages/*` returned
+   pool sums where rates aggregated both fielding/bowling sides per
+   match (catches_per_match counted both sides → 2x scale vs
+   per-team chip).
+2. **Chip baseline scope mismatch.** Team-side endpoint computed
+   `scope_avg` against the broad league (no scope_to_team), while
+   the avg col auto-narrowed to the team's tournament universe.
+   Different scopes → different numbers.
+3. **`_scope_to_team_clause` excluded NULL event_name.** Bilateral
+   matches (where cricsheet sets `event_name IS NULL`) were silently
+   dropped from live-path narrowing — diverging from the baseline
+   path's `tournament=''` convention. Aus unbounded internationals:
+   565 matches via baseline, 503 via live.
+
+**The fixes:**
+
+- **Per-innings transform on both code paths.** `_apply_*_per_innings`
+  helpers in `api/routers/teams.py` divide absolute counts by
+  innings_count, halve per-match rates that aggregate both sides,
+  recompute `overs` from per-innings legal_balls. Imported by both
+  `teams.py` (when called with `team=None`) AND
+  `scope_averages.py` so the chip's `s` and the avg endpoint's
+  response converge on the same per-innings values.
+- **`_league_aux(team, aux)` synthesis.** Inside
+  `_compute_xxx_summary` and the by-phase / by-wicket handlers, the
+  league-side call now receives `aux.scope_to_team = team` so the
+  baseline narrows to the team's tournament universe. ASSERT 1 of
+  the chip-direction invariant holds.
+- **`_scope_to_team_clause` COALESCE.** Both subquery output and
+  outer comparison wrapped in `COALESCE(event_name, '')` so NULL
+  bilaterals match `''` (the baseline convention). Documented in
+  Convention 4 of `perf-bucket-baselines.md`.
+- **Conventions 2+3 unified.** `wides`/`noballs` return delivery
+  COUNT (not run-totals) on every endpoint; `catches` includes
+  caught-and-bowled on every endpoint. Removed the
+  `ASSERT_1_SKIP` frozenset that previously hid these
+  schema-level asymmetries.
+- **Frontend two-row layout.** Pool count + per-innings rate
+  rendered as two distinct rows. Pool row blank on avg col, per-inn
+  row carries the chip. Phase + by-wicket substats convert to
+  per-innings (`· w 1.5/inn`, `· n 0.99/inn`).
+- **Chip-direction invariant test** (`tests/sanity/test_chip_direction_invariant.py`):
+  ~460 assertions across 11 (scope, team) combos including the
+  canonical RCB+SRH+IPL 2025 reproducer as a permanent regression
+  marker. Validates ASSERT 1 (chip baseline = avg col), ASSERT 2
+  (delta_pct math), ASSERT 3 (chip color matches direction ×
+  side-of-baseline).
+
+**Outcome on the canonical reproducer URL:**
+
+| | Before | After |
+|---|---|---|
+| Avg col `catches_per_match` | 8.42 | 4.21 |
+| RCB chip `value` | 4.60 | 4.60 |
+| RCB chip `scope_avg` | 4.51 | 4.21 |
+| RCB chip `delta_pct` | +2.0% (misleading) | +9.3% (honest) |
+
+Compare-tab visual: each affected discipline now has the new
+two-row layout; team col carries pool + per-inn, avg col carries
+"—" + per-inn. The chip arrow + baseline + avg col displayed value
+all agree.
+
+---
+
 ## Build-ready specs (queue)
 
-(Empty — `spec-team-compare-scoped-slots.md` shipped 2026-04-25,
-see session log.)
+(Empty — `spec-avg-column-per-innings.md` shipped 2026-04-26.)
 
 ## Known issues / live TODO
 

@@ -23,9 +23,10 @@ that lands new schema + endpoint dispatch runs **all three**.
 The TL;DR loop for backend perf work:
 
 ```bash
-# 1. Sanity — populate produces correct numbers
+# 1. Sanity — populate produces correct numbers + chip math holds
 uv run python tests/sanity/test_bucket_baseline.py
 uv run python tests/sanity/test_dispatch_equivalence.py
+uv run python tests/sanity/test_chip_direction_invariant.py
 
 # 2. Regression — endpoints stay byte-identical (or differ where intended)
 bash tests/regression/run.sh teams
@@ -128,6 +129,44 @@ uv run python tests/sanity/test_dispatch_equivalence.py --db /tmp/cricket-prod-t
 
 Expected output ends with `212 pairs equivalent, 0 failures` →
 `ALL PASS`.
+
+### `test_chip_direction_invariant.py`
+
+What: end-to-end correctness check on the Compare-tab chip envelope.
+For every chip-bearing metric on every (scope × team) combo,
+asserts:
+
+- **ASSERT 1** — `chip_scope_avg == displayed_avg` (chip baseline
+  numerically equals the avg endpoint's value for the same metric +
+  scope).
+- **ASSERT 2** — `delta_pct == round((value - scope_avg) / scope_avg
+  × 100, 1)` (raw signed math; direction tag is informational).
+- **ASSERT 3** — chip color matches `direction × side-of-baseline`:
+  green when (`higher_better and value > avg`) or (`lower_better and
+  value < avg`).
+
+11 (scope, team) combos × ~7 endpoint groups × ~6 chip-bearing
+metrics each = ~460 assertions. Sub-second.
+
+Test matrix includes the **canonical reproducer** as the first
+entry: `ipl_2025_rcb_srh` (RCB + SRH + IPL 2025) — the URL that
+triggered the original "Catches/match 4.60 ↑+2% next to avg col 8.42"
+bug. Permanent regression marker.
+
+When to run:
+- After any change to `_compute_xxx_summary`, `_xxx_aggregates`,
+  `_apply_*_per_innings`, `_league_aux`, `_scope_to_team_clause`,
+  `wrap_metric`, or any direction tag in `metrics_metadata.py`.
+- Before shipping any change that touches the Compare-tab data
+  flow.
+
+```bash
+uv run python tests/sanity/test_chip_direction_invariant.py
+uv run python tests/sanity/test_chip_direction_invariant.py --db /tmp/cricket-prod-test.db
+```
+
+Expected output ends with `11 (scope, team) pairs PASS, 0 assertion
+failures` → `ALL PASS`.
 
 ## Regression suites (`tests/regression/`)
 

@@ -28,8 +28,8 @@ REG team_opponents_matrix_india       /api/v1/teams/India/opponents-matrix?gende
 REG team_vs_opponent_ind_aus          /api/v1/teams/India/vs/Australia?gender=male&team_type=international&season_from=2024&season_to=2025
 
 # ── ball-level tabs: Batting ─────────────────────────────────────
-# 2026-04-26: summary + by-phase carry chip envelopes whose
-# `scope_avg` baseline becomes per-innings (spec-avg-column-per-innings.md).
+# Chip envelopes on summary + by-phase carry per-innings scope_avg
+# (perf-bucket-baselines.md "What 'average' means").
 REG team_batting_summary_india        /api/v1/teams/India/batting/summary?gender=male&team_type=international
 REG team_batting_by_season_india      /api/v1/teams/India/batting/by-season?gender=male&team_type=international
 REG team_batting_by_phase_india       /api/v1/teams/India/batting/by-phase?gender=male&team_type=international
@@ -37,15 +37,15 @@ REG team_batting_top_batters_india    /api/v1/teams/India/batting/top-batters?ge
 REG team_batting_heatmap_india        /api/v1/teams/India/batting/phase-season-heatmap?gender=male&team_type=international
 
 # ── Bowling ──────────────────────────────────────────────────────
-NEW team_bowling_summary_india        /api/v1/teams/India/bowling/summary?gender=male&team_type=international
+REG team_bowling_summary_india        /api/v1/teams/India/bowling/summary?gender=male&team_type=international
 REG team_bowling_by_season_india      /api/v1/teams/India/bowling/by-season?gender=male&team_type=international
 REG team_bowling_by_phase_india       /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international
 REG team_bowling_top_bowlers_india    /api/v1/teams/India/bowling/top-bowlers?gender=male&team_type=international&limit=5
 REG team_bowling_heatmap_india        /api/v1/teams/India/bowling/phase-season-heatmap?gender=male&team_type=international
 
 # ── Fielding ─────────────────────────────────────────────────────
-NEW team_fielding_summary_india       /api/v1/teams/India/fielding/summary?gender=male&team_type=international
-NEW team_fielding_by_season_india     /api/v1/teams/India/fielding/by-season?gender=male&team_type=international
+REG team_fielding_summary_india       /api/v1/teams/India/fielding/summary?gender=male&team_type=international
+REG team_fielding_by_season_india     /api/v1/teams/India/fielding/by-season?gender=male&team_type=international
 REG team_fielding_top_fielders_india  /api/v1/teams/India/fielding/top-fielders?gender=male&team_type=international&limit=5
 
 # ── Partnerships ─────────────────────────────────────────────────
@@ -59,7 +59,6 @@ REG team_partnerships_top_india       /api/v1/teams/India/partnerships/top?gende
 REG team_partnerships_bowling_summary /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=bowling
 
 # ── club-team variant (Mumbai Indians) ───────────────────────────
-# tournament=IPL pre-set → scope_to_team is no-op for Commit 3 → REG.
 REG team_mi_batting_summary           /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
 REG team_mi_bowling_top               /api/v1/teams/Mumbai%20Indians/bowling/top-bowlers?gender=male&team_type=club&tournament=Indian%20Premier%20League&limit=3
 

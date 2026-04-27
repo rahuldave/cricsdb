@@ -772,7 +772,23 @@ tab plus the phase-bands and season-trajectory expansions.
 
 All endpoints accept the standard FilterBar params (`gender`,
 `team_type`, `tournament`, `season_from`, `season_to`,
-`filter_venue`) and the page-local `series_type`.
+`filter_venue`), the page-local `series_type`, and the avg-slot's
+`scope_to_team` (auto-narrows tournament universe to the team's
+events when no tournament filter is set).
+
+**Per-innings semantic** (since 2026-04-26):
+Every numeric field on these endpoints (except match-level totals
+on `/scope/averages/summary` and identity-bearing payloads like
+`highest_total` / `best_partnership`) returns a per-INNINGS average
+— what one batting / bowling / fielding innings yields in scope.
+NOT a pool aggregate. See `internal_docs/perf-bucket-baselines.md`
+"What 'average' means" for the per-metric table.
+
+`innings_batted` / `innings_bowled` are dropped from the response
+(they'd always be 1 under per-innings semantic). Per-match rates
+(`catches_per_match`, `wides_per_match`, etc.) are halved at source
+to express per-fielding-side or per-bowling-side rate, comparable
+to a single team's contribution per match.
 
 The response shape mirrors the team siblings, with two differences:
 
@@ -804,14 +820,13 @@ curl "http://localhost:8000/api/v1/scope/averages/batting/summary?tournament=Ind
 
 ```json
 {
-  "innings_batted": 142,
-  "total_runs": 25971,
-  "legal_balls": 16299,
+  "total_runs": 182.89,
+  "legal_balls": 114.78,
   "run_rate": 9.56,
   "boundary_pct": 21.1,
   "dot_pct": 32.9,
-  "fours": 2174,
-  "sixes": 1261,
+  "fours": 15.31,
+  "sixes": 8.88,
   "avg_1st_innings_total": 189.6,
   "avg_2nd_innings_total": 176.2,
   "highest_total": {
@@ -822,6 +837,13 @@ curl "http://localhost:8000/api/v1/scope/averages/batting/summary?tournament=Ind
   }
 }
 ```
+
+Per-innings semantic — `total_runs: 182.89` reads as "an avg
+batting innings in IPL 2024 scored 182.89 runs". `fours: 15.31` =
+~15 fours per innings. Rates (`run_rate`, `boundary_pct`,
+`dot_pct`, `avg_*_innings_total`) unchanged from pool — they're
+inherently per-innings. `highest_total` is identity (single
+observation), not an average.
 
 ```bash
 curl "http://localhost:8000/api/v1/scope/averages/summary?tournament=Indian+Premier+League&season_from=2024&season_to=2024"
