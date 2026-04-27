@@ -724,6 +724,7 @@ a { color: inherit; }
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
   margin: 1.5rem 0 0.2rem;
   padding-bottom: 0.25rem;
   border-bottom: 1px solid var(--rule-soft);
@@ -818,7 +819,15 @@ a { color: inherit; }
    across all columns, so a long header / multi-line slot chip / multi-
    row discipline section in any one column advances every column to
    the next row in lockstep. Replaces the older min-height alignment
-   hack on .wisden-compare-col-name + .wisden-compare-chip-area. */
+   hack on .wisden-compare-col-name + .wisden-compare-chip-area.
+
+   `overflow-x: clip` clips children to the column track width without
+   creating a scroll container (so vertical content layout is
+   unaffected). Without it, internal flex rows (.wisden-player-section-
+   head, .wisden-player-compact-row) whose intrinsic content exceeds
+   the column floor (11rem on mobile) bleed visually into the next
+   column. The clip is the load-bearing piece on iPhone 13 — without
+   it, RCB's stat values stamp on top of the avg col's labels. */
 .wisden-compare-col {
   display: grid;
   grid-template-rows: subgrid;
@@ -826,12 +835,14 @@ a { color: inherit; }
   grid-row: 1 / -1;
   row-gap: 0;
   min-width: 0;
+  overflow-x: clip;
 }
 .wisden-compare-col-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.5rem;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--rule);
   padding-bottom: 0.25rem;
   margin-bottom: 0.1rem;
@@ -851,6 +862,15 @@ a { color: inherit; }
   align-items: center;
   flex-wrap: wrap;
   overflow-wrap: break-word;
+}
+/* Narrow viewports: shrink the column header so multi-word labels
+   ("Indian Premier League average", "Full-member average") wrap to
+   2 lines max instead of 3-4 within a 13rem-floor column. Keep the
+   bigger size on desktop where it carries the editorial register. */
+@media (max-width: 600px) {
+  .wisden-compare-col-name {
+    font-size: 1.05rem;
+  }
 }
 /* Chip-area (sub-line under the column header). Holds the team-slot
    scope-diff chip OR the avg-slot auto-narrow hint. Subgrid sizes the
@@ -916,6 +936,7 @@ a { color: inherit; }
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  flex-wrap: wrap;
   padding: 0.2rem 0;
   border-bottom: 1px solid var(--rule-soft);
   gap: 0.5rem;

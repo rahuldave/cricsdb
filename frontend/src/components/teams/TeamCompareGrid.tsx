@@ -228,17 +228,19 @@ export default function TeamCompareGrid({
       </div>
 
       {/* Outer wrapper enables horizontal scroll on narrow viewports.
-       *  At iPhone 13 width (390px) three 11rem-min columns + gap
+       *  At iPhone 13 width (390px) three 13rem-min columns + gap
        *  exceed the viewport — user pans horizontally rather than
-       *  squeezing columns to ~115px (which broke long team names
-       *  and forced numbers to wrap). At desktop widths the
-       *  minmax(11rem, 1fr) template behaves as a normal 1fr split. */}
+       *  squeezing columns to ~115px. 13rem (208px) was bumped from
+       *  11rem after the avg-col label moved to a noun phrase
+       *  ("Indian Premier League average") that can't fit at the
+       *  narrower floor without wrapping to 4 lines. At desktop
+       *  widths the minmax(13rem, 1fr) template behaves as 1fr split. */}
       <div style={{ overflowX: 'auto' }}>
         <div
           className="wisden-compare-columns"
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${totalColumns}, minmax(11rem, 1fr))`,
+            gridTemplateColumns: `repeat(${totalColumns}, minmax(13rem, 1fr))`,
             gridTemplateRows: `repeat(${totalRows}, auto)`,
             columnGap: '1.5rem',
             rowGap: '0',
