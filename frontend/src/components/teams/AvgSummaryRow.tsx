@@ -52,12 +52,20 @@ function renderStats(discipline: TeamDiscipline, profile: ScopeAverageProfile) {
   if (!stats) return null
   return (
     <dl className="wisden-player-compact">
-      {stats.map(([label, value]) => (
-        <div key={label} className="wisden-player-compact-row">
-          <dt>{label}</dt>
-          <dd className="num">{value}</dd>
-        </div>
-      ))}
+      {stats.map(([label, value]) => {
+        // Match TeamSummaryRow — Best pair stacks label / value so
+        // both cols' rows are 2 lines tall regardless of column width.
+        const stacked = label === 'Best pair'
+        const cls = stacked
+          ? 'wisden-player-compact-row is-stacked'
+          : 'wisden-player-compact-row'
+        return (
+          <div key={label} className={cls}>
+            <dt>{label}</dt>
+            <dd className="num">{value}</dd>
+          </div>
+        )
+      })}
     </dl>
   )
 }
@@ -143,7 +151,8 @@ function statsFor(
     ['100+/inn',    fmt(p.count_100_plus)],
     ['Avg',         p.avg_runs == null ? '-' : p.avg_runs.toFixed(1)],
     // No single "best pair" for the league average — there's no
-    // canonical pair identity at scope level.
-    ['Best pair',   '-'],
+    // canonical pair identity at scope level. Stacked-row layout
+    // ensures both cols allocate the same vertical space here.
+    ['Best pair',   '—'],
   ]
 }

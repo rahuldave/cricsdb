@@ -947,6 +947,17 @@ a { color: inherit; }
   border-bottom: 1px solid var(--rule-soft);
   gap: 0.5rem;
 }
+/* Stacked variant — used when the value (e.g. "Best pair" pair-name)
+   is intrinsically wide and would wrap unpredictably below the label
+   on narrow viewports. Forcing label-above / value-below in BOTH the
+   team col and the avg col keeps the row exactly 2 lines tall in
+   either column regardless of name length, so the rows below
+   ("1st wkt", "2nd wkt", ...) stay row-aligned across columns. */
+.wisden-player-compact-row.is-stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
+}
 .wisden-player-compact-row:last-child { border-bottom: 0; }
 .wisden-player-compact-row dt {
   font-family: var(--serif);

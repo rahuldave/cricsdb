@@ -95,15 +95,24 @@ function renderStats(discipline: TeamDiscipline, profile: TeamProfile) {
   if (!stats) return null
   return (
     <dl className="wisden-player-compact">
-      {stats.map(([label, value, env]) => (
-        <div key={label} className="wisden-player-compact-row">
-          <dt>{label}</dt>
-          <dd className="num">
-            {value}
-            <DeltaChip env={env} />
-          </dd>
-        </div>
-      ))}
+      {stats.map(([label, value, env]) => {
+        // "Best pair" carries a pair name that wraps unpredictably on
+        // narrow viewports — force a stacked layout so the avg col
+        // (whose pair value is always a placeholder) can match.
+        const stacked = label === 'Best pair'
+        const cls = stacked
+          ? 'wisden-player-compact-row is-stacked'
+          : 'wisden-player-compact-row'
+        return (
+          <div key={label} className={cls}>
+            <dt>{label}</dt>
+            <dd className="num">
+              {value}
+              <DeltaChip env={env} />
+            </dd>
+          </div>
+        )
+      })}
     </dl>
   )
 }
