@@ -58,6 +58,29 @@ and click every link to confirm it navigates. `tsc --noEmit` and
 `npm run build` only verify code correctness, not feature correctness.
 Do not claim UI work is complete without a browser-agent run.
 
+**Audit prompt discipline:** when asking agent-browser to verify, ask
+for RAW OUTPUT, not verdicts. "List every section header with the first
+row label per column" is checkable. "Verify all sections render" is a
+summary that drops information — when the agent reports PASS but
+walked the wrong cells, the bug ships. The 2026-04-27
+"empty-section bug on the avg column" landed because a Commit-5
+audit prompt asked for value sanity-checks instead of cell-by-cell
+text. From there on, audits should:
+- Request the literal text content of each cell/section the assertion
+  cares about, not a yes/no.
+- For each assertion you'd put in an integration test, write the test
+  AT THE SAME TIME, not after a bug surfaces. One-shot browser audits
+  are exploratory. Checked-in `tests/integration/<feature>.sh`
+  assertions are durable.
+
+**API-frontend type contract:** when a backend change drops a field
+from a response, drop it from the matching TypeScript interface in
+`frontend/src/types.ts` IN THE SAME COMMIT. Type-API divergence is
+what turns "field missing at runtime" into a silent fall-through
+through `?. ?? 0` — TypeScript believes the type, the gate evaluates
+to `0 > 0`, the UI hides itself. Tightening types alongside the
+backend change makes `tsc -b` catch the next consumer.
+
 See `internal_docs/local-development.md` for prerequisites, the project-layout cheat sheet, type-check / build commands, troubleshooting, and how to query the DB from a Python REPL.
 
 ## Deploying

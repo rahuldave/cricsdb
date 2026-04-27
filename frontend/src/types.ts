@@ -1021,8 +1021,21 @@ export interface ScopeSummary {
   bat_first_win_pct: number | null
 }
 
+/**
+ * /scope/averages/* response types.
+ *
+ * IMPORTANT — type-API contract:
+ * Per spec-avg-column-per-innings.md Commit 2 (2026-04-26), these
+ * types deliberately OMIT `innings_batted` / `innings_bowled` —
+ * the avg endpoint drops those fields because they'd always be 1
+ * under per-innings semantic. If you bring them back to the
+ * backend response, add them back here too. The reverse is also
+ * true: any field you remove from the backend response MUST be
+ * removed from these types so consumers compile-fail rather than
+ * silently fall through `?? 0` and produce wrong UI gates (the
+ * 2026-04-27 empty-section bug).
+ */
 export interface ScopeBattingSummary {
-  innings_batted: number
   total_runs: number
   legal_balls: number
   run_rate: number | null
@@ -1042,7 +1055,6 @@ export interface ScopeBattingSummary {
 
 export interface ScopeBattingSeason {
   season: string
-  innings_batted: number
   total_runs: number
   legal_balls: number
   run_rate: number | null
@@ -1053,7 +1065,6 @@ export interface ScopeBattingSeason {
 }
 
 export interface ScopeBowlingSummary {
-  innings_bowled: number
   matches: number
   runs_conceded: number
   legal_balls: number
@@ -1073,7 +1084,6 @@ export interface ScopeBowlingSummary {
 
 export interface ScopeBowlingSeason {
   season: string
-  innings_bowled: number
   runs_conceded: number
   legal_balls: number
   overs: number
