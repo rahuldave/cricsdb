@@ -134,22 +134,35 @@ code paths:
   baselines against the BROAD pool (all men's club, not just RCB's
   leagues) — diverging from the avg column's auto-narrowed pool.
 
-**Mechanism: `_league_aux(team, aux)` in `api/routers/teams.py`**
+**Mechanism: `_league_aux(team, aux, filters)` in `api/routers/teams.py`**
 synthesizes a copy of `aux` with `scope_to_team` set to `team`,
 then passes it to the league-side helper:
 
 ```python
 # api/routers/teams.py — _compute_xxx_summary, by-phase, by-wicket
 t = await _xxx_aggregates(team, filters, aux)
-s = await _xxx_aggregates(None, filters, _league_aux(team, aux))
+s = await _xxx_aggregates(None, filters, _league_aux(team, aux, filters))
 ```
 
 This makes the chip's `scope_avg` baseline against the same scope
 the avg endpoint displays — so `chip_scope_avg == displayed_avg`
-holds (ASSERT 1 of the chip-direction invariant). The synthesis is
-a no-op when `filters.tournament` is set explicitly (per
-`_scope_to_team_clause` and `baseline_where` gates) — explicit
-tournament filter takes precedence.
+holds (ASSERT 1 of the chip-direction invariant).
+
+**Synthesis is gated** on:
+- `filters.team_type == 'club'` (added 2026-04-27, mirrors the
+  frontend `TeamCompareGrid.fetchSlot` gate). For internationals,
+  a single team's "tournament universe" contains that team in every
+  match — narrowing the avg baseline against it produces a self-
+  centered mirror that flatters the team's chips by construction
+  (Australia 2024-25 in 6 events ⇒ 67-match avg pool, all featuring
+  Australia). The frontend defaults to the full pool (e.g. Men's
+  T20I 2024-25 = 870 matches) for internationals; the chip baseline
+  must agree, so synthesis no-ops.
+- `filters.tournament` not set (per `_scope_to_team_clause` and
+  `baseline_where`) — explicit tournament filter takes precedence
+  on both sides.
+- `aux.scope_to_team` not already set (request-supplied scope
+  overrides synthesis).
 
 Applied at every league-side call site:
 - `_compute_batting_summary`, `_compute_bowling_summary`,

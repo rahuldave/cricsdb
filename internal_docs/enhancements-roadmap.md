@@ -1136,6 +1136,62 @@ Integration: 16/16 still pass.
 
 ---
 
+### Shipped 2026-04-27 (avg-col baseline correction for internationals + team_class aux filter)
+
+User-reported bug on the canonical international URL `?team=Australia&
+team_type=international&compare1=__avg__&compare2=India&season_from=2024
+&season_to=2025`: avg column read "Avg in Australia's leagues" with 67
+matches, chips on Aus showed +27.7% above "average" — flatteringly
+above by construction. The `scope_to_team` auto-narrow (designed for
+closed leagues like the IPL where every team plays every other team)
+collapses on open international scopes: a single team's tournament
+universe contains that team in every match, so the avg col becomes
+a self-centered mirror.
+
+**Mechanism A — gate `scope_to_team` synthesis on `team_type='club'`.**
+Frontend `TeamCompareGrid.fetchSlot` only sets the auto-scope param
+when `team_type === 'club'` and no tournament override. Backend
+`_league_aux(team, aux, filters)` in `api/routers/teams.py` mirrors
+the gate so chip-baseline aligns with the displayed avg col. For
+internationals the avg col now defaults to the full pool (Men's T20I
+2024-25 = 870 matches across all teams, neutral for both Aus and India).
+
+**Mechanism B — `team_class=full_member` aux filter.** New
+`AuxParams.team_class` field. `full_member_clause()` in
+`api/full_members.py` (canonical ICC full-member list moved out of
+`routers/teams.py`) restricts the match pool to fixtures between two
+ICC full-member teams (Afghanistan, Australia, Bangladesh, England,
+India, Ireland, New Zealand, Pakistan, South Africa, Sri Lanka,
+West Indies, Zimbabwe — 140 matches in 2024-25 on internationals).
+Surfaced as a per-slot override on the Compare-tab avg picker:
+- `AddCompareSlot` quick-pick "+ Full-member avg in current scope"
+  (international-only).
+- `SlotScopeEditor` Class field with options "All teams" /
+  "Full members only" (international-only).
+- `scopeAvgLabel` produces "Men's T20I full-member 2024-2025 avg"
+  when team_class=full_member is set.
+
+The bucket-baseline dispatch rejects `team_class` and falls back to
+live aggregation — bucket tables don't carry a team-class dimension.
+Acceptable cost since this is opt-in on a single column.
+
+**Tests added:**
+- `tests/sanity/test_chip_direction_invariant.py` — new
+  `aus_ind_men_intl_2024_2025` row in the matrix; `league_avg_aux_for`
+  helper mirrors the gate so the test agrees with production. 13
+  (scope, team) pairs PASS.
+- `tests/sanity/test_avg_baseline_pools.py` — pins the three baseline
+  modes against a closed historical window (men_intl 2018, IPL 2018)
+  so counts (104 unbounded, 20 full-member, 8 scope-to-Aus, 60 IPL)
+  don't drift over time. 5/5 PASS.
+- Regression: 4 URLs in `tests/regression/scope-averages/urls.txt` +
+  8 in `tests/regression/teams/urls.txt` flipped REG→NEW (chip
+  envelopes on team-side intl endpoints drift). After flip, both
+  suites report 0 drifted REG / N changed NEW.
+
+NOT YET DEPLOYED to prod. Frontend follow-up to flip NEW→REG once
+the new hashes are stable.
+
 ### Shipped 2026-04-26 (avg-column per-innings + chip-baseline alignment)
 
 User-reported bug on the Teams Compare URL `?team=RCB&...&compare1=

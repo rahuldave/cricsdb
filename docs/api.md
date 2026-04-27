@@ -57,11 +57,13 @@ that axis.
 ### Aux filters (page-local narrowings)
 
 A separate `AuxParams` class (`api/filters.py`) holds page-local
-filters that aren't driven by the FilterBar UI. Currently one entry:
+filters that aren't driven by the FilterBar UI:
 
 | Param | Type | What it filters | Example |
 |---|---|---|---|
 | `series_type` | `all`/`bilateral`/`icc`/`club` (default `all`) | Categorises the match — `bilateral` = international non-ICC; `icc` = ICC events (T20 WC etc.); `club` = `team_type=club` | `series_type=bilateral` |
+| `scope_to_team` | string | Narrows the match pool to events that team has appeared in (intersection of `m.event_name`s). Used by the Compare-tab avg slot; gated frontend-side on `team_type='club'` (closed-league semantic). | `scope_to_team=Royal%20Challengers%20Bengaluru` |
+| `team_class` | `full_member` | Restricts to matches where BOTH teams are ICC full members (Afghanistan, Australia, Bangladesh, England, India, Ireland, New Zealand, Pakistan, South Africa, Sri Lanka, West Indies, Zimbabwe). Used by the Compare-tab avg slot's "+ Full-member avg" quick-pick on internationals. No-op for clubs. | `team_class=full_member` |
 
 Aux filters are accepted by **every endpoint** that takes
 `FilterBarParams`. Routers declare both as FastAPI `Depends()` and
@@ -772,9 +774,12 @@ tab plus the phase-bands and season-trajectory expansions.
 
 All endpoints accept the standard FilterBar params (`gender`,
 `team_type`, `tournament`, `season_from`, `season_to`,
-`filter_venue`), the page-local `series_type`, and the avg-slot's
+`filter_venue`), the page-local `series_type`, the avg-slot's
 `scope_to_team` (auto-narrows tournament universe to the team's
-events when no tournament filter is set).
+events when no tournament filter is set — applied frontend-side
+only for `team_type='club'`; internationals default to the full
+pool), and `team_class=full_member` (matches between two ICC
+full-member teams only).
 
 **Per-innings semantic** (since 2026-04-26):
 Every numeric field on these endpoints (except match-level totals

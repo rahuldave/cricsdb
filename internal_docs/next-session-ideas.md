@@ -3,7 +3,61 @@
 > **NO DEPLOYS gate is OFF** as of 2026-04-21. Resume normal deploy
 > cadence.
 
-## NEXT SESSION — top of queue (2026-04-27)
+## DONE 2026-04-27 — avg-col baseline correction for internationals
+
+Mechanism A (gate `scope_to_team` synthesis on `team_type='club'`)
+and Mechanism B (`team_class=full_member` aux filter on the avg-
+slot picker) both shipped. Sequence:
+
+- Backend: `team_class` added to `AuxParams`; `full_member_clause()`
+  in `api/full_members.py` (canonical ICC full-member list moved
+  out of `routers/teams.py`); `_league_aux` gated on `team_type='club'`
+  with `filters` threaded through every call site;
+  `is_precomputed_scope` rejects `team_class` so dispatch falls
+  back to live aggregation.
+- Frontend: `TeamCompareGrid.fetchSlot` only synthesizes
+  `scope_to_team` for clubs without a tournament override;
+  `team_class` added to `FilterParams` + `OVERRIDABLE_SLOT_KEYS`
+  + `SlotScopeEditor` (Class field, intl-only) + `AddCompareSlot`
+  ("+ Full-member avg in current scope" quick-pick, intl-only);
+  `scopeAvgLabel` produces "Men's T20I 2024-2025 avg" + "Men's
+  T20I full-member 2024-2025 avg"; `slotLabel` falls through to
+  `scopeAvgLabel` when the team-narrow doesn't apply.
+- Tests: chip-direction invariant gained an `aus_ind_men_intl_2024_2025`
+  row + a `league_avg_aux_for(team_type, team)` helper that mirrors
+  the gate. New `tests/sanity/test_avg_baseline_pools.py` pins the
+  three baseline modes (unbounded 104, full-member 20, scope-to-Aus 8)
+  on a closed historical window (men_intl 2018). Regression suites
+  re-classified: 4 URLs in scope-averages/urls.txt + 8 in teams/urls.txt
+  flipped REG→NEW for the chip-baseline drift on intl team-side
+  endpoints.
+- Browser-agent verified: Aus + India 2024-25 avg col reads "Men's
+  T20I 2024-2025 avg" + 870 matches; with `compare1_team_class=full_member`
+  it reads "Men's T20I full-member 2024-2025 avg" + 140 matches; the
+  RCB + SRH IPL 2025 club canary is unchanged at "Avg in Royal
+  Challengers Bengaluru's leagues" + 74 matches.
+
+**Open follow-ups** (deferred from this session):
+
+- **`team_class` on the FilterBar.** User flagged this as wide-
+  ranging — it'd change the global filter contract (FILTER_KEYS,
+  scope-link URLs, status strip, etc.). Today it's a per-slot avg-
+  picker control only. Decide later whether to elevate.
+- **`team_class` invariant gap.** When a slot's avg uses
+  `team_class=full_member`, the chip envelope on the team column
+  baselines against the unbounded pool (`_league_aux` doesn't
+  receive team_class). This is INTENTIONAL for the user's stated
+  workflow ("Aus vs everyone" + "FM-only avg") but breaks the
+  numerical chip-direction invariant when both are visible. Not
+  in the test matrix today; revisit when team_class moves to the
+  FilterBar (then the chip + avg col share the slot's scope by
+  construction).
+- **Re-flip NEW→REG.** The 12 URLs flipped to NEW in
+  `scope-averages/urls.txt` + `teams/urls.txt` should be flipped
+  back once the new hashes are stable in HEAD. One commit, no
+  shape change.
+
+## OLD top-of-queue entry — kept for diff context
 
 **Avg-col baseline semantic for internationals — `scope_to_team`
 narrow is wrong for open scopes.**
