@@ -138,6 +138,51 @@ sleep 3
 assert_snapshot_contains "Indian Premier League 2024 avg" "label shows tournament + season"
 
 # ──────────────────────────────────────────────────────────────────
+# Test 6 — Canonical reproducer (RCB + SRH + IPL 2025): every section
+# on every column renders. Catches the "empty placeholder" class of
+# bug where a section's has-data gate keys on a field the endpoint
+# stopped returning (regression marker for the avg-col per-innings
+# work — gate previously used innings_batted/innings_bowled which the
+# avg endpoint now drops).
+# ──────────────────────────────────────────────────────────────────
+echo
+echo "Test 6: canonical reproducer — RCB + SRH + IPL 2025, all sections render"
+agent-browser navigate "$BASE/teams?team=Royal+Challengers+Bengaluru&gender=male&team_type=club&tab=Compare&compare1=__avg__&compare2=Sunrisers+Hyderabad&season_from=2025&season_to=2025" >/dev/null
+sleep 3
+
+# Section headers — should all be present (3 columns × 5 disciplines = 15
+# instances of each header text on the page; presence anywhere is the gate).
+assert_snapshot_contains "RESULTS" "RESULTS section header"
+assert_snapshot_contains "BATTING" "BATTING section header"
+assert_snapshot_contains "BOWLING" "BOWLING section header"
+assert_snapshot_contains "FIELDING" "FIELDING section header"
+assert_snapshot_contains "PARTNERSHIPS" "PARTNERSHIPS section header"
+
+# The "— no <discipline> in scope —" placeholder text is the
+# bug-signature when a discipline silently empty-renders. Should NEVER
+# appear on this scope (RCB + SRH + IPL 2025 has full batting / bowling /
+# fielding / partnerships data on all three columns).
+assert_snapshot_missing "no batting in scope" "no batting placeholder leaked"
+assert_snapshot_missing "no bowling in scope" "no bowling placeholder leaked"
+assert_snapshot_missing "no fielding in scope" "no fielding placeholder leaked"
+assert_snapshot_missing "no partnerships in scope" "no partnerships placeholder leaked"
+
+# Two-row layout — pool + per-innings rows for absolute-count metrics.
+assert_snapshot_contains "Catches/inn" "two-row Catches/inn label"
+assert_snapshot_contains "Stumpings/inn" "two-row Stumpings/inn label"
+assert_snapshot_contains "Run-outs/inn" "two-row Run-outs/inn label"
+assert_snapshot_contains "Wickets/inn" "two-row Wickets/inn label"
+assert_snapshot_contains "50+/inn" "two-row 50+/inn label"
+assert_snapshot_contains "100+/inn" "two-row 100+/inn label"
+
+# Chip-direction invariant on the canonical reproducer — RCB's
+# Catches/inn (4.6) is ABOVE the avg col's per-innings rate (4.21);
+# direction=higher_better → chip is GREEN ↑. The +9.3% delta is the
+# honest one (was: misleading +2.0% pre-Commit-3). Verify the +9.
+# Format on the chip is "↑+9.3%" with the up-arrow + percent.
+assert_snapshot_contains "+9.3%" "honest +9.3% delta on Catches/inn (canonical reproducer)"
+
+# ──────────────────────────────────────────────────────────────────
 # Summary
 # ──────────────────────────────────────────────────────────────────
 echo

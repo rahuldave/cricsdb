@@ -20,13 +20,19 @@ export function teamDisciplineHasData(
   return (profile.partnerships?.total?.value ?? 0) > 0
 }
 
-/** Same gate but for the league-average column. */
+/** Same gate but for the league-average column.
+ *
+ *  IMPORTANT: the avg endpoint DROPS `innings_batted`/`innings_bowled`
+ *  from the response (spec-avg-column-per-innings.md Commit 2 — they'd
+ *  always be 1 under per-innings semantic). So the batting/bowling
+ *  gates use `legal_balls` (always present, > 0 iff scope has any
+ *  deliveries) instead. */
 export function avgDisciplineHasData(
   discipline: TeamDiscipline, profile: ScopeAverageProfile,
 ): boolean {
   if (discipline === 'results')      return (profile.summary?.matches ?? 0) > 0
-  if (discipline === 'batting')      return (profile.batting?.innings_batted ?? 0) > 0
-  if (discipline === 'bowling')      return (profile.bowling?.innings_bowled ?? 0) > 0
+  if (discipline === 'batting')      return (profile.batting?.legal_balls ?? 0) > 0
+  if (discipline === 'bowling')      return (profile.bowling?.legal_balls ?? 0) > 0
   if (discipline === 'fielding') {
     const f = profile.fielding
     if (!f) return false
