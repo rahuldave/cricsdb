@@ -9,6 +9,10 @@ from __future__ import annotations
 from typing import Optional
 
 from ..filters import FilterParams, AuxParams
+from ..tournament_canonical import (
+    is_canonical_with_variants, variants as canonical_variants,
+    event_name_in_clause,
+)
 
 
 LEAGUE_TEAM_KEY = "__league__"
@@ -75,8 +79,22 @@ def baseline_where(
         params["_team_type"] = filters.team_type
 
     if filters.tournament:
-        parts.append(f"{a}tournament = :_tournament")
-        params["_tournament"] = filters.tournament
+        # Bucket tables store the RAW cricsheet event_name as the
+        # tournament value (see populate_bucket_baseline.py — no
+        # canonicalization at population time). When the request's
+        # tournament filter is a canonical that maps to multiple
+        # variants (e.g. "T20 World Cup (Men)" → ICC World Twenty20 /
+        # World T20 / ICC Men's T20 World Cup), expand to an IN-list
+        # so all variants match. Single-variant / non-canonical names
+        # fall through to equality.
+        if is_canonical_with_variants(filters.tournament):
+            parts.append(event_name_in_clause(
+                canonical_variants(filters.tournament),
+                col=f"{a}tournament",
+            ))
+        else:
+            parts.append(f"{a}tournament = :_tournament")
+            params["_tournament"] = filters.tournament
     elif aux is not None and aux.scope_to_team:
         # Auto-narrow to the primary team's tournament universe via the
         # already-precomputed match table — no live JOIN to matchplayer
