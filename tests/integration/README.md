@@ -24,6 +24,15 @@ integration/
   team-compare-average.sh — Compare tab average-team column + phase bands
                             + partnership-by-wicket + season trajectory
                             (Spec 1 of spec-team-compare-average.md)
+  compare_avg_chips.sh    — DOM-grounded numeric assertions on Compare-tab
+                            cells + chip envelopes against INDEPENDENT
+                            sqlite-derived ground truth (no api/ source
+                            read). Anchors: men_intl 2024-2025 (unbounded
+                            + FM-only avg) and IPL 2025. ~82 assertions,
+                            cell text + chip math invariant. Run after
+                            touching FilterParams, _league_aux, the avg-
+                            slot picker, MetricDelta, or any
+                            /scope/averages/* endpoint.
   batting.sh        — Batting leaders, player page, tabs, innings-list highlight
   bowling.sh        — Bowling leaders, player page, tabs, innings-list highlight
   fielding.sh       — Fielders, Keeping tab (conditional), filter_team auto-narrow
