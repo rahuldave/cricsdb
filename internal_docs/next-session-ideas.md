@@ -3,6 +3,109 @@
 > **NO DEPLOYS gate is OFF** as of 2026-04-21. Resume normal deploy
 > cadence.
 
+## NEXT SESSION — top of queue (2026-04-27)
+
+**Avg-col baseline semantic for internationals — `scope_to_team`
+narrow is wrong for open scopes.**
+
+The `scope_to_team` auto-narrow (Phase 1 of the bucket-baseline
+work) was designed for closed leagues: RCB plays in IPL → narrow
+the avg-col baseline to IPL → "average of all 10 IPL teams across
+74 matches" = symmetric, comparable to both RCB and SRH. ✓
+
+For internationals it silently breaks. Australia in men_intl
+2024-25 has a "tournament universe" of 6 events (the tours
+Australia hosted/toured + ICC T20 WC). Narrowing the avg col to
+those 6 events gives a 67-match baseline where Australia is one of
+the two teams in EVERY match. Australia chips show as flatteringly
+above-average by construction — Australia is half of the
+"average". Comparing India to "Australia's tournament universe"
+isn't meaningful either: India isn't in most of those tours.
+
+**Two scopes the user wants the avg col to support:**
+
+1. **All international matches in the period.** No team-narrow.
+   For men_intl 2024-25 that's 870 matches across all teams —
+   "what does an average international team's batting / bowling /
+   fielding look like in this period". Both Australia and India
+   compare against the SAME baseline. Apples-to-apples.
+
+2. **All non-associate (= ICC full member) international
+   matches.** Same period, but excluding associate team matches
+   (Namibia, Nepal, Oman, USA, etc. — they dilute the baseline
+   downward because the talent gap is wide). For users who think
+   "average top-tier international" is the right comparand. The
+   `ICC_FULL_MEMBERS` list already exists hardcoded in
+   `api/routers/teams.py` for landing-page categorization — it'd
+   become a filter param.
+
+**The canonical international test URL needs both scopes to work**
+(currently neither does on this URL):
+```
+http://localhost:5174/teams?team=Australia&gender=male&team_type=international&tab=Compare&compare1=__avg__&compare2=India&season_from=2024&season_to=2025
+```
+
+Today on this URL the avg col reads "Avg in Australia's leagues" =
+the 67-match Australia-centered scope, with chips like "Australia
+Run rate 9.91 ↑+27.7%" that LOOK impressive but are an artifact of
+the baseline including Australia's own performance.
+
+**Implementation sketch (next session):**
+
+- **Mechanism A (broader default for internationals):** when
+  `team_type=international` AND no tournament filter, the avg
+  col's `scope_to_team` synthesis should NOT kick in — the
+  baseline should be the full men_intl pool. The current behavior
+  (auto-narrow) is correct for `team_type=club` (closed leagues)
+  but wrong for international. One-line guard in the avg-slot
+  fetcher in `frontend/src/components/teams/TeamCompareGrid.tsx`
+  (`fetchSlot` → `if (slot.kind === 'avg' && !slot.scope.tournament)`
+  branch). Test: Aus + Ind + men_intl 2024-25 should give an avg
+  col baselined against 870 matches, with neither team being half
+  of the pool.
+
+- **Mechanism B (associate-excluding filter):** add a backend
+  query param `team_class=full_member` (or similar) that filters
+  to matches where BOTH teams are in `ICC_FULL_MEMBERS`. Plumb
+  through `FilterParams` + filter clause. UI: a third toggle on
+  the avg-slot picker — quick-picks become "League avg in current
+  scope" / "Full members only" / "Same team, previous season" /
+  ... User picks which baseline they want.
+
+- **Audit the column header text.** "Avg in Australia's leagues"
+  reads weirdly for internationals. With Mechanism A, the header
+  for the international case becomes something like "Average
+  international team" or "Men's T20I avg, 2024-25". The
+  `scopeAvgLabel` in `frontend/src/components/teams/teamUtils.ts`
+  needs to handle the no-narrow case.
+
+- **Add the canonical international URL to test matrix.** Once
+  Mechanism A lands, `aus_ind_men_intl_2024_2025` becomes a
+  meaningful chip-direction invariant test scope alongside the
+  existing IPL canonical reproducer (`ipl_2025_rcb_srh`).
+
+**Why this is structural, not cosmetic:** the chip-direction
+invariant test currently passes on `aus_unbounded` because the
+self-centered baseline still satisfies ASSERT 1 (chip's scope_avg
+= avg col displayed value, both computed the same way). The
+invariant doesn't notice that the BASELINE ITSELF is a mirror —
+the test is a value-consistency check, not a baseline-meaningfulness
+check. We need a separate sanity gate or a UX call ("for
+international avg-slot, the baseline should not be a function of
+the primary team").
+
+**Pickup notes for next session:**
+- Read this entry first.
+- The "weird text" the user noted on the canonical URL ("Avg in
+  Australia's leagues") is part of this same fix — `scopeAvgLabel`
+  handles club-team-with-many-leagues fine, internationals badly.
+- The Conventions in `internal_docs/perf-bucket-baselines.md`
+  Convention 4 + the `_scope_to_team_clause` COALESCE invariant
+  are NOT what's broken here — those are correct. The structural
+  issue is one layer up: WHEN to apply scope_to_team at all.
+
+---
+
 ## NEXT SESSION — primary agenda
 
 **Implement `internal_docs/spec-team-compare-scoped-slots.md`.**
