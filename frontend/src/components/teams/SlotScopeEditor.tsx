@@ -24,6 +24,9 @@ export default function SlotScopeEditor({
   const [seasonTo, setSeasonTo]     = useState(initial.season_to   ?? primary.season_to   ?? '')
   const [filterVenue, setFilterVenue] = useState(initial.filter_venue ?? primary.filter_venue ?? '')
   const [seriesType, setSeriesType] = useState(initial.series_type ?? primary.series_type ?? '')
+  const [teamClass, setTeamClass]   = useState(initial.team_class  ?? '')
+
+  const isInternational = primary.team_type === 'international'
 
   const tournamentsFetch = useFetch(
     () => getTournaments({
@@ -50,6 +53,9 @@ export default function SlotScopeEditor({
     if (cmp(seasonTo,   primary.season_to))    o.season_to    = seasonTo
     if (cmp(filterVenue, primary.filter_venue)) o.filter_venue = filterVenue
     if (cmp(seriesType, primary.series_type))  o.series_type  = seriesType
+    // team_class isn't on the FilterBar — primary always inherits null,
+    // so any non-empty value here is a real divergence.
+    if (teamClass) o.team_class = teamClass
     onApply(o)
   }
 
@@ -109,6 +115,19 @@ export default function SlotScopeEditor({
           <option value="tournament_only">Tournaments only</option>
         </select>
       </div>
+      {isInternational && (
+        <div style={fieldStyle}>
+          <span style={labelStyle}>Class</span>
+          <select
+            value={teamClass}
+            onChange={e => setTeamClass(e.target.value)}
+            title="Narrow the pool to matches where both teams are ICC full members (excludes associate teams like Namibia, USA, Nepal …)."
+          >
+            <option value="">All teams</option>
+            <option value="full_member">Full members only</option>
+          </select>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
         <button type="button" className="comp-link" onClick={handleApply}>Apply</button>
         <button type="button" className="comp-link" onClick={onReset} title="Drop all overrides — slot inherits primary">Reset to primary</button>

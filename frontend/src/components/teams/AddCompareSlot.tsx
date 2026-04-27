@@ -34,8 +34,11 @@ export default function AddCompareSlot({
   if (filledCount >= 2) return null
 
   const hasAvg = slots.slot1?.kind === 'avg' || slots.slot2?.kind === 'avg'
+  const hasFmAvg = (slots.slot1?.kind === 'avg' && slots.slot1.overrides.team_class === 'full_member')
+    || (slots.slot2?.kind === 'avg' && slots.slot2.overrides.team_class === 'full_member')
   const hasSeason = !!primaryFilters.season_from
   const hasAllTimeable = !!primaryFilters.tournament || !!primaryFilters.season_from || !!primaryFilters.season_to
+  const isInternational = primaryFilters.team_type === 'international'
 
   const sameTeamAlreadyComparing = (overrides: SlotOverrides) => {
     // Refuse if a slot already has the SAME entity AND the SAME effective
@@ -54,6 +57,10 @@ export default function AddCompareSlot({
 
   const onAvgInScope = () => {
     onAddSlot(AVG_SENTINEL, {})
+    closeAll()
+  }
+  const onAvgFullMember = () => {
+    onAddSlot(AVG_SENTINEL, { team_class: 'full_member' })
     closeAll()
   }
   const onSameTeamAllTime = () => {
@@ -165,6 +172,17 @@ export default function AddCompareSlot({
           {!hasAvg && (
             <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={onAvgInScope}>
               + League avg in current scope
+            </button>
+          )}
+          {isInternational && !hasFmAvg && (
+            <button
+              type="button"
+              className="comp-link"
+              style={QP_BTN_STYLE}
+              onClick={onAvgFullMember}
+              title="Restrict the avg-column pool to matches between two ICC full-member teams (excludes associates like Namibia, USA, Nepal …)."
+            >
+              + Full-member avg in current scope
             </button>
           )}
           {hasSeason && (

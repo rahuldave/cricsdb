@@ -40,6 +40,9 @@ export default function SlotHeaderChip({ slot }: Props) {
   if (o.series_type !== undefined) {
     parts.push(SERIES_TYPE_LABEL[o.series_type] ?? o.series_type)
   }
+  if (o.team_class === 'full_member') {
+    parts.push('full members only')
+  }
 
   if (parts.length === 0) return null
 

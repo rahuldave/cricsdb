@@ -73,13 +73,22 @@ function slotKey(s: SlotState | null): string {
 function fetchSlot(slot: SlotState | null, primaryTeam: string): Promise<AnyProfile | null> {
   if (!slot) return Promise.resolve(null)
   if (slot.kind === 'avg') {
-    // Auto-narrow to primary team's tournament universe when the slot
-    // hasn't explicitly overridden tournament. RCB → IPL avg (1 league)
-    // is a 5x speedup AND semantically correct. Backend gates further
-    // on (no tournament filter), so passing unconditionally is safe.
-    const scope = slot.scope.tournament
-      ? slot.scope
-      : { ...slot.scope, scope_to_team: primaryTeam }
+    // Auto-narrow to primary team's tournament universe ONLY for clubs
+    // (closed-league semantic — RCB → IPL avg is a meaningful baseline
+    // because every IPL team plays every other IPL team). For
+    // internationals the auto-narrow degenerates to a team-centered
+    // baseline (Australia's "tournament universe" is the 6 tours/events
+    // Aus played in, all of which contain Australia by construction —
+    // so the avg col becomes "average of Aus's matches" and chips read
+    // as flatteringly above-average by structure). For internationals
+    // the avg col defaults to the full pool (e.g. Men's T20I 2024-25 =
+    // 870 matches); the user can opt into a tighter pool with
+    // team_class=full_member from the slot picker.
+    const isClub = slot.scope.team_type === 'club'
+    const shouldNarrow = isClub && !slot.scope.tournament
+    const scope = shouldNarrow
+      ? { ...slot.scope, scope_to_team: primaryTeam }
+      : slot.scope
     return getScopeAverageProfile(scope)
   }
   return getTeamProfile(slot.entity!, slot.scope)
@@ -97,7 +106,13 @@ function slotMatches(slot: SlotState, profile: AnyProfile): number {
 
 function slotLabel(slot: SlotState, primaryTeam: string): string {
   if (slot.kind === 'avg') {
-    if (!slot.scope.tournament) return `Avg in ${primaryTeam}'s leagues`
+    // The "Avg in X's leagues" label is only honest when the auto-
+    // narrow actually fired — i.e. clubs without an explicit tournament
+    // override. Internationals (or any path where scope_to_team isn't
+    // synthesized) get the scope-computed label.
+    const isClub = slot.scope.team_type === 'club'
+    const usesTeamNarrow = isClub && !slot.scope.tournament
+    if (usesTeamNarrow) return `Avg in ${primaryTeam}'s leagues`
     return scopeAvgLabel(slot.scope)
   }
   return slot.entity ?? ''
@@ -282,21 +297,25 @@ function CompareSlotColumn({
               <Link to={soloLink!} className="wisden-compare-col-namelink">{teamName}</Link>
             </>
           )}
-          {!isTeam && (
-            <span
-              className="wisden-compare-col-namelink"
-              title={
-                !slot.scope.tournament
-                  ? `Pool-weighted league baseline narrowed to tournaments ${primaryTeam} has played in (auto-scope) — fast AND semantically right.`
-                  : 'Pool-weighted league baseline scoped to the active filters'
-              }
-              style={{ fontStyle: 'italic' }}
-            >
-              {!slot.scope.tournament
-                ? `Avg in ${primaryTeam}'s leagues`
-                : scopeAvgLabel(slot.scope)}
-            </span>
-          )}
+          {!isTeam && (() => {
+            const isClub = slot.scope.team_type === 'club'
+            const usesTeamNarrow = isClub && !slot.scope.tournament
+            const title = usesTeamNarrow
+              ? `Pool-weighted league baseline narrowed to tournaments ${primaryTeam} has played in (auto-scope) — fast AND semantically right for closed leagues.`
+              : 'Pool-weighted league baseline scoped to the active filters'
+            const label = usesTeamNarrow
+              ? `Avg in ${primaryTeam}'s leagues`
+              : scopeAvgLabel(slot.scope)
+            return (
+              <span
+                className="wisden-compare-col-namelink"
+                title={title}
+                style={{ fontStyle: 'italic' }}
+              >
+                {label}
+              </span>
+            )
+          })()}
         </h2>
         {!isPrimary && slotIdx != null && (
           <button

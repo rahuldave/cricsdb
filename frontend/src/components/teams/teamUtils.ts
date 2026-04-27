@@ -40,7 +40,8 @@ export function avgDisciplineHasData(
 
 /** Scope-computed label for the average column header. Constructs a
  *  short phrase from the active FilterBar fields — "IPL 2024 avg",
- *  "Men's T20I 2024 avg", or just "League avg" when nothing's set. */
+ *  "Men's T20I 2024 avg", "Men's T20I full-member 2024 avg", or just
+ *  "League avg" when nothing's set. */
 export function scopeAvgLabel(filters: FilterParams): string {
   const parts: string[] = []
   if (filters.tournament) {
@@ -54,6 +55,9 @@ export function scopeAvgLabel(filters: FilterParams): string {
     else if (filters.gender === 'female') parts.push("Women's club")
     else parts.push('Club')
   }
+  // team_class qualifier (e.g. "full-member") slots between the tier
+  // word and the season — "Men's T20I full-member 2024-2025 avg".
+  if (filters.team_class === 'full_member') parts.push('full-member')
   if (filters.season_from && filters.season_to) {
     parts.push(filters.season_from === filters.season_to
       ? filters.season_from

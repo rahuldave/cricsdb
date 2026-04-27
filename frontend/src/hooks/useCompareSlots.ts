@@ -8,13 +8,13 @@ export type SlotKind = 'team' | 'avg'
 
 export const OVERRIDABLE_SLOT_KEYS = [
   'tournament', 'season_from', 'season_to',
-  'filter_venue', 'series_type',
+  'filter_venue', 'series_type', 'team_class',
 ] as const
 export type OverridableSlotKey = typeof OVERRIDABLE_SLOT_KEYS[number]
 
 export type ResolvedSlotScope = Pick<FilterParams,
   'gender' | 'team_type' | 'tournament' | 'season_from' | 'season_to'
-  | 'filter_venue' | 'series_type'>
+  | 'filter_venue' | 'series_type' | 'team_class'>
 
 export type SlotOverrides = Partial<Pick<ResolvedSlotScope, OverridableSlotKey>>
 
@@ -45,6 +45,9 @@ function inheritedScope(primary: FilterParams): ResolvedSlotScope {
     season_to: primary.season_to,
     filter_venue: primary.filter_venue,
     series_type: primary.series_type,
+    // team_class isn't in the FilterBar — primary always inherits null.
+    // Slots can override via per-slot URL params (compareN_team_class).
+    team_class: undefined,
   }
 }
 

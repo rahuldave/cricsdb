@@ -27,6 +27,12 @@ export interface FilterParams {
    *  backend-side on (team is None AND no explicit tournament filter).
    *  Backed by ix_matchplayer_team for fast subquery. */
   scope_to_team?: string
+  /** Per-slot avg baseline narrowing for internationals — restricts
+   *  the match pool to fixtures between two ICC full-member teams.
+   *  Currently only `'full_member'` is supported; expand as new
+   *  classes are needed (e.g. 'top_8', 'cricket_world_cup_qualifiers').
+   *  No-op for clubs (full-member is an international classification). */
+  team_class?: string
 }
 
 export interface Tournament {
