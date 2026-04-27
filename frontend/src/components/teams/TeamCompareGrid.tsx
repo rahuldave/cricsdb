@@ -70,7 +70,25 @@ function slotKey(s: SlotState | null): string {
   return `${s.kind}|${s.entity ?? ''}|${JSON.stringify(s.scope)}`
 }
 
-function fetchSlot(slot: SlotState | null, primaryTeam: string): Promise<AnyProfile | null> {
+/** Pick out a peer avg slot's narrowing knobs that the team-side
+ *  chip baseline must align to. Today only `team_class` matters
+ *  (the avg col can opt into FM-only via the picker; the chip on
+ *  the team col has to baseline against the SAME pool the avg col
+ *  displays, otherwise the "Aus +X% above avg" arrow contradicts
+ *  the literal avg-col number a column over). `scope_to_team`
+ *  alignment is handled server-side by `_league_aux` already. */
+function chipAlignmentFor(slots: CompareSlots): { chip_team_class?: string } {
+  const avg = slots.slot1?.kind === 'avg' ? slots.slot1
+            : slots.slot2?.kind === 'avg' ? slots.slot2 : null
+  if (!avg?.scope.team_class) return {}
+  return { chip_team_class: avg.scope.team_class }
+}
+
+function fetchSlot(
+  slot: SlotState | null,
+  primaryTeam: string,
+  chipAlign: { chip_team_class?: string },
+): Promise<AnyProfile | null> {
   if (!slot) return Promise.resolve(null)
   if (slot.kind === 'avg') {
     // Auto-narrow to primary team's tournament universe ONLY for clubs
@@ -91,7 +109,11 @@ function fetchSlot(slot: SlotState | null, primaryTeam: string): Promise<AnyProf
       : slot.scope
     return getScopeAverageProfile(scope)
   }
-  return getTeamProfile(slot.entity!, slot.scope)
+  // Team-side request: chip baselines must align to the avg col's
+  // scope (team_class), not the team's own. team data stays on the
+  // team's slot scope so Aus shows all 22 of its matches even when
+  // the avg col is FM-only.
+  return getTeamProfile(slot.entity!, { ...slot.scope, ...chipAlign })
 }
 
 function disciplineHasData(slot: SlotState, profile: AnyProfile, d: TeamDiscipline): boolean {
@@ -127,11 +149,18 @@ export default function TeamCompareGrid({
   const slot1 = slots.slot1
   const slot2 = slots.slot2
 
+  // Chip-baseline alignment hint: when ANY peer slot is an avg with
+  // team_class set, the team-side chip baseline must use the same
+  // team_class so the chip's scope_avg numerically equals the avg
+  // col's displayed value. Stable string-keyed for useFetch deps.
+  const chipAlign = chipAlignmentFor(slots)
+  const chipAlignKey = chipAlign.chip_team_class ?? ''
+
   // Fixed-arity useFetch calls: one per slot. Discriminate kind inside
   // the fetcher so the same hook position serves both team and avg.
-  const f0 = useFetch<AnyProfile | null>(() => fetchSlot(primary, primaryTeam), [slotKey(primary), primaryTeam])
-  const f1 = useFetch<AnyProfile | null>(() => fetchSlot(slot1,   primaryTeam), [slotKey(slot1),   primaryTeam])
-  const f2 = useFetch<AnyProfile | null>(() => fetchSlot(slot2,   primaryTeam), [slotKey(slot2),   primaryTeam])
+  const f0 = useFetch<AnyProfile | null>(() => fetchSlot(primary, primaryTeam, chipAlign), [slotKey(primary), primaryTeam, chipAlignKey])
+  const f1 = useFetch<AnyProfile | null>(() => fetchSlot(slot1,   primaryTeam, chipAlign), [slotKey(slot1),   primaryTeam, chipAlignKey])
+  const f2 = useFetch<AnyProfile | null>(() => fetchSlot(slot2,   primaryTeam, chipAlign), [slotKey(slot2),   primaryTeam, chipAlignKey])
 
   const renderColumns: { slot: SlotState; fetch: ProfileFetch; isPrimary: boolean; slotIdx: SlotIdx | null }[] = [
     { slot: primary, fetch: f0, isPrimary: true,  slotIdx: null },

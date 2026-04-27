@@ -33,6 +33,14 @@ export interface FilterParams {
    *  classes are needed (e.g. 'top_8', 'cricket_world_cup_qualifiers').
    *  No-op for clubs (full-member is an international classification). */
   team_class?: string
+  /** Chip-baseline alignment hint sent ONLY by the Compare-tab team
+   *  slot's fetcher when a peer avg slot has team_class set. Tells
+   *  the backend to apply that team_class to the league-side
+   *  baseline computation INSIDE _league_aux only — team data is
+   *  unaffected (Aus shows all 22 of its matches even when the
+   *  league baseline is FM-only). Without this, chip's scope_avg
+   *  numerically diverges from the avg col's displayed value. */
+  chip_team_class?: string
 }
 
 export interface Tournament {
