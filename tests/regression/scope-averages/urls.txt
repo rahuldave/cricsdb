@@ -9,6 +9,10 @@
 # back to REG once the new values are locked into HEAD.
 
 # ── /scope/averages/* (avg endpoint) ──────────────────────────────
+# Avg-endpoint URLs without scope_to_team are unaffected by the
+# 2026-04-27 international avg-baseline correction (the gate is
+# applied client-side in TeamCompareGrid.fetchSlot — backend still
+# honours scope_to_team when explicitly passed).
 REG scope_summary_unfiltered                /api/v1/scope/averages/summary
 REG scope_summary_ipl_2024                  /api/v1/scope/averages/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
 REG scope_summary_men_intl_2024             /api/v1/scope/averages/summary?gender=male&team_type=international&season_from=2024&season_to=2024
@@ -41,15 +45,23 @@ REG team_fielding_summary_mi_ipl_2024       /api/v1/teams/Mumbai%20Indians/field
 REG team_partnerships_summary_mi_ipl_2024   /api/v1/teams/Mumbai%20Indians/partnerships/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
 REG team_batting_by_phase_mi_ipl_2024       /api/v1/teams/Mumbai%20Indians/batting/by-phase?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
 REG team_partnerships_by_wicket_mi_ipl_2024 /api/v1/teams/Mumbai%20Indians/partnerships/by-wicket?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
-REG team_summary_india_men_intl             /api/v1/teams/India/summary?gender=male&team_type=international
+# 2026-04-27: chip envelopes on team-side international endpoints
+# (no tournament filter) drift because `_league_aux` now gates
+# scope_to_team synthesis on team_type=club. Pre-fix, India's chips
+# baselined against India's 6-event tournament universe; post-fix,
+# they baseline against the full Men's T20I pool. NEW until the
+# next session can flip these back to REG with the new hashes.
+NEW team_summary_india_men_intl             /api/v1/teams/India/summary?gender=male&team_type=international
 REG team_bowling_by_season_india            /api/v1/teams/India/bowling/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
 REG team_fielding_by_season_india           /api/v1/teams/India/fielding/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
 REG team_bowling_by_phase_mi_ipl            /api/v1/teams/Mumbai%20Indians/bowling/by-phase?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
 
 # Cross-router controls — no-tournament cases that exercise
-# scope_to_team narrowing on the team-side.
-REG team_batting_summary_india              /api/v1/teams/India/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2024
-REG team_bowling_by_phase_india             /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international&season_from=2024&season_to=2024
+# scope_to_team narrowing on the team-side. Drift expected post
+# 2026-04-27 (international gate on _league_aux). Flip back to REG
+# in a follow-up commit once the new hashes are stable.
+NEW team_batting_summary_india              /api/v1/teams/India/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2024
+NEW team_bowling_by_phase_india             /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international&season_from=2024&season_to=2024
 
 # ── live-fallback paths (filter_venue / rivalry / series_type) ───
 # Force is_precomputed_scope=False so the dispatch falls back to the
@@ -72,12 +84,15 @@ REG live_scope_bowling_by_phase_wankhede    /api/v1/scope/averages/bowling/by-ph
 REG live_scope_partnerships_by_wicket_wank  /api/v1/scope/averages/partnerships/by-wicket?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium
 
 # series_type=bilateral_only — no tournament → scope_to_team narrows
-# Australia's tournaments → chip's scope_avg shifts → NEW.
-REG live_team_batting_summary_bilat         /api/v1/teams/Australia/batting/summary?gender=male&team_type=international&series_type=bilateral_only
+# Australia's tournaments. Post 2026-04-27 the team-side chip baseline
+# is unbounded for internationals → drift on the team URL. The avg
+# endpoint URLs are unchanged (backend honours its inputs).
+NEW live_team_batting_summary_bilat         /api/v1/teams/Australia/batting/summary?gender=male&team_type=international&series_type=bilateral_only
 REG live_scope_summary_bilat                /api/v1/scope/averages/summary?gender=male&team_type=international&series_type=bilateral_only
 REG live_scope_batting_by_phase_bilat       /api/v1/scope/averages/batting/by-phase?gender=male&team_type=international&series_type=bilateral_only
 
-# rivalry context (filter_team+filter_opponent) — no tournament →
-# scope_to_team narrows India's tournament universe → NEW.
-REG live_team_batting_summary_ind_v_aus     /api/v1/teams/India/batting/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+# rivalry context (filter_team+filter_opponent) — no tournament. Same
+# story as the bilat block: team-side chip baseline drifts post
+# 2026-04-27; avg endpoint stable.
+NEW live_team_batting_summary_ind_v_aus     /api/v1/teams/India/batting/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
 REG live_scope_partnerships_summary_rivalry /api/v1/scope/averages/partnerships/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
