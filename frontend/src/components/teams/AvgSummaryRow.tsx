@@ -25,8 +25,20 @@ export default function AvgSummaryRow({
     <section className="wisden-player-section">
       <div className="wisden-player-section-head">
         <h3 className="wisden-player-section-label">{LABEL[discipline]}</h3>
-        {/* No "Open …" link for the average column — there's no
-            single-page surface for "average team". */}
+        {/* Hidden placeholder so the section-head's intrinsic height
+            matches the team col's (which has a real "(open ↗)" link
+            here at 0.85rem). Without this the avg col's head is ~4px
+            shorter and the differential bubbles down to inner stat
+            rows — which subgrid does NOT correct for, since it
+            aligns section BOXES not individual children inside them.
+            aria-hidden + tabIndex=-1 keep it out of AT/keyboard. */}
+        <span
+          aria-hidden="true"
+          className="wisden-player-section-link"
+          style={{ visibility: 'hidden' }}
+        >
+          (open ↗)
+        </span>
       </div>
       {placeholder
         ? <div className="wisden-empty-compare">— no {discipline} in scope —</div>
