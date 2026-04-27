@@ -69,6 +69,12 @@ export function scopeAvgLabel(
     line1 = 'Full-member average'
   } else if (anchorTournament) {
     line1 = `${anchorTournament} average`
+  } else if (filters.team_type === 'international') {
+    // "League" implies a closed system (10 IPL teams) — wrong for
+    // internationals, which are a collection of bilateral tours + ICC
+    // events with no fixed roster. "International" reads cleanly next
+    // to entity team cols ("Australia / International average / India").
+    line1 = 'International average'
   } else {
     line1 = 'League average'
   }
