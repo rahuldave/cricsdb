@@ -79,10 +79,24 @@ class AuxParams:
                 " from the league baseline. No-op for clubs."
             ),
         ),
+        chip_team_class: Optional[str] = Query(
+            None,
+            description=(
+                "Chip-baseline alignment hint sent by the Compare-tab team"
+                " slot when a peer avg slot has team_class set. The team"
+                " request's data is computed against the team's own scope"
+                " (no team_class), but the league-side baseline used for"
+                " chip envelope `scope_avg` is narrowed by the peer avg"
+                " slot's team_class so chip ↔ displayed-avg-col agreement"
+                " holds. Applied only inside `_league_aux`; team-side"
+                " aggregates are unaffected."
+            ),
+        ),
     ):
         self.series_type = series_type
         self.scope_to_team = scope_to_team
         self.team_class = team_class
+        self.chip_team_class = chip_team_class
 
 
 class FilterBarParams:

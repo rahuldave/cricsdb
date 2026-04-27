@@ -908,34 +908,55 @@ def _apply_partnerships_per_innings(d: dict, innings_batted: int) -> dict:
 def _league_aux(
     team: str | None, aux: AuxParams, filters: FilterParams | None = None,
 ) -> AuxParams:
-    """Return a copy of `aux` with `scope_to_team` synthesized to
-    `team` so the league-side call inside `_compute_xxx_summary` /
-    by-phase / by-wicket handlers baselines against the team's
-    tournament universe (matching the avg-slot's auto-narrow).
+    """Return a copy of `aux` for the league-side call inside
+    `_compute_xxx_summary` / by-phase / by-wicket handlers so the
+    chip envelope's `scope_avg` baselines against the same scope the
+    Compare-tab avg column displays.
 
-    Synthesis is GATED on `filters.team_type == 'club'` to mirror the
-    frontend Compare grid's `fetchSlot` gate. For internationals the
-    "tournament universe" of a single team (e.g. Australia in 2024-25
-    = 6 events all containing Australia) makes the baseline a mirror of
-    the team's own performance; chips would read flatteringly above-
-    average by construction. The frontend defaults to the full pool for
-    internationals; the chip baseline must agree with that, so we don't
-    synthesize scope_to_team here either.
+    Two synthesis steps run independently:
 
-    No-op when team is None or when aux already has scope_to_team set
-    explicitly (request-supplied scope overrides synthesis).
+    1. **`scope_to_team`** — auto-narrow the league pool to the
+       team's tournament universe. GATED on
+       `filters.team_type == 'club'` (closed-league semantic). For
+       internationals a single team's universe contains that team in
+       every match, so narrowing collapses into a self-mirror; the
+       frontend defaults to the full pool there, so the chip baseline
+       must agree (no synthesis). Skipped when aux already carries
+       `scope_to_team` explicitly.
+
+    2. **`chip_team_class` → `team_class`** — when the request
+       carries a `chip_team_class` aux hint (sent by the team slot's
+       fetcher when a peer avg slot has team_class set), copy it onto
+       the league-side aux's `team_class`. The TEAM data stays
+       scoped to the team's own filters (Aus shows all 22 of its
+       matches), but the chip's `scope_avg` is computed against the
+       FM-only pool — matching the displayed avg col's value (8.5 not
+       7.52). Without this propagation, chip.scope_avg and
+       avg.run_rate disagree whenever the avg slot uses team_class.
+       Applies for any team_type — the avg col's `team_class` is
+       conceptually orthogonal to the closed-league gate.
+
+    No-op when `team is None`.
 
     Spec: spec-avg-column-per-innings.md Commit 3 + the 2026-04-27
-    international avg-baseline correction.
+    international avg-baseline correction (Mechanism A + B + chip
+    alignment).
     """
-    if team is None or aux.scope_to_team:
-        return aux
-    if filters is not None and filters.team_type != "club":
-        return aux
     from copy import copy
-    new = copy(aux)
-    new.scope_to_team = team
-    return new
+    if team is None:
+        return aux
+
+    new: AuxParams | None = None
+    # Step 1: scope_to_team narrow (clubs only, only when not already set).
+    if not aux.scope_to_team and (filters is None or filters.team_type == "club"):
+        new = copy(aux)
+        new.scope_to_team = team
+    # Step 2: chip_team_class → team_class (any team_type).
+    if aux.chip_team_class:
+        if new is None:
+            new = copy(aux)
+        new.team_class = aux.chip_team_class
+    return new if new is not None else aux
 
 
 def _phase_dict_per_innings(by_phase: dict, innings_count: int) -> dict:
