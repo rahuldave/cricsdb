@@ -947,16 +947,24 @@ a { color: inherit; }
   border-bottom: 1px solid var(--rule-soft);
   gap: 0.5rem;
 }
-/* Stacked variant — used when the value (e.g. "Best pair" pair-name)
-   is intrinsically wide and would wrap unpredictably below the label
-   on narrow viewports. Forcing label-above / value-below in BOTH the
-   team col and the avg col keeps the row exactly 2 lines tall in
-   either column regardless of name length, so the rows below
-   ("1st wkt", "2nd wkt", ...) stay row-aligned across columns. */
-.wisden-player-compact-row.is-stacked {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.05rem;
+/* Stacked variant — used when the value is intrinsically wide and
+   would wrap unpredictably below the label on narrow viewports. The
+   classic case is the per-wicket partnership rows: team-col values
+   carry chip arrows + percentage deltas (e.g. "40.0 ↑ +32.9% · n
+   1.00/inn / hi 104"), wide enough to wrap to 2 lines on mobile
+   while the avg col's value (no chip, e.g. "30.1 · n 0.97/inn")
+   fits on 1 line. The asymmetric wrap drifts every row.
+   Same hazard for Best pair (long pair name vs em-dash placeholder).
+
+   Stacking is mobile-only — at desktop widths the column is wide
+   enough that values fit inline AND wrap symmetrically across cols. */
+@media (max-width: 600px) {
+  .wisden-player-compact-row.is-stacked,
+  .wisden-partnership-wickets .wisden-player-compact-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.05rem;
+  }
 }
 .wisden-player-compact-row:last-child { border-bottom: 0; }
 .wisden-player-compact-row dt {
