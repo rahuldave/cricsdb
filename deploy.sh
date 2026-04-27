@@ -83,10 +83,37 @@ if [ -n "$PLASH_BAK" ]; then
     echo "$PLASH_BAK" > "$BUILD_DIR/.plash"
 fi
 
-# Database (435MB — only needed on first deploy with --force_data)
+# Database (~653 MB as of 2026-04 — only needed on first deploy with --force_data).
+#
+# Pre-flight: verify the SOURCE cricket.db isn't malformed AND checkpoint
+# the WAL into the main file so the cp captures a consistent on-disk
+# state. The 2026-04-27 prod outage was caused by uploading a cricket.db
+# while populate_bucket_baseline.py still had pending WAL pages — the
+# uploaded file was page-corrupt, queries that touched the bad pages
+# 500'd in production. The two extra checks below cost ~10s and prevent
+# silently shipping a torn DB.
 if [ "$1" = "--first" ]; then
-    echo "First deploy: copying cricket.db to build (435MB)..."
+    echo "First deploy — verifying source cricket.db integrity..."
+    sqlite3 cricket.db "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null
+    integrity=$(sqlite3 cricket.db "PRAGMA integrity_check;")
+    if [ "$integrity" != "ok" ]; then
+        echo "FATAL: cricket.db is malformed:" >&2
+        echo "$integrity" | head -10 >&2
+        echo "Aborting deploy. Fix the local DB first (rebuild via import_data.py or restore from backup)." >&2
+        exit 1
+    fi
+    db_bytes=$(stat -f%z cricket.db 2>/dev/null || stat -c%s cricket.db)
+    db_mb=$(( db_bytes / 1024 / 1024 ))
+    echo "Source DB is clean (${db_mb}MB). Copying to build..."
     cp cricket.db "$BUILD_DIR/data/cricket.db"
+    # Verify the COPY also passes integrity — catches a torn cp on a
+    # full disk or filesystem hiccup before we hand it to plash.
+    copy_integrity=$(sqlite3 "$BUILD_DIR/data/cricket.db" "PRAGMA integrity_check;")
+    if [ "$copy_integrity" != "ok" ]; then
+        echo "FATAL: copy in $BUILD_DIR/data/cricket.db is malformed after cp" >&2
+        exit 1
+    fi
+    echo "Copy verified OK."
 fi
 
 echo "=== Deploy directory contents ==="
