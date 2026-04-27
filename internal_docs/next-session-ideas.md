@@ -3,6 +3,71 @@
 > **NO DEPLOYS gate is OFF** as of 2026-04-21. Resume normal deploy
 > cadence.
 
+## NEXT SESSION — top of queue (2026-04-28+)
+
+Two build-ready specs in the locked order below. Don't reorder —
+spec (e) explicitly assumes spec (d) has shipped, so the FilterBar
+promotion has to come first.
+
+### Step 1 — `spec-filterbar-team-class.md` (full-member on FilterBar)
+
+`internal_docs/spec-filterbar-team-class.md` (294 lines, build-ready).
+
+Promote `team_class=full_member` from per-slot avg-picker control
+to the 9th FilterBar key. Three-commit rollout in the spec:
+
+1. Backend move: `AuxParams.team_class` → `FilterBarParams.team_class`;
+   `_league_aux` drops the propagation step (`filters.build()` covers
+   both sides); `is_precomputed_scope` gates on `filters.team_class`.
+2. Frontend: `FILTER_KEYS` extended; intl-only toggle pill on the
+   FilterBar; auto-clear on team_type change; status-strip render.
+3. Tests: re-derive ground truth with subagent (Aus 22→16, India
+   34→31 when filter is on); update `tests/sanity/test_avg_baseline_numbers.py`
+   + `test_chip_direction_invariant.py` matrix; add browser-agent
+   integration scripts; flip regression URLs REG↔NEW twice (once
+   to NEW for the shape change, once back to REG once stable in
+   HEAD — same dance as the 2026-04-27 batch).
+
+The existing `tests/integration/compare_avg_chips.sh` MUST be
+re-grounded against new numbers — its current Aus/India anchors
+become wrong once team_class is on the FilterBar (they currently
+assume team-side data is NOT narrowed by team_class).
+
+### Step 2 — `spec-dom-tests-series-teams.md` (45 DOM-test scripts)
+
+`internal_docs/spec-dom-tests-series-teams.md` (228 lines, build-
+ready). The umbrella convention is in
+`spec-dom-grounded-tests.md` (208 lines).
+
+Three-batch rollout in the spec:
+
+1. **Batch 1** (immediately after spec-d ships): 4 scripts to
+   prove the lifted `_lib.sh` harness works.
+   - `teams_compare_intl_fm.sh` (re-grounded compare_avg_chips for
+     post-d Aus/India numbers)
+   - `teams_compare_club.sh` (RCB+SRH IPL 2025 — unchanged from
+     today)
+   - `teams_match_list_intl_fm.sh` (Aus 22→16 visible end-to-end)
+   - `series_landing_intl_fm.sh` (tile counts narrow correctly)
+
+2. **Batch 2** (next session): 10 scripts covering team_overview,
+   team_batting/bowling/fielding/partnerships, series_overview,
+   series_records.
+
+3. **Batch 3** (week 2): remaining 31 scripts + the cross-cutting
+   `team_class_consistency.sh`.
+
+Hard rule for every script: ground truth comes from a subagent
+that did NOT read `api/` or `tests/sanity/` (gold-standard) OR a
+committed `audit/<script>.sql` SQL file. NEVER copy expected
+numbers from the running API.
+
+### Skip / lower priority
+
+- The DOM-test umbrella `spec-dom-grounded-tests.md` is reference
+  material — no implementation. Read it before starting Batch 1
+  so the per-script structure is consistent.
+
 ## DONE 2026-04-27 — avg-col baseline correction for internationals
 
 Mechanism A (gate `scope_to_team` synthesis on `team_type='club'`)
