@@ -37,7 +37,15 @@ const LABEL: Record<TeamDiscipline, string> = {
   partnerships: 'PARTNERSHIPS',
 }
 
-const OPEN_TEXT: Record<TeamDiscipline, string> = {
+// Tooltip on the compact "(open ↗)" link — full description without
+// the screen real estate. The link text itself is intentionally short
+// so the section header stays on ONE line in every column at the
+// 13rem mobile column floor; if it wraps, the team col's section-head
+// becomes 2 lines tall and the avg col stays 1 line, which misaligns
+// inner values within each section (subgrid aligns section boxes,
+// not their internal content row-by-row). See iPhone-13 regression
+// caught 2026-04-27.
+const OPEN_TITLE: Record<TeamDiscipline, string> = {
   results:      'Open team page',
   batting:      'Open Batting tab',
   bowling:      'Open Bowling tab',
@@ -66,8 +74,12 @@ export default function TeamSummaryRow({
       <div className="wisden-player-section-head">
         <h3 className="wisden-player-section-label">{LABEL[discipline]}</h3>
         {!placeholder && (
-          <Link to={deepLink} className="comp-link wisden-player-section-link">
-            → {OPEN_TEXT[discipline]}
+          <Link
+            to={deepLink}
+            className="comp-link wisden-player-section-link"
+            title={OPEN_TITLE[discipline]}
+          >
+            (open ↗)
           </Link>
         )}
       </div>

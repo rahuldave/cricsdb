@@ -725,6 +725,12 @@ a { color: inherit; }
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
+  /* Equal line-box height across columns regardless of whether the
+     compact `(open ↗)` link renders. Without this, team cols are 4px
+     taller than avg cols (link is 0.85rem; label is 0.72rem), and
+     subgrid passes the differential through to inner stat rows so
+     the avg col's "Economy" sits 4px higher than the team col's. */
+  min-height: 1.4em;
   margin: 1.5rem 0 0.2rem;
   padding-bottom: 0.25rem;
   border-bottom: 1px solid var(--rule-soft);
