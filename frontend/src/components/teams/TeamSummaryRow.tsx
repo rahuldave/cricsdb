@@ -102,6 +102,35 @@ const v = (e: { value: number | null } | null | undefined): number | null =>
 
 type Row = [string, string | number, MetricEnvelope | null | undefined]
 
+/** Synthesize a per-innings chip envelope from an existing pool-count
+ *  envelope. The pool envelope's `scope_avg` is ALREADY per-innings
+ *  (after Commit 2 of spec-avg-column-per-innings.md), so we don't
+ *  divide it again — only `value` (team's pool count) gets divided
+ *  by the team's innings_count.
+ *
+ *  Direction is inherited from the source envelope. For absolute-count
+ *  metrics with direction=None (catches, wickets, count_50_plus), no
+ *  chip arrow renders — but the envelope's scope_avg stays available
+ *  for tooltips. */
+function perInnings(
+  env: MetricEnvelope | null | undefined,
+  innings: number | null,
+): MetricEnvelope | null {
+  if (!env || env.value == null || !innings || innings <= 0) return null
+  const value = Math.round((env.value / innings) * 100) / 100
+  const avg = env.scope_avg
+  const delta = avg && avg !== 0
+    ? Math.round(((value - avg) / avg) * 1000) / 10
+    : null
+  return {
+    value,
+    scope_avg: avg,
+    delta_pct: delta,
+    direction: env.direction,
+    sample_size: env.sample_size,
+  }
+}
+
 function statsFor(
   discipline: TeamDiscipline, profile: TeamProfile,
 ): Row[] | null {
@@ -142,35 +171,55 @@ function statsFor(
     const dotp = v(b.dot_pct)
     const avgOpp = v(b.avg_opposition_total)
     const wkts = v(b.wickets) ?? 0
+    // Two-row layout for absolute counts (Wickets) per
+    // spec-avg-column-per-innings.md Commit 5: pool count + per-innings
+    // rate. Per-innings divisor: bowling.innings_bowled (each match is
+    // 1 bowling innings for the team).
+    const innBowled = v(b.innings_bowled)
+    const wktsPerInn = perInnings(b.wickets, innBowled)
     return [
       ['Economy',         fmt(v(b.economy)),                                       b.economy],
       ['SR',              fmt(v(b.strike_rate)),                                   b.strike_rate],
       ['Dot %',           dotp == null ? '-' : dotp.toFixed(1),                    b.dot_pct],
       ['Avg opp. total',  avgOpp == null ? '-' : avgOpp.toFixed(1),                b.avg_opposition_total],
-      ['Wickets',         wkts.toLocaleString(),                                   b.wickets],
+      ['Wickets',         wkts.toLocaleString(),                                   null],
+      ['Wickets/inn',     fmt(wktsPerInn?.value),                                  wktsPerInn],
     ]
   }
   if (discipline === 'fielding') {
     const f = profile.fielding
     if (!f) return null
+    // Two-row layout per spec-avg-column-per-innings.md Commit 5.
+    // Per-innings rate uses the existing *_per_match envelope —
+    // numerically identical to "per fielding innings" since each team
+    // has 1 fielding innings per match. Just relabeled "/inn".
     return [
-      ['Catches',    v(f.catches) ?? 0,                          f.catches],
-      ['Stumpings',  v(f.stumpings) ?? 0,                        f.stumpings],
-      ['Run-outs',   v(f.run_outs) ?? 0,                         f.run_outs],
-      ['C / match',  fmt(v(f.catches_per_match)),                f.catches_per_match],
+      ['Catches',        v(f.catches) ?? 0,                            null],
+      ['Catches/inn',    fmt(v(f.catches_per_match)),                  f.catches_per_match],
+      ['Stumpings',      v(f.stumpings) ?? 0,                          null],
+      ['Stumpings/inn',  fmt(v(f.stumpings_per_match)),                f.stumpings_per_match],
+      ['Run-outs',       v(f.run_outs) ?? 0,                           null],
+      ['Run-outs/inn',   fmt(v(f.run_outs_per_match)),                 f.run_outs_per_match],
     ]
   }
-  // partnerships
+  // partnerships — two-row layout for 50+ / 100+ counts.
+  // Per-innings divisor: batting.innings_batted (each partnership
+  // belongs to one batting innings).
   const p = profile.partnerships
   if (!p) return null
   const pairName = p.best_pair
     ? `${shortName(p.best_pair.batter1.name)} · ${shortName(p.best_pair.batter2.name)}`
     : '-'
   const avgRuns = v(p.avg_runs)
+  const innBatted = v(profile.batting?.innings_batted)
+  const fiftyPerInn = perInnings(p.count_50_plus, innBatted)
+  const hundredPerInn = perInnings(p.count_100_plus, innBatted)
   return [
     ['Highest',     p.highest?.runs ?? '-',                              null],
-    ['50+',         v(p.count_50_plus) ?? 0,                             p.count_50_plus],
-    ['100+',        v(p.count_100_plus) ?? 0,                            p.count_100_plus],
+    ['50+',         v(p.count_50_plus) ?? 0,                             null],
+    ['50+/inn',     fmt(fiftyPerInn?.value),                             fiftyPerInn],
+    ['100+',        v(p.count_100_plus) ?? 0,                            null],
+    ['100+/inn',    fmt(hundredPerInn?.value),                           hundredPerInn],
     ['Avg',         avgRuns == null ? '-' : avgRuns.toFixed(1),          p.avg_runs],
     ['Best pair',   pairName,                                            null],
   ]

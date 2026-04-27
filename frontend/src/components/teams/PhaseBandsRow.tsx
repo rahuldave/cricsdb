@@ -57,6 +57,35 @@ function extractPhases(
   return o.phases ?? o.by_phase ?? null
 }
 
+/** Innings count for the per-innings substat divisor. On TeamProfile
+ *  it's an envelope (`.value`); on ScopeAverageProfile it's a flat
+ *  number (= scope's total innings, NOT the divisor we want — but
+ *  we don't need it on the avg side because the avg endpoint already
+ *  returns per-innings phase counts after Commit 2). */
+function innsCount(
+  profile: TeamProfile | ScopeAverageProfile,
+  side: 'batting' | 'bowling',
+): number | null {
+  const sec = side === 'batting' ? profile.batting : profile.bowling
+  if (!sec) return null
+  const key = side === 'batting' ? 'innings_batted' : 'innings_bowled'
+  const f = (sec as unknown as Record<string, unknown>)[key]
+  if (f == null) return null
+  if (typeof f === 'number') return f
+  return (f as MetricEnvelope).value ?? null
+}
+
+/** Whether the row's `wickets` field is already per-innings (avg side
+ *  post-Commit 2) or pool (team side). Heuristic: if profile has the
+ *  envelope shape on innings_*, we're on team side. */
+function isTeamSide(profile: TeamProfile | ScopeAverageProfile, side: 'batting' | 'bowling'): boolean {
+  const sec = side === 'batting' ? profile.batting : profile.bowling
+  if (!sec) return false
+  const key = side === 'batting' ? 'innings_batted' : 'innings_bowled'
+  const f = (sec as unknown as Record<string, unknown>)[key]
+  return f != null && typeof f !== 'number'  // envelope = team side
+}
+
 export default function PhaseBandsRow({ profile, discipline, placeholder = false }: Props) {
   if (placeholder) return null
   const phases = extractPhases(profile, discipline)
@@ -66,6 +95,12 @@ export default function PhaseBandsRow({ profile, discipline, placeholder = false
   const sorted = [...phases].sort(
     (a, b) => ORDER.indexOf(a.phase) - ORDER.indexOf(b.phase),
   )
+
+  // Bowling phase `· w` substat: per-innings everywhere
+  // (spec-avg-column-per-innings.md Commit 5). Team-side divides pool
+  // wickets by innings_bowled; avg-side comes through per-innings.
+  const teamSide = isTeamSide(profile, discipline)
+  const innings = innsCount(profile, discipline)
 
   return (
     <dl className="wisden-player-compact wisden-phase-bands">
@@ -87,6 +122,11 @@ export default function PhaseBandsRow({ profile, discipline, placeholder = false
             </div>
           )
         }
+        // Bowling phase: render `· w {wickets/inn}/inn` substat.
+        const wicketsRaw = p.wickets ?? 0
+        const wicketsPerInn = teamSide && innings && innings > 0
+          ? Math.round((wicketsRaw / innings) * 100) / 100
+          : wicketsRaw  // avg side: already per-innings
         return (
           <div key={p.phase} className="wisden-player-compact-row">
             <dt>{label} Econ</dt>
@@ -96,7 +136,7 @@ export default function PhaseBandsRow({ profile, discipline, placeholder = false
                 <MetricDelta env={env(p.economy)} />
               </span>
               <span style={{ opacity: 0.55, marginLeft: '0.4rem', fontSize: '0.85em' }}>
-                · w {p.wickets ?? 0} / d {fmt1(rv(p.dot_pct))}%
+                · w {fmt2(wicketsPerInn)}/inn / d {fmt1(rv(p.dot_pct))}%
               </span>
             </dd>
           </div>
