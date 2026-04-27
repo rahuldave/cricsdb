@@ -208,8 +208,8 @@ EXPECTED_A=$(cat <<'PYEXPECT'
       ("BOWLING", "Economy"):     {"value": 8.3, "chip_value": 8.34, "chip_avg": 7.52},
     },
   },
-  "Men's T20I 2024-2025 avg": {
-    "_match_header": "Men's T20I 2024-2025 avg",
+  "International average": {
+    "_match_header": "International average",
     "matches_text": "870",
     "rows": {
       ("BATTING", "Run rate"):    {"value": 7.52},
@@ -253,8 +253,8 @@ EXPECTED_AP=$(cat <<'PYEXPECT'
       ("BOWLING", "Economy"):     {"chip_value": 8.34, "chip_avg": 8.50},
     },
   },
-  "Men's T20I full-member 2024-2025 avg": {
-    "_match_header": "full-member 2024-2025",
+  "Full-member average": {
+    "_match_header": "Full-member average",
     "matches_text": "140",
     "rows": {
       ("BATTING", "Run rate"):    {"value": 8.50},
@@ -296,8 +296,8 @@ EXPECTED_B=$(cat <<'PYEXPECT'
       ("BOWLING", "Economy"):     {"chip_value": 9.24, "chip_avg": 9.63},
     },
   },
-  "Men's club 2025 avg": {
-    "_match_header": "Men's club 2025 avg",
+  "Indian Premier League average": {
+    "_match_header": "Indian Premier League average",
     "matches_text": "74",
     "rows": {
       ("BATTING", "Run rate"):    {"value": 9.63},
