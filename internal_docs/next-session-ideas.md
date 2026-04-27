@@ -85,6 +85,29 @@ spanning all rows via `grid-row: 1 / -1`. Each row sizes to its tallest
 cell across all columns, so when the avg col adds a column, all
 columns advance to the next row in lockstep.
 
+**Mobile plan** (must ship in the same commit — see "current state on
+mobile" below for why it can't be a follow-up):
+
+Today `.wisden-compare-columns` is `repeat(N, minmax(0, 1fr))` with no
+breakpoint and `.wisden-compare-col { min-width: 0 }` — columns are
+explicitly allowed to squeeze below their content's natural width. At
+iPhone 13 width (390px), 3 columns become ~115px each, numbers wrap,
+and long team names (`Royal Challengers Bengaluru`) blow past the
+2.4em reserved header height — so the existing min-height alignment
+hack is **already broken on mobile** for the 3-column case. The
+subgrid refactor doesn't fix this on its own; subgrid still squeezes.
+
+Plan: switch the grid template to `repeat(N, minmax(11rem, 1fr))` and
+wrap the container in `overflow-x-auto`. At desktop widths, columns
+behave as before (1fr each). At mobile widths, each column holds its
+11rem floor and the grid overflows; the user pans horizontally. Same
+pattern `MatchupGridChart` and `InningsGridChart` already use
+(`design-decisions.md:306, 371`).
+
+Side benefit: the subgrid refactor + min-width-floor together
+eliminate the multi-override-chip pushdown bug AND the existing
+mobile 3-col bug in one go.
+
 Why deferred:
 - ~80 lines of structural refactor in `TeamCompareGrid` + `CompareSlotColumn`.
 - Adding a 3rd compare slot must force a recompute of the row tracks
