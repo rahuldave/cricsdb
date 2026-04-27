@@ -118,21 +118,138 @@ per-innings. No transformation needed in the read-side.
    matches = ~2x what a single team contributes per match. Halve
    at the read-side (= divide by 2).
 
+### Chip-baseline scope alignment (the OTHER half of the invariant)
+
+The Compare-tab chip and the avg column are wired through SEPARATE
+code paths:
+
+- **Avg column** (`/scope/averages/*`): the avg-slot fetch passes
+  `aux.scope_to_team = primaryTeam` so the league baseline auto-
+  narrows to the primary team's tournament universe (RCB → IPL
+  only).
+- **Chip envelope** (`/teams/{team}/*/summary` etc.): the team-side
+  endpoint computes `scope_avg` by calling its OWN league-side
+  helper `_xxx_aggregates(team=None, …)`. The frontend doesn't pass
+  `scope_to_team` to the team endpoint, so naïvely the league call
+  baselines against the BROAD pool (all men's club, not just RCB's
+  leagues) — diverging from the avg column's auto-narrowed pool.
+
+**Mechanism: `_league_aux(team, aux)` in `api/routers/teams.py`**
+synthesizes a copy of `aux` with `scope_to_team` set to `team`,
+then passes it to the league-side helper:
+
+```python
+# api/routers/teams.py — _compute_xxx_summary, by-phase, by-wicket
+t = await _xxx_aggregates(team, filters, aux)
+s = await _xxx_aggregates(None, filters, _league_aux(team, aux))
+```
+
+This makes the chip's `scope_avg` baseline against the same scope
+the avg endpoint displays — so `chip_scope_avg == displayed_avg`
+holds (ASSERT 1 of the chip-direction invariant). The synthesis is
+a no-op when `filters.tournament` is set explicitly (per
+`_scope_to_team_clause` and `baseline_where` gates) — explicit
+tournament filter takes precedence.
+
+Applied at every league-side call site:
+- `_compute_batting_summary`, `_compute_bowling_summary`,
+  `team_fielding_summary`
+- `team_batting_by_phase`, `team_bowling_by_phase`
+- `team_partnerships_by_wicket`, `team_partnerships_summary` (the
+  inline league-side query uses `_partnership_filter(filters,
+  None, side, aux=_league_aux(team, aux))`).
+
+### Read-side mechanism — end-to-end data flow
+
+For one chip-bearing metric (say `catches_per_match`) on the team
+column:
+
+```
+1. Frontend → GET /teams/{team}/fielding/summary
+2. team_fielding_summary route fn calls:
+   a. t = await _fielding_aggregates(team, filters, aux)
+        → _fielding_aggregates_baseline(team, …)
+          → SUM bucketbaselinefielding rows for cell (team, gender,
+            team_type, tournament, season)
+          → returns flat dict with team's POOL counts
+            { catches: 69, matches: 15, catches_per_match: 4.6, … }
+   b. s = await _fielding_aggregates(None, filters, _league_aux(team, aux))
+        → _fielding_aggregates_baseline(None, league_aux)
+          → SUM bucketbaselinefielding LEAGUE rows narrowed by
+            scope_to_team=team via baseline_where()
+          → flat dict, BUT with team=None branch → applies
+            _apply_fielding_per_innings(out, matches*2):
+              divide counts by fielding_innings, halve per-match rates
+          → returns per-innings averages for the league
+            { catches: 4.21, catches_per_match: 4.21, matches: 74, … }
+   c. wrap_metric(t["catches_per_match"], s["catches_per_match"], …)
+      → envelope { value: 4.6, scope_avg: 4.21, delta_pct: +9.3,
+                   direction: 'higher_better', sample_size: 15 }
+3. Frontend MetricDelta renders: value 4.6, ↑+9.3% green
+   (because direction='higher_better' AND value > scope_avg)
+```
+
+The avg column on the same Compare tab fetches:
+```
+GET /scope/averages/fielding/summary?…&scope_to_team=team
+  → _fielding_summary_from_baseline(filters, aux)
+    → SUM bucketbaselinefielding LEAGUE rows narrowed by scope_to_team
+    → _format_fielding_summary(...) which calls
+      _apply_fielding_per_innings(out, matches*2)
+    → returns { catches_per_match: 4.21, … }
+```
+
+**Both paths converge on the same per-innings value because they
+share the per-innings transform** (`_apply_fielding_per_innings`
+in `api/routers/teams.py`, imported by `scope_averages.py`). One
+helper, two routers.
+
+### Per-innings transform helpers (shared between routers)
+
+Defined in `api/routers/teams.py` (near `_safe_div` / `_half`),
+imported by `api/routers/scope_averages.py`:
+
+| Helper | Used by | What it does |
+|---|---|---|
+| `_apply_batting_per_innings(d, innings_batted, drop_divisor)` | batting summary / by-season formatters; team-side `_batting_aggregates_*(team=None, …)` | Divides `total_runs`, `legal_balls`, `fours`, `sixes`, `fifties`, `hundreds` by innings_batted. Optionally drops `innings_batted` from response. |
+| `_apply_bowling_per_innings(d, innings_bowled, drop_divisor)` | bowling summary / by-season; team-side `_bowling_aggregates_*(team=None, …)` | Divides count fields by innings_bowled, halves `wides_per_match`/`noballs_per_match`, recomputes `overs` from per-innings `legal_balls`. |
+| `_apply_fielding_per_innings(d, fielding_innings)` | fielding summary / by-season; `_fielding_aggregates_*(team=None, …)` | Divides counts by `fielding_innings = matches × 2`, halves per-match rates. |
+| `_apply_partnerships_per_innings(d, innings_batted)` | partnerships summary / by-wicket / by-season; inline league query in `team_partnerships_summary` | Divides `total`, `count_50_plus`, `count_100_plus` by innings_batted. |
+| `_phase_dict_per_innings(by_phase, innings_count)` | `_xxx_by_phase_aggregates_*(team=None, …)` | Per-phase analogue — divides phase-row counts. |
+
+Divisor sources:
+- Baseline path: `_baseline_innings_batted/bowled/matches` query
+  the corresponding `bucketbaseline*` table once with `baseline_where`.
+- Live path: `_live_innings_batted/bowled/match_count` /
+  `_innings_count_for_phase` run a small `COUNT(DISTINCT i.id)` /
+  `COUNT(DISTINCT m.id)` against the delivery + innings + match
+  tables.
+
+Identity-bearing fields (`highest_total`, `worst_conceded`,
+`best_pair`, `lowest_all_out_total`) are NOT touched — they're
+single-observation payloads, not averages.
+
 ### The "chip-direction invariant" — what tests enforce
 
-For every chip-bearing metric M:
-- Chip's `scope_avg` numerically equals the avg column's displayed
-  value for the same metric AND the same scope.
-- If chip renders GREEN (better than baseline), team's value is on
-  the correct side of the displayed avg per the metric's `direction`
-  (`higher_better` ⇒ team_value > avg; `lower_better` ⇒ team_value
-  < avg). Symmetric for RED.
+For every chip-bearing metric M (and every field on the team-summary
+envelope, since Convention 2+3 unification):
 
-Validated by `tests/sanity/test_chip_direction_invariant.py` (~525
-assertions per run across the test matrix). If this test fails,
+- **ASSERT 1**: `chip_scope_avg == displayed_avg` — the chip and
+  the avg column share the same numeric baseline.
+- **ASSERT 2**: `delta_pct == round((value - scope_avg) / scope_avg
+  × 100, 1)` — `wrap_metric`'s math is RAW signed; direction is
+  informational, NOT a sign-flip.
+- **ASSERT 3**: chip color (green/red) matches `direction × side-of-
+  baseline` — green when `(higher_better and value > avg) or
+  (lower_better and value < avg)`.
+
+Validated by `tests/sanity/test_chip_direction_invariant.py`
+(~460 assertions per run across 11 (scope, team) combos including
+the canonical RCB+SRH+IPL 2025 reproducer). If this test fails,
 either the chip's baseline scope diverges from the avg column's,
-or the metric's direction tag is wrong, or `wrap_metric` math has
-drifted. Don't ship a Compare-tab change without a green run.
+the metric's direction tag is wrong, `wrap_metric`'s math has
+drifted, or one of the conventions has silently un-unified.
+Don't ship a Compare-tab change without a green run.
 
 ## Conventions baked into the schema
 
@@ -202,6 +319,19 @@ those as `tournament=''` (empty string) for SQL convenience —
 exact-match WHERE clauses work without `IS NULL` handling. The
 populate uses `COALESCE(m.event_name, '')` consistently; the read
 side does the same via `baseline_where()`.
+
+**Live-path scope narrowing must also COALESCE.** When
+`_scope_to_team_clause` builds the `m.event_name IN (…)` subquery
+for live-fallback paths, both sides of the IN-comparison are
+wrapped in `COALESCE(event_name, '')`. Without this, SQL's
+`value IN (NULL, …)` evaluates to UNKNOWN (not TRUE) and silently
+EXCLUDES bilateral matches from the team's tournament universe —
+diverging from the baseline path which includes them as `''` cells.
+
+Caught 2026-04-26 on Aus unbounded internationals (565 matches via
+baseline vs 503 via pre-fix live, ratio ~1.12). The fix is in
+`api/routers/teams.py::_scope_to_team_clause` — see the docstring
+there. Any new live-path narrower must do the same COALESCE dance.
 
 ### Convention 6 — Avg endpoint returns per-innings averages, NEVER pool
 
