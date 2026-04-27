@@ -82,8 +82,23 @@ def make_filters(**kwargs) -> FilterBarParams:
     return FilterBarParams(**{k: kwargs.get(k) for k in keys})
 
 
-def make_aux(scope_to_team: str | None = None, series_type: str | None = None) -> AuxParams:
-    return AuxParams(series_type=series_type, scope_to_team=scope_to_team)
+def make_aux(scope_to_team: str | None = None, series_type: str | None = None,
+             team_class: str | None = None) -> AuxParams:
+    return AuxParams(
+        series_type=series_type, scope_to_team=scope_to_team,
+        team_class=team_class,
+    )
+
+
+def league_avg_aux_for(team_type: str | None, team: str) -> AuxParams:
+    """Mirror of api.routers.teams._league_aux + the frontend's
+    fetchSlot gate: scope_to_team narrows the avg only for closed
+    leagues (team_type='club'). For internationals the avg defaults
+    to the full pool, so chip ↔ displayed-avg agreement requires
+    NOT passing scope_to_team to the avg endpoint either."""
+    if team_type == "club":
+        return make_aux(scope_to_team=team)
+    return make_aux()
 
 
 # ─── Test scopes ────────────────────────────────────────────────────────
@@ -105,6 +120,17 @@ SCOPES = [
                           ["Australia", "India"]),
     ("aus_unbounded",     {"gender": "male",   "team_type": "international"},
                           ["Australia"]),
+    # Canonical international reproducer for the 2026-04-27 avg-baseline
+    # correction. Pre-fix, scope_to_team auto-narrow gave a 67-match
+    # Aus-centered baseline; post-fix the avg col defaults to the full
+    # 870-match pool. This row asserts chip ↔ displayed-avg agreement
+    # under the new (un-narrowed) baseline. India is included because
+    # the 2024 + 2025 calendar puts both teams in the same window with
+    # very different schedules, so any leakage shows up immediately.
+    ("aus_ind_men_intl_2024_2025",
+                          {"gender": "male",   "team_type": "international",
+                           "season_from": "2024", "season_to": "2025"},
+                          ["Australia", "India"]),
     ("wpl_2024",          {"gender": "female", "team_type": "club",          "tournament": "Women's Premier League",  "season_from": "2024", "season_to": "2024"},
                           ["Royal Challengers Bengaluru"]),
     ("bbl_2024_25",       {"gender": "male",   "team_type": "club",          "tournament": "Big Bash League",         "season_from": "2024/25", "season_to": "2024/25"},
@@ -279,7 +305,7 @@ async def run_summary(*, name, team_fn, avg_fn, scope_label, scope, team, failur
     + delta_pct sign math."""
     f_team = make_filters(**scope); f_avg = make_filters(**scope)
     aux_team = make_aux()
-    aux_avg = make_aux(scope_to_team=team)
+    aux_avg = league_avg_aux_for(scope.get("team_type"), team)
 
     # team-side helper sigs differ — _compute_*_summary takes (team, filters, aux);
     # team_fielding_summary / team_partnerships_summary are route fns with the
@@ -305,7 +331,7 @@ async def run_summary(*, name, team_fn, avg_fn, scope_label, scope, team, failur
 async def run_partnerships_summary(*, scope_label, scope, team, failures):
     f_team = make_filters(**scope); f_avg = make_filters(**scope)
     aux_team = make_aux()
-    aux_avg = make_aux(scope_to_team=team)
+    aux_avg = league_avg_aux_for(scope.get("team_type"), team)
     team_resp = await team_partnerships_summary(team, f_team, aux_team, side="batting")
     avg_resp = await scope_partnerships_summary(f_avg, aux_avg)
     for key in ("total", "count_50_plus", "count_100_plus", "avg_runs"):
@@ -325,7 +351,7 @@ async def run_partnerships_summary(*, scope_label, scope, team, failures):
 async def run_by_phase(*, name, team_fn, avg_fn, scope_label, scope, team, failures):
     f_team = make_filters(**scope); f_avg = make_filters(**scope)
     aux_team = make_aux()
-    aux_avg = make_aux(scope_to_team=team)
+    aux_avg = league_avg_aux_for(scope.get("team_type"), team)
     team_resp = await team_fn(team, f_team, aux_team)
     avg_resp = await avg_fn(f_avg, aux_avg)
     avg_by_phase = {p["phase"]: p for p in avg_resp.get("by_phase", [])}
@@ -353,7 +379,7 @@ async def run_by_phase(*, name, team_fn, avg_fn, scope_label, scope, team, failu
 async def run_partnerships_by_wicket(*, scope_label, scope, team, failures):
     f_team = make_filters(**scope); f_avg = make_filters(**scope)
     aux_team = make_aux()
-    aux_avg = make_aux(scope_to_team=team)
+    aux_avg = league_avg_aux_for(scope.get("team_type"), team)
     team_resp = await team_partnerships_by_wicket(team, f_team, aux_team, side="batting")
     avg_resp = await scope_partnerships_by_wicket(f_avg, aux_avg)
     avg_by_wn = {r["wicket_number"]: r for r in avg_resp.get("by_wicket", [])}
