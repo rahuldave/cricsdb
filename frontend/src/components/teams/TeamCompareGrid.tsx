@@ -126,13 +126,12 @@ function slotMatches(slot: SlotState, profile: AnyProfile): number {
   return teamMatchesInScope(profile as TeamProfile)
 }
 
-function slotLabel(slot: SlotState, _primaryTeam: string): string {
-  // Single source of truth for the avg-slot label across the column
-  // header AND the season-trajectory strip's legend. The auto-narrow
-  // (clubs, no tournament filter) is surfaced as a sub-line under the
-  // column header — not folded into the label — so this function stays
-  // a pure function of `slot.scope`.
-  if (slot.kind === 'avg') return scopeAvgLabel(slot.scope)
+function slotLabel(slot: SlotState, _primaryTeam: string, primaryTournaments: string[]): string {
+  // Used by the season-trajectory strip's legend (single-line). Avg
+  // slots use the anchor (line1) only — gender / season detail in line2
+  // is the same across all legend entries (it's the FilterBar scope)
+  // and would just clutter the chart key.
+  if (slot.kind === 'avg') return scopeAvgLabel(slot.scope, primaryTournaments).line1
   return slot.entity ?? ''
 }
 
@@ -166,6 +165,11 @@ export default function TeamCompareGrid({
 
   const anyLoading = renderColumns.some(c => c.fetch.loading && !c.fetch.data)
   const firstError = renderColumns.find(c => c.fetch.error)
+
+  // Primary team's tournament universe in current scope — drives the
+  // avg-col label promotion (singleton → folded into line1) and the
+  // legend label. Empty array until the primary fetch resolves.
+  const primaryTournaments = (f0.data as TeamProfile | null)?.summary?.tournaments_in_scope ?? []
 
   // Drive row visibility — a discipline renders if ANY column has data.
   const anyHasData: Record<TeamDiscipline, boolean> = {
@@ -248,6 +252,7 @@ export default function TeamCompareGrid({
               slotIdx={c.slotIdx}
               primary={primaryFilters}
               primaryTeam={primaryTeam}
+              primaryTournaments={primaryTournaments}
               fetch={c.fetch}
               isPrimary={c.isPrimary}
               anyHasData={anyHasData}
@@ -273,7 +278,7 @@ export default function TeamCompareGrid({
         columns={renderColumns
           .filter(c => !!c.fetch.data)
           .map(c => ({
-            label: slotLabel(c.slot, primaryTeam),
+            label: slotLabel(c.slot, primaryTeam, primaryTournaments),
             profile: c.fetch.data!,
             isAverage: c.slot.kind === 'avg',
           }))}
@@ -288,11 +293,12 @@ interface ColumnProps {
   slot: SlotState
   slotIdx: SlotIdx | null
   primary: FilterParams
-  /** Primary team name — passed in for the avg-slot header label so
-   *  it can reflect the auto-scope ("Avg in RCB's leagues") instead
-   *  of the misleading default ("Men's club avg" while numbers are
-   *  IPL-only because of the auto-narrow). */
+  /** Primary team name — passed in for the SlotScopeEditor's reset
+   *  affordance and ✕-button labels. */
   primaryTeam: string
+  /** Distinct tournaments the primary team appears in within scope —
+   *  drives the avg-col label promotion (singleton folds into line1). */
+  primaryTournaments: string[]
   fetch: ProfileFetch
   isPrimary: boolean
   anyHasData: Record<TeamDiscipline, boolean>
@@ -302,7 +308,7 @@ interface ColumnProps {
 }
 
 function CompareSlotColumn({
-  slot, slotIdx, primary, primaryTeam, fetch, isPrimary, anyHasData,
+  slot, slotIdx, primary, primaryTeam, primaryTournaments, fetch, isPrimary, anyHasData,
   onRemove, onUpdateScope, onResetScope,
 }: ColumnProps) {
   const [editing, setEditing] = useState(false)
@@ -328,6 +334,12 @@ function CompareSlotColumn({
     ? `/teams?${new URLSearchParams({ team: teamName, ...carryTeamFilters(slot.scope as FilterParams) })}`
     : null
 
+  // Avg-col two-line label. line1 anchors on a tournament name when the
+  // primary team's universe collapses to a singleton (RCB → IPL); else
+  // "League average" / "Full-member average". line2 is the italic scope
+  // subtitle (gender · season range).
+  const avgLbl = !isTeam ? scopeAvgLabel(slot.scope, primaryTournaments) : null
+
   return (
     <div className="wisden-compare-col">
       <div className="wisden-compare-col-head">
@@ -344,13 +356,15 @@ function CompareSlotColumn({
             <span
               className="wisden-compare-col-namelink"
               title={
-                slot.scope.team_type === 'club' && !slot.scope.tournament
-                  ? `Pool-weighted league baseline narrowed to tournaments ${primaryTeam} has played in (auto-scope) — fast AND semantically right for closed leagues.`
+                slot.scope.team_type === 'club' && !slot.scope.tournament && primaryTournaments.length === 1
+                  ? `Pool-weighted league baseline — primary team's universe collapses to ${primaryTournaments[0]} so the avg is computed over that tournament.`
+                  : slot.scope.team_type === 'club' && !slot.scope.tournament
+                  ? `Pool-weighted league baseline narrowed to tournaments ${primaryTeam} has played in (auto-scope).`
                   : 'Pool-weighted league baseline scoped to the active filters'
               }
               style={{ fontStyle: 'italic' }}
             >
-              {scopeAvgLabel(slot.scope)}
+              {avgLbl!.line1}
             </span>
           )}
         </h2>
@@ -389,25 +403,15 @@ function CompareSlotColumn({
         </button>
       </div>
 
-      {/* Chip-area: fixed-height placeholder so columns stay row-aligned
-       *  whether or not a sub-line renders. Holds the team-slot scope-
-       *  diff chip (SlotHeaderChip) AND the avg-slot's auto-narrow
-       *  hint, exactly one of which ever renders content per column. */}
+      {/* Chip-area: italic sub-line under the column header. For team
+       *  slots — SlotHeaderChip when the slot has scope overrides. For
+       *  avg slots — line2 of the scope label (gender · season range).
+       *  Both render zero content most of the time; the subgrid row
+       *  collapses accordingly across columns. */}
       <div className="wisden-compare-chip-area">
         {isTeam && <SlotHeaderChip slot={slot} />}
-        {/* Avg slot auto-narrow hint: when scope_to_team is implicit
-         *  (clubs, no tournament filter), the column header reads the
-         *  user's filter-bar scope (e.g. "Men's club 2024-2026 avg")
-         *  but the underlying data is narrowed to `${primaryTeam}`'s
-         *  tournaments. The sub-line keeps that visible without
-         *  bloating the column title to two lines. */}
-        {!isTeam && slot.scope.team_type === 'club' && !slot.scope.tournament && (
-          <div
-            className="wisden-compare-slot-chip"
-            title={`The avg pool is narrowed to tournaments ${primaryTeam} has appeared in.`}
-          >
-            · in {primaryTeam}'s tournaments
-          </div>
+        {!isTeam && avgLbl!.line2 && (
+          <div className="wisden-compare-slot-chip">{avgLbl!.line2}</div>
         )}
       </div>
 

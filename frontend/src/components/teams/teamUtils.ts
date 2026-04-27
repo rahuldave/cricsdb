@@ -38,37 +38,73 @@ export function avgDisciplineHasData(
   return (profile.partnerships?.total ?? 0) > 0
 }
 
-/** Scope-computed label for the average column header. Constructs a
- *  short phrase from the active FilterBar fields — "IPL 2024 avg",
- *  "Men's T20I 2024 avg", "Men's T20I full-member 2024 avg", or just
- *  "League avg" when nothing's set. */
-export function scopeAvgLabel(filters: FilterParams): string {
-  const parts: string[] = []
-  if (filters.tournament) {
-    parts.push(filters.tournament)
-  } else if (filters.team_type === 'international') {
-    if (filters.gender === 'male')   parts.push("Men's T20I")
-    else if (filters.gender === 'female') parts.push("Women's T20I")
-    else parts.push('Internationals')
-  } else if (filters.team_type === 'club') {
-    if (filters.gender === 'male')   parts.push("Men's club")
-    else if (filters.gender === 'female') parts.push("Women's club")
-    else parts.push('Club')
+/** Two-line scope-computed label for the avg column header.
+ *  - `line1` is the column's *anchor* (rendered in the same h2 slot as
+ *    team-col team names): "League average", "<Tournament> average", or
+ *    "Full-member average". When `teamTournaments` is a singleton AND
+ *    no explicit tournament filter is set AND team_type is 'club', the
+ *    primary team's sole tournament is auto-promoted into line1 (e.g.
+ *    RCB's universe collapses to IPL → "Indian Premier League average").
+ *  - `line2` is the italic scope subtitle (rendered in the chip-area
+ *    sub-line): gender + tier qualifier (when not redundant with line1)
+ *    + season range, joined by " · ". Empty when nothing narrows. */
+export interface ScopeAvgLabel { line1: string; line2: string }
+
+export function scopeAvgLabel(
+  filters: FilterParams,
+  teamTournaments?: string[],
+): ScopeAvgLabel {
+  // Auto-promote the primary team's tournament when its universe
+  // collapses to a singleton — same gate as the backend's _league_aux
+  // scope_to_team narrowing (club + no explicit tournament).
+  const promoted = !filters.tournament
+    && filters.team_type === 'club'
+    && teamTournaments?.length === 1
+      ? teamTournaments[0]!
+      : null
+  const anchorTournament = filters.tournament || promoted
+
+  let line1: string
+  if (filters.team_class === 'full_member') {
+    line1 = 'Full-member average'
+  } else if (anchorTournament) {
+    line1 = `${anchorTournament} average`
+  } else {
+    line1 = 'League average'
   }
-  // team_class qualifier (e.g. "full-member") slots between the tier
-  // word and the season — "Men's T20I full-member 2024-2025 avg".
-  if (filters.team_class === 'full_member') parts.push('full-member')
+
+  // line2 — gender + tier qualifier (only when not redundant with the
+  // anchor) + season range.
+  const parts: string[] = []
+  const genderWord = filters.gender === 'male' ? "Men's"
+                   : filters.gender === 'female' ? "Women's"
+                   : ''
+
+  if (anchorTournament) {
+    // Tournament names already imply tier; keep gender only.
+    if (genderWord) parts.push(genderWord)
+  } else if (filters.team_class === 'full_member') {
+    // "Full-member" always implies intl T20I; keep gender + T20I tier.
+    parts.push(genderWord ? `${genderWord} T20I` : 'T20Is')
+  } else if (filters.team_type === 'international') {
+    parts.push(genderWord ? `${genderWord} T20I` : 'T20Is')
+  } else if (filters.team_type === 'club') {
+    parts.push(genderWord ? `${genderWord} club` : 'Clubs')
+  } else if (genderWord) {
+    parts.push(genderWord)
+  }
+
   if (filters.season_from && filters.season_to) {
     parts.push(filters.season_from === filters.season_to
       ? filters.season_from
-      : `${filters.season_from}-${filters.season_to}`)
+      : `${filters.season_from}–${filters.season_to}`)
   } else if (filters.season_from) {
     parts.push(`${filters.season_from}+`)
   } else if (filters.season_to) {
-    parts.push(`-${filters.season_to}`)
+    parts.push(`–${filters.season_to}`)
   }
-  if (parts.length === 0) return 'League avg'
-  return `${parts.join(' ')} avg`
+
+  return { line1, line2: parts.join(' · ') }
 }
 
 /** Filter-scoped match count for the column identity line. Uses

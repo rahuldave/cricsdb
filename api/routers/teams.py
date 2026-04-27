@@ -9,7 +9,7 @@ from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
 from ..full_members import ICC_FULL_MEMBERS
 from ..metrics_metadata import wrap_metric
-from ..tournament_canonical import series_type as series_type_for
+from ..tournament_canonical import series_type as series_type_for, canonicalize
 
 router = APIRouter(prefix="/api/v1/teams", tags=["Teams"])
 
@@ -296,6 +296,24 @@ async def team_summary(
     )
     keeper_ambiguous = ambig_rows[0]["c"] if ambig_rows else 0
 
+    # Distinct tournaments (canonical) the team has matches in within
+    # the current scope. Drives the avg-col label promotion on the
+    # Compare tab — when a club team's tournament universe collapses
+    # to a singleton (RCB → IPL), the avg col can label as "IPL average"
+    # instead of the generic "Men's club average".
+    tour_rows = await db.q(
+        f"""
+        SELECT DISTINCT m.event_name
+        FROM match m
+        WHERE {filt} AND m.event_name IS NOT NULL
+        """,
+        params,
+    )
+    tournaments_in_scope = sorted({
+        canon for canon in (canonicalize(r["event_name"]) for r in tour_rows)
+        if canon
+    })
+
     return {
         "team": team,
         "matches":          wrap_metric(matches, s_matches, "matches", sample_size=s_matches),
@@ -310,6 +328,7 @@ async def team_summary(
         "gender_breakdown": gender_breakdown,
         "keepers": keepers,
         "keeper_ambiguous_innings": keeper_ambiguous,
+        "tournaments_in_scope": tournaments_in_scope,
     }
 
 

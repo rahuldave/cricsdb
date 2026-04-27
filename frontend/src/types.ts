@@ -96,6 +96,11 @@ export interface TeamSummary {
   keepers: { person_id: string; name: string; innings_kept: number }[]
   /** Count of this team's fielding innings with no identified keeper. */
   keeper_ambiguous_innings: number
+  /** Distinct canonical tournaments the team has matches in within
+   *  the active filter scope. Drives the avg-col label promotion on
+   *  the Compare tab — when a club team's universe collapses to a
+   *  singleton (RCB → IPL), the avg col labels as the tournament. */
+  tournaments_in_scope: string[]
 }
 
 /** Keeper info attached to each innings on the scorecard endpoint. */

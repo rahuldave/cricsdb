@@ -457,10 +457,12 @@ Source: `api/routers/teams.py`. `{team}` is URL-encoded team name
 
 ## `GET /api/v1/teams/{team}/summary`
 
-Win/loss totals, toss stats, gender-breakdown banner, and Tier-2
-keeper list. Each numeric metric is wrapped in the per-metric
-envelope (see "Compare metric envelope" below); identity-bearing
-fields (`gender_breakdown`, `keepers`) stay flat.
+Win/loss totals, toss stats, gender-breakdown banner, Tier-2 keeper
+list, and the canonical tournaments the team has matches in within
+the active filter scope. Each numeric metric is wrapped in the per-
+metric envelope (see "Compare metric envelope" below); identity-
+bearing fields (`gender_breakdown`, `keepers`, `tournaments_in_scope`)
+stay flat.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/summary?gender=male&team_type=international"
@@ -482,9 +484,15 @@ curl "http://localhost:8000/api/v1/teams/India/summary?gender=male&team_type=int
     { "person_id": "4a8a2e3b", "name": "MS Dhoni", "innings_kept": 74 },
     { "person_id": "919a3be2", "name": "RR Pant", "innings_kept": 36 }
   ],
-  "keeper_ambiguous_innings": 18
+  "keeper_ambiguous_innings": 18,
+  "tournaments_in_scope": ["Indian Premier League"]
 }
 ```
+
+`tournaments_in_scope` drives the avg-col label promotion on the
+Compare tab — when a club team's universe collapses to a singleton
+(RCB → IPL), the avg col labels as the tournament instead of the
+generic "Men's club average".
 
 ## `GET /api/v1/teams/{team}/results`
 
