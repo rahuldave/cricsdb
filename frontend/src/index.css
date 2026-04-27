@@ -813,7 +813,18 @@ a { color: inherit; }
 }
 /* Players comparison grid — one column per player, equal widths.
    The ✕ sits top-right inside each column's header. */
+/* Each column wrapper is a CSS subgrid that takes its row tracks from
+   the parent (.wisden-compare-columns). Row sizes to the tallest cell
+   across all columns, so a long header / multi-line slot chip / multi-
+   row discipline section in any one column advances every column to
+   the next row in lockstep. Replaces the older min-height alignment
+   hack on .wisden-compare-col-name + .wisden-compare-chip-area. */
 .wisden-compare-col {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-template-columns: 1fr;
+  grid-row: 1 / -1;
+  row-gap: 0;
   min-width: 0;
 }
 .wisden-compare-col-head {
@@ -831,26 +842,31 @@ a { color: inherit; }
   font-size: 1.25rem;
   color: var(--ink);
   margin: 0;
+  min-width: 0;
+  flex: 1 1 auto;
   font-variation-settings: "opsz" 24;
   letter-spacing: -0.01em;
-  /* Reserve 2 lines of vertical space so a long column title (e.g.
-     "Royal Challengers Bengaluru" or the avg-col label when tournament
-     is unset) doesn't push that column's body rows below its siblings.
-     Pragmatic alignment fix; revisit when CSS subgrid lands per the
-     spec note in next-session-ideas.md. */
   line-height: 1.2;
-  min-height: 2.4em;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  overflow-wrap: break-word;
 }
-/* Chip-area (sub-line under the column header) — same min-height in
-   every column whether content renders or not, so the per-discipline
-   bands below it stay row-aligned across columns. Holds the team-slot
-   scope-diff chip OR the avg-slot auto-narrow hint. */
+/* Chip-area (sub-line under the column header). Holds the team-slot
+   scope-diff chip OR the avg-slot auto-narrow hint. Subgrid sizes the
+   row to the tallest chip across columns, so columns without a chip
+   leave the equivalent gap empty rather than rendering the row at 0
+   height — that's the alignment fix this refactor is for. */
 .wisden-compare-chip-area {
-  min-height: 1.4em;
   margin-bottom: 0.4rem;
 }
+/* Always-rendered slot for the inline scope-editor. Empty placeholder
+   in non-editing columns has 0 content → subgrid row collapses to
+   ~0 height. When one column expands its editor, the row track grows
+   for ALL columns (subgrid behavior), so discipline rows below the
+   editor stay aligned across columns. The placeholder MUST stay in
+   the DOM (no `display: none`) to keep auto-placement child-counts
+   uniform across columns. */
 .wisden-compare-slot-chip {
   font-size: 0.85em;
   font-style: italic;

@@ -180,6 +180,14 @@ export default function TeamCompareGrid({
 
   const totalColumns = renderColumns.length
 
+  // Subgrid row count = 4 fixed rows (col-head, chip-area, editor-row,
+  // identity) + one row per visible discipline. Parent grid declares
+  // these tracks explicitly so each column's `grid-row: 1 / -1` (in
+  // .wisden-compare-col) resolves to the full set, and per-column
+  // subgrids align their children into the same row tracks.
+  const visibleDisciplines = DISCIPLINES.filter(d => anyHasData[d]).length
+  const totalRows = 4 + visibleDisciplines
+
   const handleRemove = (slot: SlotState, isPrimary: boolean) => {
     if (isPrimary) onClearPrimary()
     else if (slot.kind === 'avg') onRemoveAvg()
@@ -215,30 +223,40 @@ export default function TeamCompareGrid({
         </div>
       </div>
 
-      <div
-        className="wisden-compare-columns"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${totalColumns}, minmax(0, 1fr))`,
-          gap: '1.5rem',
-          alignItems: 'start',
-        }}
-      >
-        {renderColumns.map((c, idx) => (
-          <CompareSlotColumn
-            key={c.isPrimary ? `__primary__${c.slot.entity}` : `slot${idx}-${c.slot.kind}-${c.slot.entity ?? 'avg'}`}
-            slot={c.slot}
-            slotIdx={c.slotIdx}
-            primary={primaryFilters}
-            primaryTeam={primaryTeam}
-            fetch={c.fetch}
-            isPrimary={c.isPrimary}
-            anyHasData={anyHasData}
-            onRemove={() => handleRemove(c.slot, c.isPrimary)}
-            onUpdateScope={onUpdateSlotScope}
-            onResetScope={onResetSlotScope}
-          />
-        ))}
+      {/* Outer wrapper enables horizontal scroll on narrow viewports.
+       *  At iPhone 13 width (390px) three 11rem-min columns + gap
+       *  exceed the viewport — user pans horizontally rather than
+       *  squeezing columns to ~115px (which broke long team names
+       *  and forced numbers to wrap). At desktop widths the
+       *  minmax(11rem, 1fr) template behaves as a normal 1fr split. */}
+      <div style={{ overflowX: 'auto' }}>
+        <div
+          className="wisden-compare-columns"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${totalColumns}, minmax(11rem, 1fr))`,
+            gridTemplateRows: `repeat(${totalRows}, auto)`,
+            columnGap: '1.5rem',
+            rowGap: '0',
+            alignItems: 'start',
+          }}
+        >
+          {renderColumns.map((c, idx) => (
+            <CompareSlotColumn
+              key={c.isPrimary ? `__primary__${c.slot.entity}` : `slot${idx}-${c.slot.kind}-${c.slot.entity ?? 'avg'}`}
+              slot={c.slot}
+              slotIdx={c.slotIdx}
+              primary={primaryFilters}
+              primaryTeam={primaryTeam}
+              fetch={c.fetch}
+              isPrimary={c.isPrimary}
+              anyHasData={anyHasData}
+              onRemove={() => handleRemove(c.slot, c.isPrimary)}
+              onUpdateScope={onUpdateSlotScope}
+              onResetScope={onResetSlotScope}
+            />
+          ))}
+        </div>
       </div>
 
       {anyLoading && !renderColumns.every(c => c.fetch.data) && (
@@ -393,16 +411,22 @@ function CompareSlotColumn({
         )}
       </div>
 
-      {editing && slotIdx != null && (
-        <SlotScopeEditor
-          primary={primary}
-          team={isTeam ? teamName : undefined}
-          initial={slot.overrides}
-          onApply={(o) => { onUpdateScope(slotIdx, o); setEditing(false) }}
-          onReset={() => { onResetScope(slotIdx); setEditing(false) }}
-          onCancel={() => setEditing(false)}
-        />
-      )}
+      {/* Editor-row slot — always rendered so every column has the
+       *  same number of subgrid children (auto-placement keeps
+       *  identity + discipline rows aligned). Empty in primary +
+       *  non-editing slot columns; collapses to ~0 height. */}
+      <div className="wisden-compare-editor-row">
+        {editing && slotIdx != null && (
+          <SlotScopeEditor
+            primary={primary}
+            team={isTeam ? teamName : undefined}
+            initial={slot.overrides}
+            onApply={(o) => { onUpdateScope(slotIdx, o); setEditing(false) }}
+            onReset={() => { onResetScope(slotIdx); setEditing(false) }}
+            onCancel={() => setEditing(false)}
+          />
+        )}
+      </div>
 
       <div className="wisden-player-identity">
         {matches > 0 && (
