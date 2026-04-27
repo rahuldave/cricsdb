@@ -28,6 +28,7 @@ from __future__ import annotations
 from fastapi import Query
 from typing import Optional
 
+from .full_members import full_member_clause
 from .tournament_canonical import (
     is_canonical_with_variants,
     variants as canonical_variants,
@@ -68,9 +69,20 @@ class AuxParams:
                 " tournament club teams."
             ),
         ),
+        team_class: Optional[str] = Query(
+            None,
+            description=(
+                "Narrow to matches where BOTH teams are in a named class."
+                " Currently supports `full_member` (= matches between ICC"
+                " full-member nations only). Used by the Compare-tab avg"
+                " slot for internationals to exclude associate-team matches"
+                " from the league baseline. No-op for clubs."
+            ),
+        ),
     ):
         self.series_type = series_type
         self.scope_to_team = scope_to_team
+        self.team_class = team_class
 
 
 class FilterBarParams:
@@ -186,6 +198,9 @@ class FilterBarParams:
             st = series_type_clause(aux.series_type, alias=table_alias)
             if st:
                 clauses.append(st)
+
+        if aux is not None and aux.team_class == "full_member":
+            clauses.append(full_member_clause(table_alias=table_alias))
 
         where = " AND ".join(clauses) if clauses else ""
         return where, params

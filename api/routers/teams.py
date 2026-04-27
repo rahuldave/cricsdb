@@ -7,24 +7,11 @@ from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
+from ..full_members import ICC_FULL_MEMBERS
 from ..metrics_metadata import wrap_metric
 from ..tournament_canonical import series_type as series_type_for
 
 router = APIRouter(prefix="/api/v1/teams", tags=["Teams"])
-
-
-# ICC full-member nations (men's & women's — same team strings in cricsheet).
-# Used by the Teams landing page to split international teams into the
-# top-line "regular" group vs "associate" (everyone else who's played an
-# international T20). Afghanistan + Ireland were elevated in 2017; we
-# treat them as regular for display simplicity since they play the full
-# tournament calendar today. Zimbabwe remains a full member despite
-# historical ICC pressure.
-ICC_FULL_MEMBERS = frozenset({
-    "Afghanistan", "Australia", "Bangladesh", "England", "India",
-    "Ireland", "New Zealand", "Pakistan", "South Africa", "Sri Lanka",
-    "West Indies", "Zimbabwe",
-})
 
 
 def _team_filter_clause(filters: FilterParams, team_param: str = ":team", aux: AuxParams | None = None) -> tuple[str, dict]:
@@ -918,16 +905,32 @@ def _apply_partnerships_per_innings(d: dict, innings_batted: int) -> dict:
     return d
 
 
-def _league_aux(team: str | None, aux: AuxParams) -> AuxParams:
+def _league_aux(
+    team: str | None, aux: AuxParams, filters: FilterParams | None = None,
+) -> AuxParams:
     """Return a copy of `aux` with `scope_to_team` synthesized to
     `team` so the league-side call inside `_compute_xxx_summary` /
     by-phase / by-wicket handlers baselines against the team's
     tournament universe (matching the avg-slot's auto-narrow).
 
-    No-op when team is None or when aux already has scope_to_team
-    set explicitly (request-supplied scope overrides synthesis).
-    Spec: spec-avg-column-per-innings.md Commit 3."""
+    Synthesis is GATED on `filters.team_type == 'club'` to mirror the
+    frontend Compare grid's `fetchSlot` gate. For internationals the
+    "tournament universe" of a single team (e.g. Australia in 2024-25
+    = 6 events all containing Australia) makes the baseline a mirror of
+    the team's own performance; chips would read flatteringly above-
+    average by construction. The frontend defaults to the full pool for
+    internationals; the chip baseline must agree with that, so we don't
+    synthesize scope_to_team here either.
+
+    No-op when team is None or when aux already has scope_to_team set
+    explicitly (request-supplied scope overrides synthesis).
+
+    Spec: spec-avg-column-per-innings.md Commit 3 + the 2026-04-27
+    international avg-baseline correction.
+    """
     if team is None or aux.scope_to_team:
+        return aux
+    if filters is not None and filters.team_type != "club":
         return aux
     from copy import copy
     new = copy(aux)
@@ -1281,7 +1284,7 @@ async def _compute_batting_summary(
     (highest_total, lowest_all_out_total) stay flat — they're not
     metrics."""
     t = await _batting_aggregates(team, filters, aux)
-    s = await _batting_aggregates(None, filters, _league_aux(team, aux))
+    s = await _batting_aggregates(None, filters, _league_aux(team, aux, filters))
     legal = t.get("legal_balls") or 0
     return {
         "team": team,
@@ -1619,7 +1622,7 @@ async def team_batting_by_phase(
     aux: AuxParams = Depends(),
 ):
     t = await _batting_by_phase_aggregates(team, filters, aux)
-    s = await _batting_by_phase_aggregates(None, filters, _league_aux(team, aux))
+    s = await _batting_by_phase_aggregates(None, filters, _league_aux(team, aux, filters))
 
     phase_ranges = {
         "powerplay": [1, 6],
@@ -2071,7 +2074,7 @@ async def _compute_bowling_summary(
 ) -> dict:
     """Per-metric envelope team-bowling summary."""
     t = await _bowling_aggregates(team, filters, aux)
-    s = await _bowling_aggregates(None, filters, _league_aux(team, aux))
+    s = await _bowling_aggregates(None, filters, _league_aux(team, aux, filters))
     legal = t.get("legal_balls") or 0
     matches = t.get("matches") or 0
     return {
@@ -2392,7 +2395,7 @@ async def team_bowling_by_phase(
     aux: AuxParams = Depends(),
 ):
     t = await _bowling_by_phase_aggregates(team, filters, aux)
-    s = await _bowling_by_phase_aggregates(None, filters, _league_aux(team, aux))
+    s = await _bowling_by_phase_aggregates(None, filters, _league_aux(team, aux, filters))
 
     phase_ranges = {
         "powerplay": [1, 6],
@@ -2699,7 +2702,7 @@ async def team_fielding_summary(
     aux: AuxParams = Depends(),
 ):
     t = await _fielding_aggregates(team, filters, aux)
-    s = await _fielding_aggregates(None, filters, _league_aux(team, aux))
+    s = await _fielding_aggregates(None, filters, _league_aux(team, aux, filters))
     matches = t.get("matches") or 0
     return {
         "team": team,
@@ -3033,7 +3036,7 @@ async def team_partnerships_by_wicket(
     where, params = _partnership_filter(filters, team, side, aux=aux)
 
     t = await _partnerships_by_wicket_aggregates(team, filters, side, aux)
-    s = await _partnerships_by_wicket_aggregates(None, filters, side, _league_aux(team, aux))
+    s = await _partnerships_by_wicket_aggregates(None, filters, side, _league_aux(team, aux, filters))
 
     # Best partnership detail per wicket (identity-bearing — only
     # fetched for the team side; the league's record at each wicket
@@ -3455,7 +3458,7 @@ async def team_partnerships_summary(
     # scope_to_team synthesized so the league-side baselines against
     # the team's tournament universe (matching the avg endpoint's
     # auto-narrow). Spec-avg-column-per-innings.md Commit 3.
-    league_aux = _league_aux(team, aux)
+    league_aux = _league_aux(team, aux, filters)
     s_where, s_params = _partnership_filter(filters, None, side, aux=league_aux)
     s_rows = await db.q(
         f"""
