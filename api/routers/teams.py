@@ -1815,8 +1815,11 @@ async def _bowling_aggregates_baseline(team, filters, aux):
           SUM(matches) AS matches,
           SUM(runs_conceded) AS runs_conceded,
           SUM(legal_balls) AS legal_balls,
-          SUM(wide_runs) AS wides,
-          SUM(noball_runs) AS noballs,
+          -- Convention 2 (unified 2026-04-26): both endpoints return
+          -- delivery COUNT, not run-total. wide_runs/noball_runs columns
+          -- still populated for callers that genuinely want runs total.
+          SUM(wides) AS wides,
+          SUM(noballs) AS noballs,
           SUM(fours_conceded) AS fours_conceded,
           SUM(sixes_conceded) AS sixes_conceded,
           SUM(dots) AS dots,
@@ -1932,8 +1935,10 @@ async def _bowling_aggregates_live(
             SUM(d.runs_total) as runs_conceded,
             COUNT(*) as all_balls,
             SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) as legal_balls,
-            SUM(d.extras_wides) as wides,
-            SUM(d.extras_noballs) as noballs,
+            -- Convention 2 (unified 2026-04-26): COUNT of wide/noball
+            -- deliveries, not run-total.
+            SUM(CASE WHEN d.extras_wides > 0 THEN 1 ELSE 0 END) as wides,
+            SUM(CASE WHEN d.extras_noballs > 0 THEN 1 ELSE 0 END) as noballs,
             SUM(CASE WHEN d.runs_batter = 4
                      AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours_conceded,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes_conceded,
@@ -2616,7 +2621,12 @@ async def _fielding_aggregates_baseline(team, filters, aux):
     matches = match_rows[0]["matches"] if match_rows else 0
     out = {
         "matches": matches,
-        "catches": catches_only,
+        # Convention 3 (unified 2026-04-26): `catches` includes
+        # caught-and-bowled on both endpoints. `caught_and_bowled`
+        # is broken out as a sub-count (consumers summing catches +
+        # caught_and_bowled would double-count — the contract is
+        # "catches" is the inclusive total).
+        "catches": catches_only + cnb,
         "caught_and_bowled": cnb,
         "stumpings": stumpings,
         "run_outs": run_outs,
@@ -2667,7 +2677,8 @@ async def _fielding_aggregates_live(
 
     out = {
         "matches": matches,
-        "catches": catches,
+        # Convention 3 (unified 2026-04-26): `catches` includes c_a_b.
+        "catches": catches + caught_and_bowled,
         "caught_and_bowled": caught_and_bowled,
         "stumpings": stumpings,
         "run_outs": run_outs,
@@ -2754,7 +2765,8 @@ async def team_fielding_by_season(
             matches = match_map.get(s, 0)
             seasons.append({
                 "season": s,
-                "catches": catches,
+                # Convention 3: catches includes c_a_b on both endpoints.
+                "catches": catches + cnb,
                 "caught_and_bowled": cnb,
                 "stumpings": stumpings,
                 "run_outs": run_outs,
@@ -2822,7 +2834,12 @@ async def team_fielding_by_season(
         matches = match_map.get(s, 0)
         total_catches = row["catches"] + row["caught_and_bowled"]
         seasons.append({
-            **row,
+            "season": row["season"],
+            # Convention 3: catches includes c_a_b on both endpoints.
+            "catches": total_catches,
+            "caught_and_bowled": row["caught_and_bowled"],
+            "stumpings": row["stumpings"],
+            "run_outs": row["run_outs"],
             "matches": matches,
             "catches_per_match": _safe_div(total_catches, matches, 1, 2),
             "stumpings_per_match": _safe_div(row["stumpings"], matches, 1, 2),

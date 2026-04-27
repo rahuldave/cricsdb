@@ -159,33 +159,41 @@ If you add a new bowler-wickets consumer: use `BOWLER_WICKET_EXCLUDE`
 in `api/routers/teams.py` (5-kind tuple) — never hand-type the
 list.
 
-### Convention 2 — `wides` is a count; `wide_runs` is the run total
+### Convention 2 — `wides` and `noballs` are delivery COUNTS on every endpoint
 
-`bucketbaselinebowling` stores BOTH:
+`bucketbaselinebowling` stores BOTH columns:
 - `wides`     — count of wide deliveries (`SUM(CASE WHEN extras_wides > 0 THEN 1 ELSE 0 END)`)
 - `wide_runs` — sum of wide runs (`SUM(extras_wides)`)
 
-Same pattern for `noballs` / `noball_runs`. The two have always had
-different semantics in different endpoints:
-- `/scope/averages/bowling/summary` returns count.
-- `/teams/{team}/bowling/summary` returns runs.
+Same pattern for `noballs` / `noball_runs`. **Every API endpoint
+returns the COUNT** (delivery count). Unified 2026-04-26 — the
+team-side endpoint previously returned wide-runs, diverging from
+the avg endpoint and producing a chip-direction invariant failure
+on `wides_per_match`. Now both endpoints return count, matching
+the standard cricket convention ("team conceded 23 wides" = 23
+wide deliveries, not 23 wide-runs).
 
-Pre-existing inconsistency (not invented by Phase 2). Schema
-supports both so dispatchers can pick the matching semantic.
+The `wide_runs` column is still populated for any future caller
+that genuinely wants a run-total (none today). Schema-level the
+split is preserved; only the response semantic is uniform.
 
-### Convention 3 — `catches` excludes `caught_and_bowled` in the team helper
+### Convention 3 — `catches` includes caught-and-bowled on every endpoint
 
 `bucketbaselinefielding.catches` is the count where
-`fc.kind = 'caught'` only. `caught_and_bowled` is a separate column.
-Two response shapes consume this:
-- `/teams/{team}/fielding/summary` returns `catches` =
-  `bucketbaselinefielding.catches` (excludes c_a_b).
-- `/scope/averages/fielding/summary` returns `catches` =
-  `catches + caught_and_bowled` (includes c_a_b).
+`fc.kind = 'caught'` only; `caught_and_bowled` is a separate
+column. **Every API endpoint returns the inclusive total**:
 
-Both endpoints' formatters handle their own combination — the
-schema stores the split so callers can choose. Pre-existing
-inconsistency.
+- `/teams/{team}/fielding/summary`: `catches` = `catches_only + cnb`
+- `/scope/averages/fielding/summary`: `catches` = `catches_only + cnb`
+- `/teams/{team}/fielding/by-season`: `catches` = `catches_only + cnb`
+- All response shapes mirror this.
+
+`caught_and_bowled` is exposed as a separate sub-count for callers
+that need the breakdown — but consumers SHOULD NOT add catches +
+caught_and_bowled (that double-counts). Unified 2026-04-26 — the
+team-side endpoint previously excluded c_a_b in `catches`,
+producing a chip-direction invariant failure for fielding catches.
+Cricket convention: a catch is a catch regardless of who took it.
 
 ### Convention 4 — `tournament=''` represents NULL `event_name`
 

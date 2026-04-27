@@ -36,14 +36,12 @@ Includes the canonical reproducer (RCB + SRH + IPL 2025) as the
 first row in the matrix — a permanent regression marker for the
 original bug.
 
-Known-asymmetric fields skipped on ASSERT 1 (pre-existing semantic
-difference between team and avg endpoint, explicitly documented):
-  - wides / noballs / wides_per_match / noballs_per_match: team
-    returns runs total, avg endpoint returns count
-    (perf-bucket-baselines.md Convention 2).
-  - catches / caught_and_bowled / total_dismissals_contributed
-    (fielding summary): team excludes c_a_b in `catches`; avg
-    endpoint includes (Convention 3).
+Conventions 2 and 3 in perf-bucket-baselines.md were unified
+2026-04-26: both team-side and avg-endpoint return delivery COUNT
+for wides/noballs (not run-total), and both treat `catches` as
+inclusive of caught-and-bowled. ASSERT 1 now runs against every
+chip-bearing metric without a skip-list — any divergence is a
+real bug.
 
 Usage:
   uv run python tests/sanity/test_chip_direction_invariant.py
@@ -188,17 +186,6 @@ SUMMARY_FIELD_MAP = {
 }
 
 
-# Pre-existing endpoint-semantic asymmetries (NOT bugs introduced by
-# the per-innings work). Skip ASSERT 1 — chip and avg endpoint return
-# numerically-different values on these fields by design.
-ASSERT_1_SKIP = frozenset({
-    # Convention 2 (perf-bucket-baselines.md): wides/noballs runs vs count.
-    "wides", "noballs", "wides_per_match", "noballs_per_match",
-    # Convention 3: fielding "catches" excludes/includes c_a_b.
-    "catches", "caught_and_bowled", "total_dismissals_contributed",
-})
-
-
 # ─── Assertions ─────────────────────────────────────────────────────────
 
 class Failure:
@@ -216,15 +203,12 @@ class Failure:
 
 
 def check_assert_1(env, displayed, *, test, scope, team, metric) -> Failure | None:
-    """chip_scope_avg == displayed_avg. Only enforced for chip-bearing
-    metrics (direction != None). For non-chip-bearing counts the chip
-    is invisible, and pre-existing semantic asymmetries are tolerated."""
-    if envelope_direction(env) is None:
-        return None
-    # Strip phase / wicket prefix to get the bare metric key.
-    bare = metric.rsplit("/", 1)[-1]
-    if bare in ASSERT_1_SKIP:
-        return None
+    """chip_scope_avg == displayed_avg.
+
+    Enforced on EVERY field in the team-summary envelope (whether
+    chip-bearing or not) since Convention 2 + 3 were unified
+    2026-04-26. Counts (direction=None) don't render chip arrows
+    but the underlying scope_avg should still match the avg endpoint."""
     chip_avg = envelope_scope_avg(env)
     if not near(chip_avg, displayed):
         return Failure(test, scope, team, metric,
