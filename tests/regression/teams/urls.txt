@@ -49,14 +49,14 @@ NEW team_fielding_by_season_india     /api/v1/teams/India/fielding/by-season?gen
 REG team_fielding_top_fielders_india  /api/v1/teams/India/fielding/top-fielders?gender=male&team_type=international&limit=5
 
 # ── Partnerships ─────────────────────────────────────────────────
-NEW team_partnerships_summary_india   /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=batting
-NEW team_partnerships_by_wicket_india /api/v1/teams/India/partnerships/by-wicket?gender=male&team_type=international&side=batting
+REG team_partnerships_summary_india   /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=batting
+REG team_partnerships_by_wicket_india /api/v1/teams/India/partnerships/by-wicket?gender=male&team_type=international&side=batting
 REG team_partnerships_best_pairs_ind  /api/v1/teams/India/partnerships/best-pairs?gender=male&team_type=international&side=batting
 REG team_partnerships_heatmap_india   /api/v1/teams/India/partnerships/heatmap?gender=male&team_type=international&side=batting
 REG team_partnerships_top_india       /api/v1/teams/India/partnerships/top?gender=male&team_type=international&side=batting&limit=5
 
 # ── bowling-side partnerships (against the team) ────────────────
-NEW team_partnerships_bowling_summary /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=bowling
+REG team_partnerships_bowling_summary /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=bowling
 
 # ── club-team variant (Mumbai Indians) ───────────────────────────
 # tournament=IPL pre-set → scope_to_team is no-op for Commit 3 → REG.
