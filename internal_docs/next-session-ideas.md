@@ -1,39 +1,87 @@
-# Next-session ideas — scoped-slots compare, then H2H + cross-tab audit
+# Next-session ideas — DOM-test rollout, then series_type FilterBar promotion
 
 > **NO DEPLOYS gate is OFF** as of 2026-04-21. Resume normal deploy
 > cadence.
 
 ## NEXT SESSION — top of queue (2026-04-28+)
 
-Two build-ready specs in the locked order below. Don't reorder —
-spec (e) explicitly assumes spec (d) has shipped, so the FilterBar
-promotion has to come first.
+`spec-filterbar-team-class-v3.md` shipped 2026-04-28 in 5 commits
+(`a0773e5` … `87ad937`). v3's full ship report lives in
+`enhancements-roadmap.md` "Shipped 2026-04-28". Top of queue now:
 
-### Step 1 — `spec-filterbar-team-class.md` (full-member on FilterBar)
+### Step 1 — `spec-dom-tests-series-teams.md` Batch 1 (NOW UNBLOCKED)
 
-`internal_docs/spec-filterbar-team-class.md` (294 lines, build-ready).
+`internal_docs/spec-dom-tests-series-teams.md` (228 lines). 4
+scripts to prove the lifted `_lib.sh` harness works. Anchor URLs
+already assumed team_class v3 had shipped — they're now valid.
 
-Promote `team_class=full_member` from per-slot avg-picker control
-to the 9th FilterBar key. Three-commit rollout in the spec:
+- `teams_compare_intl_fm.sh` — Aus / FM avg / Ind 2024-25 grid
+  (closely mirrors `tests/integration/compare_avg_chips.sh`
+  Anchor E1 which v3 already added; the DOM-test version will be
+  the canonical home).
+- `teams_compare_club.sh` — RCB + SRH IPL 2025 unchanged.
+- `teams_match_list_intl_fm.sh` — Aus 22→16 visible end-to-end.
+- `series_landing_intl_fm.sh` — tile counts narrow correctly.
 
-1. Backend move: `AuxParams.team_class` → `FilterBarParams.team_class`;
-   `_league_aux` drops the propagation step (`filters.build()` covers
-   both sides); `is_precomputed_scope` gates on `filters.team_class`.
-2. Frontend: `FILTER_KEYS` extended; intl-only toggle pill on the
-   FilterBar; auto-clear on team_type change; status-strip render.
-3. Tests: re-derive ground truth with subagent (Aus 22→16, India
-   34→31 when filter is on); update `tests/sanity/test_avg_baseline_numbers.py`
-   + `test_chip_direction_invariant.py` matrix; add browser-agent
-   integration scripts; flip regression URLs REG↔NEW twice (once
-   to NEW for the shape change, once back to REG once stable in
-   HEAD — same dance as the 2026-04-27 batch).
+Then Batch 2 (10 scripts) + Batch 3 (31 + cross-cutting) per the
+spec.
 
-The existing `tests/integration/compare_avg_chips.sh` MUST be
-re-grounded against new numbers — its current Aus/India anchors
-become wrong once team_class is on the FilterBar (they currently
-assume team-side data is NOT narrowed by team_class).
+Hard rule for every script: ground truth comes from a subagent
+that did NOT read `api/` or `tests/sanity/` (gold-standard) OR a
+committed `audit/<script>.sql` SQL file. NEVER copy expected
+numbers from the running API.
 
-### Step 2 — `spec-dom-tests-series-teams.md` (45 DOM-test scripts)
+### Step 2 — Sibling specs (NOT YET WRITTEN — write before building)
+
+These were parked during the v3 audit (2026-04-28). Each is its
+own session-scale piece of work.
+
+- **`spec-filterbar-series-type.md`** — promote `series_type` from
+  AuxParams to FilterBarParams the same way team_class went. Same
+  shape: a one-line `useCompareSlots` change (already plumbed in
+  inheritedScope), backend defensive gate, frontend pill widget,
+  ~125 NEW regression URLs, 22-surface integration matrix.
+  Estimated ~11h. Write the spec by reading
+  `spec-filterbar-team-class-v3.md` and substituting `series_type`
+  for `team_class` (mostly mechanical).
+- **`spec-slot-override-chip-alignment.md`** — addresses TWO real
+  but parked findings from the v3 audit that affect EVERY
+  overridable axis (not just team_class):
+  1. **Override-to-empty URL serialization.** `useUrlParam`
+     deletes params on falsy values, so a slot can't explicitly
+     "override to (none)" while inheriting a non-empty primary.
+     E.g.: with FilterBar `team_class=fm`, a user can't pin one
+     compare slot's avg to "unbounded baseline regardless." Same
+     limitation applies to `tournament` / `season_from` /
+     `filter_venue` / `series_type` overrides. Needs a sentinel
+     value (e.g. `__any__`) decoded at the read site.
+  2. **Chip alignment under bidirectional override.** Today
+     `chip_team_class` (and friends) can NARROW the league
+     baseline (Mode B). They cannot BROADEN it. If a user sets the
+     avg slot to differ from primary by REMOVING a narrowing
+     (e.g. primary has tournament=IPL, avg slot has tournament=''
+     for all-club), the chip on the team col baselines against
+     primary's narrowing while the avg col displays the broader
+     pool — chip math contradicts the displayed avg-col number.
+     Generalised fix: compute league-side baseline using slot's
+     resolved scope, not the request's filters.
+
+  Recommended order: write `spec-filterbar-series-type.md` FIRST
+  (smaller, mechanical). The slot-override-chip-alignment spec
+  unblocks broader expressiveness on Compare and is more
+  ambitious — a proper architectural fix to the override model.
+
+### Step 3 — Optional commit-6 follow-up
+
+After 1–2 weeks of stable HEAD on the v3 commits, flip the 121
+NEW intl-FM regression URLs added in commit 4 (`65698ff`) to REG
+so they become permanent guardrails. One commit, no shape change.
+The `tests/regression/run.sh` runner currently flags these as
+"NEW unchanged" because they're additive (no code-side patch);
+flipping to REG matches the runner's design and stops the
+suspicious-on-zero-NEW-changed exit-1.
+
+### Step 3.5 (deferred — long-term refactor) — Compare-grid CSS subgrid
 
 `internal_docs/spec-dom-tests-series-teams.md` (228 lines, build-
 ready). The umbrella convention is in
@@ -68,7 +116,7 @@ numbers from the running API.
   material — no implementation. Read it before starting Batch 1
   so the per-script structure is consistent.
 
-### Step 3 (deferred — long-term refactor) — Compare-grid CSS subgrid
+### Step 4 (deferred — long-term refactor) — Compare-grid CSS subgrid
 
 Today the Compare grid uses three independent column blocks; alignment
 across columns is forced by reserving fixed `min-height` on the column
