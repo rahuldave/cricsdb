@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type {
   TeamProfile, ScopeAverageProfile,
   MetricEnvelope,
@@ -86,10 +87,29 @@ function isTeamSide(profile: TeamProfile | ScopeAverageProfile, side: 'batting' 
   return f != null && typeof f !== 'number'  // envelope = team side
 }
 
+// 3 phase bands: powerplay, middle, death. Constant — fixed by the
+// game's structure. Used as the subgrid row span so the dl reserves
+// 3 tracks of the parent grid even when this column is in placeholder
+// mode (returns an empty dl that still occupies the 3 rows so the
+// next discipline's rows align across columns).
+const PHASE_BAND_ROWS = 3
+
+const PHASE_BAND_SUBGRID_STYLE: CSSProperties = {
+  display: 'grid',
+  gridTemplateRows: 'subgrid',
+  gridRow: `span ${PHASE_BAND_ROWS}`,
+}
+
 export default function PhaseBandsRow({ profile, discipline, placeholder = false }: Props) {
-  if (placeholder) return null
+  if (placeholder) {
+    // Empty subgrid still reserves 3 row tracks so other columns'
+    // phase rows + everything below stays row-aligned.
+    return <dl className="wisden-player-compact wisden-phase-bands" style={PHASE_BAND_SUBGRID_STYLE} />
+  }
   const phases = extractPhases(profile, discipline)
-  if (!phases || phases.length === 0) return null
+  if (!phases || phases.length === 0) {
+    return <dl className="wisden-player-compact wisden-phase-bands" style={PHASE_BAND_SUBGRID_STYLE} />
+  }
 
   const ORDER = ['powerplay', 'middle', 'death']
   const sorted = [...phases].sort(
@@ -103,7 +123,10 @@ export default function PhaseBandsRow({ profile, discipline, placeholder = false
   const innings = innsCount(profile, discipline)
 
   return (
-    <dl className="wisden-player-compact wisden-phase-bands">
+    <dl
+      className="wisden-player-compact wisden-phase-bands"
+      style={PHASE_BAND_SUBGRID_STYLE}
+    >
       {sorted.map(p => {
         const label = PHASE_LABEL[p.phase] ?? p.phase
         if (discipline === 'batting') {

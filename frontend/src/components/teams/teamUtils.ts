@@ -3,6 +3,36 @@ import type { FilterParams, TeamProfile, ScopeAverageProfile } from '../../types
 export type TeamDiscipline =
   | 'results' | 'batting' | 'bowling' | 'fielding' | 'partnerships'
 
+/** Stat rows rendered by TeamSummaryRow / AvgSummaryRow per discipline.
+ *  This MUST stay in sync with the `statsFor` arrays in those two
+ *  files (kept identical so column rows align). Used by the parent
+ *  grid + each section's subgrid to declare row spans correctly. */
+export const STAT_ROWS_BY_DISCIPLINE: Record<TeamDiscipline, number> = {
+  results:      5,  // Matches, W, L, Win %, Toss won %
+  batting:      5,  // Run rate, Boundary %, Avg 1st-inn, Highest, 100s + 50s
+  bowling:      6,  // Economy, SR, Dot %, Avg opp. total, Wickets, Wickets/inn
+  fielding:     6,  // Catches, Catches/inn, Stumpings, Stumpings/inn, Run-outs, Run-outs/inn
+  partnerships: 7,  // Highest, 50+, 50+/inn, 100+, 100+/inn, Avg, Best pair
+}
+
+/** Phase-band rows — only batting + bowling carry these (PP, Mid, Death). */
+export const PHASE_BAND_ROWS = 3
+
+/** By-wicket rows — only partnerships (1st .. 10th wkt). */
+export const BY_WICKET_ROWS = 10
+
+/** Total parent-grid row tracks per visible discipline:
+ *  section-head + stat rows + phase bands (batting/bowling) + by-wicket
+ *  (partnerships). The TeamCompareGrid sums these to compute the parent
+ *  grid's `gridTemplateRows`. */
+export const DISCIPLINE_TOTAL_ROWS: Record<TeamDiscipline, number> = {
+  results:      1 + STAT_ROWS_BY_DISCIPLINE.results,                          // 6
+  batting:      1 + STAT_ROWS_BY_DISCIPLINE.batting + PHASE_BAND_ROWS,        // 9
+  bowling:      1 + STAT_ROWS_BY_DISCIPLINE.bowling + PHASE_BAND_ROWS,        // 10
+  fielding:     1 + STAT_ROWS_BY_DISCIPLINE.fielding,                         // 7
+  partnerships: 1 + STAT_ROWS_BY_DISCIPLINE.partnerships + BY_WICKET_ROWS,    // 18
+}
+
 /** Each discipline's "has meaningful data in scope" gate. Drives both
  *  per-column band visibility and the grid-wide anyHasData mask.
  *  Reads `.value` off the envelope. */

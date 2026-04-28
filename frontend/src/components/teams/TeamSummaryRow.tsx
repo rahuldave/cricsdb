@@ -1,7 +1,11 @@
 import { Link } from 'react-router-dom'
 import type { FilterParams, MetricEnvelope, TeamProfile } from '../../types'
 import MetricDelta from '../MetricDelta'
-import { carryTeamFilters, type TeamDiscipline } from './teamUtils'
+import {
+  carryTeamFilters,
+  STAT_ROWS_BY_DISCIPLINE,
+  type TeamDiscipline,
+} from './teamUtils'
 
 interface Props {
   discipline: TeamDiscipline
@@ -37,14 +41,13 @@ const LABEL: Record<TeamDiscipline, string> = {
   partnerships: 'PARTNERSHIPS',
 }
 
-// Tooltip on the compact "(open ↗)" link — full description without
-// the screen real estate. The link text itself is intentionally short
-// so the section header stays on ONE line in every column at the
-// 13rem mobile column floor; if it wraps, the team col's section-head
-// becomes 2 lines tall and the avg col stays 1 line, which misaligns
-// inner values within each section (subgrid aligns section boxes,
-// not their internal content row-by-row). See iPhone-13 regression
-// caught 2026-04-27.
+// Tooltip on the "(open ↗)" link — full description in the title
+// attribute keeps the inline link text short. Replacing the older
+// "→ Open Bowling tab" text avoided the link wrapping to a 2nd line
+// at narrow widths (which used to push asymmetric heights between
+// team col + avg col). With nested subgrid every row pins to a real
+// grid track so the wrap risk is gone — short text is now just an
+// aesthetic preference, not load-bearing.
 const OPEN_TITLE: Record<TeamDiscipline, string> = {
   results:      'Open team page',
   batting:      'Open Batting tab',
@@ -69,8 +72,23 @@ export default function TeamSummaryRow({
   if (tab) qs.set('tab', tab)
   const deepLink = `/teams?${qs}`
 
+  // Section is a subgrid spanning (1 + statRows) tracks of the parent
+  // (.wisden-compare-col, which is itself a subgrid spanning all the
+  // top grid's tracks). The section-head takes track 1; the dl spans
+  // the remaining tracks for the discipline's stat rows. Net: every
+  // row aligns natively across columns.
+  const statRows = STAT_ROWS_BY_DISCIPLINE[discipline]
+  const sectionRows = 1 + statRows
+
   return (
-    <section className="wisden-player-section">
+    <section
+      className="wisden-player-section"
+      style={{
+        display: 'grid',
+        gridTemplateRows: 'subgrid',
+        gridRow: `span ${sectionRows}`,
+      }}
+    >
       <div className="wisden-player-section-head">
         <h3 className="wisden-player-section-label">{LABEL[discipline]}</h3>
         {!placeholder && (
@@ -83,36 +101,45 @@ export default function TeamSummaryRow({
           </Link>
         )}
       </div>
-      {placeholder
-        ? <div className="wisden-empty-compare">— no {discipline} in scope —</div>
-        : renderStats(discipline, profile)}
+      {placeholder ? (
+        <div
+          className="wisden-empty-compare"
+          style={{ gridRow: `span ${statRows}` }}
+        >
+          — no {discipline} in scope —
+        </div>
+      ) : (
+        renderStats(discipline, profile, statRows)
+      )}
     </section>
   )
 }
 
-function renderStats(discipline: TeamDiscipline, profile: TeamProfile) {
+function renderStats(
+  discipline: TeamDiscipline,
+  profile: TeamProfile,
+  statRows: number,
+) {
   const stats = statsFor(discipline, profile)
   if (!stats) return null
   return (
-    <dl className="wisden-player-compact">
-      {stats.map(([label, value, env]) => {
-        // "Best pair" carries a pair name that wraps unpredictably on
-        // narrow viewports — force a stacked layout so the avg col
-        // (whose pair value is always a placeholder) can match.
-        const stacked = label === 'Best pair'
-        const cls = stacked
-          ? 'wisden-player-compact-row is-stacked'
-          : 'wisden-player-compact-row'
-        return (
-          <div key={label} className={cls}>
-            <dt>{label}</dt>
-            <dd className="num">
-              {value}
-              <DeltaChip env={env} />
-            </dd>
-          </div>
-        )
-      })}
+    <dl
+      className="wisden-player-compact"
+      style={{
+        display: 'grid',
+        gridTemplateRows: 'subgrid',
+        gridRow: `span ${statRows}`,
+      }}
+    >
+      {stats.map(([label, value, env]) => (
+        <div key={label} className="wisden-player-compact-row">
+          <dt>{label}</dt>
+          <dd className="num">
+            {value}
+            <DeltaChip env={env} />
+          </dd>
+        </div>
+      ))}
     </dl>
   )
 }

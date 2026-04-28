@@ -1,5 +1,5 @@
 import type { ScopeAverageProfile } from '../../types'
-import type { TeamDiscipline } from './teamUtils'
+import { STAT_ROWS_BY_DISCIPLINE, type TeamDiscipline } from './teamUtils'
 
 interface Props {
   discipline: TeamDiscipline
@@ -21,51 +21,63 @@ const LABEL: Record<TeamDiscipline, string> = {
 export default function AvgSummaryRow({
   discipline, profile, placeholder = false,
 }: Props) {
+  // Same subgrid shape as TeamSummaryRow — section spans (1+statRows)
+  // tracks; the dl spans statRows. The avg col's section-head doesn't
+  // render the "(open ↗)" link (no team page exists for "average team")
+  // but the row track is sized to the parent grid's natural max content
+  // height across columns, so the team col's link line determines the
+  // shared row height. No height-matching hacks needed.
+  const statRows = STAT_ROWS_BY_DISCIPLINE[discipline]
+  const sectionRows = 1 + statRows
+
   return (
-    <section className="wisden-player-section">
+    <section
+      className="wisden-player-section"
+      style={{
+        display: 'grid',
+        gridTemplateRows: 'subgrid',
+        gridRow: `span ${sectionRows}`,
+      }}
+    >
       <div className="wisden-player-section-head">
         <h3 className="wisden-player-section-label">{LABEL[discipline]}</h3>
-        {/* Hidden placeholder so the section-head's intrinsic height
-            matches the team col's (which has a real "(open ↗)" link
-            here at 0.85rem). Without this the avg col's head is ~4px
-            shorter and the differential bubbles down to inner stat
-            rows — which subgrid does NOT correct for, since it
-            aligns section BOXES not individual children inside them.
-            aria-hidden + tabIndex=-1 keep it out of AT/keyboard. */}
-        <span
-          aria-hidden="true"
-          className="wisden-player-section-link"
-          style={{ visibility: 'hidden' }}
-        >
-          (open ↗)
-        </span>
       </div>
-      {placeholder
-        ? <div className="wisden-empty-compare">— no {discipline} in scope —</div>
-        : renderStats(discipline, profile)}
+      {placeholder ? (
+        <div
+          className="wisden-empty-compare"
+          style={{ gridRow: `span ${statRows}` }}
+        >
+          — no {discipline} in scope —
+        </div>
+      ) : (
+        renderStats(discipline, profile, statRows)
+      )}
     </section>
   )
 }
 
-function renderStats(discipline: TeamDiscipline, profile: ScopeAverageProfile) {
+function renderStats(
+  discipline: TeamDiscipline,
+  profile: ScopeAverageProfile,
+  statRows: number,
+) {
   const stats = statsFor(discipline, profile)
   if (!stats) return null
   return (
-    <dl className="wisden-player-compact">
-      {stats.map(([label, value]) => {
-        // Match TeamSummaryRow — Best pair stacks label / value so
-        // both cols' rows are 2 lines tall regardless of column width.
-        const stacked = label === 'Best pair'
-        const cls = stacked
-          ? 'wisden-player-compact-row is-stacked'
-          : 'wisden-player-compact-row'
-        return (
-          <div key={label} className={cls}>
-            <dt>{label}</dt>
-            <dd className="num">{value}</dd>
-          </div>
-        )
-      })}
+    <dl
+      className="wisden-player-compact"
+      style={{
+        display: 'grid',
+        gridTemplateRows: 'subgrid',
+        gridRow: `span ${statRows}`,
+      }}
+    >
+      {stats.map(([label, value]) => (
+        <div key={label} className="wisden-player-compact-row">
+          <dt>{label}</dt>
+          <dd className="num">{value}</dd>
+        </div>
+      ))}
     </dl>
   )
 }

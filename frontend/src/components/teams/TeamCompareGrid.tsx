@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
 import FlagBadge from '../FlagBadge'
 import Spinner from '../Spinner'
@@ -14,6 +14,7 @@ import SlotScopeEditor from './SlotScopeEditor'
 import {
   teamDisciplineHasData, teamMatchesInScope, carryTeamFilters,
   avgDisciplineHasData, scopeAvgLabel,
+  DISCIPLINE_TOTAL_ROWS,
   type TeamDiscipline,
 } from './teamUtils'
 import { useFetch, type FetchState } from '../../hooks/useFetch'
@@ -184,13 +185,23 @@ export default function TeamCompareGrid({
 
   const totalColumns = renderColumns.length
 
-  // Subgrid row count = 4 fixed rows (col-head, chip-area, editor-row,
-  // identity) + one row per visible discipline. Parent grid declares
-  // these tracks explicitly so each column's `grid-row: 1 / -1` (in
-  // .wisden-compare-col) resolves to the full set, and per-column
-  // subgrids align their children into the same row tracks.
-  const visibleDisciplines = DISCIPLINES.filter(d => anyHasData[d]).length
-  const totalRows = 4 + visibleDisciplines
+  // Nested subgrid row count: every individual row that needs to align
+  // across columns is one parent grid track. Per-discipline counts:
+  //   results:      6 = section-head + 5 stat rows
+  //   batting:      9 = section-head + 5 stat rows + 3 phase rows
+  //   bowling:     10 = section-head + 6 stat rows + 3 phase rows
+  //   fielding:     7 = section-head + 6 stat rows
+  //   partnerships: 18 = section-head + 7 stat rows + 10 by-wicket rows
+  // Plus 4 fixed top-level rows (col-head, chip-area, editor-row,
+  // identity). The TeamSummaryRow / AvgSummaryRow / PhaseBandsRow /
+  // PartnershipByWicketRows components each declare their own grid-row
+  // span via inline style, and their inner dls are subgrids over the
+  // stat rows. Result: every row natively pins across columns; no
+  // min-height / pixel-hack patches needed for alignment.
+  const visibleDisciplineRows = DISCIPLINES
+    .filter(d => anyHasData[d])
+    .reduce((s, d) => s + DISCIPLINE_TOTAL_ROWS[d], 0)
+  const totalRows = 4 + visibleDisciplineRows
 
   const handleRemove = (slot: SlotState, isPrimary: boolean) => {
     if (isPrimary) onClearPrimary()
@@ -444,13 +455,18 @@ function CompareSlotColumn({
         {matches === 0 && <em>no matches in scope</em>}
       </div>
 
+      {/* Each visible discipline contributes its rows AS DIRECT SIBLINGS
+       *  of the column subgrid (no wrapper div) so each section,
+       *  phase-band dl, and by-wicket dl is its own subgrid item with
+       *  an explicit `grid-row: span N`. Fragment keeps React happy
+       *  with the per-discipline key without adding a layout box. */}
       {DISCIPLINES.map(d => {
         if (!anyHasData[d]) return null
         const has = disciplineHasData(slot, profile, d)
         if (isTeam) {
           const tp = profile as TeamProfile
           return (
-            <div key={d}>
+            <Fragment key={d}>
               <TeamSummaryRow
                 discipline={d}
                 profile={tp}
@@ -464,12 +480,12 @@ function CompareSlotColumn({
               {d === 'partnerships' && (
                 <PartnershipByWicketRows profile={tp} placeholder={!has} />
               )}
-            </div>
+            </Fragment>
           )
         }
         const ap = profile as ScopeAverageProfile
         return (
-          <div key={d}>
+          <Fragment key={d}>
             <AvgSummaryRow
               discipline={d}
               profile={ap}
@@ -485,7 +501,7 @@ function CompareSlotColumn({
                 placeholder={!has}
               />
             )}
-          </div>
+          </Fragment>
         )
       })}
     </div>

@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type {
   TeamProfile, ScopeAverageProfile,
   MetricEnvelope,
@@ -48,12 +49,29 @@ const ORDINAL: Record<number, string> = {
   6: '6th', 7: '7th', 8: '8th', 9: '9th', 10: '10th',
 }
 
+// 10 wickets per innings is fixed by the rules of cricket. Used as
+// the subgrid row span so the dl reserves 10 tracks of the parent
+// grid in EVERY column — including placeholder cols, which return an
+// empty dl that still occupies all 10 row tracks so subsequent rows
+// (none, since this is the last section) stay row-aligned.
+const BY_WICKET_ROWS = 10
+
+const BY_WICKET_SUBGRID_STYLE: CSSProperties = {
+  display: 'grid',
+  gridTemplateRows: 'subgrid',
+  gridRow: `span ${BY_WICKET_ROWS}`,
+}
+
 export default function PartnershipByWicketRows({
   profile, isAverage: _isAverage = false, placeholder = false,
 }: Props) {
-  if (placeholder) return null
+  if (placeholder) {
+    return <dl className="wisden-player-compact wisden-partnership-wickets" style={BY_WICKET_SUBGRID_STYLE} />
+  }
   const rows = getRows(profile)
-  if (!rows || rows.length === 0) return null
+  if (!rows || rows.length === 0) {
+    return <dl className="wisden-player-compact wisden-partnership-wickets" style={BY_WICKET_SUBGRID_STYLE} />
+  }
 
   // Per-innings divisor for `· n` substat (team side; avg side
   // already comes through per-innings post-Commit 2). Source:
@@ -73,7 +91,10 @@ export default function PartnershipByWicketRows({
   const sorted = [...rows].sort((a, b) => a.wicket_number - b.wicket_number)
 
   return (
-    <dl className="wisden-player-compact wisden-partnership-wickets">
+    <dl
+      className="wisden-player-compact wisden-partnership-wickets"
+      style={BY_WICKET_SUBGRID_STYLE}
+    >
       {sorted.map(r => {
         const wn = r.wicket_number
         const label = ORDINAL[wn] ?? `${wn}th`

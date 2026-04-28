@@ -248,6 +248,51 @@ This rule overrides the "just make it work" instinct. A parallel
 helper that works in the current call-site is a liability at every
 call-site that follows.
 
+## No CSS-pixel shortcuts when a structural fix exists
+
+**When a layout problem has a clean structural solution — CSS Grid /
+subgrid for cross-column row alignment, semantic flex for inline
+content, baseline grids for typography — use the structural fix even
+if a `min-height: 4.6rem` / `padding-top: 12px` hack would land in 30
+minutes.** Pixel hacks are tuned to one viewport width, one chip
+density, one font-stack. The next content change (a new metric, a
+longer chip, a different season span) shifts the magic number and
+the layout breaks.
+
+**The Compare-grid lesson (2026-04-27):** chasing per-row alignment
+across columns with `min-height` + `flex-wrap` + invisible
+placeholders + `is-stacked` modifiers cost 6 commits, three rounds
+of "still drifting" feedback, and accumulated ~40 lines of CSS
+band-aids. The proper fix was nested CSS subgrid down to the
+individual stat row — every row a real grid track, sized natively
+to the max content height across columns. ~50 lines of refactor,
+zero magic numbers, ages with content changes for free.
+
+**Tells that you're about to take a shortcut:**
+
+- You're typing `min-height` because "the team col wraps to 2 lines
+  but the avg col fits on 1." → That's a subgrid problem. Make both
+  cells the same grid track and let it size to max content.
+- You're adding `padding-top` to push one element down to match
+  another. → They should be in the same row of a grid.
+- You're using `position: absolute` to overlay something to dodge
+  a sibling's height. → The sibling should be in a separate grid
+  track (or a different DOM ancestor).
+- You're computing pixel values from observed measurements
+  ("agent measured 73px, so I'll use 4.6rem"). → Subgrid would
+  size to 73px without you needing to know the number.
+
+**When the shortcut is genuinely correct:** sub-pixel rounding
+(e.g. `transform: translateY(-1px)` to fix a 0.5px gap), aspect-
+ratio reservation for an image whose dimensions are known at
+build time, padding for visual polish that's not load-bearing for
+alignment. These are *cosmetic* uses; they don't carry alignment
+correctness on their backs.
+
+User feedback that drove this rule (2026-04-27): "shouldn't a grid
+not have this problem?" — yes. If the answer to that question is
+"in principle yes but I took a shortcut," refactor.
+
 ## Performance notes
 
 - **Leaderboard landings** (Batting / Bowling / Fielding) depend on two composite covering indexes (`ix_delivery_batter_agg`, `ix_delivery_bowler_agg`) plus fresh `ANALYZE` stats. These are created idempotently by both `import_data.py` and `update_recent.py`. See **`internal_docs/perf-leaderboards.md`** for the diagnosis and the reusable pattern: use `filters.build(has_innings_join=False)` to get a pure match clause, then conditionally drop the innings/match JOINs entirely when no filters are active (avoids 2.95M × 2 PK probes on the delivery scan).
