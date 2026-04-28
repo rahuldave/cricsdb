@@ -83,18 +83,26 @@ IPL_2025 = dict(gender="male", team_type="club",
 
 # ─── Ground truth (pinned 2026-04-28) ─────────────────────────────────
 GROUND_TRUTH = {
-    "A1": 870, "A2": 140,
-    "A3": 22,  "A4": 16,
-    "A5": 34,  "A6": 31,
-    "A7": 17,  "A8": 0,
-    "A13": 44, "A14": 16,
+    # A1, A2, A13, A14, A17, A18, D1, D2, Bp4: avg-col matches via
+    # /scope/averages/summary — PER-TEAM averages post 2026-04-28
+    # per-team transform (spec-avg-col-per-team-transform.md). Pool
+    # implied: per_team × unique_teams ÷ 2.
+    "A1": 17.4,    # 870 × 2 / 100 unique teams
+    "A2": 25.45,   # 140 × 2 / 11 unique FM teams
+    "A3": 22, "A4": 16,    # team-side raw counts (unchanged)
+    "A5": 34, "A6": 31,
+    "A7": 17, "A8": 0,
+    "A13": 4.63,   # 44 × 2 / 19 unique teams in T20 WC
+    "A14": 3.2,    # 16 × 2 / 10 unique FM teams in T20 WC
     "A15a": 1, "A15b": 1,
     "A16a": 0, "A16b": 0,
-    "A17": 1,  "A18": 1,
+    "A17": 1.0, "A18": 1.0,  # Wankhede 1 match × 2 / 2 teams = 1.0
     "C1": 9.92, "C2": 9.82,
     "C3": 7.52, "C4": 8.50,
-    "D1": 596, "D2": 97,
-    "Bp1": 15, "Bp3": 14, "Bp4": 74,
+    "D1": 14.54,   # 596 × 2 / 82 unique women's teams
+    "D2": 17.64,   # 97  × 2 / 11 unique women's FM teams
+    "Bp1": 15, "Bp3": 14,
+    "Bp4": 14.8,   # 74 IPL 2025 matches × 2 / 10 IPL teams
 }
 
 
@@ -247,10 +255,10 @@ async def main():
     print("─── AXIS A: match counts (SQL-vs-API via summary endpoints) ───")
     expect("A1 men_intl 24-25 unbounded",
            await matches_via_scope_summary(INTL_24_25_M),
-           GROUND_TRUTH["A1"], failures)
+           GROUND_TRUTH["A1"], failures, fuzzy=True)
     expect("A2 men_intl 24-25 FM",
            await matches_via_scope_summary({**INTL_24_25_M, "team_class": "full_member"}),
-           GROUND_TRUTH["A2"], failures)
+           GROUND_TRUTH["A2"], failures, fuzzy=True)
     expect("A3 Aus unbounded",
            await matches_via_team_summary(INTL_24_25_M, "Australia"),
            GROUND_TRUTH["A3"], failures)
@@ -272,11 +280,11 @@ async def main():
 
     expect("A13 T20 WC (Men) unbounded",
            await matches_via_scope_summary({**INTL_24_25_M, "tournament": "T20 World Cup (Men)"}),
-           GROUND_TRUTH["A13"], failures)
+           GROUND_TRUTH["A13"], failures, fuzzy=True)
     expect("A14 T20 WC (Men) FM",
            await matches_via_scope_summary({**INTL_24_25_M, "tournament": "T20 World Cup (Men)",
                                              "team_class": "full_member"}),
-           GROUND_TRUTH["A14"], failures)
+           GROUND_TRUTH["A14"], failures, fuzzy=True)
 
     # Rivalries — measured via team_summary with filter_opponent set.
     expect("A15a Ind-Aus unbounded",
@@ -296,11 +304,11 @@ async def main():
 
     expect("A17 Wankhede intl unbounded",
            await matches_via_scope_summary({**INTL_24_25_M, "filter_venue": "Wankhede Stadium"}),
-           GROUND_TRUTH["A17"], failures)
+           GROUND_TRUTH["A17"], failures, fuzzy=True)
     expect("A18 Wankhede intl FM",
            await matches_via_scope_summary({**INTL_24_25_M, "filter_venue": "Wankhede Stadium",
                                              "team_class": "full_member"}),
-           GROUND_TRUTH["A18"], failures)
+           GROUND_TRUTH["A18"], failures, fuzzy=True)
 
     print()
     print("─── AXIS C: chip baselines (run rates) ───")
@@ -321,10 +329,10 @@ async def main():
     print("─── AXIS D: women's intl symmetry ───")
     expect("D1 women_intl 24-25 unbounded",
            await matches_via_scope_summary(INTL_24_25_W),
-           GROUND_TRUTH["D1"], failures)
+           GROUND_TRUTH["D1"], failures, fuzzy=True)
     expect("D2 women_intl 24-25 FM",
            await matches_via_scope_summary({**INTL_24_25_W, "team_class": "full_member"}),
-           GROUND_TRUTH["D2"], failures)
+           GROUND_TRUTH["D2"], failures, fuzzy=True)
 
     print()
     print("─── B-prime: club no-op (DEFENSIVE GATE PROOF) ───")
@@ -342,9 +350,9 @@ async def main():
     expect("Bp3 SRH IPL 2025 (control)",
            await matches_via_team_summary(IPL_2025, "Sunrisers Hyderabad"),
            GROUND_TRUTH["Bp3"], failures)
-    expect("Bp4 IPL 2025 total",
+    expect("Bp4 IPL 2025 per-team avg",
            await matches_via_scope_summary(IPL_2025),
-           GROUND_TRUTH["Bp4"], failures)
+           GROUND_TRUTH["Bp4"], failures, fuzzy=True)
 
     print()
     print("─── AXIS B: top-10 lists (SQL-direct) ───")

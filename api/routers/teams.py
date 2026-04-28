@@ -218,14 +218,41 @@ async def team_summary(
         scope_params,
     )
     sr = scope_rows[0] if scope_rows else {}
-    s_matches = sr.get("matches", 0) or 0
-    s_decided = sr.get("decided", 0) or 0
-    s_bf = sr.get("bat_first_wins", 0) or 0
-    s_ff = sr.get("field_first_wins", 0) or 0
-    # Scope-avg win_pct collapses to ~50% by construction (every win
-    # is some team's loss). Render as the bat-first share — the
-    # informative league signal.
-    s_win_pct = round(s_bf * 100 / s_decided, 1) if s_decided > 0 else None
+    # Pool totals from the scope query — keep as raw for downstream
+    # per-team transform. Each scope_avg in the envelope must be a
+    # PER-TEAM average so the displayed avg col + chip baseline align
+    # with what a typical team actually has (not the pool total).
+    # See internal_docs/spec-avg-col-per-team-transform.md.
+    pool_matches    = sr.get("matches", 0) or 0
+    pool_decided    = sr.get("decided", 0) or 0
+    pool_ties       = sr.get("ties", 0) or 0
+    pool_no_results = sr.get("no_results", 0) or 0
+    pool_toss_dec   = sr.get("toss_decided", 0) or 0
+    pool_bf         = sr.get("bat_first_wins", 0) or 0
+    pool_ff         = sr.get("field_first_wins", 0) or 0
+
+    unique_teams = await _unique_teams_in_scope(filters, aux)
+
+    def _per_team_one(v):
+        return round(v / unique_teams, 2) if unique_teams else None
+
+    def _per_team_two(v):
+        return round(v * 2 / unique_teams, 2) if unique_teams else None
+
+    s_matches    = _per_team_two(pool_matches)
+    s_decided    = _per_team_one(pool_decided)
+    s_ties       = _per_team_two(pool_ties)
+    s_no_results = _per_team_two(pool_no_results)
+    s_toss_dec   = _per_team_one(pool_toss_dec)
+    s_bf         = _per_team_one(pool_bf)
+    s_ff         = _per_team_one(pool_ff)
+    # True per-team avg win_pct = total decided wins / total team-
+    # matches × 100. Replaces the prior bat_first_win_pct substitution
+    # so chip values land in comparable per-team space.
+    s_win_pct = (
+        round(pool_decided * 100 / (pool_matches * 2), 2)
+        if pool_matches > 0 else None
+    )
 
     # Gender breakdown — only when no gender filter is active. Lets the
     # frontend warn the user when a team has matches in both men's and
@@ -314,17 +341,22 @@ async def team_summary(
         if canon
     })
 
+    # Per-team-averaged scope_avg values land in each envelope. Pool
+    # totals (sr.*) are pre-divided into s_* above; team-side values
+    # (matches, wins, …) stay as raw counts for THIS team.
+    s_losses = s_decided  # every decided match has 1 loser, same per-team avg as wins
     return {
         "team": team,
         "matches":          wrap_metric(matches, s_matches, "matches", sample_size=s_matches),
-        "wins":             wrap_metric(wins, None, "wins", sample_size=matches),
-        "losses":           wrap_metric(row.get("losses", 0) or 0, None, "losses", sample_size=matches),
-        "ties":             wrap_metric(row.get("ties", 0) or 0, sr.get("ties", 0) or 0, "ties", sample_size=matches),
-        "no_results":       wrap_metric(row.get("no_results", 0) or 0, sr.get("no_results", 0) or 0, "no_results", sample_size=matches),
+        "wins":             wrap_metric(wins, s_decided, "wins", sample_size=matches),
+        "losses":           wrap_metric(row.get("losses", 0) or 0, s_losses, "losses", sample_size=matches),
+        "ties":             wrap_metric(row.get("ties", 0) or 0, s_ties, "ties", sample_size=matches),
+        "no_results":       wrap_metric(row.get("no_results", 0) or 0, s_no_results, "no_results", sample_size=matches),
         "win_pct":          wrap_metric(win_pct, s_win_pct, "win_pct", sample_size=matches),
-        "toss_wins":        wrap_metric(row.get("toss_wins", 0) or 0, sr.get("toss_decided", 0) or 0, "toss_wins", sample_size=matches),
+        "toss_wins":        wrap_metric(row.get("toss_wins", 0) or 0, s_toss_dec, "toss_wins", sample_size=matches),
         "bat_first_wins":   wrap_metric(row.get("bat_first_wins", 0) or 0, s_bf, "bat_first_wins", sample_size=matches),
         "field_first_wins": wrap_metric(row.get("field_first_wins", 0) or 0, s_ff, "field_first_wins", sample_size=matches),
+        "unique_teams_in_scope": unique_teams,
         "gender_breakdown": gender_breakdown,
         "keepers": keepers,
         "keeper_ambiguous_innings": keeper_ambiguous,
@@ -922,6 +954,97 @@ def _apply_partnerships_per_innings(d: dict, innings_batted: int) -> dict:
         if v is not None:
             d[k] = round(v / innings_batted, 2)
     return d
+
+
+# ── Per-team transform for RESULTS metrics ──────────────────────────
+#
+# Sibling of the per-INNINGS transform above. The team summary +
+# /scope/averages/summary endpoints return team-level results stats
+# (matches, wins, toss_wins, …). The displayed "average" column on
+# Compare must show what the typical team's value is — not the pool
+# total. Each match contributes 2 team-instances (each side plays it),
+# so per-team averages are `pool * mult / unique_teams_in_scope`.
+# Multiplier is 2 for metrics where each match generates 2 instances
+# (matches, ties, no_results — both sides share the outcome) and 1
+# for metrics where each match generates 1 instance (wins / losses /
+# toss_wins / bat_first_wins / field_first_wins — one team gets
+# attribution per match).
+#
+# `win_pct` for the league averaged across teams = total wins / total
+# team-matches × 100 = decided / (matches × 2) × 100. Algebraically:
+# every decided match contributes 1 win + 1 loss → 1 to the wins
+# numerator, 2 to the denominator across both sides. Coincidentally
+# close to bat_first_win_pct on small scopes but a distinct metric.
+
+RESULTS_COUNT_KEYS_TWO_INSTANCES = ("matches", "ties", "no_results")
+RESULTS_COUNT_KEYS_ONE_INSTANCE = (
+    "decided", "toss_decided", "bat_first_wins", "field_first_wins",
+)
+
+
+def _apply_results_per_team(d: dict, unique_teams: int) -> dict:
+    """Convert pool-level RESULTS counts to per-team averages.
+
+    Adds `win_pct` (true per-team avg, not bat-first share) and
+    `unique_teams_in_scope` (diagnostic). Leaves `bat_first_win_pct`
+    untouched (it's already a percentage, no per-team transform
+    applies — every match has one bat-first or field-first outcome,
+    not per-team).
+    """
+    matches_pool = d.get("matches") or 0
+    decided_pool = d.get("decided") or 0
+    if not unique_teams:
+        d["win_pct"] = None
+        d["unique_teams_in_scope"] = 0
+        return d
+    out = dict(d)
+    for k in RESULTS_COUNT_KEYS_TWO_INSTANCES:
+        v = out.get(k)
+        if v is not None:
+            out[k] = round(v * 2 / unique_teams, 2)
+    for k in RESULTS_COUNT_KEYS_ONE_INSTANCE:
+        v = out.get(k)
+        if v is not None:
+            out[k] = round(v / unique_teams, 2)
+    # True per-team avg win_pct uses POOL totals (decided_pool /
+    # (matches_pool × 2)), not the divided values above.
+    out["win_pct"] = (
+        round(decided_pool * 100 / (matches_pool * 2), 2)
+        if matches_pool > 0 else None
+    )
+    out["unique_teams_in_scope"] = unique_teams
+    return out
+
+
+async def _unique_teams_in_scope(filters: FilterParams, aux: AuxParams) -> int:
+    """Distinct number of teams (m.team1 ∪ m.team2) within the current
+    scope. Drops any filter_team narrowing the caller may have set so
+    the count reflects the full pool of teams the avg col baselines
+    against.
+    """
+    db = get_db()
+    saved_team = filters.team
+    filters.team = None
+    try:
+        where, params = filters.build(has_innings_join=False, aux=aux)
+    finally:
+        filters.team = saved_team
+    st_clause, st_params = _scope_to_team_clause(aux, filters)
+    if st_clause:
+        where = f"{where} AND {st_clause}" if where else st_clause
+        params.update(st_params)
+    where = where or "1=1"
+    rows = await db.q(
+        f"""
+        SELECT COUNT(DISTINCT t) AS n FROM (
+            SELECT m.team1 AS t FROM match m WHERE {where}
+            UNION
+            SELECT m.team2 FROM match m WHERE {where}
+        )
+        """,
+        params,
+    )
+    return (rows[0].get("n") if rows else 0) or 0
 
 
 def _league_aux(

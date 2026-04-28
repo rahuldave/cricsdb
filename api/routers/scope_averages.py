@@ -32,6 +32,7 @@ from .teams import (
     _team_innings_clause, _partnership_filter, _scope_to_team_clause, _safe_div,
     _apply_batting_per_innings, _apply_bowling_per_innings,
     _apply_fielding_per_innings, _apply_partnerships_per_innings,
+    _apply_results_per_team, _unique_teams_in_scope,
 )
 from .bucket_baseline_dispatch import (
     is_precomputed_scope, baseline_where, LEAGUE_TEAM_KEY,
@@ -163,21 +164,21 @@ async def _summary_from_baseline(filters, aux):
         params,
     )
     r = rows[0] if rows else {}
-    matches = r.get("matches", 0) or 0
     decided = r.get("decided", 0) or 0
     bf = r.get("bat_first_wins", 0) or 0
-    ff = r.get("field_first_wins", 0) or 0
     bf_pct = round(bf * 100 / decided, 1) if decided > 0 else None
-    return {
-        "matches": matches,
+    pool = {
+        "matches": r.get("matches", 0) or 0,
         "decided": decided,
         "ties": r.get("ties", 0) or 0,
         "no_results": r.get("no_results", 0) or 0,
         "toss_decided": r.get("toss_decided", 0) or 0,
         "bat_first_wins": bf,
-        "field_first_wins": ff,
+        "field_first_wins": r.get("field_first_wins", 0) or 0,
         "bat_first_win_pct": bf_pct,
     }
+    unique_teams = await _unique_teams_in_scope(filters, aux)
+    return _apply_results_per_team(pool, unique_teams)
 
 
 async def _summary_live(filters, aux):
@@ -218,21 +219,21 @@ async def _summary_live(filters, aux):
         params,
     )
     r = rows[0] if rows else {}
-    matches = r.get("matches", 0) or 0
     decided = r.get("decided", 0) or 0
     bf = r.get("bat_first_wins", 0) or 0
-    ff = r.get("field_first_wins", 0) or 0
     bf_pct = round(bf * 100 / decided, 1) if decided > 0 else None
-    return {
-        "matches": matches,
+    pool = {
+        "matches": r.get("matches", 0) or 0,
         "decided": decided,
         "ties": r.get("ties", 0) or 0,
         "no_results": r.get("no_results", 0) or 0,
         "toss_decided": r.get("toss_decided", 0) or 0,
         "bat_first_wins": bf,
-        "field_first_wins": ff,
+        "field_first_wins": r.get("field_first_wins", 0) or 0,
         "bat_first_win_pct": bf_pct,
     }
+    unique_teams = await _unique_teams_in_scope(filters, aux)
+    return _apply_results_per_team(pool, unique_teams)
 
 
 # ============================================================
