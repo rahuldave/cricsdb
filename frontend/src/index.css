@@ -965,16 +965,17 @@ a { color: inherit; }
     align-items: flex-start;
     gap: 0.05rem;
   }
-  /* Pad the value cell to ≥2 lines tall so the avg col's short
-     value ("30.1 · n 0.97/inn") matches the team col's wrapped
-     value (3 lines: label + 2 lines of "40.0 ↑ +32.9% · n 1.00/inn
-     / hi 104"). Without this, every by-wicket row drifts ~20px
-     because team col's dd is 2 lines while avg col's is 1 line —
-     compounding to ~200px section misalignment. The team col's
-     dd already fills 2 lines from natural wrap; min-height only
-     affects the avg col where the value is short. */
-  .wisden-partnership-wickets .wisden-player-compact-row dd {
-    min-height: 2.6em;
+  /* Pin every by-wicket row to a uniform height matching the
+     TALLEST natural row (team-side rows where the chip + delta
+     wraps the dd to 3 lines, e.g. "40.0 ↑ +32.9% · n 1.00/inn
+     / hi 104" — measured at 73px on iPhone 13). Without this,
+     team col's chip-bearing rows are 73px while every other row
+     (chip-less rows in team col, all rows in avg col) is 67px,
+     and the 6px-per-chip-row delta accumulates down the section
+     (~14px drift by the 5th wkt; visible to the user 2026-04-27).
+     min-height: 4.6rem (~73.6px) normalises all rows. */
+  .wisden-partnership-wickets .wisden-player-compact-row {
+    min-height: 4.6rem;
   }
 }
 .wisden-player-compact-row:last-child { border-bottom: 0; }
