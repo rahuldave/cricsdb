@@ -42,7 +42,7 @@ from api.routers.scope_averages import scope_summary as scope_summary_endpoint
 
 def make_filters(**kwargs) -> FilterBarParams:
     keys = ("gender", "team_type", "tournament", "season_from", "season_to",
-            "filter_team", "filter_opponent", "filter_venue")
+            "filter_team", "filter_opponent", "filter_venue", "team_class")
     return FilterBarParams(**{k: kwargs.get(k) for k in keys})
 
 
@@ -50,7 +50,7 @@ def make_aux(**kwargs) -> AuxParams:
     return AuxParams(
         series_type=kwargs.get("series_type"),
         scope_to_team=kwargs.get("scope_to_team"),
-        team_class=kwargs.get("team_class"),
+        chip_team_class=kwargs.get("chip_team_class"),
     )
 
 
@@ -63,8 +63,9 @@ EXPECTED = [
      dict(),
      104),
     ("men_intl 2018 full-member only",
-     dict(gender="male", team_type="international", season_from="2018", season_to="2018"),
-     dict(team_class="full_member"),
+     dict(gender="male", team_type="international", season_from="2018", season_to="2018",
+          team_class="full_member"),
+     dict(),
      20),
     ("men_intl 2018 scope_to_team=Australia (= regression marker — the OLD bug)",
      dict(gender="male", team_type="international", season_from="2018", season_to="2018"),

@@ -69,16 +69,6 @@ class AuxParams:
                 " tournament club teams."
             ),
         ),
-        team_class: Optional[str] = Query(
-            None,
-            description=(
-                "Narrow to matches where BOTH teams are in a named class."
-                " Currently supports `full_member` (= matches between ICC"
-                " full-member nations only). Used by the Compare-tab avg"
-                " slot for internationals to exclude associate-team matches"
-                " from the league baseline. No-op for clubs."
-            ),
-        ),
         chip_team_class: Optional[str] = Query(
             None,
             description=(
@@ -95,7 +85,6 @@ class AuxParams:
     ):
         self.series_type = series_type
         self.scope_to_team = scope_to_team
-        self.team_class = team_class
         self.chip_team_class = chip_team_class
 
 
@@ -112,6 +101,16 @@ class FilterBarParams:
         filter_team: Optional[str] = Query(None),
         filter_opponent: Optional[str] = Query(None),
         filter_venue: Optional[str] = Query(None),
+        team_class: Optional[str] = Query(
+            None,
+            description=(
+                "Restrict to matches between two teams in a named class."
+                " Currently supports `full_member` (= matches between ICC"
+                " full-member nations only). No-op when team_type !="
+                " 'international' (defensive backend gate — full-member"
+                " status is an intl classification)."
+            ),
+        ),
     ):
         self.gender = gender
         self.team_type = team_type
@@ -121,6 +120,7 @@ class FilterBarParams:
         self.team = filter_team
         self.opponent = filter_opponent
         self.venue = filter_venue
+        self.team_class = team_class
 
     def build(
         self,
@@ -207,14 +207,18 @@ class FilterBarParams:
                 )
             params["opponent"] = self.opponent
 
+        # team_class is a FilterBar narrowing, defensive-gated to
+        # team_type='international'. For clubs the FM list (country
+        # names) doesn't match franchise team strings so it would zero
+        # out every match — silent no-op preserves club URL robustness.
+        if self.team_class == "full_member" and self.team_type == "international":
+            clauses.append(full_member_clause(table_alias=table_alias))
+
         # Aux clauses fold in here centrally — no router hand-wiring.
         if aux is not None and aux.series_type:
             st = series_type_clause(aux.series_type, alias=table_alias)
             if st:
                 clauses.append(st)
-
-        if aux is not None and aux.team_class == "full_member":
-            clauses.append(full_member_clause(table_alias=table_alias))
 
         where = " AND ".join(clauses) if clauses else ""
         return where, params

@@ -78,15 +78,15 @@ from api.routers.scope_averages import (
 
 def make_filters(**kwargs) -> FilterBarParams:
     keys = ("gender", "team_type", "tournament", "season_from", "season_to",
-            "filter_team", "filter_opponent", "filter_venue")
+            "filter_team", "filter_opponent", "filter_venue", "team_class")
     return FilterBarParams(**{k: kwargs.get(k) for k in keys})
 
 
 def make_aux(scope_to_team: str | None = None, series_type: str | None = None,
-             team_class: str | None = None) -> AuxParams:
+             chip_team_class: str | None = None) -> AuxParams:
     return AuxParams(
         series_type=series_type, scope_to_team=scope_to_team,
-        team_class=team_class,
+        chip_team_class=chip_team_class,
     )
 
 
@@ -130,6 +130,16 @@ SCOPES = [
     ("aus_ind_men_intl_2024_2025",
                           {"gender": "male",   "team_type": "international",
                            "season_from": "2024", "season_to": "2025"},
+                          ["Australia", "India"]),
+    # v3 (spec-filterbar-team-class-v3) — symmetric FilterBar narrowing.
+    # Both team-side and league-side baselines compute against the FM
+    # pool because filters.team_class=full_member is the same on both
+    # calls (no chip alignment hint required). Chip ↔ avg agreement is
+    # native — proves the FilterBar promotion path.
+    ("aus_ind_men_intl_2024_2025_filterbar_fm",
+                          {"gender": "male",   "team_type": "international",
+                           "season_from": "2024", "season_to": "2025",
+                           "team_class": "full_member"},
                           ["Australia", "India"]),
     ("wpl_2024",          {"gender": "female", "team_type": "club",          "tournament": "Women's Premier League",  "season_from": "2024", "season_to": "2024"},
                           ["Royal Challengers Bengaluru"]),

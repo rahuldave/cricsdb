@@ -66,7 +66,7 @@ def near(a, b) -> bool:
 
 def make_filters(**kwargs) -> FilterBarParams:
     keys = ("gender", "team_type", "tournament", "season_from", "season_to",
-            "filter_team", "filter_opponent", "filter_venue")
+            "filter_team", "filter_opponent", "filter_venue", "team_class")
     return FilterBarParams(**{k: kwargs.get(k) for k in keys})
 
 
@@ -74,7 +74,6 @@ def make_aux(**kwargs) -> AuxParams:
     return AuxParams(
         series_type=kwargs.get("series_type"),
         scope_to_team=kwargs.get("scope_to_team"),
-        team_class=kwargs.get("team_class"),
         chip_team_class=kwargs.get("chip_team_class"),
     )
 
@@ -167,13 +166,18 @@ async def assert_team_numbers(scope_label, scope, team, failures):
 async def assert_avg_numbers(scope_label, scope, mode_key, failures):
     """AXIS A — avg endpoint values agree with ground truth.
 
-    mode_key is None (no extra aux), ("team_class", "full_member"),
-    or ("scope_to_team", <team>).
+    mode_key is None (no extra narrowing), ("team_class", "full_member"),
+    or ("scope_to_team", <team>). team_class lands on filters
+    (post-v3 field move); scope_to_team stays on aux.
     """
-    f = make_filters(**scope)
+    scope_extra: dict = dict(scope)
     aux_kwargs: dict = {}
     if mode_key:
-        aux_kwargs[mode_key[0]] = mode_key[1]
+        if mode_key[0] == "team_class":
+            scope_extra["team_class"] = mode_key[1]
+        else:
+            aux_kwargs[mode_key[0]] = mode_key[1]
+    f = make_filters(**scope_extra)
     aux = make_aux(**aux_kwargs)
     avg_resp = await scope_batting_summary(f, aux)
 
@@ -191,22 +195,37 @@ async def assert_avg_numbers(scope_label, scope, mode_key, failures):
             ))
 
 
-async def assert_chip_aligns(scope_label, scope, team, avg_aux_kwargs, failures, *, chip_team_class=None):
+async def assert_chip_aligns(scope_label, scope, team, avg_aux_kwargs, failures, *, chip_team_class=None, team_filterbar_team_class=None):
     """AXIS B — chip's scope_avg equals avg endpoint's displayed value
     when the avg col uses avg_aux_kwargs.
 
-    The team request takes the ambient scope (no team_class) PLUS an
-    optional `chip_team_class` aux hint that aligns chip baselines
-    with the avg slot's scope. With chip_team_class=None this is the
-    pre-fix behaviour (FAILS when avg_aux_kwargs has team_class set).
+    Three flavours of team-side narrowing alignment:
+      - chip_team_class=None, team_filterbar_team_class=None: pre-fix
+        baseline (chip aligned naturally to plain avg).
+      - chip_team_class set: per-slot avg has team_class; team request
+        carries chip alignment hint so chip baselines against the
+        FM-only league pool. (Mode B / Per-slot override path.)
+      - team_filterbar_team_class set: FilterBar carries team_class,
+        which narrows BOTH team-side and avg-side via inheritance —
+        no chip hint needed because chip & avg are computed with the
+        same filters. (Mode E1 / FilterBar promotion path.)
     """
-    f_team = make_filters(**scope)
-    f_avg = make_filters(**scope)
+    team_scope = dict(scope)
+    avg_scope = dict(scope)
+    if team_filterbar_team_class:
+        team_scope["team_class"] = team_filterbar_team_class
+        avg_scope["team_class"] = team_filterbar_team_class
+    avg_scope_class = avg_aux_kwargs.pop("team_class", None) if avg_aux_kwargs else None
+    if avg_scope_class:
+        avg_scope["team_class"] = avg_scope_class
+
+    f_team = make_filters(**team_scope)
+    f_avg = make_filters(**avg_scope)
     team_aux_kwargs: dict = {}
     if chip_team_class:
         team_aux_kwargs["chip_team_class"] = chip_team_class
     team_aux = make_aux(**team_aux_kwargs)
-    avg_aux = make_aux(**avg_aux_kwargs)
+    avg_aux = make_aux(**(avg_aux_kwargs or {}))
 
     team_resp = await _compute_batting_summary(team, f_team, team_aux)
     avg_resp = await scope_batting_summary(f_avg, avg_aux)
@@ -293,15 +312,32 @@ async def main():
         )
         print(f"  intl_24_25 / {team} / FM-avg + chip_team_class=fm: checked")
 
-    # Sanity: when avg has team_class=fm and team request DOESN'T pass
-    # chip_team_class, the chip should NOT align (the alignment is
+    # FilterBar-mode (v3) — both team and avg inherit team_class from
+    # FilterBar. Chip alignment is native (no chip hint needed) because
+    # both the team-side aggregate and the league-side baseline use the
+    # same filters.team_class clause.
+    for team in ("Australia", "India"):
+        await assert_chip_aligns(
+            "intl_24_25", INTL_2024_25, team,
+            avg_aux_kwargs={}, failures=failures,
+            team_filterbar_team_class="full_member",
+        )
+        print(f"  intl_24_25 / {team} / FilterBar team_class=fm (v3 native align): checked")
+
+    # Sanity: when avg has team_class=fm (per-slot override) and team
+    # request DOESN'T pass chip_team_class AND FilterBar doesn't carry
+    # team_class, the chip should NOT align (the alignment is
     # intentional and gated). Asserting the negative makes the gate
-    # observable in tests.
+    # observable in tests. Post-v3, team_class is on filters — so the
+    # avg's per-slot override is encoded by passing team_class on
+    # f_avg only (not on f_team), simulating a Mode-B request where
+    # the per-slot URL grammar wrote team_class into the avg slot's
+    # scope without a chip alignment hint.
     for team in ("Australia",):
         f_team = make_filters(**INTL_2024_25)
-        f_avg = make_filters(**INTL_2024_25)
+        f_avg = make_filters(**INTL_2024_25, team_class="full_member")
         team_aux = make_aux()
-        avg_aux = make_aux(team_class="full_member")
+        avg_aux = make_aux()
         team_resp = await _compute_batting_summary(team, f_team, team_aux)
         avg_resp = await scope_batting_summary(f_avg, avg_aux)
         chip_avg = env_scope_avg(team_resp.get("run_rate"))

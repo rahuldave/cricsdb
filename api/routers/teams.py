@@ -926,16 +926,16 @@ def _apply_partnerships_per_innings(d: dict, innings_batted: int) -> dict:
 
 def _league_aux(
     team: str | None, aux: AuxParams, filters: FilterParams | None = None,
-) -> AuxParams:
-    """Return a copy of `aux` for the league-side call inside
-    `_compute_xxx_summary` / by-phase / by-wicket handlers so the
-    chip envelope's `scope_avg` baselines against the same scope the
-    Compare-tab avg column displays.
+) -> tuple[FilterParams | None, AuxParams]:
+    """Return `(league_filters, league_aux)` for the league-side call
+    inside `_compute_xxx_summary` / by-phase / by-wicket handlers so
+    the chip envelope's `scope_avg` baselines against the same scope
+    the Compare-tab avg column displays.
 
     Two synthesis steps run independently:
 
-    1. **`scope_to_team`** — auto-narrow the league pool to the
-       team's tournament universe. GATED on
+    1. **`scope_to_team`** (lands on aux) — auto-narrow the league
+       pool to the team's tournament universe. GATED on
        `filters.team_type == 'club'` (closed-league semantic). For
        internationals a single team's universe contains that team in
        every match, so narrowing collapses into a self-mirror; the
@@ -943,39 +943,40 @@ def _league_aux(
        must agree (no synthesis). Skipped when aux already carries
        `scope_to_team` explicitly.
 
-    2. **`chip_team_class` → `team_class`** — when the request
-       carries a `chip_team_class` aux hint (sent by the team slot's
-       fetcher when a peer avg slot has team_class set), copy it onto
-       the league-side aux's `team_class`. The TEAM data stays
-       scoped to the team's own filters (Aus shows all 22 of its
-       matches), but the chip's `scope_avg` is computed against the
-       FM-only pool — matching the displayed avg col's value (8.5 not
-       7.52). Without this propagation, chip.scope_avg and
+    2. **`chip_team_class` → `team_class` on filters** — when the
+       request carries a `chip_team_class` aux hint (sent by the team
+       slot's fetcher when a peer avg slot has team_class set), copy
+       it onto the LEAGUE-SIDE filters' `team_class`. Post the v3
+       FilterBar-promotion of `team_class` (2026-04-28), the field
+       lives on FilterBarParams, so the chip alignment hint must land
+       on the league-side filters copy — not the aux. The TEAM data
+       stays scoped to the team's own filters (Aus shows all 22 of
+       its matches), but the chip's `scope_avg` is computed against
+       the FM-only pool — matching the displayed avg col's value
+       (8.5 not 7.52). Without this propagation, chip.scope_avg and
        avg.run_rate disagree whenever the avg slot uses team_class.
-       Applies for any team_type — the avg col's `team_class` is
-       conceptually orthogonal to the closed-league gate.
 
     No-op when `team is None`.
 
     Spec: spec-avg-column-per-innings.md Commit 3 + the 2026-04-27
     international avg-baseline correction (Mechanism A + B + chip
-    alignment).
+    alignment) + spec-filterbar-team-class-v3.md commit 1.
     """
     from copy import copy
     if team is None:
-        return aux
+        return filters, aux
 
-    new: AuxParams | None = None
+    new_aux = aux
+    new_filters = filters
     # Step 1: scope_to_team narrow (clubs only, only when not already set).
     if not aux.scope_to_team and (filters is None or filters.team_type == "club"):
-        new = copy(aux)
-        new.scope_to_team = team
-    # Step 2: chip_team_class → team_class (any team_type).
-    if aux.chip_team_class:
-        if new is None:
-            new = copy(aux)
-        new.team_class = aux.chip_team_class
-    return new if new is not None else aux
+        new_aux = copy(aux)
+        new_aux.scope_to_team = team
+    # Step 2: chip_team_class → team_class on filters (any team_type).
+    if aux.chip_team_class and filters is not None:
+        new_filters = copy(filters)
+        new_filters.team_class = aux.chip_team_class
+    return new_filters, new_aux
 
 
 def _phase_dict_per_innings(by_phase: dict, innings_count: int) -> dict:
@@ -1324,7 +1325,8 @@ async def _compute_batting_summary(
     (highest_total, lowest_all_out_total) stay flat — they're not
     metrics."""
     t = await _batting_aggregates(team, filters, aux)
-    s = await _batting_aggregates(None, filters, _league_aux(team, aux, filters))
+    lf, la = _league_aux(team, aux, filters)
+    s = await _batting_aggregates(None, lf, la)
     legal = t.get("legal_balls") or 0
     return {
         "team": team,
@@ -1662,7 +1664,8 @@ async def team_batting_by_phase(
     aux: AuxParams = Depends(),
 ):
     t = await _batting_by_phase_aggregates(team, filters, aux)
-    s = await _batting_by_phase_aggregates(None, filters, _league_aux(team, aux, filters))
+    lf, la = _league_aux(team, aux, filters)
+    s = await _batting_by_phase_aggregates(None, lf, la)
 
     phase_ranges = {
         "powerplay": [1, 6],
@@ -2114,7 +2117,8 @@ async def _compute_bowling_summary(
 ) -> dict:
     """Per-metric envelope team-bowling summary."""
     t = await _bowling_aggregates(team, filters, aux)
-    s = await _bowling_aggregates(None, filters, _league_aux(team, aux, filters))
+    lf, la = _league_aux(team, aux, filters)
+    s = await _bowling_aggregates(None, lf, la)
     legal = t.get("legal_balls") or 0
     matches = t.get("matches") or 0
     return {
@@ -2435,7 +2439,8 @@ async def team_bowling_by_phase(
     aux: AuxParams = Depends(),
 ):
     t = await _bowling_by_phase_aggregates(team, filters, aux)
-    s = await _bowling_by_phase_aggregates(None, filters, _league_aux(team, aux, filters))
+    lf, la = _league_aux(team, aux, filters)
+    s = await _bowling_by_phase_aggregates(None, lf, la)
 
     phase_ranges = {
         "powerplay": [1, 6],
@@ -2742,7 +2747,8 @@ async def team_fielding_summary(
     aux: AuxParams = Depends(),
 ):
     t = await _fielding_aggregates(team, filters, aux)
-    s = await _fielding_aggregates(None, filters, _league_aux(team, aux, filters))
+    lf, la = _league_aux(team, aux, filters)
+    s = await _fielding_aggregates(None, lf, la)
     matches = t.get("matches") or 0
     return {
         "team": team,
@@ -3076,7 +3082,8 @@ async def team_partnerships_by_wicket(
     where, params = _partnership_filter(filters, team, side, aux=aux)
 
     t = await _partnerships_by_wicket_aggregates(team, filters, side, aux)
-    s = await _partnerships_by_wicket_aggregates(None, filters, side, _league_aux(team, aux, filters))
+    lf, la = _league_aux(team, aux, filters)
+    s = await _partnerships_by_wicket_aggregates(None, lf, side, la)
 
     # Best partnership detail per wicket (identity-bearing — only
     # fetched for the team side; the league's record at each wicket
@@ -3498,8 +3505,8 @@ async def team_partnerships_summary(
     # scope_to_team synthesized so the league-side baselines against
     # the team's tournament universe (matching the avg endpoint's
     # auto-narrow). Spec-avg-column-per-innings.md Commit 3.
-    league_aux = _league_aux(team, aux, filters)
-    s_where, s_params = _partnership_filter(filters, None, side, aux=league_aux)
+    league_filters, league_aux = _league_aux(team, aux, filters)
+    s_where, s_params = _partnership_filter(league_filters, None, side, aux=league_aux)
     s_rows = await db.q(
         f"""
         SELECT

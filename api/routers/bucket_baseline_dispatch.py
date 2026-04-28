@@ -27,8 +27,11 @@ def is_precomputed_scope(filters: FilterParams, aux: Optional[AuxParams]) -> boo
         sparse to precompute.
       - aux.series_type other than 'all'/None: per-cell baselines are
         per-tournament, so series_type can't refine within a cell.
-      - aux.team_class: bucket tables don't carry a team-class
-        dimension; full-member-only filtering must run live.
+      - filters.team_class: bucket tables don't carry a team-class
+        dimension; full-member-only filtering must run live. Reject
+        only when the filter would actually fire (intl) — for clubs
+        the FilterBarParams.build() defensive gate makes the clause
+        a no-op so bucket dispatch can stay enabled.
 
     Anything else (gender + team_type + optional tournament + optional
     season range + optional scope_to_team) → use the table.
@@ -39,7 +42,10 @@ def is_precomputed_scope(filters: FilterParams, aux: Optional[AuxParams]) -> boo
         return False
     if aux is not None and aux.series_type and aux.series_type != "all":
         return False
-    if aux is not None and aux.team_class:
+    if (
+        filters.team_class == "full_member"
+        and filters.team_type == "international"
+    ):
         return False
     return True
 
