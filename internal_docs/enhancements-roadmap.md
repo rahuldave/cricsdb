@@ -1372,6 +1372,70 @@ in case a curl/share-link slips through (Bp2 = Bp1 = 15).
 
 ---
 
+### Shipped 2026-04-28 (avg-col per-team transform for results metrics)
+
+User-flagged on the v3 canonical URL E1: avg col read
+`matches.scope_avg = 140` for the FM pool — meaningless because no
+team plays 140 matches. Same systemic issue for `toss_wins`,
+`bat_first_wins`, `field_first_wins`, `wins`, `losses`, `ties`,
+`no_results`, `win_pct`. Latent pre-v3 (the international avg col
+was Aus-shaped via the old `scope_to_team` auto-narrow); 2026-04-27
+mech A killed that auto-narrow → pool totals went visible →
+problem surfaced.
+
+**Spec:** `internal_docs/spec-avg-col-per-team-transform.md`
+(written + shipped same session).
+
+**Mental model.** Two transforms in parallel:
+- **per-INNINGS** for batting/bowling/fielding rates (existing,
+  documented in CLAUDE.md "'Average' means per-innings, NOT pool").
+- **per-TEAM** for team-level RESULTS metrics (NEW). Pool counts
+  divided by `unique_teams_in_scope`, with multiplier 2 for metrics
+  where each match generates 2 team-instances (matches / ties /
+  no_results) and 1 for metrics where each match generates 1
+  instance (wins / losses / toss_wins / bat_first_wins /
+  field_first_wins). True per-team win_pct = `decided × 100 /
+  (matches × 2)`, replacing the prior bat_first_win_pct
+  substitution.
+
+**Implementation.** Two new helpers in `api/routers/teams.py`:
+`_apply_results_per_team(d, unique_teams)` and
+`_unique_teams_in_scope(filters, aux)`. Both `/scope/averages/summary`
+(both baseline + live paths) and `/teams/{team}/summary` envelope
+construction call them so chip envelope + displayed avg col always
+agree (the chip-direction invariant holds by construction).
+
+**Pre-flight commit (`6b393a1`):** flipped 11 REG URLs hitting these
+endpoints to NEW so the runner can detect the shape change without
+treating it as drift.
+
+**Outcome on URL E1:**
+
+| | Before | After |
+|---|---|---|
+| Avg col matches | 140 | 25.45 (= 140 × 2 / 11 unique FM teams) |
+| Avg col toss_wins | 140 | 12.73 |
+| Avg col bat_first_wins | 64 | 5.82 |
+| Avg col field_first_wins | 70 | 6.36 |
+| Avg col `win_pct` | 47.8 (= bat_first_win_pct, mislabeled) | 47.86 (true per-team avg) |
+| Aus chip on Win % | 81.2 vs 47.8 (off-semantic) | 81.2 vs 47.86 (correctly per-team) |
+
+CLAUDE.md "Critical Design Decisions" section updated with the
+parallel per-INNINGS + per-TEAM convention.
+
+**Test coverage post-ship:**
+- 4/4 sanity tests green.
+- 0 REG drift across 11 regression suites (the 11 pre-flipped
+  URLs land in `NEW changed`).
+- Anchor file (`team-class-anchor-numbers.md`) implicitly updated:
+  pool totals are now `per_team × unique_teams ÷ 2`.
+
+**Followups parked:** `spec-filterbar-series-type.md` and
+`spec-slot-override-chip-alignment.md` unchanged (sibling specs to
+v3 + this transform; both still NOT WRITTEN).
+
+---
+
 ## Build-ready specs (queue)
 
 - `spec-dom-tests-series-teams.md` (228 lines) — 45 DOM-test

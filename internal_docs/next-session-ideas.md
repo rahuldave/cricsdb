@@ -6,7 +6,9 @@
 ## NEXT SESSION — top of queue (2026-04-28+)
 
 `spec-filterbar-team-class-v3.md` shipped 2026-04-28 in 5 commits
-(`a0773e5` … `87ad937`). v3's full ship report lives in
+(`a0773e5` … `87ad937`); `spec-avg-col-per-team-transform.md`
+shipped 2026-04-28 same session in 2 commits (`6b393a1` flip,
+`236eaf7` backend). v3's full ship report lives in
 `enhancements-roadmap.md` "Shipped 2026-04-28". Top of queue now:
 
 ### Step 1 — `spec-dom-tests-series-teams.md` Batch 1 (NOW UNBLOCKED)
