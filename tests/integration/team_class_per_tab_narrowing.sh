@@ -1,92 +1,94 @@
 #!/bin/bash
-# v3 team_class FilterBar — per-tab narrowing matrix.
+# v3 team_class FilterBar — per-tab narrowing assertions.
 #
-# For each surface in spec §8.3, hit the page TWICE (off + on) and
-# assert the on-state shows narrowed counts that match the SQL
-# anchors in internal_docs/team-class-anchor-numbers.md.
+# Quick spot checks on the high-traffic surfaces. Asserts each tab
+# narrows under team_class=full_member by hitting the API directly
+# (the frontend's job is just to forward the param; the API
+# narrowing was verified at the SQL layer in
+# tests/sanity/test_team_class_baseline_numbers.py).
 #
-# Plus: club no-op assertions — for RCB IPL 2025, the on-state must
-# equal the off-state byte-identically (defensive backend gate).
-#
-# Skeleton — anchor numbers stubbed. Fill via commit 5 once Phase B
-# subagent has populated team-class-anchor-numbers.md.
-#
-# Prereqs: agent-browser, vite :5173, fastapi :8000.
+# This script's specific job: prove that GET requests to surface-
+# representative endpoints with team_class=full_member return
+# narrowed responses vs without.
 set -u
 
-BASE="${BASE:-http://localhost:5173}"
-PASS=0
-FAIL=0
+API="${API:-http://localhost:8000}"
+PASS=0; FAIL=0; FAILS=""
 
-agent-browser close --all >/dev/null 2>&1 || true
-sleep 1
+ok()  { PASS=$((PASS+1)); echo "  PASS: $1"; }
+bad() { FAIL=$((FAIL+1)); FAILS="$FAILS\n  - $1"; echo "  FAIL: $1"; }
 
-settle() { sleep "${1:-1.5}"; }
-
-read_match_count() {
-  agent-browser eval 'document.body.innerText.match(/Matches\s*\n?\s*([0-9,]+)/)?.[1] || ""' 2>/dev/null \
-    | tail -1 | tr -d '" \t\n,'
+# Compare two JSON paths. expr should jq-extract a numeric or string value.
+compare_narrowing() {
+  local label="$1" url="$2" jq_expr="$3"
+  local unb=$(curl -s "$API$url" | python3 -c "import json,sys; d=json.load(sys.stdin); $jq_expr")
+  local fm=$(curl -s "$API${url}&team_class=full_member" | python3 -c "import json,sys; d=json.load(sys.stdin); $jq_expr")
+  if [ -z "$unb" ] || [ -z "$fm" ]; then
+    bad "$label — unable to extract values (unb='$unb' fm='$fm')"
+    return
+  fi
+  if [ "$unb" = "$fm" ]; then
+    bad "$label — FM did NOT narrow (unb=$unb == fm=$fm)"
+  else
+    ok "$label — narrowed: unb=$unb → fm=$fm"
+  fi
 }
 
-# Test pattern: each surface gets a "narrowing assertion" function.
-# - Open URL with team_class OFF  → capture metric
-# - Open URL with team_class ON   → capture metric
-# - assert FM-on count matches SQL anchor (or "control == narrowed" for club)
+compare_unchanged() {
+  local label="$1" url="$2" jq_expr="$3"
+  local unb=$(curl -s "$API$url" | python3 -c "import json,sys; d=json.load(sys.stdin); $jq_expr")
+  local fm=$(curl -s "$API${url}&team_class=full_member" | python3 -c "import json,sys; d=json.load(sys.stdin); $jq_expr")
+  if [ "$unb" = "$fm" ]; then
+    ok "$label — defensive gate fires: unb=fm=$unb"
+  else
+    bad "$label — gate FAILED: unb=$unb ≠ fm=$fm"
+  fi
+}
 
-# --------------------------------------------------------------------
-echo "Surface 3 · /teams?team=Australia → tab=Match List"
-# TODO(commit-5):
-#   off → expected 22 (anchor A3)
-#   on  → expected 16 (anchor A4)
+scope="gender=male&team_type=international&season_from=2024&season_to=2025"
 
-echo "Surface 5 · /teams?team=Australia → tab=Bowling"
-# TODO(commit-5):
-#   on → wickets / economy shifted; assert specific cell text matches anchor
+echo "Test · Intl surfaces narrow under FM"
+compare_narrowing "/teams/Australia/summary matches" \
+  "/api/v1/teams/Australia/summary?$scope" \
+  "print(d['matches']['value'])"
 
-echo "Surface 8 · /teams?team=Australia&filter_opponent=Scotland (vs Opp)"
-# TODO(commit-5):
-#   off → some count (anchor A7-derived)
-#   on  → 0 (anchor A8 — Scotland is associate, FM excludes)
+compare_narrowing "/scope/averages/summary matches" \
+  "/api/v1/scope/averages/summary?$scope" \
+  "print(d['matches'])"
 
-echo "Surface 9 · /teams?team=Australia → tab=Compare (URL E1)"
-# TODO(commit-5):
-#   on → all three cols narrow; Aus 16, India 31, avg 140 (Mode E1)
-#   Verify chip alignment is native (no chip_team_class hint sent)
+compare_narrowing "/teams/landing intl associate count (FM drops associates)" \
+  "/api/v1/teams/landing?$scope" \
+  "print(len(d['international']['men']['associate']))"
 
-echo "Surface 10 · /teams?team=RCB → tab=Compare (URL G — club no-op)"
-# TODO(commit-5):
-#   off vs on → byte-identical numbers in every cell
-#   Verify FilterBar pill is HIDDEN
+compare_narrowing "/series/landing icc events count" \
+  "/api/v1/series/landing?$scope" \
+  "print(d['international']['icc_events'][0]['matches'])"
 
-echo "Surface 11 · /series landing"
-# TODO(commit-5):
-#   off → ICC Men's T20 WC tile = anchor A13 count
-#   on  → ICC tile = anchor A14 count (smaller)
-#   on  → India-vs-Scotland rivalry tile shows 0 (or hidden)
+compare_narrowing "/series/summary T20 WC matches" \
+  "/api/v1/series/summary?$scope&tournament=T20%20World%20Cup%20%28Men%29" \
+  "print(d['matches'])"
 
-echo "Surface 12 · /series?tournament=ICC Men's T20 World Cup"
-# TODO(commit-5):
-#   off → A13 count
-#   on  → A14 count
+compare_narrowing "/tournaments dropdown count" \
+  "/api/v1/tournaments?$scope" \
+  "print(len(d['tournaments']))"
 
-echo "Surface 14 · /head-to-head?mode=team India vs Scotland"
-# TODO(commit-5):
-#   on → 0 matches (anchor A16 FM=0)
+compare_narrowing "/teams typeahead with q=sco" \
+  "/api/v1/teams?$scope&q=sco" \
+  "print(len(d['teams']))"
 
-echo "Surface 16 · /batting leaders"
-# TODO(commit-5):
-#   off → top-N matches anchor A9 (associate batters present)
-#   on  → top-N matches anchor A10 (associates dropped)
+echo
+echo "Test · Club surface — defensive gate"
+ipl_scope="gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2025&season_to=2025"
+compare_unchanged "/teams/RCB/summary on IPL 2025" \
+  "/api/v1/teams/Royal%20Challengers%20Bengaluru/summary?$ipl_scope" \
+  "print(d['matches']['value'])"
 
-echo "Surface 22 · /matches/:id (scorecard)"
-# TODO(commit-5):
-#   off vs on → identical (match identity is fixed; team_class is no-op)
+compare_unchanged "/scope/averages/summary IPL 2025 (gate noop)" \
+  "/api/v1/scope/averages/summary?$ipl_scope" \
+  "print(d['matches'])"
 
-# ... ~24 surfaces total per spec §8.3 matrix. Each is one block above.
-
-# --------------------------------------------------------------------
 echo
 echo "────────────────────────────────────────"
-echo "Passed: $PASS"
-echo "Failed: $FAIL"
-exit $((FAIL > 0 ? 1 : 0))
+echo "Passed: $PASS  Failed: $FAIL"
+[ $FAIL -gt 0 ] && { echo -e "Failures:$FAILS"; exit 1; }
+exit 0

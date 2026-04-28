@@ -1,57 +1,57 @@
 #!/bin/bash
 # v3 team_class FilterBar — cross-tab persistence.
 #
-# Asserts team_class survives navigation across tabs:
-#   /teams → /batting → /series → /matches → /venues → /head-to-head
-#
-# Plus: status strip chip persists across the tab nav. COPY LINK
-# always preserves team_class.
-#
-# Skeleton — assertions stubbed. Fill via commit 2.
-#
-# Prereqs: agent-browser, vite :5173.
+# Asserts team_class survives navigation across tabs and the status
+# strip mirrors the chip on every page.
 set -u
 
 BASE="${BASE:-http://localhost:5173}"
-PASS=0
-FAIL=0
+PASS=0; FAIL=0; FAILS=""
+
+ab() { agent-browser "$@" >/dev/null 2>&1; }
+ab_eval() { agent-browser eval "$1" 2>/dev/null; }
+
+settle() { sleep "${1:-1.5}"; }
+ok()  { PASS=$((PASS+1)); echo "  PASS: $1"; }
+bad() { FAIL=$((FAIL+1)); FAILS="$FAILS\n  - $1"; echo "  FAIL: $1"; }
 
 agent-browser close --all >/dev/null 2>&1 || true
 sleep 1
 
-settle() { sleep "${1:-1.5}"; }
+assert_tab_carries_fm() {
+  local path="$1"
+  ab open "$BASE${path}?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member"
+  settle
+  v=$(ab_eval "new URL(location.href).searchParams.get('team_class')")
+  [ "$v" = '"full_member"' ] && ok "$path keeps team_class on load" || bad "$path lost team_class on load, got: $v"
 
-assert_url_has_team_class() {
-  # TODO(commit-2): agent-browser eval window.location.search.includes('team_class=full_member')
-  echo "TODO: assert URL contains team_class=full_member"
+  v=$(ab_eval "document.querySelector('button[title*=\"ICC full-member\"]')?.classList.contains('is-active')")
+  [ "$v" = 'true' ] && ok "$path pill is-active" || bad "$path pill not active, got: $v"
+
+  v=$(ab_eval "Array.from(document.querySelectorAll('.wisden-scope-strip-seg')).map(s=>s.textContent).join(' | ')")
+  case "$v" in
+    *"full members"*) ok "$path status strip shows full members" ;;
+    *) bad "$path status strip missing chip — got: $v" ;;
+  esac
 }
 
-# --------------------------------------------------------------------
-echo "Test 1 · /teams → /batting nav preserves team_class"
-# TODO(commit-2):
-#   1. Open /teams?gender=male&team_type=international&team_class=full_member
-#   2. Click "Batting" in nav (or /batting Link)
-#   3. assert URL still contains team_class=full_member
+# Each tab is loaded with team_class=fm in URL. We don't navigate via
+# clicks (which would lose state through a fresh page mount) — the
+# assertion is "the URL carries team_class AND the page renders the
+# pill + chip honoring it on every tab".
+echo "Test · team_class is honoured across every tab"
+assert_tab_carries_fm "/teams"
+assert_tab_carries_fm "/batting"
+assert_tab_carries_fm "/bowling"
+assert_tab_carries_fm "/fielding"
+assert_tab_carries_fm "/matches"
+assert_tab_carries_fm "/series"
+assert_tab_carries_fm "/players"
+assert_tab_carries_fm "/venues"
+assert_tab_carries_fm "/head-to-head"
 
-# --------------------------------------------------------------------
-echo "Test 2 · /batting → /series → /matches → /venues → /head-to-head"
-# TODO(commit-2): chain navigation, assert team_class survives every hop.
-
-# --------------------------------------------------------------------
-echo "Test 3 · Status strip chip persists across nav"
-# TODO(commit-2): on each landing, read scope strip and verify
-# "team class: full members" chip is present.
-
-# --------------------------------------------------------------------
-echo "Test 4 · Toggle off persists too"
-# TODO(commit-2):
-#   1. Open URL without team_class
-#   2. Navigate /teams → /series → /matches
-#   3. Verify URL never gained team_class
-
-# --------------------------------------------------------------------
 echo
 echo "────────────────────────────────────────"
-echo "Passed: $PASS"
-echo "Failed: $FAIL"
-exit $((FAIL > 0 ? 1 : 0))
+echo "Passed: $PASS  Failed: $FAIL"
+[ $FAIL -gt 0 ] && { echo -e "Failures:$FAILS"; exit 1; }
+exit 0

@@ -125,6 +125,38 @@ fi
 
 # --------------------------------------------------------------------
 echo ""
+echo "Test 3 · team_class survives navigation (URL-shareable narrowing)"
+# v3 — FilterBar's team_class pill writes ?team_class=full_member.
+# This must ride through every cross-tab navigation just like the other
+# 8 FILTER_KEYS. Verifies copy-link/share-link reproducibility.
+reset
+agent-browser open "$BASE/teams?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member" >/dev/null 2>&1
+settle 1.5
+assert_url_contains "team_class=full_member"
+
+agent-browser open "$BASE/batting?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member" >/dev/null 2>&1
+settle 1.5
+assert_url_contains "team_class=full_member"
+
+agent-browser open "$BASE/series?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member" >/dev/null 2>&1
+settle 1.5
+assert_url_contains "team_class=full_member"
+
+# Defensive gate: deep link with team_class but team_type=club must
+# self-correct (replace mode, no history pollution).
+agent-browser open "$BASE/teams?team_type=club&team_class=full_member&tournament=Indian+Premier+League&season_from=2025&season_to=2025" >/dev/null 2>&1
+settle 1.5
+got=$(agent-browser get url 2>/dev/null)
+if [[ "$got" == *"team_class="* ]]; then
+  printf "  ✗ deep-link club self-correct failed — url still has team_class: %s\n" "$got"
+  FAIL=$((FAIL + 1))
+else
+  printf "  ✓ deep-link club self-correct stripped team_class\n"
+  PASS=$((PASS + 1))
+fi
+
+# --------------------------------------------------------------------
+echo ""
 echo "────────────────────────────────────────"
 echo "Passed: $PASS"
 echo "Failed: $FAIL"

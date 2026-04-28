@@ -237,6 +237,31 @@ assert_contains "5.col1 avg reads Full-member average" "$COL1_HEADER_5" "Full-me
 # T20 WC + full_member intersection, not the unbounded pool.
 assert_contains "5.col1 has 219 matches (full-member 2024-2026 pool)" "$COL1_MATCHES_5" "219 "
 
+# ──────────────────── ANCHOR 6 — Mode E1 (FilterBar team_class=fm) ────────────────────
+# v3 spec — FilterBar team_class=full_member narrows ALL three
+# columns via inheritance. No per-slot override needed (compare_filters
+# Anchor 5 covers the per-slot path; this anchor proves the symmetric
+# default-flow path).
+#
+# Closed window (2024-2025) pinned anchor file numbers:
+#   col0 (Australia, FM):  16 matches
+#   col1 (Full-member avg, FM): 140 matches
+#   col2 (India, FM):       31 matches
+
+navigate "$BASE/teams?team=Australia&tab=Compare&compare1=__avg__&compare2=India&gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member" \
+  "Anchor 6 — Mode E1 (FilterBar fm, 3 cols inherit)"
+
+JSON_6=$(extract_grid 2>/dev/null)
+COL0_MATCHES_6=$(echo "$JSON_6" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read())[0]["matches_text"])')
+COL1_HEADER_6=$(echo "$JSON_6" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read())[1]["header"])')
+COL1_MATCHES_6=$(echo "$JSON_6" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read())[1]["matches_text"])')
+COL2_MATCHES_6=$(echo "$JSON_6" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read())[2]["matches_text"])')
+
+assert_contains "6.col0 Aus narrowed to 16 (FM)" "$COL0_MATCHES_6" "16 "
+assert_contains "6.col1 reads Full-member average (inherited)" "$COL1_HEADER_6" "Full-member"
+assert_contains "6.col1 has 140 matches" "$COL1_MATCHES_6" "140 "
+assert_contains "6.col2 Ind narrowed to 31 (FM)" "$COL2_MATCHES_6" "31 "
+
 # ──────────────────── summary ────────────────────
 echo
 echo "════════════════════════════════════════════"

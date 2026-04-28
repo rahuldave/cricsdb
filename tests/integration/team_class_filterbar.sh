@@ -1,84 +1,85 @@
 #!/bin/bash
 # v3 team_class FilterBar — widget rendering + URL state plumbing.
 #
-# Asserts the FilterBar's "Full members only" pill behaves correctly:
-#   - Renders only when team_type=international
-#   - Hidden on team_type=club and team_type=''
-#   - Toggle on writes ?team_class=full_member to URL
-#   - Toggle off removes the param
-#   - Status strip surfaces "team class: full members" chip
-#   - "reset all" button clears team_class
-#   - COPY LINK preserves team_class
-#
-# Skeleton — assertions stubbed. Fill in via commit 2 of v3 rollout.
-#
-# Prereqs: agent-browser, vite :5173.
+# Prereqs: agent-browser, vite :5173, uvicorn :8000.
 set -u
 
 BASE="${BASE:-http://localhost:5173}"
-PASS=0
-FAIL=0
+PASS=0; FAIL=0; FAILS=""
+
+ab() { agent-browser "$@" >/dev/null 2>&1; }
+ab_eval() { agent-browser eval "$1" 2>/dev/null; }
+
+settle() { sleep "${1:-1.5}"; }
+ok()  { PASS=$((PASS+1)); echo "  PASS: $1"; }
+bad() { FAIL=$((FAIL+1)); FAILS="$FAILS\n  - $1"; echo "  FAIL: $1"; }
+
+assert_eq() {
+  if [ "$3" = "$2" ]; then ok "$1"; else bad "$1 — expected $2, got $3"; fi
+}
+
+assert_contains() {
+  case "$3" in *"$2"*) ok "$1" ;; *) bad "$1 — '$2' not in: $3" ;; esac
+}
 
 agent-browser close --all >/dev/null 2>&1 || true
 sleep 1
 
-settle() { sleep "${1:-1.5}"; }
+# ────────────────────────────────────────────
+echo "Test 1 · Pill visibility (intl visible / club hidden / All hidden)"
+ab open "$BASE/teams?gender=male&team_type=international&season_from=2024&season_to=2025"
+settle
+v=$(ab_eval "document.querySelector('button[title*=\"ICC full-member\"]') ? 'visible' : 'hidden'")
+assert_eq "pill visible on intl" '"visible"' "$v"
 
-assert_pill_visible() {
-  # TODO(commit-2): use agent-browser eval to query DOM for the pill.
-  # Selector candidate: button containing text "Full members only".
-  # Returns "true"/"false".
-  echo "TODO: assert pill visible"
-}
+ab open "$BASE/teams?gender=male&team_type=club"
+settle
+v=$(ab_eval "document.querySelector('button[title*=\"ICC full-member\"]') ? 'visible' : 'hidden'")
+assert_eq "pill hidden on club" '"hidden"' "$v"
 
-assert_pill_hidden() {
-  # TODO(commit-2): same selector — should not be present in DOM.
-  echo "TODO: assert pill hidden"
-}
+ab open "$BASE/teams?gender=male"
+settle
+v=$(ab_eval "document.querySelector('button[title*=\"ICC full-member\"]') ? 'visible' : 'hidden'")
+assert_eq "pill hidden on type=All" '"hidden"' "$v"
 
-assert_url_has_param() {
-  # TODO(commit-2): check current URL via agent-browser eval window.location.search.
-  echo "TODO: assert URL contains team_class=full_member"
-}
+# ────────────────────────────────────────────
+echo "Test 2 · Toggle writes/removes URL param + is-active class"
+ab open "$BASE/teams?gender=male&team_type=international&season_from=2024&season_to=2025"
+settle
+ab_eval "document.querySelector('button[title*=\"ICC full-member\"]').click()" >/dev/null
+sleep 0.6
+v=$(ab_eval "new URL(location.href).searchParams.get('team_class')")
+assert_eq "click ON adds team_class=full_member" '"full_member"' "$v"
 
-# --------------------------------------------------------------------
-echo "Test 1 · Pill visibility — intl-only gating"
-# TODO(commit-2):
-#   1. Open /teams?gender=male&team_type=international
-#   2. assert_pill_visible
-#   3. Switch Type to club via segmented control (or open a club URL)
-#   4. assert_pill_hidden
-#   5. Switch Type to '' (All)
-#   6. assert_pill_hidden
+v=$(ab_eval "document.querySelector('button[title*=\"ICC full-member\"]').classList.contains('is-active')")
+assert_eq "pill class is-active" 'true' "$v"
 
-# --------------------------------------------------------------------
-echo "Test 2 · Toggle on/off writes/removes URL param"
-# TODO(commit-2):
-#   1. Open /teams?gender=male&team_type=international (pill visible, no team_class on URL)
-#   2. Click pill → URL gains ?team_class=full_member, pill shows ▣
-#   3. Click pill again → URL drops team_class, pill shows ▢
+ab_eval "document.querySelector('button[title*=\"ICC full-member\"]').click()" >/dev/null
+sleep 0.6
+v=$(ab_eval "new URL(location.href).searchParams.get('team_class') || ''")
+assert_eq "click OFF removes team_class" '""' "$v"
 
-# --------------------------------------------------------------------
+# ────────────────────────────────────────────
 echo "Test 3 · Status strip chip"
-# TODO(commit-2):
-#   1. Open URL with team_class=full_member
-#   2. Read scope strip text — assert contains "full members" or "team class"
+ab open "$BASE/teams?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member"
+settle
+strip=$(ab_eval "Array.from(document.querySelectorAll('.wisden-scope-strip-seg')).map(s => s.textContent).join(' | ')")
+assert_contains "status strip shows full members chip" "full members" "$strip"
 
-# --------------------------------------------------------------------
+# ────────────────────────────────────────────
 echo "Test 4 · 'reset all' clears team_class"
-# TODO(commit-2):
-#   1. Open URL with team_class=full_member + gender=male
-#   2. Click 'reset all' button
-#   3. Assert URL is clean (no team_class, no gender)
+ab open "$BASE/teams?gender=male&team_type=international&team_class=full_member"
+settle
+ab_eval "Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === 'reset all')?.click()" >/dev/null
+sleep 0.6
+qs=$(ab_eval "location.search")
+case "$qs" in
+  *team_class=*) bad "reset all left team_class — qs=$qs" ;;
+  *) ok "reset all cleared team_class" ;;
+esac
 
-# --------------------------------------------------------------------
-echo "Test 5 · COPY LINK preserves team_class"
-# TODO(commit-2): if status-strip COPY LINK button writes URL to clipboard,
-# verify that URL contains team_class=full_member.
-
-# --------------------------------------------------------------------
 echo
 echo "────────────────────────────────────────"
-echo "Passed: $PASS"
-echo "Failed: $FAIL"
-exit $((FAIL > 0 ? 1 : 0))
+echo "Passed: $PASS  Failed: $FAIL"
+[ $FAIL -gt 0 ] && { echo -e "Failures:$FAILS"; exit 1; }
+exit 0

@@ -278,6 +278,55 @@ else
   FAIL=$((FAIL + 1))
 fi
 
+# ─────────────── ANCHOR E1 — FilterBar fm narrows everything ───────────────
+# v3 — same scope as A' but team_class is on the FILTERBAR rather
+# than the avg slot. Expectation: all three columns inherit fm:
+#   - Australia col narrows to its 16 FM matches (vs 22 unbounded in A')
+#   - India col narrows to 31 FM matches (vs 34 unbounded in A')
+#   - Avg col stays at the 140 FM pool (= same as A')
+# Chip ↔ avg agreement is native (both team-side and league-side
+# compute against filters.team_class=fm — no chip alignment hint
+# needed).
+navigate "$BASE/teams?team=Australia&gender=male&team_type=international&tab=Compare&compare1=__avg__&compare2=India&season_from=2024&season_to=2025&team_class=full_member" \
+  "Anchor E1 — INTL 2024-2025, FilterBar fm (3 cols inherit)"
+
+JSON_E1=$(extract_grid 2>/dev/null)
+
+EXPECTED_E1=$(cat <<'PYEXPECT'
+{
+  "Australia": {
+    "_match_header": "Australia",
+    "matches_text": "16",
+    "rows": {
+      ("RESULTS", "Matches"):     {"value": 16},
+      ("BATTING", "Run rate"):    {"value": 9.82, "chip_avg": 8.50},
+    },
+  },
+  "Full-member average": {
+    "_match_header": "Full-member average",
+    "matches_text": "140",
+    "rows": {
+      ("BATTING", "Run rate"):    {"value": 8.50},
+    },
+  },
+  "India": {
+    "_match_header": "India",
+    "matches_text": "31",
+    "rows": {
+      ("RESULTS", "Matches"):     {"value": 31},
+      ("BATTING", "Run rate"):    {"value": 9.41, "chip_avg": 8.50},
+    },
+  },
+}
+PYEXPECT
+)
+
+if run_assertions "ANCHOR E1 FilterBar fm inheritance" "$JSON_E1" "$EXPECTED_E1"; then
+  PASS=$((PASS + 1))
+else
+  FAIL=$((FAIL + 1))
+fi
+
 # ─────────────── ANCHOR B — IPL 2025 (closed-league avg) ───────────────
 navigate "$BASE/teams?team=Royal+Challengers+Bengaluru&gender=male&team_type=club&tab=Compare&compare1=__avg__&compare2=Sunrisers+Hyderabad&season_from=2025&season_to=2025" \
   "Anchor B — IPL 2025 club"
