@@ -135,6 +135,119 @@ What does NOT work today:
 
 ---
 
+## 2.5 LOAD-BEARING — Three modes that MUST coexist post-migration
+
+This section is NON-NEGOTIABLE. The migration must preserve all three.
+The user's question 2026-04-28 made the requirement explicit:
+
+> "we do not remove the ability of the average to be made on the basis
+> of full teams versus not full teams, independent of what we do with
+> the actual filters … we can change the average for full teams or
+> the average for all teams and look at India against full teams, as
+> in Australia against full teams, and that these latter parts are
+> driven by the filter bar at the top."
+
+Three modes:
+
+| Mode | FilterBar `team_class` | Per-slot `compareN_team_class` | Worked example (men_intl 2024-25) |
+|---|---|---|---|
+| **A — Symmetric all-teams** | off | off | Aus 22 matches vs India 34 vs avg-all-teams (1196 in scope) |
+| **B — Asymmetric FM-only avg** | off | on (avg slot) | **Aus 22 matches** (vs everyone) vs **India 34** (vs everyone) vs **avg-of-FM-only** (140 in scope). Chip on Aus baselines to the FM-only 140 via `chip_team_class`. ← **the workflow protected by this section** |
+| **C — Symmetric FM-only** | on | hidden (redundant) | Aus 16 matches (vs FM only) vs India 31 (vs FM only) vs avg-FM (140) |
+
+**Mode B is what the user wants protected.** It's the "compare a single team's full record against a meaningful league baseline" view. Without it, users can compare Aus only when they're willing to also drop their associate-opponent matches. With it, users can examine "how does Australia's full record stack up against the elite-team-only baseline?".
+
+### Mechanism preservation per mode
+
+**Mode A** — both FilterBar and per-slot are off. No team_class
+clauses fire anywhere. Default behaviour today + post-migration.
+
+**Mode B (the protected one)** — per-slot URL `compareN_team_class=full_member`:
+
+1. `useCompareSlots` reads the URL param. Slot's scope object has
+   `team_class: 'full_member'`.
+2. Avg slot fetcher (`getScopeAverageProfile`) sends `?team_class=full_member`
+   to `/api/v1/scope/averages/*`.
+3. **Today:** the URL param is parsed into `aux.team_class`.
+   `filters.build()` (called with `aux=aux`) appends `full_member_clause()`.
+4. **After spec:** the URL param is parsed into `filters.team_class`
+   instead. `filters.build()` appends `full_member_clause()` from the
+   FilterBarParams branch. **Same clause, same SQL, same result.**
+5. Team-side fetcher detects the peer avg slot has team_class set and
+   sends `chip_team_class=full_member` on the team request. This is
+   parsed into `aux.chip_team_class` (UNCHANGED post-migration —
+   `chip_team_class` stays in `AuxParams`).
+6. `_league_aux` reads `aux.chip_team_class` and copies it onto the
+   synthesized league-side aux's `team_class` for the
+   league-baseline query. This makes the chip envelope's `scope_avg`
+   numerically equal the displayed avg col's value. (UNCHANGED.)
+
+So Mode B works post-migration with **zero code-path change** —
+the only difference is which Python class parses the URL param.
+
+**Mode C** — FilterBar `team_class=full_member`. Both team-side AND
+avg-side requests carry `?team_class=full_member`. Symmetric — both
+narrow. No `chip_team_class` hint needed because both queries have
+team_class natively.
+
+### What gets removed vs what stays
+
+```
+                  REMOVED                         KEEPS WORKING
+──────────────────────────────────────────────────────────────────────────────
+AuxParams.team_class            FilterBarParams.team_class (NEW — same role)
+                                 AuxParams.chip_team_class  (UNCHANGED)
+                                 _league_aux's chip_team_class → team_class copy
+                                 useCompareSlots OVERRIDABLE_SLOT_KEYS includes
+                                   team_class (per-slot URLs work unchanged)
+                                 SlotScopeEditor's Class dropdown
+                                 AddCompareSlot's "+ Full-member avg" quick-pick
+                                   (gated on FilterBar team_class being OFF — if
+                                    FilterBar is on, the quick-pick is hidden as
+                                    redundant; if off, it's the entry point to
+                                    Mode B)
+```
+
+The "remove `AuxParams.team_class`" decision in §4.1 is about
+**eliminating field duplication** (the URL param now has a single
+home, in FilterBarParams). The avg-narrowing functionality is
+preserved 100% — same URL, same SQL, same result. The field-name
+move is invisible to anyone using the per-slot URL param.
+
+### Test coverage for the three modes
+
+After migration, three integration scripts must coexist:
+
+1. `tests/integration/teams_compare_intl_fm_filterbar.sh` — Mode C
+   (symmetric FM via FilterBar). Aus 16, India 31, avg 140.
+2. `tests/integration/teams_compare_intl_fm_per_slot.sh` — Mode B
+   (asymmetric — avg-only FM via per-slot). Aus 22, India 34, avg
+   140, chips baselined to 140. **THIS SCRIPT IS THE GUARDIAN of the
+   user's protected workflow.**
+3. `tests/integration/compare_avg_chips.sh` Anchor A' — already exists,
+   tests Mode B end-to-end with ~80 cell + chip-math assertions. Stays
+   AS-IS (URL still uses `compare1_team_class=full_member`).
+
+Plus the existing `tests/sanity/test_avg_baseline_numbers.py`'s
+"FM-avg + chip_team_class=fm" row covers the chip alignment math for
+Mode B at the SQL level.
+
+### What goes wrong if Mode B regresses
+
+Symptom: the avg col still says "140 matches" and shows FM-only
+numbers, but the chip on the Aus team col baselines against the
+WRONG pool (e.g. against the unbounded 1196-match avg) — chip math
+no longer agrees with the displayed avg col.
+
+Detection: `compare_avg_chips.sh` Anchor A' fails on the chip-math
+invariant — the displayed delta % won't equal `(value − scope_avg) /
+scope_avg × 100` for the FM avg.
+
+Mitigation: the integration script runs on every commit. If it fails,
+revert.
+
+---
+
 ## 3. Surface-level changes (what the user sees)
 
 ### 3.1 FilterBar widget
@@ -288,17 +401,26 @@ The work split:
    if self.team_class == "full_member":
        clauses.append(full_member_clause(table_alias=table_alias))
    ```
-4. Remove `team_class` field from `AuxParams` (keep the field name
-   reserved for backward-compat aux requests — accept the param,
-   silently no-op, log a deprecation warning the first time it's
-   seen). Or remove cleanly and break old per-slot URL bookmarks.
-   **Decision: remove cleanly.** Per-slot URLs from the Compare tab
-   are auto-rewritten by `useCompareSlots`'s migration (see frontend
-   §5.6). Old `?team_class=…` aux requests become accidental
-   no-ops — caught by tests.
-5. Keep `AuxParams.chip_team_class` exactly as today. Asymmetric
-   Compare-tab use is still valid: user wants their primary col on
-   "Aus vs everyone" but the avg col FM-only.
+4. Remove `team_class` field from `AuxParams`. **This is a
+   field-name move, NOT a feature removal.** The functionality
+   (avg narrowing to FM-only on per-slot URLs) is fully preserved
+   because the URL param `?team_class=full_member` now lands in
+   `FilterBarParams.team_class` instead — same SQL, same result.
+
+   **Critical correctness check:** before this edit, do a grep across
+   `api/` for any `aux.team_class` reference that ISN'T inside
+   `_league_aux` or `FilterBarParams.build()`. If there's a third
+   reader (e.g. some endpoint that handles team_class differently
+   from the standard clause), the move needs to update that reader
+   too. Probably none today — but verify.
+
+5. **Keep `AuxParams.chip_team_class` exactly as today.** This is
+   the alignment HINT mechanism (separate from the avg-narrowing
+   filter). Without it, Mode B from §2.5 would still narrow the avg
+   col but the chip math on the team col would baseline against the
+   wrong pool. `_league_aux` continues to copy `chip_team_class →
+   new_aux.team_class` on the synthesized league-side aux for
+   chip-baseline alignment.
 
 ### 4.2 Update `_league_aux` propagation
 
@@ -1059,6 +1181,10 @@ can't trust.
    wild. Lean: **remove cleanly**. The per-slot Compare URLs
    (`compareN_team_class=full_member`) keep working via the per-slot
    override mechanism — that field is still on `OVERRIDABLE_SLOT_KEYS`.
+   See §2.5 for the full preservation argument — the avg-narrowing
+   capability is preserved 100% (URL param now lands in
+   `FilterBarParams.team_class`); the field-name change is invisible
+   to anyone using a per-slot URL.
 2. **Default state**: pill defaults off (current proposal) or on for
    intl users? Lean: **off**. Matches FilterBar's "no narrowing"
    default for everything else.
@@ -1075,7 +1201,70 @@ can't trust.
    it's not adding to the default-state crowding**. Verify in
    browser.
 
+## 14. Sibling spec — `series_type` on the FilterBar
+
+User asked 2026-04-28 whether `team_class` could subsume `series_type`
+("the team class can be used for this as well and that this filter can
+be generically added to the entire application"). Answer: **NO, but
+write a parallel sibling spec.**
+
+### Why not subsume
+
+`team_class` and `series_type` target ORTHOGONAL match attributes:
+
+- **`team_class`** classifies the TEAMS — filters on `m.team1` /
+  `m.team2` against `ICC_FULL_MEMBERS`.
+- **`series_type`** classifies the EVENT — filters on `m.event_name`
+  against `tournament_canonical.TOURNAMENT_SERIES_TYPE` (`bilateral`
+  / `icc` / `franchise_league` / etc.).
+
+They compose cleanly: `series_type=icc & team_class=full_member` =
+"ICC events between two FM teams" = the Super-8 + knockout subset of
+WCs. This works today. Subsuming into a single field would force an
+N×M product of dropdown values (`bilateral`, `bilateral_fm`, `icc`,
+`icc_fm`, `tournament_fm`, …) — UX noise, and breaks the orthogonal
+composability that lets future class extensions (`icc_associate`,
+`tier_1`) compose with future series_type extensions naturally.
+
+### What to do instead
+
+Write `internal_docs/spec-filterbar-series-type.md` as a **parallel
+sibling spec** with the same shape:
+
+1. Move `series_type` from `AuxParams` (where it is today as a
+   page-local Series-tab field) to `FilterBarParams` as the 10th
+   FilterBar key.
+2. Add a chip-toggle widget in the FilterBar (intl-only? or
+   intl+club? — open question; bilateral is intl-only but
+   `franchise_league` is club).
+3. Update every page that currently reads series_type from URL to
+   instead use the FilterBar field.
+4. Same pre-flight ground truth, regression URL fan-out, integration
+   scripts pattern as this spec.
+
+### Order
+
+Recommend **team_class first, then series_type as the next session**.
+Reasons:
+- team_class is fully scoped here. series_type needs its own
+  ripple-effect catalogue (it interacts with the existing Series-tab
+  Show pill — that needs to either become the FilterBar widget or
+  become a redundant chrome that mirrors the FilterBar's state).
+- Doing both in one session means 2× the regression URL fan-out
+  (~250 new URLs) and 2× the integration scripts. Higher risk of
+  fan-out-induced merge conflicts.
+- Each spec independently is medium-risk; doing them sequentially
+  is low-risk × 2.
+
+### Don't do this in the team_class spec
+
+Do NOT add series_type to FILTER_KEYS in this spec's commits. Leave
+that as the sibling spec's work. The two specs share zero load-
+bearing edges — they're the same SHAPE of work but on independent
+fields.
+
 ---
 
-*Spec v2 — 2026-04-27. Replaces the 294-line v1. Pick up next
-session per §12.*
+*Spec v2 — 2026-04-27. Updated 2026-04-28 with §2.5 (three-modes
+preservation) + §14 (sibling spec for series_type). Replaces the
+294-line v1. Pick up next session per §12.*
