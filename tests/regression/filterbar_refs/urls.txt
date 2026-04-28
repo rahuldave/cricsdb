@@ -37,3 +37,10 @@ REG sea_team_tournament               /api/v1/seasons?team=Mumbai%20Indians&tour
 NEW sea_venue_wankhede                /api/v1/seasons?filter_venue=Wankhede%20Stadium
 NEW sea_rivalry_pair                  /api/v1/seasons?filter_team=India&filter_opponent=Australia&gender=male&team_type=international
 NEW sea_series_icc_team               /api/v1/seasons?team=India&gender=male&team_type=international&series_type=icc
+# v3 team_class FilterBar — generated NEW URLs (one-shot)
+# Source: each row mirrors a REG row in urls.txt with &team_class=full_member appended.
+# Filter: only intl-context REG entries qualify.
+
+NEW trn_team_type_intl_fm                              /api/v1/tournaments?team_type=international&team_class=full_member
+NEW trn_rivalry_ind_aus_fm                             /api/v1/tournaments?team=India&opponent=Australia&gender=male&team_type=international&team_class=full_member
+NEW trn_team_gender_type_fm                            /api/v1/tournaments?team=India&gender=male&team_type=international&team_class=full_member

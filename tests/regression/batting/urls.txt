@@ -37,3 +37,17 @@ REG bat_summary_kohli_wankhede        /api/v1/batters/ba607b88/summary?filter_ve
 # ── search (landing → player picker) ─────────────────────────────
 REG ref_players_search_kohli          /api/v1/players?q=Kohli&limit=10
 REG ref_players_search_batter_role    /api/v1/players?q=Samson&role=batter&limit=5
+# v3 team_class FilterBar — generated NEW URLs (one-shot)
+# Source: each row mirrors a REG row in urls.txt with &team_class=full_member appended.
+# Filter: only intl-context REG entries qualify.
+
+NEW bat_leaders_men_intl_fm                            /api/v1/batters/leaders?gender=male&team_type=international&limit=10&team_class=full_member
+NEW bat_leaders_with_thresholds_fm                     /api/v1/batters/leaders?gender=male&team_type=international&min_balls=200&min_dismissals=5&team_class=full_member
+NEW bat_summary_kohli_intl_fm                          /api/v1/batters/ba607b88/summary?gender=male&team_type=international&team_class=full_member
+NEW bat_vs_bowlers_kohli_fm                            /api/v1/batters/ba607b88/vs-bowlers?gender=male&team_type=international&min_balls=12&team_class=full_member
+NEW bat_by_over_kohli_fm                               /api/v1/batters/ba607b88/by-over?gender=male&team_type=international&team_class=full_member
+NEW bat_by_phase_kohli_fm                              /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international&team_class=full_member
+NEW bat_dismissals_kohli_fm                            /api/v1/batters/ba607b88/dismissals?gender=male&team_type=international&team_class=full_member
+NEW bat_inter_wicket_kohli_fm                          /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international&team_class=full_member
+NEW bat_summary_kohli_vs_aus_fm                        /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
+NEW bat_by_innings_kohli_vs_aus_fm                     /api/v1/batters/ba607b88/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5&team_class=full_member

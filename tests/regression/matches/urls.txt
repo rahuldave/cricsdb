@@ -22,3 +22,10 @@ REG match_scorecard_13017             /api/v1/matches/13017/scorecard
 
 # ── innings-grid ─────────────────────────────────────────────────
 REG match_innings_grid_13017          /api/v1/matches/13017/innings-grid
+# v3 team_class FilterBar — generated NEW URLs (one-shot)
+# Source: each row mirrors a REG row in urls.txt with &team_class=full_member appended.
+# Filter: only intl-context REG entries qualify.
+
+NEW matches_list_men_intl_fm                           /api/v1/matches?gender=male&team_type=international&limit=5&team_class=full_member
+NEW matches_list_men_intl_offset_fm                    /api/v1/matches?gender=male&team_type=international&limit=5&offset=10&team_class=full_member
+NEW matches_list_ind_vs_aus_fm                         /api/v1/matches?filter_team=India&filter_opponent=Australia&gender=male&team_type=international&limit=5&team_class=full_member
