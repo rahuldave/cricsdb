@@ -364,9 +364,18 @@ the dedicated docs:
 
 ### Build-ready specs (pick up next session)
 
+- **`internal_docs/spec-filterbar-team-class-v3.md`** — promote
+  `team_class=full_member` to the 9th FilterBar key as the next
+  overridable axis (peer of tournament / season / venue /
+  series_type). Pill is intl-only; backend has a defensive intl
+  gate; the Compare-tab fix is one line in `useCompareSlots`.
+  v3 supersedes the original `spec-filterbar-team-class.md` (v2,
+  preserved for history) — v2's "three modes" framing was
+  corrected via a 2026-04-28 audit. 5-commit rollout, ~25 SQL
+  ground-truth anchors, ~125 regression URLs, 22-surface
+  integration matrix. Pre-flight + pick-up notes in
+  `project_next_session.md` memory.
 - **`internal_docs/spec-team-compare-scoped-slots.md`** — per-column
   scope override on Teams Compare so users can do "RCB 2024 vs RCB
-  2025 vs IPL 2025 avg". 5 design decisions locked, 3-commit
-  rollout plan in the spec, backend zero-touch. Pick-up notes
-  (pre-flight checks, gotchas, international test scenarios) live
-  in the `project_next_session.md` memory.
+  2025 vs IPL 2025 avg". Already shipped 2026-04-27; preserved here
+  as the architectural reference that team_class v3 builds on.
