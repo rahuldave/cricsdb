@@ -24,7 +24,7 @@ export default function SlotScopeEditor({
   const [seasonTo, setSeasonTo]     = useState(initial.season_to   ?? primary.season_to   ?? '')
   const [filterVenue, setFilterVenue] = useState(initial.filter_venue ?? primary.filter_venue ?? '')
   const [seriesType, setSeriesType] = useState(initial.series_type ?? primary.series_type ?? '')
-  const [teamClass, setTeamClass]   = useState(initial.team_class  ?? '')
+  const [teamClass, setTeamClass]   = useState(initial.team_class  ?? primary.team_class ?? '')
 
   const isInternational = primary.team_type === 'international'
 
@@ -53,9 +53,7 @@ export default function SlotScopeEditor({
     if (cmp(seasonTo,   primary.season_to))    o.season_to    = seasonTo
     if (cmp(filterVenue, primary.filter_venue)) o.filter_venue = filterVenue
     if (cmp(seriesType, primary.series_type))  o.series_type  = seriesType
-    // team_class isn't on the FilterBar — primary always inherits null,
-    // so any non-empty value here is a real divergence.
-    if (teamClass) o.team_class = teamClass
+    if (cmp(teamClass, primary.team_class))    o.team_class   = teamClass
     onApply(o)
   }
 

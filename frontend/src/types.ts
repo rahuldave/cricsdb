@@ -27,11 +27,15 @@ export interface FilterParams {
    *  backend-side on (team is None AND no explicit tournament filter).
    *  Backed by ix_matchplayer_team for fast subquery. */
   scope_to_team?: string
-  /** Per-slot avg baseline narrowing for internationals — restricts
-   *  the match pool to fixtures between two ICC full-member teams.
-   *  Currently only `'full_member'` is supported; expand as new
-   *  classes are needed (e.g. 'top_8', 'cricket_world_cup_qualifiers').
-   *  No-op for clubs (full-member is an international classification). */
+  /** FilterBar narrowing — restricts the match pool to fixtures
+   *  between two teams in a named class. Currently only
+   *  `'full_member'` (= matches between two ICC full-member nations)
+   *  is supported; expand as new classes are needed.
+   *  Defensive backend gate: no-op when `team_type !== 'international'`
+   *  (full-member status is an intl classification). FilterBar widget
+   *  hides the pill on club / "All". Inherits down to compare slots
+   *  via `useCompareSlots`; per-slot URL `compareN_team_class=...`
+   *  overrides like every other overridable axis. */
   team_class?: string
   /** Chip-baseline alignment hint sent ONLY by the Compare-tab team
    *  slot's fetcher when a peer avg slot has team_class set. Tells

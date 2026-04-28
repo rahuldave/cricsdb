@@ -37,6 +37,7 @@ export const FILTER_KEYS = [
   'filter_team',
   'filter_opponent',
   'filter_venue',
+  'team_class',
 ] as const
 export type FilterKey = typeof FILTER_KEYS[number]
 

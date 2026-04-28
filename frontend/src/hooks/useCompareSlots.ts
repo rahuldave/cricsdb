@@ -45,9 +45,10 @@ function inheritedScope(primary: FilterParams): ResolvedSlotScope {
     season_to: primary.season_to,
     filter_venue: primary.filter_venue,
     series_type: primary.series_type,
-    // team_class isn't in the FilterBar — primary always inherits null.
-    // Slots can override via per-slot URL params (compareN_team_class).
-    team_class: undefined,
+    // team_class is the 9th FilterBar key (post-v3); slots inherit
+    // primary by default, override via compareN_team_class URL param —
+    // peer of every other overridable axis.
+    team_class: primary.team_class,
   }
 }
 

@@ -58,6 +58,7 @@ function primarySlotOf(team: string, filters: FilterParams): SlotState {
       season_to: filters.season_to,
       filter_venue: filters.filter_venue,
       series_type: filters.series_type,
+      team_class: filters.team_class,
     },
     overrides: {},
   }

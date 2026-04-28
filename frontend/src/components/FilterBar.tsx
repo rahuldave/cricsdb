@@ -176,6 +176,18 @@ export default function FilterBar() {
   const seasonFrom = params.get('season_from') || ''
   const seasonTo = params.get('season_to') || ''
   const filterVenue = params.get('filter_venue') || ''
+  const teamClass = params.get('team_class') || ''
+
+  // Auto-clear team_class when team_type leaves 'international'.
+  // Defensive deep-link guard + Type-segmented-control side effect:
+  // full-member status is an intl classification — for clubs the FM
+  // list (country names) doesn't match franchise team strings, so
+  // letting it ride would silently zero out every match.
+  useEffect(() => {
+    if (teamType !== 'international' && teamClass) {
+      setUrlParams({ team_class: '' }, { replace: true })
+    }
+  }, [teamType, teamClass])
 
   const filteredTournaments = tournaments.filter(t => {
     if (teamType && t.team_type !== teamType) return false
@@ -185,7 +197,7 @@ export default function FilterBar() {
 
   const segBtn = (active: boolean) => `wisden-seg${active ? ' is-active' : ''}`
 
-  const anyFilterSet = Boolean(gender || teamType || tournament || seasonFrom || seasonTo || filterVenue)
+  const anyFilterSet = Boolean(gender || teamType || tournament || seasonFrom || seasonTo || filterVenue || teamClass)
   const latestInScope = seasons.length > 0 && !seasonsError ? seasons[seasons.length - 1] : null
   const clearSeasons = () => setUrlParams({ season_from: '', season_to: '' })
   const setLatest = () => {
@@ -209,6 +221,7 @@ export default function FilterBar() {
   const clearAll = () => setUrlParams({
     gender: '', team_type: '', tournament: '',
     season_from: '', season_to: '', filter_venue: '',
+    team_class: '',
   })
 
   const setVenue = (name: string) => setUrlParams({ filter_venue: name })
@@ -249,6 +262,19 @@ export default function FilterBar() {
             ))}
           </select>
         </div>
+
+        {teamType === 'international' && (
+          <div className="wisden-filter-group">
+            <button
+              type="button"
+              onClick={() => set('team_class', teamClass ? '' : 'full_member')}
+              className={segBtn(teamClass === 'full_member')}
+              title="Restrict to matches between two ICC full-member nations (excludes associate teams like Scotland, Nepal, USA, …)."
+            >
+              {teamClass === 'full_member' ? '▣' : '▢'} Full members only
+            </button>
+          </div>
+        )}
 
         <div className="wisden-filter-group">
           <span className="wisden-filter-label">Seasons</span>

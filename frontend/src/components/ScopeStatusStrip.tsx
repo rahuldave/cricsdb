@@ -76,6 +76,12 @@ function buildSegments(
     segs.push({ label: 'Venue', value: filters.filter_venue })
   }
 
+  // FilterBar team_class (post-v3) — intl-only narrowing to matches
+  // between two ICC full-member nations.
+  if (filters.team_class === 'full_member') {
+    segs.push({ label: 'Team class', value: 'full members' })
+  }
+
   // Series-type aux filter — surfaced on every tab where it's set.
   // Initially a Series-tab-local pill, but the AuxParams refactor made
   // it propagate through useFilters and apply on every endpoint, so
