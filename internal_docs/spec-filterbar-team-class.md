@@ -360,10 +360,30 @@ The work split:
 
 ### 3.5 Cross-cutting interactions
 
-- **`series_type` × `team_class`**: independent. Composable.
+- **`series_type` × `team_class`**: **INDEPENDENT ORTHOGONAL AXES —
+  DO NOT MERGE INTO A SINGLE FIELD.** They target different SQL
+  columns:
+  - `series_type` filters on `m.event_name` against
+    `tournament_canonical.TOURNAMENT_SERIES_TYPE` patterns
+    (`bilateral` / `icc` / `franchise_league` / etc.). Classifies
+    the EVENT.
+  - `team_class` filters on `m.team1` AND `m.team2` against
+    `ICC_FULL_MEMBERS`. Classifies the TEAMS.
+
+  They compose cleanly via `filters.build()` AND-conjunction.
   `series_type=icc & team_class=full_member` = "FM-only ICC events"
-  (= Super-8s + knockouts at WCs). Both clauses AND together via
-  `filters.build()`.
+  = the Super-8 + knockout subset of WCs. Subsuming them into a
+  single `match_class` field would force an N×M product of dropdown
+  values (`bilateral`, `bilateral_fm`, `icc`, `icc_fm`,
+  `franchise_league`, …) — UX noise, AND it would block future
+  class-axis expansion (`team_class=tier_1` × `series_type=icc` is
+  a clean composition; `match_class=tier_1_icc` is a leaky enum).
+
+  Sibling spec `internal_docs/spec-filterbar-series-type.md` (to be
+  written) will promote `series_type` to FilterBar in a parallel
+  effort to this one — same SHAPE of work, independent rollout. See
+  §14 for the rationale on order and why these don't share commits.
+
 - **`scope_to_team` × `team_class`**: `scope_to_team` is club-only
   (the `_league_aux` gate). `team_class` is intl-only (the FilterBar
   visibility gate). Mutually exclusive by team_type — never both
