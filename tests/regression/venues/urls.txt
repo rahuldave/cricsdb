@@ -30,8 +30,8 @@ REG field_summary_venue_wankhede      /api/v1/fielders/ba607b88/summary?filter_v
 
 # ── teams (uses filters.build directly via _team_filter_clause) ──
 REG teams_landing_plain               /api/v1/teams/landing
-REG team_summary_india                /api/v1/teams/India/summary?gender=male&team_type=international
-REG team_summary_india_venue_wank     /api/v1/teams/India/summary?gender=male&team_type=international&filter_venue=Wankhede%20Stadium
+NEW team_summary_india                /api/v1/teams/India/summary?gender=male&team_type=international
+NEW team_summary_india_venue_wank     /api/v1/teams/India/summary?gender=male&team_type=international&filter_venue=Wankhede%20Stadium
 REG team_results_india                /api/v1/teams/India/results?gender=male&team_type=international&limit=5
 
 # ── head_to_head (path params; not query) ────────────────────────

@@ -13,9 +13,9 @@
 # 2026-04-27 international avg-baseline correction (the gate is
 # applied client-side in TeamCompareGrid.fetchSlot — backend still
 # honours scope_to_team when explicitly passed).
-REG scope_summary_unfiltered                /api/v1/scope/averages/summary
-REG scope_summary_ipl_2024                  /api/v1/scope/averages/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
-REG scope_summary_men_intl_2024             /api/v1/scope/averages/summary?gender=male&team_type=international&season_from=2024&season_to=2024
+NEW scope_summary_unfiltered                /api/v1/scope/averages/summary
+NEW scope_summary_ipl_2024                  /api/v1/scope/averages/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW scope_summary_men_intl_2024             /api/v1/scope/averages/summary?gender=male&team_type=international&season_from=2024&season_to=2024
 REG scope_batting_summary_ipl_2024          /api/v1/scope/averages/batting/summary?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
 REG scope_batting_summary_women_club_2024   /api/v1/scope/averages/batting/summary?gender=female&team_type=club&season_from=2024&season_to=2024
 REG scope_batting_by_phase_ipl_2024         /api/v1/scope/averages/batting/by-phase?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
@@ -48,7 +48,7 @@ REG team_partnerships_by_wicket_mi_ipl_2024 /api/v1/teams/Mumbai%20Indians/partn
 # /teams/{team}/summary computes its scope_avg via filters.build()
 # directly (no scope_to_team plumbing), so the 2026-04-27 _league_aux
 # gate doesn't affect it — stable across the change.
-REG team_summary_india_men_intl             /api/v1/teams/India/summary?gender=male&team_type=international
+NEW team_summary_india_men_intl             /api/v1/teams/India/summary?gender=male&team_type=international
 REG team_bowling_by_season_india            /api/v1/teams/India/bowling/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
 REG team_fielding_by_season_india           /api/v1/teams/India/fielding/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
 REG team_bowling_by_phase_mi_ipl            /api/v1/teams/Mumbai%20Indians/bowling/by-phase?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
@@ -75,7 +75,7 @@ REG live_team_bowling_by_season_wankhede    /api/v1/teams/Mumbai%20Indians/bowli
 REG live_team_fielding_by_season_wankhede   /api/v1/teams/Mumbai%20Indians/fielding/by-season?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium
 REG live_team_partnerships_by_wicket_wank   /api/v1/teams/Mumbai%20Indians/partnerships/by-wicket?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium&side=batting
 REG live_team_partnerships_by_season_wank   /api/v1/teams/Mumbai%20Indians/partnerships/by-season?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium&side=batting
-REG live_scope_summary_wankhede             /api/v1/scope/averages/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium
+NEW live_scope_summary_wankhede             /api/v1/scope/averages/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium
 REG live_scope_batting_summary_wankhede     /api/v1/scope/averages/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium
 REG live_scope_bowling_by_phase_wankhede    /api/v1/scope/averages/bowling/by-phase?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium
 REG live_scope_partnerships_by_wicket_wank  /api/v1/scope/averages/partnerships/by-wicket?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium
@@ -85,7 +85,7 @@ REG live_scope_partnerships_by_wicket_wank  /api/v1/scope/averages/partnerships/
 # is unbounded for internationals → drift on the team URL. The avg
 # endpoint URLs are unchanged (backend honours its inputs).
 REG live_team_batting_summary_bilat         /api/v1/teams/Australia/batting/summary?gender=male&team_type=international&series_type=bilateral_only
-REG live_scope_summary_bilat                /api/v1/scope/averages/summary?gender=male&team_type=international&series_type=bilateral_only
+NEW live_scope_summary_bilat                /api/v1/scope/averages/summary?gender=male&team_type=international&series_type=bilateral_only
 REG live_scope_batting_by_phase_bilat       /api/v1/scope/averages/batting/by-phase?gender=male&team_type=international&series_type=bilateral_only
 
 # rivalry context (filter_team+filter_opponent) — no tournament. Same

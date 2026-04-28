@@ -16,9 +16,9 @@ REG teams_landing_men_club_ipl_2024   /api/v1/teams/landing?gender=male&team_typ
 REG teams_landing_women               /api/v1/teams/landing?gender=female
 
 # ── team summary / headline endpoints ────────────────────────────
-REG team_summary_india                /api/v1/teams/India/summary?gender=male&team_type=international
-REG team_summary_india_recent         /api/v1/teams/India/summary?gender=male&team_type=international&season_from=2024&season_to=2025
-REG team_summary_mi                   /api/v1/teams/Mumbai%20Indians/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+NEW team_summary_india                /api/v1/teams/India/summary?gender=male&team_type=international
+NEW team_summary_india_recent         /api/v1/teams/India/summary?gender=male&team_type=international&season_from=2024&season_to=2025
+NEW team_summary_mi                   /api/v1/teams/Mumbai%20Indians/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
 REG team_results_india                /api/v1/teams/India/results?gender=male&team_type=international&limit=5
 REG team_results_india_offset         /api/v1/teams/India/results?gender=male&team_type=international&limit=5&offset=5
 REG team_by_season_india              /api/v1/teams/India/by-season?gender=male&team_type=international
