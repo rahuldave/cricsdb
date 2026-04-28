@@ -88,6 +88,14 @@ def _build_filter_clauses(
         if filters.opponent:
             clauses.append(f"({alias}.team1 = :filter_opp OR {alias}.team2 = :filter_opp)")
             params["filter_opp"] = filters.opponent
+    # team_class — defensive intl gate matches FilterBarParams.build().
+    # Hand-rolled here because this helper bypasses filters.build() (the
+    # canonical → variants tournament expansion needs a different code
+    # path). Without this, every Series-tab endpoint silently ignores
+    # the FilterBar's team_class pill.
+    if filters.team_class == "full_member" and filters.team_type == "international":
+        from ..full_members import full_member_clause
+        clauses.append(full_member_clause(table_alias=alias))
     return clauses, params
 
 

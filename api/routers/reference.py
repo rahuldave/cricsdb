@@ -25,6 +25,7 @@ def _reference_clauses(
     season_to: Optional[str] = None,
     filter_venue: Optional[str] = None,
     series_type: Optional[str] = None,
+    team_class: Optional[str] = None,
 ) -> tuple[list[str], dict]:
     """Build WHERE fragments for /tournaments and /seasons.
 
@@ -71,6 +72,14 @@ def _reference_clauses(
         st = _series_type_clause(series_type)
         if st:
             parts.append(st)
+    # team_class — defensive intl gate matches FilterBarParams.build().
+    # Hand-rolled here because /tournaments + /seasons take individual
+    # query params (not FilterParams) so they can drop self-referential
+    # axes. Without this, the FilterBar's tournament + season dropdowns
+    # silently ignore the team_class pill.
+    if team_class == "full_member" and team_type == "international":
+        from ..full_members import full_member_clause
+        parts.append(full_member_clause(table_alias="m"))
     return parts, params
 
 
@@ -84,6 +93,7 @@ async def list_tournaments(
     season_to: Optional[str] = Query(None),
     filter_venue: Optional[str] = Query(None),
     series_type: Optional[str] = Query(None, description="all / bilateral / icc / club (narrows the tournament list)"),
+    team_class: Optional[str] = Query(None, description="full_member (intl-only — narrows to ICC full-member-only matches)"),
 ):
     """List tournaments, narrowed by every FilterBar field the page
     has set — gender, team_type, team, season range, filter_venue,
@@ -105,6 +115,7 @@ async def list_tournaments(
         team, gender, team_type, None,
         season_from=season_from, season_to=season_to,
         filter_venue=filter_venue, series_type=series_type,
+        team_class=team_class,
     )
     if opponent:
         parts.append(
@@ -169,6 +180,7 @@ async def list_seasons(
     filter_opponent: Optional[str] = Query(None),
     filter_venue: Optional[str] = Query(None),
     series_type: Optional[str] = Query(None),
+    team_class: Optional[str] = Query(None, description="full_member (intl-only — narrows to ICC full-member-only matches)"),
 ):
     """Seasons narrowed by every FilterBar field the page has set —
     team / gender / team_type / tournament / filter_venue — plus
@@ -189,6 +201,7 @@ async def list_seasons(
     parts, params = _reference_clauses(
         team, gender, team_type, tournament,
         filter_venue=filter_venue, series_type=series_type,
+        team_class=team_class,
     )
     if filter_team and filter_opponent:
         parts.append(
@@ -242,6 +255,13 @@ async def list_teams(
     if filters.venue:
         where_parts.append("m.venue = :filter_venue")
         params["filter_venue"] = filters.venue
+    # team_class — defensive intl gate. Without this, picking "full
+    # members only" while typing in the team typeahead surfaces
+    # associate teams (Scotland, Nepal) the FilterBar pretends to
+    # exclude.
+    if filters.team_class == "full_member" and filters.team_type == "international":
+        from ..full_members import full_member_clause
+        where_parts.append(full_member_clause(table_alias="m"))
     if q:
         where_parts.append("mp.team LIKE :q")
         params["q"] = f"%{q}%"
@@ -293,6 +313,7 @@ async def search_players(
         filters.gender or filters.team_type or filters.tournament
         or filters.season_from or filters.season_to
         or filters.team or filters.opponent or filters.venue
+        or filters.team_class
         or (aux.series_type and aux.series_type != 'all')
     )
     scope_where = ""
