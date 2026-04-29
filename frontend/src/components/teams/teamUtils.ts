@@ -106,7 +106,11 @@ export function scopeAvgLabel(
     // to entity team cols ("Australia / International average / India").
     line1 = 'International average'
   } else {
-    line1 = 'League average'
+    // No anchoring scope at all (gender-only, etc.). "League average"
+    // alone read as jargon (user feedback 2026-04-29 — "no-one knows
+    // what a league average is"). "Average team" reads as plain
+    // English: a column representing what a typical team in scope does.
+    line1 = 'Average team'
   }
 
   // line2 — gender + tier qualifier (only when not redundant with the

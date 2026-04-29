@@ -97,6 +97,25 @@ export default function AddCompareSlot({
     onAddSlot(AVG_SENTINEL, o)
     closeAll()
   }
+  // Average full-member team, all-time — same team_class narrowing as
+  // onAvgFullMember but ALSO broadens every primary-set narrowing
+  // axis (tournament / season / venue / series_type) via __any__,
+  // matching the relationship between "Average team, current scope"
+  // and "Average team, all-time."
+  const onAvgFullMemberAllTime = () => {
+    const o: SlotOverrides = { team_class: 'full_member' }
+    if (primaryFilters.season_from) o.season_from = ANY_SENTINEL
+    if (primaryFilters.season_to)   o.season_to   = ANY_SENTINEL
+    if (primaryFilters.tournament)  o.tournament  = ANY_SENTINEL
+    if (primaryFilters.filter_venue) o.filter_venue = ANY_SENTINEL
+    if (primaryFilters.series_type) o.series_type = ANY_SENTINEL
+    if (sameAvgAlreadyComparing(o)) {
+      setErr('Average full-member team, all-time is already in comparison.')
+      return
+    }
+    onAddSlot(AVG_SENTINEL, o)
+    closeAll()
+  }
   // League avg, all-time — broaden every primary-narrowed axis via
   // the __any__ sentinel so the avg pool is unbounded along seasons /
   // tournament / venue / series_type / team_class. Inherits gender +
@@ -136,6 +155,11 @@ export default function AddCompareSlot({
     onAddSlot(primaryTeam, overrides)
     closeAll()
   }
+  // Same team, previous season — smart fallback so the pick works
+  // even when primary has no season pinned. With primary on a specific
+  // season → previous-of-primary. With primary unpinned → previous-of-
+  // latest, which lets year-on-year analysis work without requiring
+  // the user to pin primary first.
   const onSameTeamPrev = async () => {
     setErr(null); setBusy(true)
     try {
@@ -146,11 +170,27 @@ export default function AddCompareSlot({
         tournament: primaryFilters.tournament || undefined,
       })
       const seasonsList = r.seasons ?? []
-      const idx = seasonsList.indexOf(primaryFilters.season_from!)
-      const prev = idx > 0 ? seasonsList[idx - 1] : null
-      if (prev == null) {
-        setErr('No previous season in scope.')
+      if (seasonsList.length < 2) {
+        setErr('Not enough seasons in scope for a previous-season comparison.')
         return
+      }
+      let prev: string | null
+      if (primaryFilters.season_from) {
+        const idx = seasonsList.indexOf(primaryFilters.season_from)
+        prev = idx > 0 ? seasonsList[idx - 1] : null
+        if (prev == null) {
+          setErr(`No season before ${primaryFilters.season_from} in scope.`)
+          return
+        }
+      } else {
+        // Primary unpinned — pick the season before the latest so the
+        // comparison reads as "this team's prior year" against an
+        // unpinned (cumulative) primary.
+        prev = seasonsList[seasonsList.length - 2] ?? null
+        if (prev == null) {
+          setErr('No previous season in scope.')
+          return
+        }
       }
       const overrides: SlotOverrides = { season_from: prev, season_to: prev }
       if (sameTeamAlreadyComparing(overrides)) {
@@ -230,21 +270,34 @@ export default function AddCompareSlot({
           <div style={{ fontSize: '0.78em', opacity: 0.6, marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Quick add — same team
           </div>
-          {hasSeason && (
-            <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={onSameTeamPrev} disabled={busy}>
-              + Same team, previous season
-            </button>
-          )}
+          <button
+            type="button"
+            className="comp-link"
+            style={QP_BTN_STYLE}
+            onClick={onSameTeamPrev}
+            disabled={busy}
+            title={hasSeason
+              ? `Pin this column to ${primaryTeam} for the season before primary's — useful for year-on-year analysis.`
+              : `Pin this column to ${primaryTeam} for the season before the latest in scope. Useful for "did the latest year break the trend" reads when primary is unpinned.`}
+          >
+            + Same team, previous season
+          </button>
           {hasAllTimeable && (
             <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={onSameTeamAllTime}>
               + Same team, all-time
             </button>
           )}
           <div style={{ fontSize: '0.78em', opacity: 0.6, marginTop: '0.5rem', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Quick add — league average
+            Quick add — average team (baseline)
           </div>
-          <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={onAvgInScope}>
-            + League avg, current scope
+          <button
+            type="button"
+            className="comp-link"
+            style={QP_BTN_STYLE}
+            onClick={onAvgInScope}
+            title="A column representing what an average team in the current FilterBar scope does. Each metric is the pool-weighted mean across all matches in scope."
+          >
+            + Average team, current scope
           </button>
           {hasAllTimeable && (
             <button
@@ -252,9 +305,9 @@ export default function AddCompareSlot({
               className="comp-link"
               style={QP_BTN_STYLE}
               onClick={onAvgAllTime}
-              title="Avg-column pool broadened past primary's narrowing — uses the __any__ sentinel on tournament / season / venue / series_type so the baseline ignores the FilterBar's narrowing on those axes."
+              title="An average-team column whose pool is broader than the FilterBar — overrides every primary narrowing (tournament / season / venue / series / class) so the baseline is unbounded along those axes. Useful as a long-horizon benchmark."
             >
-              + League avg, all-time
+              + Average team, all-time
             </button>
           )}
           {isInternational && (
@@ -263,9 +316,20 @@ export default function AddCompareSlot({
               className="comp-link"
               style={QP_BTN_STYLE}
               onClick={onAvgFullMember}
-              title="Restrict the avg-column pool to matches between two ICC full-member teams (excludes associates like Namibia, USA, Nepal …)."
+              title="Restrict the average-team pool to matches between two ICC full-member teams (excludes associates like Namibia, USA, Nepal …)."
             >
-              + Full-member avg, current scope
+              + Average full-member team, current scope
+            </button>
+          )}
+          {isInternational && hasAllTimeable && (
+            <button
+              type="button"
+              className="comp-link"
+              style={QP_BTN_STYLE}
+              onClick={onAvgFullMemberAllTime}
+              title="Average-full-member-team pool, broadened past primary's narrowing along tournament / season / venue / series."
+            >
+              + Average full-member team, all-time
             </button>
           )}
           <div style={{ fontSize: '0.78em', opacity: 0.6, marginTop: '0.5rem', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -405,7 +469,7 @@ function CustomBuilder({ primary, primaryTeam, onAdd, onCancel, onErr }: CustomB
         </label>
         <label style={radioStyle}>
           <input type="radio" checked={kind === 'avg'} onChange={() => setKind('avg')} />
-          League average
+          Average team
         </label>
       </div>
       {kind === 'other' && (
