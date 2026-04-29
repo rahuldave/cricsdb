@@ -883,6 +883,21 @@ export interface TeamBattingPhase {
   sixes: number
 }
 
+/** Per-innings_number batting band — sibling of TeamBattingPhase from
+ *  /api/v1/teams/{team}/batting/by-inning. Spec: spec-inning-split.md §3.2. */
+export interface TeamBattingInning {
+  inning_no: number
+  label: string
+  runs: number
+  balls: number
+  run_rate: MetricEnvelope
+  wickets_lost: number
+  boundary_pct: MetricEnvelope
+  dot_pct: MetricEnvelope
+  fours: number
+  sixes: number
+}
+
 export interface TeamTopBatter {
   person_id: string
   name: string
@@ -931,6 +946,19 @@ export interface TeamBowlingSeason {
   worst_conceded: number
 }
 
+export interface TeamBowlingInning {
+  inning_no: number
+  label: string
+  runs_conceded: number
+  balls: number
+  economy: MetricEnvelope
+  wickets: number
+  boundary_pct: MetricEnvelope
+  dot_pct: MetricEnvelope
+  fours_conceded: number
+  sixes_conceded: number
+}
+
 export interface TeamBowlingPhase {
   phase: string
   overs_range: number[]
@@ -968,6 +996,29 @@ export interface TeamFieldingSummary {
   catches_per_match: MetricEnvelope
   stumpings_per_match: MetricEnvelope
   run_outs_per_match: MetricEnvelope
+}
+
+export interface TeamFieldingInning {
+  inning_no: number
+  label: string
+  matches: number
+  catches: number
+  caught_and_bowled: number
+  stumpings: number
+  run_outs: number
+  total_dismissals_contributed: number
+  catches_per_match: MetricEnvelope
+  stumpings_per_match: MetricEnvelope
+  run_outs_per_match: MetricEnvelope
+}
+
+export interface TeamPartnershipsInning {
+  inning_no: number
+  label: string
+  n: MetricEnvelope
+  avg_runs: MetricEnvelope
+  avg_balls: number | null
+  best_runs: number
 }
 
 /** Aggregate partnership stats for a team in the current filter scope.

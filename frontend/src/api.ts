@@ -195,6 +195,8 @@ export const getTeamBattingBySeason = (team: string, filters?: F) =>
   fetchApi<{ seasons: import('./types').TeamBattingSeason[] }>(`/api/v1/teams/${te(team)}/batting/by-season`, filters as Record<string, string>)
 export const getTeamBattingByPhase = (team: string, filters?: F) =>
   fetchApi<{ phases: import('./types').TeamBattingPhase[] }>(`/api/v1/teams/${te(team)}/batting/by-phase`, filters as Record<string, string>)
+export const getTeamBattingByInning = (team: string, filters?: F) =>
+  fetchApi<{ innings: import('./types').TeamBattingInning[] }>(`/api/v1/teams/${te(team)}/batting/by-inning`, filters as Record<string, string>)
 export const getTeamTopBatters = (team: string, filters?: F & { limit?: number }) =>
   fetchApi<{ top_batters: import('./types').TeamTopBatter[] }>(`/api/v1/teams/${te(team)}/batting/top-batters`, filters as Record<string, string>)
 export const getTeamBattingPhaseSeasonHeatmap = (team: string, filters?: F) =>
@@ -206,6 +208,8 @@ export const getTeamBowlingBySeason = (team: string, filters?: F) =>
   fetchApi<{ seasons: import('./types').TeamBowlingSeason[] }>(`/api/v1/teams/${te(team)}/bowling/by-season`, filters as Record<string, string>)
 export const getTeamBowlingByPhase = (team: string, filters?: F) =>
   fetchApi<{ phases: import('./types').TeamBowlingPhase[] }>(`/api/v1/teams/${te(team)}/bowling/by-phase`, filters as Record<string, string>)
+export const getTeamBowlingByInning = (team: string, filters?: F) =>
+  fetchApi<{ innings: import('./types').TeamBowlingInning[] }>(`/api/v1/teams/${te(team)}/bowling/by-inning`, filters as Record<string, string>)
 export const getTeamTopBowlers = (team: string, filters?: F & { limit?: number }) =>
   fetchApi<{ top_bowlers: import('./types').TeamTopBowler[] }>(`/api/v1/teams/${te(team)}/bowling/top-bowlers`, filters as Record<string, string>)
 export const getTeamBowlingPhaseSeasonHeatmap = (team: string, filters?: F) =>
@@ -215,12 +219,17 @@ export const getTeamFieldingSummary = (team: string, filters?: F) =>
   fetchApi<import('./types').TeamFieldingSummary>(`/api/v1/teams/${te(team)}/fielding/summary`, filters as Record<string, string>)
 export const getTeamFieldingBySeason = (team: string, filters?: F) =>
   fetchApi<{ seasons: import('./types').TeamFieldingSeason[] }>(`/api/v1/teams/${te(team)}/fielding/by-season`, filters as Record<string, string>)
+export const getTeamFieldingByInning = (team: string, filters?: F) =>
+  fetchApi<{ innings: import('./types').TeamFieldingInning[] }>(`/api/v1/teams/${te(team)}/fielding/by-inning`, filters as Record<string, string>)
 export const getTeamTopFielders = (team: string, filters?: F & { limit?: number }) =>
   fetchApi<{ top_fielders: import('./types').TeamTopFielder[] }>(`/api/v1/teams/${te(team)}/fielding/top-fielders`, filters as Record<string, string>)
 
 export const getTeamPartnershipsByWicket = (team: string, filters?: F & { side?: 'batting' | 'bowling' }) =>
   fetchApi<{ team: string; side: 'batting' | 'bowling'; by_wicket: import('./types').PartnershipByWicket[] }>(
     `/api/v1/teams/${te(team)}/partnerships/by-wicket`, filters as Record<string, string>)
+export const getTeamPartnershipsByInning = (team: string, filters?: F & { side?: 'batting' | 'bowling' }) =>
+  fetchApi<{ team: string; side: 'batting' | 'bowling'; innings: import('./types').TeamPartnershipsInning[] }>(
+    `/api/v1/teams/${te(team)}/partnerships/by-inning`, filters as Record<string, string>)
 export const getTeamPartnershipsBestPairs = (team: string, filters?: F & { side?: 'batting' | 'bowling'; min_n?: number; top_n?: number }) =>
   fetchApi<import('./types').PartnershipBestPairsResponse>(
     `/api/v1/teams/${te(team)}/partnerships/best-pairs`, filters as Record<string, string>)

@@ -8,12 +8,12 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import {
   getTeamSummary, getTeamByseason, getTeamVs, getTeamResults,
   getTeamOpponentsMatrix, getTeamPlayersBySeason, getTeamsLanding,
-  getTeamBattingSummary, getTeamBattingBySeason, getTeamBattingByPhase, getTeamTopBatters,
+  getTeamBattingSummary, getTeamBattingBySeason, getTeamBattingByPhase, getTeamBattingByInning, getTeamTopBatters,
   getTeamBattingPhaseSeasonHeatmap,
-  getTeamBowlingSummary, getTeamBowlingBySeason, getTeamBowlingByPhase, getTeamTopBowlers,
+  getTeamBowlingSummary, getTeamBowlingBySeason, getTeamBowlingByPhase, getTeamBowlingByInning, getTeamTopBowlers,
   getTeamBowlingPhaseSeasonHeatmap,
-  getTeamFieldingSummary, getTeamFieldingBySeason, getTeamTopFielders,
-  getTeamPartnershipsByWicket, getTeamPartnershipsBestPairs, getTeamPartnershipsHeatmap, getTeamPartnershipsTop,
+  getTeamFieldingSummary, getTeamFieldingBySeason, getTeamFieldingByInning, getTeamTopFielders,
+  getTeamPartnershipsByWicket, getTeamPartnershipsBestPairs, getTeamPartnershipsHeatmap, getTeamPartnershipsTop, getTeamPartnershipsByInning, getTeamPartnershipsSummary,
 } from '../api'
 import StatCard from '../components/StatCard'
 import InningToggle from '../components/InningToggle'
@@ -38,14 +38,16 @@ import ErrorBanner from '../components/ErrorBanner'
 import type {
   TeamSummary, TeamSeasonRecord, TeamVsOpponent, TeamResult,
   OpponentRollup, OpponentsMatrix, TeamPlayersBySeason, TeamsLanding,
-  TeamBattingSummary, TeamBattingSeason, TeamBattingPhase, TeamTopBatter,
+  TeamBattingSummary, TeamBattingSeason, TeamBattingPhase, TeamBattingInning, TeamTopBatter,
   BattingPhaseSeasonHeatmap, BowlingPhaseSeasonHeatmap,
-  TeamBowlingSummary, TeamBowlingSeason, TeamBowlingPhase, TeamTopBowler,
-  TeamFieldingSummary, TeamFieldingSeason, TeamTopFielder,
+  TeamBowlingSummary, TeamBowlingSeason, TeamBowlingPhase, TeamBowlingInning, TeamTopBowler,
+  TeamFieldingSummary, TeamFieldingSeason, TeamFieldingInning, TeamTopFielder,
   PartnershipByWicket, PartnershipPairEntry, PartnershipBestPairsResponse,
   PartnershipHeatmap, PartnershipTopEntry,
+  TeamPartnershipsSummary, TeamPartnershipsInning,
   FilterParams,
 } from '../types'
+import InningBandsRow from '../components/teams/InningBandsRow'
 
 // Tab order: discipline tabs come BEFORE the bare match list so the
 // "list of games" sits at the end — same convention as the player
@@ -493,6 +495,10 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
     () => getTeamBattingByPhase(team, filters),
     filterDeps,
   )
+  const byInning = useFetch<{ innings: TeamBattingInning[] } | null>(
+    () => getTeamBattingByInning(team, filters),
+    filterDeps,
+  )
   const topBatters = useFetch<{ top_batters: TeamTopBatter[] } | null>(
     () => getTeamTopBatters(team, { ...filters, limit: 5 }),
     filterDeps,
@@ -652,6 +658,10 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
         </>
       )}
 
+      {byInning.data && byInning.data.innings.length > 0 && (
+        <InningBandsRow discipline="batting" summary={s} bands={byInning.data.innings} />
+      )}
+
       {topBatters.data && topBatters.data.top_batters.length > 0 && (
         <div>
           <h3 className="wisden-section-title">Top 5 Batters</h3>
@@ -679,6 +689,10 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
   )
   const byPhase = useFetch<{ phases: TeamBowlingPhase[] } | null>(
     () => getTeamBowlingByPhase(team, filters),
+    filterDeps,
+  )
+  const byInning = useFetch<{ innings: TeamBowlingInning[] } | null>(
+    () => getTeamBowlingByInning(team, filters),
     filterDeps,
   )
   const topBowlers = useFetch<{ top_bowlers: TeamTopBowler[] } | null>(
@@ -830,6 +844,10 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
         </>
       )}
 
+      {byInning.data && byInning.data.innings.length > 0 && (
+        <InningBandsRow discipline="bowling" summary={s} bands={byInning.data.innings} />
+      )}
+
       {topBowlers.data && topBowlers.data.top_bowlers.length > 0 && (
         <div>
           <h3 className="wisden-section-title">Top 5 Bowlers</h3>
@@ -857,6 +875,10 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
   )
   const bySeason = useFetch<{ seasons: TeamFieldingSeason[] } | null>(
     () => getTeamFieldingBySeason(team, filters),
+    filterDeps,
+  )
+  const byInning = useFetch<{ innings: TeamFieldingInning[] } | null>(
+    () => getTeamFieldingByInning(team, filters),
     filterDeps,
   )
   const topFielders = useFetch<{ top_fielders: TeamTopFielder[] } | null>(
@@ -924,6 +946,10 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
               title="Run-outs by season" categoryLabel="Season" valueLabel="RO" height={280} />
           </div>
         </>
+      )}
+
+      {byInning.data && byInning.data.innings.length > 0 && (
+        <InningBandsRow discipline="fielding" summary={s} bands={byInning.data.innings} />
       )}
 
       {topFielders.data && topFielders.data.top_fielders.length > 0 && (
@@ -1226,6 +1252,14 @@ function PartnershipsTab({ team, filters, filterDeps }: TabProps) {
     () => getTeamPartnershipsTop(team, { ...filters, side: safeSide, limit: 10 }),
     [...filterDeps, safeSide],
   )
+  const partnershipsSummary = useFetch<TeamPartnershipsSummary | null>(
+    () => getTeamPartnershipsSummary(team, { ...filters, side: safeSide }),
+    [...filterDeps, safeSide],
+  )
+  const byInning = useFetch<{ innings: TeamPartnershipsInning[] } | null>(
+    () => getTeamPartnershipsByInning(team, { ...filters, side: safeSide }),
+    [...filterDeps, safeSide],
+  )
 
   const singleSeason = !!filters.season_from && filters.season_from === filters.season_to
 
@@ -1425,6 +1459,14 @@ function PartnershipsTab({ team, filters, filterDeps }: TabProps) {
             rowKey={r => String(r.partnership_id)}
           />
         </div>
+      )}
+
+      {partnershipsSummary.data && byInning.data && byInning.data.innings.length > 0 && (
+        <InningBandsRow
+          discipline="partnerships"
+          summary={partnershipsSummary.data}
+          bands={byInning.data.innings}
+        />
       )}
     </div>
   )
