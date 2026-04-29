@@ -90,13 +90,19 @@ function PlayerVsPlayer() {
   // If the active series_type becomes invalid after a FilterBar change
   // (e.g. pick Club → 'bilateral' is no longer offered), reset to 'all'
   // via replace — the stale state wasn't user-chosen, don't add history.
+  // Both canonical forms (bilateral / icc / club) and legacy aliases
+  // (bilateral_only / tournament_only) are accepted; the FilterBar
+  // <select> emits the legacy aliases for round-trip parity with
+  // SlotScopeEditor.
   useEffect(() => {
     if (!seriesType || seriesType === 'all') return
     const isClub = filters.team_type === 'club'
     const isIntl = filters.team_type === 'international'
+    const isBilat = seriesType === 'bilateral' || seriesType === 'bilateral_only'
+    const isIcc = seriesType === 'icc' || seriesType === 'tournament_only'
     const valid =
-      (seriesType === 'bilateral' && !isClub)
-      || (seriesType === 'icc' && !isClub)
+      (isBilat && !isClub)
+      || (isIcc && !isClub)
       || (seriesType === 'club' && !isIntl)
     if (!valid) setSeriesType('', { replace: true })
   }, [seriesType, filters.team_type])

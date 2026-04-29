@@ -1444,6 +1444,59 @@ parallel per-INNINGS + per-TEAM convention.
 
 ---
 
+### Shipped 2026-04-28 (series_type promoted to FilterBar — 10th key)
+
+5-commit rollout per `spec-filterbar-series-type.md` §9:
+
+1. **Backend field move** (`4b5abc4`): `series_type` from `AuxParams`
+   to `FilterBarParams`. `build()` reads `self.series_type`;
+   `is_precomputed_scope` reads `filters.series_type`. Test helpers
+   (`make_filters` / `make_aux`) updated. Inert end-to-end — same
+   `series_type_clause` SQL, just sourced from the new param object.
+2. **Frontend FilterBar widget + cleanup** (`2e36512`): `FILTER_KEYS`
+   gains 'series_type' (10th key). New `<select>` in FilterBar
+   between Seasons and Venue with 4 options (All / Bilateral series /
+   Tournaments only / Club tournaments). Values match
+   `SlotScopeEditor`'s existing `bilateral_only` / `tournament_only`
+   aliases for round-trip parity. `useFilters` drops the
+   special-case series_type read. `ScopeStatusStrip` reads
+   `filters.series_type` directly (chip label "Series:").
+   `anyFilterSet` + `clearAll` updated.
+3. **Helper-fan-out verification** (`389bec5`): zero code edits;
+   curl matrix confirming `/tournaments`, `/seasons`, `/matches`,
+   `/teams/{team}/summary`, `/scope/averages/summary` all narrow
+   correctly post-promotion. The only known gap (`list_teams`
+   typeahead) is acknowledged in spec §5.4 as a deferred edge case.
+4. **Regression URL additions** (`59d02cc`): 120 REG URLs across 10
+   suites, mirroring intl REG URLs with `&series_type=bilateral_only`.
+   Tag REG (not NEW) because the promotion is inert by design —
+   backend output is byte-identical pre/post; REG tags pin
+   backwards-compat against future refactors.
+5. **Sanity + integration tests** (this commit):
+   - `tests/sanity/test_series_type_baseline_numbers.py` — 10
+     anchors S1-S10 (per `internal_docs/series-type-anchor-numbers.md`)
+     each verified via SQL + API. ALL PASS.
+   - `tests/integration/series_type_filterbar.sh` — 9 assertions
+     (widget visibility on 3 tabs, URL roundtrip, status strip,
+     reset-all clears).
+   - `tests/integration/series_type_persistence.sh` — 27 assertions
+     (series_type carried + reflected on all 9 tabs).
+   - `tests/integration/series_type_per_tab_narrowing.sh` — 6
+     assertions (every endpoint narrows under bilateral_only).
+
+**Bonus fix landed in commit 5:** `frontend/src/pages/HeadToHead.tsx`
+auto-reset effect now recognizes legacy URL aliases (`bilateral_only`
+/ `tournament_only`) alongside canonical short forms. Pre-promotion
+the only series_type the H2H pill could write was the canonical
+form; post-promotion the FilterBar `<select>` writes the legacy
+alias, and the auto-reset's whitelist needed to learn both.
+
+CLAUDE.md "Critical Design Decisions" updated:
+`series_type is a FilterBar narrowing (10th key)` replaces
+`series_type is a global aux filter`. The
+`FilterBarParams + AuxParams split` bullet's count moved from 8 →
+10 fields.
+
 ### Shipped 2026-04-28 (DOM-tests Batch 1 — series + teams)
 
 4 scripts, 113 DOM assertions across 9 anchors landed under

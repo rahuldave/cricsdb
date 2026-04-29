@@ -168,6 +168,50 @@ uv run python tests/sanity/test_chip_direction_invariant.py --db /tmp/cricket-pr
 Expected output ends with `11 (scope, team) pairs PASS, 0 assertion
 failures` → `ALL PASS`.
 
+### `test_team_class_baseline_numbers.py`
+
+What: 30-anchor SQL-vs-API + raw SQL pin for the v3 team_class
+FilterBar promotion. Pinned to closed historical windows
+(`internal_docs/team-class-anchor-numbers.md`). AXIS A pins match
+counts via summary endpoints; AXIS B pins top-10 batter/bowler
+person_ids via raw SQL; AXIS C pins league + team run rates.
+For FM-mode anchors, asserts `team_class=full_member` narrows
+team-side data correctly. For club anchors, asserts the defensive
+backend gate makes team_class a no-op.
+
+When to run: after any change touching `FilterBarParams`,
+`full_member_clause`, `_apply_results_per_team`,
+`_unique_teams_in_scope`, the dispatch table, or any
+`/scope/averages/*` endpoint.
+
+```bash
+uv run python tests/sanity/test_team_class_baseline_numbers.py
+```
+
+Expected output ends with `ALL PASS`.
+
+### `test_series_type_baseline_numbers.py`
+
+What: 10-anchor SQL-vs-API pin for the series_type FilterBar
+promotion (10th key, shipped 2026-04-28). Pinned to
+`internal_docs/series-type-anchor-numbers.md` (S1-S10). Each anchor
+asserted via two paths: independent SQL (DB-direct using
+`series_type_clause` for the bilateral / icc filter), AND the
+`/matches` (or `/teams/{team}/summary`) endpoint with
+`filters.series_type` set. If a future refactor accidentally drops
+series_type from FilterBarParams or rewires it, every anchor breaks
+loudly.
+
+When to run: after any change touching `FilterBarParams.series_type`
+plumbing, `series_type_clause`, `is_precomputed_scope`, or any
+endpoint that takes a `filters: FilterBarParams = Depends()`.
+
+```bash
+uv run python tests/sanity/test_series_type_baseline_numbers.py
+```
+
+Expected output ends with `ALL PASS — 10 anchors green`.
+
 ## Regression suites (`tests/regression/`)
 
 URL-level md5-diff: stash uncommitted code, capture HEAD's response

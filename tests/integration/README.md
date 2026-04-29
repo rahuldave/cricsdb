@@ -47,7 +47,20 @@ integration/
   venues.sh         — Venues landing + filter_venue fan-out
   cross_cutting_url_state.sh       — ScopeIndicator + PlayerLink across tabs
   cross_cutting_mount_unmount.sh   — React hygiene on rapid nav / fetch cancel
-  cross_cutting_aux_filters.sh     — series_type aux filter end-to-end
+  cross_cutting_aux_filters.sh     — series_type narrowing end-to-end
+                                     (was an aux filter, promoted to
+                                     FilterBar 2026-04-28; tests still
+                                     valid)
+  series_type_filterbar.sh         — series_type FilterBar widget
+                                     rendering, URL roundtrip, status
+                                     strip chip, reset-all clear
+  series_type_persistence.sh       — series_type carries across all 9
+                                     tabs (URL + select + status strip)
+  series_type_per_tab_narrowing.sh — every endpoint narrows under
+                                     bilateral_only (matches, teams
+                                     summary/results, batting summary,
+                                     tournaments, scope/averages,
+                                     head-to-head)
 ```
 
 ## When to write one here
