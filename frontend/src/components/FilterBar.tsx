@@ -261,7 +261,7 @@ export default function FilterBar() {
          *  no-ops, ScopeStatusStrip surfaces the active value below. */}
         {teamType === 'international' && (
           <div className="wisden-filter-group">
-            <span className="wisden-filter-label">Series</span>
+            <span className="wisden-filter-label">Series Type</span>
             <select
               value={seriesType ?? ''}
               onChange={e => set('series_type', e.target.value)}
