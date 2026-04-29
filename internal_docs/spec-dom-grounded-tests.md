@@ -26,12 +26,34 @@ tests per tab/sub-tab and the conventions every script should follow.
   + keepers paragraph). One UI bug caught + fixed during the
   rollout: PartnershipsTab by-wicket DataTable rendered chip
   envelopes as "[object Object]" — narrow format functions added.
-- 🔲 Batch 3 — remaining sub-tabs (Series Editions / Champions /
-  Knockouts / Points / Batters / Bowlers / Fielders / Partnerships /
-  Matches; Teams Players / Match List / vs Opponent) +
-  `cross_cutting_team_class_consistency.sh` (asserts the same
-  number renders consistently across `/teams`, `/series`,
-  `/head-to-head`).
+- ✅ Batch 3 shipped (3a / 3b / 3c — 23 scripts + 1 harness ext.
+  across 14 commits; total dom/ suite now 41 scripts, ~720
+  assertions). Pairs:
+  • 3a: `teams_match_list_club` (12),
+        `teams_vs_opponent_{intl,club}` (10),
+        `teams_players_{intl,club}` (14),
+        `series_landing_club` (8).
+  • 3b: harness — `extract_data_table` accepts ordinal index for
+        multi-table pages (`extract_data_table 0|1|2`);
+        `series_editions_{intl,club}` (34),
+        `series_matches_{intl,club}` (25 — IPL 2025 paginated 2-
+        page anchor),
+        `series_partnerships_{intl,club}` (41 — multi-table
+        page; first ordinal-arg customer),
+        `series_batters_{intl,club}` (30),
+        `series_bowlers_{intl,club}` (30),
+        `series_fielders_{intl,club}` (32).
+  • 3c: `series_overview_intl_bilateral` (13 — Ind-vs-Eng
+        bilateral 24-25),
+        `series_champions_intl` (17 — 4 finals all-time),
+        `series_knockouts_intl` (13 — T20 WC 2024 SF + Final),
+        `series_points_club` (20 — IPL 2025 standings),
+        `cross_cutting_team_class_consistency` (9 — keystone
+        test, 4 surfaces).
+  Two doc bugs surfaced + fixed in `how-stats-calculated.md`:
+  fieldingcredit.kind underscore convention, partnership
+  by-wicket retired-hurt exclusion. The API was correct
+  throughout; only audit SQL + the doc needed updating.
 - 🔲 Players, Head-to-Head, Matches, Venues, Batting/Bowling/Fielding
   pages, scorecard: open queue, lower priority.
 

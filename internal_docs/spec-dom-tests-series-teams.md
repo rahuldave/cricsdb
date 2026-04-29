@@ -224,10 +224,20 @@ Series Overview) deferred to Batch 3 leader-extractor — they
 contain composed TeamLink/PlayerLink + subtitle compounds that
 need a more careful parser.
 
-### Batch 3 (queue for week 2)
+### Batch 3 ✅ shipped 2026-04-29 (14 commits across 3a/3b/3c)
 
-- The remaining tabs.
-- The `cross_cutting_team_class_consistency.sh` test.
+- 3a — Teams completion + Series Landing club twin (6 scripts).
+- 3b — Series sub-tabs (12 scripts) + harness extension
+       (`extract_data_table` accepts ordinal index 0..N).
+- 3c — ICC-only specials, club-only Points, plus the keystone
+       `cross_cutting_team_class_consistency.sh` test that exercises
+       the FilterBar's `team_class=full_member` narrowing across 4
+       distinct UI surfaces (consistency S1==S2==16, sensitivity
+       S3 1→0 with FM, S4 44→16 with FM).
+
+Full dom/ suite at end of Batch 3: **41 scripts, ~720 assertions**,
+all PASS. See `internal_docs/spec-dom-tests-batch-3.md` for the
+sub-batch-by-sub-batch playbook used.
 
 ## Anti-pattern guardrails
 

@@ -416,6 +416,70 @@ on 2026-04-19. They cover work that doesn't slot into a single A–Q
 letter (cross-cutting refactors, audit walks, infra fixes, follow-up
 batches) and serves as the "what shipped on day X" history.
 
+### Shipped 2026-04-29 (DOM-tests Batch 3 — full Series sub-tabs + cross-cutting)
+
+23 scripts + 1 harness extension across 14 commits, completing the
+spec-dom-tests-series-teams.md inventory. Total dom/ suite: **41
+scripts, ~720 assertions**, all green.
+
+**Batch 3a — Teams completion + Series Landing club twin (3 commits):**
+- `teams_match_list_club` (12) — RCB IPL 2025, 15 matches.
+- `teams_vs_opponent_intl` (5) — Ind-vs-SL 24-25, 4M/2W/0L/2T.
+- `teams_vs_opponent_club` (5) — RCB-vs-PBKS IPL 2025, 4M/3W/1L.
+- `teams_players_intl` (10) — Aus 24-25 across 3 seasons (18/11/22).
+- `teams_players_club` (4) — RCB IPL 2025 (19 players).
+- `series_landing_club` (8) — male club 2025, 6 tournaments.
+
+**Batch 3b — Series sub-tabs (6 commits incl. 1 standalone harness):**
+- Harness ext: `extract_data_table` accepts ordinal index for
+  multi-table pages (`extract_data_table 0|1|2`). 8 of 12 Batch
+  3b scripts are first-class customers.
+- `series_editions_{intl,club}` (34) — T20 WC 5 editions / IPL 19.
+- `series_matches_{intl,club}` (25) — T20 WC 24 (44, single page),
+  IPL 25 (74, paginated 2-page anchor).
+- `series_partnerships_{intl,club}` (41) — by-wicket grid +
+  top-N (12 tables on the page; uses ordinal arg).
+- `series_batters_{intl,club}` (30) — 3 modes: by_runs /
+  by_average / by_strike_rate.
+- `series_bowlers_{intl,club}` (30) — 3 modes: by_wickets /
+  by_strike_rate / by_economy.
+- `series_fielders_{intl,club}` (32) — 3 modes: by_dismissals /
+  by_keeper / by_run_outs.
+
+**Batch 3c — Specials + cross-cutting (4 commits):**
+- `series_overview_intl_bilateral` (13) — Ind-vs-Eng bilateral
+  24-25 (5 matches; the bilateral anchor deferred from Batch 2,
+  picked over Ind-vs-Aus 24-25 which has 0 bilateral matches).
+- `series_champions_intl` (17) — All T20 WC Men finals (4 rows).
+- `series_knockouts_intl` (13) — T20 WC 2024 SF + Final.
+- `series_points_club` (20) — IPL 2025 standings, PBKS top of
+  league at 20pts, RCB second at 18pts (won the Final from #2).
+- `cross_cutting_team_class_consistency` (9) — keystone test.
+  Asserts `team_class=full_member` narrowing across 4 surfaces:
+  S1+S2 consistency (16 == 16 between Match List + Compare),
+  S3+S4 sensitivity (1→0 on H2H Aus-vs-Oman, 44→16 on /series
+  Matches T20 WC 2024). Catches the bug-class where a tab silently
+  drops `team_class` on a sub-fetch.
+
+**Doc fixes surfaced during this batch:**
+- `how-stats-calculated.md` Fielding section had wrong DB literals
+  (`'run out'`, `'caught and bowled'` — with spaces). The schema
+  stores underscored values: `'run_out'`, `'caught_and_bowled'`.
+  Caught when audit SQL returned 20 dismissals vs DOM's 22.
+- Same doc was missing the by-wicket retired-hurt exclusion
+  (already documented for 50+/100+ thresholds, but the same
+  filter applies to /series/partnerships/by-wicket aggregates +
+  is sibling-asymmetric with /partnerships/top, which has neither
+  filter — that's why an unbroken 205 can appear at top-N row 0
+  while being absent from every row of the by-wicket grid).
+- The API was correct throughout — only audit SQL + the doc
+  needed updating.
+
+**What this closes off:** the spec-dom-tests-series-teams.md
+inventory is fully covered. Future DOM-test work is Batch 4+
+territory (Players standalone, Matches scorecard, Venues sub-tabs,
+chart-DOM extractor) — out of scope for the original spec.
+
 ### Shipped 2026-04-17 / 2026-04-18
 
 - **llms.txt** at `/llms.txt` pointing to api.md, Swagger, OpenAPI JSON, user-help — lets an LLM interact with the public API without scraping.

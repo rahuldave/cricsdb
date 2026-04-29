@@ -62,25 +62,51 @@ target (`make dom-tests`) and run when:
 - Touched `populate_*.py` / `import_data.py` / `update_recent.py`
   → run all DOM tests against the rebuilt DB.
 
-## Files
+## Inventory (41 scripts post-Batch-3)
 
 | Script | Coverage |
 |---|---|
-| `_lib.sh` | Shared harness: navigate, extractors, assert runners, summary |
-| `teams_compare_intl.sh` | Teams > Compare, INTL anchors A / A' / E1 (FilterBar fm) |
-| `teams_compare_club.sh` | Teams > Compare, CLUB anchor B (IPL 2025) |
-| `teams_match_list_intl_fm.sh` | Teams > Match List with team_class=fm (Aus 22 → 16 narrowing) |
-| `series_landing_intl_fm.sh` | /series landing tile counts narrow with team_class=fm |
+| `_lib.sh` | Harness: `navigate`, 4 extractors (`extract_grid`, `extract_data_table` ord-arg, `extract_landing_tiles`, `extract_team_overview`), 4 assert runners |
+| **Teams** ||
+| `teams_compare_{intl,club}.sh` | Teams > Compare grid (Aus FM / IPL 2025) |
+| `teams_overview_{intl,club}.sh` | Teams > Overview StatCards + keepers |
+| `teams_batting_{intl,club}.sh` | Teams > Batting band — totals + by-phase |
+| `teams_bowling_{intl,club}.sh` | Teams > Bowling band — totals + by-phase |
+| `teams_fielding_{intl,club}.sh` | Teams > Fielding band — catches/stumpings/run-outs |
+| `teams_partnerships_{intl,club}.sh` | Teams > Partnerships — best pair + by-wicket grid |
+| `teams_match_list_intl_fm.sh` | Teams > Match List, FM-narrowing (Aus 22 → 16) |
+| `teams_match_list_club.sh` | Teams > Match List club twin (RCB IPL 25, 15) |
+| `teams_vs_opponent_{intl,club}.sh` | Teams > vs Opponent rivalry StatCards |
+| `teams_players_{intl,club}.sh` | Teams > Players per-season grid (custom inline extractor) |
+| **Series** ||
+| `series_landing_{intl_fm,club}.sh` | /series landing tile counts |
+| `series_overview_{intl,club}.sh` | Series > Overview StatCards (tournament-scoped) |
+| `series_overview_intl_bilateral.sh` | Series > Overview bilateral rivalry (Ind-vs-Eng 24-25) |
+| `series_records_{intl,club}.sh` | Series > Records (highest/lowest, top batters/bowlers) |
+| `series_editions_{intl,club}.sh` | Series > Editions, full DESC list |
+| `series_matches_{intl,club}.sh` | Series > Matches (paginated for IPL 25, single-page for WC 24) |
+| `series_partnerships_{intl,club}.sh` | Series > Partnerships — by-wicket + top-N (12 tables; uses ord arg) |
+| `series_batters_{intl,club}.sh` | Series > Batters — 3 modes (by_runs/avg/SR) |
+| `series_bowlers_{intl,club}.sh` | Series > Bowlers — 3 modes (by_W/SR/econ) |
+| `series_fielders_{intl,club}.sh` | Series > Fielders — 3 modes (by_dismissals/keeper/RO) |
+| `series_champions_intl.sh` | Series > Overview Champions table (4 finals) |
+| `series_knockouts_intl.sh` | Series > Overview Knockouts table (T20 WC 24 SF + F) |
+| `series_points_club.sh` | Series > Points (IPL 25 standings, 10 rows) |
+| **Cross-cutting** ||
+| `cross_cutting_team_class_consistency.sh` | FM filter narrowing across 4 surfaces |
 | `audit/*.sql` | Independent ground-truth SQL per script |
 
 ## Phasing
 
-- **Batch 1 (this PR):** the 4 above. Goal — prove the lifted
-  harness works.
-- **Batch 2 (next session):** `teams_overview_*`, `teams_batting_*`,
-  `teams_bowling_*`, `teams_fielding_*`, `teams_partnerships_*`,
-  `series_overview_*`, `series_records_*`. ~10 scripts.
-- **Batch 3 (queue):** remaining tabs + `cross_cutting_team_class_consistency.sh`.
+- **Batch 1 (shipped):** harness + 4 anchor scripts.
+- **Batch 2 (shipped 2026-04-28):** Teams sub-tabs +
+  `series_overview_*` + `series_records_*` (14 scripts).
+- **Batch 3 (shipped 2026-04-29):** rest of Teams + all Series
+  sub-tabs + cross-cutting consistency (23 scripts +
+  ordinal-index harness ext.). Total = 41 scripts.
+- **Batch 4+ (open queue):** Players standalone, Matches
+  scorecard, Venues sub-tabs, chart-DOM extractor for Semiotic
+  charts. Out of scope for the original spec.
 
 ## Anti-pattern guardrails
 
