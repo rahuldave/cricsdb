@@ -38,7 +38,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams, _is_set
+from ..filters import FilterParams, AuxParams, _is_set
 from ..tournament_canonical import (
     TOURNAMENT_CANONICAL, TOURNAMENT_SERIES_TYPE,
     ICC_EVENT_NAMES, BILATERAL_TOP_TEAMS,
@@ -54,12 +54,27 @@ def _build_filter_clauses(
     alias: str = "m",
     include_tournament: bool = False,
     include_team_pair: bool = True,
+    aux: AuxParams | None = None,
+    has_innings_join: bool = False,
+    innings_alias: str = "i",
 ) -> tuple[list[str], dict]:
     """Build per-field WHERE clauses from FilterParams.
 
     Tournament is skipped by default — the tournaments router handles
     it specially via canonical → variants expansion. team / opponent
     are included when both set (rivalry scope) or individually.
+
+    `aux` + `has_innings_join` are the §5.3 extension for the
+    inning-split spec — when both are set, the i.innings_number
+    clause is emitted from this helper so dossier callers
+    participating in an innings JOIN can honour the page-local inning
+    narrowing. Callers that build a unified WHERE used across mixed
+    (match-level + delivery-level) queries should keep
+    has_innings_join=False — the inning clause goes through the
+    delivery-level query's own clause instead. Reference dropdown
+    callers (no innings join) keep the default and silently no-op
+    the inning narrowing.
+    Spec: internal_docs/spec-inning-split.md §5.3.
     """
     clauses: list[str] = []
     params: dict = {}
@@ -100,6 +115,11 @@ def _build_filter_clauses(
     ):
         from ..full_members import full_member_clause
         clauses.append(full_member_clause(table_alias=alias))
+    # inning (AuxParams) — emitted only when caller has an innings
+    # JOIN (see helper docstring). Spec: spec-inning-split.md §5.3.
+    if has_innings_join and aux is not None and aux.inning is not None:
+        clauses.append(f"{innings_alias}.innings_number = :inning")
+        params["inning"] = aux.inning
     return clauses, params
 
 

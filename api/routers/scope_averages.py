@@ -1050,7 +1050,7 @@ async def scope_fielding_summary(
     return await _fielding_summary_live(filters, aux)
 
 
-def _format_fielding_summary(matches, catches_only, caught_and_bowled, stumpings, run_outs):
+def _format_fielding_summary(matches, catches_only, caught_and_bowled, stumpings, run_outs, *, inning_active: bool = False):
     matches = matches or 0
     catches_only = catches_only or 0
     cnb = caught_and_bowled or 0
@@ -1068,7 +1068,12 @@ def _format_fielding_summary(matches, catches_only, caught_and_bowled, stumpings
         "stumpings_per_match": _safe_div(stumpings, matches, 1, 2),
         "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
     }
-    return _apply_fielding_per_innings(out, matches * 2)
+    # inning_active narrows each match to 1 fielding innings in scope
+    # (vs 2 for the all-innings case). Spec: spec-inning-split.md §5.5.
+    mult = 1 if inning_active else 2
+    return _apply_fielding_per_innings(
+        out, matches * mult, halve_per_match=not inning_active,
+    )
 
 
 async def _fielding_summary_from_baseline(filters, aux):
@@ -1086,12 +1091,14 @@ async def _fielding_summary_from_baseline(filters, aux):
         params,
     )
     r = rows[0] if rows else {}
+    inning_active = aux is not None and aux.inning is not None
     return _format_fielding_summary(
         matches=r.get("matches"),
         catches_only=r.get("catches_only"),
         caught_and_bowled=r.get("caught_and_bowled"),
         stumpings=r.get("stumpings"),
         run_outs=r.get("run_outs"),
+        inning_active=inning_active,
     )
 
 
@@ -1129,12 +1136,14 @@ async def _fielding_summary_live(filters, aux):
     # Normalise to the baseline shape so the formatter handles both.
     catches_with_cnb = r.get("catches") or 0
     cnb = r.get("caught_and_bowled") or 0
+    inning_active = aux is not None and aux.inning is not None
     return _format_fielding_summary(
         matches=matches,
         catches_only=catches_with_cnb - cnb,
         caught_and_bowled=cnb,
         stumpings=r.get("stumpings") or 0,
         run_outs=r.get("run_outs") or 0,
+        inning_active=inning_active,
     )
 
 
@@ -1149,7 +1158,7 @@ async def scope_fielding_by_season(
     return await _fielding_by_season_live(filters, aux)
 
 
-def _format_fielding_season_row(season, matches, catches, stumpings, run_outs):
+def _format_fielding_season_row(season, matches, catches, stumpings, run_outs, *, inning_active: bool = False):
     matches = matches or 0
     catches = catches or 0
     stumpings = stumpings or 0
@@ -1165,7 +1174,10 @@ def _format_fielding_season_row(season, matches, catches, stumpings, run_outs):
         "stumpings_per_match": _safe_div(stumpings, matches, 1, 2),
         "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
     }
-    return _apply_fielding_per_innings(out, matches * 2)
+    mult = 1 if inning_active else 2
+    return _apply_fielding_per_innings(
+        out, matches * mult, halve_per_match=not inning_active,
+    )
 
 
 async def _fielding_by_season_from_baseline(filters, aux):
@@ -1192,10 +1204,12 @@ async def _fielding_by_season_from_baseline(filters, aux):
         params_m,
     )
     m_by_season = {r["season"]: r["matches"] for r in m_rows}
+    inning_active = aux is not None and aux.inning is not None
     return {"by_season": [
         _format_fielding_season_row(
             season=r["season"], matches=m_by_season.get(r["season"], 0),
             catches=r["catches"], stumpings=r["stumpings"], run_outs=r["run_outs"],
+            inning_active=inning_active,
         )
         for r in f_rows
     ]}
@@ -1233,10 +1247,12 @@ async def _fielding_by_season_live(filters, aux):
         params,
     )
     matches_by_season = {r["season"]: r["matches"] for r in matches_rows}
+    inning_active = aux is not None and aux.inning is not None
     return {"by_season": [
         _format_fielding_season_row(
             season=r["season"], matches=matches_by_season.get(r["season"], 0),
             catches=r["catches"], stumpings=r["stumpings"], run_outs=r["run_outs"],
+            inning_active=inning_active,
         )
         for r in rows
     ]}

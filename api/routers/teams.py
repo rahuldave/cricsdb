@@ -55,12 +55,64 @@ def _decode_chip_baseline(b64: str) -> tuple[FilterParams, AuxParams] | None:
     return f, a
 
 
-def _team_filter_clause(filters: FilterParams, team_param: str = ":team", aux: AuxParams | None = None) -> tuple[str, dict]:
-    """Build match-level filter clause for team queries (no innings join)."""
+def _inning_match_filter(
+    team_value: str | None,
+    aux: AuxParams | None,
+) -> tuple[str, dict]:
+    """Match-level WHERE fragment restricting to matches where :team had
+    a role in the chosen inning. Empty when aux.inning is None or team
+    is unknown.
+
+    Semantics: aux.inning=0 → matches where :team batted in
+    innings_number=0 (= matches where :team batted first).
+    aux.inning=1 → matches where :team batted second.
+
+    NOT the same as the Compare-slot dual-meaning of §3.4 — this helper
+    is for match-level endpoints (/summary, /by-season, /vs-opponent,
+    /match-list) where there's a single match subset. Bat-side framing
+    is the natural reading for results-style metrics ("RCB's record
+    batting first"). For Compare-slot dual-meaning on bowling/fielding
+    rows, the central innings clause in FilterBarParams.build() handles
+    it via the i.team discriminator already present in those queries.
+
+    Spec: internal_docs/spec-inning-split.md §3.1a.
+    """
+    if aux is None or aux.inning is None or not team_value:
+        return "", {}
+    return (
+        "m.match_id IN ("
+        " SELECT i2.match_id FROM innings i2"
+        " WHERE i2.team = :im_team"
+        "   AND i2.innings_number = :im_inn"
+        "   AND i2.super_over = 0"
+        ")",
+        {"im_team": team_value, "im_inn": aux.inning},
+    )
+
+
+def _team_filter_clause(
+    filters: FilterParams,
+    team_param: str = ":team",
+    aux: AuxParams | None = None,
+    team_value: str | None = None,
+) -> tuple[str, dict]:
+    """Build match-level filter clause for team queries (no innings join).
+
+    `team_value` is the path-team string (e.g. "Royal Challengers
+    Bengaluru"). Required only when aux.inning is set so
+    _inning_match_filter can derive the match-id subquery — otherwise
+    it's optional and falls back to filters.team (the FilterBar
+    `filter_team`). Path-team endpoints should always pass team_value
+    explicitly.
+    """
     where, params = filters.build(has_innings_join=False, aux=aux)
     parts = [f"(m.team1 = {team_param} OR m.team2 = {team_param})"]
     if where:
         parts.append(where)
+    inn_clause, inn_params = _inning_match_filter(team_value or filters.team, aux)
+    if inn_clause:
+        parts.append(inn_clause)
+        params.update(inn_params)
     return " AND ".join(parts), params
 
 
@@ -192,7 +244,7 @@ async def team_summary(
     aux: AuxParams = Depends(),
 ):
     db = get_db()
-    filt, params = _team_filter_clause(filters, aux=aux)
+    filt, params = _team_filter_clause(filters, aux=aux, team_value=team)
     params["team"] = team
 
     rows = await db.q(
@@ -414,7 +466,7 @@ async def team_results(
     offset: int = Query(0, ge=0),
 ):
     db = get_db()
-    filt, params = _team_filter_clause(filters, aux=aux)
+    filt, params = _team_filter_clause(filters, aux=aux, team_value=team)
     params["team"] = team
     params["limit"] = limit
     params["offset"] = offset
@@ -566,7 +618,7 @@ async def team_opponents_matrix(
         top-N opponents are returned (noise suppression).
     """
     db = get_db()
-    filt, params = _team_filter_clause(filters, aux=aux)
+    filt, params = _team_filter_clause(filters, aux=aux, team_value=team)
     params["team"] = team
 
     # Rollup — per opponent totals
@@ -657,7 +709,7 @@ async def team_opponents(
 ):
     """Return opponents the team has actually played (non-zero matches), respecting filters."""
     db = get_db()
-    filt, params = _team_filter_clause(filters, aux=aux)
+    filt, params = _team_filter_clause(filters, aux=aux, team_value=team)
     params["team"] = team
 
     rows = await db.q(
@@ -682,7 +734,7 @@ async def team_by_season(
     aux: AuxParams = Depends(),
 ):
     db = get_db()
-    filt, params = _team_filter_clause(filters, aux=aux)
+    filt, params = _team_filter_clause(filters, aux=aux, team_value=team)
     params["team"] = team
 
     rows = await db.q(
@@ -737,7 +789,7 @@ async def team_players_by_season(
     db = get_db()
 
     # Roster: who was in the XI each season. Match-level filter.
-    roster_filt, roster_params = _team_filter_clause(filters, aux=aux)
+    roster_filt, roster_params = _team_filter_clause(filters, aux=aux, team_value=team)
     roster_params["team"] = team
 
     roster_rows = await db.q(
@@ -970,18 +1022,32 @@ def _apply_bowling_per_innings(d: dict, innings_bowled: int, *, drop_divisor: bo
     return d
 
 
-def _apply_fielding_per_innings(d: dict, fielding_innings: int) -> dict:
-    """Divide fielding counts by fielding_innings (= matches × 2),
-    halve per-match rates. `matches` stays as scope-context."""
+def _apply_fielding_per_innings(
+    d: dict,
+    fielding_innings: int,
+    *,
+    halve_per_match: bool = True,
+) -> dict:
+    """Divide fielding counts by fielding_innings, halve per-match rates.
+
+    `fielding_innings` is the divisor for pool counts; pass
+    `matches × 2` for the all-innings case (every match has 2 fielding
+    innings) and `matches × 1` under inning narrowing (the inning
+    clause restricts each match to 1 fielding innings in scope).
+    `halve_per_match` controls whether the existing *_per_match rates
+    are further divided by 2 — pass False under inning narrowing for
+    the same reason. Spec: spec-inning-split.md §5.5.
+    """
     if fielding_innings:
         for k in FIELDING_COUNT_KEYS:
             v = d.get(k)
             if v is not None:
                 d[k] = round(v / fielding_innings, 2)
-    for k in FIELDING_HALF_KEYS:
-        v = d.get(k)
-        if v is not None:
-            d[k] = round(v / 2, 2)
+    if halve_per_match:
+        for k in FIELDING_HALF_KEYS:
+            v = d.get(k)
+            if v is not None:
+                d[k] = round(v / 2, 2)
     return d
 
 
@@ -2857,7 +2923,14 @@ async def _fielding_aggregates_baseline(team, filters, aux):
         "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
     }
     if team is None:
-        return _apply_fielding_per_innings(out, matches * 2)
+        # Under inning narrowing each match contributes 1 fielding
+        # innings (not 2) — flip both the divisor multiplier and the
+        # per_match halving.  Spec: spec-inning-split.md §5.5.
+        inning_active = aux is not None and aux.inning is not None
+        mult = 1 if inning_active else 2
+        return _apply_fielding_per_innings(
+            out, matches * mult, halve_per_match=not inning_active,
+        )
     return out
 
 
@@ -2909,7 +2982,11 @@ async def _fielding_aggregates_live(
         "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
     }
     if team is None:
-        return _apply_fielding_per_innings(out, matches * 2)
+        inning_active = aux is not None and aux.inning is not None
+        mult = 1 if inning_active else 2
+        return _apply_fielding_per_innings(
+            out, matches * mult, halve_per_match=not inning_active,
+        )
     return out
 
 

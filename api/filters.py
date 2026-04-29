@@ -126,10 +126,39 @@ class AuxParams:
                 " Spec: spec-slot-override-chip-alignment.md §4.2."
             ),
         ),
+        inning: Optional[int] = Query(
+            None,
+            ge=0,
+            le=1,
+            description=(
+                "Page-local filter on i.innings_number (0 = batting"
+                " first, 1 = batting second). User-visible on team and"
+                " player Batting/Bowling/Fielding/Partnerships pages as"
+                " a toggle pill; per-slot override on the Compare tab"
+                " via `compareN_inning`. NOT on the FilterBar — its"
+                " 10-key ceiling stands. Threaded through filters.build"
+                " via aux=aux on every consumer; gated on"
+                " has_innings_join because the clause references the"
+                " innings alias. Match-level endpoints"
+                " (has_innings_join=False) honour inning via the"
+                " separate `_inning_match_filter` helper in"
+                " api/routers/teams.py — see"
+                " internal_docs/spec-inning-split.md §3.1a."
+            ),
+        ),
     ):
-        self.scope_to_team = scope_to_team
-        self.chip_team_class = chip_team_class
-        self.chip_baseline_scope_json = chip_baseline_scope_json
+        # When AuxParams is instantiated outside FastAPI's dependency
+        # injection (e.g. by sanity tests), the Query() defaults aren't
+        # unwrapped and the field holds the Query object itself. Convert
+        # those to None so downstream `is not None` checks behave the
+        # same in tests as in production.
+        from fastapi.params import Query as _QueryClass
+        def _norm(v):
+            return None if isinstance(v, _QueryClass) else v
+        self.scope_to_team = _norm(scope_to_team)
+        self.chip_team_class = _norm(chip_team_class)
+        self.chip_baseline_scope_json = _norm(chip_baseline_scope_json)
+        self.inning = _norm(inning)
 
 
 class FilterBarParams:
@@ -279,6 +308,15 @@ class FilterBarParams:
             st = series_type_clause(self.series_type, alias=table_alias)
             if st:
                 clauses.append(st)
+
+        # inning (AuxParams) — page-local 1st/2nd-innings filter. Gated
+        # on has_innings_join because the clause references the innings
+        # alias; match-level endpoints honour inning via
+        # _inning_match_filter in api/routers/teams.py instead. Spec:
+        # internal_docs/spec-inning-split.md.
+        if has_innings_join and aux is not None and aux.inning is not None:
+            clauses.append(f"{innings_alias}.innings_number = :inning")
+            params["inning"] = aux.inning
 
         where = " AND ".join(clauses) if clauses else ""
         return where, params

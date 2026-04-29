@@ -1523,3 +1523,90 @@ the URL must reconstruct the same view. "RCB IPL 2024 vs RCB IPL
 2025" is a comparison worth sharing. The new `compareN_<filter>`
 URL pattern follows the same per-key shape as primary FilterBar
 params for consistency.
+
+
+## Inning-split labelling: frame by match, not by side of the ball (2026-04-29)
+
+The page-local 1st-innings / 2nd-innings filter
+(`spec-inning-split.md`) labels the two states **"1st innings"** and
+**"2nd innings"** — never "bowling first" / "fielding first" —
+regardless of whether the page focuses on batting, bowling, fielding,
+or partnerships.
+
+The reason is that "X bowled first" is genuinely ambiguous. A reader
+saying "Pakistan bowled first" colloquially means Pakistan's bowlers
+were on the field DURING innings 1 — i.e. Pakistan's opposition
+batted first — i.e. `innings_number = 0` for the OPPOSITION's
+batting innings. That's the OPPOSITE of what a casual reader
+assumes when they see "Pakistan, 1st innings bowling."
+
+The "1st innings" framing dodges the ambiguity entirely: the label
+refers to the MATCH'S `innings_number`, regardless of which side of
+the ball the page focuses on. So the convention reads:
+
+- **"Bumrah, 1st innings"** = his deliveries when the opposition was
+  batting first (`i.innings_number = 0` AND `i.team != Bumrah's team`).
+- **"Pakistan fielding, 2nd innings"** = Pakistan's fielding credits
+  during `innings_number = 1`.
+- **"RCB, 1st innings"** on a batting page = RCB's batting in matches
+  where they batted first (`i.team = RCB AND i.innings_number = 0`).
+
+NEVER write "bowling first" / "fielded first" anywhere in the UI.
+Compare-slot dual-meaning (slot `inning=0` makes the batting row read
+"team batted first" matches and the bowling row read "team bowled
+first" matches — complementary subsets) is a real feature, not a
+bug — the same `i.team` discriminator already in the SQL composes
+with the inning clause to give complementary match subsets per side.
+Together they describe "this team's first-up activity across whatever
+role they were in," which is one of the questions users ask.
+SlotScopeEditor's tooltip surfaces this on the Compare tab.
+
+
+## Match-role axis (`bat_first=true|false`) is separate from per-innings (2026-04-29)
+
+The inning-split filter (`spec-inning-split.md`, `AuxParams.inning`)
+is **not** the same axis as a match-role filter ("matches where this
+team batted first"). They look similar but produce different match
+subsets. Important because the next person looking at this surface
+will think they're the same and try to retrofit one into the other.
+
+**Per-innings (`inning=0|1`)**: filters individual INNINGS rows by
+`i.innings_number`. Composes naturally with the
+`i.team = :team` (batting) vs `i.team != :team` (bowling)
+discriminator already in the codebase. Slot `inning=0` produces:
+
+- batting row from matches-where-team-batted-first,
+- bowling row from matches-where-team-bowled-first.
+
+These are COMPLEMENTARY match subsets. Together every match in the
+team's log contributes SOMETHING somewhere; together they DON'T
+equal "matches where the team batted first."
+
+**Match-role (`bat_first=true|false`, NOT YET IMPLEMENTED)**: filters
+WHOLE MATCHES by whether this team batted first or chased. Within
+those matches, all batting/bowling/fielding stats reflect the team's
+full activity. Useful for "what does Team A do AFTER they bat
+first?" — how do they defend a score they posted.
+
+Composes orthogonally with `inning`:
+
+- `bat_first=true & inning=0` = "batting stats from matches the
+  team batted first" (= same as `inning=0` batting alone, redundant).
+- `bat_first=true & inning=1` = "BOWLING stats from matches the
+  team batted first" (= the chase-defence stats — a real new
+  question).
+
+Both belong in `AuxParams` per the page-local-filter convention.
+
+For match-level endpoints (`/teams/{team}/summary`, `/by-season`,
+`/vs-opponent`, `/match-list`), the central `aux.inning` clause
+can't apply (no innings JOIN), so the spec uses the
+`_inning_match_filter` helper in `api/routers/teams.py` — a derived
+match-id subquery that commits to the "team had a role in inning X"
+reading. On the batting-side endpoints the reading is "team batted
+in inning X" (clean); on bowling/fielding-side endpoints the reading
+follows from the path team's role in that match. This is the §3.1a
+contract — locked in commit 1 of the inning-split spec. If a
+match-role axis is added later it would be a SEPARATE
+`AuxParams.bat_first` field with a separate match-id subquery — not
+a re-interpretation of `aux.inning`.

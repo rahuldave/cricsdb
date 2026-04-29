@@ -48,6 +48,11 @@ def is_precomputed_scope(filters: FilterParams, aux: Optional[AuxParams]) -> boo
         and filters.team_type == "international"
     ):
         return False
+    # Inning narrowing — bucket tables don't carry an innings dimension.
+    # Live aggregation handles it; precompute later iff measured hot.
+    # Spec: internal_docs/spec-inning-split.md §5.4.
+    if aux is not None and aux.inning is not None:
+        return False
     return True
 
 
