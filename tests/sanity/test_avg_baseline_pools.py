@@ -40,13 +40,13 @@ from api.routers.scope_averages import scope_summary as scope_summary_endpoint
 
 def make_filters(**kwargs) -> FilterBarParams:
     keys = ("gender", "team_type", "tournament", "season_from", "season_to",
-            "filter_team", "filter_opponent", "filter_venue", "team_class")
+            "filter_team", "filter_opponent", "filter_venue", "team_class",
+            "series_type")
     return FilterBarParams(**{k: kwargs.get(k) for k in keys})
 
 
 def make_aux(**kwargs) -> AuxParams:
     return AuxParams(
-        series_type=kwargs.get("series_type"),
         scope_to_team=kwargs.get("scope_to_team"),
         chip_team_class=kwargs.get("chip_team_class"),
     )
