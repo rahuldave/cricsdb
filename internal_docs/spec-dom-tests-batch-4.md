@@ -28,7 +28,7 @@ Sub-batches:
 
 | Sub-batch | Coverage | Scripts | Time | Risk |
 |---|---|---|---|---|
-| **4a** | Players landing + single + compare | 4 | ~1h | Low |
+| **4a** | Players landing + single + compare (men + women) | 7 | ~1.5h | Low |
 | **4b** | Venues sub-tabs (closely mirrors Series) | 8 | ~2h | Low |
 | **4c** | Matches scorecard (no charts) | 3 | ~1h | Medium |
 | **4d** | Chart-DOM extractor + chart-bearing assertions | 1 ext + 4 | ~3h | High |
@@ -153,12 +153,44 @@ Audit: audit/players_compare_intl.sql — both columns' batting
 **Skip 3-way compare** — adds combinatorial coverage with no new
 DOM mechanism. The 2-way anchor exercises everything 3-way does.
 
+### 4a-5: `players_landing_women.sh`
+
+Women variant of `players_landing.sh`. CuratedLists.ts maintains a
+parallel `PROFILE_WOMEN` (9 tiles) + `COMPARE_WOMEN` (3 pairs)
+bank, gated on `?gender=female`. NOT optional — any UI bug
+affecting the women landing specifically would otherwise ship
+undetected.
+
+```bash
+URL: /players?gender=female
+Extractor: same custom extractor as players_landing.sh
+Audit: audit/players_landing_women.sql — confirm each curated
+       women ID exists + has match activity.
+Note: "D Sharma" curated label vs "DB Sharma" person.name in DB —
+      the tile renders the curated label, audit calls this out.
+```
+
+### 4a-6: `players_single_intl_women.sh`
+
+Anchor: S Mandhana (`5d2eda89`), women_intl 2024-25. Same shape
+as `players_single_intl.sh` (specialist batter; BATTING + FIELDING
+bands; no BOWLING / KEEPING).
+
+### 4a-7: `players_compare_intl_women.sh`
+
+Anchor: Mandhana × Mooney (`5d2eda89` × `52d1dbc8`), women_intl
+2024-25 — the first `COMPARE_WOMEN` pair. Picked over Perry × Knight
+because Mooney is a keeper-batter (her column carries a KEEPING
+band) while Mandhana isn't — exercises the empty-section
+placeholder behavior for row alignment across columns.
+
 ### 4a — commit cadence
 
 - Commit 1: players_landing + players_single_intl + players_single_club (3 scripts)
 - Commit 2: players_compare_intl (1 script)
+- Commit 3: women anchors (3 scripts: landing + single + compare)
 
-Total: 2 commits, 4 scripts, ~50 assertions.
+Total: 3 commits, 7 scripts, ~170 assertions.
 
 ---
 
@@ -407,13 +439,13 @@ Touches:
 
 | Sub-batch | Scripts | Harness | Commits | Time |
 |---|---|---|---|---|
-| 4a | 4 | 0 | 2 | ~1h |
+| 4a | 7 | 0 | 3 | ~1.5h |
 | 4b | 8 | 0 | 4 | ~2h |
 | 4c | 3 | 0 | 2 | ~1h |
 | Wrap | — | — | 1 | ~15m |
-| **Subtotal (4a+4b+4c)** | **15** | **0** | **9** | **~4-5h** |
+| **Subtotal (4a+4b+4c)** | **18** | **0** | **10** | **~5h** |
 | 4d (optional, own session) | 4 | 1 | 5 | ~3h |
-| **Total (with 4d)** | **19** | **1** | **14** | **~7-8h** |
+| **Total (with 4d)** | **22** | **1** | **15** | **~8h** |
 
 Splittable across 1-3 sessions. Best stopping points: end of 4a
 (Players covered), end of 4b (Venues covered), end of 4c
