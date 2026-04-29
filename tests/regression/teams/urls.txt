@@ -137,3 +137,17 @@ REG team_partnerships_bowling_summary_bilat            /api/v1/teams/India/partn
 REG ref_teams_search_india_bilat                       /api/v1/teams?q=India&team_type=international&gender=male&series_type=bilateral_only
 REG ref_seasons_india_bilat                            /api/v1/seasons?team=India&gender=male&team_type=international&series_type=bilateral_only
 REG ref_tournaments_india_bilat                        /api/v1/tournaments?team=India&gender=male&team_type=international&series_type=bilateral_only
+
+# ── Slot-override + chip-baseline alignment (spec-slot-override-chip-alignment.md) ──
+# REG: lock the old chip_team_class back-compat path. Must stay byte-identical
+#      across the spec rollout — Commit 5 only adds a deprecation comment.
+REG team_batting_summary_aus_chip_team_class_fm        /api/v1/teams/Australia/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2025&chip_team_class=full_member
+# NEW: __any__ sentinel on standard FilterBar fields decodes as no-narrowing.
+#      Different output from no-__any__ baseline — asserts the decoder fires.
+NEW team_summary_rcb_season_any                        /api/v1/teams/Royal%20Challengers%20Bengaluru/summary?gender=male&team_type=club&season_from=__any__&season_to=__any__
+# NEW: chip_baseline_scope_json overrides the legacy chip alignment paths.
+#      Payload = base64({gender:male, team_type:club}) — broaden RCB 2025 chip baseline to all-clubs.
+NEW team_batting_summary_rcb_2025_chip_baseline_clubs  /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&chip_baseline_scope_json=eyJnZW5kZXIiOiAibWFsZSIsICJ0ZWFtX3R5cGUiOiAiY2x1YiJ9
+# NEW: chip_baseline_scope_json with a payload that carries scope_to_team — verify the
+#      decode threads scope_to_team into the resulting AuxParams.
+NEW team_batting_summary_rcb_chip_baseline_scope_to_team /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&chip_baseline_scope_json=eyJnZW5kZXIiOiAibWFsZSIsICJ0ZWFtX3R5cGUiOiAiY2x1YiIsICJzY29wZV90b190ZWFtIjogIlJveWFsIENoYWxsZW5nZXJzIEJlbmdhbHVydSJ9

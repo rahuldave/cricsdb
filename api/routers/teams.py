@@ -3704,8 +3704,18 @@ async def team_partnerships_summary(
         "count_100_plus": sa_raw.get("count_100_plus") or 0,
         "avg_runs": sa_raw.get("avg_runs"),
     }
+    # Divisor must come from `league_filters` so the chip's per-innings
+    # rate matches the avg endpoint (which computes its own divisor
+    # against the same scope as the aggregate). Pre-2026-04-29 this
+    # passed `filters` — silent when filters and league_filters only
+    # differed via `scope_to_team` (which lives on aux) or
+    # `chip_team_class` (which only ran the chip alignment, not the
+    # divisor), but a real bug under chip_baseline_scope_json which
+    # fully overrides league_filters. Spec:
+    # spec-slot-override-chip-alignment.md §5.2 (per-innings divisor
+    # alignment).
     sa = _apply_partnerships_per_innings(
-        sa, await _innings_count_for_phase(filters, league_aux, side="batting"),
+        sa, await _innings_count_for_phase(league_filters, league_aux, side="batting"),
     )
 
     return {
