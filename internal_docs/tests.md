@@ -168,6 +168,44 @@ uv run python tests/sanity/test_chip_direction_invariant.py --db /tmp/cricket-pr
 Expected output ends with `11 (scope, team) pairs PASS, 0 assertion
 failures` → `ALL PASS`.
 
+### `test_slot_override_alignment.py`
+
+What: sibling of `test_chip_direction_invariant.py` covering the
+**broaden-direction** + **override-to-empty** cases unlocked by
+spec-slot-override-chip-alignment.md. The chip-invariant test only
+exercised cases where the team and league-side scopes were the
+SAME or the v3-narrowing case (chip_team_class). This test sends a
+`chip_baseline_scope_json` aux field whose scope DIFFERS from the
+team's primary scope (broader on at least one axis), then asserts
+the same chip math invariant: `chip.scope_avg == avg endpoint with
+the baseline scope`.
+
+5 scenarios × 1-2 teams = 6 (scenario, team) pairs covering:
+- Broaden tournament (primary IPL 2025 → all clubs)
+- Broaden season (primary RCB 2025 → RCB all-time via scope_to_team)
+- Broaden team_class (primary FM → unbounded intl)
+- Combined broaden (season + team_class)
+- Narrowing back-compat (intl unbounded → FM via the new mechanism)
+
+Each (scenario, team) walks batting + bowling + fielding summaries,
+batting + bowling by-phase, and partnerships summary against the
+avg endpoint computed for the baseline scope.
+
+When to run:
+- After ANY change to `_league_aux`, `_decode_chip_baseline`,
+  `chipAlignmentFor` (frontend), `chip_baseline_scope_json` decoding,
+  or `_apply_*_per_innings` divisor sites that consume the
+  league-side filters.
+- Before shipping any change touching the Compare-tab chip
+  alignment path.
+
+```bash
+uv run python tests/sanity/test_slot_override_alignment.py
+```
+
+Expected output ends with `6/6 (scenario, team) pairs PASS, 0
+assertion failures` → `ALL PASS`.
+
 ### `test_team_class_baseline_numbers.py`
 
 What: 30-anchor SQL-vs-API + raw SQL pin for the v3 team_class
