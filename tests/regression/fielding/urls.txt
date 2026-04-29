@@ -53,3 +53,21 @@ NEW keep_by_season_dhoni_fm                            /api/v1/fielders/4a8a2e3b
 NEW keep_by_innings_dhoni_fm                           /api/v1/fielders/4a8a2e3b/keeping/by-innings?gender=male&team_type=international&limit=10&team_class=full_member
 NEW keep_ambiguous_dhoni_fm                            /api/v1/fielders/4a8a2e3b/keeping/ambiguous?gender=male&team_type=international&limit=10&team_class=full_member
 NEW field_summary_kohli_vs_aus_fm                      /api/v1/fielders/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
+# series_type FilterBar — generated REG URLs (one-shot)
+# Source: each row mirrors an intl REG row in urls.txt with &series_type=bilateral_only appended.
+# Tag REG (not NEW): promotion is inert by design — backend output is byte-identical pre/post.
+# Filter: only intl-context REG entries qualify (bilateral_only requires team_type=international).
+
+REG field_leaders_men_intl_bilat                       /api/v1/fielders/leaders?gender=male&team_type=international&limit=10&series_type=bilateral_only
+REG field_summary_kohli_intl_bilat                     /api/v1/fielders/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
+REG field_by_season_kohli_bilat                        /api/v1/fielders/ba607b88/by-season?gender=male&team_type=international&series_type=bilateral_only
+REG field_by_phase_kohli_bilat                         /api/v1/fielders/ba607b88/by-phase?gender=male&team_type=international&series_type=bilateral_only
+REG field_by_over_kohli_bilat                          /api/v1/fielders/ba607b88/by-over?gender=male&team_type=international&series_type=bilateral_only
+REG field_dismissal_types_kohli_bilat                  /api/v1/fielders/ba607b88/dismissal-types?gender=male&team_type=international&series_type=bilateral_only
+REG field_victims_kohli_bilat                          /api/v1/fielders/ba607b88/victims?gender=male&team_type=international&series_type=bilateral_only
+REG field_by_innings_kohli_bilat                       /api/v1/fielders/ba607b88/by-innings?gender=male&team_type=international&limit=10&series_type=bilateral_only
+REG keep_summary_dhoni_intl_bilat                      /api/v1/fielders/4a8a2e3b/keeping/summary?gender=male&team_type=international&series_type=bilateral_only
+REG keep_by_season_dhoni_bilat                         /api/v1/fielders/4a8a2e3b/keeping/by-season?gender=male&team_type=international&series_type=bilateral_only
+REG keep_by_innings_dhoni_bilat                        /api/v1/fielders/4a8a2e3b/keeping/by-innings?gender=male&team_type=international&limit=10&series_type=bilateral_only
+REG keep_ambiguous_dhoni_bilat                         /api/v1/fielders/4a8a2e3b/keeping/ambiguous?gender=male&team_type=international&limit=10&series_type=bilateral_only
+REG field_summary_kohli_vs_aus_bilat                   /api/v1/fielders/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only

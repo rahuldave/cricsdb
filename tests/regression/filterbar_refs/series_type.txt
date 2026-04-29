@@ -1,0 +1,8 @@
+# series_type FilterBar — generated REG URLs (one-shot)
+# Source: each row mirrors an intl REG row in urls.txt with &series_type=bilateral_only appended.
+# Tag REG (not NEW): promotion is inert by design — backend output is byte-identical pre/post.
+# Filter: only intl-context REG entries qualify (bilateral_only requires team_type=international).
+
+REG trn_team_type_intl_bilat                           /api/v1/tournaments?team_type=international&series_type=bilateral_only
+REG trn_rivalry_ind_aus_bilat                          /api/v1/tournaments?team=India&opponent=Australia&gender=male&team_type=international&series_type=bilateral_only
+REG trn_team_gender_type_bilat                         /api/v1/tournaments?team=India&gender=male&team_type=international&series_type=bilateral_only

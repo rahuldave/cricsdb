@@ -1,0 +1,26 @@
+# series_type FilterBar — generated REG URLs (one-shot)
+# Source: each row mirrors an intl REG row in urls.txt with &series_type=bilateral_only appended.
+# Tag REG (not NEW): promotion is inert by design — backend output is byte-identical pre/post.
+# Filter: only intl-context REG entries qualify (bilateral_only requires team_type=international).
+
+REG player_kohli_bat_summary_bilat                     /api/v1/batters/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_kohli_bow_summary_bilat                     /api/v1/bowlers/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_kohli_field_summary_bilat                   /api/v1/fielders/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_kohli_keep_summary_bilat                    /api/v1/fielders/ba607b88/keeping/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_bumrah_bat_summary_bilat                    /api/v1/batters/462411b3/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_bumrah_bow_summary_bilat                    /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_bumrah_field_summary_bilat                  /api/v1/fielders/462411b3/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_bumrah_keep_summary_bilat                   /api/v1/fielders/462411b3/keeping/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_dhoni_bat_summary_bilat                     /api/v1/batters/4a8a2e3b/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_dhoni_bow_summary_bilat                     /api/v1/bowlers/4a8a2e3b/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_dhoni_field_summary_bilat                   /api/v1/fielders/4a8a2e3b/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_dhoni_keep_summary_bilat                    /api/v1/fielders/4a8a2e3b/keeping/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_mandhana_bat_summary_bilat                  /api/v1/batters/5d2eda89/summary?gender=female&team_type=international&series_type=bilateral_only
+REG player_mandhana_field_summary_bilat                /api/v1/fielders/5d2eda89/summary?gender=female&team_type=international&series_type=bilateral_only
+REG player_kohli_bat_vs_aus_bilat                      /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
+REG player_kohli_bow_vs_aus_bilat                      /api/v1/bowlers/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
+REG player_bumrah_bat_vs_aus_bilat                     /api/v1/batters/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
+REG player_bumrah_bow_vs_aus_bilat                     /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
+REG bat_leaders_from_players_bilat                     /api/v1/batters/leaders?gender=male&team_type=international&limit=5&series_type=bilateral_only
+REG bow_leaders_from_players_bilat                     /api/v1/bowlers/leaders?gender=male&team_type=international&limit=5&series_type=bilateral_only
+REG field_leaders_from_players_bilat                   /api/v1/fielders/leaders?gender=male&team_type=international&limit=5&series_type=bilateral_only

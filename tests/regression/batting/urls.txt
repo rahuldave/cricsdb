@@ -51,3 +51,18 @@ NEW bat_dismissals_kohli_fm                            /api/v1/batters/ba607b88/
 NEW bat_inter_wicket_kohli_fm                          /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international&team_class=full_member
 NEW bat_summary_kohli_vs_aus_fm                        /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
 NEW bat_by_innings_kohli_vs_aus_fm                     /api/v1/batters/ba607b88/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5&team_class=full_member
+# series_type FilterBar — generated REG URLs (one-shot)
+# Source: each row mirrors an intl REG row in urls.txt with &series_type=bilateral_only appended.
+# Tag REG (not NEW): promotion is inert by design — backend output is byte-identical pre/post.
+# Filter: only intl-context REG entries qualify (bilateral_only requires team_type=international).
+
+REG bat_leaders_men_intl_bilat                         /api/v1/batters/leaders?gender=male&team_type=international&limit=10&series_type=bilateral_only
+REG bat_leaders_with_thresholds_bilat                  /api/v1/batters/leaders?gender=male&team_type=international&min_balls=200&min_dismissals=5&series_type=bilateral_only
+REG bat_summary_kohli_intl_bilat                       /api/v1/batters/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
+REG bat_vs_bowlers_kohli_bilat                         /api/v1/batters/ba607b88/vs-bowlers?gender=male&team_type=international&min_balls=12&series_type=bilateral_only
+REG bat_by_over_kohli_bilat                            /api/v1/batters/ba607b88/by-over?gender=male&team_type=international&series_type=bilateral_only
+REG bat_by_phase_kohli_bilat                           /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international&series_type=bilateral_only
+REG bat_dismissals_kohli_bilat                         /api/v1/batters/ba607b88/dismissals?gender=male&team_type=international&series_type=bilateral_only
+REG bat_inter_wicket_kohli_bilat                       /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international&series_type=bilateral_only
+REG bat_summary_kohli_vs_aus_bilat                     /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
+REG bat_by_innings_kohli_vs_aus_bilat                  /api/v1/batters/ba607b88/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5&series_type=bilateral_only
