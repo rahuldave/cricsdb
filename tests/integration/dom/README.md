@@ -62,11 +62,11 @@ target (`make dom-tests`) and run when:
 - Touched `populate_*.py` / `import_data.py` / `update_recent.py`
   → run all DOM tests against the rebuilt DB.
 
-## Inventory (41 scripts post-Batch-3)
+## Inventory (62 scripts post-Batch-4)
 
 | Script | Coverage |
 |---|---|
-| `_lib.sh` | Harness: `navigate`, 4 extractors (`extract_grid`, `extract_data_table` ord-arg, `extract_landing_tiles`, `extract_team_overview`), 4 assert runners |
+| `_lib.sh` | Harness: `navigate`, 5 extractors (`extract_grid`, `extract_data_table` ord-arg, `extract_landing_tiles`, `extract_team_overview`, `extract_chart_summary`), 4 assert runners |
 | **Teams** ||
 | `teams_compare_{intl,club}.sh` | Teams > Compare grid (Aus FM / IPL 2025) |
 | `teams_overview_{intl,club}.sh` | Teams > Overview StatCards + keepers |
@@ -94,6 +94,23 @@ target (`make dom-tests`) and run when:
 | `series_points_club.sh` | Series > Points (IPL 25 standings, 10 rows) |
 | **Cross-cutting** ||
 | `cross_cutting_team_class_consistency.sh` | FM filter narrowing across 4 surfaces |
+| **Players** (Batch 4a) ||
+| `players_landing.sh` + `players_landing_women.sh` | Curated tile audit (CuratedLists.ts) |
+| `players_single_intl.sh` + `players_single_club.sh` | Single-player profile + bands (Kohli / Sudharsan) |
+| `players_single_intl_women.sh` | Women profile (Mandhana 24-25) |
+| `players_compare_intl.sh` + `players_compare_intl_women.sh` | 2-way compare grid (men + women anchors) |
+| **Venues** (Batch 4b) ||
+| `venues_overview_{intl,club}.sh` | Venue StatCard band (Eden Gardens / Wankhede) |
+| `venues_batters_{intl,club}.sh` | 2-table leaderboard (by_avg + by_SR) |
+| `venues_bowlers_club.sh` + `venues_fielders_club.sh` | Wankhede leaderboards |
+| `venues_matches_club.sh` | Wankhede match list |
+| `venues_records_intl.sh` | 7-table Records fan-out (Eden) |
+| **Matches scorecard** (Batch 4c) ||
+| `matches_scorecard_{intl,club}.sh` | WC 2024 + IPL 2025 finals batting/bowling cards |
+| `matches_scorecard_highlight.sh` | ?highlight_batter / _bowler / _fielder + auto-scroll |
+| **Charts** (Batch 4d) ||
+| `charts_manhattan_{intl,club}.sh` | Per-over runs via Semiotic data summary |
+| `charts_worm_intl.sh` | Existence-class (line charts emit pixel summaries) |
 | `audit/*.sql` | Independent ground-truth SQL per script |
 
 ## Phasing
@@ -104,9 +121,13 @@ target (`make dom-tests`) and run when:
 - **Batch 3 (shipped 2026-04-29):** rest of Teams + all Series
   sub-tabs + cross-cutting consistency (23 scripts +
   ordinal-index harness ext.). Total = 41 scripts.
-- **Batch 4+ (open queue):** Players standalone, Matches
-  scorecard, Venues sub-tabs, chart-DOM extractor for Semiotic
-  charts. Out of scope for the original spec.
+- **Batch 4 (shipped 2026-04-29):** Players standalone (men +
+  women) + Venues sub-tabs + Matches scorecard + chart-DOM
+  extractor (21 scripts + extract_chart_summary harness).
+  Total = 62 scripts.
+- **Batch 5+ (open queue):** Batting/Bowling/Fielding standalone
+  pages, Help/About markdown, 404/empty-state coverage,
+  mobile viewport. No spec yet.
 
 ## Anti-pattern guardrails
 

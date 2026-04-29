@@ -28,10 +28,10 @@ Sub-batches:
 
 | Sub-batch | Coverage | Scripts | Time | Risk |
 |---|---|---|---|---|
-| **4a** | Players landing + single + compare (men + women) | 7 | ~1.5h | Low |
-| **4b** | Venues sub-tabs (closely mirrors Series) | 8 | ~2h | Low |
-| **4c** | Matches scorecard (no charts) | 3 | ~1h | Medium |
-| **4d** | Chart-DOM extractor + chart-bearing assertions | 1 ext + 4 | ~3h | High |
+| **4a** ✅ | Players landing + single + compare (men + women) | 7 | ~1.5h | Low |
+| **4b** ✅ | Venues sub-tabs (closely mirrors Series) | 8 | ~2h | Low |
+| **4c** ✅ | Matches scorecard (no charts) | 3 | ~1h | Medium |
+| **4d** ✅ | Chart-DOM extractor + Manhattan/Worm assertions | 1 ext + 3 | ~1h | Low (lower than spec'd) |
 
 Recommended order: 4a → 4b → 4c → 4d. 4d is its own session;
 fragile and lower priority. Each prior sub-batch is self-contained.
@@ -365,12 +365,22 @@ Total: 2 commits, 3 scripts, ~80 assertions.
 
 ---
 
-## 4d — Chart-DOM extractor (own session — fragile, ~3h)
+## 4d — Chart-DOM extractor ✅ shipped 2026-04-29
 
-**Skip 4d on first pass through Batch 4.** Charts are fragile:
-Semiotic positions text labels via CSS transforms which can vary
-with axis scale, font-rendering, viewport width. Asserting numeric
-labels means accepting brittleness.
+**Originally flagged as fragile — turned out tractable** because
+Semiotic emits a hidden accessibility "data summary" panel per
+chart (`<div id="semiotic-table-_r_*_">`). The panel contains
+DOM-textual stats (count, range, mean) + first-5 sample rows —
+data-derived, not pixel-derived for bar charts. Asserting via the
+summary panel is much stabler than chasing SVG `<text>` positions.
+
+Important limitation: the summary is **only data-meaningful for
+BAR CHARTS** (ManhattanChart). Line charts (WormChart) emit
+PIXEL-coordinate summaries (x: 0..1042, y: 29..320), so worm
+assertions are EXISTENCE-class only ("the chart rendered, has
+N data points") — no run-value verification. The
+matches_scorecard_intl.sh + scorecard API + Manhattan summary
+together pin the cricket data; Worm is the sole un-pinned chart.
 
 If/when 4d is built, scope:
 
@@ -439,13 +449,16 @@ Touches:
 
 | Sub-batch | Scripts | Harness | Commits | Time |
 |---|---|---|---|---|
-| 4a | 7 | 0 | 3 | ~1.5h |
-| 4b | 8 | 0 | 4 | ~2h |
-| 4c | 3 | 0 | 2 | ~1h |
-| Wrap | — | — | 1 | ~15m |
-| **Subtotal (4a+4b+4c)** | **18** | **0** | **10** | **~5h** |
-| 4d (optional, own session) | 4 | 1 | 5 | ~3h |
-| **Total (with 4d)** | **22** | **1** | **15** | **~8h** |
+| 4a ✅ | 7 | 0 | 3 | ~1.5h |
+| 4b ✅ | 8 | 0 | 4 | ~2h |
+| 4c ✅ | 3 | 0 | 2 | ~1h |
+| 4d ✅ | 3 | 1 (extract_chart_summary) | 2 | ~1h |
+| **Total** | **21** | **1** | **11** | **~5.5h** |
+
+Came in well under the spec's ~8h estimate because (a) Semiotic's
+accessibility data-summary panel was tractable (no SVG-position
+chasing needed), and (b) Players Compare reused extract_grid
+unchanged. Net: shipped cleaner than expected.
 
 Splittable across 1-3 sessions. Best stopping points: end of 4a
 (Players covered), end of 4b (Venues covered), end of 4c

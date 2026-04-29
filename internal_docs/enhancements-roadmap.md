@@ -416,6 +416,68 @@ on 2026-04-19. They cover work that doesn't slot into a single A–Q
 letter (cross-cutting refactors, audit walks, infra fixes, follow-up
 batches) and serves as the "what shipped on day X" history.
 
+### Shipped 2026-04-29 (DOM-tests Batch 4 — Players + Venues + Matches + Charts)
+
+21 scripts + 1 harness extension across 11 commits, completing the
+out-of-original-spec surfaces (spec-dom-tests-batch-4.md). Total
+dom/ suite: 41 → **62 scripts**, all green.
+
+**Batch 4a — Players standalone (3 commits, 7 scripts):**
+- players_landing (men, 9 profile + 5 compare tiles), single_intl
+  (Kohli WC 2024-25), single_club (Sudharsan IPL 2025), compare_intl
+  (Kohli × Sharma).
+- women anchors (added per user feedback after the original spec
+  said "skip women — no business need yet"): players_landing_women,
+  players_single_intl_women (Mandhana 24-25 — 25 m / 877 r / 1×100),
+  players_compare_intl_women (Mandhana × Mooney — Mooney's keeper
+  band exercises the empty-section placeholder behavior).
+
+**Batch 4b — Venues sub-tabs (4 commits, 8 scripts):**
+- Overview pair (Eden Gardens men_intl + Wankhede IPL 2025).
+- Batters pair, plus club-only Bowlers/Fielders/Matches +
+  intl-only Records (7-table fan-out).
+- Discovery: Venues Batters/Bowlers render TWO leaderboard modes
+  (by_avg + by_SR), NOT three like Series — by_runs/by_wickets
+  dropped at venue scope because of low match volumes.
+
+**Batch 4c — Matches scorecard (2 commits, 3 scripts):**
+- WC 2024 Final (1551) + IPL 2025 Final (6018) batting/bowling
+  cards per innings; matches_scorecard_highlight tests the
+  ?highlight_batter / _bowler / _fielder URL params + the
+  page-level auto-scroll workaround (asserts scrollY > 0 to catch
+  the "scroll fired before sibling charts settled" regression).
+- Discovery: scorecard H2 has NO class — used
+  `.wisden-match-header h2` instead of `.wisden-page-title`.
+  Also `.is-highlighted` lights up MULTIPLE rows for fielder
+  highlights (one per dismissal-fielder credit).
+
+**Batch 4d — Chart-DOM extractor (2 commits, 3 scripts + 1 harness):**
+- Originally flagged as fragile in the spec; turned out tractable
+  because Semiotic emits a hidden accessibility data-summary panel
+  per chart (`<div id="semiotic-table-_r_*_">`). The panel has
+  DOM-textual stats (count, range, mean) + first-5 sample rows —
+  data-derived for bar charts (ManhattanChart), pixel-derived for
+  line charts (WormChart). New extractor: `extract_chart_summary
+  <ordinal>`.
+- charts_manhattan_intl: India 8.80/over (range 3-17, first 5
+  = 15/8/3/6/7), SA 8.45/over (range 2-24, first 5 = 6/5/3/8/10).
+- charts_manhattan_club: RCB 9.50/over, PBKS 9.20/over for the
+  IPL 2025 Final.
+- charts_worm_intl: existence-class only (line charts emit
+  pixel-coordinate summaries, not run values).
+
+**Total dom/ inventory at end of session: 62 scripts** (~720 →
+~1100 assertions estimated; full assertion count not retallied
+since per-script counts are documented in the corresponding
+commit messages).
+
+What this closes: spec-dom-tests-batch-4.md's full inventory
+(Players, Venues, Matches scorecard, charts) is shipped and
+green. Out-of-scope continuation work (Batting/Bowling/Fielding
+standalone pages, Help/About markdown, 404/empty-state coverage,
+mobile-viewport bugs) is logged in the spec's "Deferred PAST
+Batch 4" section.
+
 ### Shipped 2026-04-29 (DOM-tests Batch 3 — full Series sub-tabs + cross-cutting)
 
 23 scripts + 1 harness extension across 14 commits, completing the
