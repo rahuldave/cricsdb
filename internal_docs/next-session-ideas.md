@@ -33,22 +33,26 @@ that did NOT read `api/` or `tests/sanity/` (gold-standard) OR a
 committed `audit/<script>.sql` SQL file. NEVER copy expected
 numbers from the running API.
 
-### Step 2 — Sibling specs (NOT YET WRITTEN — write before building)
+### Step 2 — Sibling specs (BOTH WRITTEN 2026-04-28 — pick one to build)
 
-These were parked during the v3 audit (2026-04-28). Each is its
-own session-scale piece of work.
+Both written in the same session that shipped v3 + per-team
+transform. Order recommendation: series_type first (mostly
+mechanical, smaller scope); slot-override-chip-alignment second
+(architectural, unblocks broader future work).
 
-- **`spec-filterbar-series-type.md`** — promote `series_type` from
-  AuxParams to FilterBarParams the same way team_class went. Same
-  shape: a one-line `useCompareSlots` change (already plumbed in
-  inheritedScope), backend defensive gate, frontend pill widget,
-  ~125 NEW regression URLs, 22-surface integration matrix.
-  Estimated ~11h. Write the spec by reading
-  `spec-filterbar-team-class-v3.md` and substituting `series_type`
-  for `team_class` (mostly mechanical).
-- **`spec-slot-override-chip-alignment.md`** — addresses TWO real
-  but parked findings from the v3 audit that affect EVERY
-  overridable axis (not just team_class):
+- **`internal_docs/spec-filterbar-series-type.md`** (286 lines)
+  — promote `series_type` from AuxParams to FilterBarParams as
+  the 10th key. Most slot plumbing already exists
+  (`useCompareSlots.inheritedScope` already reads
+  `primary.series_type`; `OVERRIDABLE_SLOT_KEYS` already
+  includes it). Net work: backend field move, FilterBar widget
+  (`<select>` recommended for compactness), `useFilters`
+  special-case removal, ScopeStatusStrip chip replaces "Show:"
+  sub-line, hand-rolled helper fan-out. ~8h. 5-commit rollout
+  per spec §9.
+- **`internal_docs/spec-slot-override-chip-alignment.md`**
+  (322 lines) — generalises the per-slot override system. Two
+  problems it fixes:
   1. **Override-to-empty URL serialization.** `useUrlParam`
      deletes params on falsy values, so a slot can't explicitly
      "override to (none)" while inheriting a non-empty primary.
@@ -68,10 +72,14 @@ own session-scale piece of work.
      Generalised fix: compute league-side baseline using slot's
      resolved scope, not the request's filters.
 
-  Recommended order: write `spec-filterbar-series-type.md` FIRST
-  (smaller, mechanical). The slot-override-chip-alignment spec
-  unblocks broader expressiveness on Compare and is more
-  ambitious — a proper architectural fix to the override model.
+  Spec specifies `__any__` URL sentinel + `chip_baseline_scope`
+  serialization that generalises today's `chip_team_class` hint.
+  ~16h estimated; risk medium-high (touches every overridable
+  axis at every endpoint). 5-commit rollout per spec §8.
+
+  Recommended order: build `spec-filterbar-series-type.md` FIRST
+  (smaller, mechanical). The slot-override-chip-alignment work
+  is architectural and unblocks broader future work.
 
 ### Step 3 — Optional commit-6 follow-up
 

@@ -1430,9 +1430,17 @@ parallel per-INNINGS + per-TEAM convention.
 - Anchor file (`team-class-anchor-numbers.md`) implicitly updated:
   pool totals are now `per_team × unique_teams ÷ 2`.
 
-**Followups parked:** `spec-filterbar-series-type.md` and
-`spec-slot-override-chip-alignment.md` unchanged (sibling specs to
-v3 + this transform; both still NOT WRITTEN).
+**Followups — both sibling specs WRITTEN this session
+(2026-04-28), build-ready, not yet implemented:**
+- `internal_docs/spec-filterbar-series-type.md` — promote
+  `series_type` from AuxParams to FilterBarParams as the 10th
+  key. ~8h, mostly mechanical (most slot plumbing already
+  exists from v3).
+- `internal_docs/spec-slot-override-chip-alignment.md` —
+  architectural fix for override-to-empty URL serialization
+  (via `__any__` sentinel) + chip alignment under bidirectional
+  override (generalises today's `chip_team_class` hint into a
+  full `chip_baseline_scope` mechanism). ~16h.
 
 ---
 
