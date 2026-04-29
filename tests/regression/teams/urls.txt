@@ -70,38 +70,38 @@ REG ref_tournaments_india             /api/v1/tournaments?team=India&gender=male
 # Source: each row mirrors a REG row in urls.txt with &team_class=full_member appended.
 # Filter: only intl-context REG entries qualify.
 
-NEW teams_landing_men_intl_fm                          /api/v1/teams/landing?gender=male&team_type=international&team_class=full_member
-NEW team_summary_india_fm                              /api/v1/teams/India/summary?gender=male&team_type=international&team_class=full_member
-NEW team_summary_india_recent_fm                       /api/v1/teams/India/summary?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member
-NEW team_results_india_fm                              /api/v1/teams/India/results?gender=male&team_type=international&limit=5&team_class=full_member
-NEW team_results_india_offset_fm                       /api/v1/teams/India/results?gender=male&team_type=international&limit=5&offset=5&team_class=full_member
-NEW team_by_season_india_fm                            /api/v1/teams/India/by-season?gender=male&team_type=international&team_class=full_member
-NEW team_players_by_season_india_fm                    /api/v1/teams/India/players-by-season?gender=male&team_type=international&season_from=2024&season_to=2024&team_class=full_member
-NEW team_opponents_india_fm                            /api/v1/teams/India/opponents?gender=male&team_type=international&team_class=full_member
-NEW team_opponents_matrix_india_fm                     /api/v1/teams/India/opponents-matrix?gender=male&team_type=international&top_n=5&team_class=full_member
-NEW team_vs_opponent_ind_aus_fm                        /api/v1/teams/India/vs/Australia?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member
-NEW team_batting_summary_india_fm                      /api/v1/teams/India/batting/summary?gender=male&team_type=international&team_class=full_member
-NEW team_batting_by_season_india_fm                    /api/v1/teams/India/batting/by-season?gender=male&team_type=international&team_class=full_member
-NEW team_batting_by_phase_india_fm                     /api/v1/teams/India/batting/by-phase?gender=male&team_type=international&team_class=full_member
-NEW team_batting_top_batters_india_fm                  /api/v1/teams/India/batting/top-batters?gender=male&team_type=international&limit=5&team_class=full_member
-NEW team_batting_heatmap_india_fm                      /api/v1/teams/India/batting/phase-season-heatmap?gender=male&team_type=international&team_class=full_member
-NEW team_bowling_summary_india_fm                      /api/v1/teams/India/bowling/summary?gender=male&team_type=international&team_class=full_member
-NEW team_bowling_by_season_india_fm                    /api/v1/teams/India/bowling/by-season?gender=male&team_type=international&team_class=full_member
-NEW team_bowling_by_phase_india_fm                     /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international&team_class=full_member
-NEW team_bowling_top_bowlers_india_fm                  /api/v1/teams/India/bowling/top-bowlers?gender=male&team_type=international&limit=5&team_class=full_member
-NEW team_bowling_heatmap_india_fm                      /api/v1/teams/India/bowling/phase-season-heatmap?gender=male&team_type=international&team_class=full_member
-NEW team_fielding_summary_india_fm                     /api/v1/teams/India/fielding/summary?gender=male&team_type=international&team_class=full_member
-NEW team_fielding_by_season_india_fm                   /api/v1/teams/India/fielding/by-season?gender=male&team_type=international&team_class=full_member
-NEW team_fielding_top_fielders_india_fm                /api/v1/teams/India/fielding/top-fielders?gender=male&team_type=international&limit=5&team_class=full_member
-NEW team_partnerships_summary_india_fm                 /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=batting&team_class=full_member
-NEW team_partnerships_by_wicket_india_fm               /api/v1/teams/India/partnerships/by-wicket?gender=male&team_type=international&side=batting&team_class=full_member
-NEW team_partnerships_best_pairs_ind_fm                /api/v1/teams/India/partnerships/best-pairs?gender=male&team_type=international&side=batting&team_class=full_member
-NEW team_partnerships_heatmap_india_fm                 /api/v1/teams/India/partnerships/heatmap?gender=male&team_type=international&side=batting&team_class=full_member
-NEW team_partnerships_top_india_fm                     /api/v1/teams/India/partnerships/top?gender=male&team_type=international&side=batting&limit=5&team_class=full_member
-NEW team_partnerships_bowling_summary_fm               /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=bowling&team_class=full_member
-NEW ref_teams_search_india_fm                          /api/v1/teams?q=India&team_type=international&gender=male&team_class=full_member
-NEW ref_seasons_india_fm                               /api/v1/seasons?team=India&gender=male&team_type=international&team_class=full_member
-NEW ref_tournaments_india_fm                           /api/v1/tournaments?team=India&gender=male&team_type=international&team_class=full_member
+REG teams_landing_men_intl_fm                          /api/v1/teams/landing?gender=male&team_type=international&team_class=full_member
+REG team_summary_india_fm                              /api/v1/teams/India/summary?gender=male&team_type=international&team_class=full_member
+REG team_summary_india_recent_fm                       /api/v1/teams/India/summary?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member
+REG team_results_india_fm                              /api/v1/teams/India/results?gender=male&team_type=international&limit=5&team_class=full_member
+REG team_results_india_offset_fm                       /api/v1/teams/India/results?gender=male&team_type=international&limit=5&offset=5&team_class=full_member
+REG team_by_season_india_fm                            /api/v1/teams/India/by-season?gender=male&team_type=international&team_class=full_member
+REG team_players_by_season_india_fm                    /api/v1/teams/India/players-by-season?gender=male&team_type=international&season_from=2024&season_to=2024&team_class=full_member
+REG team_opponents_india_fm                            /api/v1/teams/India/opponents?gender=male&team_type=international&team_class=full_member
+REG team_opponents_matrix_india_fm                     /api/v1/teams/India/opponents-matrix?gender=male&team_type=international&top_n=5&team_class=full_member
+REG team_vs_opponent_ind_aus_fm                        /api/v1/teams/India/vs/Australia?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member
+REG team_batting_summary_india_fm                      /api/v1/teams/India/batting/summary?gender=male&team_type=international&team_class=full_member
+REG team_batting_by_season_india_fm                    /api/v1/teams/India/batting/by-season?gender=male&team_type=international&team_class=full_member
+REG team_batting_by_phase_india_fm                     /api/v1/teams/India/batting/by-phase?gender=male&team_type=international&team_class=full_member
+REG team_batting_top_batters_india_fm                  /api/v1/teams/India/batting/top-batters?gender=male&team_type=international&limit=5&team_class=full_member
+REG team_batting_heatmap_india_fm                      /api/v1/teams/India/batting/phase-season-heatmap?gender=male&team_type=international&team_class=full_member
+REG team_bowling_summary_india_fm                      /api/v1/teams/India/bowling/summary?gender=male&team_type=international&team_class=full_member
+REG team_bowling_by_season_india_fm                    /api/v1/teams/India/bowling/by-season?gender=male&team_type=international&team_class=full_member
+REG team_bowling_by_phase_india_fm                     /api/v1/teams/India/bowling/by-phase?gender=male&team_type=international&team_class=full_member
+REG team_bowling_top_bowlers_india_fm                  /api/v1/teams/India/bowling/top-bowlers?gender=male&team_type=international&limit=5&team_class=full_member
+REG team_bowling_heatmap_india_fm                      /api/v1/teams/India/bowling/phase-season-heatmap?gender=male&team_type=international&team_class=full_member
+REG team_fielding_summary_india_fm                     /api/v1/teams/India/fielding/summary?gender=male&team_type=international&team_class=full_member
+REG team_fielding_by_season_india_fm                   /api/v1/teams/India/fielding/by-season?gender=male&team_type=international&team_class=full_member
+REG team_fielding_top_fielders_india_fm                /api/v1/teams/India/fielding/top-fielders?gender=male&team_type=international&limit=5&team_class=full_member
+REG team_partnerships_summary_india_fm                 /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=batting&team_class=full_member
+REG team_partnerships_by_wicket_india_fm               /api/v1/teams/India/partnerships/by-wicket?gender=male&team_type=international&side=batting&team_class=full_member
+REG team_partnerships_best_pairs_ind_fm                /api/v1/teams/India/partnerships/best-pairs?gender=male&team_type=international&side=batting&team_class=full_member
+REG team_partnerships_heatmap_india_fm                 /api/v1/teams/India/partnerships/heatmap?gender=male&team_type=international&side=batting&team_class=full_member
+REG team_partnerships_top_india_fm                     /api/v1/teams/India/partnerships/top?gender=male&team_type=international&side=batting&limit=5&team_class=full_member
+REG team_partnerships_bowling_summary_fm               /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=bowling&team_class=full_member
+REG ref_teams_search_india_fm                          /api/v1/teams?q=India&team_type=international&gender=male&team_class=full_member
+REG ref_seasons_india_fm                               /api/v1/seasons?team=India&gender=male&team_type=international&team_class=full_member
+REG ref_tournaments_india_fm                           /api/v1/tournaments?team=India&gender=male&team_type=international&team_class=full_member
 # series_type FilterBar — generated REG URLs (one-shot)
 # Source: each row mirrors an intl REG row in urls.txt with &series_type=bilateral_only appended.
 # Tag REG (not NEW): promotion is inert by design — backend output is byte-identical pre/post.

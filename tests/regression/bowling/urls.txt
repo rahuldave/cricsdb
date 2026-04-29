@@ -41,15 +41,15 @@ REG ref_players_search_bowler_role    /api/v1/players?q=Starc&role=bowler&limit=
 # Source: each row mirrors a REG row in urls.txt with &team_class=full_member appended.
 # Filter: only intl-context REG entries qualify.
 
-NEW bow_leaders_men_intl_fm                            /api/v1/bowlers/leaders?gender=male&team_type=international&limit=10&team_class=full_member
-NEW bow_leaders_with_thresholds_fm                     /api/v1/bowlers/leaders?gender=male&team_type=international&min_balls=120&min_wickets=5&team_class=full_member
-NEW bow_summary_bumrah_intl_fm                         /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&team_class=full_member
-NEW bow_vs_batters_bumrah_fm                           /api/v1/bowlers/462411b3/vs-batters?gender=male&team_type=international&min_balls=12&team_class=full_member
-NEW bow_by_over_bumrah_fm                              /api/v1/bowlers/462411b3/by-over?gender=male&team_type=international&team_class=full_member
-NEW bow_by_phase_bumrah_fm                             /api/v1/bowlers/462411b3/by-phase?gender=male&team_type=international&team_class=full_member
-NEW bow_wickets_bumrah_fm                              /api/v1/bowlers/462411b3/wickets?gender=male&team_type=international&team_class=full_member
-NEW bow_summary_bumrah_vs_aus_fm                       /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
-NEW bow_by_innings_bumrah_vs_aus_fm                    /api/v1/bowlers/462411b3/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5&team_class=full_member
+REG bow_leaders_men_intl_fm                            /api/v1/bowlers/leaders?gender=male&team_type=international&limit=10&team_class=full_member
+REG bow_leaders_with_thresholds_fm                     /api/v1/bowlers/leaders?gender=male&team_type=international&min_balls=120&min_wickets=5&team_class=full_member
+REG bow_summary_bumrah_intl_fm                         /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&team_class=full_member
+REG bow_vs_batters_bumrah_fm                           /api/v1/bowlers/462411b3/vs-batters?gender=male&team_type=international&min_balls=12&team_class=full_member
+REG bow_by_over_bumrah_fm                              /api/v1/bowlers/462411b3/by-over?gender=male&team_type=international&team_class=full_member
+REG bow_by_phase_bumrah_fm                             /api/v1/bowlers/462411b3/by-phase?gender=male&team_type=international&team_class=full_member
+REG bow_wickets_bumrah_fm                              /api/v1/bowlers/462411b3/wickets?gender=male&team_type=international&team_class=full_member
+REG bow_summary_bumrah_vs_aus_fm                       /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
+REG bow_by_innings_bumrah_vs_aus_fm                    /api/v1/bowlers/462411b3/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5&team_class=full_member
 # series_type FilterBar — generated REG URLs (one-shot)
 # Source: each row mirrors an intl REG row in urls.txt with &series_type=bilateral_only appended.
 # Tag REG (not NEW): promotion is inert by design — backend output is byte-identical pre/post.

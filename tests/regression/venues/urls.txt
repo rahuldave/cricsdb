@@ -78,13 +78,13 @@ NEW venue_summary_chepauk_male     /api/v1/venues/MA%20Chidambaram%20Stadium/sum
 # Source: each row mirrors a REG row in urls.txt with &team_class=full_member appended.
 # Filter: only intl-context REG entries qualify.
 
-NEW team_summary_india_fm                              /api/v1/teams/India/summary?gender=male&team_type=international&team_class=full_member
-NEW team_summary_india_venue_wank_fm                   /api/v1/teams/India/summary?gender=male&team_type=international&filter_venue=Wankhede%20Stadium&team_class=full_member
-NEW team_results_india_fm                              /api/v1/teams/India/results?gender=male&team_type=international&limit=5&team_class=full_member
-NEW matches_plain_fm                                   /api/v1/matches?gender=male&team_type=international&limit=5&team_class=full_member
-NEW ref_list_teams_plain_fm                            /api/v1/teams?gender=male&team_type=international&team_class=full_member
-NEW ref_tournaments_plain_fm                           /api/v1/tournaments?gender=male&team_type=international&team_class=full_member
-NEW venues_landing_male_intl_fm                        /api/v1/venues/landing?gender=male&team_type=international&team_class=full_member
+REG team_summary_india_fm                              /api/v1/teams/India/summary?gender=male&team_type=international&team_class=full_member
+REG team_summary_india_venue_wank_fm                   /api/v1/teams/India/summary?gender=male&team_type=international&filter_venue=Wankhede%20Stadium&team_class=full_member
+REG team_results_india_fm                              /api/v1/teams/India/results?gender=male&team_type=international&limit=5&team_class=full_member
+REG matches_plain_fm                                   /api/v1/matches?gender=male&team_type=international&limit=5&team_class=full_member
+REG ref_list_teams_plain_fm                            /api/v1/teams?gender=male&team_type=international&team_class=full_member
+REG ref_tournaments_plain_fm                           /api/v1/tournaments?gender=male&team_type=international&team_class=full_member
+REG venues_landing_male_intl_fm                        /api/v1/venues/landing?gender=male&team_type=international&team_class=full_member
 # series_type FilterBar — generated REG URLs (one-shot)
 # Source: each row mirrors an intl REG row in urls.txt with &series_type=bilateral_only appended.
 # Tag REG (not NEW): promotion is inert by design — backend output is byte-identical pre/post.
