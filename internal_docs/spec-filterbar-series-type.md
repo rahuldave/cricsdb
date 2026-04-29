@@ -168,12 +168,39 @@ Change to read from `filters.series_type`. Same rejection logic.
 Bucket tables don't carry the series_type dimension, so live
 aggregation is the fallback when set.
 
-### 5.4 Hand-rolled filter helpers (3 files, 3 edits)
+### 5.4 Hand-rolled filter helpers — MOSTLY ALREADY WIRED
 
-`tournaments.py::_build_filter_clauses`, `reference.py::_reference_clauses`,
-`reference.py::list_teams` — same pattern as v3 commit 3. Each
-gets a `series_type` branch using the existing `series_type_clause`
-function (already imported). Mostly mechanical.
+Verified via curl 2026-04-28: `/tournaments` already narrows
+under `series_type` — 128 unbounded → 126 bilateral_only → 2 icc
+on men_intl 2024-25. The plumbing was added when series_type was
+introduced via AuxParams, predating this spec.
+
+What's already wired:
+- `reference.py::_reference_clauses` accepts `series_type` and
+  applies `series_type_clause`. Drives `/tournaments` + `/seasons`
+  dropdown narrowing. ✓
+- `reference.py::list_teams` — passes through via FilterBarParams
+  build path. ✓
+- `tournaments.py` Series-tab endpoints — use
+  `_tournament_scope_where()` which already takes `series_type`.
+  ✓ (Note: `_build_filter_clauses` in the same file does NOT
+  take series_type, but the endpoints that use it — landing,
+  by-season — don't need series_type narrowing because the
+  enclosing tournament context already determines series-type
+  identity.)
+- Frontend `FilterBar.tsx` already passes `series_type` from URL
+  to `getTournaments` / `getSeasons` calls. ✓
+
+What's NOT wired and matters: `list_teams` in `reference.py`
+should still apply series_type via the `aux` flow (today it
+takes `filters: FilterParams = Depends()` only — no aux).
+Verify whether the typeahead narrowing is needed; if a user
+sets series_type=bilateral_only they'd want the team typeahead
+to drop teams that only appear in tournaments. Edge case; may
+not be worth the wire unless flagged.
+
+Net work in this commit: zero or near-zero edits. Most of
+"commit 3" work in this spec is verification, not editing.
 
 ---
 
@@ -353,15 +380,17 @@ backend endpoint.
    extends to 10. `<select>` widget. ScopeStatusStrip chip
    replaces "Show:" sub-line. Remove `useFilters` special-case
    read. `anyFilterSet` + `clearAll` updates.
-3. **Backend router fan-out.** Hand-rolled helpers in
-   `tournaments.py` + `reference.py` already accept `series_type`
-   (mostly — verify each call site). May be a smaller fan-out
-   than v3 because of pre-existing plumbing.
+3. **Backend router fan-out — verification only (likely zero
+   edits).** All hand-rolled helpers already apply series_type;
+   curl-verified 2026-04-28. Only edit if a specific gap surfaces
+   during the per-tab narrowing matrix run.
 4. **Regression URL additions.** ~125 NEW URLs across 10 suites.
 5. **Tests.** Sanity + URL audit + integration scripts.
 
-Estimated effort: ~8h (smaller than v3's ~11h because of
-pre-existing slot plumbing).
+Estimated effort: ~5-6h (smaller than the original ~8h estimate
+because curl-verification 2026-04-28 confirmed the dropdown
+narrowing is already in production — the work is mostly the
+FilterBar widget + ScopeStatusStrip cleanup + the field move).
 
 ---
 
