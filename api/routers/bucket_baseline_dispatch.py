@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ..filters import FilterParams, AuxParams
+from ..filters import FilterParams, AuxParams, _is_set
 from ..tournament_canonical import (
     is_canonical_with_variants, variants as canonical_variants,
     event_name_in_clause,
@@ -36,14 +36,15 @@ def is_precomputed_scope(filters: FilterParams, aux: Optional[AuxParams]) -> boo
     Anything else (gender + team_type + optional tournament + optional
     season range + optional scope_to_team) → use the table.
     """
-    if filters.venue:
+    if _is_set(filters.venue):
         return False
-    if filters.team is not None or filters.opponent is not None:
+    if _is_set(filters.team) or _is_set(filters.opponent):
         return False
-    if filters.series_type and filters.series_type != "all":
+    if _is_set(filters.series_type) and filters.series_type != "all":
         return False
     if (
-        filters.team_class == "full_member"
+        _is_set(filters.team_class)
+        and filters.team_class == "full_member"
         and filters.team_type == "international"
     ):
         return False
@@ -77,14 +78,14 @@ def baseline_where(
     parts: list[str] = [f"{a}team = :_team"]
     params: dict = {"_team": team}
 
-    if filters.gender:
+    if _is_set(filters.gender):
         parts.append(f"{a}gender = :_gender")
         params["_gender"] = filters.gender
-    if filters.team_type:
+    if _is_set(filters.team_type):
         parts.append(f"{a}team_type = :_team_type")
         params["_team_type"] = filters.team_type
 
-    if filters.tournament:
+    if _is_set(filters.tournament):
         # Bucket tables store the RAW cricsheet event_name as the
         # tournament value (see populate_bucket_baseline.py — no
         # canonicalization at population time). When the request's
@@ -106,8 +107,8 @@ def baseline_where(
         # already-precomputed match table — no live JOIN to matchplayer
         # needed.
         sub = ["team = :_scope_to_team"]
-        if filters.gender:    sub.append("gender = :_gender")
-        if filters.team_type: sub.append("team_type = :_team_type")
+        if _is_set(filters.gender):    sub.append("gender = :_gender")
+        if _is_set(filters.team_type): sub.append("team_type = :_team_type")
         parts.append(
             f"{a}tournament IN ("
             f"SELECT DISTINCT tournament FROM bucketbaselinematch "
@@ -115,10 +116,10 @@ def baseline_where(
         )
         params["_scope_to_team"] = aux.scope_to_team
 
-    if filters.season_from:
+    if _is_set(filters.season_from):
         parts.append(f"{a}season >= :_season_from")
         params["_season_from"] = filters.season_from
-    if filters.season_to:
+    if _is_set(filters.season_to):
         parts.append(f"{a}season <= :_season_to")
         params["_season_to"] = filters.season_to
 

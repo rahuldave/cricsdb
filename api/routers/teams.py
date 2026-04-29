@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams, AuxParams
+from ..filters import FilterParams, AuxParams, _is_set
 from ..full_members import ICC_FULL_MEMBERS
 from ..metrics_metadata import wrap_metric
 from ..tournament_canonical import series_type as series_type_for, canonicalize
@@ -1154,7 +1154,7 @@ def _scope_to_team_clause(
     bilaterals from the scope — diverging from the baseline path's
     narrowing.
     """
-    if aux is None or not aux.scope_to_team or filters.tournament:
+    if aux is None or not aux.scope_to_team or _is_set(filters.tournament):
         return "", {}
     return (
         "COALESCE(m.event_name, '') IN ("

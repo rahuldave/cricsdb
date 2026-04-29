@@ -38,6 +38,23 @@ from .tournament_canonical import (
 )
 
 
+# Sentinel used by Compare-tab per-slot URL overrides to express
+# "explicit empty / do not inherit primary" — distinct from the param
+# being absent (default-inherit) or empty-string (URL machinery's
+# delete-on-falsy makes that indistinguishable from absent).
+# Decoded as no-narrowing on the backend.
+# Spec: internal_docs/spec-slot-override-chip-alignment.md §4.1.
+ANY_SENTINEL = "__any__"
+
+
+def _is_set(v) -> bool:
+    """True iff v is a real narrowing value (not None, not '', not the
+    `__any__` sentinel). Use at every clause guard that consumes a URL-
+    derived filter field so the sentinel is consistently treated as
+    no-narrowing."""
+    return v not in (None, "", ANY_SENTINEL)
+
+
 class AuxParams:
     """Internal-plumbing narrowings, distinct from the FilterBar UI.
 
@@ -157,15 +174,15 @@ class FilterBarParams:
         if has_innings_join:
             clauses.append(f"{innings_alias}.super_over = 0")
 
-        if self.gender:
+        if _is_set(self.gender):
             clauses.append(f"{table_alias}.gender = :gender")
             params["gender"] = self.gender
 
-        if self.team_type:
+        if _is_set(self.team_type):
             clauses.append(f"{table_alias}.team_type = :team_type")
             params["team_type"] = self.team_type
 
-        if self.tournament:
+        if _is_set(self.tournament):
             # Canonical tournaments (e.g. "T20 World Cup (Men)") expand
             # to `event_name IN (variants)` — see api/tournament_canonical.py.
             # Single-variant / non-canonical names stay as equality.
@@ -181,19 +198,19 @@ class FilterBarParams:
                 clauses.append(f"{table_alias}.event_name = :tournament")
                 params["tournament"] = self.tournament
 
-        if self.season_from:
+        if _is_set(self.season_from):
             clauses.append(f"{table_alias}.season >= :season_from")
             params["season_from"] = self.season_from
 
-        if self.season_to:
+        if _is_set(self.season_to):
             clauses.append(f"{table_alias}.season <= :season_to")
             params["season_to"] = self.season_to
 
-        if self.venue:
+        if _is_set(self.venue):
             clauses.append(f"{table_alias}.venue = :filter_venue")
             params["filter_venue"] = self.venue
 
-        if self.team:
+        if _is_set(self.team):
             if has_innings_join:
                 clauses.append(f"{innings_alias}.team = :team")
             else:
@@ -202,7 +219,7 @@ class FilterBarParams:
                 )
             params["team"] = self.team
 
-        if self.opponent:
+        if _is_set(self.opponent):
             if has_innings_join:
                 clauses.append(
                     f"(({table_alias}.team1 = :opponent AND {innings_alias}.team = {table_alias}.team2)"
@@ -218,12 +235,16 @@ class FilterBarParams:
         # team_type='international'. For clubs the FM list (country
         # names) doesn't match franchise team strings so it would zero
         # out every match — silent no-op preserves club URL robustness.
-        if self.team_class == "full_member" and self.team_type == "international":
+        if (
+            _is_set(self.team_class)
+            and self.team_class == "full_member"
+            and self.team_type == "international"
+        ):
             clauses.append(full_member_clause(table_alias=table_alias))
 
         # series_type — promoted to FilterBar 2026-04-28. Reads from
         # self; the historical `aux.series_type` path is removed.
-        if self.series_type:
+        if _is_set(self.series_type):
             st = series_type_clause(self.series_type, alias=table_alias)
             if st:
                 clauses.append(st)

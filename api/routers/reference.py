@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams, AuxParams
+from ..filters import FilterParams, AuxParams, _is_set
 from ..tournament_canonical import (
     canonicalize, variants as canonical_variants,
     is_canonical_with_variants, event_name_in_clause,
@@ -42,16 +42,16 @@ def _reference_clauses(
     """
     parts: list[str] = []
     params: dict = {}
-    if team:
+    if _is_set(team):
         parts.append("(m.team1 = :team OR m.team2 = :team)")
         params["team"] = team
-    if gender:
+    if _is_set(gender):
         parts.append("m.gender = :gender")
         params["gender"] = gender
-    if team_type:
+    if _is_set(team_type):
         parts.append("m.team_type = :team_type")
         params["team_type"] = team_type
-    if tournament:
+    if _is_set(tournament):
         # Expand canonicals → IN (variants) so picking "T20 World Cup
         # (Men)" narrows seasons across all three cricsheet variants.
         if is_canonical_with_variants(tournament):
@@ -59,16 +59,16 @@ def _reference_clauses(
         else:
             parts.append("m.event_name = :tournament")
             params["tournament"] = tournament
-    if season_from:
+    if _is_set(season_from):
         parts.append("m.season >= :season_from")
         params["season_from"] = season_from
-    if season_to:
+    if _is_set(season_to):
         parts.append("m.season <= :season_to")
         params["season_to"] = season_to
-    if filter_venue:
+    if _is_set(filter_venue):
         parts.append("m.venue = :filter_venue")
         params["filter_venue"] = filter_venue
-    if series_type:
+    if _is_set(series_type):
         st = _series_type_clause(series_type)
         if st:
             parts.append(st)
@@ -77,7 +77,11 @@ def _reference_clauses(
     # query params (not FilterParams) so they can drop self-referential
     # axes. Without this, the FilterBar's tournament + season dropdowns
     # silently ignore the team_class pill.
-    if team_class == "full_member" and team_type == "international":
+    if (
+        _is_set(team_class)
+        and team_class == "full_member"
+        and team_type == "international"
+    ):
         from ..full_members import full_member_clause
         parts.append(full_member_clause(table_alias="m"))
     return parts, params
@@ -234,32 +238,36 @@ async def list_teams(
     where_parts = ["1=1"]
     params: dict = {}
 
-    if filters.gender:
+    if _is_set(filters.gender):
         where_parts.append("m.gender = :gender")
         params["gender"] = filters.gender
-    if filters.team_type:
+    if _is_set(filters.team_type):
         where_parts.append("m.team_type = :team_type")
         params["team_type"] = filters.team_type
-    if filters.tournament:
+    if _is_set(filters.tournament):
         if is_canonical_with_variants(filters.tournament):
             where_parts.append(event_name_in_clause(canonical_variants(filters.tournament)))
         else:
             where_parts.append("m.event_name = :tournament")
             params["tournament"] = filters.tournament
-    if filters.season_from:
+    if _is_set(filters.season_from):
         where_parts.append("m.season >= :season_from")
         params["season_from"] = filters.season_from
-    if filters.season_to:
+    if _is_set(filters.season_to):
         where_parts.append("m.season <= :season_to")
         params["season_to"] = filters.season_to
-    if filters.venue:
+    if _is_set(filters.venue):
         where_parts.append("m.venue = :filter_venue")
         params["filter_venue"] = filters.venue
     # team_class — defensive intl gate. Without this, picking "full
     # members only" while typing in the team typeahead surfaces
     # associate teams (Scotland, Nepal) the FilterBar pretends to
     # exclude.
-    if filters.team_class == "full_member" and filters.team_type == "international":
+    if (
+        _is_set(filters.team_class)
+        and filters.team_class == "full_member"
+        and filters.team_type == "international"
+    ):
         from ..full_members import full_member_clause
         where_parts.append(full_member_clause(table_alias="m"))
     # series_type — without this, the typeahead suggests teams whose
@@ -268,7 +276,7 @@ async def list_teams(
     # almost exclusively ICC qualifiers, so picking them yields a
     # zero-results page). Mirror of the team_class gate above; same
     # `_series_type_clause` the rest of the FilterBar uses.
-    if filters.series_type:
+    if _is_set(filters.series_type):
         st = _series_type_clause(filters.series_type, alias="m")
         if st:
             where_parts.append(st)
@@ -320,11 +328,13 @@ async def search_players(
     # exclude super-over deliveries (changing `innings` counts
     # compared to the legacy query).
     has_scope = bool(
-        filters.gender or filters.team_type or filters.tournament
-        or filters.season_from or filters.season_to
-        or filters.team or filters.opponent or filters.venue
-        or filters.team_class
-        or (filters.series_type and filters.series_type != 'all')
+        _is_set(filters.gender) or _is_set(filters.team_type)
+        or _is_set(filters.tournament)
+        or _is_set(filters.season_from) or _is_set(filters.season_to)
+        or _is_set(filters.team) or _is_set(filters.opponent)
+        or _is_set(filters.venue)
+        or _is_set(filters.team_class)
+        or (_is_set(filters.series_type) and filters.series_type != 'all')
     )
     scope_where = ""
     if has_scope:

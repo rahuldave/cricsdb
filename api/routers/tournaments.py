@@ -38,7 +38,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams
+from ..filters import FilterParams, _is_set
 from ..tournament_canonical import (
     TOURNAMENT_CANONICAL, TOURNAMENT_SERIES_TYPE,
     ICC_EVENT_NAMES, BILATERAL_TOP_TEAMS,
@@ -63,29 +63,29 @@ def _build_filter_clauses(
     """
     clauses: list[str] = []
     params: dict = {}
-    if filters.gender:
+    if _is_set(filters.gender):
         clauses.append(f"{alias}.gender = :gender")
         params["gender"] = filters.gender
-    if filters.team_type:
+    if _is_set(filters.team_type):
         clauses.append(f"{alias}.team_type = :team_type")
         params["team_type"] = filters.team_type
-    if include_tournament and filters.tournament:
+    if include_tournament and _is_set(filters.tournament):
         clauses.append(f"{alias}.event_name = :tournament")
         params["tournament"] = filters.tournament
-    if filters.season_from:
+    if _is_set(filters.season_from):
         clauses.append(f"{alias}.season >= :season_from")
         params["season_from"] = filters.season_from
-    if filters.season_to:
+    if _is_set(filters.season_to):
         clauses.append(f"{alias}.season <= :season_to")
         params["season_to"] = filters.season_to
-    if filters.venue:
+    if _is_set(filters.venue):
         clauses.append(f"{alias}.venue = :filter_venue")
         params["filter_venue"] = filters.venue
     if include_team_pair:
-        if filters.team:
+        if _is_set(filters.team):
             clauses.append(f"({alias}.team1 = :filter_team OR {alias}.team2 = :filter_team)")
             params["filter_team"] = filters.team
-        if filters.opponent:
+        if _is_set(filters.opponent):
             clauses.append(f"({alias}.team1 = :filter_opp OR {alias}.team2 = :filter_opp)")
             params["filter_opp"] = filters.opponent
     # team_class — defensive intl gate matches FilterBarParams.build().
@@ -93,7 +93,11 @@ def _build_filter_clauses(
     # canonical → variants tournament expansion needs a different code
     # path). Without this, every Series-tab endpoint silently ignores
     # the FilterBar's team_class pill.
-    if filters.team_class == "full_member" and filters.team_type == "international":
+    if (
+        _is_set(filters.team_class)
+        and filters.team_class == "full_member"
+        and filters.team_type == "international"
+    ):
         from ..full_members import full_member_clause
         clauses.append(full_member_clause(table_alias=alias))
     return clauses, params
