@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import TeamSearch from '../TeamSearch'
 import { getTeamSummary, getSeasons } from '../../api'
+import { ANY_SENTINEL } from '../../hooks/useUrlState'
+import SlotScopeEditor from './SlotScopeEditor'
 import type { FilterParams } from '../../types'
 import { AVG_SENTINEL, type CompareSlots, type SlotOverrides } from '../../hooks/useCompareSlots'
 
@@ -26,6 +28,7 @@ export default function AddCompareSlot({
 }: Props) {
   const [open, setOpen] = useState(false)
   const [showTeamPick, setShowTeamPick] = useState(false)
+  const [showCustomBuilder, setShowCustomBuilder] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -33,41 +36,99 @@ export default function AddCompareSlot({
   const filledCount = (slots.slot1 ? 1 : 0) + (slots.slot2 ? 1 : 0)
   if (filledCount >= 2) return null
 
-  const hasAvg = slots.slot1?.kind === 'avg' || slots.slot2?.kind === 'avg'
-  const hasFmAvg = (slots.slot1?.kind === 'avg' && slots.slot1.overrides.team_class === 'full_member')
-    || (slots.slot2?.kind === 'avg' && slots.slot2.overrides.team_class === 'full_member')
   const hasSeason = !!primaryFilters.season_from
-  const hasAllTimeable = !!primaryFilters.tournament || !!primaryFilters.season_from || !!primaryFilters.season_to
+  // "All-time" / "broaden everything" picks make sense iff primary has
+  // ANY overridable narrowing — otherwise the broadened slot is identical
+  // to the current-scope one. Includes the post-2026-04-29 axes
+  // (series_type, filter_venue, team_class) so e.g. an FM-bilaterals
+  // primary still shows "League avg, all-time" as a way to opt out of
+  // BOTH narrowings on the avg slot.
+  const hasAnyNarrowing = !!primaryFilters.tournament
+    || !!primaryFilters.season_from || !!primaryFilters.season_to
+    || !!primaryFilters.filter_venue
+    || !!primaryFilters.series_type
+    || !!primaryFilters.team_class
+  const hasAllTimeable = hasAnyNarrowing
   const isInternational = primaryFilters.team_type === 'international'
 
-  const sameTeamAlreadyComparing = (overrides: SlotOverrides) => {
-    // Refuse if a slot already has the SAME entity AND the SAME effective
-    // overrides — keeps quick-picks idempotent.
+  // Compare overrides shape-wise so quick-picks gate per-shape, not
+  // blanket-hide just because *any* avg / same-team slot exists. User
+  // feedback 2026-04-29: with one avg already in scope, the panel
+  // collapsed to "Different team — current scope" only — too thin.
+  const sameOverridesShape = (a: SlotOverrides, b: SlotOverrides): boolean => {
+    const ak = Object.keys(a), bk = Object.keys(b)
+    if (ak.length !== bk.length) return false
+    return ak.every(k => (a as Record<string, string>)[k] === (b as Record<string, string>)[k])
+  }
+  const sameTeamAlreadyComparing = (overrides: SlotOverrides): boolean => {
     for (const slot of [slots.slot1, slots.slot2]) {
       if (!slot || slot.kind !== 'team' || slot.entity !== primaryTeam) continue
-      const cur = slot.overrides
-      const sameKeys = Object.keys(overrides).length === Object.keys(cur).length
-        && Object.keys(overrides).every(k => (cur as Record<string, string>)[k] === (overrides as Record<string, string>)[k])
-      if (sameKeys) return true
+      if (sameOverridesShape(slot.overrides, overrides)) return true
+    }
+    return false
+  }
+  const sameAvgAlreadyComparing = (overrides: SlotOverrides): boolean => {
+    for (const slot of [slots.slot1, slots.slot2]) {
+      if (!slot || slot.kind !== 'avg') continue
+      if (sameOverridesShape(slot.overrides, overrides)) return true
     }
     return false
   }
 
-  const closeAll = () => { setOpen(false); setShowTeamPick(false); setErr(null); setBusy(false) }
+  const closeAll = () => {
+    setOpen(false); setShowTeamPick(false); setShowCustomBuilder(false)
+    setErr(null); setBusy(false)
+  }
 
   const onAvgInScope = () => {
+    if (sameAvgAlreadyComparing({})) {
+      setErr('League avg in current scope is already in comparison.')
+      return
+    }
     onAddSlot(AVG_SENTINEL, {})
     closeAll()
   }
   const onAvgFullMember = () => {
-    onAddSlot(AVG_SENTINEL, { team_class: 'full_member' })
+    const o: SlotOverrides = { team_class: 'full_member' }
+    if (sameAvgAlreadyComparing(o)) {
+      setErr('Full-member avg in current scope is already in comparison.')
+      return
+    }
+    onAddSlot(AVG_SENTINEL, o)
+    closeAll()
+  }
+  // League avg, all-time — broaden every primary-narrowed axis via
+  // the __any__ sentinel so the avg pool is unbounded along seasons /
+  // tournament / venue / series_type / team_class. Inherits gender +
+  // team_type bound to primary (those aren't slot-overridable).
+  // Result: a scope-AVG column whose pool is much broader than the
+  // current FilterBar window — useful as a long-horizon baseline.
+  const onAvgAllTime = () => {
+    const o: SlotOverrides = {}
+    if (primaryFilters.season_from) o.season_from = ANY_SENTINEL
+    if (primaryFilters.season_to)   o.season_to   = ANY_SENTINEL
+    if (primaryFilters.tournament)  o.tournament  = ANY_SENTINEL
+    if (primaryFilters.filter_venue) o.filter_venue = ANY_SENTINEL
+    if (primaryFilters.series_type) o.series_type = ANY_SENTINEL
+    if (primaryFilters.team_class)  o.team_class  = ANY_SENTINEL
+    // No primary narrowing → the all-time avg is identical to current-
+    // scope avg; skip showing both to avoid duplicate quick-picks.
+    if (Object.keys(o).length === 0) {
+      setErr('Current scope is already all-time — no narrowing to broaden.')
+      return
+    }
+    if (sameAvgAlreadyComparing(o)) {
+      setErr('League avg, all-time is already in comparison.')
+      return
+    }
+    onAddSlot(AVG_SENTINEL, o)
     closeAll()
   }
   const onSameTeamAllTime = () => {
     const overrides: SlotOverrides = {}
-    if (primaryFilters.tournament)  overrides.tournament  = ''
-    if (primaryFilters.season_from) overrides.season_from = ''
-    if (primaryFilters.season_to)   overrides.season_to   = ''
+    if (primaryFilters.tournament)  overrides.tournament  = ANY_SENTINEL
+    if (primaryFilters.season_from) overrides.season_from = ANY_SENTINEL
+    if (primaryFilters.season_to)   overrides.season_to   = ANY_SENTINEL
     if (sameTeamAlreadyComparing(overrides)) {
       setErr(`${primaryTeam} all-time is already in comparison.`)
       return
@@ -164,17 +225,39 @@ export default function AddCompareSlot({
         <button type="button" className="comp-link" onClick={closeAll}>close</button>
       </div>
 
-      {!showTeamPick && (
+      {!showTeamPick && !showCustomBuilder && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
           <div style={{ fontSize: '0.78em', opacity: 0.6, marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Quick add
+            Quick add — same team
           </div>
-          {!hasAvg && (
-            <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={onAvgInScope}>
-              + League avg in current scope
+          {hasSeason && (
+            <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={onSameTeamPrev} disabled={busy}>
+              + Same team, previous season
             </button>
           )}
-          {isInternational && !hasFmAvg && (
+          {hasAllTimeable && (
+            <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={onSameTeamAllTime}>
+              + Same team, all-time
+            </button>
+          )}
+          <div style={{ fontSize: '0.78em', opacity: 0.6, marginTop: '0.5rem', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Quick add — league average
+          </div>
+          <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={onAvgInScope}>
+            + League avg, current scope
+          </button>
+          {hasAllTimeable && (
+            <button
+              type="button"
+              className="comp-link"
+              style={QP_BTN_STYLE}
+              onClick={onAvgAllTime}
+              title="Avg-column pool broadened past primary's narrowing — uses the __any__ sentinel on tournament / season / venue / series_type so the baseline ignores the FilterBar's narrowing on those axes."
+            >
+              + League avg, all-time
+            </button>
+          )}
+          {isInternational && (
             <button
               type="button"
               className="comp-link"
@@ -182,26 +265,25 @@ export default function AddCompareSlot({
               onClick={onAvgFullMember}
               title="Restrict the avg-column pool to matches between two ICC full-member teams (excludes associates like Namibia, USA, Nepal …)."
             >
-              + Full-member avg in current scope
+              + Full-member avg, current scope
             </button>
           )}
-          {hasSeason && (
-            <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={onSameTeamPrev} disabled={busy}>
-              + Same team, previous season
-            </button>
-          )}
-          <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={() => setShowTeamPick(true)}>
-            + Different team — current scope
-          </button>
-          {hasAllTimeable && (
-            <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={onSameTeamAllTime}>
-              + Same team, all-time
-            </button>
-          )}
-          <div style={{ fontSize: '0.78em', opacity: 0.55, marginTop: '0.5rem' }}>
-            Tip: add a column then click <span style={{ fontWeight: 600 }}>✎</span> on its header to override
-            tournament, season, venue, or series type for that column only.
+          <div style={{ fontSize: '0.78em', opacity: 0.6, marginTop: '0.5rem', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Quick add — different team
           </div>
+          <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={() => setShowTeamPick(true)}>
+            + Different team, current scope
+          </button>
+          <div style={{ borderTop: '1px solid var(--rule-soft)', margin: '0.6rem 0 0.4rem' }} />
+          <button
+            type="button"
+            className="comp-link"
+            style={{ ...QP_BTN_STYLE, fontWeight: 500 }}
+            onClick={() => setShowCustomBuilder(true)}
+            title="Build a column with explicit team and arbitrary scope overrides — same controls as the ✎ editor on a column header."
+          >
+            + Build custom column ▾
+          </button>
         </div>
       )}
 
@@ -222,8 +304,130 @@ export default function AddCompareSlot({
         </div>
       )}
 
+      {showCustomBuilder && (
+        <CustomBuilder
+          primary={primaryFilters}
+          primaryTeam={primaryTeam}
+          onAdd={(entity, overrides) => {
+            // Duplicate-check by entity + overrides shape.
+            if (entity === AVG_SENTINEL && sameAvgAlreadyComparing(overrides)) {
+              setErr('A league avg column with that exact scope is already in comparison.')
+              return
+            }
+            if (entity !== AVG_SENTINEL && entity === primaryTeam
+                && sameTeamAlreadyComparing(overrides)) {
+              setErr(`${primaryTeam} with that scope is already in comparison.`)
+              return
+            }
+            if (entity !== AVG_SENTINEL && entity !== primaryTeam) {
+              for (const slot of [slots.slot1, slots.slot2]) {
+                if (slot?.kind === 'team' && slot.entity === entity
+                    && sameOverridesShape(slot.overrides, overrides)) {
+                  setErr(`${entity} with that scope is already in comparison.`)
+                  return
+                }
+              }
+            }
+            onAddSlot(entity, overrides)
+            closeAll()
+          }}
+          onCancel={() => { setShowCustomBuilder(false); setErr(null) }}
+          onErr={setErr}
+        />
+      )}
+
       {busy && <div style={{ marginTop: '0.4rem', fontSize: '0.85em', opacity: 0.7 }}>Working…</div>}
       {err && <div className="wisden-compare-picker-err" style={{ marginTop: '0.4rem' }}>{err}</div>}
+    </div>
+  )
+}
+
+// ─── Custom builder ───────────────────────────────────────────────────
+//
+// Three-radio kind selector + (when "different team") a TeamSearch +
+// inline SlotScopeEditor. The editor's Apply button trickles up to
+// `onAdd(entity, overrides)` with entity computed from kind:
+//   self  → primaryTeam
+//   other → selected team name
+//   avg   → AVG_SENTINEL
+//
+// Same controls as the ✎ editor on a column header — but here you
+// configure both team AND scope before the column is added, instead
+// of the two-step "add then click ✎" flow.
+
+interface CustomBuilderProps {
+  primary: FilterParams
+  primaryTeam: string
+  onAdd: (entity: string, overrides: SlotOverrides) => void
+  onCancel: () => void
+  onErr: (msg: string) => void
+}
+
+type BuilderKind = 'self' | 'other' | 'avg'
+
+function CustomBuilder({ primary, primaryTeam, onAdd, onCancel, onErr }: CustomBuilderProps) {
+  const [kind, setKind] = useState<BuilderKind>('self')
+  const [otherTeam, setOtherTeam] = useState<string>('')
+
+  const teamForEditor: string | undefined =
+    kind === 'self' ? primaryTeam :
+    kind === 'other' ? (otherTeam || undefined) :
+    undefined
+
+  const handleApply = (overrides: SlotOverrides) => {
+    if (kind === 'other' && !otherTeam) {
+      onErr('Pick a team first.')
+      return
+    }
+    const entity = kind === 'avg' ? AVG_SENTINEL :
+                   kind === 'self' ? primaryTeam : otherTeam
+    onAdd(entity, overrides)
+  }
+
+  const radioStyle: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+    fontSize: '0.85em', cursor: 'pointer', marginRight: '0.8rem',
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: '0.78em', opacity: 0.6, marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        Build custom column
+      </div>
+      <div style={{ marginBottom: '0.5rem' }}>
+        <label style={radioStyle}>
+          <input type="radio" checked={kind === 'self'} onChange={() => setKind('self')} />
+          {primaryTeam}
+        </label>
+        <label style={radioStyle}>
+          <input type="radio" checked={kind === 'other'} onChange={() => setKind('other')} />
+          Different team
+        </label>
+        <label style={radioStyle}>
+          <input type="radio" checked={kind === 'avg'} onChange={() => setKind('avg')} />
+          League average
+        </label>
+      </div>
+      {kind === 'other' && (
+        <div style={{ marginBottom: '0.5rem' }}>
+          <TeamSearch
+            onSelect={setOtherTeam}
+            placeholder={otherTeam ? `Selected: ${otherTeam}` : 'Search teams…'}
+          />
+        </div>
+      )}
+      {/* Remount the editor on kind / team change so its internal
+       *  state (tournament/season selects scoped to the team) refreshes
+       *  cleanly. */}
+      <SlotScopeEditor
+        key={`${kind}|${otherTeam}`}
+        primary={primary}
+        team={teamForEditor}
+        initial={{}}
+        onApply={handleApply}
+        onReset={() => { /* Reset is a no-op — initial is already empty */ }}
+        onCancel={onCancel}
+      />
     </div>
   )
 }
