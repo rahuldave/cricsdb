@@ -340,25 +340,93 @@ Save anchors to `internal_docs/slot-override-anchor-numbers.md`.
 
 `tests/sanity/test_slot_override_alignment.py` — for each
 scenario, hit team and avg endpoints and assert
-`team.chip.scope_avg == avg.displayed_avg` for at least 2
-metrics per scenario.
+`team.chip.scope_avg == avg.displayed_avg` for **every chip-
+bearing metric** on the scope (mirrors
+`test_chip_direction_invariant.py`'s every-metric coverage —
+NOT "≥2 per scenario," that's too thin for an architectural
+change). Expect ~600 assertions (matrix: 5 scenarios × ~25
+chip-bearing metrics × 3 disciplines = 5 scenarios × ~75 metrics
+≈ 375; allow some scenario-by-discipline drop-off).
+
+This is the architectural-change extension of the existing
+`test_chip_direction_invariant.py` (~600 assertions on the
+narrowing-direction case). The new test extends coverage to
+the broadening + override-to-empty cases.
 
 ### 7.3 Regression
 
-The `__any__` sentinel arrival in URLs is a NEW behaviour. NEW
-URLs can be added with explicit `__any__` overrides; existing
-REG URLs without `__any__` are byte-identical (no shape change
-on those).
+Three layers, each with explicit pass criteria:
 
-### 7.4 Integration
+1. **Baseline snapshot (commit-by-commit).** Run all 11 `run.sh`
+   suites + `test_chip_direction_invariant.py` BEFORE any change
+   to capture the green-state REG count + assertion count.
 
-Browser test: Compare tab on /teams?team=RCB&...&season_from=2025
-&season_to=2025 — open slot 1's ✎ editor, click "(any)" on
-season, Apply. URL gains `compare1_season_from=__any__`,
-`compare1_season_to=__any__`. Slot 1's match count shifts to
-RCB all-time.
+2. **Post-Commit 1 invariant — `__any__` decoding is a no-op for
+   every existing URL.** No URL in any current `urls.txt` has
+   `__any__`, so backend decoding the sentinel skips an unset
+   branch. ALL 11 suites must show `0 REG drifted, 0 NEW
+   changed, 0 NEW unchanged` (since no NEW URLs added yet).
+   `test_chip_direction_invariant.py` count unchanged.
 
-`tests/integration/slot_override_any.sh` (NEW) — anchor-driven.
+3. **Post-Commit 3 invariant — existing chip alignment unchanged
+   for narrowing-direction case.** The current `chip_team_class`
+   path stays as the back-compat shortcut. Add ONE explicit REG
+   URL using the OLD aux field (`?...&chip_team_class=full_member`)
+   and assert it returns byte-identical bytes after the
+   `_league_aux` refactor. Catches the "I refactored
+   `_league_aux` and silently broke v3's narrowing fix" failure.
+
+4. **NEW URLs with `__any__`.** Each scenario A–E gets at least
+   one NEW URL. Expected: `N NEW changed, 0 NEW unchanged`.
+
+### 7.4 Integration — both behavior + chip alignment
+
+**`tests/integration/slot_override_any.sh` (NEW) — URL grammar +
+write-site test.**
+- Compare tab on `/teams?team=RCB&...&season_from=2025&season_to=2025`.
+- Open slot 1's ✎ editor, click "(any)" on season, Apply.
+- Assert URL gains `compare1_season_from=__any__` AND
+  `compare1_season_to=__any__` (write-site).
+- Assert slot 1's match count shifts to RCB all-time (read-site
+  + backend decoding both work).
+
+**`tests/integration/dom/cross_cutting_slot_override_chip_align.sh`
+(NEW) — DOM-level chip alignment under broaden override.**
+- Sibling of `cross_cutting_team_class_consistency.sh` for the
+  broadening direction.
+- Anchor: RCB primary `season=2025`, avg slot
+  `compare1_season_from=__any__&compare1_season_to=__any__`.
+- Asserts: avg col's displayed value for ≥3 metrics
+  (matches/run_rate/avg_score) === each team col chip's
+  `scope_avg` for the SAME metrics (chip math invariant
+  applies to broadened scope identically).
+
+### 7.5 Canary tests (must stay green throughout)
+
+These existing tests catch silent regressions in the load-
+bearing helpers `_league_aux` + `_compute_batting_summary` etc.
+They're not new — but they're the safety net for the spec's
+"medium-high risk" rating:
+
+- `tests/integration/dom/teams_compare_intl.sh` +
+  `teams_compare_club.sh` — Compare-grid extractor pins chip
+  envelopes per row + math invariant
+  `delta_pct = (value − avg) / avg × 100`. Must stay PASS
+  on EACH commit.
+
+- `tests/sanity/test_chip_direction_invariant.py` — 600+
+  assertions on existing narrowing case. Must stay PASS on
+  each commit. The NEW `test_slot_override_alignment.py`
+  EXTENDS coverage but doesn't replace this one.
+
+- `tests/integration/dom/cross_cutting_team_class_consistency.sh`
+  — pins narrowing-direction (FM filter narrows 22→16). The
+  new spec must NOT break this; the new sibling
+  `cross_cutting_slot_override_chip_align.sh` exercises the
+  broaden direction, and both should pass after commit 3.
+
+If a canary fails on any commit: STOP, the change broke
+load-bearing infra. Don't continue to next commit.
 
 ---
 
@@ -434,16 +502,79 @@ but missed wiring the chip alignment" failure mode.
 
 ## 11. Pre-flight checklist
 
-1. Green run all existing tests + spec drift check.
-2. Subagent traces every consumer of every overridable URL param
-   per axis. Document the fan-out — there will be more call
-   sites than v3's 7.
-3. Decide UI pattern for explicit-empty (✕ button vs dropdown
-   "(any)" option) — recommend mocking both and getting user
-   feedback.
-4. Decide on `chip_baseline_scope_json` encoding (base64-JSON
-   recommended; alternatives: query param per field
-   `&compareN_baseline_<key>=...`, but that explodes URL length).
+### 11.1 Capture baselines (before any change)
+
+```bash
+# 1. Full dom/ suite — should print 62 PASS at session start
+#    (post-Batch-4 baseline).
+for s in tests/integration/dom/teams_*.sh \
+         tests/integration/dom/series_*.sh \
+         tests/integration/dom/players_*.sh \
+         tests/integration/dom/venues_*.sh \
+         tests/integration/dom/matches_*.sh \
+         tests/integration/dom/charts_*.sh \
+         tests/integration/dom/cross_cutting_*.sh; do
+  $s 2>&1 | grep -E "PASS$|FAIL$" | tail -1
+done | sort | uniq -c
+# Expect: 62 PASS
+
+# 2. Per-suite REG/NEW counts.
+for suite in teams series scope-averages batting bowling fielding \
+             players head_to_head matches venues filterbar_refs; do
+  awk -v s="$suite" '/^REG/{r++} /^NEW/{n++}
+    END{printf "%-18s REG=%d NEW=%d\n", s, r, n}' \
+    tests/regression/$suite/urls.txt
+done
+# Snapshot these counts. Post 121-URL flip on 2026-04-29: REG counts
+# include the intl-FM URLs.
+
+# 3. Chip invariant baseline.
+uv run python tests/sanity/test_chip_direction_invariant.py 2>&1 \
+  | tail -3
+# Expect: ~600 assertions PASS.
+```
+
+### 11.2 Trace every consumer (subagent)
+
+Subagent traces every consumer of every overridable URL param
+per axis (`tournament` / `season_from` / `season_to` /
+`filter_venue` / `series_type` / `team_class`). Document the
+fan-out — there will be more call sites than v3's 7. In
+particular, `_league_aux` has 7 callers today; commit 3 changes
+its signature, so each caller needs to be audited.
+
+### 11.3 Decisions to make before commit 1
+
+- UI pattern for explicit-empty (✕ button vs dropdown "(any)"
+  option) — mock both, get user feedback.
+- `chip_baseline_scope_json` encoding — base64-JSON recommended
+  (~150 bytes typical); alternatives: query param per field
+  `&compareN_baseline_<key>=...` (explodes URL length).
+- Whether to keep `chip_team_class` aux back-compat through
+  commits 1-4 (recommended) and deprecate in commit 5, or
+  remove immediately (riskier — silent break on any client
+  still passing it).
+
+### 11.4 Per-commit gate criteria
+
+- **Commit 1 (backend `__any__` decoding).** All 62 dom/ scripts
+  + 11 regression suites + chip invariant test must stay green
+  with EXACTLY the same counts. Backend change is a no-op until
+  someone passes `__any__`.
+- **Commit 2 (frontend `__any__` writer + reader).** dom/ scripts
+  green; integration script `slot_override_any.sh` PASSES
+  (URL-write + backend-decode both work).
+- **Commit 3 (chip-baseline mechanism).** dom/ + chip invariant
+  + back-compat REG URL with old `chip_team_class` aux all green.
+  New `cross_cutting_slot_override_chip_align.sh` PASSES
+  (broaden-direction alignment).
+- **Commit 4 (tests).** New sanity test
+  `test_slot_override_alignment.py` lands with all 5 scenarios
+  green. NEW regression URLs added with expected `N NEW changed,
+  0 NEW unchanged`.
+- **Commit 5 (deprecation).** Add comment to `chip_team_class`
+  aux field pointing to `chip_baseline_scope`. NO behavior
+  change in this commit — code remains identical, just docs.
 
 ---
 
