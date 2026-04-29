@@ -251,6 +251,43 @@ export default function FilterBar() {
           ))}
         </div>
 
+        {/* Series type + Full-members are intl-only universe-narrowings.
+         *  They sit BEFORE Tournament because logically you decide
+         *  "what kind of competition" before "which competition." For
+         *  club contexts both groups hide — bilateral is meaningless
+         *  for clubs, and the FM list is a country roster. Stale URL
+         *  state (series_type=… set, then user switches to club)
+         *  follows the established team_class pattern: backend silently
+         *  no-ops, ScopeStatusStrip surfaces the active value below. */}
+        {teamType === 'international' && (
+          <div className="wisden-filter-group">
+            <span className="wisden-filter-label">Series</span>
+            <select
+              value={seriesType ?? ''}
+              onChange={e => set('series_type', e.target.value)}
+              className="wisden-select"
+              title="Restrict to a category of international matches. Bilateral series partitions disjointly from Tournaments (T20 World Cup, Asia Cup, etc.); All shows both."
+            >
+              <option value="">All</option>
+              <option value="bilateral_only">Bilateral series</option>
+              <option value="tournament_only">Tournaments only</option>
+            </select>
+          </div>
+        )}
+
+        {teamType === 'international' && (
+          <div className="wisden-filter-group">
+            <button
+              type="button"
+              onClick={() => set('team_class', teamClass ? '' : 'full_member')}
+              className={segBtn(teamClass === 'full_member')}
+              title="Restrict to matches between two ICC full-member nations (excludes associate teams like Scotland, Nepal, USA, …)."
+            >
+              {teamClass === 'full_member' ? '▣' : '▢'} Full members only
+            </button>
+          </div>
+        )}
+
         <div className="wisden-filter-group">
           <span className="wisden-filter-label">Tournament</span>
           <select
@@ -265,19 +302,6 @@ export default function FilterBar() {
             ))}
           </select>
         </div>
-
-        {teamType === 'international' && (
-          <div className="wisden-filter-group">
-            <button
-              type="button"
-              onClick={() => set('team_class', teamClass ? '' : 'full_member')}
-              className={segBtn(teamClass === 'full_member')}
-              title="Restrict to matches between two ICC full-member nations (excludes associate teams like Scotland, Nepal, USA, …)."
-            >
-              {teamClass === 'full_member' ? '▣' : '▢'} Full members only
-            </button>
-          </div>
-        )}
 
         <div className="wisden-filter-group">
           <span className="wisden-filter-label">Seasons</span>
@@ -316,21 +340,6 @@ export default function FilterBar() {
               latest
             </button>
           )}
-        </div>
-
-        <div className="wisden-filter-group">
-          <span className="wisden-filter-label">Show</span>
-          <select
-            value={seriesType ?? ''}
-            onChange={e => set('series_type', e.target.value)}
-            className="wisden-select"
-            title="Restrict to a series category. Bilateral / Tournaments / Club partition the data; All shows everything."
-          >
-            <option value="">All</option>
-            <option value="bilateral_only">Bilateral series</option>
-            <option value="tournament_only">Tournaments only</option>
-            <option value="club">Club tournaments</option>
-          </select>
         </div>
 
         <div className="wisden-filter-group">

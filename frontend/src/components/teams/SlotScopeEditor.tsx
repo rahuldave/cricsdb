@@ -151,16 +151,17 @@ export default function SlotScopeEditor({
           )}
         </div>
       </div>
-      <div style={fieldStyle}>
-        <span style={labelStyle}>Series</span>
-        <select value={seriesType} onChange={e => setSeriesType(e.target.value)}>
-          <option value="">— inherit —</option>
-          {showAny.series && <option value={ANY_SENTINEL}>(any — all series)</option>}
-          <option value="all">All matches</option>
-          <option value="bilateral_only">Bilaterals only</option>
-          <option value="tournament_only">Tournaments only</option>
-        </select>
-      </div>
+      {isInternational && (
+        <div style={fieldStyle}>
+          <span style={labelStyle}>Series</span>
+          <select value={seriesType} onChange={e => setSeriesType(e.target.value)}>
+            <option value="">— inherit —</option>
+            {showAny.series && <option value={ANY_SENTINEL}>(any — all series)</option>}
+            <option value="bilateral_only">Bilaterals only</option>
+            <option value="tournament_only">Tournaments only</option>
+          </select>
+        </div>
+      )}
       {isInternational && (
         <div style={fieldStyle}>
           <span style={labelStyle}>Class</span>
