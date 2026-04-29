@@ -581,6 +581,26 @@ async def _rivalries_top_and_other_count(
 # ─── Per-tournament endpoints ─────────────────────────────────────────
 
 
+def _inning_extras(aux: AuxParams | None, innings_alias: str = "i") -> tuple[str, dict]:
+    """Per-innings narrowing fragment + bind params.
+
+    Returns ('', {}) when aux.inning is None. Otherwise returns
+    (' AND i.innings_number = :inning', {'inning': X}). Append to any
+    innings-joined SQL `WHERE …` from a tournaments-router endpoint;
+    skip on match-level meta queries (no innings alias).
+
+    Why a separate helper instead of folding into `_tournament_scope_
+    where`: that helper builds a UNIFIED where reused across both
+    match-level (meta) and innings-joined (deliveries / wickets / etc)
+    queries within the same endpoint. The inning clause references
+    `i.innings_number` and would explode on the match-level query.
+    Spec: spec-inning-split.md §3.1a + §5.3.
+    """
+    if aux is None or aux.inning is None:
+        return "", {}
+    return f" AND {innings_alias}.innings_number = :inning", {"inning": aux.inning}
+
+
 def _tournament_scope_where(
     filters: FilterParams,
     tournament: str | None,
@@ -621,6 +641,7 @@ async def tournament_summary(
     tournament: str | None = Query(None, description="Canonical tournament name (optional)"),
     series_type: str | None = Query(None, description="all / bilateral_only / tournament_only"),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     """Headline numbers for a match-set scope.
 
@@ -632,12 +653,24 @@ async def tournament_summary(
     When filter_team + filter_opponent are both set, the response also
     includes `*_by_team` companion fields breaking down records per
     team in the matchup. Reusable for enhancement O baselines.
+
+    Honours `aux.inning` (page-local 1st/2nd-innings filter): the
+    delivery / wicket aggregates narrow to the chosen inning, while
+    match-level identity (matches, editions, champions, finals) stays
+    on the full match set in scope.
     """
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    inn_clause, inn_params = _inning_extras(aux)
+    # Bind :inning once on the shared params dict — every innings-
+    # joined query references {inn_clause} which interpolates the
+    # bind name. Empty inn_params is a no-op.
+    params.update(inn_params)
     vs = variants(tournament) if tournament else []
 
     # ── Basic aggregates ──
+    # Match-level identity — NOT narrowed by inning (matches/editions
+    # are full-match concepts). Spec: spec-inning-split.md §3.1a.
     meta_rows = await db.q(
         f"""
         SELECT COUNT(DISTINCT m.id) AS matches,
@@ -649,7 +682,8 @@ async def tournament_summary(
     )
     meta = meta_rows[0] if meta_rows else {"matches": 0, "editions": 0}
 
-    # Delivery-level aggregates (runs, wickets, sixes, rates)
+    # Delivery-level aggregates (runs, wickets, sixes, rates) — DO
+    # narrow by inning when set.
     bat_rows = await db.q(
         f"""
         SELECT SUM(d.runs_total) AS total_runs,
@@ -660,9 +694,9 @@ async def tournament_summary(
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
         """,
-        params,
+        {**params, **inn_params},
     )
     b = bat_rows[0] if bat_rows else {}
     total_runs = b.get("total_runs") or 0
@@ -678,9 +712,9 @@ async def tournament_summary(
         JOIN delivery d ON d.id = w.delivery_id
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
         """,
-        params,
+        {**params, **inn_params},
     )
     total_wickets = wkt_rows[0]["wickets"] if wkt_rows else 0
 
@@ -756,7 +790,7 @@ async def tournament_summary(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         LEFT JOIN person p ON p.id = d.batter_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
           AND d.batter_id IS NOT NULL
           AND d.extras_wides = 0 AND d.extras_noballs = 0
         GROUP BY d.batter_id
@@ -785,7 +819,7 @@ async def tournament_summary(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         LEFT JOIN person p ON p.id = d.bowler_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
           AND d.bowler_id IS NOT NULL
           AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
         GROUP BY d.bowler_id
@@ -816,7 +850,7 @@ async def tournament_summary(
         ) tot
         JOIN innings i ON i.id = tot.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
         ORDER BY tot.total DESC
         LIMIT 1
         """,
@@ -842,7 +876,7 @@ async def tournament_summary(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         LEFT JOIN person p ON p.id = d.batter_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
           AND d.batter_id IS NOT NULL
           AND d.extras_wides = 0 AND d.extras_noballs = 0
         GROUP BY d.batter_id, m.id
@@ -872,7 +906,7 @@ async def tournament_summary(
         FROM partnership p
         JOIN innings i ON i.id = p.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
         ORDER BY p.partnership_runs DESC
         LIMIT 1
         """,
@@ -905,7 +939,7 @@ async def tournament_summary(
           LEFT JOIN wicket w ON w.delivery_id = d.id
           JOIN innings i ON i.id = d.innings_id
           JOIN match m ON m.id = i.match_id
-          WHERE i.super_over = 0 AND {where}
+          WHERE i.super_over = 0 AND {where}{inn_clause}
             AND d.bowler_id IS NOT NULL
           GROUP BY d.bowler_id, i.match_id
         )
@@ -949,7 +983,7 @@ async def tournament_summary(
           JOIN delivery d ON d.id = fc.delivery_id
           JOIN innings i ON i.id = d.innings_id
           JOIN match m ON m.id = i.match_id
-          WHERE i.super_over = 0 AND {where}
+          WHERE i.super_over = 0 AND {where}{inn_clause}
             AND fc.fielder_id IS NOT NULL
             AND fc.is_substitute = 0
           GROUP BY fc.fielder_id, i.match_id
@@ -1097,6 +1131,7 @@ async def tournament_summary(
     if filters.team and filters.opponent:
         by_team = await _summary_by_team(
             db, where, params, [filters.team, filters.opponent],
+            inn_clause=inn_clause,
         )
         # Wins/losses/ties/NR — the basic "who won how much" stats that
         # were missing on the Team-vs-Team dossier.
@@ -1153,6 +1188,7 @@ async def tournament_summary(
 
 async def _summary_by_team(
     db, where: str, params: dict, teams_list: list[str],
+    inn_clause: str = "",
 ) -> dict:
     """Per-team breakdowns for rivalry view: top scorer, top wicket-taker,
     highest individual, largest partnership — split by which team scored.
@@ -1160,6 +1196,11 @@ async def _summary_by_team(
     Used when filter_team + filter_opponent are both set so the dossier
     can show "highest individual by India" alongside "highest individual
     by Australia" in addition to the unified value.
+
+    Caller passes `inn_clause` (from `_inning_extras(aux)`) — the
+    helper's queries are innings-joined, so they honour the page-local
+    inning narrowing transparently. `params` already carries the
+    `:inning` bind when the caller did `params.update(inn_params)`.
     """
     out: dict[str, dict] = {}
     for team in teams_list:
@@ -1172,7 +1213,7 @@ async def _summary_by_team(
             JOIN innings i ON i.id = d.innings_id
             JOIN match m ON m.id = i.match_id
             LEFT JOIN person p ON p.id = d.batter_id
-            WHERE i.super_over = 0 AND {where}
+            WHERE i.super_over = 0 AND {where}{inn_clause}
               AND i.team = :by_team
               AND d.batter_id IS NOT NULL
               AND d.extras_wides = 0 AND d.extras_noballs = 0
@@ -1190,7 +1231,7 @@ async def _summary_by_team(
             JOIN innings i ON i.id = d.innings_id
             JOIN match m ON m.id = i.match_id
             LEFT JOIN person p ON p.id = d.bowler_id
-            WHERE i.super_over = 0 AND {where}
+            WHERE i.super_over = 0 AND {where}{inn_clause}
               AND i.team != :by_team
               AND d.bowler_id IS NOT NULL
               AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
@@ -1209,7 +1250,7 @@ async def _summary_by_team(
             JOIN innings i ON i.id = d.innings_id
             JOIN match m ON m.id = i.match_id
             LEFT JOIN person p ON p.id = d.batter_id
-            WHERE i.super_over = 0 AND {where}
+            WHERE i.super_over = 0 AND {where}{inn_clause}
               AND i.team = :by_team
               AND d.batter_id IS NOT NULL
               AND d.extras_wides = 0 AND d.extras_noballs = 0
@@ -1227,7 +1268,7 @@ async def _summary_by_team(
             FROM partnership p
             JOIN innings i ON i.id = p.innings_id
             JOIN match m ON m.id = i.match_id
-            WHERE i.super_over = 0 AND {where}
+            WHERE i.super_over = 0 AND {where}{inn_clause}
               AND i.team = :by_team
             ORDER BY p.partnership_runs DESC LIMIT 1
             """,
@@ -1267,14 +1308,19 @@ async def tournament_by_season(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     """Per-edition rollup for one tournament.
 
     Returns one row per season in scope with champion, runner-up, top
-    scorer, top wicket-taker, and aggregate batting metrics.
+    scorer, top wicket-taker, and aggregate batting metrics. Honours
+    `aux.inning`: per-season delivery aggregates narrow to the chosen
+    inning; match-count + champion identity stay full-match.
     """
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    inn_clause, inn_params = _inning_extras(aux)
+    params.update(inn_params)
 
     # Per-season match counts + final champion/runner-up
     season_rows = await db.q(
@@ -1348,7 +1394,7 @@ async def tournament_by_season(
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
         GROUP BY m.season
         """,
         params,
@@ -1363,7 +1409,7 @@ async def tournament_by_season(
           FROM delivery d
           JOIN innings i ON i.id = d.innings_id
           JOIN match m ON m.id = i.match_id
-          WHERE i.super_over = 0 AND {where}
+          WHERE i.super_over = 0 AND {where}{inn_clause}
             AND d.batter_id IS NOT NULL
             AND d.extras_wides = 0 AND d.extras_noballs = 0
           GROUP BY m.season, d.batter_id
@@ -1392,7 +1438,7 @@ async def tournament_by_season(
           JOIN delivery d ON d.id = wk.delivery_id
           JOIN innings i ON i.id = d.innings_id
           JOIN match m ON m.id = i.match_id
-          WHERE i.super_over = 0 AND {where}
+          WHERE i.super_over = 0 AND {where}{inn_clause}
             AND d.bowler_id IS NOT NULL
             AND wk.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
           GROUP BY m.season, d.bowler_id
@@ -1643,6 +1689,7 @@ async def tournament_records(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(5, ge=1, le=20),
 ):
     """Records lists for the match-set scope — each capped at top-N.
@@ -1651,9 +1698,14 @@ async def tournament_records(
     largest partnerships, best bowling figures, most sixes in a match.
     Tournament optional (omit for cross-tournament rivalry records);
     series_type narrows international scope (bilateral_only / tournament_only).
+    Honours `aux.inning` — every record is innings-joined and narrows
+    to the chosen inning when set (e.g. "highest 1st-innings team
+    total in IPL 2025").
     """
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    inn_clause, inn_params = _inning_extras(aux)
+    params.update(inn_params)
     params["lim"] = limit
 
     # Highest team totals
@@ -1670,7 +1722,7 @@ async def tournament_records(
         ) tot
         JOIN innings i ON i.id = tot.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
         ORDER BY tot.total DESC LIMIT :lim
         """,
         params,
@@ -1753,7 +1805,7 @@ async def tournament_records(
         JOIN match m ON m.id = i.match_id
         LEFT JOIN person p1 ON p1.id = p.batter1_id
         LEFT JOIN person p2 ON p2.id = p.batter2_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
         ORDER BY p.partnership_runs DESC LIMIT :lim
         """,
         params,
@@ -1775,7 +1827,7 @@ async def tournament_records(
           FROM delivery d
           JOIN innings i ON i.id = d.innings_id
           JOIN match m ON m.id = i.match_id
-          WHERE i.super_over = 0 AND {where}
+          WHERE i.super_over = 0 AND {where}{inn_clause}
             AND d.batter_id IS NOT NULL
           GROUP BY d.batter_id, d.innings_id, m.id
         )
@@ -1812,7 +1864,7 @@ async def tournament_records(
           LEFT JOIN wicket w ON w.delivery_id = d.id
           JOIN innings i ON i.id = d.innings_id
           JOIN match m ON m.id = i.match_id
-          WHERE i.super_over = 0 AND {where}
+          WHERE i.super_over = 0 AND {where}{inn_clause}
             AND d.bowler_id IS NOT NULL
           GROUP BY d.bowler_id, m.id
         )
@@ -1841,7 +1893,7 @@ async def tournament_records(
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
         GROUP BY m.id
         ORDER BY sixes DESC LIMIT :lim
         """,
@@ -1929,12 +1981,15 @@ async def tournament_batters_leaders(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(10, ge=1, le=50),
     min_balls: int = Query(100, ge=1),
     min_dismissals: int = Query(3, ge=0),
 ):
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    inn_clause, inn_params = _inning_extras(aux)
+    params.update(inn_params)
 
     agg_rows = await db.q(
         f"""
@@ -1946,7 +2001,7 @@ async def tournament_batters_leaders(
         JOIN match m ON m.id = i.match_id
         WHERE d.batter_id IS NOT NULL
           AND d.extras_wides = 0 AND d.extras_noballs = 0
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         GROUP BY d.batter_id
         HAVING COUNT(*) >= :min_balls
         """,
@@ -1961,7 +2016,7 @@ async def tournament_batters_leaders(
         JOIN match m ON m.id = i.match_id
         WHERE w.player_out_id IS NOT NULL
           AND w.kind NOT IN ('retired hurt', 'retired out')
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         GROUP BY w.player_out_id
         """,
         params,
@@ -2023,7 +2078,7 @@ async def tournament_batters_leaders(
             JOIN match m ON m.id = i.match_id
             WHERE d.batter_id IN ({placeholders})
               AND d.extras_wides = 0 AND d.extras_noballs = 0
-              AND i.super_over = 0 AND {where}
+              AND i.super_over = 0 AND {where}{inn_clause}
             GROUP BY d.batter_id, i.team
             """,
             {**params, **name_params},
@@ -2058,6 +2113,7 @@ async def tournament_batter_scope_stats(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     """Scoped batting stats for one picked player.
 
@@ -2068,6 +2124,8 @@ async def tournament_batter_scope_stats(
     """
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    inn_clause, inn_params = _inning_extras(aux)
+    params.update(inn_params)
     params["person_id"] = person_id
 
     agg_rows = await db.q(
@@ -2078,7 +2136,7 @@ async def tournament_batter_scope_stats(
         JOIN match m ON m.id = i.match_id
         WHERE d.batter_id = :person_id
           AND d.extras_wides = 0 AND d.extras_noballs = 0
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         """,
         params,
     )
@@ -2097,7 +2155,7 @@ async def tournament_batter_scope_stats(
         JOIN match m ON m.id = i.match_id
         WHERE w.player_out_id = :person_id
           AND w.kind NOT IN ('retired hurt', 'retired out')
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         """,
         params,
     )
@@ -2117,7 +2175,7 @@ async def tournament_batter_scope_stats(
         JOIN match m ON m.id = i.match_id
         WHERE d.batter_id = :person_id
           AND d.extras_wides = 0 AND d.extras_noballs = 0
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         GROUP BY i.team
         ORDER BY n DESC
         LIMIT 1
@@ -2145,12 +2203,15 @@ async def tournament_bowlers_leaders(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(10, ge=1, le=50),
     min_balls: int = Query(60, ge=1),
     min_wickets: int = Query(3, ge=0),
 ):
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    inn_clause, inn_params = _inning_extras(aux)
+    params.update(inn_params)
 
     agg_rows = await db.q(
         f"""
@@ -2161,7 +2222,7 @@ async def tournament_bowlers_leaders(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE d.bowler_id IS NOT NULL
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         GROUP BY d.bowler_id
         HAVING balls >= :min_balls
         """,
@@ -2176,7 +2237,7 @@ async def tournament_bowlers_leaders(
         JOIN match m ON m.id = i.match_id
         WHERE d.bowler_id IS NOT NULL
           AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         GROUP BY d.bowler_id
         """,
         params,
@@ -2237,7 +2298,7 @@ async def tournament_bowlers_leaders(
             JOIN innings i ON i.id = d.innings_id
             JOIN match m ON m.id = i.match_id
             WHERE d.bowler_id IN ({placeholders})
-              AND i.super_over = 0 AND {where}
+              AND i.super_over = 0 AND {where}{inn_clause}
             GROUP BY d.bowler_id, team
             """,
             {**params, **name_params},
@@ -2272,6 +2333,7 @@ async def tournament_bowler_scope_stats(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     """Scoped bowling stats for one picked player.
 
@@ -2281,6 +2343,8 @@ async def tournament_bowler_scope_stats(
     """
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    inn_clause, inn_params = _inning_extras(aux)
+    params.update(inn_params)
     params["person_id"] = person_id
 
     agg_rows = await db.q(
@@ -2291,7 +2355,7 @@ async def tournament_bowler_scope_stats(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE d.bowler_id = :person_id
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         """,
         params,
     )
@@ -2310,7 +2374,7 @@ async def tournament_bowler_scope_stats(
         JOIN match m ON m.id = i.match_id
         WHERE d.bowler_id = :person_id
           AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         """,
         params,
     )
@@ -2330,7 +2394,7 @@ async def tournament_bowler_scope_stats(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE d.bowler_id = :person_id
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         GROUP BY team
         ORDER BY n DESC
         LIMIT 1
@@ -2358,10 +2422,13 @@ async def tournament_fielders_leaders(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     limit: int = Query(10, ge=1, le=50),
 ):
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    inn_clause, inn_params = _inning_extras(aux)
+    params.update(inn_params)
     params["lim"] = limit
 
     # By total dismissals (catches + stumpings + run-outs + c&b)
@@ -2378,7 +2445,7 @@ async def tournament_fielders_leaders(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE fc.fielder_id IS NOT NULL
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         GROUP BY fc.fielder_id
         ORDER BY total DESC
         LIMIT :lim
@@ -2402,7 +2469,7 @@ async def tournament_fielders_leaders(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE fc.fielder_id IS NOT NULL
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         GROUP BY fc.fielder_id
         HAVING run_outs > 0
         ORDER BY run_outs DESC, total DESC
@@ -2427,7 +2494,7 @@ async def tournament_fielders_leaders(
         JOIN fieldingcredit fc ON fc.delivery_id = d.id
           AND fc.fielder_id = ka.keeper_id
         WHERE ka.keeper_id IS NOT NULL
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         GROUP BY ka.keeper_id
         HAVING total > 0
         ORDER BY total DESC
@@ -2463,7 +2530,7 @@ async def tournament_fielders_leaders(
             JOIN innings i ON i.id = d.innings_id
             JOIN match m ON m.id = i.match_id
             WHERE fc.fielder_id IN ({placeholders})
-              AND i.super_over = 0 AND {where}
+              AND i.super_over = 0 AND {where}{inn_clause}
             GROUP BY fc.fielder_id, team
             """,
             {**params, **name_params},
@@ -2497,6 +2564,7 @@ async def tournament_fielder_scope_stats(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     """Scoped fielding stats for one picked player.
 
@@ -2513,6 +2581,8 @@ async def tournament_fielder_scope_stats(
     """
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
+    inn_clause, inn_params = _inning_extras(aux)
+    params.update(inn_params)
     params["person_id"] = person_id
 
     disp_rows = await db.q(
@@ -2527,7 +2597,7 @@ async def tournament_fielder_scope_stats(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE fc.fielder_id = :person_id
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         """,
         params,
     )
@@ -2590,7 +2660,7 @@ async def tournament_fielder_scope_stats(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE fc.fielder_id = :person_id
-          AND i.super_over = 0 AND {where}
+          AND i.super_over = 0 AND {where}{inn_clause}
         GROUP BY team
         ORDER BY n DESC
         LIMIT 1
@@ -2631,11 +2701,15 @@ def _partnership_tournament_where(
     filters: FilterParams, tournament: str | None,
     side: str = "batting",
     series_type: str | None = None,
+    aux: AuxParams | None = None,
 ) -> tuple[str, dict]:
     """Build WHERE for partnership queries scoped by tournament + filters.
 
     side='batting': partnerships of `filter_team` (if set) or any team.
     side='bowling': partnerships conceded by `filter_team`.
+
+    Honours `aux.inning` — partnerships are innings-rows so the inning
+    clause folds straight into the unified WHERE.
     """
     where, params = _tournament_scope_where(
         filters, tournament, series_type=series_type,
@@ -2651,6 +2725,9 @@ def _partnership_tournament_where(
         else:
             clauses.append("i.team != :filter_team")
         params["filter_team"] = filters.team
+    if aux is not None and aux.inning is not None:
+        clauses.append("i.innings_number = :inning")
+        params["inning"] = aux.inning
     return " AND ".join(clauses), params
 
 
@@ -2659,6 +2736,7 @@ async def tournament_partnerships_by_wicket(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     side: str = Query("batting"),
 ):
     """Per-wicket partnership rollup for the tournament.
@@ -2670,7 +2748,7 @@ async def tournament_partnerships_by_wicket(
         side = "batting"
     db = get_db()
     where, params = _partnership_tournament_where(
-        filters, tournament, side, series_type=series_type,
+        filters, tournament, side, series_type=series_type, aux=aux,
     )
 
     rows = await db.q(
@@ -2754,6 +2832,7 @@ async def tournament_partnerships_top(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     side: str = Query("batting"),
     limit: int = Query(10, ge=1, le=50),
 ):
@@ -2762,7 +2841,7 @@ async def tournament_partnerships_top(
         side = "batting"
     db = get_db()
     where, params = _partnership_tournament_where(
-        filters, tournament, side, series_type=series_type,
+        filters, tournament, side, series_type=series_type, aux=aux,
     )
     params["lim"] = limit
 
@@ -2824,6 +2903,7 @@ async def tournament_partnerships_top_by_wicket(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     side: str = Query("batting"),
     per_wicket: int = Query(10, ge=1, le=20),
 ):
@@ -2836,7 +2916,7 @@ async def tournament_partnerships_top_by_wicket(
         side = "batting"
     db = get_db()
     where, params = _partnership_tournament_where(
-        filters, tournament, side, series_type=series_type,
+        filters, tournament, side, series_type=series_type, aux=aux,
     )
     params["pw"] = per_wicket
 
@@ -2909,6 +2989,7 @@ async def tournament_partnerships_heatmap(
     tournament: str | None = Query(None),
     series_type: str | None = Query(None),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
     side: str = Query("batting"),
 ):
     """Season × wicket avg-runs heatmap for the tournament."""
@@ -2916,7 +2997,7 @@ async def tournament_partnerships_heatmap(
         side = "batting"
     db = get_db()
     where, params = _partnership_tournament_where(
-        filters, tournament, side, series_type=series_type,
+        filters, tournament, side, series_type=series_type, aux=aux,
     )
 
     rows = await db.q(
@@ -3011,6 +3092,7 @@ async def rivalry_summary(
     team1: str = Query(...),
     team2: str = Query(...),
     filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
 ):
     """Synthesized bilateral rivalry dossier across all international meetings.
 
@@ -3035,6 +3117,8 @@ async def rivalry_summary(
     params["a"] = a
     params["b"] = b
     where = " AND ".join(clauses)
+    inn_clause, inn_params = _inning_extras(aux)
+    params.update(inn_params)
 
     # Match-level aggregates
     m_rows = await db.q(
@@ -3130,7 +3214,7 @@ async def rivalry_summary(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         LEFT JOIN person p ON p.id = d.batter_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
           AND d.batter_id IS NOT NULL
           AND d.extras_wides = 0 AND d.extras_noballs = 0
         GROUP BY d.batter_id
@@ -3152,7 +3236,7 @@ async def rivalry_summary(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         LEFT JOIN person p ON p.id = d.bowler_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
           AND d.bowler_id IS NOT NULL
           AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
         GROUP BY d.bowler_id
@@ -3176,7 +3260,7 @@ async def rivalry_summary(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         LEFT JOIN person p ON p.id = d.batter_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
           AND d.batter_id IS NOT NULL
           AND d.extras_wides = 0 AND d.extras_noballs = 0
         GROUP BY d.batter_id, m.id
@@ -3199,7 +3283,7 @@ async def rivalry_summary(
         FROM partnership p
         JOIN innings i ON i.id = p.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}
+        WHERE i.super_over = 0 AND {where}{inn_clause}
         ORDER BY p.partnership_runs DESC LIMIT 1
         """,
         params,

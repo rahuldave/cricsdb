@@ -80,7 +80,7 @@ def _inning_match_filter(
     if aux is None or aux.inning is None or not team_value:
         return "", {}
     return (
-        "m.match_id IN ("
+        "m.id IN ("
         " SELECT i2.match_id FROM innings i2"
         " WHERE i2.team = :im_team"
         "   AND i2.innings_number = :im_inn"

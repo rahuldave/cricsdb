@@ -196,6 +196,90 @@ def _identity_max(c: sqlite3.Connection, scope: dict, team: str, inning: int | N
     return rows[0]["hi"] if rows else None
 
 
+def _api_partition_smoke() -> list[str]:
+    """Hit the live API on localhost:8000 and assert partition end-to-
+    end via the actual endpoints. Catches bugs that the SQL-only
+    aggregator doesn't see (e.g. the `_inning_match_filter` referenced
+    `m.match_id` instead of `m.id` for several hours after commit 1
+    landed because the SQL path doesn't go through the helper).
+
+    Returns a list of failure strings; empty on success or when the
+    API isn't reachable (that's not a failure — it's a skip).
+    """
+    import urllib.request
+    import urllib.error
+
+    base = os.environ.get("API_BASE", "http://localhost:8000")
+
+    def get(url):
+        try:
+            with urllib.request.urlopen(base + url, timeout=5) as resp:
+                return __import__("json").loads(resp.read())
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError):
+            return None
+
+    # Skip if API isn't up.
+    probe = get("/api/v1/teams")
+    if probe is None:
+        return []  # API not running — skip cleanly.
+
+    failures: list[str] = []
+    team = "Royal%20Challengers%20Bengaluru"
+    q = "?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2025&season_to=2025"
+
+    # Family of endpoint shapes to check. (label, path, [(metric_key, partition_kind)])
+    # partition_kind: 'add' (v0+v1==vall) | 'eq' (v0==v1==vall, identity)
+    cases = [
+        ("/teams/{team}/summary",        f"/api/v1/teams/{team}/summary{q}",
+         [("matches","add"), ("wins","add"), ("losses","add")]),
+        ("/teams/{team}/batting/summary", f"/api/v1/teams/{team}/batting/summary{q}",
+         [("total_runs","add"), ("legal_balls","add"), ("innings_batted","add")]),
+        ("/teams/{team}/bowling/summary", f"/api/v1/teams/{team}/bowling/summary{q}",
+         [("runs_conceded","add"), ("legal_balls","add"), ("wickets","add")]),
+        ("/teams/{team}/fielding/summary", f"/api/v1/teams/{team}/fielding/summary{q}",
+         [("catches","add"), ("stumpings","add"), ("run_outs","add")]),
+        ("/series/summary",              f"/api/v1/series/summary{q}",
+         [("total_runs","add"), ("legal_balls","add"), ("total_wickets","add")]),
+        ("/series/partnerships/by-wicket(total n)",
+         f"/api/v1/series/partnerships/by-wicket{q}",
+         [("__bywicket_total_n__","add")]),
+    ]
+
+    def env(d, k):
+        if d is None:
+            return None
+        v = d.get(k)
+        return v.get("value") if isinstance(v, dict) else v
+
+    for label, url, metrics in cases:
+        all_r = get(url)
+        r0 = get(url + "&inning=0")
+        r1 = get(url + "&inning=1")
+        if any(r is None for r in (all_r, r0, r1)):
+            failures.append(f"[API {label}] one of the responses failed")
+            continue
+        for k, kind in metrics:
+            if k == "__bywicket_total_n__":
+                v_all = sum(w.get("n", 0) for w in (all_r.get("by_wicket") or []))
+                v0 = sum(w.get("n", 0) for w in (r0.get("by_wicket") or []))
+                v1 = sum(w.get("n", 0) for w in (r1.get("by_wicket") or []))
+            else:
+                v_all = env(all_r, k) or 0
+                v0 = env(r0, k) or 0
+                v1 = env(r1, k) or 0
+            if kind == "add":
+                if v0 + v1 != v_all:
+                    failures.append(
+                        f"[API {label} / {k}] {v0}+{v1}={v0+v1} != {v_all}"
+                    )
+            elif kind == "eq":
+                if not (v_all == v0 == v1):
+                    failures.append(
+                        f"[API {label} / {k}] all={v_all} v0={v0} v1={v1}"
+                    )
+    return failures
+
+
 def _landing_check(c: sqlite3.Connection) -> tuple[bool, str]:
     """The /teams/landing endpoint is has_innings_join=False and NOT
     wired to _inning_match_filter. Asserting at the SQL primitive
@@ -317,6 +401,16 @@ def main(argv: list[str]) -> int:
         failures.append(f"[/teams/landing helper] {msg}")
     else:
         pass_cnt += 1
+
+    # API-level partition smoke (catches bugs the SQL-only aggregator
+    # doesn't, e.g. typos inside _inning_match_filter). Skipped when
+    # uvicorn isn't running.
+    api_fail = _api_partition_smoke()
+    if not api_fail:
+        # Either passed or was skipped — count as 1 pass either way.
+        pass_cnt += 1
+    else:
+        failures.extend(api_fail)
 
     print(f"\n{pass_cnt} assertions PASS, {len(failures)} failures")
     for f in failures:
