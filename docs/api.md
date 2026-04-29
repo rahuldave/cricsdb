@@ -618,10 +618,26 @@ design. Shape follows a consistent pattern:
   numeric metrics (run_rate / economy / boundary_pct / dot_pct)
   envelope-wrapped against the in-scope league baseline; counts
   (runs / balls / wickets_lost / fours / sixes) stay flat.
+- `.../by-inning` — 1st-innings / 2nd-innings split. Sibling of
+  `/by-phase` for the inning-split spec; partitions every numeric
+  metric on `i.innings_number` (0/1). Same envelope shape as
+  `/by-phase`. Available for batting / bowling / fielding /
+  partnerships. Spec: `internal_docs/spec-inning-split.md` §3.2.
 - `.../top-batters` `.../top-bowlers` `.../top-fielders` — top-N
   players for that team. Params: `limit` (default 5).
 - `.../phase-season-heatmap` — phase × season matrix for run rate +
   wickets/innings.
+
+#### Page-local `?inning=0|1` narrowing (AuxParams)
+
+Every endpoint that joins innings (i.e. has innings-level metrics)
+also accepts the page-local `?inning=0` (1st-innings only) or
+`?inning=1` (2nd-innings only) query param. NOT a FilterBar field —
+it's an AuxParams aux narrowing. Match-level endpoints
+(`/teams/{team}/{summary,by-season,vs-opponent,match-list}`) honour
+the same param via a derived match-id subquery (`team batted in
+inning X` semantic). Spec: `internal_docs/spec-inning-split.md`
+§3.1a + §5.2.
 
 ### Batting
 
@@ -636,8 +652,34 @@ boundary_pct, dot_pct, fours, sixes, fifties, hundreds,
 avg_1st_innings_total, avg_2nd_innings_total,
 highest_total, lowest_all_out_total }`. Identity-bearing fields
 (`highest_total`, `lowest_all_out_total`) stay flat. Subroutes:
-`/by-season`, `/by-phase`, `/top-batters`, `/phase-season-heatmap`
-(unchanged shapes).
+`/by-season`, `/by-phase`, `/by-inning`, `/top-batters`,
+`/phase-season-heatmap` (unchanged shapes).
+
+The `/by-inning` shape:
+
+```bash
+curl "http://localhost:8000/api/v1/teams/Royal%20Challengers%20Bengaluru/batting/by-inning?gender=male&team_type=club&season_from=2025&season_to=2025"
+```
+
+```json
+{
+  "innings": [
+    { "inning_no": 0, "label": "1st innings",
+      "runs": 1452, "balls": 924,
+      "run_rate": {"value": 9.43, "scope_avg": ..., "delta_pct": ..., "direction": "higher_better", "sample_size": 924},
+      "wickets_lost": 55, "boundary_pct": {...}, "dot_pct": {...},
+      "fours": 119, "sixes": 77 },
+    { "inning_no": 1, "label": "2nd innings", ... }
+  ]
+}
+```
+
+Same shape for `/bowling/by-inning` (with `runs_conceded` /
+`economy` / `wickets` / `fours_conceded` / `sixes_conceded`
+instead) and `/fielding/by-inning` (`matches` / `catches` /
+`stumpings` / `run_outs` / `*_per_match`). For
+`/partnerships/by-inning` the per-row keys are `n` / `avg_runs` /
+`avg_balls` / `best_runs` (sibling of `/by-wicket`).
 
 ### Bowling
 

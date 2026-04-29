@@ -151,3 +151,18 @@ NEW team_batting_summary_rcb_2025_chip_baseline_clubs  /api/v1/teams/Royal%20Cha
 # NEW: chip_baseline_scope_json with a payload that carries scope_to_team — verify the
 #      decode threads scope_to_team into the resulting AuxParams.
 NEW team_batting_summary_rcb_chip_baseline_scope_to_team /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&chip_baseline_scope_json=eyJnZW5kZXIiOiAibWFsZSIsICJ0ZWFtX3R5cGUiOiAiY2x1YiIsICJzY29wZV90b190ZWFtIjogIlJveWFsIENoYWxsZW5nZXJzIEJlbmdhbHVydSJ9
+
+# ── Inning-split (spec-inning-split.md) commits 1 + 2 ──
+# Commit 1: ?inning=0|1 narrowing on existing summary endpoints.
+NEW team_batting_summary_rcb_inn0      /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=0
+NEW team_batting_summary_rcb_inn1      /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=1
+NEW team_bowling_summary_rcb_inn0      /api/v1/teams/Royal%20Challengers%20Bengaluru/bowling/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=0
+NEW team_fielding_summary_rcb_inn0     /api/v1/teams/Royal%20Challengers%20Bengaluru/fielding/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=0
+NEW team_summary_rcb_inn0              /api/v1/teams/Royal%20Challengers%20Bengaluru/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=0
+NEW team_summary_rcb_inn1              /api/v1/teams/Royal%20Challengers%20Bengaluru/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=1
+NEW team_byseason_rcb_inn0             /api/v1/teams/Royal%20Challengers%20Bengaluru/by-season?gender=male&team_type=club&season_from=2025&season_to=2025&inning=0
+# Commit 2: new /by-inning band endpoints (team-side mirrors of /by-phase).
+NEW team_batting_by_inning_rcb         /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/by-inning?gender=male&team_type=club&season_from=2025&season_to=2025
+NEW team_bowling_by_inning_rcb         /api/v1/teams/Royal%20Challengers%20Bengaluru/bowling/by-inning?gender=male&team_type=club&season_from=2025&season_to=2025
+NEW team_fielding_by_inning_rcb        /api/v1/teams/Royal%20Challengers%20Bengaluru/fielding/by-inning?gender=male&team_type=club&season_from=2025&season_to=2025
+NEW team_partnerships_by_inning_rcb    /api/v1/teams/Royal%20Challengers%20Bengaluru/partnerships/by-inning?gender=male&team_type=club&season_from=2025&season_to=2025

@@ -1252,6 +1252,50 @@ async def _innings_count_for_phase(filters, aux, *, side: str) -> int:
     return (rows[0].get("n") if rows else 0) or 0
 
 
+async def _innings_count_per_inning(filters, aux, *, side: str) -> dict[int, int]:
+    """Innings-count GROUPED BY i.innings_number, for one side.
+
+    Used by the league-side branch of `_*_by_inning_aggregates` to
+    compute the per-innings divisor when transforming pool counts to
+    per-innings rates. Each row of the /by-inning response divides by
+    the count of innings of THAT innings_number in scope (typically
+    matches × 1, since each match contributes one innings_0 and one
+    innings_1 to the league pool).
+    """
+    db = get_db()
+    where, params = _team_innings_clause(filters, None, side=side, aux=aux)
+    rows = await db.q(
+        f"""
+        SELECT i.innings_number AS inning, COUNT(DISTINCT i.id) AS n
+        FROM innings i
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+        GROUP BY i.innings_number
+        """,
+        params,
+    )
+    return {r["inning"]: (r["n"] or 0) for r in rows if r["inning"] in (0, 1)}
+
+
+def _inning_dict_per_innings(by_inning: dict, counts_per_inning: dict) -> dict:
+    """Apply per-innings transform to a {inning: row} dict — divides
+    pool counts by the per-inning innings_count. Mirrors
+    `_phase_dict_per_innings` shape but per-row divisor instead of a
+    single shared divisor (counts vary across innings for abandoned
+    matches and slot inning narrowing)."""
+    keys = ("runs", "runs_conceded", "balls", "wickets_lost", "wickets",
+            "fours", "sixes", "fours_conceded", "sixes_conceded")
+    for inn_no, r in by_inning.items():
+        div = counts_per_inning.get(inn_no, 0)
+        if not div:
+            continue
+        for k in keys:
+            v = r.get(k)
+            if v is not None:
+                r[k] = round(v / div, 2)
+    return by_inning
+
+
 def _scope_to_team_clause(
     aux: AuxParams | None, filters: FilterParams,
 ) -> tuple[str, dict]:
@@ -1894,6 +1938,120 @@ async def _batting_by_phase_aggregates_live(
     if team is None:
         out = _phase_dict_per_innings(out, await _innings_count_for_phase(filters, aux, side="batting"))
     return out
+
+
+async def _batting_by_inning_aggregates(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict[int, dict]:
+    """Flat per-inning batting aggregates keyed by innings_number (0/1).
+
+    Mirrors `_batting_by_phase_aggregates_live` but `GROUP BY
+    i.innings_number` instead of by phase CASE. Live only — bucket
+    tables don't carry an innings dimension. Spec:
+    spec-inning-split.md §3.2 + §5.5.
+    """
+    db = get_db()
+    where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
+
+    rows = await db.q(
+        f"""
+        SELECT
+            i.innings_number AS inning,
+            COUNT(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 END) as balls,
+            SUM(d.runs_total) as runs,
+            SUM(CASE WHEN d.runs_batter = 4
+                     AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
+            SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes,
+            SUM(CASE WHEN d.runs_total = 0
+                     AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) as dots
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+        GROUP BY i.innings_number
+        """,
+        params,
+    )
+    wicket_rows = await db.q(
+        f"""
+        SELECT i.innings_number AS inning, COUNT(*) as wickets_lost
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+          AND w.kind NOT IN ('retired hurt', 'retired not out')
+        GROUP BY i.innings_number
+        """,
+        params,
+    )
+    wicket_map = {r["inning"]: r["wickets_lost"] for r in wicket_rows}
+
+    out: dict[int, dict] = {}
+    for r in rows:
+        inning = r["inning"]
+        if inning not in (0, 1):
+            continue
+        balls = r["balls"] or 0
+        runs = r["runs"] or 0
+        fours = r["fours"] or 0
+        sixes = r["sixes"] or 0
+        boundaries = fours + sixes
+        out[inning] = {
+            "inning": inning,
+            "runs": runs,
+            "balls": balls,
+            "run_rate": _safe_div(runs, balls, 6),
+            "wickets_lost": wicket_map.get(inning, 0),
+            "boundary_pct": _safe_div(boundaries, balls, 100, 1),
+            "bat_dot_pct": _safe_div(r["dots"] or 0, balls, 100, 1),
+            "fours": fours,
+            "sixes": sixes,
+        }
+    if team is None:
+        out = _inning_dict_per_innings(
+            out, await _innings_count_per_inning(filters, aux, side="batting"),
+        )
+    return out
+
+
+@router.get("/{team}/batting/by-inning")
+async def team_batting_by_inning(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    """Per-innings_number batting band — sibling of /by-phase. Returns
+    an `innings` array with up to two entries (1st innings / 2nd
+    innings) carrying the same metrics + chip envelopes as /by-phase.
+    Spec: spec-inning-split.md §3.2.
+    """
+    t = await _batting_by_inning_aggregates(team, filters, aux)
+    lf, la = _league_aux(team, aux, filters)
+    s = await _batting_by_inning_aggregates(None, lf, la)
+
+    innings = []
+    for inn_no in (0, 1):
+        tr = t.get(inn_no)
+        if tr is None:
+            continue
+        sr = s.get(inn_no, {})
+        balls = tr["balls"]
+        innings.append({
+            "inning_no": inn_no,
+            "label": "1st innings" if inn_no == 0 else "2nd innings",
+            "runs": tr["runs"],
+            "balls": balls,
+            "run_rate":     wrap_metric(tr["run_rate"], sr.get("run_rate"), "run_rate", sample_size=balls),
+            "wickets_lost": tr["wickets_lost"],
+            "boundary_pct": wrap_metric(tr["boundary_pct"], sr.get("boundary_pct"), "boundary_pct", sample_size=balls),
+            "dot_pct":      wrap_metric(tr["bat_dot_pct"], sr.get("bat_dot_pct"), "bat_dot_pct", sample_size=balls),
+            "fours": tr["fours"],
+            "sixes": tr["sixes"],
+        })
+    return {"innings": innings}
 
 
 @router.get("/{team}/batting/by-phase")
@@ -2671,6 +2829,114 @@ async def _bowling_by_phase_aggregates_live(
     return out
 
 
+async def _bowling_by_inning_aggregates(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict[int, dict]:
+    """Flat per-inning bowling aggregates keyed by innings_number.
+
+    Mirrors `_bowling_by_phase_aggregates_live` but `GROUP BY
+    i.innings_number`. Live only. Spec: spec-inning-split.md §3.2.
+    """
+    db = get_db()
+    where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
+
+    rows = await db.q(
+        f"""
+        SELECT
+            i.innings_number AS inning,
+            COUNT(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 END) as balls,
+            SUM(d.runs_total) as runs,
+            SUM(CASE WHEN d.runs_batter = 4
+                     AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
+            SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes,
+            SUM(CASE WHEN d.runs_total = 0
+                     AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) as dots
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+        GROUP BY i.innings_number
+        """,
+        params,
+    )
+    w_rows = await db.q(
+        f"""
+        SELECT i.innings_number AS inning, COUNT(*) as wickets
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {where} AND w.kind NOT IN {BOWLER_WICKET_EXCLUDE}
+        GROUP BY i.innings_number
+        """,
+        params,
+    )
+    wicket_map = {r["inning"]: r["wickets"] for r in w_rows}
+
+    out: dict[int, dict] = {}
+    for r in rows:
+        inning = r["inning"]
+        if inning not in (0, 1):
+            continue
+        balls = r["balls"] or 0
+        runs = r["runs"] or 0
+        fours = r["fours"] or 0
+        sixes = r["sixes"] or 0
+        out[inning] = {
+            "inning": inning,
+            "runs_conceded": runs,
+            "balls": balls,
+            "economy": _safe_div(runs, balls, 6),
+            "wickets": wicket_map.get(inning, 0),
+            "boundary_pct": _safe_div(fours + sixes, balls, 100, 1),
+            "bowl_dot_pct": _safe_div(r["dots"] or 0, balls, 100, 1),
+            "fours_conceded": fours,
+            "sixes_conceded": sixes,
+        }
+    if team is None:
+        out = _inning_dict_per_innings(
+            out, await _innings_count_per_inning(filters, aux, side="fielding"),
+        )
+    return out
+
+
+@router.get("/{team}/bowling/by-inning")
+async def team_bowling_by_inning(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    """Per-innings_number bowling band — sibling of /by-phase.
+    Spec: spec-inning-split.md §3.2.
+    """
+    t = await _bowling_by_inning_aggregates(team, filters, aux)
+    lf, la = _league_aux(team, aux, filters)
+    s = await _bowling_by_inning_aggregates(None, lf, la)
+
+    innings = []
+    for inn_no in (0, 1):
+        tr = t.get(inn_no)
+        if tr is None:
+            continue
+        sr = s.get(inn_no, {})
+        balls = tr["balls"]
+        innings.append({
+            "inning_no": inn_no,
+            "label": "1st innings" if inn_no == 0 else "2nd innings",
+            "runs_conceded": tr["runs_conceded"],
+            "balls": balls,
+            "economy":      wrap_metric(tr["economy"], sr.get("economy"), "economy", sample_size=balls),
+            "wickets": tr["wickets"],
+            "boundary_pct": wrap_metric(tr["boundary_pct"], sr.get("boundary_pct"), "boundary_pct", sample_size=balls),
+            "dot_pct":      wrap_metric(tr["bowl_dot_pct"], sr.get("bowl_dot_pct"), "bowl_dot_pct", sample_size=balls),
+            "fours_conceded": tr["fours_conceded"],
+            "sixes_conceded": tr["sixes_conceded"],
+        })
+    return {"innings": innings}
+
+
 @router.get("/{team}/bowling/by-phase")
 async def team_bowling_by_phase(
     team: str,
@@ -2988,6 +3254,117 @@ async def _fielding_aggregates_live(
             out, matches * mult, halve_per_match=not inning_active,
         )
     return out
+
+
+async def _fielding_by_inning_aggregates(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict[int, dict]:
+    """Flat per-inning fielding aggregates keyed by innings_number.
+
+    Mirrors `_fielding_aggregates_live` but `GROUP BY i.innings_number`.
+    No /by-phase sibling for fielding (phase doesn't apply to fielding
+    credits) — the per-inning split is the first banded fielding view.
+    Spec: spec-inning-split.md §3.2.
+    """
+    db = get_db()
+    where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
+
+    kind_rows = await db.q(
+        f"""
+        SELECT i.innings_number AS inning, fc.kind AS kind, COUNT(*) as cnt
+        FROM fieldingcredit fc
+        JOIN delivery d ON d.id = fc.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+        GROUP BY i.innings_number, fc.kind
+        """,
+        params,
+    )
+    by_inning_kind: dict[int, dict[str, int]] = {0: {}, 1: {}}
+    for r in kind_rows:
+        if r["inning"] in (0, 1):
+            by_inning_kind[r["inning"]][r["kind"]] = r["cnt"]
+
+    match_rows = await db.q(
+        f"""
+        SELECT i.innings_number AS inning, COUNT(DISTINCT m.id) as matches
+        FROM innings i
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+        GROUP BY i.innings_number
+        """,
+        params,
+    )
+    matches_per_inning = {r["inning"]: r["matches"] for r in match_rows if r["inning"] in (0, 1)}
+
+    out: dict[int, dict] = {}
+    for inning, by_kind in by_inning_kind.items():
+        if inning not in matches_per_inning and not by_kind:
+            continue
+        catches = by_kind.get("caught", 0)
+        cnb = by_kind.get("caught_and_bowled", 0)
+        stumpings = by_kind.get("stumped", 0)
+        run_outs = by_kind.get("run_out", 0)
+        matches = matches_per_inning.get(inning, 0)
+        out[inning] = {
+            "inning": inning,
+            "matches": matches,
+            "catches": catches + cnb,
+            "caught_and_bowled": cnb,
+            "stumpings": stumpings,
+            "run_outs": run_outs,
+            "total_dismissals_contributed": catches + cnb + stumpings + run_outs,
+            "catches_per_match": _safe_div(catches + cnb, matches, 1, 2),
+            "stumpings_per_match": _safe_div(stumpings, matches, 1, 2),
+            "run_outs_per_match": _safe_div(run_outs, matches, 1, 2),
+        }
+    if team is None:
+        # Each match contributes 1 fielding innings to the inning-X
+        # scope (not 2). _apply_fielding_per_innings with halve=False
+        # honours that. Spec §5.5.
+        for inning, row in out.items():
+            matches = matches_per_inning.get(inning, 0)
+            _apply_fielding_per_innings(row, matches * 1, halve_per_match=False)
+    return out
+
+
+@router.get("/{team}/fielding/by-inning")
+async def team_fielding_by_inning(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    """Per-innings_number fielding band — no /by-phase sibling (phase
+    doesn't apply to fielding). Spec: spec-inning-split.md §3.2.
+    """
+    t = await _fielding_by_inning_aggregates(team, filters, aux)
+    lf, la = _league_aux(team, aux, filters)
+    s = await _fielding_by_inning_aggregates(None, lf, la)
+
+    innings = []
+    for inn_no in (0, 1):
+        tr = t.get(inn_no)
+        if tr is None:
+            continue
+        sr = s.get(inn_no, {})
+        matches = tr["matches"]
+        innings.append({
+            "inning_no": inn_no,
+            "label": "1st innings" if inn_no == 0 else "2nd innings",
+            "matches": matches,
+            "catches": tr["catches"],
+            "caught_and_bowled": tr["caught_and_bowled"],
+            "stumpings": tr["stumpings"],
+            "run_outs": tr["run_outs"],
+            "total_dismissals_contributed": tr["total_dismissals_contributed"],
+            "catches_per_match":  wrap_metric(tr["catches_per_match"], sr.get("catches_per_match"), "catches_per_match", sample_size=matches),
+            "stumpings_per_match": wrap_metric(tr["stumpings_per_match"], sr.get("stumpings_per_match"), "stumpings_per_match", sample_size=matches),
+            "run_outs_per_match": wrap_metric(tr["run_outs_per_match"], sr.get("run_outs_per_match"), "run_outs_per_match", sample_size=matches),
+        })
+    return {"innings": innings}
 
 
 @router.get("/{team}/fielding/summary")
@@ -3318,6 +3695,94 @@ async def _partnerships_by_wicket_aggregates(
             if innings_batted:
                 row["n"] = round((row["n"] or 0) / innings_batted, 2)
     return out
+
+
+async def _partnerships_by_inning_aggregates(
+    team: str | None,
+    filters: FilterParams,
+    side: str,
+    aux: AuxParams,
+) -> dict[int, dict]:
+    """Flat per-inning partnership aggregates keyed by innings_number.
+
+    Mirrors `_partnerships_by_wicket_aggregates` but groups by
+    i.innings_number instead of p.wicket_number. Live only — bucket
+    table has wicket_number but no innings_number dimension.
+    Spec: spec-inning-split.md §3.2.
+    """
+    db = get_db()
+    where, params = _partnership_filter(filters, team, side, aux=aux)
+
+    rows = await db.q(
+        f"""
+        SELECT i.innings_number AS inning,
+               COUNT(*) AS n,
+               ROUND(AVG(p.partnership_runs), 1) AS avg_runs,
+               ROUND(AVG(p.partnership_balls), 1) AS avg_balls,
+               MAX(p.partnership_runs) AS best_runs
+        FROM partnership p
+        JOIN innings i ON i.id = p.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+          AND p.ended_by_kind NOT IN ('retired hurt', 'retired not out')
+        GROUP BY i.innings_number
+        """,
+        params,
+    )
+    out: dict[int, dict] = {}
+    for r in rows:
+        inning = r["inning"]
+        if inning not in (0, 1):
+            continue
+        out[inning] = {
+            "inning": inning,
+            "n": r["n"] or 0,
+            "avg_runs": r["avg_runs"],
+            "avg_balls": r["avg_balls"],
+            "best_runs": r["best_runs"] or 0,
+        }
+    if team is None:
+        # League-side per-innings transform: divide n by innings count
+        # for that inning_number. avg_runs / avg_balls / best_runs are
+        # identity-bearing — leave alone.
+        counts = await _innings_count_per_inning(filters, aux, side="batting")
+        for inning, row in out.items():
+            div = counts.get(inning, 0)
+            if div:
+                row["n"] = round((row["n"] or 0) / div, 2)
+    return out
+
+
+@router.get("/{team}/partnerships/by-inning")
+async def team_partnerships_by_inning(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    side: str = Query("batting"),
+):
+    """Per-innings_number partnership band — sibling of /by-wicket.
+    Spec: spec-inning-split.md §3.2.
+    """
+    side = _validate_side(side)
+    t = await _partnerships_by_inning_aggregates(team, filters, side, aux)
+    lf, la = _league_aux(team, aux, filters)
+    s = await _partnerships_by_inning_aggregates(None, lf, side, la)
+
+    innings = []
+    for inn_no in (0, 1):
+        tr = t.get(inn_no)
+        if tr is None:
+            continue
+        sr = s.get(inn_no, {})
+        innings.append({
+            "inning_no": inn_no,
+            "label": "1st innings" if inn_no == 0 else "2nd innings",
+            "n":         wrap_metric(tr["n"], sr.get("n"), "total", sample_size=tr["n"]),
+            "avg_runs":  wrap_metric(tr["avg_runs"], sr.get("avg_runs"), "avg_runs", sample_size=tr["n"]),
+            "avg_balls": tr["avg_balls"],
+            "best_runs": tr["best_runs"],
+        })
+    return {"team": team, "side": side, "innings": innings}
 
 
 @router.get("/{team}/partnerships/by-wicket")

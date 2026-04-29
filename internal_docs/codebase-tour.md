@@ -33,6 +33,14 @@ api/
                          /api/v1/teams/{team}/summary|results|vs/{opponent}|by-season
                          /api/v1/teams/{team}/players-by-season (roster + bat avg + bowl SR + turnover)
                          plus batting/bowling/fielding/partnerships endpoints + opponents-matrix.
+                         Each discipline has parallel /by-phase + /by-inning band
+                         endpoints (mirror shape, GROUP BY phase CASE vs
+                         i.innings_number) — see _batting_by_inning_aggregates and
+                         siblings. Match-level endpoints (summary / by-season /
+                         vs-opponent / match-list) honour `?inning=0|1` via the
+                         _inning_match_filter helper (derived match-id subquery —
+                         "team batted in inning X"). Spec:
+                         internal_docs/spec-inning-split.md.
                          The 5 compare summary endpoints (team_summary,
                          team_batting_summary, team_bowling_summary,
                          team_fielding_summary, team_partnerships_summary) wrap
