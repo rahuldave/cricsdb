@@ -86,15 +86,31 @@ EVALEOF
 
 # ─────────────────────────── EXTRACTOR: DataTable ───────────────────────────
 # For tabular surfaces (Match List, leaderboards, partnerships top-N).
+# Pages with multiple DataTables (e.g. Series > Batters renders by_runs +
+# by_average back-to-back) take an ordinal arg:
+#   extract_data_table        # first table (default — pre-3b behavior)
+#   extract_data_table 0      # first table (explicit)
+#   extract_data_table 1      # second table
+#
+# The total_label / footer is page-global (single .wisden-pagination)
+# and the second table on multi-table pages may not have its own
+# footer — when missing, total_label comes back empty and only the
+# row count is asserted by callers.
+#
 # Returns: { headers: [str], rows: [[cell_text, ...]], total_rows: N,
-#            total_label: "Showing M of N" or "N rows" }
+#            total_label: "Showing M of N" or "" }
 extract_data_table() {
-  agent-browser eval --stdin <<'EVALEOF'
+  local idx="${1:-0}"
+  agent-browser eval --stdin <<EVALEOF
 (() => {
-  // Take the first DataTable on the page. If a page has multiple,
-  // tests should narrow with a more specific selector wrapper.
-  const tbl = document.querySelector('.wisden-table, table.data-table, table');
-  if (!tbl) return { error: 'no table found' };
+  const idx = ${idx};
+  const tables = document.querySelectorAll(
+    '.wisden-table, table.data-table, table'
+  );
+  const tbl = tables[idx];
+  if (!tbl) {
+    return { error: 'no table at index ' + idx + ' (have ' + tables.length + ')' };
+  }
 
   const headers = Array.from(tbl.querySelectorAll('thead th')).map(
     th => th.innerText.trim()
@@ -103,8 +119,12 @@ extract_data_table() {
     Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim())
   );
 
-  // "Showing N–M of T" lives under .wisden-pagination (DataTable.tsx).
-  const totalEl = document.querySelector(
+  // Pagination/footer is page-global — fine for the first table; for
+  // ordinal>0 it may belong to a different table, so callers should
+  // assert row count primarily and total_label as a soft signal.
+  const totalEl = document.querySelectorAll(
+    '.wisden-pagination, .wisden-table-meta, .data-table-footer, .table-footer'
+  )[idx] || document.querySelector(
     '.wisden-pagination, .wisden-table-meta, .data-table-footer, .table-footer'
   );
   const total_label = totalEl?.innerText?.trim() || '';
