@@ -29,10 +29,14 @@ innings-number framing avoids the confusion entirely; see §7.
 In scope (full coverage):
 
 - **Series dossier** (`/series?tournament=X`) — Overview, Batters,
-  Bowlers, Fielders, Partnerships, Records subtabs.
+  Bowlers, Fielders, Partnerships, Records subtabs (innings-joined,
+  rides through the central clause via the §5.3 helper extension).
 - **Teams page** (`/teams?team=X`) — By Season, vs Opponent,
   Batting, Bowling, Fielding, Partnerships, Players subtabs (page-
   level toggle); Compare tab (per-slot SlotScopeEditor override).
+  Match-level endpoints (`/summary`, `/by-season`, `/vs-opponent`,
+  `/match-list`) get inning narrowing via the new
+  `_inning_match_filter` helper (§3.1a).
 - **Players profile** (`/players?player=X`) — multi-band view.
 - **Standalone discipline pages** — `/batting?player=X`,
   `/bowling?player=X`, `/fielding?player=X`.
@@ -121,8 +125,10 @@ Team-side (`api/routers/teams.py`):
   phase-season-heatmap}`
 - `/{team}/fielding/{summary,by-season,top-fielders}`
 - `/{team}/partnerships/{summary,by-wicket,best-pairs,heatmap,top}`
-- `/{team}/summary` — per-team results metrics: matches/wins/losses
-  partitioned by inning (1st-innings record vs 2nd-innings record)
+- `/{team}/summary` — per-team results metrics, partitioned by inning
+  via the `_inning_match_filter` helper described in §3.1a (a derived
+  match-id subquery — the central `aux.inning` clause CAN'T be applied
+  to this endpoint because it's `has_innings_join=False`).
 
 Player-side (`api/routers/{batting,bowling,fielding,keeping}.py`):
 - `/leaders` (batters / bowlers / fielders) — leaderboards filtered
@@ -136,14 +142,30 @@ Series-side (`api/routers/tournaments.py`):
 - `/series/{batters,bowlers,fielders}-leaders`
 - `/series/partnerships/{by-wicket,top,top-by-wicket,heatmap}`
 
-Note: `tournaments.py::_build_filter_clauses` is a hand-rolled
-clause builder that bypasses `filters.build()` — it MUST be
-extended to accept an `aux: AuxParams | None` arg and apply the
-inning clause itself when set + when the underlying SQL has an
-innings JOIN. Same hand-rolled pattern applied to
-`reference.py::_reference_clauses` (already takes a series_type
-arg via the same shape; inning rides through the same way). Both
-helpers are listed in the "trace every consumer" check in §12.2.
+**Hand-rolled clause builders — disambiguated.**
+`tournaments.py::_build_filter_clauses` serves two different call-site
+populations:
+
+- **/series dossier endpoints** (`/series/summary`, `/series/records`,
+  `/series/{batters,bowlers,fielders}-leaders`, partnerships variants)
+  — these JOIN innings and must apply the inning clause.
+- **/tournaments dropdown** (FilterBar reference) — no innings join,
+  inning is meaningless there.
+
+Resolution: extend `_build_filter_clauses` to accept BOTH `aux:
+AuxParams | None` AND a `has_innings_join: bool = True` parameter
+(parallel to `FilterBarParams.build`). Dossier callers pass
+`has_innings_join=True` and `aux=aux`; the dropdown caller in
+`tournaments_list` passes `has_innings_join=False` and `aux=None`.
+The clause body adds `i.innings_number = :inning` only when both
+gates are open. Same shape applied to
+`reference.py::_reference_clauses` (which today takes a series_type
+arg via the same hand-rolled pattern — inning rides through the
+same way). Both helpers are listed in the "trace every consumer"
+check in §12.2.
+
+This supersedes the bullet in §5.3 — the helpers ARE changed; the
+guard is the new `has_innings_join` arg, not "no change needed."
 
 Venues-side: `/venues?venue=X` subtabs reuse the existing
 batters/bowlers/fielders leaderboards with `filter_venue` set.
@@ -164,6 +186,109 @@ NOT touched:
   innings JOIN; the inning filter is meaningless there.
 - `/venues/{venue}/summary` — already structured by inning natively.
 - `/matches`, `/head-to-head/*` — out of scope per §1.
+
+### 3.1a Match-level endpoints (`has_innings_join=False`) — per-endpoint contract
+
+The central clause `i.innings_number = :inning` (§5.2) is gated on
+`has_innings_join=True` because it references the innings alias.
+But several team endpoints call `filters.build(has_innings_join=
+False)` and would silently no-op on `?inning=0|1`. §3.3 promises a
+toggle on these surfaces — so we need a parallel mechanism.
+
+**Audit of `has_innings_join=False` call sites in `api/routers/
+teams.py`** (verified by grep before writing this spec):
+
+| Site | Endpoint family | Toggle in §3.3? |
+|---|---|---|
+| L60 `_team_filter_clause` | `/teams/{team}/summary`, match-list assembly | yes (`/summary` partitioned; match-list filtered) |
+| L90 `teams_landing` | `/teams/landing` (directory) | no — directory, not a stats surface |
+| L234 `_team_filter_clause` | `/teams/{team}/by-season` | yes |
+| L471 `_team_filter_clause` | `/teams/{team}/vs-opponent` | yes |
+| L1070 `_team_filter_clause` | `/teams/{team}/match-list` | yes |
+
+Plus parallel sites in `tournaments.py` (Series leaders, records)
+and `reference.py` (dropdowns) — already handled by the §5.3
+disambiguation.
+
+**Mechanism — `_inning_match_filter` helper.**
+Add to `api/routers/teams.py` (mirroring the existing
+`_team_filter_clause` shape):
+
+```python
+def _inning_match_filter(
+    team: str,
+    aux: AuxParams | None,
+) -> tuple[str, dict]:
+    """Return a match-level WHERE fragment that restricts to matches
+    where :team played a role in the chosen inning. Empty when
+    aux.inning is None.
+
+    Semantics: aux.inning=0 → matches where :team batted in
+    innings_number=0 (= matches where :team batted first).
+    aux.inning=1 → matches where :team batted second.
+
+    NOTE the asymmetry vs §3.4 Compare-slot dual-meaning: this helper
+    is for match-level endpoints (/summary, /by-season, /vs-opponent,
+    /match-list) where there's a single match subset. Bat-side framing
+    is the natural reading for results-style metrics ("RCB's record
+    batting first"). For Compare-slot dual-meaning on bowling/fielding
+    rows, see §3.4 — that runs through the central innings clause,
+    not this helper.
+    """
+    if aux is None or aux.inning is None:
+        return "", {}
+    return (
+        "m.match_id IN ("
+        " SELECT i2.match_id FROM innings i2"
+        " WHERE i2.team = :im_team"
+        "   AND i2.innings_number = :im_inn"
+        "   AND i2.super_over = 0"
+        ")",
+        {"im_team": team, "im_inn": aux.inning},
+    )
+```
+
+Compose in `_team_filter_clause`:
+
+```python
+def _team_filter_clause(filters, team_param=":team", aux=None,
+                        team_value: str | None = None):
+    where, params = filters.build(has_innings_join=False, aux=aux)
+    parts = [f"(m.team1 = {team_param} OR m.team2 = {team_param})"]
+    if where:
+        parts.append(where)
+    inn_clause, inn_params = _inning_match_filter(
+        team_value or filters.team or "", aux
+    )
+    if inn_clause:
+        parts.append(inn_clause)
+        params.update(inn_params)
+    return " AND ".join(parts), params
+```
+
+Endpoint-by-endpoint commitment (this is the spec, lock in before
+commit 1):
+
+| Endpoint | Inning behaviour |
+|---|---|
+| `/teams/{team}/summary` | matches/wins/losses/toss/win_pct partition into "team batted first" (inning=0) vs "team batted second" (inning=1) subsets. Pool counts on the team side; per-team-avg comparators on the league side run through the same `_inning_match_filter` so chip alignment holds. |
+| `/teams/{team}/by-season` | row-level partition — each season-row reflects only matches in the chosen inning subset. Seasons with zero such matches drop out naturally. |
+| `/teams/{team}/vs-opponent` | per-opponent record reflects only matches in the chosen inning subset. |
+| `/teams/{team}/match-list` | filters to matches where :team had the role in inning X. (Useful: "show RCB's chase log" via inning=1.) |
+| `/teams/landing` | NO toggle (per §3.3) — no change needed; helper isn't wired here. |
+
+Per-innings-rate metrics on `/summary` (e.g. `win_pct`) keep the
+same divisor logic as the existing per-team transform — but the
+divisor (matches/decided/etc.) is computed from the
+inning-narrowed subset, since the same clause is in the team-side
+SQL. League-side mirror (`/scope/averages/team-summary`) needs the
+SAME helper threading or chip math drifts; covered in §5.5.
+
+Series-side analogue: NOT added in this spec. The Series Overview
+endpoint joins innings already (verified by §3.1 enumeration), so
+the central clause via the §5.3 helper extension covers it. If a
+future Series-Overview metric is at match-level (no innings join),
+revisit then.
 
 ### 3.2 New endpoints — by-inning band mirrors
 
@@ -405,11 +530,20 @@ narrow by inning; the aux field is silently a no-op there
 
 ### 5.3 Hand-rolled clause builders
 
-`tournaments.py::_build_filter_clauses` and
-`reference.py::_reference_clauses` don't have an innings join.
-Inning narrowing is meaningless on /tournaments and /seasons
-dropdowns. These bypass `filters.build()` entirely; no change
-needed. Ditto `reference.py::list_teams` and `search_players`.
+Two flavours. The split is per call-site, not per helper:
+
+- **Dossier callers** (Series Overview / Records / leaders /
+  partnerships) JOIN innings and need the inning clause. Per §3.1,
+  `_build_filter_clauses` is extended to accept `aux: AuxParams |
+  None` and `has_innings_join: bool = True`; dossier callers pass
+  both. The body emits `i.innings_number = :inning` when
+  `aux.inning is not None and has_innings_join`.
+- **Reference dropdown callers** (`/api/v1/tournaments`,
+  `/api/v1/seasons`, `reference.py::list_teams`,
+  `reference.py::search_players`) don't join innings. They pass
+  `has_innings_join=False` and `aux=None`. Inning narrowing is a
+  silent no-op there — narrowing the FilterBar season dropdown by
+  "1st innings" is meaningless.
 
 ### 5.4 `api/routers/bucket_baseline_dispatch.py`
 
@@ -433,8 +567,50 @@ Mirror `_batting_by_phase_aggregates`,
 and the fielding per-season variant — but `GROUP BY
 i.innings_number` instead of by phase CASE. Same envelope wrapping
 via `wrap_metric`. Same per-innings transform via
-`_apply_*_per_innings` (the divisor is innings_count_in_inning_X
-which the league-side aggregator computes from the same scope).
+`_apply_*_per_innings`.
+
+**Per-innings divisor — invariant.** When `aux.inning` is set, every
+per-innings transform helper MUST receive a divisor (`innings_batted`
+/ `innings_bowled` / `innings_fielded` / `partnerships_count`)
+computed from the SAME inning-filtered query that produced the
+numerator. Concretely:
+
+- Numerator (e.g. `total_runs`): `SUM(...) WHERE i.team=:team AND
+  i.innings_number=:inning AND ...`
+- Divisor (`innings_batted`): `COUNT(DISTINCT i.id) WHERE i.team=
+  :team AND i.innings_number=:inning AND ...`
+- Per-innings rate: numerator / divisor
+
+A divisor pulled from a separate (non-narrowed) query — e.g. by
+reusing a cached "total innings_batted in scope" computed before the
+inning clause was added — would produce a per-innings rate that
+silently halves (the numerator narrows, the denominator doesn't).
+Chip envelopes' `scope_avg` would then disagree with the avg-col
+displayed value, breaking the chip alignment invariant.
+
+The rule applies on BOTH sides:
+
+- Team-side (`teams.py::_apply_{batting,bowling,fielding,
+  partnerships}_per_innings` call sites): the divisor is read from
+  the same row in the same query that has the inning clause applied.
+  If the divisor comes from a sibling query (rare, but exists for
+  fielding which JOINs `fieldingcredit`), that sibling query gets
+  the same `aux.inning`-derived clause.
+- League-side (`scope_averages.py` mirrors + `_league_aux` chip
+  baseline): the divisor is computed from the league pool with the
+  same `aux.inning` (or, for chip alignment under broaden direction,
+  the `chip_baseline_scope_json` payload's `inning` field).
+
+Sanity-test assertion (covered in §10.1): for each scope,
+`per_innings_rate(inning=0)` and `per_innings_rate(inning=1)`
+weight-reconstruct the unfiltered rate via
+`(rate_0 * count_0 + rate_1 * count_1) / (count_0 + count_1)`.
+A mismatched divisor breaks this invariant cleanly.
+
+Implementation note: grep `_apply_.*_per_innings\(` in
+`api/routers/teams.py` and `api/routers/scope_averages.py` before
+shipping commit 1 — every call site must be inning-aware. List in
+§12.2 trace.
 
 ---
 
@@ -786,6 +962,30 @@ weighted-by-innings-count reconstruction:
 v_all = (v_0 * count_0 + v_1 * count_1) / (count_0 + count_1)
 ```
 
+This is the invariant that catches a wrong divisor (§5.5) — if the
+denominator on either side wasn't inning-narrowed, the
+weight-reconstruction will diverge from `v_all`.
+
+**Identity-bearing fields** (different invariant — max-of-pieces).
+Partition doesn't apply to `highest_total`, `lowest_all_out`,
+`best_pair`, `worst_inn_runs`. The relationship is:
+
+```python
+unfiltered_max == max(inning0_max, inning1_max)
+unfiltered_min == min(inning0_min, inning1_min)  # when defined
+```
+
+…assuming the metric is monotone within a side. Test: for each
+scope, query the field with no inning filter and with inning=0 +
+inning=1; assert max/min reconstruction. Skip when the field is
+null (scope produced no innings of that flavour — abandoneds).
+
+**Match-level no-op assertion.** `/teams/landing` is the lone
+`has_innings_join=False` site that intentionally ignores inning
+(per §3.1a). Assert: `GET /teams/landing?...&inning=0` returns
+byte-identical JSON to `GET /teams/landing?...` (no inning param).
+Catches accidental wiring of `_inning_match_filter` to the landing.
+
 Time-pinned to closed-window anchors — copy-paste of
 `test_chip_direction_invariant.py`'s scope list works as the seed.
 
@@ -794,41 +994,123 @@ aggregate is one SQL).
 
 ### 10.2 Regression — NEW URLs
 
-Add to `tests/regression/teams/urls.txt`,
-`tests/regression/batting/urls.txt`,
-`tests/regression/bowling/urls.txt`,
-`tests/regression/fielding/urls.txt`,
-`tests/regression/scope-averages/urls.txt`:
+Per-suite enumeration (concrete URL counts, not "~"):
 
-```
-NEW team_batting_summary_rcb_inn0  /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=0
-NEW team_batting_summary_rcb_inn1  /api/v1/teams/.../batting/summary?...&inning=1
-NEW team_batting_by_inning_rcb     /api/v1/teams/.../batting/by-inning?gender=male&team_type=club&season_from=2025&season_to=2025
-... (mirror for bowling, fielding, partnerships, player batting/bowling/fielding, scope averages)
-```
+**`tests/regression/teams/urls.txt`** — 16 NEW + 4 REG:
+- `/teams/{team}/{batting,bowling,fielding,partnerships}/summary` × 2 inning (8 NEW)
+- `/teams/{team}/{batting,bowling,fielding,partnerships}/by-inning` × 1 (4 NEW)
+- `/teams/{team}/summary?inning=0|1` (2 NEW — match-level via
+  `_inning_match_filter`, §3.1a)
+- `/teams/{team}/by-season?inning=0|1` (2 NEW)
+- 4 REG entries with `&inning=0|1` to lock in the partition shape.
 
-Plus 1-2 REG entries with `&inning=0|1` to lock in the partition
-behaviour against future shape changes.
+**`tests/regression/batting/urls.txt`** — 4 NEW:
+- `/batters/{p}/summary?inning=0|1` (2)
+- `/batters/leaders?...&inning=0|1` (2)
 
-The existing `&inning`-absent REG URLs MUST stay byte-identical
-post-Commit-1 (the clause is gated on `aux.inning is not None`, so
-no inning param ⇒ no clause ⇒ same SQL).
+**`tests/regression/bowling/urls.txt`** — 4 NEW (mirror of batting).
+
+**`tests/regression/fielding/urls.txt`** — 4 NEW.
+
+**`tests/regression/series/urls.txt`** — 14 NEW (Series dossier
+coverage, was missing in v1 of this spec):
+- `/series/summary?...&inning=0|1` (2)
+- `/series/by-season?...&inning=0|1` (2)
+- `/series/records?...&inning=0|1` (2)
+- `/series/{batters,bowlers,fielders}-leaders?...&inning=0|1` (6)
+- `/series/partnerships/{by-wicket,top}?...&inning=0|1` (4 — pick 2
+  variants × 2 inning)
+- 2 REG entries.
+
+**`tests/regression/scope-averages/urls.txt`** — 12 NEW (1 per
+mirror endpoint × inning=0; the 0/1 partition is checked by sanity
+test, regression just needs anchor numbers).
+
+**`tests/regression/players/urls.txt`** — 0 NEW (Players page is a
+frontend composer; backend coverage rides through batting/bowling/
+fielding suites).
+
+**`tests/regression/venues/urls.txt`** — 0 NEW (Venues subtabs
+reuse `/batters/leaders` etc. with `filter_venue` — covered by
+batting/bowling/fielding suite NEW URLs; add 2 REG entries with
+`filter_venue` + `inning` to confirm composition).
+
+Total: ~58 NEW + ~10 REG across 6 suites.
+
+**Critical invariant**: every existing `inning`-absent REG URL
+MUST stay byte-identical post-Commit-1. The central clause is
+gated on `aux.inning is not None`, so no inning param ⇒ no
+clause ⇒ same SQL. If a single REG drifts, the gate is wired
+wrong — investigate before shipping.
 
 ### 10.3 DOM tests
 
-`tests/integration/dom/cross_cutting_inning_split.sh` (NEW):
+`tests/integration/dom/cross_cutting_inning_split.sh` (NEW) —
+this is the central new DOM test. Five sections, each with raw-
+output assertions per the audit-prompt-discipline rule in CLAUDE.md
+(literal cell text, not "PASS/FAIL summaries"):
 
-- Anchor: `/teams?team=RCB&tab=Batting&season_from=2025&season_to=2025`.
-- Toggle through "All / 1st / 2nd". Assert the headline run rate
-  changes; assert match-count: 1st + 2nd = overall.
-- Repeat on `/teams?...&tab=Compare` with two slots overriding
-  `compare1_inning=0` and `compare2_inning=1`. Assert chip
-  alignment math `chip.scope_avg == avg.displayed` for the
-  inning-overriden slots — same invariant as
-  `cross_cutting_slot_override_chip_align.sh`.
+**§A — single-team toggle, partition.**
+- Anchor: `/teams?team=RCB&tab=Batting&season_from=2025&
+  season_to=2025`.
+- Capture headline `run_rate`, `total_runs`, `matches`, `innings`
+  for All / 1st / 2nd.
+- Assert `total_runs(all) == total_runs(1st) + total_runs(2nd)`,
+  `innings(all) == innings(1st) + innings(2nd)`.
+- Assert `run_rate` differs across the three states (would catch a
+  silent no-op where the toggle changes the URL but nothing else).
 
-Per-page DOM tests (`teams_batting_*.sh`, `players_single_*.sh`,
-etc.) gain new anchors with `&inning=0|1`.
+**§B — Compare-slot dual-meaning** (was missing in v1 of this
+spec; flagged in code review as the most under-tested semantic).
+- Anchor: `/teams?team=RCB&tab=Compare&compare1=Royal%20...&
+  compare1_inning=0` (slot 1 = same team, batted-first override).
+- Capture the slot column's BATTING row metrics AND BOWLING row
+  metrics.
+- Assert: batting-row's `innings_count` is the count of "RCB
+  batted first" matches in scope; bowling-row's `innings_count`
+  is the count of "RCB bowled first" matches in scope.
+- Assert the two counts are NOT equal (proves the dual-meaning is
+  surfacing different match subsets, not the same subset rendered
+  twice). Sum of the two counts ≈ total RCB matches in scope (off
+  by however many abandoneds — assert ≥ 95% of total).
+
+**§C — chip alignment under inning override.**
+- Anchor: `/teams?team=RCB&tab=Compare&compare1=__avg__&
+  compare1_inning=0`.
+- For each chip-bearing metric, capture the team-side chip's
+  `scope_avg` AND the avg col's displayed value.
+- Assert `chip.scope_avg == avg.displayed` (math invariant —
+  same shape as `cross_cutting_slot_override_chip_align.sh`).
+
+**§D — status strip rendering.**
+- Anchor: `/teams?team=RCB&inning=0`.
+- Assert the status strip contains a segment with label "Inning"
+  and value "1st innings" (literal text match).
+- Repeat with `inning=1` → "2nd innings".
+- Anchor without `inning` → status strip has NO "Inning" segment.
+
+**§E — toggle pill ↔ URL roundtrip.**
+- Anchor: `/teams?team=RCB&tab=Batting`.
+- Click "1st innings" pill → URL gains `inning=0` (no full reload).
+- Click "2nd innings" → URL gains `inning=1`.
+- Click "All innings" → `inning` removed from URL.
+- Browser back button walks `inning=1 → inning=0 → (none)`.
+
+Per-page DOM tests gain new anchors with `&inning=0|1`:
+- `teams_batting_{club,intl}.sh` — 1 anchor each
+- `teams_bowling_{club,intl}.sh` — 1 each
+- `teams_fielding_{club,intl}.sh` — 1 each
+- `teams_partnerships_{club,intl}.sh` — 1 each
+- `teams_overview_{club,intl}.sh` — 1 each (verify match-level
+  partition via `_inning_match_filter`)
+- `teams_compare_{club,intl}.sh` — 1 each with slot override
+- `players_single_{club,intl,intl_women}.sh` — 1 each
+- `series_overview_{club,intl}.sh` + `series_records_{club,intl}.sh`
+  + `series_{batters,bowlers,fielders}_{club,intl}.sh` — 1 each
+- `venues_{batters,bowlers,fielders}_club.sh` — 1 each
+
+~26 per-page anchor additions. Each is a small append to an
+existing `.sh` script.
 
 ### 10.4 Canaries (must stay green throughout)
 
@@ -844,51 +1126,92 @@ etc.) gain new anchors with `&inning=0|1`.
 
 ## 11. Migration sequence
 
-7 commits, in order:
+6 commits, in order. Each ships its own tests + docs (per
+CLAUDE.md "Keeping docs in sync" + commit-cadence rules — no
+catch-all "tests + docs" commit at the end).
 
-1. **Backend `inning` filter primitive.** `AuxParams.inning`,
-   `FilterBarParams.build()` clause, `is_precomputed_scope`
-   rejection. Sanity test
-   `tests/sanity/test_inning_split_partition.py` ships in this
-   commit. No frontend change yet — every endpoint accepts
-   `?inning=0|1` and returns the partitioned aggregate.
-2. **Backend `/by-inning` band endpoints.** New aggregators
-   mirroring `/by-phase` for batting, bowling, fielding,
-   partnerships team-side and the corresponding scope/averages
-   mirrors. Player-side by-inning is the existing `/by-innings`
-   endpoint pattern? No — `/by-innings` (with the trailing s)
-   already exists on player batting/bowling and lists individual
-   innings rows; per-innings-NUMBER aggregate is a different beast.
-   New endpoints: `/api/v1/batters/{p}/by-inning-no` (etc.) — name
-   is awkward; settle on `/by-inning-half` or just only add team-
-   side bands. **Decision before commit 2:** team-side band
-   endpoints only; player pages rely on the toggle (commit 4).
+1. **Backend `inning` filter primitive + match-level helper.**
+   - `AuxParams.inning` + `FilterBarParams.build()` clause +
+     `is_precomputed_scope` rejection.
+   - `_inning_match_filter` helper (§3.1a) wired into
+     `_team_filter_clause` so `/teams/{team}/{summary,by-season,
+     vs-opponent,match-list}` partition correctly.
+   - `_build_filter_clauses` extension (§5.3) — accepts `aux` +
+     `has_innings_join`; dossier callers pass True.
+   - Sanity test `tests/sanity/test_inning_split_partition.py` —
+     additive partition + per-innings-rate weight reconstruction
+     + identity-bearing max/min reconstruction + `/teams/landing`
+     no-op assertion (§10.1).
+   - **Docs**: `internal_docs/design-decisions.md` bowler-
+     labelling convention (§7.1) + match-role-axis-vs-per-innings
+     distinction (§9.1).
+   - No frontend change yet — every backend endpoint accepts
+     `?inning=0|1` and returns the partitioned aggregate.
+   - Regression: every existing REG URL stays byte-identical.
+
+2. **Backend `/by-inning` band endpoints.** Team-side only (per
+   §12.3 decision: player pages use the toggle, no player-side
+   band endpoints). New aggregators mirror `/by-phase` for
+   batting/bowling/fielding/partnerships. Same envelope
+   wrapping, `GROUP BY i.innings_number`. Per-innings divisor
+   from inning-narrowed query per §5.5 invariant.
+   - Tests: NEW regression URLs in `tests/regression/teams/
+     urls.txt` for the four new endpoints.
+   - Docs: `docs/api.md` entries for the four new endpoints +
+     `internal_docs/codebase-tour.md` entry under teams.py.
+
 3. **Frontend slot-grammar + Compare tab override.**
    `OVERRIDABLE_SLOT_KEYS` adds `inning`; `SlotScopeEditor`
-   "Innings" row; `ColumnScopeStrip` "Inning:" segment;
-   `chipAlignmentFor` (no-op if §6.5 holds). DOM canary
-   `cross_cutting_slot_override_chip_align.sh` extended with one
-   inning anchor.
+   "Innings" row with the dual-meaning tooltip from §7.2;
+   `ColumnScopeStrip` "Inning:" segment; `chipAlignmentFor`
+   verify (§6.5).
+   - Tests: extend
+     `tests/integration/dom/cross_cutting_slot_override_chip_align
+     .sh` with an inning anchor; ship the §B + §C blocks of
+     `cross_cutting_inning_split.sh` (Compare-slot dual-meaning +
+     chip alignment).
+   - Docs: `internal_docs/design-decisions.md` slot-grammar
+     extension entry; `internal_docs/spec-team-compare-scoped-
+     slots.md` cross-link.
+
 4. **Frontend toggle on player pages.** `InningToggle.tsx`
-   mounted on `Batting.tsx`, `Bowling.tsx`, `Fielding.tsx`. URL
-   param `inning` flips the headline.
-5. **Frontend toggle on team tabs (no bands yet).** `InningToggle`
-   mounted on Team Batting/Bowling/Fielding/Partnerships tabs.
-   Uses the same primitive.
+   mounted on `Batting.tsx`, `Bowling.tsx`, `Fielding.tsx`.
+   URL param `inning` flips the headline.
+   - Tests: per-page anchors in `players_single_*.sh` (§10.3
+     per-page list).
+   - Docs: `internal_docs/codebase-tour.md` frontend hooks
+     block notes the new component.
+
+5. **Frontend toggle on team tabs (no bands yet) + status
+   strip.** `InningToggle` mounted on Team Batting / Bowling /
+   Fielding / Partnerships / By Season / vs Opponent tabs.
+   `ScopeStatusStrip` segment for inning (§6.6).
+   - Tests: ship the §A + §D + §E blocks of
+     `cross_cutting_inning_split.sh` (single-team toggle
+     partition + status strip + URL roundtrip); per-page
+     `teams_*.sh` anchors.
+   - Docs: `internal_docs/how-stats-calculated.md` partition
+     semantic entry.
+
 6. **Frontend band rows on team tabs.** `InningBandsRow.tsx`
-   reading `/by-inning` band endpoints. Three rows (Overall / 1st
-   / 2nd) below the existing Phase bands.
-7. **Tests + docs.** Regression URL adds, full DOM cross-cutting
-   test, `internal_docs/design-decisions.md` bowler-labelling
-   convention, `internal_docs/how-stats-calculated.md` partition
-   semantic.
+   reading `/by-inning` band endpoints. Three rows (Overall /
+   1st / 2nd) below the existing Phase bands on Team
+   Batting/Bowling/Fielding/Partnerships tabs.
+   - Tests: extend `teams_{batting,bowling,fielding,
+     partnerships}_*.sh` with a band-row presence + value
+     check.
+   - Docs: `CLAUDE.md` "Key Files" line for `InningBandsRow.tsx`
+     parallel to `PhaseBandsRow.tsx`.
 
-Estimated total effort: ~12-15h (mechanical filter + band code +
-toggle UI + spec-mandated tests + design-decision doc).
+Estimated total effort: ~14-17h (was 12-15h in v1 — added time
+for `_inning_match_filter` per-endpoint surgery + per-commit doc
+discipline).
 
-Risk: **low**. Single new clause, one new aux field, four new
-band endpoints. No architectural refactor. The slot-grammar piece
-rides entirely on the override mechanism shipped 2026-04-29.
+Risk: **low-to-moderate**. One new clause + one new helper
+(_inning_match_filter), one new aux field, four new band
+endpoints. The match-level helper is the only architectural
+addition; the rest is mechanical. The slot-grammar piece rides
+entirely on the override mechanism shipped 2026-04-29.
 
 ---
 
@@ -921,56 +1244,100 @@ c = sqlite3.connect('cricket.db')
 "
 ```
 
-### 12.2 Trace every consumer of `aux=`
+### 12.2 Trace every consumer of `aux=` AND every per-innings divisor
 
 ```bash
+# Every filters.build() call site — must pass aux=aux (or aux=None).
 grep -rn "filters\.build\(" api/ | grep -v test
+
+# Every per-innings transform helper call site — must use a
+# divisor from the inning-narrowed query (per §5.5 invariant).
+grep -rn "_apply_.*_per_innings\(" api/ | grep -v test
+
+# Every call site of the hand-rolled clause builders that the
+# §5.3 disambiguation extends — must pass has_innings_join +
+# aux per-call.
+grep -rn "_build_filter_clauses\|_reference_clauses" api/ | grep -v test
+
+# Every has_innings_join=False call site in teams.py — confirm
+# §3.1a has decided which ones get _inning_match_filter wired and
+# which stay no-op (landing).
+grep -rn "has_innings_join=False" api/routers/teams.py
 ```
 
-Every call site must pass `aux=aux` (or `aux=None`). Per the
-shared-helper contract in CLAUDE.md, omitting it leaves `aux` as
-a free variable — import-time silent, request-time 500. The
-`inning` clause is gated on `aux.inning`, so any call site that
-drops aux silently fails to narrow.
+Per the shared-helper contract in CLAUDE.md, omitting `aux=aux`
+leaves `aux` as a free variable — import-time silent, request-
+time 500. The `inning` clause is gated on `aux.inning`, so any
+call site that drops aux silently fails to narrow.
+
+For the divisor grep: every match must be inning-aware before
+shipping commit 1. A wrong divisor breaks the per-innings-rate
+weight-reconstruction in `tests/sanity/test_inning_split_
+partition.py`, which is the canary.
 
 ### 12.3 Decisions to make before commit 1
 
 - **Player page band endpoint?** §11 commit 2 punts to "team-side
-  only." Confirm that's right — alternative is to ship player-side
-  bands too. Decision rationale: player pages already toggle the
-  whole page via §6.1; band rows would duplicate the data the user
-  is already looking at. Skip unless user asks.
+  only." Confirmed. Player pages already toggle the whole page
+  via §6.1; band rows would duplicate the data the user is
+  already looking at. Skip unless user asks.
 - **Toggle pill default?** "All innings" (no narrowing) — matches
   the convention of every other narrowing field.
 - **Chip baseline alignment for inning** — verify §6.5 (no new
   code needed) by running the broaden-direction DOM test with an
   inning override before claiming done.
+- **Match-level endpoint semantic — already locked.** §3.1a
+  commits `/teams/{team}/summary` and friends to the "team batted
+  first" reading via `_inning_match_filter`. This is NOT the
+  Compare-slot dual-meaning of §3.4 — different mechanism,
+  different endpoints. Don't conflate.
 
 ### 12.4 Per-commit gate criteria
 
-- **Commit 1 (backend filter primitive).** All existing REG URLs
-  byte-identical. Sanity tests pass (chip invariant, slot
-  alignment, NEW partition test). Per-endpoint smoke: curl with
-  `&inning=0` and `&inning=1` returns expected partitioned counts.
-- **Commit 2 (band endpoints).** /by-inning endpoints return the
-  same partitioned aggregates as 2× /summary?inning=0|1. New
-  regression URLs flagged as NEW.
+- **Commit 1 (backend filter primitive + match-level helper).**
+  All existing `inning`-absent REG URLs byte-identical. Sanity
+  tests pass: chip invariant, slot alignment, NEW partition test
+  (additive + weight-reconstruction + identity-bearing max/min +
+  `/teams/landing` no-op). Per-endpoint smoke: curl
+  `/teams/{team}/summary?inning=0` and `?inning=1` against an IPL
+  2025 anchor — partition reconciles. Bowler-labelling convention
+  in design-decisions.md.
+- **Commit 2 (band endpoints).** `/by-inning` endpoints return
+  the same partitioned aggregates as 2× corresponding
+  `/summary?inning=0|1`. NEW regression URLs added in
+  `tests/regression/teams/urls.txt`. `docs/api.md` entries
+  shipped.
 - **Commit 3 (slot grammar).** chip invariant + slot-override
-  alignment tests stay PASS. New DOM canary anchor passes.
-- **Commit 4-5 (toggles).** Frontend tsc -b clean. UI verification
-  via agent-browser per CLAUDE.md UI-verification rule — load each
-  page with the toggle, exercise all three states, confirm the
-  partition invariant holds at the rendered level (toggle to "1st"
-  + "2nd" sums to "All"'s headline number).
-- **Commit 6 (band rows).** Same UI verification on team tabs,
-  bands aligned with the existing PhaseBandsRow visually.
-- **Commit 7 (tests + docs).** All NEW regression URLs added; DOM
-  cross-cutting test PASS; design-decisions.md + how-stats-
-  calculated.md updated.
+  alignment tests stay PASS. New DOM cross-cutting §B + §C
+  blocks PASS. SlotScopeEditor "Innings" tooltip surfaces the
+  dual-meaning text per §7.2.
+- **Commit 4 (player-page toggle).** Frontend tsc -b clean. UI
+  verification via agent-browser per CLAUDE.md UI-verification
+  rule — load `/batting?player=...` etc., exercise three states,
+  confirm partition invariant at rendered level. `players_single
+  _*.sh` anchors PASS.
+- **Commit 5 (team-tabs toggle + status strip).** Same UI
+  verification on team tabs. Cross-cutting §A + §D + §E blocks
+  PASS. Status-strip rendering test PASS. how-stats-calculated.md
+  partition entry shipped.
+- **Commit 6 (band rows).** UI verification on team tabs; bands
+  aligned with existing PhaseBandsRow visually. `teams_*.sh`
+  anchors include band-row presence checks. CLAUDE.md "Key
+  Files" updated.
+
+There is no commit 7. Each feature commit ships its own tests +
+docs.
 
 ---
 
 *Spec written 2026-04-29 after the slot-override-chip-alignment
 rollout shipped. Builds directly on the slot-override grammar +
-chip-baseline mechanism shipped that same day. Pick up at §11
-commit 1.*
+chip-baseline mechanism shipped that same day. Revised 2026-04-29
+after critical review: added §3.1a match-level endpoint contract
++ `_inning_match_filter` helper (resolves `has_innings_join=False`
+silent no-op), disambiguated §3.1↔§5.3 hand-rolled clause builder
+contradiction, tightened §5.5 per-innings divisor invariant,
+expanded §10 test plan (identity-bearing fields, dual-meaning
+DOM test, status-strip + URL roundtrip, enumerated regression
+URLs), redistributed commit 7's contents across commits 1-6.
+Pick up at §11 commit 1.*
