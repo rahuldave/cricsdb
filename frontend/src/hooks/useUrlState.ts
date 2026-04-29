@@ -1,6 +1,13 @@
 import { useSearchParams } from 'react-router-dom'
 import { useCallback } from 'react'
 
+// `__any__` is the slot-override sentinel for "explicit empty / do
+// not inherit primary." See spec-slot-override-chip-alignment.md §4.1.
+// Falsy values (empty string, undefined) still trigger the URL-delete
+// branch — the sentinel is the ONLY way to keep an explicitly-empty
+// param in the URL.
+export const ANY_SENTINEL = '__any__'
+
 /**
  * Read/write individual URL search params without clobbering others.
  * Returns [value, setValue] like useState but backed by the URL.
@@ -33,6 +40,11 @@ export function useUrlParam(
  * Set multiple URL params atomically (avoids race conditions).
  * Pushes history by default. Pass `{ replace: true }` for programmatic
  * auto-corrections that shouldn't pollute the back stack.
+ *
+ * Truthy values are written; falsy values delete the key. The
+ * `__any__` sentinel is truthy and lands in the URL literally — it's
+ * the contract callers use to express "explicit empty" on slot
+ * overrides (distinct from the absent-default-inherit case).
  */
 export function useSetUrlParams(): (
   updates: Record<string, string>,

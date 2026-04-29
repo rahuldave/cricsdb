@@ -21,6 +21,7 @@ import { useFetch, type FetchState } from '../../hooks/useFetch'
 import { getTeamProfile, getScopeAverageProfile } from '../../api'
 import type { TeamProfile, ScopeAverageProfile, FilterParams } from '../../types'
 import type { SlotState, CompareSlots, SlotOverrides } from '../../hooks/useCompareSlots'
+import { OVERRIDABLE_SLOT_KEYS } from '../../hooks/useCompareSlots'
 
 type SlotIdx = 1 | 2
 
@@ -72,24 +73,59 @@ function slotKey(s: SlotState | null): string {
   return `${s.kind}|${s.entity ?? ''}|${JSON.stringify(s.scope)}`
 }
 
-/** Pick out a peer avg slot's narrowing knobs that the team-side
- *  chip baseline must align to. Today only `team_class` matters
- *  (the avg col can opt into FM-only via the picker; the chip on
- *  the team col has to baseline against the SAME pool the avg col
- *  displays, otherwise the "Aus +X% above avg" arrow contradicts
- *  the literal avg-col number a column over). `scope_to_team`
- *  alignment is handled server-side by `_league_aux` already. */
-function chipAlignmentFor(slots: CompareSlots): { chip_team_class?: string } {
+/** Pick out a peer avg slot's resolved scope so the team-side chip
+ *  baseline aligns to whatever the avg col displays. Two encodings
+ *  ride together for back-compat through the rollout:
+ *
+ *  - `chip_team_class` — the narrow v3 hint that ONLY conveys the
+ *    team_class axis. Backend reads this in `_league_aux` (Commit 1
+ *    of this spec preserves the path). Kept here so a backend that
+ *    hasn't shipped the new mechanism still aligns under
+ *    narrowing-direction overrides.
+ *  - `chip_baseline_scope_json` — base64-JSON of the avg slot's
+ *    FULL effective scope (FilterBar fields + synthesized
+ *    `scope_to_team` when the auto-narrow applies). Backend honors
+ *    this in Commit 3; ignored as an unknown query param until
+ *    then. Generalises chip alignment to broaden-direction
+ *    overrides (e.g. primary tournament=IPL, avg slot
+ *    tournament=__any__ → chip baseline = all-club pool).
+ *
+ *  Spec: spec-slot-override-chip-alignment.md §4.2, §6.4. */
+type ChipAlign = { chip_team_class?: string; chip_baseline_scope_json?: string }
+function chipAlignmentFor(slots: CompareSlots, primaryTeam: string): ChipAlign {
   const avg = slots.slot1?.kind === 'avg' ? slots.slot1
             : slots.slot2?.kind === 'avg' ? slots.slot2 : null
-  if (!avg?.scope.team_class) return {}
-  return { chip_team_class: avg.scope.team_class }
+  if (!avg) return {}
+
+  const out: ChipAlign = {}
+  // Back-compat — backend's existing _league_aux path reads this.
+  if (avg.scope.team_class) out.chip_team_class = avg.scope.team_class
+
+  // Forward — full-scope serialization. Mirror the auto-narrow logic
+  // in fetchSlot so the chip baseline carries the same scope_to_team
+  // synthesis that drives the avg col's actual aggregation.
+  const isClub = avg.scope.team_type === 'club'
+  const shouldNarrow = isClub && !avg.scope.tournament
+  const payload: Record<string, string> = {}
+  if (avg.scope.gender)       payload.gender = avg.scope.gender
+  if (avg.scope.team_type)    payload.team_type = avg.scope.team_type
+  for (const k of OVERRIDABLE_SLOT_KEYS) {
+    const v = avg.scope[k]
+    if (v) payload[k] = v
+  }
+  if (shouldNarrow) payload.scope_to_team = primaryTeam
+  if (Object.keys(payload).length > 0) {
+    // btoa with JSON is URL-safe enough for query params; Python
+    // base64.urlsafe_b64decode tolerates standard b64 too.
+    out.chip_baseline_scope_json = btoa(JSON.stringify(payload))
+  }
+  return out
 }
 
 function fetchSlot(
   slot: SlotState | null,
   primaryTeam: string,
-  chipAlign: { chip_team_class?: string },
+  chipAlign: ChipAlign,
 ): Promise<AnyProfile | null> {
   if (!slot) return Promise.resolve(null)
   if (slot.kind === 'avg') {
@@ -146,12 +182,14 @@ export default function TeamCompareGrid({
   const slot1 = slots.slot1
   const slot2 = slots.slot2
 
-  // Chip-baseline alignment hint: when ANY peer slot is an avg with
-  // team_class set, the team-side chip baseline must use the same
-  // team_class so the chip's scope_avg numerically equals the avg
-  // col's displayed value. Stable string-keyed for useFetch deps.
-  const chipAlign = chipAlignmentFor(slots)
-  const chipAlignKey = chipAlign.chip_team_class ?? ''
+  // Chip-baseline alignment hint: when ANY peer slot is an avg, the
+  // team-side chip baseline must use the avg's effective scope so the
+  // chip's scope_avg numerically equals the avg col's displayed value.
+  // Stable string-keyed for useFetch deps — concatenate both fields so
+  // edits to either side bust the cache.
+  const chipAlign = chipAlignmentFor(slots, primaryTeam)
+  const chipAlignKey =
+    `${chipAlign.chip_team_class ?? ''}|${chipAlign.chip_baseline_scope_json ?? ''}`
 
   // Fixed-arity useFetch calls: one per slot. Discriminate kind inside
   // the fetcher so the same hook position serves both team and avg.

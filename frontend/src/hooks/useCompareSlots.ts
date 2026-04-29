@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { FilterParams } from '../types'
+import { ANY_SENTINEL } from './useUrlState'
 
 export const AVG_SENTINEL = '__avg__'
 
@@ -16,6 +17,10 @@ export type ResolvedSlotScope = Pick<FilterParams,
   'gender' | 'team_type' | 'tournament' | 'season_from' | 'season_to'
   | 'filter_venue' | 'series_type' | 'team_class'>
 
+// Override entries hold either a real value (narrowing) or
+// ANY_SENTINEL ('__any__') meaning "explicit empty / do not inherit
+// primary." Resolved scope folds ANY_SENTINEL → undefined so the
+// downstream fetcher sends no narrowing for that field.
 export type SlotOverrides = Partial<Pick<ResolvedSlotScope, OverridableSlotKey>>
 
 export interface SlotState {
@@ -62,8 +67,14 @@ function readSlot(
   const scope = inheritedScope(primary)
   for (const k of OVERRIDABLE_SLOT_KEYS) {
     const v = params.get(`compare${n}_${k}`)
-    if (v != null) {
-      overrides[k] = v
+    if (v == null) continue          // missing → default-inherit, no override
+    overrides[k] = v                  // record divergence (sentinel or real value)
+    if (v === ANY_SENTINEL) {
+      // Explicit empty — drop the inherited primary value from
+      // resolved scope so the slot's fetcher sends no narrowing for
+      // this axis.
+      scope[k] = undefined
+    } else {
       scope[k] = v
     }
   }

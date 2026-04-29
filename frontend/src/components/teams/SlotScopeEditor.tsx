@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useFetch } from '../../hooks/useFetch'
 import { getTournaments, getSeasons } from '../../api'
 import VenueSearch from '../VenueSearch'
+import { ANY_SENTINEL } from '../../hooks/useUrlState'
 import type { FilterParams } from '../../types'
 import type { SlotOverrides } from '../../hooks/useCompareSlots'
 
@@ -14,19 +15,47 @@ interface Props {
   onCancel: () => void
 }
 
-const cmp = (a: string, b?: string) => a !== (b ?? '')
+// Editor state encodes the user's intent for each field as one of:
+//  - '' (empty)  → inherit primary (no override)
+//  - ANY_SENTINEL ('__any__') → explicit empty, do NOT inherit
+//  - any other string → narrow to that value
+//
+// `cmp(local, primaryVal)` decides whether to write an override on
+// Apply. `__any__` always counts as an override (it's the sentinel).
+const cmp = (a: string, b?: string) => a !== (b ?? '') && a !== ''
+
+// Translate stored override (which may be ANY_SENTINEL) → editor state.
+// Stored sentinel keeps the literal '__any__' string so the dropdown's
+// "(any)" option stays selected on round-trip.
+const toEditorValue = (override: string | undefined, primaryVal?: string): string => {
+  if (override === undefined) return primaryVal ?? ''
+  return override
+}
 
 export default function SlotScopeEditor({
   primary, team, initial, onApply, onReset, onCancel,
 }: Props) {
-  const [tournament, setTournament] = useState(initial.tournament ?? primary.tournament ?? '')
-  const [seasonFrom, setSeasonFrom] = useState(initial.season_from ?? primary.season_from ?? '')
-  const [seasonTo, setSeasonTo]     = useState(initial.season_to   ?? primary.season_to   ?? '')
-  const [filterVenue, setFilterVenue] = useState(initial.filter_venue ?? primary.filter_venue ?? '')
-  const [seriesType, setSeriesType] = useState(initial.series_type ?? primary.series_type ?? '')
-  const [teamClass, setTeamClass]   = useState(initial.team_class  ?? primary.team_class ?? '')
+  const [tournament, setTournament] = useState(toEditorValue(initial.tournament, primary.tournament))
+  const [seasonFrom, setSeasonFrom] = useState(toEditorValue(initial.season_from, primary.season_from))
+  const [seasonTo, setSeasonTo]     = useState(toEditorValue(initial.season_to,   primary.season_to))
+  const [filterVenue, setFilterVenue] = useState(toEditorValue(initial.filter_venue, primary.filter_venue))
+  const [seriesType, setSeriesType] = useState(toEditorValue(initial.series_type, primary.series_type))
+  const [teamClass, setTeamClass]   = useState(toEditorValue(initial.team_class,  primary.team_class))
 
   const isInternational = primary.team_type === 'international'
+
+  // For fields where primary HAS a value, expose an "(any — show all)"
+  // option in the dropdown — selecting it broadens the slot past
+  // primary's narrowing. For fields primary doesn't narrow, the option
+  // is meaningless (clearing == inheriting primary's already-empty
+  // value), so we hide it.
+  const showAny = {
+    tournament: !!primary.tournament,
+    season:     !!(primary.season_from || primary.season_to),
+    venue:      !!primary.filter_venue,
+    series:     !!primary.series_type,
+    teamClass:  !!primary.team_class,
+  }
 
   const tournamentsFetch = useFetch(
     () => getTournaments({
@@ -41,7 +70,7 @@ export default function SlotScopeEditor({
       team,
       gender: primary.gender,
       team_type: primary.team_type,
-      tournament: tournament || undefined,
+      tournament: (tournament && tournament !== ANY_SENTINEL) ? tournament : undefined,
     }),
     [team, primary.gender, primary.team_type, tournament],
   )
@@ -75,7 +104,10 @@ export default function SlotScopeEditor({
       <div style={fieldStyle}>
         <span style={labelStyle}>Tournament</span>
         <select value={tournament} onChange={e => setTournament(e.target.value)} style={{ flex: 1 }}>
-          <option value="">All tournaments</option>
+          <option value="">— inherit primary —</option>
+          {showAny.tournament && (
+            <option value={ANY_SENTINEL}>(any — show all tournaments)</option>
+          )}
           {tournaments.map(t => (
             <option key={t.event_name} value={t.event_name}>{t.event_name}</option>
           ))}
@@ -84,30 +116,46 @@ export default function SlotScopeEditor({
       <div style={fieldStyle}>
         <span style={labelStyle}>Season</span>
         <select value={seasonFrom} onChange={e => setSeasonFrom(e.target.value)}>
-          <option value="">—</option>
+          <option value="">— inherit —</option>
+          {showAny.season && <option value={ANY_SENTINEL}>(any)</option>}
           {seasons.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <span style={{ opacity: 0.6 }}>to</span>
         <select value={seasonTo} onChange={e => setSeasonTo(e.target.value)}>
-          <option value="">—</option>
+          <option value="">— inherit —</option>
+          {showAny.season && <option value={ANY_SENTINEL}>(any)</option>}
           {seasons.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
       <div style={fieldStyle}>
         <span style={labelStyle}>Venue</span>
-        <div style={{ flex: 1 }}>
-          <VenueSearch
-            value={filterVenue}
-            onSelect={setFilterVenue}
-            onClear={() => setFilterVenue('')}
-            placeholder="Any venue"
-          />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div style={{ flex: 1 }}>
+            <VenueSearch
+              value={filterVenue === ANY_SENTINEL ? '' : filterVenue}
+              onSelect={setFilterVenue}
+              onClear={() => setFilterVenue('')}
+              placeholder={filterVenue === ANY_SENTINEL ? '(any venue)' : 'Inherit primary'}
+            />
+          </div>
+          {showAny.venue && (
+            <button
+              type="button"
+              className="comp-link"
+              onClick={() => setFilterVenue(ANY_SENTINEL)}
+              title="Override to all venues — broadens past primary's venue narrowing"
+              style={{ fontSize: '0.85em' }}
+            >
+              any
+            </button>
+          )}
         </div>
       </div>
       <div style={fieldStyle}>
         <span style={labelStyle}>Series</span>
         <select value={seriesType} onChange={e => setSeriesType(e.target.value)}>
           <option value="">— inherit —</option>
+          {showAny.series && <option value={ANY_SENTINEL}>(any — all series)</option>}
           <option value="all">All matches</option>
           <option value="bilateral_only">Bilaterals only</option>
           <option value="tournament_only">Tournaments only</option>
@@ -121,7 +169,10 @@ export default function SlotScopeEditor({
             onChange={e => setTeamClass(e.target.value)}
             title="Narrow the pool to matches where both teams are ICC full members (excludes associate teams like Namibia, USA, Nepal …)."
           >
-            <option value="">All teams</option>
+            <option value="">— inherit —</option>
+            {showAny.teamClass && (
+              <option value={ANY_SENTINEL}>(any — all teams, override primary)</option>
+            )}
             <option value="full_member">Full members only</option>
           </select>
         </div>
