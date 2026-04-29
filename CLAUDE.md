@@ -400,6 +400,20 @@ the dedicated docs:
 
 ### Build-ready specs (pick up next session)
 
+- **`internal_docs/spec-inning-split.md`** — 1st innings / 2nd
+  innings page-local filter on team + player + series + venues
+  Batting/Bowling/Fielding/Partnerships, plus per-slot Compare
+  override and new `/by-inning` band endpoints. Per-subtab matrix
+  in §3.3. **Slot inning=0 is dual-meaning** on Compare tab —
+  batting row reads "team batted first" matches, bowling row reads
+  "team bowled first" matches (complementary subsets); reading
+  convention in §7.2 + tooltip on the SlotScopeEditor's Innings
+  dropdown. AuxParams gains `inning`; bucket_baseline rejects.
+  H2H deferred to "in due course" (§9). Match-role axis
+  (`bat_first=true|false`) flagged as separate future filter (§9.1)
+  — distinct from per-innings, not in this spec. 7-commit
+  rollout, ~12-15h. Pre-flight in §12.
+
 - **`internal_docs/spec-filterbar-team-class-v3.md`** — promote
   `team_class=full_member` to the 9th FilterBar key as the next
   overridable axis (peer of tournament / season / venue /
