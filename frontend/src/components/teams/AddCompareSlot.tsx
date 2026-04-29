@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import TeamSearch from '../TeamSearch'
 import { getTeamSummary, getSeasons } from '../../api'
 import { ANY_SENTINEL } from '../../hooks/useUrlState'
@@ -31,6 +31,41 @@ export default function AddCompareSlot({
   const [showCustomBuilder, setShowCustomBuilder] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // Pre-fetch primary team's seasons on panel open so the
+  // "Same team, previous season" pick can hide cleanly when no
+  // previous season exists (rather than always show + click yields
+  // error). Prior behaviour was an always-visible button — bad UX
+  // when primary was already on the earliest season in scope.
+  // Cache key: (primaryTeam + gender + team_type + tournament).
+  const [seasonsForPrev, setSeasonsForPrev] = useState<string[] | null>(null)
+  useEffect(() => {
+    if (!open) { setSeasonsForPrev(null); return }
+    let alive = true
+    getSeasons({
+      team: primaryTeam,
+      gender: primaryFilters.gender,
+      team_type: primaryFilters.team_type,
+      tournament: primaryFilters.tournament || undefined,
+    }).then(r => {
+      if (!alive) return
+      setSeasonsForPrev(r.seasons ?? [])
+    }).catch(() => {
+      if (!alive) return
+      setSeasonsForPrev([])
+    })
+    return () => { alive = false }
+  }, [open, primaryTeam, primaryFilters.gender, primaryFilters.team_type, primaryFilters.tournament])
+
+  const prevAvailable: boolean = (() => {
+    if (seasonsForPrev == null) return false
+    if (seasonsForPrev.length < 2) return false
+    if (primaryFilters.season_from) {
+      return seasonsForPrev.indexOf(primaryFilters.season_from) > 0
+    }
+    // Primary unpinned + ≥2 seasons → previous-of-latest works.
+    return true
+  })()
 
   // Total compare-side columns. Cap = 2 (primary + 2 = 3 total).
   const filledCount = (slots.slot1 ? 1 : 0) + (slots.slot2 ? 1 : 0)
@@ -270,18 +305,20 @@ export default function AddCompareSlot({
           <div style={{ fontSize: '0.78em', opacity: 0.6, marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Quick add — same team
           </div>
-          <button
-            type="button"
-            className="comp-link"
-            style={QP_BTN_STYLE}
-            onClick={onSameTeamPrev}
-            disabled={busy}
-            title={hasSeason
-              ? `Pin this column to ${primaryTeam} for the season before primary's — useful for year-on-year analysis.`
-              : `Pin this column to ${primaryTeam} for the season before the latest in scope. Useful for "did the latest year break the trend" reads when primary is unpinned.`}
-          >
-            + Same team, previous season
-          </button>
+          {prevAvailable && (
+            <button
+              type="button"
+              className="comp-link"
+              style={QP_BTN_STYLE}
+              onClick={onSameTeamPrev}
+              disabled={busy}
+              title={hasSeason
+                ? `Pin this column to ${primaryTeam} for the season before primary's — useful for year-on-year analysis.`
+                : `Pin this column to ${primaryTeam} for the season before the latest in scope. Useful for "did the latest year break the trend" reads when primary is unpinned.`}
+            >
+              + Same team, previous season
+            </button>
+          )}
           {hasAllTimeable && (
             <button type="button" className="comp-link" style={QP_BTN_STYLE} onClick={onSameTeamAllTime}>
               + Same team, all-time
