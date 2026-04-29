@@ -57,15 +57,20 @@ export default function AddCompareSlot({
     return () => { alive = false }
   }, [open, primaryTeam, primaryFilters.gender, primaryFilters.team_type, primaryFilters.tournament])
 
-  const prevAvailable: boolean = (() => {
-    if (seasonsForPrev == null) return false
-    if (seasonsForPrev.length < 2) return false
+  // Compute the actual previous-season string the click handler would
+  // pick, so the button can show it inline. When primary is pinned,
+  // it's the season before primary's; when primary is unpinned, it's
+  // the season before the latest in scope (which is what onSameTeamPrev
+  // falls back to). null = no previous available → button hides.
+  const prevSeason: string | null = (() => {
+    if (seasonsForPrev == null || seasonsForPrev.length < 2) return null
     if (primaryFilters.season_from) {
-      return seasonsForPrev.indexOf(primaryFilters.season_from) > 0
+      const idx = seasonsForPrev.indexOf(primaryFilters.season_from)
+      return idx > 0 ? seasonsForPrev[idx - 1]! : null
     }
-    // Primary unpinned + ≥2 seasons → previous-of-latest works.
-    return true
+    return seasonsForPrev[seasonsForPrev.length - 2]!
   })()
+  const prevAvailable = prevSeason != null
 
   // Total compare-side columns. Cap = 2 (primary + 2 = 3 total).
   const filledCount = (slots.slot1 ? 1 : 0) + (slots.slot2 ? 1 : 0)
@@ -313,10 +318,10 @@ export default function AddCompareSlot({
               onClick={onSameTeamPrev}
               disabled={busy}
               title={hasSeason
-                ? `Pin this column to ${primaryTeam} for the season before primary's — useful for year-on-year analysis.`
-                : `Pin this column to ${primaryTeam} for the season before the latest in scope. Useful for "did the latest year break the trend" reads when primary is unpinned.`}
+                ? `Pin this column to ${primaryTeam} ${prevSeason} — the season before primary's ${primaryFilters.season_from}. Useful for year-on-year analysis.`
+                : `Pin this column to ${primaryTeam} ${prevSeason} — the season before the latest (${seasonsForPrev?.[seasonsForPrev.length - 1]}) in scope. Pair with another slot for year-on-year reads against an unpinned primary.`}
             >
-              + Same team, previous season
+              + Same team, {prevSeason} (previous season)
             </button>
           )}
           {hasAllTimeable && (
