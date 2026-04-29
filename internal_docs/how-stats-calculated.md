@@ -195,16 +195,25 @@ DB stores 0-19 (matching cricsheet). Each router's response adds
 
 ### Catches / Stumpings / Run-outs
 
-Counts from `wicket` rows joined to `delivery`:
-- **catches**: `kind = 'caught'` with the fielder in `fielders_json`.
-  INCLUDES `caught and bowled` per Conventions 2 + 3 (see
+Counts from `fieldingcredit` rows joined to `delivery` → `innings`
+→ `match`. The `kind` column stores underscored literals — the
+multi-word kinds use `_`, NOT spaces:
+
+- **catches**: `kind = 'caught'`, fielder = `fc.fielder_id`.
+  INCLUDES `caught_and_bowled` per Conventions 2 + 3 (see
   `perf-bucket-baselines.md`).
-- **caught_and_bowled**: separate sub-count when bowler == fielder.
-  Consumers MUST NOT add `catches + caught_and_bowled` (double-counts).
+- **caught_and_bowled**: `kind = 'caught_and_bowled'` — separate
+  sub-count when bowler == fielder. Consumers MUST NOT add
+  `catches + caught_and_bowled` (double-counts).
 - **stumpings**: `kind = 'stumped'`, fielder = the keeper.
-- **run_outs**: `kind = 'run out'`, fielder credited via
+- **run_outs**: `kind = 'run_out'`, fielder credited via
   `fieldingcredit` (handles cases where multiple fielders share
-  credit on a single run-out).
+  credit on a single run-out — each gets its own row).
+
+The four canonical values in the schema are `'caught'`, `'stumped'`,
+`'run_out'`, `'caught_and_bowled'`. Any audit SQL that pins these
+must use the underscored form — `'run out'` / `'caught and bowled'`
+silently match zero rows.
 
 ### Per-match rates
 
@@ -312,6 +321,22 @@ Both EXCLUDE `ended_by_kind IN ('retired hurt', 'retired not out')`
 — a partnership ended by a retired-hurt isn't a "completed" stand
 in the conventional sense. Note `count_100_plus` is a SUBSET of
 `count_50_plus` (every 100+ partnership is also 50+).
+
+### By-wicket aggregations (Series Partnerships tab)
+
+`/api/v1/series/partnerships/by-wicket` returns one row per
+`wicket_number` with `n`, `avg_runs`, `avg_balls`, `best_runs`. The
+same `ended_by_kind NOT IN ('retired hurt', 'retired not out')`
+exclusion applies (see `api/routers/tournaments.py:2664`), AND
+`p.wicket_number IS NOT NULL` is required (drops unbroken /
+carry-over partnerships with no fallen wicket).
+
+The sibling `/series/partnerships/top` endpoint (the top-N list on
+the same DOM page) does NOT apply either filter — top-N reports the
+biggest stands across the entire pool, including unbroken ones.
+That's why an unbroken 205 (no wicket fallen, `wicket_number IS
+NULL`) can appear at row 0 of the top-N table while being absent
+from every row of the by-wicket grid.
 
 ### Best pair
 
