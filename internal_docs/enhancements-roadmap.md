@@ -1497,6 +1497,56 @@ CLAUDE.md "Critical Design Decisions" updated:
 `FilterBarParams + AuxParams split` bullet's count moved from 8 →
 10 fields.
 
+### Shipped 2026-04-28 (DOM-tests Batch 2 — teams sub-tabs + series)
+
+7-pair / 7-commit rollout per `spec-dom-tests-series-teams.md`
+Batch 2. 14 scripts, 240 assertions, all green. Total dom/ suite
+now 18 scripts / 353 assertions.
+
+Pairs (commit hashes 8a632b9 → bacb848 → 79f6ad4 → 28c2428 →
+6f8099c → 39a73cd → 4ace499):
+
+- `teams_overview_{intl,club}.sh` (20) — always-on summary band
+  (Matches/Wins/Losses/Win % StatCards + keepers paragraph).
+- `teams_batting_{intl,club}.sh` (72) — 15-card StatCard grid.
+- `teams_bowling_{intl,club}.sh` (74) — 12-card StatCard grid.
+- `teams_fielding_{intl,club}.sh` (42) — 8-card grid (Catches
+  inclusive per CLAUDE.md "Wides/noballs/catches semantic").
+- `teams_partnerships_{intl,club}.sh` (18) — by-wicket grid
+  (10 rows, asserts top + last per the spec's "first and last
+  row" rule).
+- `series_overview_{intl,club}.sh` (14) — 6-card series summary.
+- `series_records_{intl,club}.sh` (18) — top-10 highest team
+  totals (first DataTable on the Records tab).
+
+**Harness extension:** one new extractor added to `_lib.sh`
+(`extract_team_overview` — single-team `.wisden-statrow` walk +
+keepers paragraph). Compare-grid + DataTable + landing-tile
+extractors from Batch 1 reused unchanged.
+
+**UI bug fix landed in commit 5 (6f8099c):** the Partnerships
+by-wicket DataTable rendered `n` and `avg_runs` chip envelopes as
+"[object Object]" — the API returns chip envelopes ({value,
+scope_avg, …}) but the DataTable column had no `format` function
+so React stringified the object directly. Two narrow format
+functions added to `wicketColumns` in `pages/Teams.tsx` extract
+`.value` with a graceful fallback for the plain-number case. This
+is exactly the "API correct + UI wrong" class of bug DOM tests
+exist to catch.
+
+**Audit gotcha logged:** `populate_bucket_baseline.py` boundary
+formula is `runs_batter=4 AND COALESCE(runs_non_boundary,0)=0`
+for fours (excludes all-run 4s where batters run 4 between
+wickets) but plain `runs_batter=6` for sixes (every 6 is a
+boundary by definition). DOM tests pin this convention.
+
+**Batch 3 queued:** remaining sub-tabs (Series Editions / Champions
+/ Knockouts / Points / Batters / Bowlers / Fielders / Partnerships
+/ Matches; Teams Players / Match List / vs Opponent), leader-card
+extractor for compound TeamLink/PlayerLink cells, multi-DataTable
+extractor (records tab has 5+ tables), and the
+`cross_cutting_team_class_consistency.sh` test.
+
 ### Shipped 2026-04-28 (DOM-tests Batch 1 — series + teams)
 
 4 scripts, 113 DOM assertions across 9 anchors landed under
