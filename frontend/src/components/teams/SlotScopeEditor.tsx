@@ -41,6 +41,7 @@ export default function SlotScopeEditor({
   const [filterVenue, setFilterVenue] = useState(toEditorValue(initial.filter_venue, primary.filter_venue))
   const [seriesType, setSeriesType] = useState(toEditorValue(initial.series_type, primary.series_type))
   const [teamClass, setTeamClass]   = useState(toEditorValue(initial.team_class,  primary.team_class))
+  const [inning, setInning]         = useState(toEditorValue(initial.inning,      primary.inning))
 
   const isInternational = primary.team_type === 'international'
 
@@ -55,6 +56,7 @@ export default function SlotScopeEditor({
     venue:      !!primary.filter_venue,
     series:     !!primary.series_type,
     teamClass:  !!primary.team_class,
+    inning:     !!primary.inning,
   }
 
   const tournamentsFetch = useFetch(
@@ -83,6 +85,7 @@ export default function SlotScopeEditor({
     if (cmp(filterVenue, primary.filter_venue)) o.filter_venue = filterVenue
     if (cmp(seriesType, primary.series_type))  o.series_type  = seriesType
     if (cmp(teamClass, primary.team_class))    o.team_class   = teamClass
+    if (cmp(inning,    primary.inning))        o.inning       = inning
     onApply(o)
   }
 
@@ -178,6 +181,26 @@ export default function SlotScopeEditor({
           </select>
         </div>
       )}
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Innings</span>
+        <select
+          value={inning}
+          onChange={e => setInning(e.target.value)}
+          title={
+            "1st innings = matches' inning_number=0; 2nd innings = inning_number=1.\n\n" +
+            "On Compare slots this is dual-meaning: BATTING row reads matches where this team BATTED FIRST (= they batted in inning 0); " +
+            "BOWLING and FIELDING rows read matches where this team BOWLED FIRST (= opposition batted in inning 0). " +
+            "Two complementary subsets of the team's match log, surfaced together as 'first-up activity across roles'."
+          }
+        >
+          <option value="">— inherit —</option>
+          {showAny.inning && (
+            <option value={ANY_SENTINEL}>(any — all innings)</option>
+          )}
+          <option value="0">1st innings only</option>
+          <option value="1">2nd innings only</option>
+        </select>
+      </div>
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
         <button type="button" className="comp-link" onClick={handleApply}>Apply</button>
         <button type="button" className="comp-link" onClick={onReset} title="Drop all overrides — slot inherits primary">Reset to primary</button>

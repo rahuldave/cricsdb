@@ -9,13 +9,13 @@ export type SlotKind = 'team' | 'avg'
 
 export const OVERRIDABLE_SLOT_KEYS = [
   'tournament', 'season_from', 'season_to',
-  'filter_venue', 'series_type', 'team_class',
+  'filter_venue', 'series_type', 'team_class', 'inning',
 ] as const
 export type OverridableSlotKey = typeof OVERRIDABLE_SLOT_KEYS[number]
 
 export type ResolvedSlotScope = Pick<FilterParams,
   'gender' | 'team_type' | 'tournament' | 'season_from' | 'season_to'
-  | 'filter_venue' | 'series_type' | 'team_class'>
+  | 'filter_venue' | 'series_type' | 'team_class' | 'inning'>
 
 // Override entries hold either a real value (narrowing) or
 // ANY_SENTINEL ('__any__') meaning "explicit empty / do not inherit
@@ -54,6 +54,11 @@ function inheritedScope(primary: FilterParams): ResolvedSlotScope {
     // primary by default, override via compareN_team_class URL param —
     // peer of every other overridable axis.
     team_class: primary.team_class,
+    // inning is an AuxParams aux field (not a FilterBar key). Slots
+    // inherit primary's URL `?inning=` (the page-level InningToggle's
+    // value, when set on team Batting/Bowling/Fielding tabs) and may
+    // override via `compareN_inning=`. Spec: spec-inning-split.md §6.2.
+    inning: primary.inning,
   }
 }
 

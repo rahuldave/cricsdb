@@ -45,6 +45,14 @@ export interface FilterParams {
    *  league baseline is FM-only). Without this, chip's scope_avg
    *  numerically diverges from the avg col's displayed value. */
   chip_team_class?: string
+  /** Page-local 1st/2nd-innings filter — string '0' (batting first)
+   *  or '1' (batting second). NOT a FilterBar field (10-key ceiling
+   *  stands); set by the page-level InningToggle on team/player
+   *  Batting/Bowling/Fielding/Partnerships pages, OR per-slot via the
+   *  Compare-tab SlotScopeEditor (compareN_inning URL param). Mirror
+   *  of api/filters.py::AuxParams.inning. Spec:
+   *  internal_docs/spec-inning-split.md. */
+  inning?: string
 }
 
 export interface Tournament {

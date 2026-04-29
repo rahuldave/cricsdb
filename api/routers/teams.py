@@ -47,10 +47,26 @@ def _decode_chip_baseline(b64: str) -> tuple[FilterParams, AuxParams] | None:
         team_class=payload.get("team_class"),
         series_type=payload.get("series_type"),
     )
+    # `inning` rides in payload as a string ('0' / '1') — the
+    # OVERRIDABLE_SLOT_KEYS iterate in chipAlignmentFor reads it from
+    # ResolvedSlotScope where it's typed as string. Backend AuxParams
+    # expects int. Convert here so the league-side aggregation honours
+    # the avg slot's inning narrowing for chip math alignment. Spec:
+    # spec-inning-split.md §6.5 + §8.
+    raw_inning = payload.get("inning")
+    inning_val: int | None = None
+    if raw_inning is not None:
+        try:
+            iv = int(raw_inning)
+            if iv in (0, 1):
+                inning_val = iv
+        except (TypeError, ValueError):
+            inning_val = None
     a = AuxParams(
         scope_to_team=payload.get("scope_to_team"),
         chip_team_class=None,
         chip_baseline_scope_json=None,
+        inning=inning_val,
     )
     return f, a
 

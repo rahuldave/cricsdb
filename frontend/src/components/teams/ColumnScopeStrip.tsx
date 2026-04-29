@@ -115,6 +115,14 @@ export function buildSlotSegments(
     segs.push({ label: 'Class', value: 'any', overridden: true })
   }
 
+  if (scope.inning === '0') {
+    segs.push({ label: 'Innings', value: '1st', overridden: ovr('inning') })
+  } else if (scope.inning === '1') {
+    segs.push({ label: 'Innings', value: '2nd', overridden: ovr('inning') })
+  } else if (ovr('inning')) {
+    segs.push({ label: 'Innings', value: 'any', overridden: true })
+  }
+
   return segs
 }
 

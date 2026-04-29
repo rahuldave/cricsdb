@@ -76,11 +76,12 @@ def make_filters(**kw) -> FilterBarParams:
 
 
 def make_aux(*, scope_to_team=None, chip_team_class=None,
-             chip_baseline_scope_json=None) -> AuxParams:
+             chip_baseline_scope_json=None, inning=None) -> AuxParams:
     return AuxParams(
         scope_to_team=scope_to_team,
         chip_team_class=chip_team_class,
         chip_baseline_scope_json=chip_baseline_scope_json,
+        inning=inning,
     )
 
 
@@ -220,6 +221,40 @@ SCENARIOS = [
          "team_class": "full_member"},
         ["Australia"],
     ),
+    # F. Inning override (spec-inning-split.md §6.5 + §8) — primary
+    #    has no inning narrowing; avg slot overrides inning=0 (1st-
+    #    innings only). Chip's scope_avg must equal what the avg
+    #    endpoint displays when called with aux.inning=0. Catches the
+    #    `_decode_chip_baseline` ignoring `inning` regression that
+    #    surfaced 2026-04-29 during commit 3 visual smoke.
+    (
+        "F_ipl_2025_to_inning0",
+        {"gender": "male", "team_type": "club",
+         "tournament": "Indian Premier League",
+         "season_from": "2025", "season_to": "2025"},
+        {"gender": "male", "team_type": "club",
+         "tournament": "Indian Premier League",
+         "season_from": "2025", "season_to": "2025",
+         "inning": "0"},
+        {"gender": "male", "team_type": "club",
+         "tournament": "Indian Premier League",
+         "season_from": "2025", "season_to": "2025"},
+        ["Royal Challengers Bengaluru"],
+    ),
+    # G. Inning override + scope_to_team (closed-league avg auto-
+    #    narrow) — same shape as B but with an additional inning=1
+    #    narrowing on the avg slot. Both must align.
+    (
+        "G_rcb_2025_to_rcb_alltime_inning1",
+        {"gender": "male", "team_type": "club",
+         "tournament": "Indian Premier League",
+         "season_from": "2025", "season_to": "2025"},
+        {"gender": "male", "team_type": "club",
+         "scope_to_team": "Royal Challengers Bengaluru",
+         "inning": "1"},
+        {"gender": "male", "team_type": "club"},
+        ["Royal Challengers Bengaluru"],
+    ),
 ]
 
 
@@ -232,7 +267,11 @@ async def run_summary(*, scenario, team_fn, avg_fn, primary, payload,
     team_resp = await team_fn(team, f_team, aux_team)
 
     f_avg = make_filters(**baseline_scope_for_avg)
-    aux_avg = make_aux(scope_to_team=scope_to_team_for_avg)
+    # Forward `inning` from the chip-baseline payload to the avg side.
+    # Mirror of how the frontend's avg slot would request the avg
+    # endpoint with aux.inning when the slot has inning override.
+    aux_avg = make_aux(scope_to_team=scope_to_team_for_avg,
+                       inning=payload.get("inning"))
     avg_resp = await avg_fn(f_avg, aux_avg)
 
     for key, env in team_resp.items():
@@ -257,7 +296,11 @@ async def run_by_phase(*, scenario, team_fn, avg_fn, primary, payload,
     team_resp = await team_fn(team, f_team, aux_team)
 
     f_avg = make_filters(**baseline_scope_for_avg)
-    aux_avg = make_aux(scope_to_team=scope_to_team_for_avg)
+    # Forward `inning` from the chip-baseline payload to the avg side.
+    # Mirror of how the frontend's avg slot would request the avg
+    # endpoint with aux.inning when the slot has inning override.
+    aux_avg = make_aux(scope_to_team=scope_to_team_for_avg,
+                       inning=payload.get("inning"))
     avg_resp = await avg_fn(f_avg, aux_avg)
     avg_by_phase = {p["phase"]: p for p in avg_resp.get("by_phase", [])}
 
@@ -285,7 +328,11 @@ async def run_partnerships_summary(*, scenario, primary, payload,
     team_resp = await team_partnerships_summary(team, f_team, aux_team, side="batting")
 
     f_avg = make_filters(**baseline_scope_for_avg)
-    aux_avg = make_aux(scope_to_team=scope_to_team_for_avg)
+    # Forward `inning` from the chip-baseline payload to the avg side.
+    # Mirror of how the frontend's avg slot would request the avg
+    # endpoint with aux.inning when the slot has inning override.
+    aux_avg = make_aux(scope_to_team=scope_to_team_for_avg,
+                       inning=payload.get("inning"))
     avg_resp = await scope_partnerships_summary(f_avg, aux_avg)
 
     for key in ("total", "count_50_plus", "count_100_plus", "avg_runs"):
