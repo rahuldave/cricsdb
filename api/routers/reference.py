@@ -314,7 +314,7 @@ async def search_players(
         or filters.season_from or filters.season_to
         or filters.team or filters.opponent or filters.venue
         or filters.team_class
-        or (aux.series_type and aux.series_type != 'all')
+        or (filters.series_type and filters.series_type != 'all')
     )
     scope_where = ""
     if has_scope:

@@ -2,22 +2,23 @@
 
 Two-class model:
 
-- `FilterBarParams` — the 8 fields driven by the frontend's FilterBar UI
-  (gender, team_type, tournament, season_from/to, filter_team,
-  filter_opponent, filter_venue). Maps 1:1 with `FILTER_KEYS` on the
-  frontend (`components/scopeLinks.ts`). Rides through scope-link URLs.
+- `FilterBarParams` — the 10 fields driven by the frontend's FilterBar
+  UI (gender, team_type, tournament, season_from/to, filter_team,
+  filter_opponent, filter_venue, team_class, series_type). Maps 1:1 with
+  `FILTER_KEYS` on the frontend (`components/scopeLinks.ts`). Rides
+  through scope-link URLs.
 
-- `AuxParams` — page-local narrowings that don't originate from the
-  FilterBar. Currently `series_type` (Series-tab local pill). Future
-  page-local filters (result_filter, close_match, super_over,
+- `AuxParams` — internal-plumbing narrowings that don't originate from
+  the FilterBar. Currently `scope_to_team` (Compare-tab avg-slot
+  auto-narrow) and `chip_team_class` (chip-baseline alignment hint).
+  Future page-local filters (result_filter, close_match, super_over,
   toss_decision) land here without bleeding into the UI contract.
 
 Endpoints that care only about FilterBar use `FilterBarParams = Depends()`.
 Endpoints that also want aux take both dependencies and pass aux to
-`filters.build(aux=aux)`, which threads `series_type_clause` and future
-aux clauses centrally. This keeps each router from re-wiring the same
-clause by hand (the original `/matches` endpoint bug was precisely a
-missing hand-wire).
+`filters.build(aux=aux)`, which threads aux clauses centrally. This
+keeps each router from re-wiring the same clause by hand (the original
+`/matches` endpoint bug was precisely a missing hand-wire).
 
 `FilterParams` is kept as an alias for `FilterBarParams` for incremental
 migration — existing call sites keep working.
@@ -38,7 +39,7 @@ from .tournament_canonical import (
 
 
 class AuxParams:
-    """Page-local, non-FilterBar narrowings.
+    """Internal-plumbing narrowings, distinct from the FilterBar UI.
 
     Distinct from FilterBarParams so:
       - scope-link URLs and status-strip summaries can iterate FilterBar
@@ -46,17 +47,13 @@ class AuxParams:
       - future page-local filters (result_filter, close_match,
         toss_decision, …) have a natural home without polluting the
         FilterBar contract.
+
+    `series_type` was promoted from here to FilterBarParams 2026-04-28
+    (10th FilterBar key) — see spec-filterbar-series-type.md.
     """
 
     def __init__(
         self,
-        series_type: Optional[str] = Query(
-            None,
-            description=(
-                "Page-local narrowing: all (default) / bilateral / icc / club."
-                " Legacy: bilateral_only / tournament_only."
-            ),
-        ),
         scope_to_team: Optional[str] = Query(
             None,
             description=(
@@ -83,7 +80,6 @@ class AuxParams:
             ),
         ),
     ):
-        self.series_type = series_type
         self.scope_to_team = scope_to_team
         self.chip_team_class = chip_team_class
 
@@ -111,6 +107,16 @@ class FilterBarParams:
                 " status is an intl classification)."
             ),
         ),
+        series_type: Optional[str] = Query(
+            None,
+            description=(
+                "Restrict to a category of series. Canonical values:"
+                " all (default — no clause) / bilateral / icc / club."
+                " Legacy aliases: bilateral_only → bilateral,"
+                " tournament_only → icc. Promoted from AuxParams to"
+                " FilterBarParams 2026-04-28 (the 10th FilterBar key)."
+            ),
+        ),
     ):
         self.gender = gender
         self.team_type = team_type
@@ -121,6 +127,7 @@ class FilterBarParams:
         self.opponent = filter_opponent
         self.venue = filter_venue
         self.team_class = team_class
+        self.series_type = series_type
 
     def build(
         self,
@@ -214,9 +221,10 @@ class FilterBarParams:
         if self.team_class == "full_member" and self.team_type == "international":
             clauses.append(full_member_clause(table_alias=table_alias))
 
-        # Aux clauses fold in here centrally — no router hand-wiring.
-        if aux is not None and aux.series_type:
-            st = series_type_clause(aux.series_type, alias=table_alias)
+        # series_type — promoted to FilterBar 2026-04-28. Reads from
+        # self; the historical `aux.series_type` path is removed.
+        if self.series_type:
+            st = series_type_clause(self.series_type, alias=table_alias)
             if st:
                 clauses.append(st)
 

@@ -61,13 +61,13 @@ def make_filters(**kwargs) -> FilterBarParams:
     """Construct a FilterBarParams with explicit values (FastAPI Depends
     bypassed). Defaults for unspecified keys are None."""
     keys = ("gender", "team_type", "tournament", "season_from", "season_to",
-            "filter_team", "filter_opponent", "filter_venue")
+            "filter_team", "filter_opponent", "filter_venue", "series_type")
     f = FilterBarParams(**{k: kwargs.get(k) for k in keys})
     return f
 
 
 def make_aux(scope_to_team: str | None = None) -> AuxParams:
-    return AuxParams(series_type=None, scope_to_team=scope_to_team)
+    return AuxParams(scope_to_team=scope_to_team)
 
 
 # ─── Test scopes ────────────────────────────────────────────────────────
