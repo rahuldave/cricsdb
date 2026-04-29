@@ -13,20 +13,23 @@ const SERIES_TYPE_LABEL: Record<string, string> = {
 
 const isAny = (v: string | undefined) => v === ANY_SENTINEL
 
-// Italic sub-line below a team-slot's name surfacing the scope fields
-// that differ from primary. Picker / editor only writes overrides for
-// actually-divergent fields, so any key in slot.overrides is treated
-// as a real divergence.
+// Sub-line below a slot's name surfacing the scope fields that differ
+// from primary. Picker / editor only writes overrides for actually-
+// divergent fields, so any key in slot.overrides is treated as a real
+// divergence.
 //
 // `__any__` overrides render as "any <axis>" so the user can see the
 // slot has explicitly broadened past primary's narrowing (vs the
 // no-override case where the chip is suppressed entirely).
 //
-// Avg slots fold scope into their column label (scopeAvgLabel reads
-// the resolved scope), so a chip there would duplicate the label —
-// suppressed.
+// Renders for BOTH team AND avg slots. Pre-2026-04-29 it suppressed
+// for avg on the theory that scopeAvgLabel's line2 already showed the
+// scope — but line2 only carries the resolved scope (gender · season)
+// not the DIFFERENCE from primary, so users couldn't see what they'd
+// just overridden in the editor. The override chip + the identity
+// line2 are now two distinct sub-lines (line2 = "Men's"; chip = "Scope:
+// any season") so the user has explicit feedback for what changed.
 export default function SlotHeaderChip({ slot }: Props) {
-  if (slot.kind === 'avg') return null
   const o = slot.overrides
   const parts: string[] = []
 
@@ -65,9 +68,10 @@ export default function SlotHeaderChip({ slot }: Props) {
   return (
     <div
       className="wisden-compare-slot-chip"
-      title="This slot's scope differs from the FilterBar above. Chip values baseline against the slot's scope."
+      title="This slot's scope differs from the FilterBar above. Chip values baseline against the slot's scope. Click ✎ to edit."
     >
-      · {parts.join(' · ')}
+      <span className="wisden-compare-slot-chip-label">Scope:</span>{' '}
+      {parts.join(' · ')}
     </div>
   )
 }

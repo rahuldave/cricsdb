@@ -455,16 +455,21 @@ function CompareSlotColumn({
         </button>
       </div>
 
-      {/* Chip-area: italic sub-line under the column header. For team
-       *  slots — SlotHeaderChip when the slot has scope overrides. For
-       *  avg slots — line2 of the scope label (gender · season range).
-       *  Both render zero content most of the time; the subgrid row
-       *  collapses accordingly across columns. */}
+      {/* Chip-area: two sub-lines under the column header.
+       *   1. AVG-slot identity line (gender · season range, computed
+       *      from resolved scope) — light italic, no pill.
+       *   2. Override chip (BOTH team and avg slots) — pill with
+       *      "Scope:" prefix. Shows what the slot's scope DIFFERS
+       *      from primary (e.g. "Scope: any season"). Distinct from
+       *      the avg identity because identity carries absolute
+       *      scope while the chip carries the user's just-applied
+       *      override. Renders only when overrides exist; subgrid
+       *      sizes the row to the tallest content across columns. */}
       <div className="wisden-compare-chip-area">
-        {isTeam && <SlotHeaderChip slot={slot} />}
         {!isTeam && avgLbl!.line2 && (
-          <div className="wisden-compare-slot-chip">{avgLbl!.line2}</div>
+          <div className="wisden-compare-avg-id">{avgLbl!.line2}</div>
         )}
+        <SlotHeaderChip slot={slot} />
       </div>
 
       {/* Editor-row slot — always rendered so every column has the

@@ -876,21 +876,53 @@ a { color: inherit; }
    scope-diff chip OR the avg-slot auto-narrow hint. Subgrid sizes the
    row to the tallest chip across columns, so columns without a chip
    leave the equivalent gap empty rather than rendering the row at 0
-   height — that's the alignment fix this refactor is for. */
+   height — that's the alignment fix this refactor is for.
+
+   `min-height` reserves vertical space EVEN when no column has a chip,
+   so the layout is consistent regardless of override state. User
+   feedback 2026-04-29: when overrides ARE applied the chip needs to
+   be unmissable (the prior 0.7-opacity italic was easily mistaken for
+   a separator dot); see .wisden-compare-slot-chip below. */
 .wisden-compare-chip-area {
   margin-bottom: 0.4rem;
+  min-height: 1.6rem;
 }
-/* Always-rendered slot for the inline scope-editor. Empty placeholder
-   in non-editing columns has 0 content → subgrid row collapses to
-   ~0 height. When one column expands its editor, the row track grows
-   for ALL columns (subgrid behavior), so discipline rows below the
-   editor stay aligned across columns. The placeholder MUST stay in
-   the DOM (no `display: none`) to keep auto-placement child-counts
-   uniform across columns. */
+/* Scope-override indicator under a team column's name. User feedback
+   2026-04-29: the prior style (italic, opacity 0.7, "· 2024") was
+   indistinguishable from a separator. Now: bordered pill with a
+   "Scope:" prefix label and a darker grey body so it reads as
+   "this column has a custom scope, click ✎ to edit." */
 .wisden-compare-slot-chip {
+  display: inline-block;
+  font-size: 0.82em;
+  color: var(--ink-faint, #6b6b6b);
+  background: var(--bg-soft, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--rule, rgba(0, 0, 0, 0.12));
+  border-left: 3px solid var(--accent, #b85c1f);
+  border-radius: 2px;
+  padding: 0.1rem 0.45rem;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+.wisden-compare-slot-chip-label {
+  font-variant-caps: all-small-caps;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--accent, #b85c1f);
+  margin-right: 0.15rem;
+}
+/* Avg-slot identity sub-line (gender · season range). Computed by
+   scopeAvgLabel from the slot's RESOLVED scope — distinct from the
+   override chip below, which shows the diff from primary. Light
+   italic, no pill, so it reads as identity context not as a
+   user-applied override. */
+.wisden-compare-avg-id {
   font-size: 0.85em;
   font-style: italic;
-  opacity: 0.7;
+  color: var(--ink-faint, #6b6b6b);
+  margin-bottom: 0.2rem;
 }
 .wisden-compare-col-namelink {
   color: inherit;
