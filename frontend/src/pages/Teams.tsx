@@ -16,6 +16,7 @@ import {
   getTeamPartnershipsByWicket, getTeamPartnershipsBestPairs, getTeamPartnershipsHeatmap, getTeamPartnershipsTop,
 } from '../api'
 import StatCard from '../components/StatCard'
+import InningToggle from '../components/InningToggle'
 import MetricDelta from '../components/MetricDelta'
 import TeamSearch from '../components/TeamSearch'
 import FlagBadge from '../components/FlagBadge'
@@ -207,6 +208,7 @@ export default function Teams() {
     selected, filters.gender, filters.team_type, filters.tournament,
     filters.season_from, filters.season_to,
     filters.filter_venue,
+    filters.inning,
   ]
 
   // Summary drives the page header — failure blocks the whole tab area.
@@ -366,6 +368,14 @@ export default function Teams() {
           </div>
 
           <div>
+            {/* Page-local 1st/2nd-innings toggle. Mounts only on tabs
+                that have innings-level metrics. Compare uses per-slot
+                override (SlotScopeEditor "Innings" row) instead.
+                Match List + Players don't have inning-relevant stats.
+                Spec: spec-inning-split.md §6.1 + §3.3. */}
+            {(['By Season', 'vs Opponent', 'Batting', 'Bowling', 'Fielding', 'Partnerships'] as const).includes(activeTab as never) && (
+              <InningToggle />
+            )}
             {activeTab === 'By Season' && (
               <>
                 {seasonsFetch.loading && <Spinner label="Loading season records…" />}

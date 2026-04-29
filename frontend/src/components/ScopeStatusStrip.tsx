@@ -92,6 +92,15 @@ function buildSegments(
     segs.push({ label: 'Series', value: label })
   }
 
+  // Page-local 1st/2nd-innings narrowing — AuxParams aux field, NOT
+  // a FilterBar key, but surfaces here so the user sees that the page
+  // is partitioned. Spec: spec-inning-split.md §6.6.
+  if (filters.inning === '0') {
+    segs.push({ label: 'Innings', value: '1st innings' })
+  } else if (filters.inning === '1') {
+    segs.push({ label: 'Innings', value: '2nd innings' })
+  }
+
   // Active tab + pagination — URL-driven, so both deep-link into the
   // strip. "Overview" is the default tab across every dossier; show
   // the segment only when it's something else. Page shown when > 1.

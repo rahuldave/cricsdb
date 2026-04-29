@@ -391,6 +391,108 @@ See "Bowling/Phase boundaries" above. Identical for batting.
 
 ---
 
+## Inning split (1st innings / 2nd innings)
+
+Page-local 1st-innings / 2nd-innings filter — NOT a FilterBar field.
+Lives in `AuxParams.inning` (`int 0|1`); UI surface is the
+`InningToggle` pill on player and team Batting/Bowling/Fielding/
+Partnerships pages, plus the per-slot `compareN_inning=` override on
+the Compare tab. URL param `?inning=`.
+
+### Partition invariant
+
+For every additive metric (counts and sums — runs, balls, wickets,
+catches, stumpings, partnerships, fielding events) and every closed
+scope:
+
+```
+metric(inning=0) + metric(inning=1) == metric(unfiltered)
+```
+
+Tested on every commit by `tests/sanity/test_inning_split_partition.
+py` across IPL 2025, T20 WC Men 2024, BBL 2024/25, and all-men-intl
+2024 — 4 scopes × 4 teams × 3 disciplines × N metrics, plus
+identity-bearing fields (`highest_total` reconstructs as max of
+inning-0 and inning-1 maxes), plus an API-level smoke that catches
+helper bugs the SQL-only path misses.
+
+### Two semantic mechanisms
+
+The inning narrowing applies via two distinct mechanisms depending
+on the endpoint shape:
+
+1. **Innings-joined endpoints** (every player / team /by-phase /
+   /by-inning / /summary that JOINs `innings`): the central clause
+   `i.innings_number = :inning` lands in `FilterBarParams.build()`,
+   gated on `has_innings_join=True`. Composes naturally with the
+   existing `i.team = :team` discriminator already in the SQL.
+   Slot `inning=0` reads:
+   - **Batting side** (`i.team = :team`): matches where this team
+     batted in inning 0 = matches where this team batted first.
+   - **Bowling/Fielding side** (`i.team != :team`): matches where
+     this team's opposition batted in inning 0 = matches where
+     this team bowled first.
+   These are COMPLEMENTARY match subsets — together they describe
+   the team's "first-up activity across whatever role they were in"
+   (the §3.4 dual-meaning). The SlotScopeEditor's "Innings"
+   tooltip surfaces this for users.
+
+2. **Match-level endpoints** (`/teams/{team}/{summary,by-season,
+   vs-opponent,match-list}` — `has_innings_join=False`): the
+   central clause can't apply (no `i` alias). Instead, the
+   `_inning_match_filter(team, aux)` helper (api/routers/teams.py)
+   emits a derived match-id subquery committing to the "team
+   batted in inning X" reading:
+   ```sql
+   m.id IN (SELECT i2.match_id FROM innings i2
+             WHERE i2.team = :im_team
+               AND i2.innings_number = :im_inn
+               AND i2.super_over = 0)
+   ```
+   Reading: `inning=0` → matches where team batted first;
+   `inning=1` → matches where team batted second / chased.
+
+### Per-innings divisor
+
+Every league-side baseline that divides a count by an
+"innings-count" divisor MUST compute that divisor from the same
+`aux.inning`-narrowed query that produced the numerator. A divisor
+pulled from a non-narrowed sibling query produces a per-innings
+rate that silently halves (numerator narrows, denominator doesn't),
+breaking the chip-alignment math invariant. Helpers:
+
+- `_innings_count_per_inning(filters, aux, side)` — innings count
+  GROUPED BY innings_number for the given side (batting / fielding).
+  Used by `/by-inning` aggregators' team=None branch to compute the
+  per-row divisor.
+- `_apply_fielding_per_innings(out, fielding_innings, halve_per_match)`
+  — fielding has a special multiplier flip under inning narrowing:
+  `mult=1` (not 2) and `halve_per_match=False`, since each match
+  contributes only ONE fielding innings to the inning-X scope.
+
+### Match-role axis (`bat_first=true|false`) is a SEPARATE concept
+
+A possible future filter for "matches where this team batted first"
+(regardless of which inning the data was generated in) is
+match-level, not innings-level — different SQL clause, different
+semantic. Composes orthogonally with `inning`. Not in this spec.
+See design-decisions.md "Match-role axis is separate from
+per-innings" for the differentiation.
+
+### Out of scope
+
+`/matches` list, `/head-to-head`, `bucket_baseline_*` precomputation,
+"chasing" derived from D/L target — see spec §1 + §9. Live
+aggregation handles the inning narrowing without precomputed help;
+revisit if measured hot.
+
+Spec: `internal_docs/spec-inning-split.md`.
+Convention doc: `internal_docs/design-decisions.md` "Inning-split
+labelling: frame by match, not by side of the ball" + "Match-role
+axis is separate from per-innings".
+
+---
+
 ## Maintenance rule
 
 **When you add a metric:**
