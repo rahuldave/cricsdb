@@ -872,57 +872,55 @@ a { color: inherit; }
     font-size: 1.05rem;
   }
 }
-/* Chip-area (sub-line under the column header). Holds the team-slot
-   scope-diff chip OR the avg-slot auto-narrow hint. Subgrid sizes the
-   row to the tallest chip across columns, so columns without a chip
-   leave the equivalent gap empty rather than rendering the row at 0
-   height — that's the alignment fix this refactor is for.
-
-   `min-height` reserves vertical space EVEN when no column has a chip,
-   so the layout is consistent regardless of override state. User
-   feedback 2026-04-29: when overrides ARE applied the chip needs to
-   be unmissable (the prior 0.7-opacity italic was easily mistaken for
-   a separator dot); see .wisden-compare-slot-chip below. */
+/* Chip-area: per-column effective-scope readout under the header.
+   Holds the ColumnScopeStrip; subgrid sizes the row to the tallest
+   wrapped strip across columns. No fixed pill / no rectangular
+   border — the strip wraps naturally over multiple lines when the
+   list of scope segments is long. User feedback 2026-04-29
+   explicitly accepted "all columns forced down 2-3 rows" as the
+   right tradeoff for unmissable per-column scope feedback. */
 .wisden-compare-chip-area {
   margin-bottom: 0.4rem;
-  min-height: 1.6rem;
+  min-height: 1.4rem;
 }
-/* Scope-override indicator under a team column's name. User feedback
-   2026-04-29: the prior style (italic, opacity 0.7, "· 2024") was
-   indistinguishable from a separator. Now: bordered pill with a
-   "Scope:" prefix label and a darker grey body so it reads as
-   "this column has a custom scope, click ✎ to edit." */
-.wisden-compare-slot-chip {
-  display: inline-block;
-  font-size: 0.82em;
-  color: var(--ink-faint, #6b6b6b);
-  background: var(--bg-soft, rgba(0, 0, 0, 0.04));
-  border: 1px solid var(--rule, rgba(0, 0, 0, 0.12));
-  border-left: 3px solid var(--accent, #b85c1f);
-  border-radius: 2px;
-  padding: 0.1rem 0.45rem;
-  line-height: 1.4;
-  letter-spacing: 0.01em;
-  max-width: 100%;
-  overflow-wrap: break-word;
+/* Per-column scope strip — visual mirror of .wisden-scope-strip-*
+   (the page-wide ScopeStatusStrip below the FilterBar) so the user
+   reads it as "this is a status bar of a kind" at a glance. Carries
+   the same `--bg-soft` tint + bottom rule as the page-wide strip,
+   scoped to a single column. No accent colour on text (orange reads
+   as link); overridden segments get a `✎` prefix + dotted underline
+   on the value, matching the ✎ edit button on the column header. */
+.wisden-col-scope {
+  font-family: var(--serif);
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+  line-height: 1.5;
+  display: block;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 0.3rem 0.5rem;
+  word-spacing: 0.02em;
 }
-.wisden-compare-slot-chip-label {
-  font-variant-caps: all-small-caps;
+.wisden-col-scope-seg { display: inline; }
+.wisden-col-scope-segLabel {
+  font-variant: all-small-caps;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+}
+.wisden-col-scope-segValue {
+  color: var(--ink);
+  font-weight: 500;
+}
+.wisden-col-scope-sep { color: var(--ink-faint); }
+.wisden-col-scope-seg.is-overridden .wisden-col-scope-segValue {
   font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--accent, #b85c1f);
-  margin-right: 0.15rem;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
 }
-/* Avg-slot identity sub-line (gender · season range). Computed by
-   scopeAvgLabel from the slot's RESOLVED scope — distinct from the
-   override chip below, which shows the diff from primary. Light
-   italic, no pill, so it reads as identity context not as a
-   user-applied override. */
-.wisden-compare-avg-id {
-  font-size: 0.85em;
-  font-style: italic;
-  color: var(--ink-faint, #6b6b6b);
-  margin-bottom: 0.2rem;
+.wisden-col-scope-edit {
+  color: var(--ink);
+  font-size: 0.95em;
+  margin-right: 0.05em;
 }
 .wisden-compare-col-namelink {
   color: inherit;

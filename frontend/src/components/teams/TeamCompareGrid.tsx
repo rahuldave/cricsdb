@@ -9,7 +9,7 @@ import AvgSummaryRow from './AvgSummaryRow'
 import PhaseBandsRow from './PhaseBandsRow'
 import PartnershipByWicketRows from './PartnershipByWicketRows'
 import SeasonTrajectoryStrip from './SeasonTrajectoryStrip'
-import SlotHeaderChip from './SlotHeaderChip'
+import ColumnScopeStrip from './ColumnScopeStrip'
 import SlotScopeEditor from './SlotScopeEditor'
 import {
   teamDisciplineHasData, teamMatchesInScope, carryTeamFilters,
@@ -455,21 +455,20 @@ function CompareSlotColumn({
         </button>
       </div>
 
-      {/* Chip-area: two sub-lines under the column header.
-       *   1. AVG-slot identity line (gender · season range, computed
-       *      from resolved scope) — light italic, no pill.
-       *   2. Override chip (BOTH team and avg slots) — pill with
-       *      "Scope:" prefix. Shows what the slot's scope DIFFERS
-       *      from primary (e.g. "Scope: any season"). Distinct from
-       *      the avg identity because identity carries absolute
-       *      scope while the chip carries the user's just-applied
-       *      override. Renders only when overrides exist; subgrid
-       *      sizes the row to the tallest content across columns. */}
+      {/* Chip-area: per-column scope readout. Mirrors the global
+       *  ScopeStatusStrip below the FilterBar so users can match a
+       *  column's scope to the page-wide one at a glance. Every
+       *  column renders a strip — primary, team slots, avg slots —
+       *  with overridden segments marked `✎`. Subgrid sizes the row
+       *  to the tallest column's wrapped strip; columns whose strip
+       *  is shorter just have whitespace below. User feedback
+       *  2026-04-29 explicitly accepted "all columns forced down 2-3
+       *  rows" as the right tradeoff. */}
       <div className="wisden-compare-chip-area">
-        {!isTeam && avgLbl!.line2 && (
-          <div className="wisden-compare-avg-id">{avgLbl!.line2}</div>
-        )}
-        <SlotHeaderChip slot={slot} />
+        <ColumnScopeStrip
+          scope={slot.scope}
+          overrideKeys={new Set(Object.keys(slot.overrides))}
+        />
       </div>
 
       {/* Editor-row slot — always rendered so every column has the
