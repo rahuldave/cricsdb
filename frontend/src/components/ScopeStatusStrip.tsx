@@ -12,9 +12,8 @@
  *
  * Reads:
  *   - FilterBar fields via `useFilters()` — gender, team_type, tournament,
- *     season_from/to, filter_team, filter_opponent, filter_venue.
- *   - `series_type` directly from URL (Series-tab local param, not in
- *     FilterParams).
+ *     season_from/to, filter_team, filter_opponent, filter_venue,
+ *     team_class, series_type. All 10 keys from FILTER_KEYS.
  *   - Path identity params (`team`, `player`, `compare`, `venue`) so
  *     the strip reflects what the CURRENT PAGE is about, not just its
  *     FilterBar settings.
@@ -28,7 +27,6 @@ type Segment = { label: string; value: string }
 
 function buildSegments(
   filters: ReturnType<typeof useFilters>,
-  seriesType: string | null,
   pathTeam: string | null,
   pathVenue: string | null,
   pathPlayer: string | null,
@@ -82,18 +80,16 @@ function buildSegments(
     segs.push({ label: 'Team class', value: 'full members' })
   }
 
-  // Series-type aux filter — surfaced on every tab where it's set.
-  // Initially a Series-tab-local pill, but the AuxParams refactor made
-  // it propagate through useFilters and apply on every endpoint, so
-  // showing it on /teams, /batting, /bowling, etc. is correct (and
-  // necessary so the user understands why a count looks narrower than
-  // expected on a deep-linked URL).
-  if (seriesType && seriesType !== 'all') {
-    const label = seriesType === 'bilateral' ? 'bilateral T20Is'
-      : seriesType === 'icc' ? 'ICC events'
-      : seriesType === 'club' ? 'club tournaments'
-      : seriesType
-    segs.push({ label: 'Show', value: label })
+  // FilterBar series_type — partition narrowing surfaced on every tab.
+  // (Promoted to FilterBar 2026-04-28; read from filters.series_type
+  // alongside the other FILTER_KEYS instead of a separate URL read.)
+  if (filters.series_type && filters.series_type !== 'all') {
+    const st = filters.series_type
+    const label = st === 'bilateral' || st === 'bilateral_only' ? 'bilateral T20Is'
+      : st === 'icc' || st === 'tournament_only' ? 'ICC events'
+      : st === 'club' ? 'club tournaments'
+      : st
+    segs.push({ label: 'Series', value: label })
   }
 
   // Active tab + pagination — URL-driven, so both deep-link into the
@@ -118,7 +114,6 @@ export default function ScopeStatusStrip() {
     return null
   }
 
-  const seriesType = params.get('series_type')
   const pathTeam = params.get('team')
   const pathVenue = params.get('venue')
   const pathPlayer = params.get('player')
@@ -127,7 +122,7 @@ export default function ScopeStatusStrip() {
   const page = params.get('page')
 
   const segments = buildSegments(
-    filters, seriesType, pathTeam, pathVenue, pathPlayer, pathCompare, tab, page,
+    filters, pathTeam, pathVenue, pathPlayer, pathCompare, tab, page,
   )
 
   const handleCopy = async () => {

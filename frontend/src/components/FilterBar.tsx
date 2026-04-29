@@ -177,6 +177,9 @@ export default function FilterBar() {
   const seasonTo = params.get('season_to') || ''
   const filterVenue = params.get('filter_venue') || ''
   const teamClass = params.get('team_class') || ''
+  // `seriesType` itself is declared at the top of the component
+  // (used for the /tournaments + /seasons scope-fetch effects).
+  // `seriesType ?? ''` is used inline for the select's value attr.
 
   // Auto-clear team_class when team_type leaves 'international'.
   // Defensive deep-link guard + Type-segmented-control side effect:
@@ -197,7 +200,7 @@ export default function FilterBar() {
 
   const segBtn = (active: boolean) => `wisden-seg${active ? ' is-active' : ''}`
 
-  const anyFilterSet = Boolean(gender || teamType || tournament || seasonFrom || seasonTo || filterVenue || teamClass)
+  const anyFilterSet = Boolean(gender || teamType || tournament || seasonFrom || seasonTo || filterVenue || teamClass || seriesType)
   const latestInScope = seasons.length > 0 && !seasonsError ? seasons[seasons.length - 1] : null
   const clearSeasons = () => setUrlParams({ season_from: '', season_to: '' })
   const setLatest = () => {
@@ -221,7 +224,7 @@ export default function FilterBar() {
   const clearAll = () => setUrlParams({
     gender: '', team_type: '', tournament: '',
     season_from: '', season_to: '', filter_venue: '',
-    team_class: '',
+    team_class: '', series_type: '',
   })
 
   const setVenue = (name: string) => setUrlParams({ filter_venue: name })
@@ -313,6 +316,21 @@ export default function FilterBar() {
               latest
             </button>
           )}
+        </div>
+
+        <div className="wisden-filter-group">
+          <span className="wisden-filter-label">Show</span>
+          <select
+            value={seriesType ?? ''}
+            onChange={e => set('series_type', e.target.value)}
+            className="wisden-select"
+            title="Restrict to a series category. Bilateral / Tournaments / Club partition the data; All shows everything."
+          >
+            <option value="">All</option>
+            <option value="bilateral_only">Bilateral series</option>
+            <option value="tournament_only">Tournaments only</option>
+            <option value="club">Club tournaments</option>
+          </select>
         </div>
 
         <div className="wisden-filter-group">
