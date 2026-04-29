@@ -1444,13 +1444,48 @@ parallel per-INNINGS + per-TEAM convention.
 
 ---
 
+### Shipped 2026-04-28 (DOM-tests Batch 1 — series + teams)
+
+4 scripts, 113 DOM assertions across 9 anchors landed under
+`tests/integration/dom/`:
+
+- `teams_compare_intl.sh` — anchors A (unbounded baseline), A'
+  (FM-only avg slot), E1 (FilterBar-fm inheritance — proves all 3
+  Compare cols inherit `team_class=full_member` so Aus narrows
+  22 → 16, India 34 → 31, avg pinned at 25.45 matches per FM team).
+  68 assertions.
+- `teams_compare_club.sh` — anchor B (RCB + SRH + IPL avg, 2025).
+  26 assertions.
+- `teams_match_list_intl_fm.sh` — proves FilterBar `team_class`
+  narrows the match-list endpoint. M1 unbounded shows row 21 vs
+  Oman (associate); M2 FM-only's row 15 narrows to England — the
+  vs-Oman row's disappearance is the wiring proof. 15 assertions.
+- `series_landing_intl_fm.sh` — proves `team_class` narrows ICC-
+  event tile counts on `/series` AND collapses associate-only
+  events. T20 WC tile narrows 44 → 16; ACC Men's Premier Cup tile
+  vanishes entirely (0 FM v FM matches). 4 assertions.
+
+**Mechanism:** harness lifted into `tests/integration/dom/_lib.sh`
+with three extractors (`extract_grid` for compare grids,
+`extract_data_table` for DataTables, `extract_landing_tiles` for
+sectioned tile directories) and three assert runners (compare,
+data-table, landing). Each script cites independent ground-truth
+SQL committed to `tests/integration/dom/audit/`. The original
+`tests/integration/compare_avg_chips.sh` was deleted as part of
+the lift — its A/A'/E1/B anchors are now split across the two
+`teams_compare_*.sh` files with expected dicts updated to reflect
+today's per-team-transform DOM (avg col matches identity reads
+"N matches in scope" per-team, not absolute pool).
+
+**Followups — Batch 2 (build-ready, ~10 scripts):**
+`teams_overview_*`, `teams_batting_*`, `teams_bowling_*`,
+`teams_fielding_*`, `teams_partnerships_*`, `series_overview_*`,
+`series_records_*` — see `spec-dom-tests-series-teams.md`.
+
 ## Build-ready specs (queue)
 
-- `spec-dom-tests-series-teams.md` (228 lines) — 45 DOM-test
-  scripts in 3 batches. Anchor URLs assume team_class v3 has
-  shipped (it has, 2026-04-28). Batch 1 (4 scripts) is
-  immediately runnable — see `spec-dom-grounded-tests.md`
-  umbrella (208 lines) for harness conventions.
+- `spec-dom-tests-series-teams.md` Batch 2 (10 scripts) +
+  Batch 3 (~30 scripts + cross-cutting consistency test).
 
 ## Known issues / live TODO
 

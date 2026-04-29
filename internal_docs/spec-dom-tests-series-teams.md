@@ -169,15 +169,31 @@ diverges from another's.
 
 Don't ship 45 scripts in one commit. Phase as:
 
-### Batch 1 (this session, after FilterBar promotion lands)
+### Batch 1 — ✅ shipped 2026-04-28
 
-- `teams_compare_intl.sh` (the existing `compare_avg_chips.sh` lifted into the new naming convention).
-- `teams_compare_club.sh`.
-- `teams_match_list_intl_fm.sh` — proves the FilterBar-promotion narrowing on Aus 22→16.
-- `series_landing_intl_fm.sh` — proves the landing tile counts narrow.
+- `teams_compare_intl.sh` — anchors A (unbounded), A' (FM-only avg
+  slot), E1 (FilterBar fm — 3 cols inherit). 68 assertions.
+- `teams_compare_club.sh` — anchor B (IPL 2025 + RCB + SRH + IPL
+  avg). 26 assertions.
+- `teams_match_list_intl_fm.sh` — anchors M1 (Aus unbounded → 22,
+  oldest row vs Oman) and M2 (FM-only → 16, oldest vs England).
+  Proves the FilterBar narrowing on the match-list endpoint.
+  15 assertions.
+- `series_landing_intl_fm.sh` — anchors L1 (T20 WC tile = 44, ACC
+  Premier Cup tile = 24) and L2 (T20 WC narrows to 16, ACC tile
+  vanishes — narrowed to 0 = endpoint omits). 4 assertions.
 
-4 scripts, ~10 ground-truth values each. Goal: prove the lifted
-harness works.
+113 assertions across 9 anchors, all green. Harness lifted into
+`tests/integration/dom/_lib.sh` (extractors for compare grids,
+DataTables, landing tiles + 3 assert runners). Ground-truth SQL
+under `tests/integration/dom/audit/`.
+
+The original `tests/integration/compare_avg_chips.sh` was deleted
+as part of the lift — its 4 anchors are split across the two new
+`teams_compare_*.sh` files with the same harness body and updated
+to reflect the 2026-04-28 per-team-transform DOM (avg col matches
+identity now reads "N matches in scope" per-team, not absolute
+pool).
 
 ### Batch 2 (next session)
 

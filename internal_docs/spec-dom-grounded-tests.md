@@ -6,12 +6,18 @@ sqlite-derived ground truth → cell-by-cell numeric agreement) is the
 one we want everywhere a number renders. This file lists the wanted
 tests per tab/sub-tab and the conventions every script should follow.
 
-## Status (2026-04-27)
+## Status (2026-04-28)
 
-- ✅ Compare tab: `tests/integration/compare_avg_chips.sh` (82
-  assertions, 2 anchors).
-- 🔲 Series tab + sub-tabs: spec-only (see `spec-dom-tests-series.md`).
-- 🔲 Teams tab + sub-tabs: spec-only (see `spec-dom-tests-teams.md`).
+- ✅ Batch 1 shipped — 4 scripts under `tests/integration/dom/`,
+  113 DOM assertions across 9 anchors (A / A' / E1 / B / M1 / M2 /
+  L1 / L2). Shared harness lifted into `tests/integration/dom/_lib.sh`
+  with extractors for compare grids, DataTables, and landing tiles
+  + 3 assert runners. Independent ground-truth SQL in
+  `tests/integration/dom/audit/`.
+- 🔲 Batch 2 — Teams sub-tabs (Overview / Batting / Bowling /
+  Fielding / Partnerships) + Series Overview / Records. ~10 scripts.
+- 🔲 Batch 3 — remaining tabs +
+  `cross_cutting_team_class_consistency.sh`.
 - 🔲 Players, Head-to-Head, Matches, Venues, Batting/Bowling/Fielding
   pages, scorecard: open queue, lower priority.
 
