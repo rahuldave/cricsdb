@@ -159,6 +159,150 @@ extract_landing_tiles() {
 EVALEOF
 }
 
+# ─────────────────────────── EXTRACTOR: team overview ───────────────────────────
+# For /teams?team=X (default tab "By Season" — the always-on summary
+# band rendered above every tab). DOM:
+#   h2.wisden-page-title          ← team name
+#   .wisden-statrow > .wisden-stat ← StatCard entries (Matches, Wins, etc.)
+#       > .wisden-stat-label       ← "Matches"
+#       > .wisden-stat-value       ← "22"
+#       > .wisden-stat-sub         ← optional <MetricDelta> chip
+#           > span[title]          ← "${value} vs scope avg ${avg} — ±${delta}%"
+#   p.wisden-tab-help              ← keepers list (when present)
+#       > a.comp-link              ← per-keeper link
+# Returns: { team_name, stats: {label: {value, chipTitle, envValue, envAvg, envDelta}}, keepers: [...] }
+extract_team_overview() {
+  agent-browser eval --stdin <<'EVALEOF'
+(() => {
+  const titleRe = /^(\S+) vs scope avg (\S+)\s+—\s+([+-]?\S+)%/;
+  const team_name = document.querySelector('.wisden-page-title')
+    ?.innerText?.trim().split('\n')[0] || '';
+
+  const stats = {};
+  for (const card of document.querySelectorAll('.wisden-statrow .wisden-stat')) {
+    const label = card.querySelector('.wisden-stat-label')?.innerText?.trim() || '';
+    const value = card.querySelector('.wisden-stat-value')?.innerText?.trim() || '';
+    const chipSpan = card.querySelector('.wisden-stat-sub span[title]');
+    const chipTitle = chipSpan?.getAttribute('title') || '';
+    const m = chipTitle.match(titleRe);
+    stats[label] = {
+      value,
+      chipTitle,
+      envValue: m ? parseFloat(m[1]) : null,
+      envAvg:   m ? parseFloat(m[2]) : null,
+      envDelta: m ? parseFloat(m[3]) : null,
+    };
+  }
+
+  // Keepers paragraph: find the <p> whose first child <span> reads
+  // "Keepers used:". Each keeper is name + " (" + innings + ")".
+  const keepers = [];
+  const keeperP = Array.from(document.querySelectorAll('p.wisden-tab-help')).find(p =>
+    p.innerText.startsWith('Keepers used:')
+  );
+  if (keeperP) {
+    for (const a of keeperP.querySelectorAll('a.comp-link')) {
+      const name = a.innerText.trim();
+      // The "(N)" innings count lives in the next sibling span.
+      const sib = a.nextSibling;
+      const sibText = sib ? (sib.textContent || '') : '';
+      // Find the span after this anchor with the (N) text.
+      let count = null;
+      let n = a.nextElementSibling;
+      if (n && n.tagName === 'SPAN') {
+        const m = n.innerText.match(/\((\d+)\)/);
+        if (m) count = parseInt(m[1], 10);
+      }
+      keepers.push({ name, innings_kept: count });
+    }
+  }
+
+  return { team_name, stats, keepers };
+})()
+EVALEOF
+}
+
+# ─────────────────────────── ASSERT RUNNER: team overview ───────────────────────────
+# Expected dict shape:
+#   {
+#       "team_name": "Australia",        # exact match on page-title
+#       "stats": {
+#           "Matches": {"value": "22"},  # value substring match
+#           "Wins": {"value": "19"},
+#           "Win %": {                   # value + chip envelope
+#               "value": "86.4%",
+#               "chip_value": 86.4,
+#               "chip_avg": 48.45,
+#               "chip_delta": 78.3,
+#           },
+#       },
+#       "min_keepers": 0,                # optional — assert at least N keepers rendered
+#   }
+run_team_overview_assertions() {
+  local label="$1"
+  local json="$2"
+  local expected_py="$3"
+  python3 - "$label" "$json" "$expected_py" "$EPS_PCT" "$EPS_NUM" <<'PYEOF'
+import json, sys
+label, raw, expected_py, eps_pct_s, eps_num_s = sys.argv[1:6]
+EPS_PCT = float(eps_pct_s)
+EPS_NUM = float(eps_num_s)
+
+dom = json.loads(raw)
+expected = eval(expected_py)
+
+passes, fails = [], []
+def check(cond, msg):
+    (passes if cond else fails).append(msg)
+
+def near(a, b, eps):
+    if a is None and b is None: return True
+    if a is None or b is None: return False
+    return abs(float(a) - float(b)) <= eps
+
+exp_team = expected.get("team_name")
+if exp_team is not None:
+    check(exp_team in dom["team_name"],
+          f"[{label}] team_name '{dom['team_name']}' contains '{exp_team}'")
+
+for stat_label, exp in expected.get("stats", {}).items():
+    actual = dom["stats"].get(stat_label)
+    if actual is None:
+        fails.append(f"[{label}] stat '{stat_label}' missing from page")
+        continue
+    if "value" in exp:
+        check(exp["value"] in actual["value"],
+              f"[{label}] stat '{stat_label}' value '{actual['value']}' contains '{exp['value']}'")
+    if "chip_value" in exp:
+        check(near(actual["envValue"], exp["chip_value"], EPS_NUM),
+              f"[{label}] stat '{stat_label}' chip.value {actual['envValue']} vs expected {exp['chip_value']}")
+    if "chip_avg" in exp:
+        check(near(actual["envAvg"], exp["chip_avg"], EPS_NUM),
+              f"[{label}] stat '{stat_label}' chip.scope_avg {actual['envAvg']} vs expected {exp['chip_avg']}")
+    if "chip_delta" in exp:
+        check(near(actual["envDelta"], exp["chip_delta"], EPS_PCT),
+              f"[{label}] stat '{stat_label}' chip.delta {actual['envDelta']}% vs expected {exp['chip_delta']}%")
+    # Math invariant for chip-bearing stats.
+    if actual["envValue"] is not None and actual["envAvg"] not in (None, 0):
+        calc = (actual["envValue"] - actual["envAvg"]) / actual["envAvg"] * 100
+        check(near(actual["envDelta"], calc, EPS_PCT),
+              f"[{label}] stat '{stat_label}' chip math: displayed {actual['envDelta']}% vs computed {calc:.2f}% from value/avg")
+
+if "min_keepers" in expected:
+    n = expected["min_keepers"]
+    check(len(dom["keepers"]) >= n,
+          f"[{label}] keepers count {len(dom['keepers'])} >= {n}")
+
+print(f"\n=== {label}: {len(passes)} passed, {len(fails)} failed ===")
+for p in passes:
+    print(f"  ✓ {p}")
+for f in fails:
+    print(f"  ✗ {f}")
+
+sys.exit(0 if not fails else 1)
+PYEOF
+}
+
 # ─────────────────────────── ASSERT RUNNER ───────────────────────────
 # Diffs the extracted JSON against an expected python-literal dict.
 # Expected dict shape for compare grid:
