@@ -87,7 +87,24 @@ else
 fi
 
 # ────────────────────────────────────────────
-echo "Test 7 · /head-to-head/team narrows"
+echo "Test 7 · /teams typeahead narrows under series_type"
+plain=$(jpath "$BASE/api/v1/teams?gender=male&team_type=international&season_from=2024&season_to=2025" "len(d['teams'])")
+icc=$(jpath "$BASE/api/v1/teams?gender=male&team_type=international&season_from=2024&season_to=2025&series_type=icc" "len(d['teams'])")
+assert_narrow "/teams typeahead under series_type=icc" "$plain" "$icc"
+# Spot-check: Scotland's match count must drop under series_type=icc
+# (Scotland played both ICC qualifiers + bilaterals in 2024-25; the
+# clause must split the count). Pre-fix bug was: mp.team list narrowed
+# but match counts in each row stayed plain.
+SCOT_PLAIN=$(jpath "$BASE/api/v1/teams?gender=male&team_type=international&season_from=2024&season_to=2025&q=Sco" "next((t['matches'] for t in d['teams'] if t['name']=='Scotland'), 0)")
+SCOT_ICC=$(jpath "$BASE/api/v1/teams?gender=male&team_type=international&season_from=2024&season_to=2025&series_type=icc&q=Sco" "next((t['matches'] for t in d['teams'] if t['name']=='Scotland'), 0)")
+if [ "$SCOT_PLAIN" -gt "$SCOT_ICC" ] 2>/dev/null && [ "$SCOT_ICC" -gt 0 ] 2>/dev/null; then
+  ok "Scotland row matches narrow: $SCOT_PLAIN → $SCOT_ICC under icc"
+else
+  bad "Scotland row didn't narrow (plain=$SCOT_PLAIN icc=$SCOT_ICC)"
+fi
+
+# ────────────────────────────────────────────
+echo "Test 8 · /head-to-head/team narrows"
 # H2H team mode — Aus vs India 2024-25 with bilateral_only should be 0
 # (they only met at the T20 WC; S7 anchor).
 plain=$(jpath "$BASE/api/v1/head-to-head/team?team1=India&team2=Australia&gender=male&team_type=international&season_from=2024&season_to=2025" "d.get('total_matches', d.get('matches'))")

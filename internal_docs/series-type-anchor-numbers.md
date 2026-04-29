@@ -99,11 +99,14 @@ commit 2 (FilterBar widget):
   has at least one bilateral match — narrowing doesn't drop seasons
   in this scope. tournament_only narrows to 12 (only seasons with
   ICC events). ✓
-- `/teams` (typeahead) does NOT narrow under series_type — the
-  `list_teams` endpoint takes `filters: FilterParams = Depends()`
-  but no series_type plumbing into the join. Per spec §5.4 final
-  paragraph: "Edge case; may not be worth the wire unless flagged."
-  Deferred. ✗ (intentional)
+- `/teams` (typeahead): GAP at first audit (100 == 100), fixed
+  same-day in a follow-up commit — `list_teams` now applies
+  `series_type_clause(filters.series_type)` alongside the
+  `team_class` clause. Post-fix: 100 → 27 under `series_type=icc`
+  on men_intl 2024-25 (only the 27 teams that played in T20 WC or
+  ACC Premier Cup). Scotland row narrows 17 → 4 (4 ICC + 13
+  bilateral = 17 total). Asserted by
+  `tests/integration/series_type_per_tab_narrowing.sh::Test 7`. ✓
 - `/matches` matches S1/S2/S3 anchors above (870 / 802 / 68). ✓
 - `/scope/averages/summary` narrows correctly AND dispatch falls
   back to live aggregation under series_type (per

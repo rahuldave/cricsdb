@@ -199,6 +199,15 @@ sets series_type=bilateral_only they'd want the team typeahead
 to drop teams that only appear in tournaments. Edge case; may
 not be worth the wire unless flagged.
 
+**Update 2026-04-28** — flagged + fixed same-session.
+`list_teams` reads `filters.series_type` directly (no aux needed
+post-promotion) and applies `_series_type_clause` alongside the
+`team_class` defensive gate. The fix is one ~5-line block;
+typeahead narrows 100 → 27 under `series_type=icc` on men_intl
+2024-25, with row counts also narrowing (Scotland 17 → 4).
+Regression assertion landed in
+`tests/integration/series_type_per_tab_narrowing.sh::Test 7`.
+
 Net work in this commit: zero or near-zero edits. Most of
 "commit 3" work in this spec is verification, not editing.
 

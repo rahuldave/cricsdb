@@ -262,6 +262,16 @@ async def list_teams(
     if filters.team_class == "full_member" and filters.team_type == "international":
         from ..full_members import full_member_clause
         where_parts.append(full_member_clause(table_alias="m"))
+    # series_type — without this, the typeahead suggests teams whose
+    # only matches in scope are out of the chosen series category
+    # (e.g. Scotland under series_type=bilateral_only — they play
+    # almost exclusively ICC qualifiers, so picking them yields a
+    # zero-results page). Mirror of the team_class gate above; same
+    # `_series_type_clause` the rest of the FilterBar uses.
+    if filters.series_type:
+        st = _series_type_clause(filters.series_type, alias="m")
+        if st:
+            where_parts.append(st)
     if q:
         where_parts.append("mp.team LIKE :q")
         params["q"] = f"%{q}%"
