@@ -1221,8 +1221,30 @@ function PartnershipsTab({ team, filters, filterDeps }: TabProps) {
 
   const wicketColumns: Column<PartnershipByWicket>[] = [
     { key: 'wicket_number', label: 'Wkt' },
-    { key: 'n', label: 'n', sortable: true },
-    { key: 'avg_runs', label: 'Avg runs' },
+    // n and avg_runs come back as chip envelopes ({value, scope_avg,
+    // …}) on this endpoint — extract .value so the DataTable renders
+    // the number, not "[object Object]". Caught by
+    // tests/integration/dom/teams_partnerships_intl.sh 2026-04-28.
+    { key: 'n', label: 'n', sortable: true,
+      format: (_, r) => {
+        const e = r.n as unknown
+        if (typeof e === 'number') return String(e)
+        if (e && typeof e === 'object' && 'value' in (e as object)) {
+          const v = (e as { value: number | null }).value
+          return v != null ? String(v) : '—'
+        }
+        return '—'
+      } },
+    { key: 'avg_runs', label: 'Avg runs',
+      format: (_, r) => {
+        const e = r.avg_runs as unknown
+        if (typeof e === 'number') return String(e)
+        if (e && typeof e === 'object' && 'value' in (e as object)) {
+          const v = (e as { value: number | null }).value
+          return v != null ? String(v) : '—'
+        }
+        return '—'
+      } },
     { key: 'avg_balls', label: 'Avg balls' },
     { key: 'best_runs', label: 'Best', sortable: true },
     {
