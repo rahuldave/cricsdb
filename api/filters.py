@@ -93,12 +93,30 @@ class AuxParams:
                 " chip envelope `scope_avg` is narrowed by the peer avg"
                 " slot's team_class so chip ↔ displayed-avg-col agreement"
                 " holds. Applied only inside `_league_aux`; team-side"
-                " aggregates are unaffected."
+                " aggregates are unaffected. Superseded by"
+                " `chip_baseline_scope_json` (general all-axis form);"
+                " kept as back-compat shortcut."
+            ),
+        ),
+        chip_baseline_scope_json: Optional[str] = Query(
+            None,
+            description=(
+                "Generalised chip-baseline alignment — base64-encoded"
+                " JSON of the peer avg slot's full effective scope"
+                " (FilterBar fields + synthesized scope_to_team). When"
+                " set, `_league_aux` parses it into a fresh"
+                " (filters, aux) pair used as the league-side baseline,"
+                " bypassing the narrower `chip_team_class` shortcut."
+                " Lets chip math align under broaden-direction overrides"
+                " (e.g. primary tournament=IPL, avg slot"
+                " tournament=__any__ → chip baseline = all-club pool)."
+                " Spec: spec-slot-override-chip-alignment.md §4.2."
             ),
         ),
     ):
         self.scope_to_team = scope_to_team
         self.chip_team_class = chip_team_class
+        self.chip_baseline_scope_json = chip_baseline_scope_json
 
 
 class FilterBarParams:

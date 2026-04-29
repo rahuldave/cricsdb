@@ -14,6 +14,47 @@ from ..tournament_canonical import series_type as series_type_for, canonicalize
 router = APIRouter(prefix="/api/v1/teams", tags=["Teams"])
 
 
+def _decode_chip_baseline(b64: str) -> tuple[FilterParams, AuxParams] | None:
+    """Decode the `chip_baseline_scope_json` aux field — base64-JSON of
+    the peer avg slot's effective scope — into a fresh
+    (FilterBarParams, AuxParams) pair the league-side aggregation can
+    use directly. Returns None on parse error (caller falls back to the
+    legacy `chip_team_class` + `scope_to_team` synthesis path).
+
+    Payload shape (any subset of the keys, all strings):
+      gender, team_type, tournament, season_from, season_to,
+      filter_venue, series_type, team_class, scope_to_team
+
+    Spec: spec-slot-override-chip-alignment.md §4.2, §5.2.
+    """
+    import base64, json
+    try:
+        raw = base64.b64decode(b64, validate=True)
+        payload = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    f = FilterParams(
+        gender=payload.get("gender"),
+        team_type=payload.get("team_type"),
+        tournament=payload.get("tournament"),
+        season_from=payload.get("season_from"),
+        season_to=payload.get("season_to"),
+        filter_team=None,
+        filter_opponent=None,
+        filter_venue=payload.get("filter_venue"),
+        team_class=payload.get("team_class"),
+        series_type=payload.get("series_type"),
+    )
+    a = AuxParams(
+        scope_to_team=payload.get("scope_to_team"),
+        chip_team_class=None,
+        chip_baseline_scope_json=None,
+    )
+    return f, a
+
+
 def _team_filter_clause(filters: FilterParams, team_param: str = ":team", aux: AuxParams | None = None) -> tuple[str, dict]:
     """Build match-level filter clause for team queries (no innings join)."""
     where, params = filters.build(has_innings_join=False, aux=aux)
@@ -1055,47 +1096,56 @@ def _league_aux(
     the chip envelope's `scope_avg` baselines against the same scope
     the Compare-tab avg column displays.
 
-    Two synthesis steps run independently:
+    Three synthesis paths, in priority order:
 
-    1. **`scope_to_team`** (lands on aux) — auto-narrow the league
-       pool to the team's tournament universe. GATED on
-       `filters.team_type == 'club'` (closed-league semantic). For
-       internationals a single team's universe contains that team in
-       every match, so narrowing collapses into a self-mirror; the
-       frontend defaults to the full pool there, so the chip baseline
-       must agree (no synthesis). Skipped when aux already carries
-       `scope_to_team` explicitly.
+    0. **`chip_baseline_scope_json`** (preferred, post-2026-04-29) —
+       full base64-JSON serialization of the peer avg slot's scope
+       sent by the frontend `chipAlignmentFor`. When set, fully
+       overrides the team-side filters for the league baseline call.
+       Generalises Steps 1 + 2 below: handles narrowing AND broadening
+       overrides on every overridable axis (tournament / season /
+       venue / series_type / team_class). Spec:
+       spec-slot-override-chip-alignment.md §4.2.
 
-    2. **`chip_team_class` → `team_class` on filters** — when the
-       request carries a `chip_team_class` aux hint (sent by the team
-       slot's fetcher when a peer avg slot has team_class set), copy
-       it onto the LEAGUE-SIDE filters' `team_class`. Post the v3
-       FilterBar-promotion of `team_class` (2026-04-28), the field
-       lives on FilterBarParams, so the chip alignment hint must land
-       on the league-side filters copy — not the aux. The TEAM data
-       stays scoped to the team's own filters (Aus shows all 22 of
-       its matches), but the chip's `scope_avg` is computed against
-       the FM-only pool — matching the displayed avg col's value
-       (8.5 not 7.52). Without this propagation, chip.scope_avg and
-       avg.run_rate disagree whenever the avg slot uses team_class.
+    1. **`scope_to_team`** (legacy fallback, lands on aux) — auto-
+       narrow the league pool to the team's tournament universe.
+       GATED on `filters.team_type == 'club'` (closed-league
+       semantic). For internationals a single team's universe
+       contains that team in every match, so narrowing collapses into
+       a self-mirror; the frontend defaults to the full pool there,
+       so the chip baseline must agree (no synthesis). Skipped when
+       aux already carries `scope_to_team` explicitly.
+
+    2. **`chip_team_class` → `team_class` on filters** (legacy
+       fallback) — the v3 narrow-direction shortcut. Copy onto the
+       LEAGUE-SIDE filters' `team_class`. Kept for back-compat with
+       clients that haven't switched to `chip_baseline_scope_json`.
 
     No-op when `team is None`.
 
-    Spec: spec-avg-column-per-innings.md Commit 3 + the 2026-04-27
-    international avg-baseline correction (Mechanism A + B + chip
-    alignment) + spec-filterbar-team-class-v3.md commit 1.
+    Spec: spec-slot-override-chip-alignment.md §5.2 +
+    spec-avg-column-per-innings.md Commit 3 + the 2026-04-27
+    international avg-baseline correction.
     """
     from copy import copy
     if team is None:
         return filters, aux
 
+    # Path 0 — full-scope override. Bypass the legacy synthesis paths
+    # entirely so the league-side aggregation uses the avg slot's exact
+    # effective scope. Falls through on parse error.
+    if aux.chip_baseline_scope_json:
+        decoded = _decode_chip_baseline(aux.chip_baseline_scope_json)
+        if decoded is not None:
+            return decoded
+
     new_aux = aux
     new_filters = filters
-    # Step 1: scope_to_team narrow (clubs only, only when not already set).
+    # Path 1: scope_to_team narrow (clubs only, only when not already set).
     if not aux.scope_to_team and (filters is None or filters.team_type == "club"):
         new_aux = copy(aux)
         new_aux.scope_to_team = team
-    # Step 2: chip_team_class → team_class on filters (any team_type).
+    # Path 2: chip_team_class → team_class on filters (any team_type).
     if aux.chip_team_class and filters is not None:
         new_filters = copy(filters)
         new_filters.team_class = aux.chip_team_class
