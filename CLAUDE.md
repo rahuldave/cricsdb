@@ -58,6 +58,20 @@ and click every link to confirm it navigates. `tsc --noEmit` and
 `npm run build` only verify code correctness, not feature correctness.
 Do not claim UI work is complete without a browser-agent run.
 
+**DO NOT SPECULATE — verify before proposing a fix or explanation.**
+When the user reports a bug or asks why something looks/behaves a
+certain way, do NOT reason from code-reading or prior assumptions and
+guess what's wrong. First REPRODUCE: load the URL with agent-browser
+and observe what's actually rendered, click the actual control,
+query the DB, run the actual test. Then propose. Phrases like
+"this might be because…", "probably the X is Y…", "I bet the issue
+is…" are tells that you're about to ship a speculative fix — STOP
+and verify first. The user has flagged this twice (2026-04-29):
+speculation that turns out wrong wastes a round-trip; speculation
+that "matches what they're seeing" by accident sets the wrong fix
+in motion. Reproduction is cheap (one agent-browser call); guessing
+costs the user trust.
+
 **Audit prompt discipline:** when asking agent-browser to verify, ask
 for RAW OUTPUT, not verdicts. "List every section header with the first
 row label per column" is checkable. "Verify all sections render" is a
