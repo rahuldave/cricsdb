@@ -134,6 +134,55 @@ extract_data_table() {
 EVALEOF
 }
 
+# ─────────────────────────── EXTRACTOR: chart summary ───────────────────────────
+# For Semiotic SVG charts (WormChart, ManhattanChart). Semiotic
+# auto-emits a hidden accessibility "data summary" panel per chart,
+# accessed via "Skip to data table" links → `<div id="semiotic-
+# table-_r_*_"><button>View data summary…</button></div>`. The
+# button expands to a <div role="note"> with aggregate stats +
+# a <table> of the first 5 data points.
+#
+# Asserting CHART NUMERIC LABELS by SVG-position is fragile (label
+# transforms change with viewport / axis scale / font rendering).
+# This extractor uses the data-summary panel — the same data Semiotic
+# rendered into the chart, but DOM-textual instead of position-textual.
+#
+#   extract_chart_summary 0   # first chart on the page
+#   extract_chart_summary 1   # second chart
+#
+# Returns: { id, exists, summary, samples: [[cell,...],...] }
+#   summary  — role=note text, e.g.
+#              "20 data points. category: 1, 2, 3… (20 unique). value: 3 to 17, mean 8.8."
+#   samples  — first 5 data points as rows of cells, e.g.
+#              [["Bar","1","15"],["Bar","2","8"],...]
+extract_chart_summary() {
+  local idx="${1:-0}"
+  agent-browser eval --stdin <<EVALEOF
+(() => {
+  const idx = ${idx};
+  const containers = document.querySelectorAll('[id^="semiotic-table-"]');
+  const c = containers[idx];
+  if (!c) {
+    return { error: 'no semiotic-table at index ' + idx
+                  + ' (have ' + containers.length + ')' };
+  }
+  // Click button to expand if not already open.
+  const btn = c.querySelector('button');
+  if (btn && !c.querySelector('table')) {
+    btn.click();
+  }
+  // Allow a microtask for the React re-render to commit.
+  return new Promise(resolve => setTimeout(() => {
+    const summary = c.querySelector('[role="note"]')?.innerText?.trim() || '';
+    const rows = Array.from(c.querySelectorAll('tbody tr')).map(tr =>
+      Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim())
+    );
+    resolve({ id: c.id, exists: true, summary, samples: rows });
+  }, 100));
+})()
+EVALEOF
+}
+
 # ─────────────────────────── EXTRACTOR: landing tiles ───────────────────────────
 # For /series (TournamentsLanding) — sectioned tile directory.
 # DOM:
