@@ -168,6 +168,7 @@ FastAPI also exposes auto-generated interactive docs at **`/api/docs`** (Swagger
 - **Added a new router file, a new page, or a new hook?** Update **`internal_docs/codebase-tour.md`** (both the router summary line and the frontend hooks block).
 - **Shipped a feature that belongs in the A-O narrative?** Add or amend the entry in **`internal_docs/enhancements-roadmap.md`**; done items stay there as historical markers.
 - **Made a non-obvious design decision** (a convention future contributors would otherwise try to change)? Add a bullet to **`internal_docs/design-decisions.md`**.
+- **Added or changed a metric formula** (run rate, economy, win %, a transform, an exclusion rule)? Update the matching section in **`internal_docs/how-stats-calculated.md`** with the new formula + WHY. The doc grows with the codebase; never let a formula go undocumented.
 - **Changed pipeline behaviour, introduced a new invariant the DB must carry, or added a testing workflow?** Touch **`internal_docs/data-pipeline.md`** (and/or `internal_docs/testing-update-recent.md`).
 - **Refactored a shared query helper (`FilterParams`, router filter fns, SQL generators) with many callers?** Run `./tests/regression/run.sh <feature>` against a URL inventory at `tests/regression/<feature>/urls.txt`. Workflow + inventory conventions in **`internal_docs/regression-testing-api.md`** + **`tests/regression/README.md`**. Report the pass count before claiming done.
 - **Intentionally changed the response shape of an endpoint that has REG entries in `urls.txt`?** Flip those lines from `REG` to `NEW` in a **separate, earlier commit** before the shape change itself. The runner keys on the HEAD-side `kind` column (`kind, hh = head[k]` in `run.sh`), so an uncommitted flip has no effect — it has to be in HEAD when the runner stashes. Workflow: (1) commit the `REG→NEW` flip on affected URLs, (2) commit the backend change, (3) run `./tests/regression/run.sh <feature>` — expected output is `0 REG drifted, N NEW changed, 0 NEW unchanged`.
@@ -302,7 +303,7 @@ not have this problem?" — yes. If the answer to that question is
 
 ## Critical Design Decisions
 
-Read `internal_docs/design-decisions.md` for full details. Key points:
+Read `internal_docs/design-decisions.md` for full details. Concrete formulas (run rate, economy, win %, per-innings vs per-team transforms, etc.) live in **`internal_docs/how-stats-calculated.md`** — go there first when asking "wait, how is that calculated?". Key points:
 
 - **Over numbering:** DB stores 0-19 (matching cricsheet source). API returns 1-20 (+1 in each router's response). Frontend displays as-is.
 - **Phase boundaries:** Powerplay = overs 1-6, Middle = 7-15, Death = 16-20 (in API responses). SQL internally uses 0-5, 6-14, 15-19.
