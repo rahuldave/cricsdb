@@ -8,6 +8,7 @@ import PlayerSearch from '../components/PlayerSearch'
 import SeriesLink from '../components/SeriesLink'
 import FlagBadge from '../components/FlagBadge'
 import ScopeIndicator from '../components/ScopeIndicator'
+import InningToggle from '../components/InningToggle'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
@@ -56,6 +57,7 @@ export default function Fielding() {
     filters.season_from, filters.season_to,
     filters.filter_team, filters.filter_opponent,
     filters.filter_venue,
+    filters.inning,
   ]
 
   const summaryFetch = useFetch<FieldingSummary | null>(
@@ -235,6 +237,7 @@ export default function Fielding() {
             )}
           </h2>
           <ScopeIndicator filters={filters} />
+          <InningToggle />
           <div className="wisden-statrow cols-6">
             <StatCard label="Catches" value={summary.catches} />
             <StatCard label="Stumpings" value={summary.stumpings} />

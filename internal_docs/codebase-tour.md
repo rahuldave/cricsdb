@@ -165,6 +165,14 @@ frontend/src/
                                     overrides}. Reads new compareN params, falls back to legacy
                                     compare=A,B / avg_slot=1 (one-shot migration in Teams.tsx
                                     rewrites legacy with replace:true). Memoed by URL qs.
+                                    OVERRIDABLE_SLOT_KEYS includes `inning` post-2026-04-29
+                                    (spec-inning-split.md commit 3) — Compare-tab slots can
+                                    override the page-level inning toggle via compareN_inning.
+  components/InningToggle.tsx  — Three-pill segmented control writing URL ?inning= via
+                                    useUrlParam. Mounted on player Batting/Bowling/Fielding
+                                    pages above the headline stats (commit 4); team
+                                    Batting/Bowling/Fielding tabs in commit 5. AuxParams aux
+                                    field — NOT a FilterBar key. Spec: spec-inning-split.md §6.1.
   components/                  — Layout (now hosts a Players ▾ group with desktop hover-dropdown
                                    + persistent mobile sub-row while any /players, /batting,
                                    /bowling, /fielding route is active; mounts FilterBar +

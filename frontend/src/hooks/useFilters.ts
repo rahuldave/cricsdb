@@ -24,6 +24,12 @@ export function useFilters(): FilterParams {
       const v = params.get(k as FilterKey)
       if (v) out[k as FilterKey] = v
     }
+    // AuxParams-style fields — read from URL but NOT in FILTER_KEYS
+    // (the FilterBar UI doesn't drive them). Each lands as its
+    // backend AuxParams namesake when the API client serializes
+    // FilterParams → query string.
+    const inning = params.get('inning')
+    if (inning) out.inning = inning
     return out as FilterParams
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qs])
