@@ -78,3 +78,37 @@ in commit 5) hits each anchor via two paths:
 If the two paths agree on every anchor, the promotion is inert
 where it should be (S1, S5 are the unbounded controls) AND active
 where it should be (S2, S3, S6, S7, S8, S10).
+
+## Hand-rolled helper verification (spec commit 3)
+
+Per spec §5.4 + §9 commit 3, this is verification-only with zero
+backend edits. Curl matrix run 2026-04-28 against the just-shipped
+commit 2 (FilterBar widget):
+
+| Endpoint | plain | bilateral_only | tournament_only |
+|---|---|---|---|
+| `/tournaments` (men_intl 24-25) | 128 | **126** | **2** |
+| `/seasons` (men_intl unbounded) | 44 | 44 | **12** |
+| `/teams` (typeahead, men_intl) | 107 | 107 | 107 |
+| `/matches` (men_intl 24-25) | **870** | **802** | **68** |
+| `/scope/averages/summary` (per-team) | 17.4 | 16.04 | 5.04 |
+
+- `/tournaments` narrowing matches spec §5.4's curl-verified anchor
+  exactly (128 → 126 → 2). ✓
+- `/seasons` plain = bilateral_only because every year in window
+  has at least one bilateral match — narrowing doesn't drop seasons
+  in this scope. tournament_only narrows to 12 (only seasons with
+  ICC events). ✓
+- `/teams` (typeahead) does NOT narrow under series_type — the
+  `list_teams` endpoint takes `filters: FilterParams = Depends()`
+  but no series_type plumbing into the join. Per spec §5.4 final
+  paragraph: "Edge case; may not be worth the wire unless flagged."
+  Deferred. ✗ (intentional)
+- `/matches` matches S1/S2/S3 anchors above (870 / 802 / 68). ✓
+- `/scope/averages/summary` narrows correctly AND dispatch falls
+  back to live aggregation under series_type (per
+  `is_precomputed_scope` reading filters.series_type now). ✓
+
+Net: every endpoint that mattered before commit 1 still narrows
+correctly post-promotion. The only known gap (`list_teams`
+typeahead) was acknowledged by the spec as deferred.
