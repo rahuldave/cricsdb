@@ -91,14 +91,26 @@ async def lifespan(app: FastAPI):
 
     # SPA fallback — must be registered AFTER API routers so /api/v1/* matches first
     if os.path.exists("frontend/dist"):
-        from fastapi.responses import FileResponse
+        from fastapi import Request
+        from fastapi.responses import FileResponse, HTMLResponse
 
         @app.get("/{path:path}", include_in_schema=False)
-        async def serve_spa(path: str):
+        async def serve_spa(path: str, request: Request):
             file_path = os.path.join("frontend/dist", path)
             if os.path.isfile(file_path):
                 return FileResponse(file_path)
-            return FileResponse("frontend/dist/index.html")
+            # SPA route — rewrite the static index.html's <title> and
+            # OG / Twitter meta tags per route so social-card scrapers
+            # (Twitter, Slack, iMessage, LinkedIn) get page-specific
+            # cards. Scrapers don't run JS, so client-side
+            # useDocumentTitle wouldn't reach them. Spec lives inline
+            # in `social_meta.py`.
+            from .social_meta import build_meta, inject_meta
+            meta = build_meta(path, dict(request.query_params))
+            with open("frontend/dist/index.html") as f:
+                html = f.read()
+            html = inject_meta(html, meta)
+            return HTMLResponse(content=html)
 
     yield
 
