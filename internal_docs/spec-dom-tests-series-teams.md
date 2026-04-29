@@ -195,12 +195,34 @@ to reflect the 2026-04-28 per-team-transform DOM (avg col matches
 identity now reads "N matches in scope" per-team, not absolute
 pool).
 
-### Batch 2 (next session)
+### Batch 2 — ✅ shipped 2026-04-28
 
-- `teams_overview_*`, `teams_batting_*`, `teams_bowling_*`, `teams_fielding_*`, `teams_partnerships_*`.
-- `series_overview_*`, `series_records_*`.
+7 pairs (14 scripts), 240 assertions, all green. Each pair shares
+extractor + ground-truth derivation; one new
+`extract_team_overview` extractor added to `_lib.sh` (single-team
+`.wisden-statrow`). Per-pair counts:
 
-10 scripts.
+- `teams_overview_{intl,club}.sh` — 20 (Aus 2024-25, RCB IPL 2025).
+- `teams_batting_{intl,club}.sh` — 72 (15 StatCards × 2, ~5 chip
+  envelopes each).
+- `teams_bowling_{intl,club}.sh` — 74 (12 StatCards × 2, ~5 chip
+  envelopes each).
+- `teams_fielding_{intl,club}.sh` — 42 (8 StatCards × 2, 3 chips).
+- `teams_partnerships_{intl,club}.sh` — 18 (10-row by-wicket grid,
+  asserts top + last). **UI bug caught + fixed:** the by-wicket
+  DataTable rendered `n` and `avg_runs` chip envelopes as
+  "[object Object]" because there was no `format` function —
+  added narrow `.value` extractors with graceful fallback.
+- `series_overview_{intl,club}.sh` — 14 (T20 WC Men 2024;
+  IPL 2025).
+- `series_records_{intl,club}.sh` — 18 (highest team totals
+  table — first DataTable on the Records tab; required +4s soak
+  for the 5+ DataTable fan-out).
+
+Leaders cards (Most titles, Top scorer, Top wicket-taker on
+Series Overview) deferred to Batch 3 leader-extractor — they
+contain composed TeamLink/PlayerLink + subtitle compounds that
+need a more careful parser.
 
 ### Batch 3 (queue for week 2)
 

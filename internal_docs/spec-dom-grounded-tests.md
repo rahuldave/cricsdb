@@ -8,16 +8,30 @@ tests per tab/sub-tab and the conventions every script should follow.
 
 ## Status (2026-04-28)
 
-- ✅ Batch 1 shipped — 4 scripts under `tests/integration/dom/`,
-  113 DOM assertions across 9 anchors (A / A' / E1 / B / M1 / M2 /
-  L1 / L2). Shared harness lifted into `tests/integration/dom/_lib.sh`
-  with extractors for compare grids, DataTables, and landing tiles
-  + 3 assert runners. Independent ground-truth SQL in
-  `tests/integration/dom/audit/`.
-- 🔲 Batch 2 — Teams sub-tabs (Overview / Batting / Bowling /
-  Fielding / Partnerships) + Series Overview / Records. ~10 scripts.
-- 🔲 Batch 3 — remaining tabs +
-  `cross_cutting_team_class_consistency.sh`.
+- ✅ Batch 1 shipped — 4 scripts (113 assertions, 9 anchors:
+  A / A' / E1 / B / M1 / M2 / L1 / L2). Harness in `_lib.sh` with
+  three extractors (`extract_grid` for Compare-tab columns;
+  `extract_data_table` for tabular surfaces; `extract_landing_tiles`
+  for sectioned tile directories) + three assert runners.
+- ✅ Batch 2 shipped — 14 scripts (240 new assertions; total dom/
+  suite = 353 across 18 scripts). Pairs:
+  `teams_overview_{intl,club}` (20),
+  `teams_batting_{intl,club}` (72),
+  `teams_bowling_{intl,club}` (74),
+  `teams_fielding_{intl,club}` (42),
+  `teams_partnerships_{intl,club}` (18),
+  `series_overview_{intl,club}` (14),
+  `series_records_{intl,club}` (18). One new harness extractor
+  added (`extract_team_overview` — single-team `.wisden-statrow`
+  + keepers paragraph). One UI bug caught + fixed during the
+  rollout: PartnershipsTab by-wicket DataTable rendered chip
+  envelopes as "[object Object]" — narrow format functions added.
+- 🔲 Batch 3 — remaining sub-tabs (Series Editions / Champions /
+  Knockouts / Points / Batters / Bowlers / Fielders / Partnerships /
+  Matches; Teams Players / Match List / vs Opponent) +
+  `cross_cutting_team_class_consistency.sh` (asserts the same
+  number renders consistently across `/teams`, `/series`,
+  `/head-to-head`).
 - 🔲 Players, Head-to-Head, Matches, Venues, Batting/Bowling/Fielding
   pages, scorecard: open queue, lower priority.
 
