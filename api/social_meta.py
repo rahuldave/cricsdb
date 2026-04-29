@@ -11,16 +11,24 @@ per-route so shared cards carry page-specific content.
 Card image stays static (`og-card.png`) — per-page image generation
 is more work and not asked-for; the wordmark card is a fine fallback.
 
-Currently covers param-derivable routes (no DB lookup needed):
+Covers:
   /teams?team=X[&tab=Y[&compare1=Z[&compare2=W]]]  → Team / Compare
   /series?tournament=X                              → Series dossier
   /venues?venue=X                                   → Venue dossier
-  /head-to-head?mode=team&team1=A&team2=B           → Rivalry
-  /head-to-head?player=A&compare=B                  → Player rivalry
+  /head-to-head?mode=team&team1=A&team2=B           → Team rivalry
+  /head-to-head?mode=player&player=A&compare=B      → Player rivalry
+  /players?player=<id>[&compare=<id>[,<id>]]        → Player profile / compare
+  /batting?player=<id>                              → Player batting
+  /bowling?player=<id>                              → Player bowling
+  /fielding?player=<id>                             → Player fielding
+  /matches/<match_id>                               → Match scorecard
 
-Routes whose subject is encoded as an opaque ID (player/match) need
-a DB lookup to resolve the human name; deferred until the per-page
-title work expands to those.
+Player + match routes carry opaque IDs as their identifying param,
+so `build_meta` is async and queries the DB to resolve human names.
+Param-only routes don't need the DB but stay in the same async
+function for uniformity. On lookup failure (id not in DB, transient
+DB error) the function falls back to the static site card — never
+raises out of the SPA fallback path.
 
 Spec: user feedback 2026-04-29 — "what do we title and twitter card
 pages like this?"
@@ -28,6 +36,9 @@ pages like this?"
 from __future__ import annotations
 
 import re
+from typing import Any
+
+from .dependencies import get_db
 
 SITE_NAME = "T20 & CricsDB"
 SITE_BASE = "https://t20.rahuldave.com"
@@ -38,13 +49,61 @@ DEFAULT_DESCRIPTION = (
 DEFAULT_TITLE = f"{SITE_NAME} — An almanack of Twenty20 cricket"
 
 
-def build_meta(path: str, query: dict) -> dict:
+async def _lookup_persons(person_ids: list[str]) -> dict[str, str]:
+    """Resolve {person_id: name} for the supplied IDs. Empty input or
+    DB failure both return an empty dict — caller falls back to the
+    raw ID string in that case (never raises)."""
+    person_ids = [p for p in person_ids if p]
+    if not person_ids:
+        return {}
+    try:
+        db = get_db()
+        # Inline f-string interpolation because deebase bind params
+        # don't expand lists for IN-clauses (project convention; see
+        # CLAUDE.md "deebase db.q()"). IDs are 8-char hex from
+        # cricsheet — sanitise defensively to alphanumeric.
+        clean = [pid for pid in person_ids if re.fullmatch(r"[A-Za-z0-9]+", pid)]
+        if not clean:
+            return {}
+        in_list = ",".join(f"'{pid}'" for pid in clean)
+        rows = await db.q(
+            f"SELECT id, name FROM person WHERE id IN ({in_list})", {},
+        )
+        return {r["id"]: r["name"] for r in rows}
+    except Exception:
+        return {}
+
+
+async def _lookup_match(match_id: str) -> dict[str, Any] | None:
+    """Resolve match identity (teams, season, event_name, gender) for
+    a given match_id. Returns None on parse failure / missing match."""
+    if not match_id:
+        return None
+    try:
+        mid = int(match_id)
+    except ValueError:
+        return None
+    try:
+        db = get_db()
+        rows = await db.q(
+            "SELECT id, team1, team2, season, event_name, gender, "
+            "venue, city, outcome_winner FROM match WHERE id = :mid",
+            {"mid": mid},
+        )
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+async def build_meta(path: str, query: dict) -> dict:
     """Return {title, description, url} for a given SPA route.
 
     `path` is the SPA route (e.g. "teams"); `query` is a flat
     {key: value} dict from the URL's query string. Falls back to the
     site-wide title/description when the route doesn't match a known
-    pattern (or when the relevant identifying param is missing).
+    pattern (or when the relevant identifying param is missing /
+    fails DB lookup). Async so player + match routes can resolve
+    human names from opaque IDs.
     """
     p = path.strip("/")
 
@@ -139,6 +198,57 @@ def build_meta(path: str, query: dict) -> dict:
         if scope_tag:
             description += f" — {scope_tag}"
         description += "."
+
+    # ─── Player routes (opaque IDs → DB lookup) ──────────────────────
+    # /players?player=X[&compare=Y[,Z]]    /batting?player=X
+    # /bowling?player=X    /fielding?player=X    /head-to-head?mode=player
+    elif p in ("players", "batting", "bowling", "fielding") or (p == "head-to-head" and mode == "player"):
+        player_id = query.get("player")
+        compare_csv = query.get("compare") or ""
+        compare_ids = [c.strip() for c in compare_csv.split(",") if c.strip()]
+        if player_id:
+            names = await _lookup_persons([player_id] + compare_ids)
+            primary_name = names.get(player_id, player_id)
+            others = [names.get(cid, cid) for cid in compare_ids]
+            page_label = {
+                "players":     "Player",
+                "batting":     "Batting",
+                "bowling":     "Bowling",
+                "fielding":    "Fielding",
+                "head-to-head": "Head to Head",
+            }[p]
+            if others:
+                title = f"{primary_name} vs {' vs '.join(others)} — {page_label} · {SITE_NAME}"
+                description = f"T20 {page_label.lower()}: {primary_name} vs {', '.join(others)}"
+            else:
+                title = f"{primary_name} — {page_label} · {SITE_NAME}"
+                description = f"T20 {page_label.lower()} stats for {primary_name}"
+            if scope_tag:
+                description += f" — {scope_tag}"
+            description += "."
+
+    # ─── Match scorecard ─────────────────────────────────────────────
+    # /matches/<id>      (the non-list match URL — list page /matches
+    # has no identifying ID and falls through to default.)
+    elif p.startswith("matches/"):
+        match_id = p[len("matches/"):]
+        m = await _lookup_match(match_id)
+        if m:
+            t1, t2 = m.get("team1") or "?", m.get("team2") or "?"
+            season = m.get("season") or ""
+            event = m.get("event_name") or ""
+            venue = m.get("venue") or ""
+            winner = m.get("outcome_winner") or ""
+            title = f"{t1} v {t2} — Scorecard · {SITE_NAME}"
+            desc_bits = []
+            if event: desc_bits.append(event)
+            if season: desc_bits.append(season)
+            if venue: desc_bits.append(f"@ {venue}")
+            if winner: desc_bits.append(f"{winner} won")
+            description = f"T20 scorecard: {t1} v {t2}"
+            if desc_bits:
+                description += f" — {' · '.join(desc_bits)}"
+            description += "."
 
     return {"title": title, "description": description, "url": url}
 

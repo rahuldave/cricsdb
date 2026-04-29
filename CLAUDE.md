@@ -72,6 +72,19 @@ that "matches what they're seeing" by accident sets the wrong fix
 in motion. Reproduction is cheap (one agent-browser call); guessing
 costs the user trust.
 
+**DO NOT defer parts of an assigned task without asking.** When the
+user gives you a task — "add per-page Twitter cards", "wire up X for
+the whole app" — finish it. Don't ship the easy half and pitch the
+rest as a follow-up ("I deferred the player/match routes since they
+need DB lookups"). If a part is genuinely out-of-scope or needs a
+different design call, ASK before cutting it; don't decide
+unilaterally. The "shipped + deferred" pattern reads as scope-
+shaving and forces the user to re-prompt for the work they already
+asked for. User flagged 2026-04-29 after a per-page social-meta
+task shipped 4-of-6 route patterns and deferred the two that
+needed an `await db.q(...)` lookup. The fix isn't more deferral
+discipline — it's finishing the job.
+
 **Audit prompt discipline:** when asking agent-browser to verify, ask
 for RAW OUTPUT, not verdicts. "List every section header with the first
 row label per column" is checkable. "Verify all sections render" is a

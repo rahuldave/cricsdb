@@ -106,7 +106,7 @@ async def lifespan(app: FastAPI):
             # useDocumentTitle wouldn't reach them. Spec lives inline
             # in `social_meta.py`.
             from .social_meta import build_meta, inject_meta
-            meta = build_meta(path, dict(request.query_params))
+            meta = await build_meta(path, dict(request.query_params))
             with open("frontend/dist/index.html") as f:
                 html = f.read()
             html = inject_meta(html, meta)
