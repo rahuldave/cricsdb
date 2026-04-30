@@ -30,6 +30,7 @@ from fastapi import Query
 from typing import Optional
 
 from .full_members import full_member_clause
+from .club_tiers import primary_club_clause, secondary_club_clause
 from .tournament_canonical import (
     is_canonical_with_variants,
     variants as canonical_variants,
@@ -178,10 +179,19 @@ class FilterBarParams:
             None,
             description=(
                 "Restrict to matches between two teams in a named class."
-                " Currently supports `full_member` (= matches between ICC"
-                " full-member nations only). No-op when team_type !="
-                " 'international' (defensive backend gate — full-member"
-                " status is an intl classification)."
+                " Polymorphic over team_type:"
+                " `full_member` requires team_type='international' (= matches"
+                " between ICC full-member nations);"
+                " `primary_club` requires team_type='club' (= matches in a"
+                " marquee international franchise league — IPL, BBL, PSL,"
+                " BPL, CPL, SA20, ILT20, LPL, MLC, The Hundred (M+W), WBBL,"
+                " WPL, …);"
+                " `secondary_club` requires team_type='club' (= matches in"
+                " a domestic state/county/provincial competition — Vitality"
+                " Blast, SMA Trophy, CSA T20 Challenge, Super Smash, NPL,"
+                " Women's Super Smash, …)."
+                " Cross-type values are silent no-ops (defensive backend"
+                " gate). Spec: internal_docs/spec-filterbar-team-class-club.md."
             ),
         ),
         series_type: Optional[str] = Query(
@@ -291,16 +301,17 @@ class FilterBarParams:
                 )
             params["opponent"] = self.opponent
 
-        # team_class is a FilterBar narrowing, defensive-gated to
-        # team_type='international'. For clubs the FM list (country
-        # names) doesn't match franchise team strings so it would zero
-        # out every match — silent no-op preserves club URL robustness.
-        if (
-            _is_set(self.team_class)
-            and self.team_class == "full_member"
-            and self.team_type == "international"
-        ):
-            clauses.append(full_member_clause(table_alias=table_alias))
+        # team_class is polymorphic over team_type. Each value pairs
+        # with one team_type; cross-type combinations are silent
+        # no-ops (preserves URL robustness when the frontend gate
+        # fails or a curl request mixes them). Spec §3.
+        if _is_set(self.team_class):
+            if self.team_class == "full_member" and self.team_type == "international":
+                clauses.append(full_member_clause(table_alias=table_alias))
+            elif self.team_class == "primary_club" and self.team_type == "club":
+                clauses.append(primary_club_clause(table_alias=table_alias))
+            elif self.team_class == "secondary_club" and self.team_type == "club":
+                clauses.append(secondary_club_clause(table_alias=table_alias))
 
         # series_type — promoted to FilterBar 2026-04-28. Reads from
         # self; the historical `aux.series_type` path is removed.

@@ -72,18 +72,22 @@ def _reference_clauses(
         st = _series_type_clause(series_type)
         if st:
             parts.append(st)
-    # team_class — defensive intl gate matches FilterBarParams.build().
+    # team_class — polymorphic over team_type (mirrors FilterBarParams.build()).
     # Hand-rolled here because /tournaments + /seasons take individual
     # query params (not FilterParams) so they can drop self-referential
     # axes. Without this, the FilterBar's tournament + season dropdowns
-    # silently ignore the team_class pill.
-    if (
-        _is_set(team_class)
-        and team_class == "full_member"
-        and team_type == "international"
-    ):
-        from ..full_members import full_member_clause
-        parts.append(full_member_clause(table_alias="m"))
+    # silently ignore the team_class pill. Spec §3 + §8 #2 (auto-narrow
+    # tournament dropdown under tier).
+    if _is_set(team_class):
+        if team_class == "full_member" and team_type == "international":
+            from ..full_members import full_member_clause
+            parts.append(full_member_clause(table_alias="m"))
+        elif team_class == "primary_club" and team_type == "club":
+            from ..club_tiers import primary_club_clause
+            parts.append(primary_club_clause(table_alias="m"))
+        elif team_class == "secondary_club" and team_type == "club":
+            from ..club_tiers import secondary_club_clause
+            parts.append(secondary_club_clause(table_alias="m"))
     return parts, params
 
 
@@ -97,7 +101,7 @@ async def list_tournaments(
     season_to: Optional[str] = Query(None),
     filter_venue: Optional[str] = Query(None),
     series_type: Optional[str] = Query(None, description="all / bilateral / icc / club (narrows the tournament list)"),
-    team_class: Optional[str] = Query(None, description="full_member (intl-only — narrows to ICC full-member-only matches)"),
+    team_class: Optional[str] = Query(None, description="full_member (intl-only) / primary_club / secondary_club (club-only) — silent no-op when team_type doesn't match"),
 ):
     """List tournaments, narrowed by every FilterBar field the page
     has set — gender, team_type, team, season range, filter_venue,
@@ -184,7 +188,7 @@ async def list_seasons(
     filter_opponent: Optional[str] = Query(None),
     filter_venue: Optional[str] = Query(None),
     series_type: Optional[str] = Query(None),
-    team_class: Optional[str] = Query(None, description="full_member (intl-only — narrows to ICC full-member-only matches)"),
+    team_class: Optional[str] = Query(None, description="full_member (intl-only) / primary_club / secondary_club (club-only) — silent no-op when team_type doesn't match"),
 ):
     """Seasons narrowed by every FilterBar field the page has set —
     team / gender / team_type / tournament / filter_venue — plus
@@ -259,17 +263,21 @@ async def list_teams(
     if _is_set(filters.venue):
         where_parts.append("m.venue = :filter_venue")
         params["filter_venue"] = filters.venue
-    # team_class — defensive intl gate. Without this, picking "full
-    # members only" while typing in the team typeahead surfaces
+    # team_class — polymorphic over team_type. Without this, picking
+    # "full members only" while typing in the team typeahead surfaces
     # associate teams (Scotland, Nepal) the FilterBar pretends to
-    # exclude.
-    if (
-        _is_set(filters.team_class)
-        and filters.team_class == "full_member"
-        and filters.team_type == "international"
-    ):
-        from ..full_members import full_member_clause
-        where_parts.append(full_member_clause(table_alias="m"))
+    # exclude. Same logic for the club tiers — typing under primary_club
+    # must hide secondary-tier teams (Surrey, Baroda, …) and vice-versa.
+    if _is_set(filters.team_class):
+        if filters.team_class == "full_member" and filters.team_type == "international":
+            from ..full_members import full_member_clause
+            where_parts.append(full_member_clause(table_alias="m"))
+        elif filters.team_class == "primary_club" and filters.team_type == "club":
+            from ..club_tiers import primary_club_clause
+            where_parts.append(primary_club_clause(table_alias="m"))
+        elif filters.team_class == "secondary_club" and filters.team_type == "club":
+            from ..club_tiers import secondary_club_clause
+            where_parts.append(secondary_club_clause(table_alias="m"))
     # series_type — without this, the typeahead suggests teams whose
     # only matches in scope are out of the chosen series category
     # (e.g. Scotland under series_type=bilateral_only — they play

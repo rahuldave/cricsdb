@@ -28,10 +28,9 @@ def is_precomputed_scope(filters: FilterParams, aux: Optional[AuxParams]) -> boo
       - filters.series_type other than 'all'/None: per-cell baselines
         are per-tournament, so series_type can't refine within a cell.
       - filters.team_class: bucket tables don't carry a team-class
-        dimension; full-member-only filtering must run live. Reject
-        only when the filter would actually fire (intl) — for clubs
-        the FilterBarParams.build() defensive gate makes the clause
-        a no-op so bucket dispatch can stay enabled.
+        dimension; tier filtering must run live. Reject only when the
+        filter would actually fire (matched team_type) — cross-type
+        values are silent no-ops so bucket dispatch can stay enabled.
 
     Anything else (gender + team_type + optional tournament + optional
     season range + optional scope_to_team) → use the table.
@@ -42,12 +41,11 @@ def is_precomputed_scope(filters: FilterParams, aux: Optional[AuxParams]) -> boo
         return False
     if _is_set(filters.series_type) and filters.series_type != "all":
         return False
-    if (
-        _is_set(filters.team_class)
-        and filters.team_class == "full_member"
-        and filters.team_type == "international"
-    ):
-        return False
+    if _is_set(filters.team_class):
+        if filters.team_class == "full_member" and filters.team_type == "international":
+            return False
+        if filters.team_class in ("primary_club", "secondary_club") and filters.team_type == "club":
+            return False
     # Inning narrowing — bucket tables don't carry an innings dimension.
     # Live aggregation handles it; precompute later iff measured hot.
     # Spec: internal_docs/spec-inning-split.md §5.4.

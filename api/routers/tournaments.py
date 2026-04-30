@@ -104,18 +104,22 @@ def _build_filter_clauses(
         if _is_set(filters.opponent):
             clauses.append(f"({alias}.team1 = :filter_opp OR {alias}.team2 = :filter_opp)")
             params["filter_opp"] = filters.opponent
-    # team_class — defensive intl gate matches FilterBarParams.build().
-    # Hand-rolled here because this helper bypasses filters.build() (the
-    # canonical → variants tournament expansion needs a different code
-    # path). Without this, every Series-tab endpoint silently ignores
-    # the FilterBar's team_class pill.
-    if (
-        _is_set(filters.team_class)
-        and filters.team_class == "full_member"
-        and filters.team_type == "international"
-    ):
-        from ..full_members import full_member_clause
-        clauses.append(full_member_clause(table_alias=alias))
+    # team_class — polymorphic over team_type. Mirrors the dispatch in
+    # FilterBarParams.build(); hand-rolled here because this helper
+    # bypasses filters.build() (the canonical → variants tournament
+    # expansion needs a different code path). Without this, every
+    # Series-tab endpoint silently ignores the FilterBar's team_class
+    # pill. Spec: spec-filterbar-team-class-club.md §3.
+    if _is_set(filters.team_class):
+        if filters.team_class == "full_member" and filters.team_type == "international":
+            from ..full_members import full_member_clause
+            clauses.append(full_member_clause(table_alias=alias))
+        elif filters.team_class == "primary_club" and filters.team_type == "club":
+            from ..club_tiers import primary_club_clause
+            clauses.append(primary_club_clause(table_alias=alias))
+        elif filters.team_class == "secondary_club" and filters.team_type == "club":
+            from ..club_tiers import secondary_club_clause
+            clauses.append(secondary_club_clause(table_alias=alias))
     # inning (AuxParams) — emitted only when caller has an innings
     # JOIN (see helper docstring). Spec: spec-inning-split.md §5.3.
     if has_innings_join and aux is not None and aux.inning is not None:

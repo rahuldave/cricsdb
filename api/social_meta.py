@@ -153,6 +153,10 @@ async def build_meta(path: str, query: dict) -> dict:
         scope_bits.append(f"–{season_to}")
     if team_class == "full_member":
         scope_bits.append("full-member only")
+    elif team_class == "primary_club":
+        scope_bits.append("primary clubs only")
+    elif team_class == "secondary_club":
+        scope_bits.append("secondary clubs only")
     scope_tag = " · ".join(scope_bits)
 
     if p == "teams" and team:
