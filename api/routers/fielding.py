@@ -7,6 +7,7 @@ from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
+from ..aux_clauses import splice_aux_join_clauses
 from ..player_nationality import player_nationalities
 
 router = APIRouter(prefix="/api/v1/fielders", tags=["Fielding"])
@@ -59,16 +60,12 @@ async def fielding_leaders(
     DESC then run-outs DESC.
     """
     db = get_db()
-    # See batting_leaders for the rationale: bool(match_where) sniffs
-    # any FilterBar narrowing; aux.inning is gated inside build() so
-    # we extend the sniff + splice the inning clause manually into
-    # the JOIN-branch SQL where the `i` alias exists.
+    # See batting_leaders + aux_clauses module for the rationale.
+    # `aux_extra` is " AND <clause>..." with leading AND; we strip
+    # for the AND-joined fc_parts list below.
     match_where, params = filters.build(has_innings_join=False, aux=aux)
-    inning_clause = ""
-    if aux is not None and aux.inning is not None:
-        inning_clause = "i.innings_number = :inning"
-        params["inning"] = aux.inning
-    has_filters = bool(match_where) or bool(inning_clause)
+    aux_extra = splice_aux_join_clauses(aux, params)
+    has_filters = bool(match_where) or bool(aux_extra)
 
     # --- List 1: top fielders by total dismissals ------------------
     # All four kinds aggregated per fielder, with per-kind breakdown
@@ -80,8 +77,10 @@ async def fielding_leaders(
                    "JOIN match m ON m.id = i.match_id")
         if match_where:
             fc_parts.append(match_where)
-        if inning_clause:
-            fc_parts.append(inning_clause)
+        if aux_extra:
+            # aux_extra carries leading " AND "; the fc_parts list
+            # gets joined by " AND ", so strip the prefix.
+            fc_parts.append(aux_extra.removeprefix(" AND "))
     else:
         fc_join = ""
     fc_where = " AND ".join(fc_parts)
@@ -119,8 +118,8 @@ async def fielding_leaders(
         ka_join += " JOIN match m ON m.id = i.match_id"
         if match_where:
             ka_parts.append(match_where)
-        if inning_clause:
-            ka_parts.append(inning_clause)
+        if aux_extra:
+            ka_parts.append(aux_extra.removeprefix(" AND "))
     ka_where = " AND ".join(ka_parts)
     keeper_rows = await db.q(
         f"""

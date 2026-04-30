@@ -39,6 +39,7 @@ from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams, _is_set
+from ..aux_clauses import splice_aux_join_clauses
 from ..tournament_canonical import (
     TOURNAMENT_CANONICAL, TOURNAMENT_SERIES_TYPE,
     ICC_EVENT_NAMES, BILATERAL_TOP_TEAMS,
@@ -581,24 +582,31 @@ async def _rivalries_top_and_other_count(
 # ─── Per-tournament endpoints ─────────────────────────────────────────
 
 
-def _inning_extras(aux: AuxParams | None, innings_alias: str = "i") -> tuple[str, dict]:
-    """Per-innings narrowing fragment + bind params.
+def _inning_extras(aux: AuxParams | None) -> tuple[str, dict]:
+    """Per-innings narrowing fragment + bind params, formatted for
+    the unified-WHERE pattern this module uses.
 
-    Returns ('', {}) when aux.inning is None. Otherwise returns
-    (' AND i.innings_number = :inning', {'inning': X}). Append to any
-    innings-joined SQL `WHERE …` from a tournaments-router endpoint;
-    skip on match-level meta queries (no innings alias).
+    Two callers shapes:
 
-    Why a separate helper instead of folding into `_tournament_scope_
-    where`: that helper builds a UNIFIED where reused across both
-    match-level (meta) and innings-joined (deliveries / wickets / etc)
-    queries within the same endpoint. The inning clause references
-    `i.innings_number` and would explode on the match-level query.
+    Module-internal (tournaments.py): the same `where` is reused
+    across mixed (match-level + innings-joined) queries within one
+    endpoint, so the inning clause is appended PER-QUERY via
+    `{inn_clause}` rather than folded into `where` itself. Caller
+    pattern:
+        inn_clause, inn_params = _inning_extras(aux)
+        params.update(inn_params)
+        # ... `WHERE i.super_over=0 AND {where}{inn_clause}`
+
+    Returns `('', {})` when aux.inning is None. Mechanism comes
+    from `aux_clauses.JOIN_CLAUSES` so a future aux narrowing that
+    needs alias-availability handling auto-flows through here too —
+    no separate helper to maintain.
+
     Spec: spec-inning-split.md §3.1a + §5.3.
     """
-    if aux is None or aux.inning is None:
-        return "", {}
-    return f" AND {innings_alias}.innings_number = :inning", {"inning": aux.inning}
+    fresh: dict = {}
+    clause = splice_aux_join_clauses(aux, fresh)
+    return clause, fresh
 
 
 def _tournament_scope_where(

@@ -7,6 +7,7 @@ from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
+from ..aux_clauses import splice_aux_join_clauses
 from ..player_nationality import player_nationalities
 
 router = APIRouter(prefix="/api/v1/batters", tags=["Batting"])
@@ -61,29 +62,21 @@ async def batting_leaders(
     thresholds.
     """
     db = get_db()
-    # has_innings_join=False → only match-level clauses, no super_over
-    # filter. Empty string = no filters at all → skip both joins.
-    # `bool(match_where)` is the canonical fast-path sniff: every
-    # FilterBar narrowing emits a clause (literal or bind), so as new
-    # filters are added they auto-flow through this signal — no
-    # enumeration to maintain.
-    #
-    # The inning clause is the one exception: it's gated on
-    # has_innings_join inside `filters.build` (the clause references
-    # `i.innings_number`, which only exists when callers have the
-    # alias). The leaders SQL DOES have that alias in its filtered
-    # branch, so we splice the inning clause manually below — and
-    # extend the fast-path sniff to include `aux.inning is not None`.
+    # has_innings_join=False keeps `match_where` empty when truly
+    # unfiltered → bare-delivery fast path engages (~100× faster).
+    # Aux-narrowings (e.g. inning) are gated inside `filters.build`
+    # because they reference aliases that aren't always in scope,
+    # so we splice them via the JOIN_CLAUSES registry on the
+    # JOIN-branch SQL (where the aliases ARE in scope).
+    # Adding a new aux narrowing → register a new JoinClause; no
+    # change required here.
     match_where, params = filters.build(has_innings_join=False, aux=aux)
-    inning_clause = ""
-    if aux is not None and aux.inning is not None:
-        inning_clause = " AND i.innings_number = :inning"
-        params["inning"] = aux.inning
-    has_filters = bool(match_where) or bool(inning_clause)
+    aux_extra = splice_aux_join_clauses(aux, params)
+    has_filters = bool(match_where) or bool(aux_extra)
 
     if has_filters:
-        # match_where may be empty if only inning is set; `1=1` keeps
-        # the trailing AND chain valid in that case.
+        # match_where may be empty if only an aux narrowing is set
+        # — `1=1` keeps the trailing AND chain valid.
         m_where = match_where if match_where else "1=1"
         agg_sql = f"""
             SELECT d.batter_id AS person_id,
@@ -94,7 +87,7 @@ async def batting_leaders(
             JOIN match m ON m.id = i.match_id
             WHERE d.batter_id IS NOT NULL
               AND d.extras_wides = 0 AND d.extras_noballs = 0
-              AND {m_where}{inning_clause}
+              AND {m_where}{aux_extra}
             GROUP BY d.batter_id
             HAVING COUNT(*) >= :min_balls
         """
@@ -106,7 +99,7 @@ async def batting_leaders(
             JOIN match m ON m.id = i.match_id
             WHERE w.player_out_id IS NOT NULL
               AND w.kind NOT IN ('retired hurt', 'retired out')
-              AND {m_where}{inning_clause}
+              AND {m_where}{aux_extra}
             GROUP BY w.player_out_id
         """
     else:

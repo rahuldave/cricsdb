@@ -7,6 +7,7 @@ from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
+from ..aux_clauses import splice_aux_join_clauses
 from ..player_nationality import player_nationalities
 
 router = APIRouter(prefix="/api/v1/bowlers", tags=["Bowling"])
@@ -57,16 +58,11 @@ async def bowling_leaders(
     super-over caveat (0.04% noise, imperceptible).
     """
     db = get_db()
-    # See batting_leaders for the rationale: bool(match_where) sniffs
-    # any FilterBar narrowing; aux.inning is gated inside build() so
-    # we extend the sniff + splice the inning clause manually into
-    # the JOIN-branch SQL where the alias exists.
+    # See batting_leaders for the rationale + the `aux_clauses`
+    # module for the JoinClause registry mechanism.
     match_where, params = filters.build(has_innings_join=False, aux=aux)
-    inning_clause = ""
-    if aux is not None and aux.inning is not None:
-        inning_clause = " AND i.innings_number = :inning"
-        params["inning"] = aux.inning
-    has_filters = bool(match_where) or bool(inning_clause)
+    aux_extra = splice_aux_join_clauses(aux, params)
+    has_filters = bool(match_where) or bool(aux_extra)
 
     if has_filters:
         m_where = match_where if match_where else "1=1"
@@ -78,7 +74,7 @@ async def bowling_leaders(
             FROM delivery d
             JOIN innings i ON i.id = d.innings_id
             JOIN match m ON m.id = i.match_id
-            WHERE d.bowler_id IS NOT NULL AND {m_where}{inning_clause}
+            WHERE d.bowler_id IS NOT NULL AND {m_where}{aux_extra}
             GROUP BY d.bowler_id
             HAVING balls >= :min_balls
         """
@@ -90,7 +86,7 @@ async def bowling_leaders(
             JOIN match m ON m.id = i.match_id
             WHERE d.bowler_id IS NOT NULL
               AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-              AND {m_where}{inning_clause}
+              AND {m_where}{aux_extra}
             GROUP BY d.bowler_id
         """
     else:
