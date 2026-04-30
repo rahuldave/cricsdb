@@ -1691,3 +1691,52 @@ spot-check 2-3 randomly-chosen hits before committing.
 The litmus test: *"if I read 5 random matches, is each one the
 shape I assumed?"* If yes, regex is safe. If any of them has
 surrounding variants you didn't anticipate, enumerate.
+
+
+## TODO: lift the inning-clause splice into a helper (revisit) (2026-04-30)
+
+After fixing `/batters/leaders` + `/bowlers/leaders` +
+`/fielders/leaders` to honour `?inning=`, the same three-line
+pattern lives inline in all three endpoints:
+
+```python
+match_where, params = filters.build(has_innings_join=False, aux=aux)
+inning_clause = ""
+if aux is not None and aux.inning is not None:
+    inning_clause = " AND i.innings_number = :inning"
+    params["inning"] = aux.inning
+has_filters = bool(match_where) or bool(inning_clause)
+```
+
+It works, but it's copy-pasted across three routers. A small helper
+would localize the alias-name + bind-name + clause-shape
+decisions — the kind of variation a future restructure (e.g.
+adding a `bat_first` aux field that needs similar
+alias-availability handling) would force the same three sites to
+update in lockstep. User flagged 2026-04-30 ("you put the stuff
+you need to do for the innings right in the same function. That's
+generally bad style").
+
+Suggested factoring (deferred — let-it-be-for-now per the same
+user message):
+
+```python
+def _inning_clause_for_join(
+    aux: AuxParams | None, params: dict, alias: str = "i",
+) -> str:
+    """Return ' AND <alias>.innings_number = :inning' when set,
+    mutating params to bind. Use in SQL where the innings alias is
+    in scope but `filters.build` suppressed the clause via
+    has_innings_join=False — typically because the same where is
+    reused on a bare-table fast path that lacks the alias."""
+    if aux is None or aux.inning is None:
+        return ""
+    params["inning"] = aux.inning
+    return f" AND {alias}.innings_number = :inning"
+```
+
+`tournaments.py::_inning_extras` is a sibling helper for the
+unified-WHERE flow (different signature because the where there
+is appended via `{inn_clause}` per-query, not via SQL
+concatenation). When this helper is lifted, consider whether the
+two can converge into one.
