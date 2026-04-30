@@ -63,7 +63,10 @@ async def bulk_insert_returning_ids(db, table_obj, rows):
 
 
 async def import_people(db):
-    """Import people.csv and names.csv."""
+    """Import people.csv and names.csv (full populate — assumes empty
+    person + personname tables; called from import_data.py main on a
+    fresh DB build). For incremental refresh against an already-
+    populated DB, use refresh_people_registry() instead."""
     people_table = await db.create(Person, pk="id", if_not_exists=True)
     names_table = await db.create(PersonName, pk="id", if_not_exists=True,
                                   indexes=["person_id"])
@@ -116,6 +119,107 @@ async def import_people(db):
                 await bulk_insert(db, names_table, batch)
         result = await db.q("SELECT COUNT(*) as c FROM personname")
         print(f"  Imported {result[0]['c']} name variants")
+
+
+async def refresh_people_registry(db):
+    """Idempotent refresh of person + personname tables from the
+    local people.csv / names.csv. Uses INSERT OR IGNORE so existing
+    rows are preserved (no PK collision) and only newly-registered
+    person_ids land in the DB.
+
+    Why this exists separately from import_people(): update_recent.py
+    inserts new matchplayer rows for newly-imported matches, which
+    can reference person_ids that weren't in people.csv when the
+    initial import_data.py ran. cricsheet's people.csv refresh ships
+    those ids; this helper re-applies the CSV onto the already-
+    populated tables. Surfaced 2026-04-30 by ~70 orphan player_ids
+    (PSL 2026 newcomers + small-associate cluster) — see
+    project_next_session.md memory.
+
+    INSERT OR IGNORE semantics: if a person_id already exists, the
+    row is skipped — name + key_* fields stay at their original
+    values. Acceptable: cricsheet's canonical-name registry is
+    deliberately stable; in the rare case where a name has
+    legitimately changed, a force re-import (drop tables + run
+    import_data.py) is the explicit knob.
+    """
+    people_csv = os.path.join(DATA_DIR, "people.csv")
+    if not os.path.exists(people_csv):
+        print("people.csv not found, skipping refresh")
+        return
+
+    pre_p = (await db.q("SELECT COUNT(*) AS c FROM person"))[0]["c"]
+    pre_n = (await db.q("SELECT COUNT(*) AS c FROM personname"))[0]["c"]
+    print(f"Refreshing people registry (pre: {pre_p} person, {pre_n} personname rows)")
+
+    # Build the column list once from the CSV header, then issue
+    # INSERT OR IGNORE per row in batches via raw SQL.
+    with open(people_csv, newline="") as f:
+        reader = csv.DictReader(f)
+        cols = ["id", "name", "unique_name"] + [
+            c for c in reader.fieldnames if c.startswith("key_")
+        ]
+        placeholders = ", ".join(f":{c}" for c in cols)
+        col_list = ", ".join(cols)
+        sql = f"INSERT OR IGNORE INTO person ({col_list}) VALUES ({placeholders})"
+        batch: list[dict] = []
+        for row in reader:
+            person = {
+                "id": row["identifier"],
+                "name": row["name"],
+                "unique_name": row["unique_name"],
+            }
+            for col in reader.fieldnames:
+                if col.startswith("key_"):
+                    val = row.get(col, "").strip()
+                    person[col] = val if val else None
+            batch.append(person)
+            if len(batch) >= 5000:
+                await _insert_many(db, sql, batch)
+                batch = []
+        if batch:
+            await _insert_many(db, sql, batch)
+
+    # names.csv — same upsert pattern.
+    names_csv = os.path.join(DATA_DIR, "names.csv")
+    if os.path.exists(names_csv):
+        with open(names_csv, newline="") as f:
+            reader = csv.DictReader(f)
+            # personname has an auto-increment id PK; INSERT OR IGNORE
+            # on (person_id, name) requires a uniqueness constraint —
+            # names table doesn't have one. Use a NOT EXISTS guard
+            # instead so re-runs don't duplicate aliases.
+            sql = """
+                INSERT INTO personname (person_id, name)
+                SELECT :person_id, :name
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM personname
+                    WHERE person_id = :person_id AND name = :name
+                )
+            """
+            batch = []
+            for row in reader:
+                batch.append({
+                    "person_id": row["identifier"],
+                    "name": row["name"],
+                })
+                if len(batch) >= 5000:
+                    await _insert_many(db, sql, batch)
+                    batch = []
+            if batch:
+                await _insert_many(db, sql, batch)
+
+    post_p = (await db.q("SELECT COUNT(*) AS c FROM person"))[0]["c"]
+    post_n = (await db.q("SELECT COUNT(*) AS c FROM personname"))[0]["c"]
+    print(f"  post: {post_p} person (+{post_p - pre_p}), "
+          f"{post_n} personname (+{post_n - pre_n})")
+
+
+async def _insert_many(db, sql: str, rows: list[dict]) -> None:
+    """deebase doesn't expose execute-many, so use the underlying
+    engine inside one transaction for the upsert batch."""
+    async with db._engine.begin() as conn:
+        await conn.execute(text(sql), rows)
 
 
 async def get_match_tables(db, incremental=False):

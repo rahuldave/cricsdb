@@ -28,7 +28,10 @@ import zipfile
 
 from deebase import Database
 
-from import_data import DB_PATH, DATA_DIR, get_match_tables, import_match_file, write_unknown_venues
+from import_data import (
+    DB_PATH, DATA_DIR, get_match_tables, import_match_file,
+    refresh_people_registry, write_unknown_venues,
+)
 
 CRICSHEET_BASE = "https://cricsheet.org/downloads"
 CRICSHEET_REGISTER = "https://cricsheet.org/register"
@@ -256,6 +259,16 @@ async def main():
         if not new_files:
             print("Database is up to date.")
             return
+
+        # Refresh the people / personname registry FIRST. New matches
+        # often reference person_ids that cricsheet has registered
+        # since the initial import (e.g. PSL 2026 newcomers). Without
+        # this, matchplayer rows land with valid person_ids but no
+        # corresponding person row, and `/batting?player=<id>` etc.
+        # render the dossier without a player name. INSERT OR IGNORE
+        # — existing rows are preserved. Spec: project_next_session.md
+        # 2026-04-30 entry.
+        await refresh_people_registry(db)
 
         tables = await get_match_tables(db, incremental=True)
         imported = 0
