@@ -21,7 +21,7 @@ Running `update_recent.py --days 30` against your dev DB catches
 schema problems but not data-volume problems. Running it against a
 copy of the prod snapshot does.
 
-## The copy path (always use /tmp, never touch the Downloads file)
+## The copy path (always use tmp/, never touch the Downloads file)
 
 1. Download the prod bundle from plash:
 
@@ -31,19 +31,27 @@ copy of the prod snapshot does.
    # ~/Downloads/t20-cricket-db_download/ containing data/cricket.db
    ```
 
-2. Copy the DB to `/tmp` — **never** run `update_recent.py` directly
-   against the Downloads path:
+2. Copy the DB to `tmp/` (project-local, gitignored) — **never** run
+   `update_recent.py` directly against the Downloads path:
 
    ```bash
+   mkdir -p tmp
    cp ~/Downloads/t20-cricket-db_download/data/cricket.db \
-      /tmp/cricket-prod-test.db
+      tmp/cricket-prod-test.db
    ```
 
    The reason is that `update_recent.py` opens the DB in WAL mode and
    writes. A failed run can leave the DB in a partially-updated state
    that's hard to untangle. Keep the pristine Downloads copy as your
-   "known good" reference; mutate only the `/tmp` copy, which you can
+   "known good" reference; mutate only the `tmp/` copy, which you can
    delete and re-copy as often as you like.
+
+   `tmp/` is in `.gitignore` (and survives sweeps that purge `/tmp/`
+   on system restart). The previous convention was `/tmp/...` and
+   many older sanity-test docstrings still reference that path —
+   both work; the project-local `tmp/` is preferred going forward
+   because it survives reboots and lives next to the project for
+   easy cleanup.
 
    **Schema-drift gotcha:** if the Downloads snapshot pre-dates a
    schema migration that landed in the local working DB (e.g. the
@@ -56,10 +64,10 @@ copy of the prod snapshot does.
    # only the columns the snapshot is missing — diff via PRAGMA
    diff \
      <(sqlite3 cricket.db                     "PRAGMA table_info(match);") \
-     <(sqlite3 /tmp/cricket-prod-test.db      "PRAGMA table_info(match);")
+     <(sqlite3 tmp/cricket-prod-test.db      "PRAGMA table_info(match);")
 
    # apply each missing column
-   sqlite3 /tmp/cricket-prod-test.db "ALTER TABLE match ADD COLUMN venue_country TEXT;"
+   sqlite3 tmp/cricket-prod-test.db "ALTER TABLE match ADD COLUMN venue_country TEXT;"
    ```
 
    Production plash never hits this because its DB has been migrated
@@ -67,16 +75,16 @@ copy of the prod snapshot does.
    the migration carry the gap. A `bash deploy.sh --first` resets
    prod to the local DB's schema, eliminating the gap going forward.
 
-3. Run the incremental import against the `/tmp` copy via the `--db`
+3. Run the incremental import against the `tmp/` copy via the `--db`
    flag:
 
    ```bash
    # dry-run first
-   uv run python update_recent.py --db /tmp/cricket-prod-test.db \
+   uv run python update_recent.py --db tmp/cricket-prod-test.db \
      --days 30 --dry-run
 
    # if dry-run looks sane, do it for real
-   uv run python update_recent.py --db /tmp/cricket-prod-test.db \
+   uv run python update_recent.py --db tmp/cricket-prod-test.db \
      --days 30
    ```
 
@@ -85,11 +93,11 @@ copy of the prod snapshot does.
 
    ```bash
    # quick check via sqlite3
-   sqlite3 /tmp/cricket-prod-test.db \
+   sqlite3 tmp/cricket-prod-test.db \
      "SELECT MAX(date) FROM matchdate; SELECT COUNT(*) FROM match;"
 
    # or serve the test DB via the API to click around
-   ln -sf /tmp/cricket-prod-test.db ./cricket.db.test
+   ln -sf tmp/cricket-prod-test.db ./cricket.db.test
    # then temporarily edit api/dependencies.py to point at
    # ./cricket.db.test, or start a second uvicorn with an env var.
    # The --db flag does NOT yet propagate into the API — it's
@@ -99,7 +107,7 @@ copy of the prod snapshot does.
 5. Clean up when done:
 
    ```bash
-   rm /tmp/cricket-prod-test.db
+   rm tmp/cricket-prod-test.db
    ```
 
 ## What `update_recent.py --db` does NOT change

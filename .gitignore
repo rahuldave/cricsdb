@@ -25,6 +25,10 @@ data/*.csv
 # Deploy staging
 build_plash/
 
+# Local scratch — prod-DB test copies, ad-hoc fix scripts, etc.
+# (see internal_docs/testing-update-recent.md for the test-DB pattern)
+tmp/
+
 # DeeBase
 .deebase/.env
 
