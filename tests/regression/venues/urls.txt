@@ -95,3 +95,11 @@ REG matches_plain_bilat                                /api/v1/matches?gender=ma
 REG ref_list_teams_plain_bilat                         /api/v1/teams?gender=male&team_type=international&series_type=bilateral_only
 REG ref_tournaments_plain_bilat                        /api/v1/tournaments?gender=male&team_type=international&series_type=bilateral_only
 REG venues_landing_male_intl_bilat                     /api/v1/venues/landing?gender=male&team_type=international&series_type=bilateral_only
+
+# club-tier team_class — venue narrowing under tier (V-series anchors)
+NEW venue_wankhede_pri                   /api/v1/venues/Wankhede%20Stadium/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW venue_wankhede_sec_zero              /api/v1/venues/Wankhede%20Stadium/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW venue_oval_pri                       /api/v1/venues/Kennington%20Oval/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW venue_oval_sec                       /api/v1/venues/Kennington%20Oval/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW venue_lords_pri                      /api/v1/venues/Lord%27s/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW venue_lords_sec                      /api/v1/venues/Lord%27s/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club

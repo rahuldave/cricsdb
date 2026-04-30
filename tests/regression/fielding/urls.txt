@@ -71,3 +71,7 @@ REG keep_by_season_dhoni_bilat                         /api/v1/fielders/4a8a2e3b
 REG keep_by_innings_dhoni_bilat                        /api/v1/fielders/4a8a2e3b/keeping/by-innings?gender=male&team_type=international&limit=10&series_type=bilateral_only
 REG keep_ambiguous_dhoni_bilat                         /api/v1/fielders/4a8a2e3b/keeping/ambiguous?gender=male&team_type=international&limit=10&series_type=bilateral_only
 REG field_summary_kohli_vs_aus_bilat                   /api/v1/fielders/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
+
+# club-tier team_class — fielding leaders narrowing
+NEW fielding_leaders_club_pri            /api/v1/fielders/leaders?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club&limit=10
+NEW fielding_leaders_club_sec            /api/v1/fielders/leaders?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club&limit=10

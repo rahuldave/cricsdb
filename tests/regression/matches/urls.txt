@@ -37,3 +37,9 @@ REG matches_list_ind_vs_aus_fm                         /api/v1/matches?filter_te
 REG matches_list_men_intl_bilat                        /api/v1/matches?gender=male&team_type=international&limit=5&series_type=bilateral_only
 REG matches_list_men_intl_offset_bilat                 /api/v1/matches?gender=male&team_type=international&limit=5&offset=10&series_type=bilateral_only
 REG matches_list_ind_vs_aus_bilat                      /api/v1/matches?filter_team=India&filter_opponent=Australia&gender=male&team_type=international&limit=5&series_type=bilateral_only
+
+# club-tier team_class — match list narrowing under tier
+NEW matches_men_club_pri                 /api/v1/matches?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club&limit=10
+NEW matches_men_club_sec                 /api/v1/matches?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club&limit=10
+NEW matches_women_club_pri               /api/v1/matches?gender=female&team_type=club&season_from=2024&season_to=2025&team_class=primary_club&limit=10
+NEW matches_intl_pri_noop                /api/v1/matches?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=primary_club&limit=10

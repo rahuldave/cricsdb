@@ -71,3 +71,9 @@ REG h2h_team_batters_ind_aus_bilat                     /api/v1/series/batters-le
 REG h2h_team_bowlers_ind_aus_bilat                     /api/v1/series/bowlers-leaders?filter_team=India&filter_opponent=Australia&gender=male&team_type=international&limit=5&series_type=bilateral_only
 REG h2h_team_summary_ind_aus_bil_bilat                 /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male&team_type=international&series_type=bilateral_only&series_type=bilateral_only
 REG h2h_team_summary_ind_aus_tourn_bilat               /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male&team_type=international&series_type=tournament_only&series_type=bilateral_only
+
+# club-tier team_class — rivalry under tier
+NEW h2h_mi_csk_pri                       /api/v1/head-to-head?team1=Mumbai%20Indians&team2=Chennai%20Super%20Kings&gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW h2h_mi_csk_sec_zero                  /api/v1/head-to-head?team1=Mumbai%20Indians&team2=Chennai%20Super%20Kings&gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW h2h_surrey_somerset_sec              /api/v1/head-to-head?team1=Surrey&team2=Somerset&gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW h2h_ind_aus_pri_noop                 /api/v1/head-to-head?team1=India&team2=Australia&gender=male&team_type=international&season_from=2024&season_to=2025&team_class=primary_club

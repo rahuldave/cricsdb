@@ -166,3 +166,76 @@ NEW team_batting_by_inning_rcb         /api/v1/teams/Royal%20Challengers%20Benga
 NEW team_bowling_by_inning_rcb         /api/v1/teams/Royal%20Challengers%20Bengaluru/bowling/by-inning?gender=male&team_type=club&season_from=2025&season_to=2025
 NEW team_fielding_by_inning_rcb        /api/v1/teams/Royal%20Challengers%20Bengaluru/fielding/by-inning?gender=male&team_type=club&season_from=2025&season_to=2025
 NEW team_partnerships_by_inning_rcb    /api/v1/teams/Royal%20Challengers%20Bengaluru/partnerships/by-inning?gender=male&team_type=club&season_from=2025&season_to=2025
+
+# club-tier team_class — generated NEW URLs (one-shot)
+# Source: each row mirrors a REG row in urls.txt with &team_class=primary_club
+# (subject Mumbai Indians ⊂ primary) or &team_class=secondary_club
+# (subject Surrey ⊂ secondary). Plus cross-type silent-no-op rows
+# (subject + value mismatched on team_type) — these MUST hash-equal
+# their no-team_class counterparts on first capture; subsequent runs
+# guard against the defensive backend gate breaking. Spec §6.2.
+
+# ── Mumbai Indians (primary subject) ───────────────────────────
+NEW team_summary_mi_pri                  /api/v1/teams/Mumbai%20Indians/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW team_results_mi_pri                  /api/v1/teams/Mumbai%20Indians/results?gender=male&team_type=club&season_from=2024&season_to=2025&limit=5&team_class=primary_club
+NEW team_by_season_mi_pri                /api/v1/teams/Mumbai%20Indians/by-season?gender=male&team_type=club&team_class=primary_club
+NEW team_opponents_mi_pri                /api/v1/teams/Mumbai%20Indians/opponents?gender=male&team_type=club&team_class=primary_club
+NEW team_opponents_matrix_mi_pri         /api/v1/teams/Mumbai%20Indians/opponents-matrix?gender=male&team_type=club&top_n=5&team_class=primary_club
+NEW team_players_by_season_mi_pri        /api/v1/teams/Mumbai%20Indians/players-by-season?gender=male&team_type=club&season_from=2024&season_to=2024&team_class=primary_club
+NEW team_vs_opponent_mi_csk_pri          /api/v1/teams/Mumbai%20Indians/vs/Chennai%20Super%20Kings?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW team_batting_summary_mi_pri          /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW team_batting_by_season_mi_pri        /api/v1/teams/Mumbai%20Indians/batting/by-season?gender=male&team_type=club&team_class=primary_club
+NEW team_batting_by_phase_mi_pri         /api/v1/teams/Mumbai%20Indians/batting/by-phase?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW team_batting_top_batters_mi_pri      /api/v1/teams/Mumbai%20Indians/batting/top-batters?gender=male&team_type=club&season_from=2024&season_to=2025&limit=5&team_class=primary_club
+NEW team_bowling_summary_mi_pri          /api/v1/teams/Mumbai%20Indians/bowling/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW team_bowling_by_season_mi_pri        /api/v1/teams/Mumbai%20Indians/bowling/by-season?gender=male&team_type=club&team_class=primary_club
+NEW team_bowling_top_bowlers_mi_pri      /api/v1/teams/Mumbai%20Indians/bowling/top-bowlers?gender=male&team_type=club&season_from=2024&season_to=2025&limit=5&team_class=primary_club
+NEW team_fielding_summary_mi_pri         /api/v1/teams/Mumbai%20Indians/fielding/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW team_partnerships_summary_mi_pri     /api/v1/teams/Mumbai%20Indians/partnerships/summary?gender=male&team_type=club&season_from=2024&season_to=2025&side=batting&team_class=primary_club
+NEW team_partnerships_top_mi_pri         /api/v1/teams/Mumbai%20Indians/partnerships/top?gender=male&team_type=club&season_from=2024&season_to=2025&side=batting&limit=5&team_class=primary_club
+
+# ── Surrey (secondary subject) ─────────────────────────────────
+NEW team_summary_surrey_sec              /api/v1/teams/Surrey/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW team_results_surrey_sec              /api/v1/teams/Surrey/results?gender=male&team_type=club&season_from=2024&season_to=2025&limit=5&team_class=secondary_club
+NEW team_by_season_surrey_sec            /api/v1/teams/Surrey/by-season?gender=male&team_type=club&team_class=secondary_club
+NEW team_opponents_surrey_sec            /api/v1/teams/Surrey/opponents?gender=male&team_type=club&team_class=secondary_club
+NEW team_opponents_matrix_surrey_sec     /api/v1/teams/Surrey/opponents-matrix?gender=male&team_type=club&top_n=5&team_class=secondary_club
+NEW team_players_by_season_surrey_sec    /api/v1/teams/Surrey/players-by-season?gender=male&team_type=club&season_from=2024&season_to=2024&team_class=secondary_club
+NEW team_vs_opponent_surrey_somerset_sec /api/v1/teams/Surrey/vs/Somerset?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW team_batting_summary_surrey_sec      /api/v1/teams/Surrey/batting/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW team_batting_by_season_surrey_sec    /api/v1/teams/Surrey/batting/by-season?gender=male&team_type=club&team_class=secondary_club
+NEW team_batting_by_phase_surrey_sec     /api/v1/teams/Surrey/batting/by-phase?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW team_batting_top_batters_surrey_sec  /api/v1/teams/Surrey/batting/top-batters?gender=male&team_type=club&season_from=2024&season_to=2025&limit=5&team_class=secondary_club
+NEW team_bowling_summary_surrey_sec      /api/v1/teams/Surrey/bowling/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW team_bowling_by_season_surrey_sec    /api/v1/teams/Surrey/bowling/by-season?gender=male&team_type=club&team_class=secondary_club
+NEW team_bowling_top_bowlers_surrey_sec  /api/v1/teams/Surrey/bowling/top-bowlers?gender=male&team_type=club&season_from=2024&season_to=2025&limit=5&team_class=secondary_club
+NEW team_fielding_summary_surrey_sec     /api/v1/teams/Surrey/fielding/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW team_partnerships_summary_surrey_sec /api/v1/teams/Surrey/partnerships/summary?gender=male&team_type=club&season_from=2024&season_to=2025&side=batting&team_class=secondary_club
+NEW team_partnerships_top_surrey_sec     /api/v1/teams/Surrey/partnerships/top?gender=male&team_type=club&season_from=2024&season_to=2025&side=batting&limit=5&team_class=secondary_club
+
+# ── Cross-type silent-no-op rows (defensive gate proofs) ───────
+# Each NEW row's response MUST hash-equal the corresponding row
+# WITHOUT team_class. Verified via byte-identical capture on first
+# run. If the gate breaks, these flip to NEW changed.
+NEW teams_landing_intl_pri_noop          /api/v1/teams/landing?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=primary_club
+NEW teams_landing_intl_sec_noop          /api/v1/teams/landing?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=secondary_club
+NEW team_summary_india_pri_noop          /api/v1/teams/India/summary?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=primary_club
+NEW team_summary_india_sec_noop          /api/v1/teams/India/summary?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=secondary_club
+NEW team_summary_mi_fm_noop              /api/v1/teams/Mumbai%20Indians/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=full_member
+NEW team_summary_surrey_fm_noop          /api/v1/teams/Surrey/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=full_member
+
+# ── Cross-tier zero-row sanity (P7, P9 anchors at API surface) ─
+NEW team_summary_mi_sec_zero             /api/v1/teams/Mumbai%20Indians/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW team_summary_surrey_pri_zero         /api/v1/teams/Surrey/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+
+# ── Tournament dropdown auto-narrow (§8 #2) ────────────────────
+NEW ref_tournaments_pri                  /api/v1/tournaments?team_type=club&team_class=primary_club
+NEW ref_tournaments_sec                  /api/v1/tournaments?team_type=club&team_class=secondary_club
+NEW ref_teams_typeahead_pri              /api/v1/teams?team_type=club&team_class=primary_club
+NEW ref_teams_typeahead_sec              /api/v1/teams?team_type=club&team_class=secondary_club
+
+# ── Women's club-tier ──────────────────────────────────────────
+NEW teams_landing_women_pri              /api/v1/teams/landing?gender=female&team_type=club&team_class=primary_club
+NEW teams_landing_women_sec              /api/v1/teams/landing?gender=female&team_type=club&team_class=secondary_club
+
+# Multi-tier venue interaction (V4-V6) lives in tests/regression/venues/urls.txt.

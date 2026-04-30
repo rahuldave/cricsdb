@@ -127,3 +127,13 @@ REG live_team_batting_summary_bilat_bilat              /api/v1/teams/Australia/b
 REG live_scope_batting_by_phase_bilat_bilat            /api/v1/scope/averages/batting/by-phase?gender=male&team_type=international&series_type=bilateral_only&series_type=bilateral_only
 REG live_team_batting_summary_ind_v_aus_bilat          /api/v1/teams/India/batting/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
 REG live_scope_partnerships_summary_rivalry_bilat      /api/v1/scope/averages/partnerships/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
+
+# club-tier team_class — scope-averages baseline pools
+NEW scope_avg_summary_club_pri           /api/v1/scope/averages/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW scope_avg_summary_club_sec           /api/v1/scope/averages/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW scope_avg_batting_club_pri           /api/v1/scope/averages/batting/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW scope_avg_batting_club_sec           /api/v1/scope/averages/batting/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW scope_avg_bowling_club_pri           /api/v1/scope/averages/bowling/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW scope_avg_bowling_club_sec           /api/v1/scope/averages/bowling/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+NEW scope_avg_summary_women_pri          /api/v1/scope/averages/summary?gender=female&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+NEW scope_avg_summary_intl_pri_noop      /api/v1/scope/averages/summary?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=primary_club

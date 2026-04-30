@@ -65,3 +65,12 @@ REG series_summary_ipl_wankhede       /api/v1/series/summary?tournament=Indian%2
 #    both); post-fix inn=0 starts with DC/KKR 67 and inn=1 with RCB 49.
 NEW series_records_ipl_inn0           /api/v1/series/records?tournament=Indian%20Premier%20League&gender=male&team_type=club&inning=0&limit=5
 NEW series_records_ipl_inn1           /api/v1/series/records?tournament=Indian%20Premier%20League&gender=male&team_type=club&inning=1&limit=5
+
+# club-tier team_class — IPL (primary) + tier no-op + cross-tier zero
+NEW series_landing_men_pri               /api/v1/series/landing?gender=male&team_type=club&team_class=primary_club
+NEW series_landing_men_sec               /api/v1/series/landing?gender=male&team_type=club&team_class=secondary_club
+NEW series_landing_women_pri             /api/v1/series/landing?gender=female&team_type=club&team_class=primary_club
+NEW series_by_season_ipl_pri             /api/v1/series/by-season?tournament=Indian%20Premier%20League&gender=male&team_type=club&team_class=primary_club
+NEW series_by_season_ipl_sec_zero        /api/v1/series/by-season?tournament=Indian%20Premier%20League&gender=male&team_type=club&team_class=secondary_club
+NEW series_partnerships_top_ipl_pri      /api/v1/series/partnerships/top?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5&team_class=primary_club
+NEW series_points_table_ipl_2024_pri     /api/v1/series/points-table?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&gender=male&team_type=club&team_class=primary_club

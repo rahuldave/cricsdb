@@ -52,3 +52,13 @@ REG trn_team_gender_type_fm                            /api/v1/tournaments?team=
 REG trn_team_type_intl_bilat                           /api/v1/tournaments?team_type=international&series_type=bilateral_only
 REG trn_rivalry_ind_aus_bilat                          /api/v1/tournaments?team=India&opponent=Australia&gender=male&team_type=international&series_type=bilateral_only
 REG trn_team_gender_type_bilat                         /api/v1/tournaments?team=India&gender=male&team_type=international&series_type=bilateral_only
+
+# club-tier team_class — typeahead + Tournament dropdown auto-narrow
+NEW ref_teams_typeahead_pri              /api/v1/teams?team_type=club&team_class=primary_club
+NEW ref_teams_typeahead_sec              /api/v1/teams?team_type=club&team_class=secondary_club
+NEW ref_teams_typeahead_women_pri        /api/v1/teams?gender=female&team_type=club&team_class=primary_club
+NEW ref_tournaments_club_pri             /api/v1/tournaments?team_type=club&team_class=primary_club
+NEW ref_tournaments_club_sec             /api/v1/tournaments?team_type=club&team_class=secondary_club
+NEW ref_seasons_ipl_pri                  /api/v1/seasons?tournament=Indian%20Premier%20League&team_type=club&team_class=primary_club
+NEW ref_teams_intl_pri_noop              /api/v1/teams?team_type=international&team_class=primary_club
+NEW ref_teams_club_fm_noop               /api/v1/teams?team_type=club&team_class=full_member

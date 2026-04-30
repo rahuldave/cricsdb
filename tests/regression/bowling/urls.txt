@@ -64,3 +64,7 @@ REG bow_by_phase_bumrah_bilat                          /api/v1/bowlers/462411b3/
 REG bow_wickets_bumrah_bilat                           /api/v1/bowlers/462411b3/wickets?gender=male&team_type=international&series_type=bilateral_only
 REG bow_summary_bumrah_vs_aus_bilat                    /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
 REG bow_by_innings_bumrah_vs_aus_bilat                 /api/v1/bowlers/462411b3/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5&series_type=bilateral_only
+
+# club-tier team_class — bowling leaders + dossier narrowing
+NEW bowling_leaders_club_pri             /api/v1/bowlers/leaders?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club&limit=10
+NEW bowling_leaders_club_sec             /api/v1/bowlers/leaders?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club&limit=10
