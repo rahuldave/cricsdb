@@ -1610,3 +1610,84 @@ contract — locked in commit 1 of the inning-split spec. If a
 match-role axis is added later it would be a SEPARATE
 `AuxParams.bat_first` field with a separate match-id subquery — not
 a re-interpretation of `aux.inning`.
+
+
+## Bulk edits across many files: enumerate, don't regex-and-pray (2026-04-30)
+
+When a change fans out across many files or many sites within one
+file — adding a clause to every innings-joined query, threading a
+new param through every endpoint signature, gaining a new
+`filterDeps` entry on every page — DO NOT trust a regex find-and-
+replace alone. ENUMERATE every site, then audit one-by-one.
+
+Two bugs from the inning-split rollout came from this exact
+shortcut:
+
+1. **`series/records lowest_all_out_totals`** ignored `aux.inning`
+   for half a day after commit 1b. The regex sed I ran appended
+   `{inn_clause}` to every `WHERE i.super_over = 0 AND {where}` in
+   `tournaments.py` — 23 hits. But the lowest-all-out query had
+   `it.wkts >= 10` interposed:
+
+       WHERE i.super_over = 0 AND it.wkts >= 10 AND {where}
+
+   so the regex didn't match. The query stayed bare; both
+   `inning=0` and `inning=1` returned the same list (RCB 49 vs KKR
+   on top of both — that famous chase-collapse should only appear
+   under inning=1).
+
+2. **`Players.tsx` + `VenueDossier.tsx` + 3 `filterDeps` arrays**
+   missed the toggle / refetch wiring. Per spec §3.3 those pages
+   were supposed to support inning narrowing but I never mounted
+   the toggle and the filterDeps gap meant fetches wouldn't
+   refire. Silent because nobody clicked a missing toggle —
+   bug was passive but real.
+
+Both surfaced from the same root cause: a bulk patch that quietly
+missed outliers, without an enumeration pass to catch them.
+
+### The cheap audit (5-minute pattern)
+
+Before claiming a fan-out commit done, run:
+
+```bash
+# Find every site of the pattern you intended to change.
+grep -rn "<pattern>" <files> --include="*.py"
+
+# Then enumerate each with context — does each match the
+# canonical shape your edit handled? Does any have surrounding
+# variants (interposed clauses, multi-line breaks, alternative
+# whitespace) that would have slipped through a regex?
+```
+
+For each fan-out style, the audit shape:
+
+- **SQL clauses spread across many queries.** `grep` for `{where}`
+  (or whatever the placeholder is); for each hit, check whether
+  the surrounding query has the JOIN that makes the new clause
+  meaningful, and whether the placeholder is followed by what
+  the regex expected.
+- **Helper threading (`aux=aux`, etc).** `grep` for the helper
+  call; `grep -v` for the threading arg; eyeball each remaining
+  line and confirm it's intentional (out-of-scope, deferred, etc).
+- **Per-page `filterDeps`.** `grep` for the array name; for each
+  page check whether the new field is in the array; assume
+  "missing" means "broken" until proven otherwise.
+- **Spec checklist matrices.** When the spec lists "page X gets
+  feature Y" for N pages, after shipping check by visiting all N
+  pages — `agent-browser` loop, one assertion per page, fast.
+
+Cost is ~5 minutes per audit, vs hours of debugging when the
+silent gap surfaces in production. Default to running it.
+
+### When the regex shortcut IS appropriate
+
+Pure mechanical rename across uniform call sites (e.g. one helper
+moved from module A to module B, every import is `from A import F`
+→ `from B import F`). The transformation is exact-string on a
+known-uniform pattern, no semantic decisions per site. Even then,
+spot-check 2-3 randomly-chosen hits before committing.
+
+The litmus test: *"if I read 5 random matches, is each one the
+shape I assumed?"* If yes, regex is safe. If any of them has
+surrounding variants you didn't anticipate, enumerate.
