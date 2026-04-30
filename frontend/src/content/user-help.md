@@ -260,6 +260,44 @@ to the **last 3 seasons** on first visit, because the unfiltered
 all-time view is rarely what people actually want. You can always
 click `all-time` to widen it.
 
+### Innings toggle (1st innings / 2nd innings)
+
+A second row of pills sits below the filter bar on the player and
+team Batting / Bowling / Fielding / Partnerships pages, the Series
+dossier's stat subtabs, and the Venues stat subtabs:
+
+> **Innings:** [ All innings | 1st innings | 2nd innings ]
+
+Pick "1st innings" to restrict every number on the page to deliveries
+from the match's first innings; "2nd innings" for the chase / second
+innings. "All innings" (default) clears the narrowing.
+
+Reading convention: the label refers to the **match's** innings_number,
+regardless of which side of the ball the page focuses on.
+
+- "Bumrah, 1st innings" = his deliveries when the opposition was
+  batting first.
+- "RCB batting, 1st innings" = their batting in matches where they
+  batted first (= 8 RCB matches in IPL 2025).
+- "RCB bowling, 1st innings" = their bowling in matches where they
+  bowled first (= 7 RCB matches in IPL 2025; the OPPOSITION batted
+  in inning 0).
+
+Why this framing: "bowled first" / "fielded first" are ambiguous in
+casual cricket parlance and mean the OPPOSITE of what readers
+typically assume. Sticking to "1st innings" / "2nd innings"
+(matching the scorecard convention) avoids the trap.
+
+The toggle is **page-local** and **not** part of the filter bar —
+the share URL carries `?inning=0` or `?inning=1` so a copied link
+reproduces exactly what you see, but it doesn't follow you to a
+new tab the way Gender / Type / Tournament do.
+
+On the team Compare tab, the inning narrowing lives **per slot**
+(click ✎ on a column header → "Innings" dropdown). That lets you
+compare e.g. "RCB all innings" vs "RCB chasing only" vs "IPL
+1st-innings average" in three columns.
+
 ## Reading the landings
 
 **Top-10 batters** are ranked by batting average and by strike
