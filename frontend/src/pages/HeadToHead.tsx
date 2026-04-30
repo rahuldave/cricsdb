@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
+import { useFilterDeps } from '../hooks/useFilterDeps'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -115,8 +116,7 @@ function PlayerVsPlayer() {
           series_type: seriesType === 'all' ? undefined : seriesType,
         })
       : Promise.resolve(null),
-    [batterId, bowlerId, seriesType, filters.gender, filters.team_type, filters.tournament,
-     filters.season_from, filters.season_to, filters.filter_venue, filters.team_class],
+    [batterId, bowlerId, seriesType, ...useFilterDeps()],
   )
   useDocumentTitle(
     data ? `${data.batter.name} v ${data.bowler.name}` : enabled ? null : 'Head to Head'

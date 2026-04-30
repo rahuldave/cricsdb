@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useFilters } from '../hooks/useFilters'
+import { useFilterDeps } from '../hooks/useFilterDeps'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -67,14 +68,7 @@ function SinglePlayerView({ playerId }: { playerId: string }) {
   const filters = useFilters()
   const setUrlParams = useSetUrlParams()
 
-  const filterDeps = [
-    playerId, filters.gender, filters.team_type, filters.tournament,
-    filters.season_from, filters.season_to,
-    filters.filter_team, filters.filter_opponent,
-    filters.filter_venue,
-    filters.team_class,
-    filters.inning,
-  ]
+  const filterDeps = [playerId, ...useFilterDeps()]
 
   const profileFetch = useFetch<PlayerProfileT | null>(
     () => getPlayerProfile(playerId, filters),

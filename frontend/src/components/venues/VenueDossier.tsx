@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
+import { useFilterDeps } from '../../hooks/useFilterDeps'
 import { useUrlParam } from '../../hooks/useUrlState'
 import { useFetch } from '../../hooks/useFetch'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
@@ -78,14 +79,7 @@ export default function VenueDossier({ venue }: { venue: string }) {
 
   useDocumentTitle(venue)
 
-  const filterDeps = [
-    venue,
-    filters.gender, filters.team_type, filters.tournament,
-    filters.season_from, filters.season_to,
-    filters.filter_team, filters.filter_opponent,
-    filters.team_class,
-    filters.inning,
-  ]
+  const filterDeps = [venue, ...useFilterDeps()]
 
   const scopedFilters = { ...filters, filter_venue: venue }
 

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import FlagBadge from '../FlagBadge'
 import { useFetch } from '../../hooks/useFetch'
+import { useFilterDeps } from '../../hooks/useFilterDeps'
 import { getBatterSummary, getBowlerSummary } from '../../api'
 import {
   PROFILE_MEN, PROFILE_WOMEN, COMPARE_MEN, COMPARE_WOMEN,
@@ -109,14 +110,7 @@ function ProfileTileCard({ tile, filters }: { tile: ProfileTile; filters: Filter
   // scope-consistent numbers. `.catch(() => null)` — a 404 (e.g.
   // a women's player in a men's scope) just suppresses the strip,
   // the tile is still clickable.
-  const filterDeps = [
-    tile.id, tile.role,
-    filters.gender, filters.team_type, filters.tournament,
-    filters.season_from, filters.season_to,
-    filters.filter_venue,
-    filters.team_class,
-    filters.inning,
-  ]
+  const filterDeps = [tile.id, tile.role, ...useFilterDeps()]
   const strip = useFetch<StatStrip | null>(
     () => fetchStrip(tile, filters),
     filterDeps,

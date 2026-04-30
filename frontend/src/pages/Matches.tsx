@@ -2,6 +2,7 @@ import type React from 'react'
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
+import { useFilterDeps } from '../hooks/useFilterDeps'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -36,13 +37,10 @@ export default function Matches() {
 
   const [offset, setOffset] = useState(0)
 
+  const filterDeps = useFilterDeps()
+
   // Reset pagination when filters change
-  useEffect(() => { setOffset(0) }, [
-    filters.gender, filters.team_type, filters.tournament,
-    filters.season_from, filters.season_to, filters.filter_venue,
-    filters.team_class,
-    team, playerId,
-  ])
+  useEffect(() => { setOffset(0) }, [...filterDeps, team, playerId])
 
   // Fetch match list
   const { data: listData, loading, error, refetch } = useFetch(
@@ -53,10 +51,7 @@ export default function Matches() {
       limit: PAGE_SIZE,
       offset,
     }),
-    [filters.gender, filters.team_type, filters.tournament,
-     filters.season_from, filters.season_to, filters.filter_venue,
-     filters.team_class,
-     team, playerId, offset],
+    [...filterDeps, team, playerId, offset],
   )
   const matches = listData?.matches ?? []
   const total = listData?.total ?? 0

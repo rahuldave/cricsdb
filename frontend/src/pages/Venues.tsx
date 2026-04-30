@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useFilters } from '../hooks/useFilters'
+import { useFilterDeps } from '../hooks/useFilterDeps'
 import VenuesLandingBoard from '../components/venues/VenuesLanding'
 import VenueDossier from '../components/venues/VenueDossier'
 import { ScopeContext } from '../components/scopeLinks'
@@ -37,13 +38,7 @@ export default function Venues() {
     }
   }, [filters.filter_venue, setUrlParams])
 
-  const filterDeps = [
-    filters.gender, filters.team_type, filters.tournament,
-    filters.season_from, filters.season_to,
-    filters.filter_team, filters.filter_opponent,
-    filters.team_class,
-    filters.inning,
-  ]
+  const filterDeps = useFilterDeps()
 
   if (venue) {
     // Promote the `venue=X` path identity → filter_venue pinning so

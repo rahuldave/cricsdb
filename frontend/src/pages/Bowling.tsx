@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
+import { useFilterDeps } from '../hooks/useFilterDeps'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch, type FetchState } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -50,14 +51,7 @@ export default function Bowling() {
     setUrlParams({ player: p.id, tab: 'By Season' })
   }
 
-  const filterDeps = [
-    playerId, filters.gender, filters.team_type, filters.tournament,
-    filters.season_from, filters.season_to,
-    filters.filter_team, filters.filter_opponent,
-    filters.filter_venue,
-    filters.team_class,
-    filters.inning,
-  ]
+  const filterDeps = [playerId, ...useFilterDeps()]
 
   const summaryFetch = useFetch<BowlingSummary | null>(
     () => playerId ? getBowlerSummary(playerId, filters) : Promise.resolve(null),

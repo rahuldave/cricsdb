@@ -6,6 +6,7 @@ import ScopeIndicator from '../ScopeIndicator'
 import PlayerSummaryRow, { disciplineHasData } from './PlayerSummaryRow'
 import { classifyRole, matchesInScope, carryFilters } from './roleUtils'
 import { useFetch, type FetchState } from '../../hooks/useFetch'
+import { useFilterDeps } from '../../hooks/useFilterDeps'
 import { useSetUrlParams } from '../../hooks/useUrlState'
 import { getPlayerProfile } from '../../api'
 import type {
@@ -23,14 +24,7 @@ const DISCIPLINES: Discipline[] = ['batting', 'bowling', 'fielding', 'keeping']
 export default function PlayerCompareGrid({ ids, filters }: Props) {
   const setUrlParams = useSetUrlParams()
 
-  const filterDeps = [
-    filters.gender, filters.team_type, filters.tournament,
-    filters.season_from, filters.season_to,
-    filters.filter_team, filters.filter_opponent,
-    filters.filter_venue,
-    filters.team_class,
-    filters.inning,
-  ]
+  const filterDeps = useFilterDeps()
 
   // Fixed-arity slots (primary + up to 2 compares) so React sees the
   // same number of useFetch calls every render. Empty slots resolve

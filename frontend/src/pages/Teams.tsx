@@ -2,6 +2,7 @@ import type React from 'react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
+import { useFilterDeps } from '../hooks/useFilterDeps'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -206,13 +207,12 @@ export default function Teams() {
 
   const [resultsOffset, setResultsOffset] = useState(0)
 
-  const filterDeps = [
-    selected, filters.gender, filters.team_type, filters.tournament,
-    filters.season_from, filters.season_to,
-    filters.filter_venue,
-    filters.team_class,
-    filters.inning,
-  ]
+  // Deps array iterates FILTER_KEYS via useFilterDeps() — adding a
+  // new FilterBar key auto-includes it. Page-local extras (path team
+  // identity) prepended explicitly. See design-decisions.md
+  // "filterDeps arrays — explicit, per-page, easy to under-wire" —
+  // this is the cure.
+  const filterDeps = [selected, ...useFilterDeps()]
 
   // Summary drives the page header — failure blocks the whole tab area.
   const summaryFetch = useFetch<TeamSummary | null>(

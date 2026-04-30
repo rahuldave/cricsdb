@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
+import { useFilterDeps } from '../../hooks/useFilterDeps'
 import { useUrlParam, useSetUrlParams } from '../../hooks/useUrlState'
 import { useFetch } from '../../hooks/useFetch'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
@@ -169,11 +170,7 @@ export default function TournamentDossier({
 
   const filterDeps = [
     tournament, filterTeam, filterOpponent, seriesType,
-    filters.gender, filters.team_type,
-    filters.season_from, filters.season_to,
-    filters.filter_venue,
-    filters.team_class,
-    filters.inning,
+    ...useFilterDeps(),
   ]
 
   const summaryFetch = useFetch<TournamentSummary>(
