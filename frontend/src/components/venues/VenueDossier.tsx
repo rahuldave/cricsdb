@@ -83,6 +83,7 @@ export default function VenueDossier({ venue }: { venue: string }) {
     filters.gender, filters.team_type, filters.tournament,
     filters.season_from, filters.season_to,
     filters.filter_team, filters.filter_opponent,
+    filters.team_class,
     filters.inning,
   ]
 

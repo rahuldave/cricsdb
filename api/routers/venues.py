@@ -195,7 +195,7 @@ async def venue_summary(
         clauses_d.append(d_where)
     where_d = " AND ".join(clauses_d)
 
-    # 1. Meta + total match count (also drives 404).
+    # 1. Meta + total match count.
     meta_rows = await db.q(
         f"""
         SELECT COUNT(DISTINCT m.id)         AS matches,
@@ -208,8 +208,22 @@ async def venue_summary(
     )
     meta = meta_rows[0] if meta_rows else {}
     matches = meta.get("matches", 0) or 0
+    # Distinguish "venue doesn't exist anywhere in DB" (genuine 404)
+    # from "venue exists but has no matches in this filter scope"
+    # (200 with matches=0). The latter is reachable post-team_class
+    # club tier — e.g. MCG hosts only BBL/WBBL (both primary), so
+    # MCG + team_class=secondary_club legitimately yields zero in
+    # scope but the venue is real. Pre-tier work, every produced URL
+    # narrowed to a scope the venue had matches in, so the conflation
+    # never surfaced. Distinguishing them lets the frontend render an
+    # empty-state hint instead of a generic 404.
     if matches == 0:
-        raise HTTPException(status_code=404, detail=f"Venue not found: {venue}")
+        exists_rows = await db.q(
+            "SELECT 1 FROM match m WHERE m.venue = :venue LIMIT 1",
+            {"venue": venue},
+        )
+        if not exists_rows:
+            raise HTTPException(status_code=404, detail=f"Venue not found: {venue}")
 
     # 2. by_tournament × gender × season. event_name IS NULL rows
     # bucket under "—" so the row still appears (a bilateral friendly

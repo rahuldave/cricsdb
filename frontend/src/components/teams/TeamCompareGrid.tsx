@@ -105,7 +105,15 @@ function chipAlignmentFor(slots: CompareSlots, primaryTeam: string): ChipAlign {
   // in fetchSlot so the chip baseline carries the same scope_to_team
   // synthesis that drives the avg col's actual aggregation.
   const isClub = avg.scope.team_type === 'club'
-  const shouldNarrow = isClub && !avg.scope.tournament
+  // Skip the auto-narrow when the slot has explicitly declared a club
+  // tier — `team_class=primary_club` / `secondary_club` is the user's
+  // own pool dimension, and intersecting with `scope_to_team` would
+  // collapse it back to the team's tournament universe (e.g. CSK +
+  // primary_club ⇒ IPL ∩ primary = IPL again, swallowing the broaden).
+  const explicitClubTier =
+    avg.scope.team_class === 'primary_club' ||
+    avg.scope.team_class === 'secondary_club'
+  const shouldNarrow = isClub && !avg.scope.tournament && !explicitClubTier
   const payload: Record<string, string> = {}
   if (avg.scope.gender)       payload.gender = avg.scope.gender
   if (avg.scope.team_type)    payload.team_type = avg.scope.team_type
@@ -141,7 +149,12 @@ function fetchSlot(
     // 870 matches); the user can opt into a tighter pool with
     // team_class=full_member from the slot picker.
     const isClub = slot.scope.team_type === 'club'
-    const shouldNarrow = isClub && !slot.scope.tournament
+    // Mirror chipAlignmentFor: skip auto-narrow when explicit club
+    // tier is set so the slot's pool reflects the user's broaden.
+    const explicitClubTier =
+      slot.scope.team_class === 'primary_club' ||
+      slot.scope.team_class === 'secondary_club'
+    const shouldNarrow = isClub && !slot.scope.tournament && !explicitClubTier
     const scope = shouldNarrow
       ? { ...slot.scope, scope_to_team: primaryTeam }
       : slot.scope

@@ -172,6 +172,7 @@ export default function TournamentDossier({
     filters.gender, filters.team_type,
     filters.season_from, filters.season_to,
     filters.filter_venue,
+    filters.team_class,
     filters.inning,
   ]
 

@@ -1223,8 +1223,21 @@ def _league_aux(
 
     new_aux = aux
     new_filters = filters
-    # Path 1: scope_to_team narrow (clubs only, only when not already set).
-    if not aux.scope_to_team and (filters is None or filters.team_type == "club"):
+    # Path 1: scope_to_team narrow (clubs only, only when not already set,
+    # and only when the request hasn't explicitly declared a club-tier
+    # pool via team_class). The tier override is the user's explicit
+    # pool dimension — auto-narrowing to the team's tournament
+    # universe on top would intersect both clauses (IPL ∩ primary
+    # = IPL again for a CSK avg slot), silently swallowing the tier
+    # broadening the user asked for.
+    explicit_club_tier = filters is not None and filters.team_class in (
+        "primary_club", "secondary_club",
+    )
+    if (
+        not aux.scope_to_team
+        and (filters is None or filters.team_type == "club")
+        and not explicit_club_tier
+    ):
         new_aux = copy(aux)
         new_aux.scope_to_team = team
     # Path 2: chip_team_class → team_class on filters (any team_type).

@@ -442,3 +442,42 @@ the dedicated docs:
   scope override on Teams Compare so users can do "RCB 2024 vs RCB
   2025 vs IPL 2025 avg". Already shipped 2026-04-27; preserved here
   as the architectural reference that team_class v3 builds on.
+
+**Integration tests must self-anchor against SQL.** Numeric
+expected values in `tests/integration/<feature>.sh` (Matches counts,
+Runs, RR values, leaderboard sizes, baseline-avg numerator/denominator)
+must be **derived from `cricket.db` at test runtime**, not hardcoded
+literals. Pattern:
+
+```bash
+expected=$(sqlite3 "$DB" "SELECT COUNT(*) FROM match WHERE …")
+actual=$(ab_eval "document.body.textContent.match(/Matches(\\d+)/)?.[1]")
+assert_eq "label" "$expected" "$actual"
+```
+
+Three-layer chain:
+- **Sanity** (`tests/sanity/test_*.py`) asserts SQL ↔ API.
+- **Integration** (`tests/integration/*.sh`) asserts DOM ↔ SQL via
+  the running app (transitively SQL ↔ API ↔ DOM).
+- **Regression** (`tests/regression/<feature>/urls.txt`) asserts
+  no-drift across refactors at the API layer.
+
+If you hardcode `assert_eq "label" "548" "$actual"`, a bug that
+drifts the API to 548-by-coincidence (or that drifts both API and
+DOM together) silently passes. The DB is the source of truth — if
+the test computes its expected value from SQL each run, the test
+self-corrects against DB updates AND surfaces drift the moment
+either API or DOM departs from SQL. The team_class club-tier work
+shipped a `filterDeps`-missing bug on 7 of 8 entry pages because
+the original integration tests asserted hardcoded counts on Teams
+only; flipping to SQL-derived anchors lets the test walk every
+page and surface mismatches at the page that's actually broken.
+
+`tests/integration/team_class_club_per_page_refetch.sh` is the
+reference implementation. New shell tests follow that shape:
+`sql()` helper wraps `sqlite3 $DB`, every `assert_eq` reads its
+expected from `$(sql ...)`. Keep IN-list constants (FM frozenset,
+PRIMARY/SECONDARY club leagues, ICC events) inline at the top of
+the script, mirroring the Python source-of-truth — divergence
+between the two surfaces immediately because both sanity and
+integration run against the same DB but different SQL strings.

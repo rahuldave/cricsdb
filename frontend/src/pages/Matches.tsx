@@ -40,6 +40,7 @@ export default function Matches() {
   useEffect(() => { setOffset(0) }, [
     filters.gender, filters.team_type, filters.tournament,
     filters.season_from, filters.season_to, filters.filter_venue,
+    filters.team_class,
     team, playerId,
   ])
 
@@ -54,6 +55,7 @@ export default function Matches() {
     }),
     [filters.gender, filters.team_type, filters.tournament,
      filters.season_from, filters.season_to, filters.filter_venue,
+     filters.team_class,
      team, playerId, offset],
   )
   const matches = listData?.matches ?? []
