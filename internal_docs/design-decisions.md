@@ -74,6 +74,42 @@ The `filter_team` and `filter_opponent` query parameter names use the `filter_` 
 
 Super overs (`innings.super_over = 1`) are always excluded from stats.
 
+### `team_class` is polymorphic over `team_type`
+
+`team_class` is a single FilterBar key that dispatches on the
+active `team_type`:
+
+- `team_type=international` → only `full_member` is meaningful
+  (12 ICC nations, source: `api/full_members.py`).
+- `team_type=club` → `primary_club` (10 men's + 4 women's marquee
+  franchise leagues) or `secondary_club` (5 men's + 2 women's
+  domestic state/county/provincial competitions). Source:
+  `api/club_tiers.py`.
+- `team_type=''` (All) → no value is meaningful; pill is hidden.
+
+Cross-type combinations (e.g. `team_type=club&team_class=full_member`)
+are **silent no-ops** at the backend (the clause never fires).
+Defensive design — if the frontend gate fails or a curl request
+mixes them, the API response equals the no-`team_class` response,
+NOT zero. This keeps URLs robust under copy-paste / share-link.
+
+Why one polymorphic key and not two? `team_class` was already in
+`FILTER_KEYS` and `OVERRIDABLE_SLOT_KEYS` post-v3 (FM intl rollout).
+Adding a parallel `club_tier` key would have duplicated the entire
+scope-link plumbing, slot inheritance, chip-strip rendering, and
+deep-link guards for the same conceptual purpose ("narrow by class
+of team"). CLAUDE.md's "extend existing abstractions, do NOT fork
+parallel helpers" applies directly. The two concepts are mutually
+exclusive at the data level (a match has exactly one `team_type`),
+so the polymorphism is natural, not forced.
+
+Spec: `internal_docs/spec-filterbar-team-class-club.md`. The
+classification rationale lives separately at
+`internal_docs/club-tier-classification.md` (forthcoming) so
+landing-page bucketing (in `tournament_canonical.py`) and tier
+classification (in `club_tiers.py`) can evolve independently
+without one's UX call corrupting the other's filter contract.
+
 ### Team context: players change teams
 
 A player like Kohli plays for India (international) and RCB (IPL). The `innings.team` field records which team a player batted for in each innings. Filtering by team uses `innings.team`, not a fixed player-team mapping.

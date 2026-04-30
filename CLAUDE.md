@@ -426,6 +426,18 @@ the dedicated docs:
   ground-truth anchors, ~125 regression URLs, 22-surface
   integration matrix. Pre-flight + pick-up notes in
   `project_next_session.md` memory.
+- **`internal_docs/spec-filterbar-team-class-club.md`** —
+  extends v3 by teaching `team_class` two new values
+  (`primary_club` / `secondary_club`) so the FilterBar pill
+  becomes polymorphic over `team_type`. Source of truth is
+  `api/club_tiers.py` (10 men's + 4 women's primary frozenset,
+  5 men's + 2 women's secondary). Cross-type combinations are
+  silent no-ops. Tournament dropdown auto-narrows under tier.
+  Compare-tab gains "+ Average primary-club team" / "+ Average
+  secondary-club team" quick-picks. 7-commit rollout, 47 SQL
+  anchors + 60 list rows, ~95 regression URLs, 4 integration
+  scripts (52 assertions). Classification rationale + edge cases:
+  `internal_docs/club-tier-classification.md`.
 - **`internal_docs/spec-team-compare-scoped-slots.md`** — per-column
   scope override on Teams Compare so users can do "RCB 2024 vs RCB
   2025 vs IPL 2025 avg". Already shipped 2026-04-27; preserved here

@@ -63,7 +63,7 @@ filters that aren't driven by the FilterBar UI:
 |---|---|---|---|
 | `series_type` | `all`/`bilateral`/`icc`/`club` (default `all`) | Categorises the match — `bilateral` = international non-ICC; `icc` = ICC events (T20 WC etc.); `club` = `team_type=club` | `series_type=bilateral` |
 | `scope_to_team` | string | Narrows the match pool to events that team has appeared in (intersection of `m.event_name`s). Used by the Compare-tab avg slot; gated frontend-side on `team_type='club'` (closed-league semantic). | `scope_to_team=Royal%20Challengers%20Bengaluru` |
-| `team_class` | `full_member` | Restricts to matches where BOTH teams are ICC full members (Afghanistan, Australia, Bangladesh, England, India, Ireland, New Zealand, Pakistan, South Africa, Sri Lanka, West Indies, Zimbabwe). Used by the Compare-tab avg slot's "+ Full-member avg" quick-pick on internationals. No-op for clubs. | `team_class=full_member` |
+| `team_class` | `full_member` / `primary_club` / `secondary_club` | Polymorphic over `team_type`. **`full_member`** (`team_type=international`): both teams are ICC full members (Afghanistan, Australia, Bangladesh, England, India, Ireland, New Zealand, Pakistan, South Africa, Sri Lanka, West Indies, Zimbabwe). **`primary_club`** (`team_type=club`): match's event_name is in a marquee international franchise league (IPL, BBL, PSL, BPL, CPL, SA20, ILT20, LPL, MLC, The Hundred (M+W), WBBL, WPL, Women's Cricket Super League). **`secondary_club`** (`team_type=club`): match's event_name is in a domestic state/county/provincial competition (Vitality Blast, Syed Mushtaq Ali Trophy, CSA T20 Challenge, Super Smash, Nepal Premier League, Women's Super Smash, NZC Women's T20). Cross-type combinations are silent no-ops (defensive backend gate — preserves URL robustness when frontend gate fails or curl mixes them). | `team_class=full_member` · `team_class=primary_club` · `team_class=secondary_club` |
 
 Aux filters are accepted by **every endpoint** that takes
 `FilterBarParams`. Routers declare both as FastAPI `Depends()` and
@@ -102,6 +102,30 @@ A handful of endpoints add endpoint-specific params (`limit`,
 `offset`, `min_balls`, `min_dismissals`, `min_wickets`, `q`, `role`,
 `top_n`, `bowler_id` / `batter_id` in matchup endpoints, etc.) —
 called out per endpoint below.
+
+### `team_class` worked examples
+
+```
+# Intl: matches between two ICC full members only (intl-only)
+curl 'http://localhost:8000/api/v1/teams/India/summary?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member'
+
+# Club: marquee international franchise leagues only
+curl 'http://localhost:8000/api/v1/teams/Mumbai%20Indians/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club'
+
+# Club: domestic state/county/provincial competitions only
+curl 'http://localhost:8000/api/v1/teams/Surrey/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club'
+
+# Cross-type silent no-op — these return the same response as
+# omitting team_class (defensive backend gate):
+curl 'http://localhost:8000/api/v1/teams/India/summary?...&team_class=primary_club'   # intl + club tier
+curl 'http://localhost:8000/api/v1/teams/Mumbai%20Indians/summary?...&team_class=full_member'   # club + intl tier
+```
+
+Tournament dropdown (`/api/v1/tournaments`) and team typeahead
+(`/api/v1/teams`) both respect `team_class` — they auto-narrow to
+events / teams in the chosen tier so the user can't pick a
+combination that would zero out (e.g. `tournament=Vitality Blast` +
+`team_class=primary_club`).
 
 ## Seasons convention
 
@@ -828,8 +852,8 @@ All endpoints accept the standard FilterBar params (`gender`,
 `scope_to_team` (auto-narrows tournament universe to the team's
 events when no tournament filter is set — applied frontend-side
 only for `team_type='club'`; internationals default to the full
-pool), and `team_class=full_member` (matches between two ICC
-full-member teams only).
+pool), and `team_class` (polymorphic — `full_member` on intl,
+`primary_club` / `secondary_club` on clubs).
 
 **Per-innings semantic** (since 2026-04-26):
 Every numeric field on these endpoints (except match-level totals

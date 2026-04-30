@@ -93,6 +93,13 @@ api/
 tournament_canonical.py — Shared canonical map (T20 WC variants → "T20 World Cup (Men)" etc.)
                          imported by filters.py + tournaments.py + reference.py for global
                          IN-variants expansion of tournament=X queries.
+full_members.py       — ICC full-member nation list + full_member_clause() builder.
+                         Powers `team_class=full_member` (intl-only) on the FilterBar pill.
+club_tiers.py         — PRIMARY_CLUB_LEAGUES + SECONDARY_CLUB_LEAGUES frozensets +
+                         primary_club_clause / secondary_club_clause builders. Powers
+                         `team_class=primary_club` and `=secondary_club` (club-only) on
+                         the FilterBar pill. Disjointness asserted at import. Spec:
+                         internal_docs/spec-filterbar-team-class-club.md.
 models/tables.py      — deebase models: Person, Match, Innings, Delivery, Wicket,
                         FieldingCredit, KeeperAssignment, Partnership
 team_aliases.py       — Canonical team-name mapping (used by import + fix script)
