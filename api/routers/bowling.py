@@ -57,10 +57,19 @@ async def bowling_leaders(
     super-over caveat (0.04% noise, imperceptible).
     """
     db = get_db()
+    # See batting_leaders for the rationale: bool(match_where) sniffs
+    # any FilterBar narrowing; aux.inning is gated inside build() so
+    # we extend the sniff + splice the inning clause manually into
+    # the JOIN-branch SQL where the alias exists.
     match_where, params = filters.build(has_innings_join=False, aux=aux)
-    has_filters = bool(match_where)
+    inning_clause = ""
+    if aux is not None and aux.inning is not None:
+        inning_clause = " AND i.innings_number = :inning"
+        params["inning"] = aux.inning
+    has_filters = bool(match_where) or bool(inning_clause)
 
     if has_filters:
+        m_where = match_where if match_where else "1=1"
         agg_sql = f"""
             SELECT d.bowler_id AS person_id,
                    SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
@@ -69,7 +78,7 @@ async def bowling_leaders(
             FROM delivery d
             JOIN innings i ON i.id = d.innings_id
             JOIN match m ON m.id = i.match_id
-            WHERE d.bowler_id IS NOT NULL AND {match_where}
+            WHERE d.bowler_id IS NOT NULL AND {m_where}{inning_clause}
             GROUP BY d.bowler_id
             HAVING balls >= :min_balls
         """
@@ -81,7 +90,7 @@ async def bowling_leaders(
             JOIN match m ON m.id = i.match_id
             WHERE d.bowler_id IS NOT NULL
               AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-              AND {match_where}
+              AND {m_where}{inning_clause}
             GROUP BY d.bowler_id
         """
     else:

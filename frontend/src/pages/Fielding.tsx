@@ -213,6 +213,12 @@ export default function Fielding() {
         <PlayerSearch role="fielder" onSelect={handleSelect} placeholder="Search for a fielder…" />
       </div>
 
+      {/* InningToggle visible on BOTH the landing leaderboards
+          (top fielders + top keepers by_keeper_dismissals) and the
+          per-fielder profile. /fielders/leaders honours ?inning=
+          via commit 1's central clause. Spec §6.1. */}
+      <InningToggle />
+
       {!playerId && <FieldingLandingBoard filters={filters} filterDeps={filterDeps} />}
 
       {playerId && summaryFetch.loading && <Spinner label="Loading fielder…" size="lg" />}
@@ -237,7 +243,6 @@ export default function Fielding() {
             )}
           </h2>
           <ScopeIndicator filters={filters} />
-          <InningToggle />
           <div className="wisden-statrow cols-6">
             <StatCard label="Catches" value={summary.catches} />
             <StatCard label="Stumpings" value={summary.stumpings} />

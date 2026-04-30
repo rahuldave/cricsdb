@@ -63,10 +63,28 @@ async def batting_leaders(
     db = get_db()
     # has_innings_join=False → only match-level clauses, no super_over
     # filter. Empty string = no filters at all → skip both joins.
+    # `bool(match_where)` is the canonical fast-path sniff: every
+    # FilterBar narrowing emits a clause (literal or bind), so as new
+    # filters are added they auto-flow through this signal — no
+    # enumeration to maintain.
+    #
+    # The inning clause is the one exception: it's gated on
+    # has_innings_join inside `filters.build` (the clause references
+    # `i.innings_number`, which only exists when callers have the
+    # alias). The leaders SQL DOES have that alias in its filtered
+    # branch, so we splice the inning clause manually below — and
+    # extend the fast-path sniff to include `aux.inning is not None`.
     match_where, params = filters.build(has_innings_join=False, aux=aux)
-    has_filters = bool(match_where)
+    inning_clause = ""
+    if aux is not None and aux.inning is not None:
+        inning_clause = " AND i.innings_number = :inning"
+        params["inning"] = aux.inning
+    has_filters = bool(match_where) or bool(inning_clause)
 
     if has_filters:
+        # match_where may be empty if only inning is set; `1=1` keeps
+        # the trailing AND chain valid in that case.
+        m_where = match_where if match_where else "1=1"
         agg_sql = f"""
             SELECT d.batter_id AS person_id,
                    SUM(d.runs_batter) AS runs,
@@ -76,7 +94,7 @@ async def batting_leaders(
             JOIN match m ON m.id = i.match_id
             WHERE d.batter_id IS NOT NULL
               AND d.extras_wides = 0 AND d.extras_noballs = 0
-              AND {match_where}
+              AND {m_where}{inning_clause}
             GROUP BY d.batter_id
             HAVING COUNT(*) >= :min_balls
         """
@@ -88,7 +106,7 @@ async def batting_leaders(
             JOIN match m ON m.id = i.match_id
             WHERE w.player_out_id IS NOT NULL
               AND w.kind NOT IN ('retired hurt', 'retired out')
-              AND {match_where}
+              AND {m_where}{inning_clause}
             GROUP BY w.player_out_id
         """
     else:

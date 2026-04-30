@@ -164,6 +164,11 @@ export default function Bowling() {
         <PlayerSearch role="bowler" onSelect={handleSelect} placeholder="Search for a bowler…" />
       </div>
 
+      {/* InningToggle visible on BOTH the landing leaderboards and
+          the per-bowler profile — backend's /bowlers/leaders + the
+          per-bowler endpoints both honour ?inning=. Spec §6.1. */}
+      <InningToggle />
+
       {!playerId && <BowlingLandingBoard filters={filters} filterDeps={filterDeps} />}
 
       {playerId && summaryFetch.loading && <Spinner label="Loading bowler…" size="lg" />}
@@ -188,7 +193,6 @@ export default function Bowling() {
             )}
           </h2>
           <ScopeIndicator filters={filters} />
-          <InningToggle />
           <div className="wisden-statrow cols-5">
             <StatCard label="Matches" value={summary.matches} />
             <StatCard label="Innings" value={summary.innings} />

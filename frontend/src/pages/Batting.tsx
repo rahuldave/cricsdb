@@ -180,6 +180,13 @@ export default function Batting() {
         <PlayerSearch role="batter" onSelect={handleSelect} placeholder="Search for a batter…" />
       </div>
 
+      {/* InningToggle visible on BOTH the landing leaderboards and the
+          per-player profile — backend's /batters/leaders + the per-
+          player endpoints both honour ?inning=. Mounted once here so
+          flipping the pill on the landing carries into the profile
+          view if the user clicks a leaderboard row. Spec §6.1. */}
+      <InningToggle />
+
       {!playerId && <BattingLandingBoard filters={filters} filterDeps={filterDeps} />}
 
       {playerId && summaryFetch.loading && <Spinner label="Loading batter…" size="lg" />}
@@ -204,7 +211,6 @@ export default function Batting() {
             )}
           </h2>
           <ScopeIndicator filters={filters} />
-          <InningToggle />
           <div className="wisden-statrow cols-5">
             <StatCard label="Matches" value={summary.matches} />
             <StatCard label="Innings" value={summary.innings} />

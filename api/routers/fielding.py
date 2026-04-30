@@ -59,8 +59,16 @@ async def fielding_leaders(
     DESC then run-outs DESC.
     """
     db = get_db()
+    # See batting_leaders for the rationale: bool(match_where) sniffs
+    # any FilterBar narrowing; aux.inning is gated inside build() so
+    # we extend the sniff + splice the inning clause manually into
+    # the JOIN-branch SQL where the `i` alias exists.
     match_where, params = filters.build(has_innings_join=False, aux=aux)
-    has_filters = bool(match_where)
+    inning_clause = ""
+    if aux is not None and aux.inning is not None:
+        inning_clause = "i.innings_number = :inning"
+        params["inning"] = aux.inning
+    has_filters = bool(match_where) or bool(inning_clause)
 
     # --- List 1: top fielders by total dismissals ------------------
     # All four kinds aggregated per fielder, with per-kind breakdown
@@ -70,7 +78,10 @@ async def fielding_leaders(
         fc_join = ("JOIN delivery d ON d.id = fc.delivery_id "
                    "JOIN innings i ON i.id = d.innings_id "
                    "JOIN match m ON m.id = i.match_id")
-        fc_parts.append(match_where)
+        if match_where:
+            fc_parts.append(match_where)
+        if inning_clause:
+            fc_parts.append(inning_clause)
     else:
         fc_join = ""
     fc_where = " AND ".join(fc_parts)
@@ -106,7 +117,10 @@ async def fielding_leaders(
     ]
     if has_filters:
         ka_join += " JOIN match m ON m.id = i.match_id"
-        ka_parts.append(match_where)
+        if match_where:
+            ka_parts.append(match_where)
+        if inning_clause:
+            ka_parts.append(inning_clause)
     ka_where = " AND ".join(ka_parts)
     keeper_rows = await db.q(
         f"""
