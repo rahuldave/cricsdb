@@ -1751,7 +1751,7 @@ async def tournament_records(
         FROM innings_totals it
         JOIN innings i ON i.id = it.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND it.wkts >= 10 AND {where}
+        WHERE i.super_over = 0 AND it.wkts >= 10 AND {where}{inn_clause}
         ORDER BY it.total ASC LIMIT :lim
         """,
         params,

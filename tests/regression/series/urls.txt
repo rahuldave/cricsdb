@@ -57,3 +57,11 @@ REG rivalries_summary_ind_aus         /api/v1/rivalries/summary?team1=India&team
 
 # ── venue scope (Phase 2 filter_venue fan-out) ───────────────────
 REG series_summary_ipl_wankhede       /api/v1/series/summary?tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium%2C%20Mumbai
+
+# ── inning-split (spec-inning-split.md) — lock the lowest_all_out
+#    fix from 2026-04-29 (commit 8) so the inning narrowing on
+#    /series/records doesn't silently regress. Pre-fix both inning=0
+#    and inning=1 returned the same list (RCB 49 vs KKR at top of
+#    both); post-fix inn=0 starts with DC/KKR 67 and inn=1 with RCB 49.
+NEW series_records_ipl_inn0           /api/v1/series/records?tournament=Indian%20Premier%20League&gender=male&team_type=club&inning=0&limit=5
+NEW series_records_ipl_inn1           /api/v1/series/records?tournament=Indian%20Premier%20League&gender=male&team_type=club&inning=1&limit=5
