@@ -108,6 +108,32 @@ partition CSV under `docs/keeper-ambiguous/`. The
 `(person, scope_key)` cells whose scope is touched by the new
 matches; an unrelated scope's rows stay byte-identical.
 
+**People-registry refresh (auto, since 2026-04-30):** Before any
+match imports, `update_recent.py` does two things:
+
+1. **CSV refresh in place.** HEADs cricsheet's people.csv +
+   names.csv. If size or `Last-Modified` differs from local, GET +
+   atomic-replace via a `.part` suffix. Skipped when CSV is
+   up-to-date. Equivalent to a scoped `download_data.py --force`
+   for just these two files.
+2. **`refresh_people_registry(db)`.** INSERT-OR-IGNORE the local
+   CSVs onto the `person` and `personname` tables. Existing rows
+   preserved; newly-registered ids land. Pre-existing person.name
+   values are kept (cricsheet's canonical-name registry is stable;
+   for the rare legitimate rename, drop the table + run
+   import_data.py). For names.csv, a NOT EXISTS guard prevents
+   duplicate aliases.
+
+Why this exists: pre-fix (before 2026-04-30), incremental match
+imports inserted matchplayer rows referencing person_ids that
+cricsheet had registered AFTER the initial `import_data.py` run.
+The matchplayer ↔ person FK soft-broke; player-dossier-by-id pages
+(`/batting?player=<id>`) rendered without a name. The refresh
+closes that loop on every cycle. Surfaced 2026-04-30 by
+`/bowling?player=f98481d3` (Muhammad Ismail, Multan Sultans, PSL
+2026) — see `internal_docs/spec-filterbar-team-class-club.md`
+session log + git commit `7506b9c`.
+
 ```bash
 uv run python update_recent.py --dry-run --days 7   # check status
 uv run python update_recent.py --days 7              # actually import

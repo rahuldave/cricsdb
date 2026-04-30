@@ -45,6 +45,28 @@ copy of the prod snapshot does.
    "known good" reference; mutate only the `/tmp` copy, which you can
    delete and re-copy as often as you like.
 
+   **Schema-drift gotcha:** if the Downloads snapshot pre-dates a
+   schema migration that landed in the local working DB (e.g. the
+   `match.venue_country` column added during the venues Phase-3
+   work), the match-import step will 100% fail with
+   `table match has no column named venue_country` until you apply
+   the missing migration to the test copy:
+
+   ```bash
+   # only the columns the snapshot is missing — diff via PRAGMA
+   diff \
+     <(sqlite3 cricket.db                     "PRAGMA table_info(match);") \
+     <(sqlite3 /tmp/cricket-prod-test.db      "PRAGMA table_info(match);")
+
+   # apply each missing column
+   sqlite3 /tmp/cricket-prod-test.db "ALTER TABLE match ADD COLUMN venue_country TEXT;"
+   ```
+
+   Production plash never hits this because its DB has been migrated
+   in place across deploys; only Downloads snapshots taken before
+   the migration carry the gap. A `bash deploy.sh --first` resets
+   prod to the local DB's schema, eliminating the gap going forward.
+
 3. Run the incremental import against the `/tmp` copy via the `--db`
    flag:
 

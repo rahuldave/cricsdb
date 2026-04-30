@@ -40,8 +40,11 @@ AVAILABLE_WINDOWS = [2, 7, 14, 30]
 PEOPLE_CSVS = ["people.csv", "names.csv"]
 
 
-def check_people_freshness(data_dir: str) -> None:
-    """Compare local people.csv / names.csv against cricsheet's via HEAD."""
+def check_people_freshness(data_dir: str, *, refresh: bool = False) -> None:
+    """Compare local people.csv / names.csv against cricsheet's via HEAD.
+    With refresh=True, re-download stale files in place. Default
+    behaviour (refresh=False) is log-only — used by --dry-run.
+    """
     import email.utils
 
     print("People/names CSVs:")
@@ -57,13 +60,8 @@ def check_people_freshness(data_dir: str) -> None:
             print(f"  {name}: HEAD failed ({e})")
             continue
 
-        if not os.path.exists(local):
-            print(f"  {name}: MISSING locally — remote {remote_size} bytes, "
-                  f"Last-Modified {remote_lm}")
-            continue
-
-        local_size = os.path.getsize(local)
-        local_mtime = os.path.getmtime(local)
+        local_size = os.path.getsize(local) if os.path.exists(local) else 0
+        local_mtime = os.path.getmtime(local) if os.path.exists(local) else 0
         remote_mtime = None
         if remote_lm:
             try:
@@ -71,20 +69,41 @@ def check_people_freshness(data_dir: str) -> None:
             except Exception:
                 pass
 
-        size_match = (remote_size == local_size)
-        mtime_newer = (remote_mtime is not None and remote_mtime > local_mtime + 1)
-
-        if size_match and not mtime_newer:
-            print(f"  {name}: up to date "
-                  f"({local_size} bytes, Last-Modified {remote_lm})")
+        if not os.path.exists(local):
+            stale = True
+            reason = ["MISSING locally"]
         else:
+            size_match = (remote_size == local_size)
+            mtime_newer = (remote_mtime is not None and remote_mtime > local_mtime + 1)
+            stale = not size_match or mtime_newer
             reason = []
             if not size_match:
                 reason.append(f"size {local_size} -> {remote_size}")
             if mtime_newer:
                 reason.append(f"server newer ({remote_lm})")
+
+        if not stale:
+            print(f"  {name}: up to date "
+                  f"({local_size} bytes, Last-Modified {remote_lm})")
+            continue
+
+        if not refresh:
             print(f"  {name}: STALE ({'; '.join(reason)}) — "
-                  f"re-run download_data.py --force to refresh")
+                  f"re-run with refresh=True or download_data.py --force")
+            continue
+
+        # Refresh in place — atomic via .part suffix.
+        print(f"  {name}: STALE ({'; '.join(reason)}) — refreshing")
+        tmp = local + ".part"
+        try:
+            with urllib.request.urlopen(url) as resp, open(tmp, "wb") as f:
+                shutil.copyfileobj(resp, f)
+            os.replace(tmp, local)
+            print(f"  {name}: refreshed -> {os.path.getsize(local)} bytes")
+        except Exception as e:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+            print(f"  {name}: refresh FAILED ({e}) — keeping existing")
 
 
 def pick_window(days: int) -> int:
@@ -260,14 +279,20 @@ async def main():
             print("Database is up to date.")
             return
 
-        # Refresh the people / personname registry FIRST. New matches
-        # often reference person_ids that cricsheet has registered
-        # since the initial import (e.g. PSL 2026 newcomers). Without
-        # this, matchplayer rows land with valid person_ids but no
-        # corresponding person row, and `/batting?player=<id>` etc.
-        # render the dossier without a player name. INSERT OR IGNORE
-        # — existing rows are preserved. Spec: project_next_session.md
-        # 2026-04-30 entry.
+        # 1. Refresh the local people.csv + names.csv from cricsheet
+        # (only if stale). cricsheet adds names every cycle; without
+        # this, a fresh person_id in the new match-JSONs has nowhere
+        # to land in the person table. Atomic in-place download via
+        # .part suffix; HEAD-driven so it's a no-op when up to date.
+        check_people_freshness(DATA_DIR, refresh=True)
+
+        # 2. Apply the (possibly-refreshed) CSVs onto the person +
+        # personname tables via INSERT OR IGNORE. Existing rows
+        # preserved; new ids land. Runs BEFORE the match-import loop
+        # so matchplayer rows for the new matches have their
+        # corresponding person rows in place. Without this, the
+        # dossier-by-id pages (`/batting?player=<id>` etc.) render
+        # without a name. Spec: project_next_session.md 2026-04-30.
         await refresh_people_registry(db)
 
         tables = await get_match_tables(db, incremental=True)
