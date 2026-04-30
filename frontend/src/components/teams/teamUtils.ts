@@ -97,6 +97,10 @@ export function scopeAvgLabel(
   let line1: string
   if (filters.team_class === 'full_member') {
     line1 = 'Full-member average'
+  } else if (filters.team_class === 'primary_club') {
+    line1 = 'Primary-club average'
+  } else if (filters.team_class === 'secondary_club') {
+    line1 = 'Secondary-club average'
   } else if (anchorTournament) {
     line1 = `${anchorTournament} average`
   } else if (filters.team_type === 'international') {
@@ -126,6 +130,9 @@ export function scopeAvgLabel(
   } else if (filters.team_class === 'full_member') {
     // "Full-member" always implies intl T20I; keep gender + T20I tier.
     parts.push(genderWord ? `${genderWord} T20I` : 'T20Is')
+  } else if (filters.team_class === 'primary_club' || filters.team_class === 'secondary_club') {
+    // Tier-narrowed club; gender + "club" qualifier (the tier is in line1).
+    parts.push(genderWord ? `${genderWord} club` : 'Clubs')
   } else if (filters.team_type === 'international') {
     parts.push(genderWord ? `${genderWord} T20I` : 'T20Is')
   } else if (filters.team_type === 'club') {

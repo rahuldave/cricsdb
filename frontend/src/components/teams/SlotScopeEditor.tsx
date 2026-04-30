@@ -44,6 +44,7 @@ export default function SlotScopeEditor({
   const [inning, setInning]         = useState(toEditorValue(initial.inning,      primary.inning))
 
   const isInternational = primary.team_type === 'international'
+  const isClub = primary.team_type === 'club'
 
   // For fields where primary HAS a value, expose an "(any — show all)"
   // option in the dropdown — selecting it broadens the slot past
@@ -178,6 +179,23 @@ export default function SlotScopeEditor({
               <option value={ANY_SENTINEL}>(any — all teams, override primary)</option>
             )}
             <option value="full_member">Full members only</option>
+          </select>
+        </div>
+      )}
+      {isClub && (
+        <div style={fieldStyle}>
+          <span style={labelStyle}>Tier</span>
+          <select
+            value={teamClass}
+            onChange={e => setTeamClass(e.target.value)}
+            title="Narrow the pool to a club tier. Primary = marquee international franchise leagues (IPL, BBL, PSL, …). Secondary = domestic state/county/provincial competitions (Vitality Blast, SMA, Super Smash, …)."
+          >
+            <option value="">— inherit —</option>
+            {showAny.teamClass && (
+              <option value={ANY_SENTINEL}>(any — all club tiers, override primary)</option>
+            )}
+            <option value="primary_club">Primary clubs only</option>
+            <option value="secondary_club">Secondary clubs only</option>
           </select>
         </div>
       )}

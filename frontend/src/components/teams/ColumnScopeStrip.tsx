@@ -111,6 +111,10 @@ export function buildSlotSegments(
 
   if (scope.team_class === 'full_member') {
     segs.push({ label: 'Class', value: 'full members', overridden: ovr('team_class') })
+  } else if (scope.team_class === 'primary_club') {
+    segs.push({ label: 'Tier', value: 'primary clubs', overridden: ovr('team_class') })
+  } else if (scope.team_class === 'secondary_club') {
+    segs.push({ label: 'Tier', value: 'secondary clubs', overridden: ovr('team_class') })
   } else if (ovr('team_class')) {
     segs.push({ label: 'Class', value: 'any', overridden: true })
   }

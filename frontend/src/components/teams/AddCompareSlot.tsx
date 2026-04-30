@@ -90,6 +90,7 @@ export default function AddCompareSlot({
     || !!primaryFilters.team_class
   const hasAllTimeable = hasAnyNarrowing
   const isInternational = primaryFilters.team_type === 'international'
+  const isClub = primaryFilters.team_type === 'club'
 
   // Compare overrides shape-wise so quick-picks gate per-shape, not
   // blanket-hide just because *any* avg / same-team slot exists. User
@@ -132,6 +133,27 @@ export default function AddCompareSlot({
     const o: SlotOverrides = { team_class: 'full_member' }
     if (sameAvgAlreadyComparing(o)) {
       setErr('Full-member avg in current scope is already in comparison.')
+      return
+    }
+    onAddSlot(AVG_SENTINEL, o)
+    closeAll()
+  }
+  // Tier-narrowed avg quick-picks — club-side counterparts to
+  // onAvgFullMember. Visible regardless of FilterBar's current
+  // team_class state (per spec §4.5: explicit override entry point).
+  const onAvgPrimaryClub = () => {
+    const o: SlotOverrides = { team_class: 'primary_club' }
+    if (sameAvgAlreadyComparing(o)) {
+      setErr('Primary-club avg in current scope is already in comparison.')
+      return
+    }
+    onAddSlot(AVG_SENTINEL, o)
+    closeAll()
+  }
+  const onAvgSecondaryClub = () => {
+    const o: SlotOverrides = { team_class: 'secondary_club' }
+    if (sameAvgAlreadyComparing(o)) {
+      setErr('Secondary-club avg in current scope is already in comparison.')
       return
     }
     onAddSlot(AVG_SENTINEL, o)
@@ -372,6 +394,28 @@ export default function AddCompareSlot({
               title="Average-full-member-team pool, broadened past primary's narrowing along tournament / season / venue / series."
             >
               + Average full-member team, all-time
+            </button>
+          )}
+          {isClub && (
+            <button
+              type="button"
+              className="comp-link"
+              style={QP_BTN_STYLE}
+              onClick={onAvgPrimaryClub}
+              title="Restrict the average-team pool to matches in primary-tier club leagues (IPL, BBL, PSL, BPL, CPL, SA20, ILT20, MLC, LPL, The Hundred (M+W), WBBL, WPL)."
+            >
+              + Average primary-club team, current scope
+            </button>
+          )}
+          {isClub && (
+            <button
+              type="button"
+              className="comp-link"
+              style={QP_BTN_STYLE}
+              onClick={onAvgSecondaryClub}
+              title="Restrict the average-team pool to matches in secondary-tier club leagues (Vitality Blast, SMA Trophy, CSA T20 Challenge, Super Smash, NPL, Women's Super Smash)."
+            >
+              + Average secondary-club team, current scope
             </button>
           )}
           <div style={{ fontSize: '0.78em', opacity: 0.6, marginTop: '0.5rem', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
