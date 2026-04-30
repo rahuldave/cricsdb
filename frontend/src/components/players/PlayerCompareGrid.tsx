@@ -134,11 +134,11 @@ function CompareColumn({
   const profile = fetch.data
 
   if (fetch.loading && !profile) {
-    return <div className="wisden-compare-col"><Spinner label="…" /></div>
+    return <div className="wisden-compare-col wisden-compare-col--flat"><Spinner label="…" /></div>
   }
   if (!profile) {
     return (
-      <div className="wisden-compare-col">
+      <div className="wisden-compare-col wisden-compare-col--flat">
         <div className="wisden-empty">No data.</div>
       </div>
     )
@@ -156,7 +156,7 @@ function CompareColumn({
   const soloLink = `/players?${deepLinkQs}`
 
   return (
-    <div className="wisden-compare-col">
+    <div className="wisden-compare-col wisden-compare-col--flat">
       <div className="wisden-compare-col-head">
         <h2 className="wisden-compare-col-name">
           {nationalities.length > 0 && (

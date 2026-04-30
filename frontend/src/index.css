@@ -837,6 +837,21 @@ a { color: inherit; }
   min-width: 0;
   overflow-x: clip;
 }
+/* PlayerCompareGrid uses .wisden-compare-col-head + name styling but
+   does NOT need the cross-column row alignment that the team Compare
+   tab gets via CSS subgrid (each player's discipline panels are
+   self-contained — Kohli's "Batting" doesn't need to sit on the same
+   visual row as Yadav's "Bowling"). The `--flat` modifier reverts
+   the subgrid hijacking back to plain block flow so each section
+   stacks below the previous one in source order. Without this
+   modifier, every <PlayerSummaryRow> falls to row 1 of an empty
+   subgrid and the discipline panels visibly overlap.
+   Spec: bug fix 2026-04-30 (user-reported on /players?...&compare=…). */
+.wisden-compare-col--flat {
+  display: block;
+  grid-template-rows: none;
+  grid-row: auto;
+}
 .wisden-compare-col-head {
   display: flex;
   align-items: baseline;
