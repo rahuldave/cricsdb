@@ -151,31 +151,76 @@ Global filters (gender, tournament, season range) are also in URL params, manage
 
 Example URL: `/batting?player=ba607b88&tab=By+Over&tournament=Indian+Premier+League`
 
-### filterDeps arrays — explicit, per-page, easy to under-wire (revisit)
+### Compare-tab avg slot: explicit `team_class` disables `scope_to_team` auto-narrow
 
-Every page that runs `useFetch(fn, deps)` maintains its own hand-rolled
-`filterDeps` array listing the individual filter fields it cares about
-— `[filters.gender, filters.team_type, filters.tournament,
-filters.season_from, filters.season_to, filters.filter_team,
-filters.filter_opponent, filters.filter_venue, …]`. This is explicit
-and gives every page tight control over which filter changes trigger
-refetches, but it's a **landmine when adding a new filter**: Phase 2
-of Venues added `filter_venue` to `FilterParams`, the FilterBar, and
-the URL — but the page-level `filterDeps` arrays kept the old list, so
-an SPA-set venue change wouldn't trigger a refetch (only reloading
-would, because reload rebuilds from URL). We patched 13 call sites +
-5 carry functions by hand.
+The Compare-tab default avg slot for a club team auto-narrows the
+pool to the team's tournament universe via the `scope_to_team`
+synthesis in `api/routers/teams.py::_league_aux` Path 1 (CSK avg →
+IPL avg, the closed-league semantic). Most slots are happy with
+that — chips on RCB compare against IPL, the natural baseline.
 
-**Revisit when it bites again**: either derive `filterDeps` from
-`Object.values(filters)` in `useFilters()` — stable-keyed so reference
-identity is preserved when nothing changes — or expose a
-`useFilterDeps()` helper that returns the same array everywhere. The
-carry-filter utilities (`components/teams/teamUtils.ts::carryTeamFilters`,
-`components/players/roleUtils.ts::carryFilters`, inline blocks on
-Batting/Bowling/Fielding, `TournamentsLanding.buildFilterQs`) would
-collapse similarly. Risk is if an unrelated URL param sneaks into
-`useFilters()` later and starts triggering spurious refetches — but
-that's a discipline thing, not an architectural blocker.
+**The exception**: when a slot explicitly sets `team_class=primary_club`
+or `secondary_club`, the user has declared the pool dimension
+themselves ("show me CSK vs all primary-tier clubs, not just IPL").
+Auto-narrowing on top intersects both clauses (IPL ∩ primary =
+IPL again for a CSK slot), silently swallowing the broaden the user
+asked for. So `_league_aux` short-circuits the synthesis when
+`filters.team_class in {primary_club, secondary_club}` — the same
+guard exists frontend-side in `TeamCompareGrid.tsx::fetchSlot` so
+the URL doesn't even carry `scope_to_team` for tier-overridden
+slots. Spec: spec-filterbar-team-class-club.md §4.4.
+
+The legacy intl `team_class=full_member` value doesn't need this
+guard because `scope_to_team` itself is gated on `team_type='club'`
+(closed-league semantic) — for intl, the synthesis never fires.
+
+### filterDeps arrays — migrated to `useFilterDeps()` (2026-04-30)
+
+**Resolution of the under-wire landmine.** The old pattern: every
+page hand-rolled its own filterDeps array
+(`[filters.gender, filters.team_type, filters.tournament, …]`).
+Phase 2 of Venues added `filter_venue`, the v3 work added
+`team_class`, and the v3-club tier work *re-broke* `team_class` on
+seven of the eight entry pages — all the same shape: a new key in
+`FILTER_KEYS` that hand-rolled arrays didn't pick up. Click-after-
+mount silently failed to refetch; only deep-links worked because
+mount reads URL state directly.
+
+**Fix shipped 2026-04-30**: every consumer routes through
+`hooks/useFilterDeps.ts`, which iterates `FILTER_KEYS` and returns
+the same array shape on each render (memoized on `filters`
+identity). Twelve call sites (8 pages + 4 dossier/landing components)
+collapsed to one-liners:
+
+```ts
+// Was:
+const filterDeps = [
+  filters.gender, filters.team_type, filters.tournament,
+  filters.season_from, filters.season_to,
+  filters.filter_team, filters.filter_opponent,
+  filters.filter_venue, filters.team_class, filters.inning,
+]
+// Now:
+const filterDeps = useFilterDeps()         // pure filter deps
+// or, with page-local extras:
+const filterDeps = [playerId, ...useFilterDeps()]
+```
+
+The next filter key added to `FILTER_KEYS` auto-includes itself
+on every page — no per-page audit needed. Net diff was −400 / +128
+lines for the migration.
+
+Risk model that the explicit form was guarding against — "an
+unrelated URL param sneaks into `useFilters()` and triggers
+spurious refetches" — moves to discipline at the `FILTER_KEYS`
+registry: only fields that should drive every page's refetch belong
+there. Page-local URL state (e.g. `tab`, `compare1`, `inning`-
+toggle picker memory) lives outside the registry.
+
+The carry-filter utilities (`carryTeamFilters`, `carryFilters`,
+`buildFilterQs`) didn't migrate — those serialize URL params for
+href construction, a different concern. The `scopeLinks.ts`
+`buildParams` already iterates `FILTER_KEYS` on the link side.
 
 ### Semiotic v3 chart wrappers
 

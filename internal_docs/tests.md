@@ -209,7 +209,7 @@ assertion failures` → `ALL PASS`.
 ### `test_team_class_baseline_numbers.py`
 
 What: 30-anchor SQL-vs-API + raw SQL pin for the v3 team_class
-FilterBar promotion. Pinned to closed historical windows
+FilterBar promotion (intl FM). Pinned to closed historical windows
 (`internal_docs/team-class-anchor-numbers.md`). AXIS A pins match
 counts via summary endpoints; AXIS B pins top-10 batter/bowler
 person_ids via raw SQL; AXIS C pins league + team run rates.
@@ -227,6 +227,37 @@ uv run python tests/sanity/test_team_class_baseline_numbers.py
 ```
 
 Expected output ends with `ALL PASS`.
+
+### `test_team_class_club_baseline_numbers.py`
+
+What: 47-anchor + 60-list-row SQL-vs-API pin for the **club-tier**
+extension of `team_class` (`primary_club` / `secondary_club`,
+shipped 2026-04-30). Pinned at
+`internal_docs/club-tier-anchor-numbers.md`. Three module-level
+invariants run unconditionally:
+- **disjointness** — `PRIMARY_CLUB_LEAGUES ∩ SECONDARY_CLUB_LEAGUES == ∅`
+- **completeness** — every `team_type=club, match_type=T20`
+  `event_name` in the DB is in one of the two frozensets. Fails CI
+  if `update_recent` introduces a new club event that's not yet
+  classified.
+- **team-string disjoint** — no team string appears in matches
+  under both tiers.
+
+Anchor groups: P-series (per-team narrowing), INV (whole-DB
+partition), G (cross-type silent no-op gate proofs), V (venue),
+H (head-to-head), X (cross-tier player), C (run-rate baselines),
+BWL (bowling-side build_side_neutral), W (women's), T (distinct-
+team-string counts), B/BWL-list (top-10 leaderboards per tier).
+
+When to run: after any change touching `api/club_tiers.py`,
+`primary_club_clause` / `secondary_club_clause`, the dispatch
+extension, or any endpoint that consumes `team_class`.
+
+```bash
+uv run python tests/sanity/test_team_class_club_baseline_numbers.py
+```
+
+Expected output ends with `✅ All anchors PASS.`.
 
 ### `test_series_type_baseline_numbers.py`
 
@@ -342,6 +373,15 @@ Both Vite (5174) and uvicorn (8000) need to be running. See `CLAUDE.md`
 | `players.sh` | Players landing + tile click → single-player view + 2/3-way comparison + nav-group dropdown active class. |
 | `players_hygiene.sh` | Companion to `players.sh` — mount/unmount under rapid nav (no React warnings, no uncaught page errors). |
 | `venues.sh` | Venues landing tile-grid + per-venue dossier + `filter_venue` ambient propagation. |
+| `team_class_filterbar.sh` | v3 intl FM toggle — pill rendering, URL state writes, ScopeStatusStrip chip. |
+| `team_class_gating.sh` | v3 intl FM toggle — defensive gate (Type→Club auto-clears full_member). |
+| `team_class_persistence.sh` | v3 intl FM toggle — URL plumbing through link clicks. |
+| `team_class_per_tab_narrowing.sh` | v3 intl FM toggle — per-tab narrowing assertions on each subtab. |
+| `team_class_club_filterbar.sh` | club-tier extension — Tier segmented control on club mode, FM toggle hidden on club / shown on intl, URL state writes. |
+| `team_class_club_gating.sh` | club-tier extension — six layered auto-clear paths (intl→club, club→intl, type→All, deep-link self-correct) + curl-side backend silent-no-op proofs (G2/G3/G5 anchors). |
+| `team_class_club_persistence.sh` | club-tier extension — phrase PlayerLink preserves team_class; Tournament dropdown auto-narrows under tier (literal-events list assertion). |
+| `team_class_club_compare.sh` | club-tier extension — Compare-tab "+ Average primary-club / secondary-club team" quick-picks visible/hidden by team_type; SlotScopeEditor Tier dropdown options. |
+| `team_class_club_per_page_refetch.sh` | **SQL-anchored**, **DOM-asserted** end-to-end on every page that surfaces the tier pill — Teams MI/Surrey, Venues Oval/Wankhede/MCG, Player Batting (cross-tier), Matches list, H2H team mode, plus Compare-tab avg-slot pool sizes (catches the scope_to_team-eats-tier bug). Each numeric expected value is computed via `sqlite3 cricket.db` at runtime, not hardcoded. Pattern reference for any new feature whose narrowing is page-visible. |
 
 ### Cross-cutting scripts
 
@@ -350,6 +390,31 @@ Both Vite (5174) and uvicorn (8000) need to be running. See `CLAUDE.md`
 | `cross_cutting_url_state.sh` | URL-as-default contract: `useUrlParam` push-vs-replace discipline, ScopeIndicator + PlayerLink reflect URL across tabs. |
 | `cross_cutting_mount_unmount.sh` | React hygiene under rapid navigation, fast filter changes, in-flight searches. NEGATIVE assertions (no console errors, no stale-data warnings). |
 | `cross_cutting_aux_filters.sh` | series_type aux filter propagation: useFilters reads it from URL, every API consumer passes it through, status strip surfaces it. End-to-end with explicit series_type=bilateral / icc / club assertions. |
+
+### SQL-anchored integration tests
+
+Per CLAUDE.md "Integration tests must self-anchor against SQL" —
+new shell tests for any feature whose narrowing produces visible
+numeric output should derive expected values from the DB at
+runtime, not from hardcoded literals. Pattern:
+
+```bash
+DB="${DB:-/Users/rahul/Projects/cricsdb/cricket.db}"
+sql() { sqlite3 "$DB" "$1" 2>&1; }
+
+expected=$(sql "SELECT COUNT(*) FROM match WHERE …")
+ab open "$BASE/<page-url>"
+sleep 4
+actual=$(ab_eval "document.body.textContent.match(/Matches(\d+)/)?.[1]")
+assert_eq "label" "$expected" "$actual"
+```
+
+Reference implementation:
+`tests/integration/team_class_club_per_page_refetch.sh`. See
+`internal_docs/spec-filterbar-team-class-club.md` §6.3 for the
+shape and the why. Sanity layer asserts SQL ↔ API; integration
+asserts DOM ↔ SQL via the running app — bug at any layer surfaces
+at the integration assertion that touches it.
 
 ### When to run which
 

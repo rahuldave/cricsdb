@@ -163,6 +163,11 @@ frontend/src/
                                    .wisden-table, .wisden-tabs, etc.)
   hooks/useUrlState.ts         — useUrlParam + useSetUrlParams (atomic URL state updates)
   hooks/useFetch.ts            — { data, loading, error, refetch } wrapper around an async fn
+  hooks/useFilterDeps.ts       — returns FILTER_KEYS-iterated array for useFetch deps. EVERY
+                                    page that runs useFetch on filter-bound data MUST use this
+                                    (or `[<extras>, ...useFilterDeps()]`) — hand-rolling deps
+                                    arrays caused the v3 + club-tier filterDeps under-wire bugs
+                                    (see design-decisions.md "filterDeps arrays — migrated").
   hooks/useContainerWidth.ts   — ResizeObserver wrapper used by responsive chart wrappers
   hooks/useDefaultSeasonWindow.ts — Batting/Bowling/Fielding landings auto-default to last 3
                                     seasons in scope when no season filter is set (one-shot

@@ -267,8 +267,19 @@ narrow to men's internationals only.
 Venue-character dossier bundle (Phase 3). Pins `m.venue = :venue` from
 the path and strips any ambient `filter_venue` on the query; every
 other common filter (gender / team_type / tournament / season window
-/ filter_team / filter_opponent) is honored. 404 if the venue has no
-matches in scope.
+/ filter_team / filter_opponent / team_class) is honored.
+
+Status codes:
+- **200** with `matches: 0` and empty payload sections — venue
+  exists in the DB but the current filter scope has no matches
+  (e.g. MCG + `team_class=secondary_club` — MCG hosts only
+  BBL/WBBL, both primary). Frontend renders an empty-state page,
+  not a generic error. **Behaviour change shipped 2026-04-30**:
+  pre-fix, the endpoint conflated this with a missing venue and
+  returned 404; the conflation only surfaced once the club-tier
+  filter made zero-scope reachable.
+- **404** only when `venue` doesn't appear at all in `match.venue`
+  (genuine missing-venue path).
 
 Returns: headline match count; matches-hosted-by tournament × gender
 × season; average first-innings total; bat-first vs chase win counts
