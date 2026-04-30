@@ -15,6 +15,7 @@ import {
   getMatches,
 } from '../../api'
 import StatCard from '../StatCard'
+import InningToggle from '../InningToggle'
 import PlayerLink from '../PlayerLink'
 import PlayerSearch from '../PlayerSearch'
 import TeamLink from '../TeamLink'
@@ -171,6 +172,7 @@ export default function TournamentDossier({
     filters.gender, filters.team_type,
     filters.season_from, filters.season_to,
     filters.filter_venue,
+    filters.inning,
   ]
 
   const summaryFetch = useFetch<TournamentSummary>(
@@ -523,6 +525,16 @@ export default function TournamentDossier({
           </button>
         ))}
       </div>
+
+      {/* Page-local 1st/2nd-innings toggle. Mounts only on the
+          statistical subtabs that have innings-level metrics. The
+          Overview / Editions / Points / Matches subtabs aggregate at
+          a different level (full-match identity, calendar) where
+          inning narrowing isn't meaningful, so the toggle hides.
+          Spec: spec-inning-split.md §6.1 + §3.3. */}
+      {(['Batters', 'Bowlers', 'Fielders', 'Partnerships', 'Records'] as const).includes(currentTab as never) && (
+        <InningToggle />
+      )}
 
       {currentTab === 'Overview' && (
         <OverviewTab
