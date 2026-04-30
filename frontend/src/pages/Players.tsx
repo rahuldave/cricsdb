@@ -4,6 +4,7 @@ import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import PlayerSearch from '../components/PlayerSearch'
+import InningToggle from '../components/InningToggle'
 import PlayerProfile from '../components/players/PlayerProfile'
 import PlayersLanding from '../components/players/PlayersLanding'
 import PlayerCompareGrid from '../components/players/PlayerCompareGrid'
@@ -36,6 +37,10 @@ export default function Players() {
 
       {!playerId && <PlayersLanding filters={filters} />}
 
+      {/* Page-local 1st/2nd-innings toggle. Mounts only when a player
+          is selected (single-player or compare). Spec §6.1. */}
+      {playerId && <InningToggle />}
+
       {playerId && !isCompare && (
         <>
           <SinglePlayerView playerId={playerId} />
@@ -67,6 +72,7 @@ function SinglePlayerView({ playerId }: { playerId: string }) {
     filters.season_from, filters.season_to,
     filters.filter_team, filters.filter_opponent,
     filters.filter_venue,
+    filters.inning,
   ]
 
   const profileFetch = useFetch<PlayerProfileT | null>(

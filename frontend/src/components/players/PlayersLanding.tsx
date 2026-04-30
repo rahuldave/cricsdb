@@ -114,6 +114,7 @@ function ProfileTileCard({ tile, filters }: { tile: ProfileTile; filters: Filter
     filters.gender, filters.team_type, filters.tournament,
     filters.season_from, filters.season_to,
     filters.filter_venue,
+    filters.inning,
   ]
   const strip = useFetch<StatStrip | null>(
     () => fetchStrip(tile, filters),

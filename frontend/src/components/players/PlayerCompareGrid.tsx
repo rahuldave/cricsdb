@@ -28,6 +28,7 @@ export default function PlayerCompareGrid({ ids, filters }: Props) {
     filters.season_from, filters.season_to,
     filters.filter_team, filters.filter_opponent,
     filters.filter_venue,
+    filters.inning,
   ]
 
   // Fixed-arity slots (primary + up to 2 compares) so React sees the

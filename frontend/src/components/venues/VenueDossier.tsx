@@ -18,6 +18,7 @@ import type {
 } from '../../types'
 import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
+import InningToggle from '../InningToggle'
 import DataTable from '../DataTable'
 import PlayerLink from '../PlayerLink'
 import TeamLink from '../TeamLink'
@@ -82,6 +83,7 @@ export default function VenueDossier({ venue }: { venue: string }) {
     filters.gender, filters.team_type, filters.tournament,
     filters.season_from, filters.season_to,
     filters.filter_team, filters.filter_opponent,
+    filters.inning,
   ]
 
   const scopedFilters = { ...filters, filter_venue: venue }
@@ -188,6 +190,15 @@ export default function VenueDossier({ venue }: { venue: string }) {
           </button>
         ))}
       </div>
+
+      {/* Page-local 1st/2nd-innings toggle. Mounts only on the
+          innings-level Venues subtabs — Overview already splits
+          natively (avg 1st-inn total, chase win %), Matches is a
+          calendar list, so neither benefits from inning narrowing.
+          Spec: spec-inning-split.md §3.3 + §6.1. */}
+      {(['Batters', 'Bowlers', 'Fielders', 'Records'] as const).includes(currentTab as never) && (
+        <InningToggle />
+      )}
 
       {currentTab === 'Overview' && <VenueOverviewPanel summary={summary} />}
       {currentTab === 'Batters' && (
