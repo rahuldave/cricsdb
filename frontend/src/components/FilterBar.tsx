@@ -181,15 +181,20 @@ export default function FilterBar() {
   // (used for the /tournaments + /seasons scope-fetch effects).
   // `seriesType ?? ''` is used inline for the select's value attr.
 
-  // Auto-clear team_class when team_type leaves 'international'.
-  // Defensive deep-link guard + Type-segmented-control side effect:
-  // full-member status is an intl classification — for clubs the FM
-  // list (country names) doesn't match franchise team strings, so
-  // letting it ride would silently zero out every match.
+  // Auto-clear team_class when its current value is incompatible with
+  // the active team_type. Polymorphic over team_type:
+  //   intl → only `full_member` is meaningful
+  //   club → only `primary_club` / `secondary_club`
+  //   ''   → all values cleared
+  // Defensive deep-link guard + Type-segmented-control side effect.
+  // Spec: spec-filterbar-team-class-club.md §3 + §4.1.
   useEffect(() => {
-    if (teamType !== 'international' && teamClass) {
-      setUrlParams({ team_class: '' }, { replace: true })
-    }
+    if (!teamClass) return
+    let invalid = false
+    if (!teamType) invalid = true
+    else if (teamType === 'international' && teamClass !== 'full_member') invalid = true
+    else if (teamType === 'club' && teamClass !== 'primary_club' && teamClass !== 'secondary_club') invalid = true
+    if (invalid) setUrlParams({ team_class: '' }, { replace: true })
   }, [teamType, teamClass])
 
   const filteredTournaments = tournaments.filter(t => {
@@ -284,6 +289,43 @@ export default function FilterBar() {
               title="Restrict to matches between two ICC full-member nations (excludes associate teams like Scotland, Nepal, USA, …)."
             >
               {teamClass === 'full_member' ? '▣' : '▢'} Full members only
+            </button>
+          </div>
+        )}
+
+        {/* Club tier — polymorphic counterpart to the FM toggle. Three
+         *  buttons: All / Primary / Secondary. Primary = marquee
+         *  international franchise leagues (IPL, BBL, PSL, …).
+         *  Secondary = domestic state/county/provincial competitions
+         *  + small-market franchises (Vitality Blast, Syed Mushtaq Ali,
+         *  Super Smash, NPL, …). Spec:
+         *  internal_docs/spec-filterbar-team-class-club.md §4.1. */}
+        {teamType === 'club' && (
+          <div className="wisden-filter-group">
+            <span className="wisden-filter-label">Tier</span>
+            <button
+              type="button"
+              onClick={() => set('team_class', '')}
+              className={segBtn(!teamClass)}
+              title="Show every club tournament regardless of tier."
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => set('team_class', 'primary_club')}
+              className={segBtn(teamClass === 'primary_club')}
+              title="Marquee international franchise leagues — IPL, BBL, PSL, BPL, CPL, SA20, ILT20, MLC, LPL, The Hundred (M+W), WBBL, WPL, Women's Cricket Super League."
+            >
+              Primary
+            </button>
+            <button
+              type="button"
+              onClick={() => set('team_class', 'secondary_club')}
+              className={segBtn(teamClass === 'secondary_club')}
+              title="Domestic state / county / provincial competitions — Vitality Blast, Syed Mushtaq Ali Trophy, CSA T20 Challenge, Super Smash, Nepal Premier League, Women's Super Smash."
+            >
+              Secondary
             </button>
           </div>
         )}

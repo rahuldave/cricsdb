@@ -74,10 +74,16 @@ function buildSegments(
     segs.push({ label: 'Venue', value: filters.filter_venue })
   }
 
-  // FilterBar team_class (post-v3) — intl-only narrowing to matches
-  // between two ICC full-member nations.
+  // FilterBar team_class — polymorphic over team_type:
+  // - full_member (intl-only): both teams ICC full-member nations
+  // - primary_club (club-only): marquee international franchise leagues
+  // - secondary_club (club-only): domestic state/county/provincial
   if (filters.team_class === 'full_member') {
     segs.push({ label: 'Team class', value: 'full members' })
+  } else if (filters.team_class === 'primary_club') {
+    segs.push({ label: 'Team class', value: 'primary clubs' })
+  } else if (filters.team_class === 'secondary_club') {
+    segs.push({ label: 'Team class', value: 'secondary clubs' })
   }
 
   // FilterBar series_type — partition narrowing surfaced on every tab.
