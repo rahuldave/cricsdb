@@ -18,9 +18,9 @@ Covers:
 Usage (local DB):
     uv run python tests/sanity/test_player_scope_stats.py
 
-Usage (against the prod snapshot copied to /tmp):
-    cp ~/Downloads/t20-cricket-db_download/data/cricket.db /tmp/cricket-prod-test.db
-    uv run python tests/sanity/test_player_scope_stats.py --db /tmp/cricket-prod-test.db
+Usage (against the prod snapshot copied to project-local tmp/):
+    mkdir -p tmp && cp ~/Downloads/t20-cricket-db_download/data/cricket.db tmp/cricket-prod-test.db
+    uv run python tests/sanity/test_player_scope_stats.py --db tmp/cricket-prod-test.db
 
 Each check prints PASS or FAIL on its own line. The script exits 0 on
 all-pass, 1 on any failure. Per CLAUDE.md the table is populated by

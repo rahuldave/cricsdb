@@ -53,12 +53,12 @@ table's role.
 
 When to run:
 - After editing `scripts/populate_player_scope_stats.py`.
-- Against a `/tmp` prod-snapshot copy when validating an
+- Against a `tmp/` prod-snapshot copy when validating an
   incremental update before deploy.
 
 ```bash
 uv run python tests/sanity/test_player_scope_stats.py
-uv run python tests/sanity/test_player_scope_stats.py --db /tmp/cricket-prod-test.db
+uv run python tests/sanity/test_player_scope_stats.py --db tmp/cricket-prod-test.db
 ```
 
 ### `test_bucket_baseline.py`
@@ -87,12 +87,12 @@ What: the same pattern for `bucketbaseline_*` tables (built by
 When to run:
 - After any `scripts/populate_bucket_baseline.py` change.
 - After any schema change to `BucketBaseline*` models.
-- Against a `/tmp` prod-snapshot copy before deploying populate
+- Against a `tmp/` prod-snapshot copy before deploying populate
   changes.
 
 ```bash
 uv run python tests/sanity/test_bucket_baseline.py
-uv run python tests/sanity/test_bucket_baseline.py --db /tmp/cricket-prod-test.db
+uv run python tests/sanity/test_bucket_baseline.py --db tmp/cricket-prod-test.db
 ```
 
 ### `test_dispatch_equivalence.py`
@@ -120,11 +120,11 @@ When to run:
 - After any change to the dispatch helpers (`bucket_baseline_dispatch.py`).
 - After any `_xxx_from_baseline` or `_xxx_live` implementation
   edit.
-- Against a `/tmp` prod-snapshot copy to confirm both DBs agree.
+- Against a `tmp/` prod-snapshot copy to confirm both DBs agree.
 
 ```bash
 uv run python tests/sanity/test_dispatch_equivalence.py
-uv run python tests/sanity/test_dispatch_equivalence.py --db /tmp/cricket-prod-test.db
+uv run python tests/sanity/test_dispatch_equivalence.py --db tmp/cricket-prod-test.db
 ```
 
 Expected output ends with `212 pairs equivalent, 0 failures` →
@@ -162,7 +162,7 @@ When to run:
 
 ```bash
 uv run python tests/sanity/test_chip_direction_invariant.py
-uv run python tests/sanity/test_chip_direction_invariant.py --db /tmp/cricket-prod-test.db
+uv run python tests/sanity/test_chip_direction_invariant.py --db tmp/cricket-prod-test.db
 ```
 
 Expected output ends with `11 (scope, team) pairs PASS, 0 assertion

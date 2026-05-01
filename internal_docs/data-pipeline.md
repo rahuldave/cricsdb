@@ -269,7 +269,7 @@ Before pushing a DB update to prod, it's worth running the
 incremental pipeline against a copy of the live DB to confirm the
 import path works on real data (schema quirks in fresh cricsheet
 files, populate-script regressions on specific matches, etc).
-`update_recent.py --db /tmp/cricket-prod-test.db` routes the import
+`update_recent.py --db tmp/cricket-prod-test.db` routes the import
 at a custom DB path without touching `./cricket.db`. See
 `internal_docs/testing-update-recent.md` for the copy-to-tmp workflow and
 what not to do (never run against `~/Downloads/` directly — keep that

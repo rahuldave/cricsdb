@@ -45,7 +45,7 @@ real bug.
 
 Usage:
   uv run python tests/sanity/test_chip_direction_invariant.py
-  uv run python tests/sanity/test_chip_direction_invariant.py --db /tmp/cricket-prod-test.db
+  uv run python tests/sanity/test_chip_direction_invariant.py --db tmp/cricket-prod-test.db
 """
 from __future__ import annotations
 

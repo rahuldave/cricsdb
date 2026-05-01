@@ -18,7 +18,7 @@ few seconds since each is a single SQL query.
 
 Usage:
     uv run python tests/sanity/test_dispatch_equivalence.py
-    uv run python tests/sanity/test_dispatch_equivalence.py --db /tmp/cricket-prod-test.db
+    uv run python tests/sanity/test_dispatch_equivalence.py --db tmp/cricket-prod-test.db
 """
 from __future__ import annotations
 

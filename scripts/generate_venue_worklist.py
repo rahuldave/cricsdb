@@ -28,7 +28,7 @@ Output: docs/venue-worklist/YYYY-MM-DD-worklist.csv
 
 Usage:
     uv run python scripts/generate_venue_worklist.py
-    uv run python scripts/generate_venue_worklist.py --db /tmp/cricket-prod-test.db
+    uv run python scripts/generate_venue_worklist.py --db tmp/cricket-prod-test.db
 """
 
 import argparse

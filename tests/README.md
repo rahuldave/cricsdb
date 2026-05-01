@@ -97,12 +97,12 @@ Prerequisites for `regression/`:
 ```
 
 Prerequisites for `sanity/`:
-- A populated `cricket.db` (or pass `--db /tmp/cricket-prod-test.db`
-  for the prod snapshot — `cp ~/Downloads/t20-cricket-db_download/data/cricket.db /tmp/`).
+- A populated `cricket.db` (or pass `--db tmp/cricket-prod-test.db`
+  for the prod snapshot — `mkdir -p tmp && cp ~/Downloads/t20-cricket-db_download/data/cricket.db tmp/cricket-prod-test.db`).
 
 ```bash
 uv run python tests/sanity/test_player_scope_stats.py
-uv run python tests/sanity/test_player_scope_stats.py --db /tmp/cricket-prod-test.db
+uv run python tests/sanity/test_player_scope_stats.py --db tmp/cricket-prod-test.db
 ```
 
 See each subdir's README for the full details + how to add a new

@@ -3,13 +3,13 @@ One-time pass: canonicalize venue / city / venue_country on the match
 table, using api/venue_aliases.py as the source of truth.
 
 Mirrors scripts/fix_team_names.py and scripts/fix_event_names.py. Safe
-to run against the main DB or a /tmp copy. Idempotent — re-running is a
+to run against the main DB or a tmp/ copy. Idempotent — re-running is a
 no-op because canonical values resolve to themselves.
 
 Usage:
     uv run python scripts/fix_venue_names.py
     uv run python scripts/fix_venue_names.py --dry-run
-    uv run python scripts/fix_venue_names.py --db /tmp/cricket-prod-test.db
+    uv run python scripts/fix_venue_names.py --db tmp/cricket-prod-test.db
 
 Output: unknown (venue, city) pairs (i.e. pairs missing from
 VENUE_ALIASES) are written to docs/venue-worklist/unknowns-<date>.csv

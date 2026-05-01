@@ -27,7 +27,7 @@ fix lands with proof.
 
 Usage:
   uv run python tests/sanity/test_avg_baseline_numbers.py
-  uv run python tests/sanity/test_avg_baseline_numbers.py --db /tmp/cricket-prod-test.db
+  uv run python tests/sanity/test_avg_baseline_numbers.py --db tmp/cricket-prod-test.db
 
 Set CRICSDB_TEST_BASE_URL to point at a different uvicorn instance
 (default http://localhost:8000).

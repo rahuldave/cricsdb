@@ -21,7 +21,7 @@ manually).
 
 Usage:
   uv run python tests/sanity/test_avg_baseline_pools.py
-  uv run python tests/sanity/test_avg_baseline_pools.py --db /tmp/cricket-prod-test.db
+  uv run python tests/sanity/test_avg_baseline_pools.py --db tmp/cricket-prod-test.db
 """
 from __future__ import annotations
 

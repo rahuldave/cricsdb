@@ -404,8 +404,8 @@ player_scope_stats). `populate_incremental` is called by
 # Local DB
 uv run python scripts/populate_bucket_baseline.py
 
-# Different DB (e.g. /tmp prod-snapshot copy)
-uv run python scripts/populate_bucket_baseline.py --db /tmp/cricket-prod-test.db
+# Different DB (e.g. project-local prod-snapshot copy)
+uv run python scripts/populate_bucket_baseline.py --db tmp/cricket-prod-test.db
 ```
 
 ### Implementation pattern

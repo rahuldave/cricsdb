@@ -25,7 +25,7 @@ reads) — see internal_docs/team-class-anchor-numbers.md.
 
 Usage:
   uv run python tests/sanity/test_team_class_baseline_numbers.py
-  uv run python tests/sanity/test_team_class_baseline_numbers.py --db /tmp/cricket-prod-test.db
+  uv run python tests/sanity/test_team_class_baseline_numbers.py --db tmp/cricket-prod-test.db
 """
 from __future__ import annotations
 
