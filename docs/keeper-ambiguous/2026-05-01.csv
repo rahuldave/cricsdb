@@ -1,0 +1,6 @@
+innings_id,match_id,date,tournament,season,fielding_team,innings_number,ambiguous_reason,candidate_ids,candidate_names,resolved_keeper_id,resolved_source,notes
+26194,13095,2026-05-01,Indonesia tour of Malaysia,2026,Malaysia,0,multi_career,"1f13eba1,415d30b6,6667067e","Muhammad Haziq Aiman,Virandeep Singh,Syed Aziz",,,
+26197,13096,2026-05-01,Pakistan Super League,2026,Hyderabad Kingsmen,1,multi_career,"bafb9238,f21043a5","Usman Khan,MDKJ Perera",,,
+26198,13097,2026-05-01,Indian Premier League,2026,Delhi Capitals,0,multi_career,"85b3fab2,b17e2f24","T Stubbs,KL Rahul",,,
+26202,13099,2026-05-01,Austria tour of Germany,2026,Austria,0,no_candidate,,,,,
+26205,13100,2026-05-01,Austria tour of Germany,2026,Austria,1,no_candidate,,,,,
