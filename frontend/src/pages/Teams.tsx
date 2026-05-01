@@ -128,13 +128,34 @@ export default function Teams() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Self-correcting deep link — share URL with a compare slot but no
-  // `tab` would default to "By Season" and silently hide the grid.
+  // Self-correcting deep link, runs ONCE per mount (useRef gate, same
+  // shape as the legacy-compare migration effect above). Two cases:
+  //   (a) URL has compare slots but NO `tab` param → useUrlParam defaults
+  //       to "By Season" and the grid silently hides. Redirect to Compare
+  //       so the share-link's intent (the compare slots) wins.
+  //   (b) URL has compare slots AND an explicit non-Compare `tab`
+  //       (a stale share link from a previous Compare session). Honour
+  //       the user's tab choice and strip the stale compare params so the
+  //       URL reflects what's actually on screen.
+  // After mount, in-page tab clicks go through the tab-button onClick
+  // (which already strips compare on switch to non-Compare), so the
+  // self-correction only has to fire once.
+  const compareSelfCorrectRef = useRef(false)
   useEffect(() => {
-    if (hasCompareSlot && selected && activeTab !== 'Compare') {
+    if (compareSelfCorrectRef.current) return
+    if (!hasCompareSlot || !selected) return
+    compareSelfCorrectRef.current = true
+    if (activeTab === 'Compare') return
+    const tabExplicit = new URLSearchParams(window.location.search).has('tab')
+    if (!tabExplicit) {
       setActiveTab('Compare', { replace: true })
+    } else {
+      setUrlParams({
+        compare: '', avg_slot: '',
+        ...clearSlotUpdates(1), ...clearSlotUpdates(2),
+      }, { replace: true })
     }
-  }, [hasCompareSlot, selected])
+  }, [hasCompareSlot, selected, activeTab])
 
   // Default first-load auto-fill — landing on the Compare tab with a
   // primary team and no compare slots fills compare1=__avg__ so the
@@ -364,7 +385,19 @@ export default function Teams() {
 
           <div className="wisden-tabs">
             {tabs.map(tab => (
-              <button key={tab} onClick={() => setUrlParams({ tab, vs: '' })}
+              <button key={tab} onClick={() => {
+                // Switching away from Compare strips the compareN params
+                // so they don't linger on the shared URL of a Batting /
+                // Bowling / etc. tab where they're inert.
+                const updates: Record<string, string> = { tab, vs: '' }
+                if (tab !== 'Compare') {
+                  Object.assign(updates,
+                    { compare: '', avg_slot: '' },
+                    clearSlotUpdates(1), clearSlotUpdates(2),
+                  )
+                }
+                setUrlParams(updates)
+              }}
                 className={`wisden-tab${activeTab === tab ? ' is-active' : ''}`}
               >{tab}</button>
             ))}

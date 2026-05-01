@@ -61,6 +61,29 @@ integration/
                                      summary/results, batting summary,
                                      tournaments, scope/averages,
                                      head-to-head)
+  team_class_club_per_page_refetch.sh — every InningToggle's sibling:
+                                     team_class pill click-after-mount
+                                     refetches, on every page that
+                                     mounts the FilterBar tier pill.
+                                     SQL-anchored Matches counter.
+  inning_per_page_refetch.sh       — inning toggle click-after-mount
+                                     refetches, on every page that
+                                     mounts InningToggle: Player
+                                     Batting/Bowling/Fielding/Players
+                                     dossier, Teams Batting/Bowling/
+                                     Fielding/Partnerships subtabs,
+                                     Tournament dossier Batters tab,
+                                     Venue dossier Batters tab. Plus
+                                     compare-param URL discipline
+                                     (deep-link strip / preserve / on
+                                     in-page Compare→Batting click).
+                                     SQL-anchored. Catches the bug
+                                     class where a shared deps array
+                                     forgets a key — every consumer
+                                     silently no-op's its refetch.
+                                     Reference test for "every call
+                                     site of a shared abstraction"
+                                     coverage (CLAUDE.md).
 ```
 
 ## When to write one here

@@ -222,6 +222,27 @@ The carry-filter utilities (`carryTeamFilters`, `carryFilters`,
 href construction, a different concern. The `scopeLinks.ts`
 `buildParams` already iterates `FILTER_KEYS` on the link side.
 
+**Inning is in `useFilterDeps` but not in `FILTER_KEYS`** (added
+2026-05-01). `inning` is an AuxParam — page-local user-facing
+toggle (`InningToggle`), but explicitly NOT a FilterBar field
+(spec-inning-split.md §2). We keep it out of `FILTER_KEYS` so it
+doesn't ride into subscript link URLs / status-strip phrase
+chains. But every page that mounts `InningToggle` must refetch
+when the URL `?inning=` flips, so `useFilterDeps` returns
+`[...FILTER_KEYS values, filters.inning]`. The dual-list shape is
+deliberate: FILTER_KEYS = "drives link URLs", useFilterDeps =
+"drives fetch deps." Adding a new AuxParam that needs refetch
+behaviour means appending it to useFilterDeps's tail, not to
+FILTER_KEYS.
+
+Bug history: shipped without `filters.inning` in commit
+`be4d755` (the migration itself); silently broke inning toggle on
+every page that mounts it. The 83-pass integration suite at the
+time covered only `team_class` clicks. Reference test going
+forward: `tests/integration/inning_per_page_refetch.sh` exercises
+all 10 InningToggle mount sites with click-after-mount + SQL-
+anchored DOM assertions.
+
 ### Semiotic v3 chart wrappers
 
 Semiotic v3 exports named chart components (`BarChart`, `LineChart`, `Scatterplot`, `DonutChart`) rather than the generic Frame components of v1/v2. Our wrappers are thin — they pass props through with sensible defaults:
