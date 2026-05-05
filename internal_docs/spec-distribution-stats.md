@@ -1,14 +1,16 @@
 # Spec — Distribution-shaped statistics on the API
 
 > **Status:** Inventory + cross-discipline framing remain DRAFT.
-> §8 (batter v1 distribution dossier) is **IMPLEMENTED** —
-> shipped 2026-05-05 across 5 commits (scope_links lockstep, endpoint
-> + helpers, sanity invariants, regression URL inventory, docs).
-> Endpoint live at `GET /api/v1/batters/{id}/distribution`. 126/126
-> sanity invariants pass; 19/19 regression URLs return 200; 11/11
+> §8 (batter v1 backend distribution dossier) is **IMPLEMENTED** —
+> shipped 2026-05-05 across 5 commits. Endpoint live at
+> `GET /api/v1/batters/{id}/distribution`. 126/126 sanity
+> invariants pass; 19/19 regression URLs return 200; 11/11
 > scope-splits lockstep fixtures pass.
-> Wire format and sampling-unit pinning resolved for batter;
-> remaining open questions in §6 apply to the bowler / fielder /
+> §9 (batter v1 frontend — Distribution panel on `/batting`) is
+> **build-ready** — layout, panel anatomy, types, fetcher, components,
+> empty-state handling, integration test plan, and 5-commit ordering
+> all pinned. Awaiting implementation.
+> Remaining open questions in §6 apply to the bowler / fielder /
 > team slices.
 
 ---
@@ -645,15 +647,469 @@ only, inning aux 0/1, empty scope). All 19 return 200 against
 the live endpoint. `as_of_date=2025-01-01` pinned for md5-diff
 stability.
 
-**No agent-browser integration test in v1** — this spec ships
-API only; the integration test arrives with the frontend slice.
+**No agent-browser integration test in v1 backend** — the API-only
+slice ships without one. The integration test arrives with the
+frontend (§9.10).
+
+---
+
+## 9. Batter v1 frontend — Distribution panel on `/batting?player=X`
+
+> **Status:** build-ready. Consumes the §8 endpoint
+> `GET /api/v1/batters/{id}/distribution`. Lands a new
+> "Distribution panel" between the existing stat row 1 and stat
+> row 2 on `frontend/src/pages/Batting.tsx`. No backend changes
+> required.
+>
+> **In scope:** window toggle (Lifetime / Last 10 / Last 60d),
+> per-innings runs histogram (semiotic-backed, 6 fixed bins),
+> stat strip (Mean / Median / Std / CV / Average), milestone
+> chips, chronological sparkline of the observations list, form
+> delta line, suggested-splits link row.
+>
+> **Out of v1 frontend:** phase decomposition UI (data is in the
+> response for future SR-by-phase work but the existing By Phase
+> tab covers the visual need today); per-innings phase obs
+> visualisations; Compare-tab integration; sample-size confidence
+> overlays.
+
+### 9.1 Layout
+
+The current `/batting?player=X` page renders:
+
+```
+PlayerSearch + InningToggle
+─────────────────────────────────────────────────
+Title (name + flag) + ScopeIndicator
+Stat row 1  · Matches · Innings · Runs · Average · SR    ← AVG SITS HERE
+Stat row 2  · Boundaries · B/Four · B/Boundary · Dot% · 50s/100s
+Tabs        · By Season | By Over | By Phase | vs Bowlers | …
+```
+
+The Distribution panel inserts **between row 1 and row 2** so it
+visually anchors to the Average tile (row 1, col 4). Median +
+CV + std live in the panel's stat strip — adjacent reading,
+single eye-sweep. Row 2 stays unchanged; tabs unchanged.
+
+### 9.2 Distribution panel anatomy
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ Distribution                          [Lifetime | 10 | 60d]│  window toggle (chip-style)
+│                                                            │
+│ ┌─────────────────────────────┬───────────────────────┐    │
+│ │ histogram (6 bins)          │ Mean         49.4     │    │
+│ │ + mean line ─ + median line │ Median       42       │    │
+│ │                             │ Std          31.3     │    │
+│ │                             │ CV           0.63     │    │
+│ │                             │ Average      61.75    │    │
+│ │                             │                       │    │
+│ │                             │ P(≥50)   ┃   P(≥100)  │    │
+│ │                             │  40%     ┃    7%      │    │
+│ │                             │ P(≤10)                │    │
+│ │                             │  7%                   │    │
+│ └─────────────────────────────┴───────────────────────┘    │
+│                                                            │
+│ ▁▃▂▅▁▇▂▁▃▆▅▁▂  ← chronological sparkline (observations[])  │
+│                                                            │
+│ Form: Last 10 mean −7.0 · median 0  vs lifetime            │
+│                                                            │
+│ Compare to:  All IPL  ·  All cricket in 2024  ·  All-time  │
+└────────────────────────────────────────────────────────────┘
+```
+
+#### 9.2.1 Window toggle
+
+Three chip buttons in the panel header — `Lifetime` / `Last 10` /
+`Last 60d`. Local component state (NOT URL-driven — selection
+doesn't survive page reload, doesn't appear in the URL). Default
+`Lifetime`.
+
+The histogram, stat strip, milestone chips, and sparkline ALL
+redraw against the selected window's dossier
+(`response.lifetime` | `response.form.last_10` | `response.form.last_60d`).
+
+The **form delta line and suggested-splits row do NOT redraw** —
+they always read from `response.form.delta` and
+`response.suggested_splits` respectively, both of which are
+window-independent.
+
+Empty-window handling: if the selected window has `n_innings == 0`,
+the panel renders the dossier-empty placeholder (§9.6) instead of
+the histogram. The toggle button is still clickable; user can
+switch back.
+
+#### 9.2.2 Histogram
+
+Six fixed bins, aligned with the cricketing milestones:
+
+| Bin | Range | Visual treatment |
+|---|---|---|
+| 0 | 0–9 runs | "failure" — muted/red tint |
+| 1 | 10–24 | neutral |
+| 2 | 25–49 | neutral |
+| 3 | 50–74 | "fifty" — green tint |
+| 4 | 75–99 | "approaching ton" — green tint |
+| 5 | 100+ | "ton" — gold tint |
+
+Fixed bins (not adaptive) make the histogram **comparable across
+players**: Kohli's bin-3 and Mandhana's bin-3 mean the same thing.
+Adaptive bucketing would maximize within-player resolution at the
+cost of cross-player legibility — wrong tradeoff for this surface.
+
+Built on the existing `frontend/src/components/charts/BarChart.tsx`
+wrapper (semiotic-backed). `data` = `[{bin: '0-9', count: N, ...},
+...]`; `categoryAccessor='bin'`, `valueAccessor='count'`,
+`colorBy='bin'` with a 6-color palette in
+`frontend/src/components/charts/palette.ts` (extend with
+`WISDEN_RUN_BINS`).
+
+**Mean + median markers**: vertical dashed lines overlaid at the
+bin proportional to the mean / median value. Implementation note:
+Semiotic's `XYFrame` annotations or a thin custom SVG overlay on
+the chart container — implementer's call. The labels render in
+the stat strip alongside their colored dot, so the marker doesn't
+need its own legend.
+
+Hover state: bar shows `{bin label}: N innings ({pct%})`.
+
+#### 9.2.3 Stat strip
+
+Right of the histogram, a label/value list. Two sections:
+
+**Group 1 — point summaries** (vertical stack):
+```
+Mean       49.4         ← total runs / n_innings
+Median     42           ← median(runs across innings)
+Std        31.3         ← sqrt(sample variance)
+CV         0.63         ← std / mean (unitless; renders to 2dp)
+Average    61.75        ← total runs / n_dismissals (cricket convention)
+```
+
+**Group 2 — milestone chips** (horizontal row of small colored
+chips):
+```
+P(≥50)  40%   P(≥100)  7%   P(≤10)  7%
+```
+
+Color coding for the chips: green for ≥50 / ≥100 (positive
+milestones), red for ≤10 (failure marker). `null` values (no
+data — empty window) render as `—` not `0%`.
+
+CV is computed client-side (`std / mean_per_innings`). No
+backend change. Skipped if `mean_per_innings` is `null` or 0.
+
+#### 9.2.4 Sparkline
+
+A tiny chronological line/bar chart — full panel width, ~30px
+high — showing per-innings runs in date order from the observations
+list. Built on `frontend/src/components/charts/LineChart.tsx`
+or a dedicated minimal renderer (implementer's call).
+
+Window-dependent: sparkline data is `currentWindow.runs.observations`
+mapped to runs only. Lifetime shows the full history; Last 10
+shows 10 marks; Last 60d shows however many fall in the window
+(can be 0–N).
+
+Optional overlay for the Lifetime window: a rolling-10 mean line.
+Skipped on Last 10 / Last 60d (rolling-N over a 10-element sample
+is degenerate).
+
+#### 9.2.5 Form delta line
+
+Single text line below the sparkline, rendered window-independent:
+
+```
+Form: Last 10 mean −7.0 · median 0   vs lifetime
+       Last 60d mean +8.4 · median +12   vs lifetime
+```
+
+Both deltas always shown. Color the delta numbers by sign: green
+if positive (in form), red if negative. `null` deltas render as
+"insufficient data" (e.g., last_60d with n=0).
+
+Reads `response.form.delta` directly; never recomputed client-side.
+
+#### 9.2.6 Suggested-splits row
+
+Bottom of the panel:
+
+```
+Compare to:  All IPL  ·  All cricket in 2024  ·  All-time
+```
+
+Each split rendered via the existing `PlayerLink` contract from
+`internal_docs/links.md` (`name` link + per-split scope override).
+The link target is the same `/batting?player=X` page with the
+split's `params` applied to the URL. `subscriptSource` (per
+links.md) carries the split-specific scope so the rendered phrase
+matches.
+
+If `response.suggested_splits` is empty (e.g., user has no
+narrowing axes set — already at all-time), the row is hidden.
+
+### 9.3 Empty / sparse states
+
+Three cases:
+
+1. **Player not selected** (`!playerId`) — panel does not render at
+   all. Page falls back to `BattingLandingBoard` per existing logic.
+2. **Lifetime sample has `n_innings == 0`** — entire panel renders
+   a single helper line in place of the histogram + stat strip:
+   "No innings under this filter — try widening the scope."
+   The suggested-splits row still renders (it lets the user pick a
+   broader scope). Window toggle hidden.
+3. **Window has `n_innings == 0` but lifetime is non-empty** — the
+   selected window pane shows "No innings in the last 10 / 60 days
+   under this filter" while the toggle remains active so the user
+   can switch back to Lifetime. Form delta line shows "insufficient
+   data" for that window.
+
+### 9.4 Types — `frontend/src/types.ts`
+
+Add a new `BatterDistribution` interface mirroring the API response
+shape from §8.8. Sketch:
+
+```ts
+export interface InningsObservation {
+  innings_id: number
+  match_id: number
+  date: string
+  runs: number
+  balls: number
+  dismissed: boolean
+  fours: number
+  sixes: number
+  dots: number
+  runs_pp: number
+  balls_pp: number
+  runs_mid: number
+  balls_mid: number
+  runs_death: number
+  balls_death: number
+}
+
+export interface DistributionDossier {
+  n_innings: number
+  n_dismissals: number
+  n_notouts: number
+  runs: {
+    total: number
+    balls_total: number
+    mean_per_innings: number | null
+    median: number | null
+    variance: number | null
+    std: number | null
+    average: number | null
+    observations: InningsObservation[]
+  }
+  milestones: {
+    p_failure_10: number | null
+    p_25_plus: number | null
+    p_50_plus: number | null
+    p_100_plus: number | null
+  }
+  phase: {
+    powerplay: { runs_total: number; balls_total: number; innings_active: number }
+    middle:    { runs_total: number; balls_total: number; innings_active: number }
+    death:     { runs_total: number; balls_total: number; innings_active: number }
+  }
+}
+
+export interface BatterDistribution {
+  scope: Record<string, string>
+  lifetime: DistributionDossier
+  form: {
+    last_10: DistributionDossier
+    last_60d: DistributionDossier
+    delta: {
+      last_10_mean_minus_lifetime: number | null
+      last_10_median_minus_lifetime: number | null
+      last_60d_mean_minus_lifetime: number | null
+      last_60d_median_minus_lifetime: number | null
+    }
+  }
+  suggested_splits: { label: string; params: Record<string, string> }[]
+}
+```
+
+Keep types tight — `tsc -b` catching the next consumer is the
+defense against drift between API and frontend (per CLAUDE.md
+"API-frontend type contract" rule).
+
+### 9.5 Fetching — `frontend/src/api.ts`
+
+Add a single function, mirroring the existing batter fetchers:
+
+```ts
+export const getBatterDistribution = (id: string, filters?: F) =>
+  fetchApi<BatterDistribution>(
+    `/api/v1/batters/${id}/distribution`,
+    filters as Record<string, string>,
+  )
+```
+
+In `Batting.tsx`, fetch alongside the existing `summaryFetch` —
+same `useFilterDeps()` dependency array (so it refetches on every
+FilterBar change AND on `inning` aux change, per the post-`be4d755`
+discipline rule). Mount unconditional on `playerId` (not gated by
+the active tab — the panel is always visible when a player is
+selected).
+
+```ts
+const distFetch = useFetch<BatterDistribution | null>(
+  () => playerId
+    ? getBatterDistribution(playerId, filters)
+    : Promise.resolve(null),
+  filterDeps,
+)
+const distribution = distFetch.data
+```
+
+The fetch is a single roundtrip; lifetime + both form windows + all
+splits arrive in one payload. No incremental loading.
+
+### 9.6 Components
+
+**New** (under `frontend/src/components/batting/`):
+
+- `BatterDistributionPanel.tsx` — top-level panel orchestrating
+  the layout. Props: `dossier: BatterDistribution | null`,
+  `loading: boolean`, `error: string | null`.
+- `RunsHistogram.tsx` — fixed-bin histogram with mean / median
+  markers. Wraps `BarChart`. Bin computation is a pure function
+  here so it's testable.
+- `DistributionStatStrip.tsx` — the right-hand stat list + the
+  milestone chips row. Pure presentational.
+- `RunsSparkline.tsx` — tiny chronological line/bar chart. Wraps
+  `LineChart` or hand-rolled SVG.
+- `FormDeltaLine.tsx` — the "Last 10 mean ±X · median ±Y"
+  presentational line. Color signing.
+- `SuggestedSplitsRow.tsx` — rendering the splits via
+  `PlayerLink`. Hidden when splits are empty.
+
+**Reused:**
+
+- `PlayerLink` (existing) — for suggested-splits navigation.
+- `BarChart` — histogram primitive.
+- `LineChart` — sparkline primitive.
+- `useFilterDeps()` — fetch dep array (post-be4d755 idiom).
+- `useFetch` — fetch wrapper.
+- `Spinner` / `ErrorBanner` — loading + error states.
+
+### 9.7 Window toggle state
+
+Local `useState<'lifetime' | 'last_10' | 'last_60d'>('lifetime')`
+inside `BatterDistributionPanel`. Not URL-driven — toggling doesn't
+update browser history or the share-link. Reasoning: this is a
+**ephemeral inspection axis**, not a navigable scope. Sharing a URL
+with `?dist_window=last_10` would imply the receiving user wants the
+same view, but more often it's just "look at the same player /
+scope" — keeping the window choice local-only avoids URL noise and
+matches the wisden-tab convention (active tab is local state, see
+existing Batting.tsx `activeTab`).
+
+### 9.8 Sparkline rolling overlay (Lifetime only)
+
+For the Lifetime window with `n_innings ≥ 10`, overlay a rolling-10
+mean line on the sparkline. Computed client-side from
+`observations.map(o => o.runs)`. Skipped on Last 10 / Last 60d (the
+window is short enough that rolling-N is degenerate).
+
+For lifetime samples below 10 innings, skip the overlay (sparkline
+still renders the bare runs sequence).
+
+### 9.9 Out of scope (explicit deferral list)
+
+- **Phase decomposition UI in the Distribution panel.** Data is in
+  the response (per-innings phase obs + rollup) so future SR-by-
+  phase / dot-by-phase / boundary-by-phase work is purely a render
+  layer above the same payload. The existing `By Phase` tab
+  already covers the v1 visual need.
+- **Per-innings sparkline annotations** (e.g. dots colored by
+  dismissal type, shape coded by phase share). Reserved for v1.5.
+- **Confidence overlays on the histogram** (e.g. a faded bar
+  showing bootstrapped confidence at small n). Tied to the
+  sample-size floor decision in §6.4 — out of v1.
+- **Compare-tab integration.** The Distribution dossier on the
+  Teams Compare tab is a separate spec slice (§6.7).
+- **Bowler / fielder distribution dossiers** — the entire endpoint
+  + UI for those is a separate slice; their APIs aren't built yet.
+- **Persisting the window-toggle state in URL** — see §9.7.
+
+### 9.10 Tests
+
+**Integration** (`tests/integration/batter_distribution.sh`) — the
+agent-browser end-to-end. Per the CLAUDE.md "browser-agent run
+mandatory for frontend work" rule + "integration tests must self-
+anchor against SQL" rule:
+
+- Load `/batting?player=ba607b88&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024`.
+- Assert the Distribution panel renders with the histogram, stat
+  strip, milestone chips, sparkline, form-delta line, and splits
+  row visible.
+- For each window button, click it and assert the histogram + stat
+  strip + milestone chips redraw to the new window's values. The
+  form-delta line MUST NOT change between clicks (window-independent).
+  The suggested-splits row MUST NOT change.
+- Numeric anchors derived from `cricket.db` at runtime via
+  `sqlite3` per the SQL-anchored-tests rule:
+  - Lifetime `Mean` and `Median` text must match
+    `(SUM(runs)/COUNT(*)` and SQL median of the per-innings
+    aggregation for the same scope.
+  - `P(≥50)` chip text must match `count(o.runs ≥ 50)/n_innings`.
+  - Phase rollup: not displayed in v1 UI; not asserted at the DOM
+    level. Sanity test in §8.10 already covers the partition.
+- Click a suggested-split link; assert the URL updates to the
+  emitted `params` and the page re-fetches with the new scope.
+- Inning aux: with `?inning=0`, assert the panel re-fetches and
+  numbers change (the click-after-mount test must include
+  InningToggle interaction since the §8 endpoint honours
+  AuxParams; per the post-`be4d755` rule).
+
+**Coverage discipline:** the integration test must exercise the
+panel at multiple PlayerSearch entry points (search-and-pick AND
+deep-link) since `useFilterDeps` is shared across batting
+endpoints. Per the "tests must cover EVERY call site of a shared
+abstraction" rule.
+
+**Type-check** — `tsc -b` from project root must pass with the new
+types in `types.ts` (per the `feedback_typecheck_use_build` memory
+note: cricsdb's root `tsconfig.json` has `files:[]`; `tsc --noEmit`
+checks nothing — use `tsc -b`).
+
+**Browser-agent verification** mandatory before claiming done:
+load each of the 19 regression URLs from §8 in a real browser via
+the `agent-browser` skill, exercise the window toggle, hover the
+histogram bars, and click each suggested-split link. Verify the
+panel doesn't break on the empty-scope URL or the inning-aux
+URLs.
+
+### 9.11 Implementation order
+
+Five atomic commits matching the §8 ordering pattern:
+
+1. **Types + fetcher** — `BatterDistribution` types in
+   `types.ts`; `getBatterDistribution` in `api.ts`. tsc-clean.
+2. **Histogram + stat strip** — `RunsHistogram.tsx`,
+   `DistributionStatStrip.tsx`, palette extension. Standalone-
+   testable from a Storybook-style page or a temporary test mount.
+3. **Sparkline + form delta + splits row** — `RunsSparkline.tsx`,
+   `FormDeltaLine.tsx`, `SuggestedSplitsRow.tsx`.
+4. **Panel orchestration + Batting.tsx integration** —
+   `BatterDistributionPanel.tsx`; mount in `Batting.tsx` between
+   stat row 1 and stat row 2; window toggle state.
+5. **Integration test + docs** —
+   `tests/integration/batter_distribution.sh`;
+   `internal_docs/codebase-tour.md` mention; spec post-impl pass.
+
+After commit 4, run agent-browser through the 19 regression URLs
+from §8 to verify rendering before commit 5.
 
 ---
 
 *Started 2026-05-04. Inventory + framing drafted first; batter v1
-spec (§8) drafted + IMPLEMENTED 2026-05-05 across 5 commits
-(scope_links lockstep, endpoint + helpers, 126 sanity invariants,
-19-URL regression inventory, docs). 11/11 scope-splits fixture
-cases pass; 126/126 distribution invariants pass; all 19
-regression URLs return 200. Bowler / fielder / team specs to
-follow.*
+backend (§8) drafted + IMPLEMENTED 2026-05-05 across 5 commits.
+Batter v1 frontend (§9) drafted 2026-05-05 — build-ready, awaiting
+implementation. Bowler / fielder / team distribution dossiers
+remain as sibling specs; no work done.*
