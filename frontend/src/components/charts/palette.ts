@@ -26,6 +26,31 @@ export const WISDEN_PALETTE: string[] = [
 export const WISDEN_PHASES: string[] = [WISDEN.indigo, WISDEN.ochre, WISDEN.oxblood]
 
 /**
+ * Run-tier coloring for the per-innings runs histogram (batter
+ * Distribution panel, spec-distribution-stats.md §9.2.2).
+ *
+ * Tiers:
+ *  - failure   : 0–9 runs    (muted oxblood — got out cheap)
+ *  - building  : 10–49 runs  (faint slate — "got going")
+ *  - fifty     : 50–99 runs  (sage green — match-shaping innings)
+ *  - century   : 100–149     (ochre gold — match-winning)
+ *  - rare      : 150+        (deeper gold — exceptional)
+ *
+ * Keys MUST match the strings emitted by `binTier()` in
+ * components/batting/distributionBins.ts.
+ */
+export const WISDEN_RUN_TIERS: Record<
+  'failure' | 'building' | 'fifty' | 'century' | 'rare',
+  string
+> = {
+  failure:  '#A03B3B',  // muted oxblood
+  building: '#A8A091',  // faint slate-tan
+  fifty:    '#7A8E6A',  // sage green
+  century:  WISDEN.ochre,
+  rare:     '#9C6B17',  // deeper gold
+}
+
+/**
  * High-contrast pair for two-innings charts (Worm, Manhattan) where the
  * default categorical palette runs ink+slate, which read too similarly
  * on cream. Pure ink against a saturated indigo gives a clear value
