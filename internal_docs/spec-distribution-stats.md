@@ -718,58 +718,120 @@ single eye-sweep. Row 2 stays unchanged; tabs unchanged.
 └────────────────────────────────────────────────────────────┘
 ```
 
-#### 9.2.1 Window toggle
+#### 9.2.1 Window toggle — what it does
+
+**Mechanism.** The §8 API returns all three dossiers in one
+payload — `lifetime`, `form.last_10`, `form.last_60d`, each with
+the identical shape (n_innings, runs stats, milestones, phase,
+observations). The window toggle is a **pure presentational
+selector**: clicking does NOT refetch; it just swaps which of the
+three pre-fetched dossiers drives the histogram + stat strip +
+milestone chips + sparkline. Switching is instant.
 
 Three chip buttons in the panel header — `Lifetime` / `Last 10` /
-`Last 60d`. Local component state (NOT URL-driven — selection
-doesn't survive page reload, doesn't appear in the URL). Default
-`Lifetime`.
+`Last 60d`. Default `lifetime`.
 
-The histogram, stat strip, milestone chips, and sparkline ALL
-redraw against the selected window's dossier
-(`response.lifetime` | `response.form.last_10` | `response.form.last_60d`).
+**Window-dependent** (redraw on toggle):
+- Histogram (different binned counts)
+- Stat strip (different mean / median / std / CV / average)
+- Milestone chips (different probabilities)
+- Sparkline (different observation slice)
 
-The **form delta line and suggested-splits row do NOT redraw** —
-they always read from `response.form.delta` and
-`response.suggested_splits` respectively, both of which are
-window-independent.
+**Window-independent** (do NOT redraw on toggle):
+- Form delta line — always reads `response.form.delta`, which
+  reports BOTH windows' deltas vs lifetime. The toggle doesn't
+  change "is this player hot or cold right now."
+- Suggested-splits row — always reads `response.suggested_splits`,
+  which is keyed off the FilterBar scope, not the window.
+
+#### 9.2.1a URL state — `?dist_window=`
+
+The window selection is **encoded in the URL** as
+`?dist_window=lifetime|last_10|last_60d`. Default = absent →
+`lifetime`. Toggling rewrites the URL via `useSearchParams`
+(`replace: false` — toggle clicks should land in browser history,
+so back-button restores the prior window).
+
+Why URL state — share-link reproducibility (per
+`feedback_state_location.md`): if you send someone a link looking
+at Kohli's last-10 form, the receiver should land on the same view.
+The window choice is meaningful enough to share.
+
+This differs from the existing wisden-tab convention (active tab
+on Players is local state). The tab choice on Players is more
+"what am I currently inspecting" than "what view do I want my
+correspondent to see"; for the distribution panel, the window IS
+the view's identity.
+
+Cross-page persistence: `dist_window` is a panel-local URL key
+(prefix `dist_`) so it doesn't bleed into other pages' URL
+contracts. If a Bowler distribution panel ships later (§7), it
+reuses the same `dist_window` key — both panels are bound to the
+same toggle semantics.
 
 Empty-window handling: if the selected window has `n_innings == 0`,
-the panel renders the dossier-empty placeholder (§9.6) instead of
+the panel renders the dossier-empty placeholder (§9.3) instead of
 the histogram. The toggle button is still clickable; user can
-switch back.
+switch back. URL keeps the chosen window even when empty (so
+sharing a link to `?dist_window=last_60d` honestly reproduces the
+"no recent innings" view).
 
 #### 9.2.2 Histogram
 
-Six fixed bins, aligned with the cricketing milestones:
+**Width-10 fixed bins** all the way through the runs range — gives
+useful resolution above 100 (where a Gayle 175 should not look the
+same as a Kohli 102). Bin definition (22 bins total):
 
-| Bin | Range | Visual treatment |
+```
+[0,9], [10,19], [20,29], [30,39], [40,49], [50,59], [60,69],
+[70,79], [80,89], [90,99], [100,109], [110,119], [120,129],
+[130,139], [140,149], [150,159], [160,169], [170,179],
+[180,189], [190,199], [200+]
+```
+
+**Render rule** — show bins from `[0,9]` through the bin containing
+`max(window.observations.runs)`, inclusive. The `200+` terminal
+bin only renders if a 200+ score exists in scope (not yet, but the
+bin is defined for forward-compatibility).
+
+The "always render through the max" rule means **interior empty
+bins still draw** (preserves the distribution shape — a player
+with 5 innings 0-9, 0 innings 10-19, 8 innings 20-29 still sees
+the gap at 10-19), while the **empty upper tail vanishes** (a
+batter with max 30 sees four bars, not 22). Per-player chart
+width auto-fits the data.
+
+For most batters this resolves to ~6–14 bars; tail batters 3–4;
+century-rich batters 12–18.
+
+Fixed bin edges (not adaptive) keep the histogram **comparable
+across players** — Kohli's `[50,59]` bar and Mandhana's `[50,59]`
+bar mean the same thing. Adaptive bucketing would maximize
+within-player resolution at the cost of cross-player legibility.
+
+**Bin color coding** by milestone tier:
+
+| Range | Tier | Visual |
 |---|---|---|
-| 0 | 0–9 runs | "failure" — muted/red tint |
-| 1 | 10–24 | neutral |
-| 2 | 25–49 | neutral |
-| 3 | 50–74 | "fifty" — green tint |
-| 4 | 75–99 | "approaching ton" — green tint |
-| 5 | 100+ | "ton" — gold tint |
-
-Fixed bins (not adaptive) make the histogram **comparable across
-players**: Kohli's bin-3 and Mandhana's bin-3 mean the same thing.
-Adaptive bucketing would maximize within-player resolution at the
-cost of cross-player legibility — wrong tradeoff for this surface.
+| `[0,9]` | failure | muted red |
+| `[10,49]` | building | neutral light |
+| `[50,99]` | fifty range | neutral medium |
+| `[100,149]` | century range | gold tint |
+| `[150,200+]` | rare | gold highlight |
 
 Built on the existing `frontend/src/components/charts/BarChart.tsx`
 wrapper (semiotic-backed). `data` = `[{bin: '0-9', count: N, ...},
 ...]`; `categoryAccessor='bin'`, `valueAccessor='count'`,
-`colorBy='bin'` with a 6-color palette in
-`frontend/src/components/charts/palette.ts` (extend with
-`WISDEN_RUN_BINS`).
+`colorBy='tier'` (the new four-tier coloring) with the palette
+extension in `frontend/src/components/charts/palette.ts` (add
+`WISDEN_RUN_TIERS`).
 
 **Mean + median markers**: vertical dashed lines overlaid at the
-bin proportional to the mean / median value. Implementation note:
-Semiotic's `XYFrame` annotations or a thin custom SVG overlay on
-the chart container — implementer's call. The labels render in
-the stat strip alongside their colored dot, so the marker doesn't
-need its own legend.
+position proportional to the continuous mean / median values
+(NOT bin-snapped). Implementation: Semiotic's `XYFrame`
+annotations or a thin custom SVG overlay on the chart container —
+implementer's call. The labels render in the stat strip alongside
+their colored dot, so the marker doesn't need its own legend.
 
 Hover state: bar shows `{bin label}: N innings ({pct%})`.
 
@@ -997,17 +1059,43 @@ splits arrive in one payload. No incremental loading.
 - `useFetch` — fetch wrapper.
 - `Spinner` / `ErrorBanner` — loading + error states.
 
-### 9.7 Window toggle state
+### 9.7 Window toggle state — URL-encoded (revised 2026-05-05)
 
-Local `useState<'lifetime' | 'last_10' | 'last_60d'>('lifetime')`
-inside `BatterDistributionPanel`. Not URL-driven — toggling doesn't
-update browser history or the share-link. Reasoning: this is a
-**ephemeral inspection axis**, not a navigable scope. Sharing a URL
-with `?dist_window=last_10` would imply the receiving user wants the
-same view, but more often it's just "look at the same player /
-scope" — keeping the window choice local-only avoids URL noise and
-matches the wisden-tab convention (active tab is local state, see
-existing Batting.tsx `activeTab`).
+URL key: `dist_window`. Values: `lifetime` (default — absent
+param) | `last_10` | `last_60d`. Read via `useSearchParams`
+(NOT `useFilters` — `dist_window` is panel-local, not a FilterBar
+field; adding it to FILTER_KEYS would pollute the link-builder
+contract).
+
+```ts
+const [searchParams, setSearchParams] = useSearchParams()
+const distWindow = (searchParams.get('dist_window') ?? 'lifetime') as DistWindow
+
+function setDistWindow(next: DistWindow) {
+  const sp = new URLSearchParams(searchParams)
+  if (next === 'lifetime') sp.delete('dist_window')
+  else sp.set('dist_window', next)
+  setSearchParams(sp)  // replace: false — toggle clicks land in history
+}
+```
+
+Note: `lifetime` is the default and is encoded by **omitting** the
+param (not `?dist_window=lifetime`) so URLs without the param read
+as the canonical default. Saves one URL noise param on the common
+case.
+
+Toggle clicks DO land in browser history (back-button works to
+restore previous window). This matches the user's "all state
+encoded in URL" principle — the receiver of a shared link sees
+exactly what the sender was looking at.
+
+Per `feedback_urlstate.md` (useSearchParams race condition): when
+multiple URL writes happen near-simultaneously (e.g. user toggles
+the window AND the filter refetch resolves), use the
+`useSearchParams` setter form that takes a function (or compute
+the next state from `searchParams` synchronously inside the
+handler). The pattern above is safe because the handler reads
+`searchParams` once and writes once; React batches the update.
 
 ### 9.8 Sparkline rolling overlay (Lifetime only)
 
@@ -1035,7 +1123,6 @@ still renders the bare runs sequence).
   Teams Compare tab is a separate spec slice (§6.7).
 - **Bowler / fielder distribution dossiers** — the entire endpoint
   + UI for those is a separate slice; their APIs aren't built yet.
-- **Persisting the window-toggle state in URL** — see §9.7.
 
 ### 9.10 Tests
 
@@ -1052,6 +1139,13 @@ anchor against SQL" rule:
   strip + milestone chips redraw to the new window's values. The
   form-delta line MUST NOT change between clicks (window-independent).
   The suggested-splits row MUST NOT change.
+- After each window-toggle click, assert the URL updated to
+  `?dist_window=last_10` / `last_60d` (and that toggling back to
+  Lifetime DELETES the param, not sets it to `lifetime`). Hit
+  browser back-button; assert the previous window is restored.
+- Deep-link with `?dist_window=last_10` directly; assert the panel
+  renders that window selected on first paint (no flash of
+  Lifetime).
 - Numeric anchors derived from `cricket.db` at runtime via
   `sqlite3` per the SQL-anchored-tests rule:
   - Lifetime `Mean` and `Median` text must match
