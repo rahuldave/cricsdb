@@ -22,13 +22,14 @@ import ErrorBanner from '../components/ErrorBanner'
 import {
   getBatterSummary, getBatterInnings, getBatterVsBowlers, getBatterByOver,
   getBatterByPhase, getBatterBySeason, getBatterDismissals, getBatterInterWicket,
-  getBattingLeaders,
+  getBattingLeaders, getBatterDistribution,
 } from '../api'
 import type {
   PlayerSearchResult, BattingSummary, BattingInnings, BowlerMatchup,
   OverStats, PhaseStats, SeasonBattingStats, DismissalAnalysis, InterWicketStats,
-  BattingLeaders, BattingLeaderEntry, FilterParams,
+  BattingLeaders, BattingLeaderEntry, FilterParams, BatterDistribution,
 } from '../types'
+import BatterDistributionPanel from '../components/batting/BatterDistributionPanel'
 
 // Small helper for the consistent loading/error pattern in each tab.
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
@@ -62,6 +63,16 @@ export default function Batting() {
   )
   const summary = summaryFetch.data
   useDocumentTitle(summary ? `${summary.name} — Batting` : playerId ? null : 'Batting')
+
+  // Distribution dossier — fetched alongside summary, drives the
+  // §9 Distribution panel between stat row 1 and stat row 2. Same
+  // filterDeps so it refetches on FilterBar / inning aux change
+  // (post-be4d755 discipline).
+  const distFetch = useFetch<BatterDistribution | null>(
+    () => playerId ? getBatterDistribution(playerId, filters) : Promise.resolve(null),
+    filterDeps,
+  )
+  const distribution = distFetch.data
 
   // Self-correcting deep link — if a user lands on /batting?player=X
   // without a gender filter, infer it from the player's international
@@ -213,6 +224,14 @@ export default function Batting() {
             <StatCard label="Average" value={fmt(summary.average)} />
             <StatCard label="Strike Rate" value={fmt(summary.strike_rate)} />
           </div>
+          {playerId && (
+            <BatterDistributionPanel
+              playerId={playerId}
+              distribution={distribution}
+              loading={distFetch.loading}
+              error={distFetch.error}
+            />
+          )}
           <div className="wisden-statrow cols-5">
             <StatCard label="Boundaries" value={summary.boundaries} subtitle={`${summary.fours} 4s, ${summary.sixes} 6s`} />
             <StatCard label="B/Four" value={fmt(summary.balls_per_four)} />
