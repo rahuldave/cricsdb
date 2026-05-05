@@ -352,3 +352,118 @@ export function resolveScopePhrases(
 
   return tiers
 }
+
+// ─── Suggested splits — scope-derived navigation hints ─────────────────
+//
+// Mirror of `api/scope_links.py::suggested_splits`. Walks the active
+// scope and emits an ordered list of `(label, params)` pairs — each is
+// a one-click navigation hint to a related scope the user is likely
+// to want next ("Kohli IPL 2024 vs Kohli all IPL").
+//
+// Lockstep-tested with the Python implementation against the shared
+// fixture at `tests/sanity/scope_splits_fixtures.json`. Every change
+// here MUST be mirrored in api/scope_links.py + the fixture.
+//
+// Spec: internal_docs/spec-distribution-stats.md §8.7.
+
+const IDENTITY_KEYS_FOR_SPLITS = ['gender', 'team_type'] as const
+
+export interface SplitSuggestion {
+  label: string
+  params: Record<string, string>
+}
+
+function _truthy(v: string | null | undefined): v is string {
+  return v !== null && v !== undefined && v !== ''
+}
+
+function _identityForSplits(scope: Partial<FilterParams>): Record<string, string> {
+  const id: Record<string, string> = {}
+  for (const k of IDENTITY_KEYS_FOR_SPLITS) {
+    const v = scope[k]
+    if (_truthy(v as string | null | undefined)) id[k] = v as string
+  }
+  return id
+}
+
+function _withoutKeys(
+  scope: Partial<FilterParams>,
+  ...drop: string[]
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(scope)) {
+    if (drop.includes(k)) continue
+    if (_truthy(v as string | null | undefined)) out[k] = String(v)
+  }
+  return out
+}
+
+export function suggestedSplits(scope: Partial<FilterParams>): SplitSuggestion[] {
+  const splits: SplitSuggestion[] = []
+  const identity = _identityForSplits(scope)
+
+  const tournament = _truthy(scope.tournament) ? scope.tournament! : null
+  const seasonFrom = _truthy(scope.season_from) ? scope.season_from! : null
+  const seasonTo = _truthy(scope.season_to) ? scope.season_to! : null
+  const hasTournament = !!tournament
+  const hasSingleSeason = !!seasonFrom && !!seasonTo && seasonFrom === seasonTo
+  const hasSeasonRange = (!!seasonFrom || !!seasonTo) && !hasSingleSeason
+  const hasAnySeason = hasSingleSeason || hasSeasonRange
+
+  const opponent = _truthy(scope.filter_opponent) ? scope.filter_opponent! : null
+  const venue = _truthy(scope.filter_venue) ? scope.filter_venue! : null
+
+  // Tournament × season axis
+  if (hasTournament && hasSingleSeason && tournament && seasonFrom) {
+    splits.push({
+      label: `All ${tournament}`,
+      params: { ...identity, tournament },
+    })
+    splits.push({
+      label: `All cricket in ${seasonFrom}`,
+      params: { ...identity, season_from: seasonFrom, season_to: seasonFrom },
+    })
+    splits.push({ label: 'All-time', params: { ...identity } })
+  } else if (hasTournament && !hasAnySeason) {
+    splits.push({ label: 'All-time', params: { ...identity } })
+  } else if (hasAnySeason && !hasTournament) {
+    splits.push({ label: 'All-time', params: { ...identity } })
+  }
+
+  // Opponent axis
+  if (opponent) {
+    splits.push({
+      label: `vs ${opponent}, all-time`,
+      params: { ...identity, filter_opponent: opponent },
+    })
+    splits.push({
+      label: 'vs all opponents',
+      params: _withoutKeys(scope, 'filter_opponent'),
+    })
+  }
+
+  // Venue axis
+  if (venue) {
+    splits.push({
+      label: `at ${venue}, all-time`,
+      params: { ...identity, filter_venue: venue },
+    })
+    splits.push({
+      label: 'at all venues',
+      params: _withoutKeys(scope, 'filter_venue'),
+    })
+  }
+
+  // Gender flip — only on women's scope (men's is the asymmetric default;
+  // flipping male → female would zero out most player profiles).
+  if (scope.gender === 'female') {
+    const flipped: Record<string, string> = {}
+    for (const [k, v] of Object.entries(scope)) {
+      if (_truthy(v as string | null | undefined)) flipped[k] = String(v)
+    }
+    flipped.gender = 'male'
+    splits.push({ label: "Switch to men's", params: flipped })
+  }
+
+  return splits
+}

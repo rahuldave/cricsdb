@@ -1,0 +1,90 @@
+[
+  {
+    "name": "empty scope — no splits",
+    "scope": {},
+    "expected": []
+  },
+  {
+    "name": "identity-only scope (gender + team_type) — no narrowing axes set, no splits",
+    "scope": {"gender": "male", "team_type": "club"},
+    "expected": []
+  },
+  {
+    "name": "tournament + single season — three broadens",
+    "scope": {"gender": "male", "tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024"},
+    "expected": [
+      {"label": "All Indian Premier League", "params": {"gender": "male", "tournament": "Indian Premier League"}},
+      {"label": "All cricket in 2024", "params": {"gender": "male", "season_from": "2024", "season_to": "2024"}},
+      {"label": "All-time", "params": {"gender": "male"}}
+    ]
+  },
+  {
+    "name": "tournament only — all-time",
+    "scope": {"gender": "male", "tournament": "Indian Premier League"},
+    "expected": [
+      {"label": "All-time", "params": {"gender": "male"}}
+    ]
+  },
+  {
+    "name": "single season only — all-time",
+    "scope": {"gender": "male", "season_from": "2024", "season_to": "2024"},
+    "expected": [
+      {"label": "All-time", "params": {"gender": "male"}}
+    ]
+  },
+  {
+    "name": "season range only — all-time",
+    "scope": {"gender": "male", "season_from": "2022", "season_to": "2024"},
+    "expected": [
+      {"label": "All-time", "params": {"gender": "male"}}
+    ]
+  },
+  {
+    "name": "opponent only — isolate + drop pair",
+    "scope": {"gender": "male", "team_type": "international", "filter_opponent": "Australia"},
+    "expected": [
+      {"label": "vs Australia, all-time", "params": {"gender": "male", "team_type": "international", "filter_opponent": "Australia"}},
+      {"label": "vs all opponents", "params": {"gender": "male", "team_type": "international"}}
+    ]
+  },
+  {
+    "name": "tournament + season + opponent — five splits",
+    "scope": {"gender": "male", "tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024", "filter_opponent": "Chennai Super Kings"},
+    "expected": [
+      {"label": "All Indian Premier League", "params": {"gender": "male", "tournament": "Indian Premier League"}},
+      {"label": "All cricket in 2024", "params": {"gender": "male", "season_from": "2024", "season_to": "2024"}},
+      {"label": "All-time", "params": {"gender": "male"}},
+      {"label": "vs Chennai Super Kings, all-time", "params": {"gender": "male", "filter_opponent": "Chennai Super Kings"}},
+      {"label": "vs all opponents", "params": {"gender": "male", "tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024"}}
+    ]
+  },
+  {
+    "name": "venue only — isolate + drop pair",
+    "scope": {"gender": "male", "filter_venue": "Wankhede Stadium"},
+    "expected": [
+      {"label": "at Wankhede Stadium, all-time", "params": {"gender": "male", "filter_venue": "Wankhede Stadium"}},
+      {"label": "at all venues", "params": {"gender": "male"}}
+    ]
+  },
+  {
+    "name": "tournament + season + venue — five splits",
+    "scope": {"gender": "male", "tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024", "filter_venue": "Wankhede Stadium"},
+    "expected": [
+      {"label": "All Indian Premier League", "params": {"gender": "male", "tournament": "Indian Premier League"}},
+      {"label": "All cricket in 2024", "params": {"gender": "male", "season_from": "2024", "season_to": "2024"}},
+      {"label": "All-time", "params": {"gender": "male"}},
+      {"label": "at Wankhede Stadium, all-time", "params": {"gender": "male", "filter_venue": "Wankhede Stadium"}},
+      {"label": "at all venues", "params": {"gender": "male", "tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024"}}
+    ]
+  },
+  {
+    "name": "gender female with tournament — switch to men's",
+    "scope": {"gender": "female", "tournament": "Women's Premier League", "season_from": "2024", "season_to": "2024"},
+    "expected": [
+      {"label": "All Women's Premier League", "params": {"gender": "female", "tournament": "Women's Premier League"}},
+      {"label": "All cricket in 2024", "params": {"gender": "female", "season_from": "2024", "season_to": "2024"}},
+      {"label": "All-time", "params": {"gender": "female"}},
+      {"label": "Switch to men's", "params": {"gender": "male", "tournament": "Women's Premier League", "season_from": "2024", "season_to": "2024"}}
+    ]
+  }
+]
