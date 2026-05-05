@@ -1,0 +1,50 @@
+# Batter distribution dossier — endpoint inventory.
+#
+# Subject: V Kohli (ba607b88 — male, international + IPL),
+# SV Samson (a4cc73aa — IPL), S Mandhana (5d2eda89 — women's),
+# JJ Bumrah (462411b3 — tail batter as a stress case).
+#
+# `as_of_date` is pinned on every URL so form.last_60d is
+# deterministic across runs (otherwise drift = "today changed").
+# Production callers omit as_of_date; the regression inventory
+# pins it because md5-diff requires byte-stability.
+#
+# All REG — documents current behaviour of the v1 endpoint.
+# When refactoring a shared helper that touches batting OR
+# scope_links, paired NEW entries should be added for URLs you
+# expect to drift.
+
+# ── lifetime totals across primary axes ──────────────────────────
+REG dist_kohli_all_time                /api/v1/batters/ba607b88/distribution?as_of_date=2025-01-01
+REG dist_kohli_men_intl                /api/v1/batters/ba607b88/distribution?gender=male&team_type=international&as_of_date=2025-01-01
+REG dist_kohli_ipl                     /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
+REG dist_kohli_ipl_2024                /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
+REG dist_kohli_ipl_2023                /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2023&season_to=2023&as_of_date=2025-01-01
+REG dist_kohli_recent_2years           /api/v1/batters/ba607b88/distribution?gender=male&season_from=2024&season_to=2025&as_of_date=2025-01-01
+
+# ── opponent narrowing ───────────────────────────────────────────
+REG dist_kohli_vs_csk_ipl              /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_opponent=Chennai%20Super%20Kings&as_of_date=2025-01-01
+REG dist_kohli_vs_aus_intl             /api/v1/batters/ba607b88/distribution?gender=male&team_type=international&filter_opponent=Australia&as_of_date=2025-01-01
+
+# ── venue narrowing ──────────────────────────────────────────────
+REG dist_kohli_at_chinnaswamy          /api/v1/batters/ba607b88/distribution?gender=male&filter_venue=M%20Chinnaswamy%20Stadium&as_of_date=2025-01-01
+
+# ── samson (IPL only) ────────────────────────────────────────────
+REG dist_samson_ipl                    /api/v1/batters/a4cc73aa/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
+REG dist_samson_ipl_2024               /api/v1/batters/a4cc73aa/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
+
+# ── women's (mandhana) ───────────────────────────────────────────
+REG dist_mandhana_all                  /api/v1/batters/5d2eda89/distribution?gender=female&as_of_date=2025-01-01
+REG dist_mandhana_intl                 /api/v1/batters/5d2eda89/distribution?gender=female&team_type=international&as_of_date=2025-01-01
+REG dist_mandhana_wpl_2024             /api/v1/batters/5d2eda89/distribution?gender=female&team_type=club&tournament=Women%27s%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
+
+# ── tail batter — small sample stress (Bumrah) ───────────────────
+REG dist_bumrah_intl                   /api/v1/batters/462411b3/distribution?gender=male&team_type=international&as_of_date=2025-01-01
+REG dist_bumrah_ipl_2024               /api/v1/batters/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
+
+# ── inning-aux narrowing (page-local AuxParam) ──────────────────
+REG dist_kohli_ipl_inning0             /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=0&as_of_date=2025-01-01
+REG dist_kohli_ipl_inning1             /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=1&as_of_date=2025-01-01
+
+# ── empty scope (no matches) — regression marker for empty handling
+REG dist_kohli_at_nonexistent_venue    /api/v1/batters/ba607b88/distribution?filter_venue=Nonexistent%20Ground&as_of_date=2025-01-01
