@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import statistics
+from datetime import date, timedelta
 from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
@@ -9,6 +11,7 @@ from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
 from ..aux_clauses import splice_aux_join_clauses
 from ..player_nationality import player_nationalities
+from ..scope_links import suggested_splits, scope_dict_from_filters
 
 router = APIRouter(prefix="/api/v1/batters", tags=["Batting"])
 
@@ -945,3 +948,254 @@ async def batting_inter_wicket(
         })
 
     return {"inter_wicket": inter_wicket}
+
+
+# ─── Distribution dossier ──────────────────────────────────────────────
+#
+# Per-innings runs distribution for a batter, with phase decomposition,
+# milestone probabilities, and last-10-innings + last-60-day form
+# windows. Spec: internal_docs/spec-distribution-stats.md §8.
+#
+# The spec mentions three "retired" exclusions for the dismissed flag
+# but existing batting endpoints exclude only ('retired hurt',
+# 'retired out') — 'retired not out' is 13 rows in 162k wickets and
+# materially irrelevant. We match the existing convention here for
+# cross-endpoint consistency; revisit in a project-wide sweep if the
+# semantic gap matters.
+
+# Phase boundaries on the DB-side over_number (0-19). Mirrors the
+# convention in /by-phase. PP=overs 1-6, Mid=7-15, Death=16-20 in
+# user-facing 1-indexed numbering.
+_PHASE_RANGES = {
+    "powerplay": (0, 5),
+    "middle": (6, 14),
+    "death": (15, 19),
+}
+
+
+async def _innings_master_sample(
+    db, person_id: str, filters: FilterParams, aux: AuxParams,
+) -> list[dict]:
+    """Materialise per-innings observation rows for a batter under the
+    active filter scope. One row per (match, innings the batter batted
+    in). Used as the master sample for the distribution dossier and
+    its form windows. Spec §8.2."""
+    where, params = _batting_filter(filters, person_id, aux=aux)
+    rows = await db.q(
+        f"""
+        SELECT
+            i.id AS innings_id,
+            i.match_id,
+            i.innings_number,
+            (SELECT md.date FROM matchdate md WHERE md.match_id = i.match_id
+             ORDER BY md.date LIMIT 1) AS date,
+            SUM(d.runs_batter) AS runs,
+            COUNT(*) AS balls,
+            MAX(CASE WHEN w.id IS NOT NULL THEN 1 ELSE 0 END) AS dismissed,
+            SUM(CASE WHEN d.runs_batter = 4
+                     AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS fours,
+            SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
+            SUM(CASE WHEN d.runs_batter = 0 AND d.runs_extras = 0 THEN 1 ELSE 0 END) AS dots,
+            SUM(CASE WHEN d.over_number BETWEEN 0 AND 5
+                     THEN d.runs_batter ELSE 0 END) AS runs_pp,
+            SUM(CASE WHEN d.over_number BETWEEN 0 AND 5
+                     THEN 1 ELSE 0 END) AS balls_pp,
+            SUM(CASE WHEN d.over_number BETWEEN 6 AND 14
+                     THEN d.runs_batter ELSE 0 END) AS runs_mid,
+            SUM(CASE WHEN d.over_number BETWEEN 6 AND 14
+                     THEN 1 ELSE 0 END) AS balls_mid,
+            SUM(CASE WHEN d.over_number BETWEEN 15 AND 19
+                     THEN d.runs_batter ELSE 0 END) AS runs_death,
+            SUM(CASE WHEN d.over_number BETWEEN 15 AND 19
+                     THEN 1 ELSE 0 END) AS balls_death
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        LEFT JOIN wicket w ON w.delivery_id = d.id
+            AND w.player_out_id = :person_id
+            AND w.kind NOT IN ('retired hurt', 'retired out')
+        WHERE {where}
+        GROUP BY i.id
+        ORDER BY date ASC, i.innings_number ASC
+        """,
+        params,
+    )
+    return [
+        {
+            "innings_id": r["innings_id"],
+            "match_id": r["match_id"],
+            "date": r["date"],
+            "runs": r["runs"] or 0,
+            "balls": r["balls"] or 0,
+            "dismissed": bool(r["dismissed"]),
+            "fours": r["fours"] or 0,
+            "sixes": r["sixes"] or 0,
+            "dots": r["dots"] or 0,
+            "runs_pp": r["runs_pp"] or 0,
+            "balls_pp": r["balls_pp"] or 0,
+            "runs_mid": r["runs_mid"] or 0,
+            "balls_mid": r["balls_mid"] or 0,
+            "runs_death": r["runs_death"] or 0,
+            "balls_death": r["balls_death"] or 0,
+        }
+        for r in rows
+    ]
+
+
+def _distribution_dossier(observations: list[dict]) -> dict:
+    """Pure aggregate of a per-innings observation list. No DB access.
+    Same shape used for lifetime + form windows. Spec §8.3 / §8.4 / §8.5.
+
+    Empty samples return a sane null shape — mean / median / variance /
+    average / milestones all `null`; phase totals all 0; observations
+    list empty.
+    """
+    n = len(observations)
+    if n == 0:
+        return {
+            "n_innings": 0,
+            "n_dismissals": 0,
+            "n_notouts": 0,
+            "runs": {
+                "total": 0, "balls_total": 0,
+                "mean_per_innings": None, "median": None,
+                "variance": None, "std": None, "average": None,
+                "observations": [],
+            },
+            "milestones": {
+                "p_failure_10": None, "p_25_plus": None,
+                "p_50_plus": None, "p_100_plus": None,
+            },
+            "phase": {
+                k: {"runs_total": 0, "balls_total": 0, "innings_active": 0}
+                for k in _PHASE_RANGES
+            },
+        }
+
+    runs_list = [o["runs"] for o in observations]
+    n_dismissals = sum(1 for o in observations if o["dismissed"])
+    n_notouts = n - n_dismissals
+    total_runs = sum(runs_list)
+    total_balls = sum(o["balls"] for o in observations)
+
+    mean_runs = total_runs / n
+    median_runs = statistics.median(runs_list)
+    # Sample variance needs n >= 2; for n == 1 fall back to 0.
+    variance = statistics.variance(runs_list) if n >= 2 else 0.0
+    std = variance ** 0.5
+    average = (total_runs / n_dismissals) if n_dismissals > 0 else None
+
+    def _p_geq(threshold: int) -> float:
+        return sum(1 for r in runs_list if r >= threshold) / n
+
+    def _p_leq(threshold: int) -> float:
+        return sum(1 for r in runs_list if r <= threshold) / n
+
+    phase = {}
+    for name, (lo, hi) in _PHASE_RANGES.items():
+        if name == "powerplay":
+            runs_key, balls_key = "runs_pp", "balls_pp"
+        elif name == "middle":
+            runs_key, balls_key = "runs_mid", "balls_mid"
+        else:
+            runs_key, balls_key = "runs_death", "balls_death"
+        phase[name] = {
+            "runs_total": sum(o[runs_key] for o in observations),
+            "balls_total": sum(o[balls_key] for o in observations),
+            "innings_active": sum(1 for o in observations if o[balls_key] > 0),
+        }
+
+    return {
+        "n_innings": n,
+        "n_dismissals": n_dismissals,
+        "n_notouts": n_notouts,
+        "runs": {
+            "total": total_runs,
+            "balls_total": total_balls,
+            "mean_per_innings": round(mean_runs, 2),
+            "median": median_runs,
+            "variance": round(variance, 2),
+            "std": round(std, 2),
+            "average": round(average, 2) if average is not None else None,
+            "observations": observations,
+        },
+        "milestones": {
+            "p_failure_10": round(_p_leq(10), 4),
+            "p_25_plus": round(_p_geq(25), 4),
+            "p_50_plus": round(_p_geq(50), 4),
+            "p_100_plus": round(_p_geq(100), 4),
+        },
+        "phase": phase,
+    }
+
+
+def _form_windows(observations: list[dict], today: date) -> dict:
+    """Derive last-10 + last-60d form windows from a date-asc
+    observation list. Returns the per-window dossiers plus a delta
+    block comparing window means / medians to the lifetime sample.
+    Spec §8.6."""
+    last_10 = observations[-10:]
+    cutoff = (today - timedelta(days=60)).isoformat()
+    last_60d = [o for o in observations if (o["date"] or "") >= cutoff]
+
+    lifetime_doss = _distribution_dossier(observations)
+    last_10_doss = _distribution_dossier(last_10)
+    last_60d_doss = _distribution_dossier(last_60d)
+
+    def _delta(w: dict, key: str) -> Optional[float]:
+        wv = w["runs"][key]
+        lv = lifetime_doss["runs"][key]
+        if wv is None or lv is None:
+            return None
+        return round(wv - lv, 2)
+
+    return {
+        "last_10": last_10_doss,
+        "last_60d": last_60d_doss,
+        "delta": {
+            "last_10_mean_minus_lifetime": _delta(last_10_doss, "mean_per_innings"),
+            "last_10_median_minus_lifetime": _delta(last_10_doss, "median"),
+            "last_60d_mean_minus_lifetime": _delta(last_60d_doss, "mean_per_innings"),
+            "last_60d_median_minus_lifetime": _delta(last_60d_doss, "median"),
+        },
+    }
+
+
+@router.get("/{person_id}/distribution")
+async def batting_distribution(
+    person_id: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    as_of_date: Optional[str] = Query(
+        None,
+        description=(
+            "ISO date (YYYY-MM-DD) to anchor the form.last_60d window."
+            " Defaults to the server's today. Pin this for deterministic"
+            " regression tests; production callers leave it absent."
+        ),
+    ),
+):
+    """Per-innings runs distribution dossier for a batter under the
+    active filter scope.
+
+    Returns lifetime + form-window dossiers (last-10 innings + last-60
+    days) plus scope-derived suggested-splits navigation hints.
+
+    Spec: internal_docs/spec-distribution-stats.md §8.
+    """
+    db = get_db()
+    today = date.fromisoformat(as_of_date) if as_of_date else date.today()
+
+    observations = await _innings_master_sample(db, person_id, filters, aux)
+    lifetime = _distribution_dossier(observations)
+    form = _form_windows(observations, today)
+
+    scope = scope_dict_from_filters(filters)
+    splits = suggested_splits(scope)
+
+    return {
+        "scope": {k: v for k, v in scope.items() if v},
+        "lifetime": lifetime,
+        "form": form,
+        "suggested_splits": splits,
+    }
