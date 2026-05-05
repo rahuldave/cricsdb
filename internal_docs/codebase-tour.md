@@ -59,6 +59,7 @@ api/
                           decomposition; milestone probabilities; scope-derived
                           suggested-splits). Spec:
                           internal_docs/spec-distribution-stats.md §8.
+                         Frontend panel: components/batting/* — see below.
     bowling.py        — /api/v1/bowlers/leaders (top 10 by SR + by economy, filter-sensitive)
                          /api/v1/bowlers/{id}/summary|by-innings|vs-batters|by-over|by-phase|by-season|wickets
     fielding.py       — /api/v1/fielders/leaders (top 10 fielders + top 10 keepers, volume-based)
@@ -248,7 +249,35 @@ frontend/src/
                                    range formatting), charts/
     charts/                    — BarChart, LineChart, ScatterChart, DonutChart wrappers (responsive),
                                    HeatmapChart, BubbleMatrix,
-                                   WormChart, ManhattanChart, InningsGridChart, MatchupGridChart
+                                   WormChart, ManhattanChart, InningsGridChart, MatchupGridChart.
+                                   palette.ts: WISDEN_PALETTE / WISDEN_PHASES / WISDEN_RUN_TIERS
+                                   (per-innings runs histogram tier colors).
+    batting/                   — Batter Distribution panel (spec-distribution-stats.md §9):
+                                   BatterDistributionPanel    top-level orchestrator on /batting?player=X,
+                                                                 mounted between stat row 1 (Avg) and
+                                                                 stat row 2; window toggle URL-encoded
+                                                                 as ?dist_window= (default = absent →
+                                                                 lifetime); per-window dossier picked
+                                                                 from the single-payload response
+                                   RunsHistogram              22-bin width-10 histogram via BarChart;
+                                                                 always renders [0,9]–[90,99] floor
+                                                                 (tail batters' empty right side IS
+                                                                 the bowler signal); above 99 the
+                                                                 empty upper tail is hidden
+                                   DistributionStatStrip      Mean / Median / Std / CV / Average +
+                                                                 milestone chips (P≥50, P≥100, P≤10).
+                                                                 CV computed client-side from std/mean
+                                   RunsSparkline              custom inline-SVG (no semiotic for a
+                                                                 36px widget) per-innings runs +
+                                                                 optional rolling-N mean overlay
+                                                                 (Lifetime only)
+                                   FormDeltaLine              window-INDEPENDENT — both windows always
+                                                                 shown; reads dossier.form.delta directly
+                                   SuggestedSplitsRow         renders dossier.suggested_splits via
+                                                                 react-router Link; preserves the
+                                                                 current ?inning= aux on navigation
+                                   distributionBins.ts        pure helpers (binIndex / binLabel /
+                                                                 binTier / buildHistogramRows)
     tournaments/               — TournamentsLanding (sectioned grids + men's/women's rivalry tiles),
                                    TournamentDossier (shared dossier UI for tournament OR rivalry
                                    scope; reused by HeadToHead Team-vs-Team mode)

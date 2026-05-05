@@ -37,6 +37,14 @@ integration/
                             avg-slot picker, MetricDelta, or any
                             /scope/averages/* endpoint.
   batting.sh        — Batting leaders, player page, tabs, innings-list highlight
+  batter_distribution.sh — Batter Distribution panel (spec-distribution-stats.md
+                            §9): SQL-anchored stat-strip values, window-toggle
+                            URL state (?dist_window=lifetime|last_10|last_60d
+                            with Lifetime as absent param), back-button restore,
+                            deep-link no-flash, suggested-split navigation,
+                            inning aux click-after-mount partition invariant
+                            (inning=0 + inning=1 == lifetime n_innings),
+                            empty-scope placeholder. 21 assertions.
   bowling.sh        — Bowling leaders, player page, tabs, innings-list highlight
   fielding.sh       — Fielders, Keeping tab (conditional), filter_team auto-narrow
   series.sh         — Series landing, dossier, series_type reset, legacy redirects

@@ -45,7 +45,7 @@ in dedicated docs — go there before making assumptions.
 **Active work**
 - Next-session agenda + NO-DEPLOYS gate: `internal_docs/next-session-ideas.md`
 - A–Q lettered roadmap, dated session logs, deferred queue: `internal_docs/enhancements-roadmap.md`
-- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md` (§8 backend IMPLEMENTED 2026-05-05; §9 frontend build-ready 2026-05-05; rest of doc framing remains DRAFT)
+- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md` (§8 backend + §9 frontend both IMPLEMENTED 2026-05-05; rest of doc framing remains DRAFT)
 - Club-tier classification (read before classifying a new club league): `internal_docs/club-tier-classification.md`. Anchor numbers: `internal_docs/club-tier-anchor-numbers.md`.
 
 ## Running Locally

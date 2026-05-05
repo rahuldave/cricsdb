@@ -1,15 +1,16 @@
 # Spec — Distribution-shaped statistics on the API
 
 > **Status:** Inventory + cross-discipline framing remain DRAFT.
-> §8 (batter v1 backend distribution dossier) is **IMPLEMENTED** —
-> shipped 2026-05-05 across 5 commits. Endpoint live at
-> `GET /api/v1/batters/{id}/distribution`. 126/126 sanity
-> invariants pass; 19/19 regression URLs return 200; 11/11
-> scope-splits lockstep fixtures pass.
+> §8 (batter v1 backend distribution dossier) is **IMPLEMENTED**
+> 2026-05-05.
 > §9 (batter v1 frontend — Distribution panel on `/batting`) is
-> **build-ready** — layout, panel anatomy, types, fetcher, components,
-> empty-state handling, integration test plan, and 5-commit ordering
-> all pinned. Awaiting implementation.
+> **IMPLEMENTED** 2026-05-05 across 5 commits (types + fetcher;
+> histogram + stat strip + tier palette; sparkline + form delta
+> + splits row; panel + Batting.tsx integration; integration test
+> + docs). Panel live at `/batting?player=X`. 21/21 integration
+> assertions pass against cricket.db. Numbers SQL-anchored at test
+> runtime (mean / median / P(≥50) / n_innings; inning=0 + inning=1
+> partition invariant).
 > Remaining open questions in §6 apply to the bowler / fielder /
 > team slices.
 
@@ -655,8 +656,10 @@ frontend (§9.10).
 
 ## 9. Batter v1 frontend — Distribution panel on `/batting?player=X`
 
-> **Status:** build-ready. Consumes the §8 endpoint
-> `GET /api/v1/batters/{id}/distribution`. Lands a new
+> **Status:** IMPLEMENTED 2026-05-05 across 5 commits.
+> Panel live at `/batting?player=X`. 21/21 integration assertions
+> pass. Consumes the §8 endpoint
+> `GET /api/v1/batters/{id}/distribution`. Lands the new
 > "Distribution panel" between the existing stat row 1 and stat
 > row 2 on `frontend/src/pages/Batting.tsx`. No backend changes
 > required.
@@ -1216,6 +1219,11 @@ from §8 to verify rendering before commit 5.
 
 *Started 2026-05-04. Inventory + framing drafted first; batter v1
 backend (§8) drafted + IMPLEMENTED 2026-05-05 across 5 commits.
-Batter v1 frontend (§9) drafted 2026-05-05 — build-ready, awaiting
-implementation. Bowler / fielder / team distribution dossiers
-remain as sibling specs; no work done.*
+Batter v1 frontend (§9) drafted + IMPLEMENTED 2026-05-05 across
+5 more commits — types + fetcher; histogram + stat strip + tier
+palette; sparkline + form delta + splits row; panel orchestrator
++ Batting.tsx integration; integration test + docs. 21/21
+integration assertions pass; SQL-anchored Mean / Median / P(≥50)
+/ n_innings + inning=0/inning=1 partition invariant.
+Bowler / fielder / team distribution dossiers remain as sibling
+specs; no work done.*
