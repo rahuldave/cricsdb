@@ -428,6 +428,83 @@ export interface InterWicketStats {
   avg_balls_before_next_wicket: number | null
 }
 
+// ─── Batter distribution dossier ────────────────────────────────────────
+//
+// Mirror of the /api/v1/batters/{id}/distribution response. Spec:
+// internal_docs/spec-distribution-stats.md §8.8.
+
+export interface InningsObservation {
+  innings_id: number
+  match_id: number
+  date: string | null
+  runs: number
+  balls: number
+  dismissed: boolean
+  fours: number
+  sixes: number
+  dots: number
+  runs_pp: number
+  balls_pp: number
+  runs_mid: number
+  balls_mid: number
+  runs_death: number
+  balls_death: number
+}
+
+export interface DistributionPhaseRollup {
+  runs_total: number
+  balls_total: number
+  innings_active: number
+}
+
+export interface DistributionDossier {
+  n_innings: number
+  n_dismissals: number
+  n_notouts: number
+  runs: {
+    total: number
+    balls_total: number
+    mean_per_innings: number | null
+    median: number | null
+    variance: number | null
+    std: number | null
+    average: number | null
+    observations: InningsObservation[]
+  }
+  milestones: {
+    p_failure_10: number | null
+    p_25_plus: number | null
+    p_50_plus: number | null
+    p_100_plus: number | null
+  }
+  phase: {
+    powerplay: DistributionPhaseRollup
+    middle: DistributionPhaseRollup
+    death: DistributionPhaseRollup
+  }
+}
+
+export interface SuggestedSplit {
+  label: string
+  params: Record<string, string>
+}
+
+export interface BatterDistribution {
+  scope: Record<string, string>
+  lifetime: DistributionDossier
+  form: {
+    last_10: DistributionDossier
+    last_60d: DistributionDossier
+    delta: {
+      last_10_mean_minus_lifetime: number | null
+      last_10_median_minus_lifetime: number | null
+      last_60d_mean_minus_lifetime: number | null
+      last_60d_median_minus_lifetime: number | null
+    }
+  }
+  suggested_splits: SuggestedSplit[]
+}
+
 export interface BowlingSummary {
   person_id: string
   name: string

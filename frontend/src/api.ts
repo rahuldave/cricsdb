@@ -108,6 +108,8 @@ export const getBatterDismissals = (id: string, filters?: F) =>
   fetchApi<DismissalAnalysis>(`/api/v1/batters/${id}/dismissals`, filters as Record<string, string>)
 export const getBatterInterWicket = (id: string, filters?: F) =>
   fetchApi<{ inter_wicket: InterWicketStats[] }>(`/api/v1/batters/${id}/inter-wicket`, filters as Record<string, string>)
+export const getBatterDistribution = (id: string, filters?: F) =>
+  fetchApi<import('./types').BatterDistribution>(`/api/v1/batters/${id}/distribution`, filters as Record<string, string>)
 
 // Bowling
 export const getBowlingLeaders = (filters?: F & { limit?: number; min_balls?: number; min_wickets?: number }) =>
