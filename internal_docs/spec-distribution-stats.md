@@ -789,20 +789,32 @@ same as a Kohli 102). Bin definition (22 bins total):
 [180,189], [190,199], [200+]
 ```
 
-**Render rule** — show bins from `[0,9]` through the bin containing
-`max(window.observations.runs)`, inclusive. The `200+` terminal
-bin only renders if a 200+ score exists in scope (not yet, but the
-bin is defined for forward-compatibility).
+**Render rule** — show bins from `[0,9]` through whichever is
+greater of:
+- `[90,99]` (the floor — always render the first 10 bins through 99)
+- the bin containing `max(window.observations.runs)`
 
-The "always render through the max" rule means **interior empty
-bins still draw** (preserves the distribution shape — a player
-with 5 innings 0-9, 0 innings 10-19, 8 innings 20-29 still sees
-the gap at 10-19), while the **empty upper tail vanishes** (a
-batter with max 30 sees four bars, not 22). Per-player chart
-width auto-fits the data.
+The `200+` terminal bin only renders if a 200+ score exists in
+scope (not yet, but the bin is defined for forward-compatibility).
 
-For most batters this resolves to ~6–14 bars; tail batters 3–4;
-century-rich batters 12–18.
+**Why the always-through-[90,99] floor:** so a tail batter
+(Bumrah, max ~30) renders the full 0-99 span — 10 bars, 7 of
+them zero-height after his max — and the empty right side reads
+"this is a bowler" at a glance. Without the floor, Bumrah's
+chart would auto-shrink to 4 bars filling the panel width and
+visually look like a real batter who happened to peak at 30 — a
+qualitative misread.
+
+Above 99, the render-through-max rule kicks in: Kohli (max ~120)
+renders 13 bars, Gayle (max 171) renders 18.
+
+**Interior empty bins still draw** — preserves distribution shape
+(a player with 5 innings 0-9, 0 innings 10-19, 8 innings 20-29
+still sees the gap at 10-19). The **empty upper tail above max
+vanishes** only when max ≥ 100 (above the 0-99 floor).
+
+Bar counts: tail batters 10 (the floor); typical batters 10–13;
+century-rich batters 13–18.
 
 Fixed bin edges (not adaptive) keep the histogram **comparable
 across players** — Kohli's `[50,59]` bar and Mandhana's `[50,59]`
