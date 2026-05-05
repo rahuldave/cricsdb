@@ -53,7 +53,12 @@ api/
                          _team_innings_clause / _partnership_filter — single
                          SQL surface, two code paths.
     batting.py        — /api/v1/batters/leaders (top 10 by avg + by SR, filter-sensitive)
-                         /api/v1/batters/{id}/summary|by-innings|vs-bowlers|by-over|by-phase|by-season|dismissals|inter-wicket
+                         /api/v1/batters/{id}/summary|by-innings|vs-bowlers|by-over|by-phase|by-season|dismissals|inter-wicket|distribution
+                         /distribution: per-innings runs distribution dossier
+                          (lifetime + last-10 + last-60d form windows; phase
+                          decomposition; milestone probabilities; scope-derived
+                          suggested-splits). Spec:
+                          internal_docs/spec-distribution-stats.md §8.
     bowling.py        — /api/v1/bowlers/leaders (top 10 by SR + by economy, filter-sensitive)
                          /api/v1/bowlers/{id}/summary|by-innings|vs-batters|by-over|by-phase|by-season|wickets
     fielding.py       — /api/v1/fielders/leaders (top 10 fielders + top 10 keepers, volume-based)
@@ -90,6 +95,16 @@ api/
                          and /api/v1/venues/landing (country-grouped tile grid). Both
                          strip filter_venue from their own filter chain (self-
                          referential).
+scope_links.py        — suggested_splits(scope) — server-side mirror of
+                         frontend/src/components/scopeLinks.ts::suggestedSplits.
+                         Walks an active filter scope and emits ordered
+                         (label, params) navigation hints (broaden / isolate
+                         per axis: tournament × season, opponent, venue,
+                         gender flip). Lockstep-tested with the TS impl via
+                         tests/sanity/scope_splits_fixtures.json. Reusable
+                         on any scoped page that wants "always-ahead"
+                         navigation; first consumer is /batters/{id}/distribution.
+                         Spec: internal_docs/spec-distribution-stats.md §8.7.
 tournament_canonical.py — Shared canonical map (T20 WC variants → "T20 World Cup (Men)" etc.)
                          imported by filters.py + tournaments.py + reference.py for global
                          IN-variants expansion of tournament=X queries.

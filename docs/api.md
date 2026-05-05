@@ -1035,6 +1035,74 @@ Partnership-segment analysis: runs + rate in each "between-wickets"
 span of an innings. `{ inter_wicket: [ { after_wicket, avg_runs,
 avg_balls, run_rate, n } ] }`.
 
+## `GET /api/v1/batters/{id}/distribution`
+
+Per-innings runs distribution dossier: lifetime + form-window
+aggregates (mean / median / variance / std / average), milestone
+probabilities (`p_failure_10`, `p_25_plus`, `p_50_plus`,
+`p_100_plus`), phase decomposition (powerplay / middle / death
+runs and balls per phase, plus per-innings phase columns on every
+observation), and scope-derived suggested-splits navigation hints
+("All IPL", "All cricket in 2024", "All-time"). Form windows are
+last-10 innings + last-60 days, both with the same shape as
+lifetime; a `delta` block reports window-mean-minus-lifetime-mean
+and window-median-minus-lifetime-median. Optional `as_of_date`
+(YYYY-MM-DD) anchors the last-60-day window deterministically;
+production callers omit it. Spec:
+`internal_docs/spec-distribution-stats.md` §8.
+
+```bash
+curl "http://localhost:8000/api/v1/batters/ba607b88/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
+```
+
+```jsonc
+{
+  "scope": { "tournament": "Indian Premier League",
+             "season_from": "2024", "season_to": "2024" },
+  "lifetime": {
+    "n_innings": 15, "n_dismissals": 12, "n_notouts": 3,
+    "runs": {
+      "total": 741, "balls_total": 479,
+      "mean_per_innings": 49.4, "median": 42,
+      "variance": 982.83, "std": 31.35, "average": 61.75,
+      "observations": [
+        { "innings_id": 11773, "match_id": 5875, "date": "2024-03-22",
+          "runs": 21, "balls": 20, "dismissed": true,
+          "fours": 0, "sixes": 1, "dots": 6,
+          "runs_pp": 4, "balls_pp": 6,
+          "runs_mid": 17, "balls_mid": 14,
+          "runs_death": 0, "balls_death": 0 }
+        // ... (15 entries, date-asc)
+      ]
+    },
+    "milestones": { "p_failure_10": 0.0667, "p_25_plus": 0.7333,
+                    "p_50_plus": 0.4, "p_100_plus": 0.0667 },
+    "phase": {
+      "powerplay": { "runs_total": 373, "balls_total": 231, "innings_active": 15 },
+      "middle":    { "runs_total": 271, "balls_total": 198, "innings_active": 11 },
+      "death":     { "runs_total":  97, "balls_total":  50, "innings_active":  5 }
+    }
+  },
+  "form": {
+    "last_10":  { "n_innings": 10, "runs": {/* same shape */}, "milestones": {...}, "phase": {...} },
+    "last_60d": { "n_innings": 0,  "runs": {/* null shape */}, "milestones": {...}, "phase": {...} },
+    "delta": {
+      "last_10_mean_minus_lifetime": -6.9,
+      "last_10_median_minus_lifetime": 0.0,
+      "last_60d_mean_minus_lifetime": null,
+      "last_60d_median_minus_lifetime": null
+    }
+  },
+  "suggested_splits": [
+    { "label": "All Indian Premier League",
+      "params": { "tournament": "Indian Premier League" } },
+    { "label": "All cricket in 2024",
+      "params": { "season_from": "2024", "season_to": "2024" } },
+    { "label": "All-time", "params": {} }
+  ]
+}
+```
+
 ---
 
 # Bowlers (`/api/v1/bowlers/{id}/…`)

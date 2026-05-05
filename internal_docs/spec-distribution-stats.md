@@ -1,14 +1,15 @@
 # Spec — Distribution-shaped statistics on the API
 
 > **Status:** Inventory + cross-discipline framing remain DRAFT.
-> §8 (batter v1 distribution dossier) is **build-ready** —
-> per-innings observation row, aggregate calculations, milestone
-> probabilities, phase decomposition (per-innings obs + rollup),
-> form windows (last-10 + last-60d), suggested-splits decision
-> table, endpoint shape, implementation pointers, and sanity /
-> regression test plan all pinned. Wire format and sampling-unit
-> pinning resolved for batter; remaining open questions in §6 apply
-> to the bowler / fielder / team slices.
+> §8 (batter v1 distribution dossier) is **IMPLEMENTED** —
+> shipped 2026-05-05 across 5 commits (scope_links lockstep, endpoint
+> + helpers, sanity invariants, regression URL inventory, docs).
+> Endpoint live at `GET /api/v1/batters/{id}/distribution`. 126/126
+> sanity invariants pass; 19/19 regression URLs return 200; 11/11
+> scope-splits lockstep fixtures pass.
+> Wire format and sampling-unit pinning resolved for batter;
+> remaining open questions in §6 apply to the bowler / fielder /
+> team slices.
 
 ---
 
@@ -256,7 +257,7 @@ form windows → suggested splits) but each pins its own answers to
 
 ---
 
-## 8. Batter v1 — distribution dossier (build-ready)
+## 8. Batter v1 — distribution dossier (IMPLEMENTED)
 
 > First concrete slice. Batter only, runs/innings only. Phase
 > decomposition stored on every per-innings observation even though
@@ -265,6 +266,13 @@ form windows → suggested splits) but each pins its own answers to
 > or endpoint change. Frontend (semiotic histograms with mean +
 > median overlays, sparklines) is **out of scope for this spec** —
 > API only.
+>
+> **Shipped 2026-05-05** across 5 commits:
+> 1. `scope_links: suggested_splits — Python + TS lockstep mirror`
+> 2. `batting: /batters/{id}/distribution endpoint`
+> 3. `sanity: batter distribution invariants — 126 assertions`
+> 4. `regression: batter_distribution urls.txt — 19-URL inventory`
+> 5. `docs: api.md + spec corrections`
 
 ### 8.1 Scope pinning
 
@@ -305,18 +313,34 @@ batter)`). Columns:
 | `date` | `match.date` (used for ordering + form windows) |
 | `runs` | `SUM(runs_batter)` over **legal balls** (`extras_wides = 0 AND extras_noballs = 0`) where `delivery.batter_id = id` |
 | `balls` | `COUNT(legal balls)` faced by `id` |
-| `dismissed` | boolean — exists a `wicket` with `player_out_id = id` AND `kind NOT IN ('retired hurt', 'retired out', 'retired not out')` |
+| `dismissed` | boolean — exists a `wicket` with `player_out_id = id` AND `kind NOT IN ('retired hurt', 'retired out')` (see §8.3.0 below) |
 | `fours` | `COUNT(legal balls WHERE runs_batter = 4 AND COALESCE(runs_non_boundary, 0) = 0)` — excludes "ran 4" |
 | `sixes` | `COUNT(legal balls WHERE runs_batter = 6)` |
 | `dots` | `COUNT(legal balls WHERE runs_total = 0)` |
-| `runs_pp`, `balls_pp` | as `runs`/`balls` plus `WHERE delivery.over_idx BETWEEN 0 AND 5` |
-| `runs_mid`, `balls_mid` | `WHERE over_idx BETWEEN 6 AND 14` |
-| `runs_death`, `balls_death` | `WHERE over_idx BETWEEN 15 AND 19` |
+| `runs_pp`, `balls_pp` | as `runs`/`balls` plus `WHERE delivery.over_number BETWEEN 0 AND 5` |
+| `runs_mid`, `balls_mid` | `WHERE over_number BETWEEN 6 AND 14` |
+| `runs_death`, `balls_death` | `WHERE over_number BETWEEN 15 AND 19` |
 
 All conventions match `internal_docs/how-stats-calculated.md` —
 legal-balls restriction, dismissal exclusion list, fours
 non-boundary-flag check, phase boundaries on the DB-side 0–19
-numbering.
+numbering. Column is `delivery.over_number` (was misnamed
+`over_idx` in the original spec draft; corrected post-implementation).
+
+#### 8.3.0 'retired not out' — convention drift
+
+`how-stats-calculated.md` says the dismissed-flag exclusion list
+should be `('retired hurt', 'retired out', 'retired not out')`
+(three values). Existing batting endpoints (`/summary`,
+`/by-innings`, `/vs-bowlers`, `/by-phase`, `/leaders`) all use the
+2-element list `('retired hurt', 'retired out')` only. 'retired
+not out' is 13 rows out of 162k wickets (0.008%) — materially
+irrelevant.
+
+**The implementation matches the existing 2-element convention**
+for cross-endpoint consistency. A project-wide sweep to align doc
++ code on the 3-element list (or reject the 3-element doc) is
+out of scope for this slice; flagged as a follow-up.
 
 Ordered `match.date ASC, innings.innings_number ASC` — date-asc
 ensures `observations[]` doubles as the sparkline data without an
@@ -557,33 +581,41 @@ Response:
 }
 ```
 
-### 8.9 Implementation pointers
+### 8.9 Implementation pointers (as shipped)
 
-- **New endpoint** in `api/routers/batters.py` — mirrors siblings
-  `/batters/{id}/summary`, `/batters/{id}/by-innings`, etc.
-- **New helper** `_innings_master_sample(person_id, filters, aux)`
-  returning the per-innings observation rows. Reuses
-  `FilterBarParams.build()` for the WHERE clause, the existing
-  phase-boundary constants, and the existing dismissal-exclusion
-  list from the batting-average code path.
-- **New helper** `_distribution_dossier(observations)` computing
-  the aggregate stats from a list of obs rows. Pure function, no
-  DB access; used for lifetime + both windows.
-- **New helper** `_form_windows(observations)` slicing the
-  observation list into last-10 / last-60d windows and running the
-  dossier on each.
-- **Server-side `suggested_splits(scope)`** — new module
-  `api/scope_links.py` (or alongside batter router), Python mirror
-  of `frontend/src/components/scopeLinks.ts::suggestedSplits`.
+- **New endpoint** at `batting_distribution` in
+  `api/routers/batting.py` (file is `batting.py`, not `batters.py`
+  as the original spec draft said — the URL prefix `/batters/` is a
+  separate naming choice). Mirrors siblings `/batters/{id}/summary`,
+  `/batters/{id}/by-innings`, etc.
+- **`_innings_master_sample(db, person_id, filters, aux)`** in
+  `batting.py` — async SQL query returning the per-innings
+  observation rows. Reuses `_batting_filter` (which calls
+  `FilterBarParams.build(has_innings_join=True, aux=aux)`) for the
+  WHERE clause, the existing phase-boundary constants, and the
+  existing 2-element dismissal-exclusion list (§8.3.0).
+- **`_distribution_dossier(observations)`** in `batting.py` — pure
+  function computing the aggregate stats. Used for lifetime + both
+  form windows. Empty samples return a sane null-shape (no
+  exceptions on n=0).
+- **`_form_windows(observations, today)`** in `batting.py` —
+  slices the observation list into last-10 / last-60d windows;
+  runs the dossier on each; emits the `delta` block.
+- **`api/scope_links.py`** — new module. `suggested_splits(scope)`
+  + `scope_dict_from_filters(filters)` helpers. Python mirror of
+  `frontend/src/components/scopeLinks.ts::suggestedSplits`. Lockstep
+  enforced via `tests/sanity/scope_splits_fixtures.json` + the
+  Python sanity test (TS implementation: manual review).
 
-### 8.10 Tests
+### 8.10 Tests (as shipped)
 
-**Sanity** (`tests/sanity/test_batter_distribution_invariants.py`):
+**Sanity** (`tests/sanity/test_batter_distribution_invariants.py` —
+126 assertions across 4 scopes pass):
 
 - `n_innings == len(observations)` for `lifetime`, `last_10`,
   `last_60d`.
-- `last_10.n_innings ≤ 10`; `last_10.observations` is the date-DESC
-  tail of `lifetime.observations` (modulo ordering convention).
+- `last_10.n_innings ≤ 10`; `last_10.observations` is the
+  contiguous date-asc tail of `lifetime.observations`.
 - `phase.powerplay.runs_total + phase.middle.runs_total +
   phase.death.runs_total == runs.total` (phase decomposition is a
   partition of the legal-balls runs). Same for `balls_total`.
@@ -593,21 +625,25 @@ Response:
   > 0`; `runs.average == null` when `n_dismissals == 0`.
 - `milestones.p_X_plus × n_innings == count(o.runs ≥ X)` for each
   threshold (denominator-correctness).
-- `form.delta.last_10_mean_minus_lifetime ==
-  form.last_10.runs.mean_per_innings −
-  lifetime.runs.mean_per_innings` (delta-consistency).
-- TS / Python `suggestedSplits` lockstep: same scope input → same
-  split output (same labels, same params), pinned via a small
-  JSON fixture used by both test runners.
+- `form.delta.last_10_(mean|median)_minus_lifetime ==
+  form.last_10.runs.(mean_per_innings|median) −
+  lifetime.runs.(mean_per_innings|median)` (delta-consistency).
+- **SQL anchor** — lifetime `n_innings`, `runs.total`,
+  `runs.balls_total` match a direct sqlite3 aggregation against
+  `cricket.db` for the same filter scope (per the SQL-anchored-
+  tests rule from CLAUDE.md).
+
+**Sanity** (`tests/sanity/test_scope_links_lockstep.py` — 11
+fixtures pass): TS / Python `suggestedSplits` lockstep, fixture-
+driven.
 
 **Regression** (`tests/regression/batter_distribution/urls.txt`):
-
-- Inventory of ~20 URLs covering the cross-product of
-  `(player ∈ {Kohli, Mandhana, Bumrah-as-batter,
-  retired-batter}) × scope ∈ {all-time, IPL, IPL 2024, vs
-  Australia, at Wankhede, women_intl, season_only,
-  gender_flip}`. Per the existing regression-harness convention
-  (`internal_docs/regression-testing-api.md`).
+19-URL inventory covering Kohli (busy), Samson (IPL-only),
+Mandhana (women's), Bumrah (tail-batter stress) × multiple scopes
+(all-time, IPL, IPL by season, vs CSK, at Chinnaswamy, season
+only, inning aux 0/1, empty scope). All 19 return 200 against
+the live endpoint. `as_of_date=2025-01-01` pinned for md5-diff
+stability.
 
 **No agent-browser integration test in v1** — this spec ships
 API only; the integration test arrives with the frontend slice.
@@ -615,8 +651,9 @@ API only; the integration test arrives with the frontend slice.
 ---
 
 *Started 2026-05-04. Inventory + framing drafted first; batter v1
-spec (§8) added 2026-05-05 after a focused conversation pinning
-runs/innings as the master sample, no quantiles, milestone
-probabilities, notout convention, phase decomposition (per-innings
-obs + rollup), last-10 + last-60d form windows, and scope-derived
-suggested splits. Bowler / fielder / team specs to follow.*
+spec (§8) drafted + IMPLEMENTED 2026-05-05 across 5 commits
+(scope_links lockstep, endpoint + helpers, 126 sanity invariants,
+19-URL regression inventory, docs). 11/11 scope-splits fixture
+cases pass; 126/126 distribution invariants pass; all 19
+regression URLs return 200. Bowler / fielder / team specs to
+follow.*
