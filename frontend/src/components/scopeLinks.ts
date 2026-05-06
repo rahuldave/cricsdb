@@ -211,6 +211,14 @@ export function abbreviateScope(scope: Partial<FilterParams>): string {
     )
   }
 
+  // Inning aux — page-local 1st/2nd-innings filter. NOT in
+  // FILTER_KEYS (it's an AuxParam, not a FilterBar key) but it's a
+  // genuine scope narrowing the user sees, so it belongs in the
+  // abbreviation alongside the FilterBar axes. Mirrors the
+  // ScopeStatusStrip rendering convention.
+  if (scope.inning === '0') parts.push('1st innings')
+  else if (scope.inning === '1') parts.push('2nd innings')
+
   return parts.join(' · ')
 }
 
