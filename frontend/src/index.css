@@ -1814,6 +1814,25 @@ a { color: inherit; }
   font-weight: 700;
   color: var(--accent);
 }
+
+/* Distribution panel — histogram + stat-strip grid.
+   Two columns on wide viewports (histogram fills, stat strip fixed-ish);
+   single column stack on narrow viewports so the histogram doesn't get
+   squeezed to a 100px sliver next to a 220px-min stat strip. Breakpoint
+   at 720px chosen so iPad-portrait (810w) still gets two columns but
+   typical phone landscape (≤700w) stacks. */
+.wisden-dist-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .wisden-dist-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
 .wisden-scope-strip-copy {
   margin-left: auto;
   font-family: var(--serif);

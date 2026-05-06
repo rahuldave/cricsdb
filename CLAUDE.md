@@ -69,6 +69,31 @@ and click every link to confirm it navigates. `tsc --noEmit` and
 `npm run build` only verify code correctness, not feature correctness.
 Do not claim UI work is complete without a browser-agent run.
 
+**Mobile viewport check is part of UI verification, not optional.**
+For any new component / layout / panel / stat-row, check at a phone
+viewport (`agent-browser set viewport 390 844` then `reload`)
+BEFORE committing. Common failure modes:
+- A grid with `minmax(0, 1fr) minmax(220px, …)` squeezes the first
+  column to ~98px on a 342-wide panel — the histogram or chart
+  becomes invisible at that width. Use a CSS class with a
+  `@media (max-width: 720px) { grid-template-columns: 1fr }`
+  fallback (inline `style={{}}` can't do media queries — extract
+  to a `wisden-*` class in `index.css`).
+- Inline widgets that work fine on desktop (toggles, milestone
+  chip rows, form-delta lines) need `flex-wrap: wrap` to drop to
+  the next line on mobile, or they overflow the panel.
+- `grid-template-columns: repeat(N, 1fr)` with N > 3 typically
+  needs to drop to fewer columns on mobile via a media-query
+  override.
+
+**A frontend change is not "done" until both desktop and mobile
+viewports look right.** Reproduce the user's exact URL at both
+widths; the panel that reads great on a 1280-wide laptop can be
+broken (literally invisible content) on a 390-wide phone.
+The user flagged this 2026-05-06: a width-`1fr | minmax(220, 320)`
+grid silently zero'd the histogram column on mobile while sailing
+through desktop verification.
+
 **DO NOT SPECULATE — verify before proposing a fix or explanation.**
 When the user reports a bug or asks why something looks/behaves a
 certain way, do NOT reason from code-reading or prior assumptions and

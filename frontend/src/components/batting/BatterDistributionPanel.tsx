@@ -158,12 +158,7 @@ export default function BatterDistributionPanel({
         </>
       ) : (
         <>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1fr) minmax(220px, 320px)',
-            gap: '1.5rem',
-            alignItems: 'start',
-          }}>
+          <div className="wisden-dist-grid">
             <RunsHistogram dossier={dossier} />
             <DistributionStatStrip dossier={dossier} />
           </div>
