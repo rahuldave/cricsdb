@@ -1,5 +1,6 @@
 import FlagBadge from '../FlagBadge'
 import ScopeIndicator from '../ScopeIndicator'
+import ScopedPageHeader from '../ScopedPageHeader'
 import PlayerSummaryRow, { disciplineHasData } from './PlayerSummaryRow'
 import { classifyRole, matchesInScope } from './roleUtils'
 import type { PlayerProfile as PlayerProfileT, FilterParams } from '../../types'
@@ -29,16 +30,16 @@ export default function PlayerProfile({
 
   return (
     <div>
-      <h2 className="wisden-page-title">
+      <ScopedPageHeader filters={filters}>
         {name}
         {nationalities.length > 0 && (
-          <span style={{ marginLeft: '0.6rem', display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+          <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
             {nationalities.map(n => (
               <FlagBadge key={`${n.team}-${n.gender}`} team={n.team} gender={n.gender} size="lg" linkTo />
             ))}
           </span>
         )}
-      </h2>
+      </ScopedPageHeader>
       {!suppressScopePill && <ScopeIndicator filters={filters} />}
       <div className="wisden-player-identity">
         <em>{role}</em>
