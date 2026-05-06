@@ -1379,6 +1379,1082 @@ Established 2026-05-06 on the v2 form-windows extension.
 
 ---
 
+## 11. Bowler v1 — distribution dossier (DRAFT)
+
+> Sibling of §8. Bowler-only, single endpoint, three sibling
+> distribution blocks under one master sample. Reuses every §10.1
+> backend convention; the bowler-specific design calls (master
+> sample shape, qualifying-spell threshold, anchored conditional
+> ladder, Wilson confidence intervals on every probability,
+> derived strike-rate / average) are settled below before any
+> code is written.
+>
+> **Status: DRAFT — not yet implemented.** Pending build per the
+> §11.10 implementation order.
+
+### 11.1 Scope pinning
+
+**In v1:**
+
+- Endpoint: `GET /api/v1/bowlers/{id}/distribution?{FilterParams}&min_balls=12&as_of_date=YYYY-MM-DD`.
+- Master sample: per-innings tuple — one row per `(match, innings
+  the bowler bowled in)` clearing the `min_balls` qualifying-spell
+  threshold.
+- **Three sibling distribution blocks** under one payload:
+  - `wickets` — zero-inflated discrete count (§4 shape 2).
+  - `runs_conceded` — skewed continuous, absolute runs per innings
+    (§4 shape 3).
+  - `economy` — continuous, per-over rate per innings (§4 shape 1).
+- Phase columns (PP / Mid / Death) on every per-innings observation
+  AND aggregated rollup. Stores `runs`, `balls`, `wickets` per
+  phase so future "death-overs SR / economy / wicket rate" work
+  is a pure derivation — no re-query, no schema change.
+- Form windows: last_10 / last_60d / last_6mo / last_1yr — same
+  dossier shape as lifetime (single-payload + window-toggle, §10.1).
+- Suggested splits embedded in the response — calls existing
+  `api/scope_links.py::suggested_splits` (no change to the helper).
+- Every existing `FilterParams` axis honoured (gender, team_type,
+  tournament, season range, opponent, venue, team_class).
+- **Wilson 95% CI** computed server-side on every probability
+  (simples + conditionals) — every `p_*` field ships as
+  `{ value, num, denom, ci_low, ci_high }`.
+
+**Explicitly out of v1** (settled in discussion 2026-05-06):
+
+- **Kaplan–Meier survival curve for bowling SR.** Censoring in T20
+  is structural (4-over cap / captain rotation), not informative.
+  Under a constant-hazard assumption the K–M MLE collapses to
+  `total_balls / total_wickets`, which we ship as a derived scalar
+  `pool_strike_rate`. K–M is the right tool for an experimental
+  modeling stage / downloadable dataset, not the descriptive
+  dossier; deferred.
+- **Empirical-Bayes / hierarchical shrinkage on rare-event chips**
+  (e.g. P(≥5│≥2) shrunk toward a league prior). The whole point
+  of the dossier is to surface bowler-specific signal; shrinkage
+  toward the league mean erases it. Wilson CIs cover the small-n
+  honesty story without pooling. Population-prior shrinkage is a
+  use case for the future "league-baseline distributions" slice.
+- **Quantile vector** (P5/P25/…/P95). Same project-wide decision
+  as batter — variance + std + mean + median + milestone CDF
+  readouts cover the consistency story.
+- **Per-innings strike-rate distribution / per-innings average
+  distribution.** Both have undefined values in zero-wicket
+  innings (and >40% of T20 spells are wicketless). The per-innings
+  ratios are dominated by zero-divisions; the pool ratio is the
+  honest summary. SR and average ship as scalar pool stats only.
+- **Confidence overlays beyond Wilson** (bootstrap / Bayesian
+  credible intervals). Wilson is the closed-form one-line answer;
+  Jeffreys would add a numerical-methods dependency for sub-pp
+  improvement at our sample sizes.
+- **Frontend / UI** — covered separately in §12.
+- **Fielder / team distribution dossiers** — sibling specs.
+
+### 11.2 Per-innings observation row
+
+For bowler `id` under `FilterParams F` and `min_balls=M` (default
+12), materialise one row per innings where the bowler bowled at
+least `M` legal balls. Columns:
+
+| Column | Definition |
+|---|---|
+| `innings_id` | `innings.id` |
+| `match_id` | `innings.match_id` |
+| `date` | `match.date` (used for ordering + form windows) |
+| `balls` | `COUNT(legal balls)` bowled by `id` (`extras_wides = 0 AND extras_noballs = 0`) |
+| `runs_conceded` | `SUM(d.runs_total)` over **all deliveries** (includes wides + no-balls runs) — matches existing `/bowlers/.../summary` convention |
+| `wickets` | `COUNT(wicket WHERE delivery.bowler_id = id AND wicket.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field'))` — bowler-credited only, mirrors existing endpoints' 4-element exclusion list |
+| `dots` | `COUNT(legal balls WHERE runs_total = 0)` |
+| `boundaries_conceded` | `COUNT(legal balls WHERE (runs_batter = 4 AND COALESCE(runs_non_boundary,0)=0) OR runs_batter = 6)` |
+| `wides` | `COUNT(deliveries WHERE extras_wides > 0)` |
+| `noballs` | `COUNT(deliveries WHERE extras_noballs > 0)` |
+| `runs_pp` / `balls_pp` / `wickets_pp` | as `runs_conceded` / `balls` / `wickets` plus `WHERE delivery.over_number BETWEEN 0 AND 5` |
+| `runs_mid` / `balls_mid` / `wickets_mid` | `WHERE over_number BETWEEN 6 AND 14` |
+| `runs_death` / `balls_death` / `wickets_death` | `WHERE over_number BETWEEN 15 AND 19` |
+
+Master-sample SQL filter uses `_bowling_legal_filter` (already
+present in `api/routers/bowling.py`) which calls
+`FilterParams.build_side_neutral(has_innings_join=True, aux=aux)`
+— bowlers' team is the **opposite** side of the batting innings,
+so side-neutral team filtering is required (NOT the side-aligned
+`build()` used by batters).
+
+**Qualifying threshold applied at master-sample time**: `HAVING
+balls >= :min_balls` after the GROUP BY. Every downstream
+aggregate, every form window, every milestone is computed over
+the qualifying-spell sample — there is no "all spells including
+cameos" view at v1. Cameo cricket (1-over fillers) is tracked by
+existing endpoints; it's deliberate noise here.
+
+`min_balls` default `12` (= 2 legal overs). The API accepts 0 (no
+filter) for completeness; `agent-browser` and `tests/integration`
+exercise both default and `min_balls=0`. UI default and the
+documented "qualifying spell" definition stay at 12. Bumping to
+18 (3 overs) is a UX call for v2 if the noise floor still bothers
+us; the param is the knob.
+
+Ordered `match.date ASC, innings.innings_number ASC` — date-asc
+ensures `observations[]` doubles as the sparkline data without an
+extra sort.
+
+### 11.3 Wilson 95% CI helper
+
+New module `api/wilson.py`:
+
+```python
+import math
+
+def wilson_ci(num: int, denom: int, z: float = 1.96) -> tuple[float | None, float | None]:
+    """Wilson 95% confidence interval for a binomial proportion.
+    Returns (None, None) when denom == 0 (undefined). Bounded in
+    [0, 1] always; non-degenerate at num == 0 or num == denom.
+    """
+    if denom <= 0:
+        return (None, None)
+    p = num / denom
+    z2 = z * z
+    den = 1.0 + z2 / denom
+    center = (p + z2 / (2.0 * denom)) / den
+    half = z * math.sqrt(p * (1.0 - p) / denom + z2 / (4.0 * denom * denom)) / den
+    return (max(0.0, center - half), min(1.0, center + half))
+
+
+def prob_record(num: int, denom: int) -> dict:
+    """Standard probability shape: value + num + denom + Wilson CI.
+    `value` is None when `denom == 0` (undefined ratio); CI bounds
+    likewise. Uniform across simples (denom = n_innings) and
+    conditionals (denom = count(≥anchor))."""
+    if denom <= 0:
+        return {"value": None, "num": num, "denom": 0,
+                "ci_low": None, "ci_high": None}
+    lo, hi = wilson_ci(num, denom)
+    return {"value": round(num / denom, 4), "num": num, "denom": denom,
+            "ci_low": round(lo, 4), "ci_high": round(hi, 4)}
+```
+
+Single import site for both bowler v1 (this section) and the
+batter retrofit (§13). No scipy dependency; closed-form math, no
+edge-case branches needed beyond `denom == 0`.
+
+### 11.4 Aggregate calculations — three sibling blocks
+
+Each block is a self-contained dossier computed by a pure function
+over `obs[]`. The same `_form_windows` slicer reused from §8.6
+runs each window through the same aggregator.
+
+#### 11.4.1 `wickets` block (zero-inflated count)
+
+| Field | Formula | Note |
+|---|---|---|
+| `total` | `sum(o.wickets)` | pool wickets |
+| `mean_per_innings` | `total / n_innings` | what to expect next match |
+| `median` | `median([o.wickets for o in obs])` | usually 0 or 1 — the zero-inflation tell |
+| `variance` | sample variance, `n−1` | |
+| `std` | `sqrt(variance)` | |
+| `observations` | full per-innings tuple list (date-asc) | |
+
+**Milestones — simples** (denom = `n_innings`), in `wickets.milestones`:
+
+| Field | Formula |
+|---|---|
+| `p_zero` | `count(w == 0) / n_innings` |
+| `p_geq_1` | `count(w ≥ 1) / n_innings` |
+| `p_geq_2` | `count(w ≥ 2) / n_innings` ← anchor for conditionals |
+| `p_geq_3` | `count(w ≥ 3) / n_innings` |
+| `p_geq_4` | `count(w ≥ 4) / n_innings` |
+| `p_geq_5` | `count(w ≥ 5) / n_innings` |
+
+**Milestones — conditionals**, **all anchored at ≥2** (denom =
+`count(w ≥ 2)` for every conditional — stable denominator across
+the chain, avoids the cascading-noise problem of a chained ladder
+P(≥k│≥k−1) where each rung's denom shrinks geometrically):
+
+| Field | Formula | Reading |
+|---|---|---|
+| `p_3_given_2` | `count(w ≥ 3) / count(w ≥ 2)` | of his impactful spells, how often a 3-fer |
+| `p_4_given_2` | `count(w ≥ 4) / count(w ≥ 2)` | how often did the 2-wicket spell climb to a 4-fer |
+| `p_5_given_2` | `count(w ≥ 5) / count(w ≥ 2)` | the rare 5-fer rate, conditioned on a real spell |
+
+Anchored ladder rationale: with denom held at `count(≥2)` the
+binomial SE is a function of `n` (the anchor) and `p` (the
+upper-rung rate). At small `p` the SE shrinks, so the upper-rung
+conditionals are *less* noisy than they would be in a chain
+(P(≥5│≥4) chain on 1/4 → ±22pp; P(≥5│≥2) anchored on 1/35 →
+±~6pp). Chain conditionals are the right shape for batter
+"conversion" narrative (continuous milestones, dense at all
+levels); bowler upper rungs are rare events on a discrete count,
+and the magnitude framing — "of his real spells, what fraction
+became big bags?" — matches cricket vocabulary better.
+
+Every probability ships via `prob_record(num, denom)` from §11.3
+— uniform `{value, num, denom, ci_low, ci_high}` shape.
+
+#### 11.4.2 `runs_conceded` block (skewed continuous)
+
+| Field | Formula |
+|---|---|
+| `total` | `sum(o.runs_conceded)` |
+| `mean_per_innings` | `total / n_innings` |
+| `median` | `median([o.runs_conceded for o in obs])` |
+| `variance` / `std` | sample variance / its sqrt |
+| `observations` | already on master sample |
+
+**Milestones — simples only**, denom = `n_innings`:
+
+| Field | Reading |
+|---|---|
+| `p_leq_15` | "tight in absolute" — under 15 runs in a qualifying spell |
+| `p_leq_25` | "decent" |
+| `p_geq_40` | "expensive" |
+| `p_geq_50` | "leaked" — career-bad spell |
+
+No conditionals (continuous data; "given he leaked >25, did he
+leak >40" doesn't carry the cricket narrative weight that the
+discrete-count climb does).
+
+#### 11.4.3 `economy` block (continuous, per-over rate)
+
+| Field | Formula | Note |
+|---|---|---|
+| `pool` | `(total_runs_conceded × 6) / total_balls` | balls-weighted; the "career economy" number |
+| `mean_per_innings` | `mean([o.runs_conceded × 6 / o.balls for o in obs])` | unweighted mean of per-innings economies — different number, useful for histogram center-of-mass |
+| `median_per_innings` | `median(per-innings economies)` | |
+| `variance` / `std` | sample variance of per-innings economies | |
+| `per_innings` | `[round(o.runs_conceded × 6 / o.balls, 2) for o in obs]` | derived from observations[]; does NOT live on master sample (computed once at dossier-build time) |
+
+**Milestones — simples only**, denom = `n_innings`:
+
+| Field | Reading |
+|---|---|
+| `p_econ_leq_6` | "tight spell" |
+| `p_econ_leq_7` | "decent" |
+| `p_econ_geq_9` | "expensive" |
+| `p_econ_geq_10` | "leaked" |
+
+Both `pool` AND `mean_per_innings` are surfaced — they answer
+different questions. Pool is the conventional career-economy
+number opponents quote; mean-of-per-innings-economy is the
+distribution's center of mass and is what the histogram axis
+needs labelled. Document both in the API docs.
+
+#### 11.4.4 Pool-derived scalars (cross-block)
+
+At the top of every dossier (alongside `n_innings`), compute:
+
+| Field | Formula | Note |
+|---|---|---|
+| `pool_strike_rate` | `total_balls / total_wickets` if `total_wickets > 0` else `null` | balls per wicket, the conventional career SR |
+| `pool_average` | `total_runs_conceded / total_wickets` if `total_wickets > 0` else `null` | runs per wicket — same exposure as batter `average`, kept as an honest scalar |
+
+These replace per-innings SR / average distributions (out of v1,
+§11.1). They sit at the dossier level, not under any of the three
+blocks, because they cross-link wickets + runs.
+
+#### 11.4.5 Phase rollup
+
+```jsonc
+"phase": {
+  "powerplay": { "runs_total": 78, "balls_total": 96, "wickets_total": 4, "innings_active": 12 },
+  "middle":    { "runs_total": ..., "balls_total": ..., "wickets_total": ..., "innings_active": ... },
+  "death":     { ... }
+}
+```
+
+`innings_active` = innings where the bowler bowled ≥ 1 ball in
+that phase. The right denominator for "his death-overs economy"
+— don't penalise an opener-spell bowler who never bowls death.
+
+**Invariant**: `powerplay.runs_total + middle.runs_total +
+death.runs_total == runs_conceded.total` (within phase
+boundaries; sanity check in §11.7). Same partition holds for
+`balls_total` and `wickets_total`.
+
+### 11.5 Form windows
+
+Reuse the §8.6 mechanism verbatim. Same four windows:
+
+| Window | Definition |
+|---|---|
+| `form.last_10` | `ORDER BY date DESC, innings_number DESC LIMIT 10` |
+| `form.last_60d` | `WHERE date >= today() − 60 days` |
+| `form.last_6mo` | `WHERE date >= today() − 180 days` |
+| `form.last_1yr` | `WHERE date >= today() − 365 days` |
+
+Each window has the **full dossier shape** — `wickets`,
+`runs_conceded`, `economy`, `phase`, and the cross-block scalars.
+
+`form.delta` block — for each window × two metrics, ship 8
+entries on the **focal** stat per block:
+
+```jsonc
+"form": {
+  "delta": {
+    "last_10_wickets_mean_minus_lifetime":   <float>,
+    "last_10_economy_pool_minus_lifetime":   <float>,
+    "last_60d_wickets_mean_minus_lifetime":  <float>,
+    "last_60d_economy_pool_minus_lifetime":  <float>,
+    "last_6mo_wickets_mean_minus_lifetime":  <float>,
+    "last_6mo_economy_pool_minus_lifetime":  <float>,
+    "last_1yr_wickets_mean_minus_lifetime":  <float>,
+    "last_1yr_economy_pool_minus_lifetime":  <float>
+  }
+}
+```
+
+Wickets-mean delta uses `wickets.mean_per_innings`; economy delta
+uses `economy.pool` (the conventional one) so the form line reads
+"is he taking more wickets right now? going for fewer runs an
+over right now?" — the two questions cricket actually asks.
+
+### 11.6 Suggested splits
+
+No change to `api/scope_links.py`. The `suggested_splits(scope)`
+helper from §8.7 is generic — it walks any `FilterParams`-shaped
+scope and emits the 4-tier broaden ladder. Bowler endpoint
+includes the same `suggested_splits` field in its response.
+
+### 11.7 Endpoint shape
+
+```
+GET /api/v1/bowlers/{id}/distribution?{FilterParams}&min_balls=12&as_of_date=YYYY-MM-DD
+```
+
+`min_balls` (int, default 12, ge=0) — qualifying-spell threshold.
+`as_of_date` (ISO date, optional) — anchors the calendar form
+windows for deterministic regression tests.
+
+Response sketch (single window shown; lifetime + each form window
+have identical shape):
+
+```jsonc
+{
+  "scope": { "tournament": "IPL", "season_from": "2024", ... },
+  "thresholds": { "min_balls": 12 },
+  "lifetime": {
+    "n_innings": 87,
+    "pool_strike_rate": 18.4,
+    "pool_average": 22.1,
+    "wickets": {
+      "total": 102,
+      "mean_per_innings": 1.17,
+      "median": 1,
+      "variance": 1.41,
+      "std": 1.19,
+      "observations": [
+        { "innings_id": ..., "match_id": ..., "date": "2024-04-12",
+          "balls": 24, "runs_conceded": 28, "wickets": 3,
+          "dots": 11, "boundaries_conceded": 2, "wides": 1, "noballs": 0,
+          "runs_pp": 0, "balls_pp": 0, "wickets_pp": 0,
+          "runs_mid": 6, "balls_mid": 6, "wickets_mid": 1,
+          "runs_death": 22, "balls_death": 18, "wickets_death": 2 },
+        ...
+      ],
+      "milestones": {
+        "p_zero":     { "value": 0.31, "num": 27, "denom": 87, "ci_low": 0.22, "ci_high": 0.42 },
+        "p_geq_1":    { "value": 0.69, "num": 60, "denom": 87, "ci_low": 0.58, "ci_high": 0.78 },
+        "p_geq_2":    { "value": 0.40, "num": 35, "denom": 87, "ci_low": 0.30, "ci_high": 0.51 },
+        "p_geq_3":    { "value": 0.14, "num": 12, "denom": 87, "ci_low": 0.08, "ci_high": 0.23 },
+        "p_geq_4":    { "value": 0.05, "num":  4, "denom": 87, "ci_low": 0.02, "ci_high": 0.11 },
+        "p_geq_5":    { "value": 0.01, "num":  1, "denom": 87, "ci_low": 0.00, "ci_high": 0.06 },
+        "p_3_given_2":{ "value": 0.34, "num": 12, "denom": 35, "ci_low": 0.21, "ci_high": 0.51 },
+        "p_4_given_2":{ "value": 0.11, "num":  4, "denom": 35, "ci_low": 0.05, "ci_high": 0.26 },
+        "p_5_given_2":{ "value": 0.03, "num":  1, "denom": 35, "ci_low": 0.01, "ci_high": 0.14 }
+      }
+    },
+    "runs_conceded": {
+      "total": 1842, "mean_per_innings": 21.17, "median": 20,
+      "variance": 87.4, "std": 9.35,
+      "milestones": {
+        "p_leq_15":  { "value": ..., "num": ..., "denom": 87, "ci_low": ..., "ci_high": ... },
+        "p_leq_25":  { ... },
+        "p_geq_40":  { ... },
+        "p_geq_50":  { ... }
+      }
+    },
+    "economy": {
+      "pool": 6.81,
+      "mean_per_innings": 7.04,
+      "median_per_innings": 6.75,
+      "variance": 4.12, "std": 2.03,
+      "per_innings": [7.0, 5.25, 9.75, ...],
+      "milestones": {
+        "p_econ_leq_6": { ... },
+        "p_econ_leq_7": { ... },
+        "p_econ_geq_9": { ... },
+        "p_econ_geq_10":{ ... }
+      }
+    },
+    "phase": {
+      "powerplay": { "runs_total": 412, "balls_total": 540, "wickets_total": 28, "innings_active": 71 },
+      "middle":    { ... },
+      "death":     { ... }
+    }
+  },
+  "form": {
+    "last_10":  { /* full lifetime-shape dossier */ },
+    "last_60d": { ... },
+    "last_6mo": { ... },
+    "last_1yr": { ... },
+    "delta": {
+      "last_10_wickets_mean_minus_lifetime": +0.3,
+      "last_10_economy_pool_minus_lifetime": -0.4,
+      ...
+    }
+  },
+  "suggested_splits": [
+    { "label": "All IPL",          "params": { "tournament": "IPL" } },
+    { "label": "All cricket 2024", "params": { "season_from": "2024", "season_to": "2024" } },
+    { "label": "All-time",         "params": {} }
+  ]
+}
+```
+
+### 11.8 Implementation pointers
+
+- **New endpoint** at `bowling_distribution` in
+  `api/routers/bowling.py`. Mirrors siblings
+  `/bowlers/{id}/summary`, `/bowlers/{id}/by-innings`, etc.
+- **`_innings_master_sample_bowler(db, person_id, filters, aux,
+  min_balls)`** in `bowling.py`. Reuses `_bowling_legal_filter`
+  (which calls `FilterParams.build_side_neutral(...)`), the
+  existing 4-element `wicket.kind` exclusion list, and the same
+  phase boundaries as the batter master sample.
+- **`_distribution_dossier_bowler(observations)`** — pure function
+  computing the three sibling blocks + phase rollup + pool
+  scalars. Empty samples return a sane null shape (no exceptions
+  on n=0).
+- **`_form_windows_bowler(observations, today)`** — slices the
+  observation list into the four windows, runs the aggregator on
+  each, emits the bowler-specific delta block (wickets-mean +
+  economy-pool, not batter's mean+median).
+- **`api/wilson.py`** — new module. `wilson_ci(num, denom)` +
+  `prob_record(num, denom)` helpers. Used by both bowler v1 and
+  the batter retrofit (§13).
+- **No frontend changes in this scope** — §12 covers the panel.
+
+### 11.9 Tests
+
+**Sanity** (`tests/sanity/test_bowler_distribution_invariants.py`)
+— mirrors the batter sanity layout. ~150 assertions across 4–5
+scopes (Bumrah / Rashid / Boult / a part-time bowler like Kohli /
+empty scope). Each assertion derives expected values from
+sqlite3 against `cricket.db` at runtime per the SQL-anchored
+rule.
+
+- `n_innings == len(observations)` for `lifetime`, `last_10`,
+  `last_60d`, `last_6mo`, `last_1yr`.
+- `last_10.observations` is the contiguous date-asc tail.
+- Phase partition: `powerplay.X + middle.X + death.X ==
+  runs_conceded.total / wickets.total / balls_total` respectively
+  (X ∈ {runs_total, wickets_total, balls_total}).
+- `pool_strike_rate × wickets.total ≈ sum_balls` (within rounding).
+- `pool_average × wickets.total ≈ runs_conceded.total`.
+- `economy.pool == runs_conceded.total × 6 / sum_balls` (exact
+  to 2 dp).
+- For every milestone field: `value × denom ≈ num` (rounding-tol);
+  `ci_low ≤ value ≤ ci_high`; `0 ≤ ci_low`; `ci_high ≤ 1`.
+- Subset invariant: `count(w ≥ k) ≤ count(w ≥ k−1)` for k = 1..5.
+- Conditional anchor invariant: `p_3_given_2.denom ==
+  p_4_given_2.denom == p_5_given_2.denom == count(w ≥ 2)`.
+- Wilson sanity: pin a known-input row (num=1, denom=35) against
+  the analytic Wilson formula computed in the test (independent
+  reproduction; catches an off-by-one in the helper).
+- `min_balls=0` vs `min_balls=12`: `n_innings` strictly increases
+  (or stays equal); when equal, every aggregate is identical.
+
+**Sanity** (`tests/sanity/test_wilson_ci.py`) — table-driven
+fixtures: (0, 0) → all-None; (0, 10) → [0, ~0.31]; (10, 10) →
+[~0.69, 1]; (1, 35) → [~0.005, ~0.15]; pinned to 4-dp.
+
+**Regression** (`tests/regression/bowler_distribution/urls.txt`)
+— ~20-URL inventory: same 4 marquee bowlers × scopes (all-time,
+IPL, IPL by season, vs-team, at-venue, season-only, inning aux
+0/1, empty scope, default `min_balls` AND `min_balls=0`).
+`as_of_date=2025-01-01` pinned for md5-diff stability.
+
+**No agent-browser integration test in v1 backend** — API-only
+slice. Integration arrives with the frontend (§12.10).
+
+### 11.10 Implementation order — five atomic backend commits
+
+1. `wilson: api/wilson.py + sanity test` — helper module shipped
+   independently so the retrofit (§13) and v1 share one source.
+2. `scope_links: no-op confirmation` — verify
+   `suggested_splits(scope)` already produces correct output for
+   the bowler endpoint test scopes; no code change expected.
+3. `bowling: /bowlers/{id}/distribution endpoint` —
+   `_innings_master_sample_bowler` + `_distribution_dossier_bowler`
+   + `_form_windows_bowler` + the route.
+4. `sanity: bowler distribution invariants` — ~150-assertion
+   test suite per §11.9.
+5. `regression: bowler_distribution urls.txt` — 20-URL inventory,
+   all 200 against the live endpoint.
+
+After commit 5, run `./tests/regression/run.sh bowler_distribution`
+and confirm `0 REG drifted, 20 NEW changed, 0 NEW unchanged`.
+Then flip `NEW → REG` in a separate commit to lock the shape.
+
+---
+
+## 12. Bowler v1 frontend — Distribution panel on `/bowling?player=X` (DRAFT)
+
+> Sibling of §9. Lands the new "Distribution panel" on
+> `frontend/src/pages/Bowling.tsx`. Consumes the §11 endpoint.
+> Reuses every §10.3 frontend convention; bowler-specific extensions
+> are the **two histograms** (discrete wickets + continuous economy)
+> and the **CI rendering** on probability chips.
+>
+> **In scope:** window toggle (Scope / Last 10 / Last 60d / Last
+> 6mo / Last 1yr); **metric tabs** (Wickets / Economy / Runs
+> conceded — only one histogram + stat-strip + milestone-chip set
+> visible at a time); per-metric histogram styling (discrete bars
+> for wickets, continuous bins for economy + runs); milestone
+> chips with Wilson CI tooltips; chronological sparkline (wickets
+> per innings — always visible, doesn't switch with the metric
+> tab); form delta line; suggested-splits link row.
+>
+> **Out of v1 frontend:** phase decomposition UI (data is in the
+> response for future SR-by-phase work but the existing By Phase
+> tab covers the visual need today); per-innings phase obs
+> visualisations; Compare-tab integration; rendering K–M curves.
+
+### 12.1 Layout
+
+The current `/bowling?player=X` page renders:
+
+```
+PlayerSearch + InningToggle
+─────────────────────────────────────────────────
+ScopedPageHeader (name + flag + abbreviated scope)
+Stat row 1  · Matches · Innings · Wickets · Average · SR · Economy
+Stat row 2  · Dot% · Boundary% · Best · 4-fers · 5-fers
+Tabs        · By Season | By Over | By Phase | vs Batters | …
+```
+
+The Distribution panel inserts **between row 1 and row 2** —
+visually anchors to the SR/Economy/Wickets tiles in row 1.
+
+### 12.2 Distribution panel anatomy
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ Distribution                  [Scope | 10 | 60d | 6mo | 1y]  min=12    │  window toggle + threshold readout
+│ [ Wickets ] [ Economy ] [ Runs conceded ]                              │  metric tabs
+│                                                                        │
+│ ┌─────────────────────────────────┬──────────────────────────────┐     │
+│ │  (active-tab histogram)         │ (active-tab stat strip)      │     │
+│ │  Wickets per innings (0..max)   │ Mean wkts        1.17        │     │
+│ │  ▆ ▇ ▅ ▃ ▁ ▁                    │ Median wkts      1           │     │
+│ │  0 1 2 3 4 5+                   │ Pool SR          18.4        │     │
+│ │                                 │ Pool econ        6.81        │     │
+│ │                                 │ Pool average     22.1        │     │
+│ │                                 │                              │     │
+│ │                                 │ (active-tab milestone chips) │     │
+│ │                                 │ P(0) 31% · P(≥1) 69%         │     │
+│ │                                 │ P(≥2) 40% · P(≥3) 14%        │     │
+│ │                                 │ P(≥4) 5% · P(≥5) 1%          │     │
+│ │                                 │ ── conditionals (anchor ≥2) ─│     │
+│ │                                 │ P(≥3│≥2) 34% · P(≥4│≥2) 11%  │     │
+│ │                                 │ P(≥5│≥2) 3% [n=35]           │     │
+│ └─────────────────────────────────┴──────────────────────────────┘     │
+│                                                                        │
+│ ▁▃▂▅▁▇▂▁▃▆▅▁▂  ← chronological sparkline (wickets per innings)         │  always visible (NOT tab-switched)
+│                                                                        │
+│ Form: 10 wkts +0.3 · econ −0.4   60d ... · 6mo ... · 1y ...            │
+│                                                                        │
+│ Compare to:  All IPL  ·  All cricket 2024  ·  All-time                 │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+**Tab semantics.** The metric tabs swap the **histogram + stat
+strip + milestone chips** as a single unit. Each tab presents its
+metric's complete view:
+
+| Tab | Histogram | Stat strip | Milestones |
+|---|---|---|---|
+| **Wickets** | discrete bars 0..max(5+), `WISDEN_WICKET_TIERS` color | mean / median wkts + pool SR + pool average | 6 simples (P(0)…P(≥5)) + 3 conditionals anchored at ≥2 |
+| **Economy** | continuous bins 1 RPO across [3, 13+], pool reference line | pool econ + mean per innings + median per innings + std | 4 simples (P(econ ≤ 6 / ≤ 7 / ≥ 9 / ≥ 10)) |
+| **Runs conceded** | continuous bins 5 runs across [0, max], floored at [0, 60] | runs total + mean + median + std | 4 simples (P(≤15 / ≤25 / ≥40 / ≥50)) |
+
+**What stays visible across tabs** (window-dependent but
+metric-independent): the wickets-per-innings sparkline, the
+form-delta line, the suggested-splits row. These read the same
+data regardless of which metric tab is active — the sparkline is
+the bowler's signature wicket-rhythm timeline (wickets is the
+headline stat); the form-delta combines wickets+economy in one
+line; splits are scope-keyed not metric-keyed.
+
+**Mobile.** One histogram on screen at a time + the stat strip
+beneath it (single column below 720px via `wisden-*` media query)
+keeps the panel readable on phones. The previous "two stacked
+histograms" design forced both into a single mobile column, halved
+each, and made neither legible.
+
+#### 12.2.0 Metric tab URL state — `?dist_metric=`
+
+Encoded in the URL: `?dist_metric=wickets|economy|runs`. Default
+= absent → `wickets` (the headline metric — bowler's identity is
+wicket-taking first).
+
+```ts
+const distMetric = (searchParams.get('dist_metric') ?? 'wickets') as DistMetric
+
+function setDistMetric(next: DistMetric) {
+  const sp = new URLSearchParams(searchParams)
+  if (next === 'wickets') sp.delete('dist_metric')
+  else sp.set('dist_metric', next)
+  setSearchParams(sp)  // toggle clicks land in browser history
+}
+```
+
+Same idiom as `dist_window` (§9.7). Default encoded by absence
+keeps share-link URLs clean. Tab clicks land in history so
+back-button restores the prior tab.
+
+Cross-tab persistence: if a future page also uses metric tabs,
+each panel uses a panel-local prefix (`dist_metric` for the
+Distribution panel) to avoid collisions.
+
+#### 12.2.1 Window toggle — same mechanism as §9.2.1
+
+URL key `dist_window`, values `scope` (default; absent param) |
+`last_10` | `last_60d` | `last_6mo` | `last_1yr`. Same key as
+the batter panel — there's only ever one Distribution panel
+mounted on a page. Per `feedback_state_location.md`, share-link
+reproducibility is the contract.
+
+The threshold readout (`min=12`) renders next to the toggle as a
+small italic. Reflects `response.thresholds.min_balls`. Not
+toggleable in v1 — bumping it is a URL-edit operation
+(`?min_balls=18`); fine for power users, fine to defer a UI
+control.
+
+#### 12.2.2 Wickets histogram — discrete bars
+
+Bin-width 1 across the integer range `[0, max(observations.wickets)]`,
+floored at 5+ minimum (always render bars 0..5, even when nobody
+in scope took more than 3, so a non-strike bowler's empty right
+side reads "this isn't a wicket-taker" at a glance — same logic
+as the batter [0,9]–[90,99] floor in §9.2.2). Above 5, render
+through `max(observations.wickets)` (rare for one bowler to top 6
+in a T20 innings; 7-fer terminal bin defined for forward
+compatibility).
+
+Bin color coding (new constant `WISDEN_WICKET_TIERS` in
+`palette.ts`):
+
+| Bin | Tier | Visual |
+|---|---|---|
+| 0 | wicketless | muted slate |
+| 1, 2 | building | neutral |
+| 3 | 3-fer | sage |
+| 4 | 4-fer | ochre |
+| 5+ | 5-fer+ | gold highlight |
+
+Hover: `{wickets}: N innings ({pct%})`. Mean / median markers as
+vertical thin lines (NOT bin-snapped — they sit at fractional
+positions between bars).
+
+#### 12.2.3 Economy histogram — continuous
+
+Bin-width 1 RPO across `[3, 13]` (10 bins) with a `13+` terminal
+bin for the far-right tail. Always-render-floor at `[3, 13]` so
+every bowler's chart spans the same x-axis — comparable across
+players, mirroring the batter histogram convention.
+
+Color: a single neutral palette (no tiers — economy is continuous,
+the milestone chips carry the threshold reading; tiering the
+histogram bars would double-encode and clutter).
+
+Pool-economy reference line (vertical solid black, like the batter
+sparkline 20-run line in §9.2.4) at `economy.pool`.
+
+#### 12.2.4 Runs-conceded tab
+
+Continuous histogram, bin-width 5 runs across `[0,
+max(observations.runs_conceded)]`, floored at `[0, 60]` so
+parsimonious bowlers' empty right side is recognizable at a
+glance. No tier coloring — neutral palette like the economy
+histogram (continuous metric; milestone chips carry the threshold
+reading).
+
+Stat strip shows `runs_conceded` block fields (total / mean /
+median / std). Milestone chips: P(≤15) / P(≤25) / P(≥40) /
+P(≥50).
+
+Less prominent than wickets/economy in narrative weight (runs
+conceded is a derived consequence of economy × balls), so it sits
+in the **third tab position** — clicked into when the user wants
+to see "did he leak in absolute terms" rather than "what's his
+RPO shape". Power-user view, but a peer view.
+
+#### 12.2.5 Stat strip
+
+Right of the wickets histogram, label/value list:
+
+**Group 1 — point summaries** (vertical):
+
+```
+Mean wkts       1.17          ← wickets.mean_per_innings
+Median wkts     1             ← wickets.median
+Pool SR         18.4          ← lifetime.pool_strike_rate
+Pool econ       6.81          ← economy.pool
+Pool average    22.1          ← lifetime.pool_average
+```
+
+**Group 2 — milestone chips, two rows** (single flex container,
+flex-wrap, separator between simples and conditionals):
+
+```
+P(0) 31%  ·  P(≥1) 69%  ·  P(≥2) 40%  ·  P(≥3) 14%  ·  P(≥4) 5%  ·  P(≥5) 1%
+─── conditionals (anchor ≥2) ───
+P(≥3│≥2) 34%  ·  P(≥4│≥2) 11%  ·  P(≥5│≥2) 3%
+```
+
+Each chip renders the value as `XX%`. **Hover** (or tap on touch)
+reveals `[lo, hi] (n=denom)` — e.g. `P(≥5│≥2) 3% [1-14] (n=35)`.
+Below a sample-size floor (`denom < 10`) the chip styling fades
+to a low-opacity treatment that signals "small n, read with
+caution"; the value stays visible. `null` denom (impossible by
+construction for simples; possible for conditionals when no
+innings hit the anchor) renders as `—` not `0%`.
+
+#### 12.2.6 Sparkline
+
+Per-innings wickets in chronological order, full panel width.
+Discrete bar style (each innings = one short vertical bar; bar
+height ∈ {0, 1, 2, 3, 4, 5+}) — renders the bowler's wicket-
+taking rhythm over time.
+
+Window-dependent: data is `currentWindow.wickets.observations`
+mapped to the wickets count.
+
+Optional: a thin horizontal line at `wickets.mean_per_innings`
+to reference the spell-by-spell variation. No rolling-N overlay
+in v1 (wickets are discrete; rolling means smear over the integer
+levels).
+
+#### 12.2.7 Form delta line
+
+Window-INDEPENDENT (per §10.3). Reads from `response.form.delta`,
+renders all four windows side-by-side as a flex-wrap line:
+
+```
+Form: Last 10 wkts +0.3 · econ −0.4   Last 60d wkts ... · econ ...   ...
+```
+
+Color delta numbers by sign — positive wickets-mean = green
+(taking more), negative = red. For economy the polarity flips:
+positive economy delta = red (going for more), negative = green.
+Document in the legend under the form line.
+
+#### 12.2.8 Suggested-splits row
+
+Identical to §9.2.6. Reads `response.suggested_splits`; renders
+each via existing `PlayerLink` per `internal_docs/links.md`.
+
+### 12.3 Empty / sparse states
+
+Three cases (mirrors §9.3):
+
+1. **No player selected** → panel doesn't render; `BowlingLandingBoard`.
+2. **Lifetime `n_innings == 0`** → "No qualifying spells (≥ 12
+   balls) under this filter — try widening the scope, or add
+   `min_balls=0` to include cameos." Suggested-splits row still
+   renders.
+3. **Window `n_innings == 0` but lifetime non-empty** → window
+   pane shows "No qualifying spells in the last 10 / 60d / 6mo /
+   1y under this filter"; toggle stays active.
+
+### 12.4 Types — `frontend/src/types.ts`
+
+```ts
+export interface ProbRecord {
+  value: number | null
+  num: number
+  denom: number
+  ci_low: number | null
+  ci_high: number | null
+}
+
+export interface BowlerInningsObservation {
+  innings_id: number
+  match_id: number
+  date: string
+  balls: number
+  runs_conceded: number
+  wickets: number
+  dots: number
+  boundaries_conceded: number
+  wides: number
+  noballs: number
+  runs_pp: number; balls_pp: number; wickets_pp: number
+  runs_mid: number; balls_mid: number; wickets_mid: number
+  runs_death: number; balls_death: number; wickets_death: number
+}
+
+export interface BowlerWicketsBlock {
+  total: number
+  mean_per_innings: number | null
+  median: number | null
+  variance: number | null
+  std: number | null
+  observations: BowlerInningsObservation[]
+  milestones: {
+    p_zero: ProbRecord
+    p_geq_1: ProbRecord
+    p_geq_2: ProbRecord
+    p_geq_3: ProbRecord
+    p_geq_4: ProbRecord
+    p_geq_5: ProbRecord
+    p_3_given_2: ProbRecord
+    p_4_given_2: ProbRecord
+    p_5_given_2: ProbRecord
+  }
+}
+
+export interface BowlerRunsConcededBlock {
+  total: number
+  mean_per_innings: number | null
+  median: number | null
+  variance: number | null
+  std: number | null
+  milestones: {
+    p_leq_15: ProbRecord
+    p_leq_25: ProbRecord
+    p_geq_40: ProbRecord
+    p_geq_50: ProbRecord
+  }
+}
+
+export interface BowlerEconomyBlock {
+  pool: number | null
+  mean_per_innings: number | null
+  median_per_innings: number | null
+  variance: number | null
+  std: number | null
+  per_innings: number[]
+  milestones: {
+    p_econ_leq_6: ProbRecord
+    p_econ_leq_7: ProbRecord
+    p_econ_geq_9: ProbRecord
+    p_econ_geq_10: ProbRecord
+  }
+}
+
+export interface BowlerDossier {
+  n_innings: number
+  pool_strike_rate: number | null
+  pool_average: number | null
+  wickets: BowlerWicketsBlock
+  runs_conceded: BowlerRunsConcededBlock
+  economy: BowlerEconomyBlock
+  phase: {
+    powerplay: { runs_total: number; balls_total: number; wickets_total: number; innings_active: number }
+    middle:    { runs_total: number; balls_total: number; wickets_total: number; innings_active: number }
+    death:     { runs_total: number; balls_total: number; wickets_total: number; innings_active: number }
+  }
+}
+
+export interface BowlerDistribution {
+  scope: Record<string, string>
+  thresholds: { min_balls: number }
+  lifetime: BowlerDossier
+  form: {
+    last_10: BowlerDossier
+    last_60d: BowlerDossier
+    last_6mo: BowlerDossier
+    last_1yr: BowlerDossier
+    delta: {
+      last_10_wickets_mean_minus_lifetime: number | null
+      last_10_economy_pool_minus_lifetime: number | null
+      last_60d_wickets_mean_minus_lifetime: number | null
+      last_60d_economy_pool_minus_lifetime: number | null
+      last_6mo_wickets_mean_minus_lifetime: number | null
+      last_6mo_economy_pool_minus_lifetime: number | null
+      last_1yr_wickets_mean_minus_lifetime: number | null
+      last_1yr_economy_pool_minus_lifetime: number | null
+    }
+  }
+  suggested_splits: { label: string; params: Record<string, string> }[]
+}
+```
+
+### 12.5 Components
+
+**New** under `frontend/src/components/bowling/`:
+
+- `BowlerDistributionPanel.tsx` — top-level orchestrator. Owns
+  the metric-tab + window-toggle URL state. Renders the active
+  tab's metric panel below the tab strip.
+- `WicketsMetricPanel.tsx` — composite of `WicketsHistogram` +
+  the wickets-specific stat strip (mean wkts, median wkts, pool
+  SR, pool average) + wickets milestone chips (6 simples + 3
+  ≥2-anchored conditionals).
+- `EconomyMetricPanel.tsx` — composite of `EconomyHistogram` +
+  economy stat strip (pool, mean per innings, median per innings,
+  std) + economy milestone chips (4 simples).
+- `RunsConcededMetricPanel.tsx` — composite of
+  `RunsConcededHistogram` + runs-conceded stat strip (total,
+  mean, median, std) + runs-conceded milestone chips (4 simples).
+- `WicketsHistogram.tsx` / `EconomyHistogram.tsx` /
+  `RunsConcededHistogram.tsx` — pure chart wrappers (each
+  histogram primitive with its own bin scheme, color palette,
+  reference line).
+- `ProbChip.tsx` — **shared with batter retrofit** (§13). Renders
+  a `ProbRecord` as `value%` with hover tooltip `[lo, hi] (n=denom)`,
+  fades when `denom < 10`, shows `—` for null. Lives at
+  `frontend/src/components/distribution/ProbChip.tsx` so both
+  panels import from the same file.
+- `WicketsSparkline.tsx` — per-innings wicket count over time.
+  Always visible below the active metric panel; reads
+  `currentWindow.wickets.observations` regardless of metric tab.
+- `BowlerFormDeltaLine.tsx` — bowler-specific form line (wkts
+  delta + economy delta polarities differ from batter).
+
+**Reused:**
+
+- `PlayerLink`, `BarChart`, `LineChart`, `useFilterDeps`,
+  `useFetch`, `Spinner`, `ErrorBanner`.
+- `WISDEN_RUN_TIERS` palette extended with `WISDEN_WICKET_TIERS`.
+- The shared `ProbChip` component (§13 makes the existing batter
+  panel adopt it too).
+
+### 12.6 Tests
+
+**Integration** (`tests/integration/bowler_distribution.sh`) —
+agent-browser end-to-end. SQL-anchored numeric assertions.
+Mirror the §9.10 layout:
+
+- Load `/bowling?player=<bumrah>&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024`.
+- Assert all sub-panels render (wickets histogram, economy
+  histogram, stat strip, sparkline, form-delta, splits row).
+- For each window button (Scope / 10 / 60d / 6mo / 1y), click and
+  assert active-tab histogram + stat strip + milestone chips
+  redraw; sparkline + form-delta line + splits row do NOT change.
+- After each window click, assert URL state matches `?dist_window=...`
+  (and absent param for Scope). Browser back-button restores
+  prior window.
+- For each metric tab (Wickets / Economy / Runs conceded), click
+  and assert the histogram swaps to the metric-specific binning,
+  the stat strip swaps fields, and the milestone chips swap to
+  the metric-specific list. Sparkline does NOT change. URL state
+  matches `?dist_metric=...` (absent for the default `wickets`
+  tab). Browser back-button restores prior tab.
+- Deep-link with `?dist_metric=economy&dist_window=last_60d`:
+  panel renders the economy tab on the last_60d window on first
+  paint (no flash of default).
+- Hover P(≥5│≥2) chip — assert tooltip text `[ci_low%-ci_high%]
+  (n=<denom>)` matches the API response exactly.
+- Below sample-size floor (denom < 10): assert chip has the
+  fade styling class.
+- Numeric anchors via `sqlite3 cricket.db`:
+  - `Mean wkts` text matches
+    `SUM(wickets)/COUNT(*)` over the qualifying-spell sample.
+  - `P(≥3) NN%` chip matches
+    `count(w ≥ 3)/n_innings × 100`.
+  - `Pool econ` text matches
+    `SUM(runs_total) × 6.0 / SUM(legal_balls)`.
+- Inning aux: with `?inning=0` and `?inning=1`, panel re-fetches;
+  numbers change.
+- Mobile viewport: `set viewport 390 844 && reload` on the live
+  panel — assert the histogram + stat strip stack vertically, the
+  metric tabs and window-toggle chips wrap onto two rows if
+  needed, and the active-tab content remains legible at that
+  width.
+
+**Browser-agent verification**: load each of the 20 regression
+URLs from §11 in `agent-browser`; verify panel renders for each.
+Mobile viewport check (`set viewport 390 844 && reload`) on a
+representative URL — assert both histograms remain visible
+(grid stacks below 720px per the `wisden-*` media-query
+convention).
+
+### 12.7 Implementation order — five atomic frontend commits
+
+1. **Types + fetcher** — `BowlerDistribution` types in
+   `types.ts`; `getBowlerDistribution` in `api.ts`. tsc-clean.
+2. **Histograms + metric panels + ProbChip** — three histogram
+   wrappers (`WicketsHistogram`, `EconomyHistogram`,
+   `RunsConcededHistogram`), three composite metric panels
+   (`WicketsMetricPanel`, `EconomyMetricPanel`,
+   `RunsConcededMetricPanel`), shared `ProbChip.tsx` at
+   `frontend/src/components/distribution/`, `WISDEN_WICKET_TIERS`
+   palette extension.
+3. **Sparkline + form-delta + splits row** — `WicketsSparkline.tsx`,
+   `BowlerFormDeltaLine.tsx`. Reuse `SuggestedSplitsRow.tsx`
+   if compatible; else trivial fork.
+4. **Panel orchestration + Bowling.tsx integration** —
+   `BowlerDistributionPanel.tsx` with metric-tab + window-toggle
+   URL state; mount in `Bowling.tsx` between row 1 and row 2.
+5. **Integration test + docs** —
+   `tests/integration/bowler_distribution.sh`;
+   `internal_docs/codebase-tour.md` mention; spec post-impl
+   pass.
+
+After commit 4, browser-agent through the 20 regression URLs.
+
+---
+
+## 13. Wilson-CI retrofit on batter conditionals (DRAFT)
+
+Adding Wilson confidence intervals to bowler probabilities (§11.3)
+makes the existing batter `milestones` shape — bare scalars — the
+inconsistent one. Retrofit the batter endpoint so every probability
+across the project uses the same `prob_record(num, denom)` shape.
+
+**Affected endpoint:** `GET /api/v1/batters/{id}/distribution`.
+
+**Affected fields** (every milestone in every dossier — lifetime +
+4 form windows):
+
+- Simples: `p_failure_10`, `p_25_plus`, `p_30_plus`, `p_50_plus`,
+  `p_100_plus` — denom = `n_innings`.
+- Conditionals: `p_50_given_30`, `p_70_given_50` — denom =
+  `count(≥30)` and `count(≥50)` respectively.
+
+**Shape change:** every field flips from `number | null` to
+`ProbRecord` (per §11.3 / §12.4).
+
+**Sequencing — strict per the regression-harness rule** (§10.2):
+
+1. **Commit A**: flip all batter regression URLs `REG → NEW` in
+   `tests/regression/batter_distribution/urls.txt`. Earlier than
+   the shape change so the runner's `kind, hh = head[k]` reads
+   the NEW tag from HEAD.
+2. **Commit B**: shape change in `api/routers/batting.py` —
+   replace the inline rounded-scalar emissions with calls to
+   `prob_record(num, denom)`. Run `./tests/regression/run.sh
+   batter_distribution`; expect `0 REG drifted, 19 NEW changed,
+   0 NEW unchanged`.
+3. **Commit C**: flip URLs `NEW → REG` to lock the new shape.
+4. **Commit D — frontend retrofit**: update
+   `BatterDistribution` types (`number | null` → `ProbRecord`);
+   update the `MilestoneChips` render to use the shared
+   `ProbChip` component. `tsc -b` then catches any consumer that
+   still expects scalar.
+5. **Commit E — sanity test update**: invariants in
+   `test_batter_distribution_invariants.py` re-target the
+   `.value` field; add Wilson CI + denom assertions matching
+   the §11.9 bowler list.
+
+**Why ship this in the bowler v1 arc, not a separate release:**
+the cross-cutting `ProbChip` component lands once; otherwise we
+ship the bowler panel with one chip component and a duplicate
+batter chip with a different shape. The retrofit is small (~50
+LOC across both sides) and the regression flip is the only
+ceremony.
+
+**Out of scope for this retrofit:** changing any batter milestone
+threshold (still `failure_10`, `25_plus`, `30_plus`, `50_plus`,
+`100_plus`, `50_given_30`, `70_given_50` — only the *shape* of
+each value changes), or moving the batter conditionals to an
+anchored ladder (the chain `P(≥50│≥30)` → `P(≥70│≥50)` is the
+right cricket-conversion narrative for batting; bowler anchors
+at ≥2 because rare events on a discrete count behave differently
+— see §11.4.1).
+
+---
+
 *Started 2026-05-04. Inventory + framing drafted first.
 2026-05-05: batter v1 backend (§8) + frontend (§9) IMPLEMENTED
 across 10 atomic commits.
@@ -1390,4 +2466,6 @@ sparkline solid 20-run line + 1.5px legend swatches,
 ScopedPageHeader rolled to all 8 scoped pages, mobile media-query
 fix.
 Patterns codified in §10 for sibling slices.
-Bowler / fielder / team distribution dossiers remain to be done.*
+2026-05-06: bowler v1 spec drafted (§11 backend + §12 frontend +
+§13 Wilson-CI batter retrofit). Pending implementation.
+Fielder / team distribution dossiers remain to be done.*
