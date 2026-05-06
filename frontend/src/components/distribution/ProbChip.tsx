@@ -16,9 +16,11 @@
  *  - Native `title` tooltip on hover/long-press: `[ci_low%-ci_high%]
  *    (n=denom)` — readable on every platform without bespoke
  *    tooltip libraries.
- *  - Polarity controls the fill + text color:
+ *  - Polarity controls the fill + text color (revised 2026-05-06 —
+ *    negative flipped from muted oxblood to muted indigo because
+ *    red is now exclusively reserved for the rolling-mean overlay):
  *    - positive → sage (good outcome — high P)
- *    - negative → muted oxblood (bad outcome — high P)
+ *    - negative → muted indigo (bad outcome — high P)
  *    - neutral  → faint slate (no good/bad framing — conditionals)
  *
  * Spec: internal_docs/spec-distribution-stats.md §11.3 (helper),
@@ -51,13 +53,13 @@ function tooltipFor(record: ProbRecord): string {
 
 export default function ProbChip({ label, record, polarity, smallNFloor = 10 }: Props) {
   const bg =
-    polarity === 'positive' ? 'rgba(122, 142, 106, 0.14)'
-    : polarity === 'negative' ? 'rgba(160, 59, 59, 0.12)'
-    : 'rgba(60, 91, 122, 0.10)'
+    polarity === 'positive' ? 'rgba(122, 142, 106, 0.14)'  // sage tint
+    : polarity === 'negative' ? 'rgba(112, 144, 168, 0.18)'  // indigo tint
+    : 'rgba(60, 91, 122, 0.10)'  // slate (neutral)
   const fg =
-    polarity === 'positive' ? '#3F5A2F'
-    : polarity === 'negative' ? '#7A1F1F'
-    : '#3C5B7A'
+    polarity === 'positive' ? '#3F5A2F'   // dark sage
+    : polarity === 'negative' ? '#3F5A78'  // dark indigo
+    : '#3C5B7A'  // slate
 
   const isNull = record.value === null || record.denom <= 0
   const lowN = !isNull && record.denom < smallNFloor
