@@ -43,6 +43,32 @@ def _without(scope: dict, *keys: str) -> dict:
     return {k: v for k, v in scope.items() if k not in keys and v}
 
 
+def _season_tag(from_v: Optional[str], to_v: Optional[str]) -> str:
+    """Mirror of frontend/src/components/scopeLinks.ts::seasonTag.
+    "2024" if from==to, "2023–2024" range, "2023+" or "≤2024" half-open.
+    """
+    f = from_v if from_v else None
+    t = to_v if to_v else None
+    if f and t:
+        return f if f == t else f"{f}–{t}"
+    if f:
+        return f"{f}+"
+    if t:
+        return f"≤{t}"
+    return ""
+
+
+def _season_params(scope: dict) -> dict:
+    """Round-trip the scope's season range as URL params, dropping
+    falsy bounds."""
+    out = {}
+    if _truthy(scope, "season_from"):
+        out["season_from"] = scope["season_from"]
+    if _truthy(scope, "season_to"):
+        out["season_to"] = scope["season_to"]
+    return out
+
+
 def suggested_splits(scope: dict) -> list[dict]:
     """Walk the active scope, emit related-scope navigation hints.
 
@@ -58,31 +84,25 @@ def suggested_splits(scope: dict) -> list[dict]:
     has_tournament = _truthy(scope, "tournament")
     has_season_from = _truthy(scope, "season_from")
     has_season_to = _truthy(scope, "season_to")
-    has_single_season = (
-        has_season_from and has_season_to
-        and scope["season_from"] == scope["season_to"]
-    )
-    has_season_range = (has_season_from or has_season_to) and not has_single_season
-    has_any_season = has_single_season or has_season_range
+    has_any_season = has_season_from or has_season_to
 
     has_opponent = _truthy(scope, "filter_opponent")
     has_venue = _truthy(scope, "filter_venue")
 
     # ── Tournament × season axis ──────────────────────────────────────
-    if has_tournament and has_single_season:
+    # Branch on has_any_season (single OR range), not has_single_season
+    # — the season-range case (e.g. 2024-2026) is just as broadenable as
+    # a single season; the only difference is the human-readable label.
+    if has_tournament and has_any_season:
         tournament = scope["tournament"]
-        season = scope["season_from"]
+        season_label = _season_tag(scope.get("season_from"), scope.get("season_to"))
         splits.append({
             "label": f"All {tournament}",
             "params": {**identity, "tournament": tournament},
         })
         splits.append({
-            "label": f"All cricket in {season}",
-            "params": {
-                **identity,
-                "season_from": season,
-                "season_to": season,
-            },
+            "label": f"All cricket in {season_label}",
+            "params": {**identity, **_season_params(scope)},
         })
         splits.append({"label": "All-time", "params": {**identity}})
     elif has_tournament and not has_any_season:

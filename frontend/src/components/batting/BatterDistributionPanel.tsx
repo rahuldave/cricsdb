@@ -159,11 +159,11 @@ export default function BatterDistributionPanel({
             }}>
               oldest ← bars (one per innings) → most recent
               {' · '}
-              <span style={{ color: '#9C9C9C' }}>—</span>{' grey: 20-run line'}
+              <span style={{ color: 'var(--ink)' }}>--</span>{' 20-run line'}
               {window === 'scope' && (
                 <>
                   {' · '}
-                  <span style={{ color: '#7A1F1F' }}>—</span>{' red: 10-innings rolling mean'}
+                  <span style={{ color: '#7A1F1F' }}>—</span>{' 10-innings rolling mean'}
                 </>
               )}
             </div>

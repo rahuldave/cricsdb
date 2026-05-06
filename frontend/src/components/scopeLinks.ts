@@ -406,22 +406,31 @@ export function suggestedSplits(scope: Partial<FilterParams>): SplitSuggestion[]
   const seasonFrom = _truthy(scope.season_from) ? scope.season_from! : null
   const seasonTo = _truthy(scope.season_to) ? scope.season_to! : null
   const hasTournament = !!tournament
-  const hasSingleSeason = !!seasonFrom && !!seasonTo && seasonFrom === seasonTo
-  const hasSeasonRange = (!!seasonFrom || !!seasonTo) && !hasSingleSeason
-  const hasAnySeason = hasSingleSeason || hasSeasonRange
+  const hasAnySeason = !!seasonFrom || !!seasonTo
 
   const opponent = _truthy(scope.filter_opponent) ? scope.filter_opponent! : null
   const venue = _truthy(scope.filter_venue) ? scope.filter_venue! : null
 
-  // Tournament × season axis
-  if (hasTournament && hasSingleSeason && tournament && seasonFrom) {
+  function seasonParams(): Record<string, string> {
+    const p: Record<string, string> = {}
+    if (seasonFrom) p.season_from = seasonFrom
+    if (seasonTo) p.season_to = seasonTo
+    return p
+  }
+
+  // Tournament × season axis — branch on hasAnySeason (single OR range),
+  // not hasSingleSeason. A 3-year range is just as broadenable as a
+  // single season; only the human-readable label changes (uses
+  // seasonTag for "2024-2026" / "2024+" / etc.).
+  if (hasTournament && hasAnySeason && tournament) {
+    const seasonLabel = seasonTag(seasonFrom, seasonTo)
     splits.push({
       label: `All ${tournament}`,
       params: { ...identity, tournament },
     })
     splits.push({
-      label: `All cricket in ${seasonFrom}`,
-      params: { ...identity, season_from: seasonFrom, season_to: seasonFrom },
+      label: `All cricket in ${seasonLabel}`,
+      params: { ...identity, ...seasonParams() },
     })
     splits.push({ label: 'All-time', params: { ...identity } })
   } else if (hasTournament && !hasAnySeason) {

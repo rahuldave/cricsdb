@@ -64,10 +64,10 @@ export default function RunsSparkline({
         <line
           x1={0} x2={VB_W}
           y1={refY} y2={refY}
-          stroke="#9C9C9C"
-          strokeWidth={0.4}
-          strokeDasharray="0.6 0.6"
-          opacity={0.7}
+          stroke={WISDEN.ink}
+          strokeWidth={0.5}
+          strokeDasharray="0.8 0.8"
+          opacity={0.85}
         />
       )}
       {series.map((r, i) => {

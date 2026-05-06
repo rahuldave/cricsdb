@@ -43,29 +43,30 @@ export default function FormDeltaLine({ dossier }: Props) {
       fontSize: '0.82rem',
       color: 'var(--ink-faint)',
       marginTop: '0.4rem',
-      lineHeight: 1.5,
+      lineHeight: 1.4,
+      display: 'flex',
+      flexWrap: 'wrap',
+      columnGap: '1.0rem',
+      rowGap: '0.1rem',
+      alignItems: 'baseline',
     }}>
-      <div style={{ marginBottom: '0.15rem' }}>
-        Form vs scope (mean · median):
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: '1.2rem', rowGap: '0.1rem' }}>
-        <span>
-          last 10: <Delta value={delta.last_10_mean_minus_lifetime} />
-          {' · '}<Delta value={delta.last_10_median_minus_lifetime} />
-        </span>
-        <span>
-          last 60d: <Delta value={delta.last_60d_mean_minus_lifetime} />
-          {' · '}<Delta value={delta.last_60d_median_minus_lifetime} />
-        </span>
-        <span>
-          last 6mo: <Delta value={delta.last_6mo_mean_minus_lifetime} />
-          {' · '}<Delta value={delta.last_6mo_median_minus_lifetime} />
-        </span>
-        <span>
-          last 1y: <Delta value={delta.last_1yr_mean_minus_lifetime} />
-          {' · '}<Delta value={delta.last_1yr_median_minus_lifetime} />
-        </span>
-      </div>
+      <span>Form vs scope (mean · median):</span>
+      <span>
+        last 10: <Delta value={delta.last_10_mean_minus_lifetime} />
+        {' · '}<Delta value={delta.last_10_median_minus_lifetime} />
+      </span>
+      <span>
+        last 60d: <Delta value={delta.last_60d_mean_minus_lifetime} />
+        {' · '}<Delta value={delta.last_60d_median_minus_lifetime} />
+      </span>
+      <span>
+        last 6mo: <Delta value={delta.last_6mo_mean_minus_lifetime} />
+        {' · '}<Delta value={delta.last_6mo_median_minus_lifetime} />
+      </span>
+      <span>
+        last 1y: <Delta value={delta.last_1yr_mean_minus_lifetime} />
+        {' · '}<Delta value={delta.last_1yr_median_minus_lifetime} />
+      </span>
     </div>
   )
 }

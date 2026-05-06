@@ -96,19 +96,17 @@ export default function DistributionStatStrip({ dossier }: Props) {
           {n_innings} inns · {n_dismissals} outs · {n_innings - n_dismissals} not out
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-        {/* Simples — unconditional probabilities */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-          <MilestoneChip label="P(≤10)"  value={fmtPct(milestones.p_failure_10)} polarity="negative" />
-          <MilestoneChip label="P(≥30)"  value={fmtPct(milestones.p_30_plus)}    polarity="positive" />
-          <MilestoneChip label="P(≥50)"  value={fmtPct(milestones.p_50_plus)}    polarity="positive" />
-          <MilestoneChip label="P(≥100)" value={fmtPct(milestones.p_100_plus)}   polarity="positive" />
-        </div>
-        {/* Conditionals — "going-on" probabilities */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-          <MilestoneChip label="P(≥50│≥30)" value={fmtPct(milestones.p_50_given_30)} polarity="neutral" />
-          <MilestoneChip label="P(≥70│≥50)" value={fmtPct(milestones.p_70_given_50)} polarity="neutral" />
-        </div>
+      {/* All probabilities — single flex row that wraps naturally on
+          narrow viewports. Simples (negative + positive polarity)
+          followed by conditionals (neutral slate) so the eye reads
+          unconditional first, then "going-on" rates. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+        <MilestoneChip label="P(≤10)"     value={fmtPct(milestones.p_failure_10)}  polarity="negative" />
+        <MilestoneChip label="P(≥30)"     value={fmtPct(milestones.p_30_plus)}     polarity="positive" />
+        <MilestoneChip label="P(≥50)"     value={fmtPct(milestones.p_50_plus)}     polarity="positive" />
+        <MilestoneChip label="P(≥100)"    value={fmtPct(milestones.p_100_plus)}    polarity="positive" />
+        <MilestoneChip label="P(≥50│≥30)" value={fmtPct(milestones.p_50_given_30)} polarity="neutral" />
+        <MilestoneChip label="P(≥70│≥50)" value={fmtPct(milestones.p_70_given_50)} polarity="neutral" />
       </div>
     </div>
   )

@@ -40,6 +40,24 @@
     ]
   },
   {
+    "name": "tournament + season range — three broadens (range label)",
+    "scope": {"gender": "male", "tournament": "Indian Premier League", "season_from": "2024", "season_to": "2026"},
+    "expected": [
+      {"label": "All Indian Premier League", "params": {"gender": "male", "tournament": "Indian Premier League"}},
+      {"label": "All cricket in 2024–2026", "params": {"gender": "male", "season_from": "2024", "season_to": "2026"}},
+      {"label": "All-time", "params": {"gender": "male"}}
+    ]
+  },
+  {
+    "name": "tournament + half-open season (from only) — three broadens",
+    "scope": {"gender": "male", "tournament": "Indian Premier League", "season_from": "2024"},
+    "expected": [
+      {"label": "All Indian Premier League", "params": {"gender": "male", "tournament": "Indian Premier League"}},
+      {"label": "All cricket in 2024+", "params": {"gender": "male", "season_from": "2024"}},
+      {"label": "All-time", "params": {"gender": "male"}}
+    ]
+  },
+  {
     "name": "opponent only — isolate + drop pair",
     "scope": {"gender": "male", "team_type": "international", "filter_opponent": "Australia"},
     "expected": [
