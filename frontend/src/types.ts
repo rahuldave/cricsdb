@@ -472,15 +472,15 @@ export interface DistributionDossier {
     observations: InningsObservation[]
   }
   milestones: {
-    p_failure_10: number | null
-    p_25_plus: number | null
-    p_30_plus: number | null
-    p_50_plus: number | null
-    p_100_plus: number | null
-    /** P(runs ≥ 50 | runs ≥ 30) — null when no innings reached 30. */
-    p_50_given_30: number | null
-    /** P(runs ≥ 70 | runs ≥ 50) — null when no innings reached 50. */
-    p_70_given_50: number | null
+    p_failure_10: ProbRecord
+    p_25_plus: ProbRecord
+    p_30_plus: ProbRecord
+    p_50_plus: ProbRecord
+    p_100_plus: ProbRecord
+    /** P(runs ≥ 50 | runs ≥ 30) — value=None when no innings reached 30. */
+    p_50_given_30: ProbRecord
+    /** P(runs ≥ 70 | runs ≥ 50) — value=None when no innings reached 50. */
+    p_70_given_50: ProbRecord
   }
   phase: {
     powerplay: DistributionPhaseRollup

@@ -14,6 +14,7 @@
  */
 
 import type { DistributionDossier } from '../../types'
+import ProbChip from '../distribution/ProbChip'
 
 interface Props {
   dossier: DistributionDossier
@@ -22,11 +23,6 @@ interface Props {
 function fmtNum(v: number | null | undefined, digits = 2): string {
   if (v === null || v === undefined) return '—'
   return v.toFixed(digits)
-}
-
-function fmtPct(v: number | null | undefined): string {
-  if (v === null || v === undefined) return '—'
-  return `${(v * 100).toFixed(0)}%`
 }
 
 function StatRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
@@ -46,34 +42,10 @@ function StatRow({ label, value, accent }: { label: string; value: string; accen
   )
 }
 
-function MilestoneChip({ label, value, polarity }: {
-  label: string
-  value: string
-  polarity: 'positive' | 'negative' | 'neutral'
-}) {
-  // Wisden palette slate + sage / oxblood — translucent fills so the
-  // page background still reads through.
-  const bg =
-    polarity === 'positive' ? 'rgba(122, 142, 106, 0.14)'
-    : polarity === 'negative' ? 'rgba(160, 59, 59, 0.12)'
-    : 'rgba(60, 91, 122, 0.10)'  // neutral: faint slate
-  const fg =
-    polarity === 'positive' ? '#3F5A2F'
-    : polarity === 'negative' ? '#7A1F1F'
-    : '#3C5B7A'  // neutral slate
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'baseline', gap: '0.35rem',
-      padding: '0.18rem 0.55rem', borderRadius: '999px',
-      background: bg, color: fg,
-      fontSize: '0.72rem',
-      fontFamily: 'var(--serif)', fontStyle: 'italic',
-    }}>
-      <span>{label}</span>
-      <span className="num" style={{ fontStyle: 'normal', fontWeight: 600, fontSize: '0.82rem' }}>{value}</span>
-    </span>
-  )
-}
+// MilestoneChip removed — replaced by the shared ProbChip component
+// at components/distribution/ProbChip.tsx (post-§13 retrofit).
+// Single source of truth across batter + bowler panels for
+// Wilson-CI tooltip + small-n fade + null handling.
 
 export default function DistributionStatStrip({ dossier }: Props) {
   const { runs, n_innings, n_dismissals } = dossier
@@ -116,12 +88,12 @@ export function MilestoneChipsRow({ dossier }: Props) {
       gap: '0.35rem',
       marginTop: '0.85rem',
     }}>
-      <MilestoneChip label="P(≤10)"     value={fmtPct(milestones.p_failure_10)}  polarity="negative" />
-      <MilestoneChip label="P(≥30)"     value={fmtPct(milestones.p_30_plus)}     polarity="positive" />
-      <MilestoneChip label="P(≥50)"     value={fmtPct(milestones.p_50_plus)}     polarity="positive" />
-      <MilestoneChip label="P(≥100)"    value={fmtPct(milestones.p_100_plus)}    polarity="positive" />
-      <MilestoneChip label="P(≥50│≥30)" value={fmtPct(milestones.p_50_given_30)} polarity="neutral" />
-      <MilestoneChip label="P(≥70│≥50)" value={fmtPct(milestones.p_70_given_50)} polarity="neutral" />
+      <ProbChip label="P(≤10)"     record={milestones.p_failure_10}  polarity="negative" />
+      <ProbChip label="P(≥30)"     record={milestones.p_30_plus}     polarity="positive" />
+      <ProbChip label="P(≥50)"     record={milestones.p_50_plus}     polarity="positive" />
+      <ProbChip label="P(≥100)"    record={milestones.p_100_plus}    polarity="positive" />
+      <ProbChip label="P(≥50│≥30)" record={milestones.p_50_given_30} polarity="neutral" />
+      <ProbChip label="P(≥70│≥50)" record={milestones.p_70_given_50} polarity="neutral" />
     </div>
   )
 }
