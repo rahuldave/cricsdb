@@ -60,16 +60,17 @@ def make_aux() -> AuxParams:
     return AuxParams()
 
 
-# (label, person_id, filter dict). person_ids resolved at runtime via
-# SELECT WHERE name = ... so the test is portable across DB snapshots.
+# (label, person_id, filter dict). IDs pinned to disambiguate
+# homonyms (4 Rashid Khans in person table; 5f547c8b is the Afghan
+# leg-spinner with 502 wickets at the time of this test).
 # Bumrah (busy IPL bowler), Rashid Khan (T20-I + IPL), Trent Boult
 # (multi-team), and Kohli (part-time bowler — small sample edge cases).
-SCOPE_NAMES: list[tuple[str, str, dict]] = [
-    ("bumrah_ipl_2024",   "JJ Bumrah",     {"tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024"}),
-    ("bumrah_all_time",   "JJ Bumrah",     {}),
-    ("rashid_all_time",   "Rashid Khan",   {}),
-    ("boult_ipl",         "TA Boult",      {"tournament": "Indian Premier League"}),
-    ("kohli_part_time",   "V Kohli",       {}),
+SCOPES: list[tuple[str, str, dict]] = [
+    ("bumrah_ipl_2024",   "462411b3", {"tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024"}),
+    ("bumrah_all_time",   "462411b3", {}),
+    ("rashid_all_time",   "5f547c8b", {}),
+    ("boult_ipl",         "a818c1be", {"tournament": "Indian Premier League"}),
+    ("kohli_part_time",   "ba607b88", {}),
 ]
 
 AS_OF = "2025-01-01"
@@ -364,11 +365,6 @@ async def assert_min_balls_monotonicity(
 
 # ─── Main ──────────────────────────────────────────────────────────────
 
-async def resolve_person_id(name: str) -> str | None:
-    rows = await deps._db.q("SELECT id FROM person WHERE name = :n LIMIT 1", {"n": name})
-    return rows[0]["id"] if rows else None
-
-
 async def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--db", default=os.path.join(
@@ -386,12 +382,7 @@ async def main() -> int:
 
     all_results: list[tuple[bool, str]] = []
 
-    for label, name, scope_dict in SCOPE_NAMES:
-        pid = await resolve_person_id(name)
-        if not pid:
-            all_results.append(check(f"{label}: resolve person_id for {name}", False))
-            continue
-
+    for label, pid, scope_dict in SCOPES:
         filters = make_filters(**scope_dict)
         aux = make_aux()
         resp = await bowling_distribution(
@@ -404,7 +395,7 @@ async def main() -> int:
         all_results.extend(await assert_min_balls_monotonicity(label, pid, scope_dict))
 
     # Empty-scope edge case — venue that doesn't exist
-    pid = await resolve_person_id("JJ Bumrah")
+    pid = "462411b3"  # Bumrah
     if pid:
         empty_filters = make_filters(filter_venue="Nonexistent Stadium XYZ")
         resp = await bowling_distribution(
