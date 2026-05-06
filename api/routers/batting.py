@@ -1063,8 +1063,13 @@ def _distribution_dossier(observations: list[dict]) -> dict:
                 "observations": [],
             },
             "milestones": {
-                "p_failure_10": None, "p_25_plus": None,
-                "p_50_plus": None, "p_100_plus": None,
+                "p_failure_10": None,
+                "p_25_plus": None,
+                "p_30_plus": None,
+                "p_50_plus": None,
+                "p_100_plus": None,
+                "p_50_given_30": None,
+                "p_70_given_50": None,
             },
             "phase": {
                 k: {"runs_total": 0, "balls_total": 0, "innings_active": 0}
@@ -1085,11 +1090,22 @@ def _distribution_dossier(observations: list[dict]) -> dict:
     std = variance ** 0.5
     average = (total_runs / n_dismissals) if n_dismissals > 0 else None
 
+    def _count_geq(threshold: int) -> int:
+        return sum(1 for r in runs_list if r >= threshold)
+
     def _p_geq(threshold: int) -> float:
-        return sum(1 for r in runs_list if r >= threshold) / n
+        return _count_geq(threshold) / n
 
     def _p_leq(threshold: int) -> float:
         return sum(1 for r in runs_list if r <= threshold) / n
+
+    def _p_cond(num_threshold: int, denom_threshold: int) -> Optional[float]:
+        """Conditional probability P(runs ≥ num | runs ≥ denom). Null
+        when no innings reached the denominator threshold (undefined)."""
+        denom = _count_geq(denom_threshold)
+        if denom == 0:
+            return None
+        return _count_geq(num_threshold) / denom
 
     phase = {}
     for name, (lo, hi) in _PHASE_RANGES.items():
@@ -1122,25 +1138,48 @@ def _distribution_dossier(observations: list[dict]) -> dict:
         "milestones": {
             "p_failure_10": round(_p_leq(10), 4),
             "p_25_plus": round(_p_geq(25), 4),
+            "p_30_plus": round(_p_geq(30), 4),
             "p_50_plus": round(_p_geq(50), 4),
             "p_100_plus": round(_p_geq(100), 4),
+            # Conditional "going-on" probabilities — measure how often a
+            # batter who reached the threshold went on to the next mark.
+            # Null when the denominator threshold was never reached.
+            "p_50_given_30": (
+                round(_p_cond(50, 30), 4) if _p_cond(50, 30) is not None else None
+            ),
+            "p_70_given_50": (
+                round(_p_cond(70, 50), 4) if _p_cond(70, 50) is not None else None
+            ),
         },
         "phase": phase,
     }
 
 
 def _form_windows(observations: list[dict], today: date) -> dict:
-    """Derive last-10 + last-60d form windows from a date-asc
-    observation list. Returns the per-window dossiers plus a delta
-    block comparing window means / medians to the lifetime sample.
-    Spec §8.6."""
+    """Derive last-10 + last-60d + last-6mo + last-1yr form windows from
+    a date-asc observation list. Returns the per-window dossiers plus a
+    delta block comparing each window's mean / median to the
+    full-scope sample. Spec §8.6.
+
+    Window definitions:
+      - last_10:   ORDER BY date DESC LIMIT 10 (no calendar dependence).
+      - last_60d:  match.date >= today − 60 days (recent form).
+      - last_6mo:  match.date >= today − 180 days (medium-term arc).
+      - last_1yr:  match.date >= today − 365 days (loss-of-form gauge).
+    """
     last_10 = observations[-10:]
-    cutoff = (today - timedelta(days=60)).isoformat()
-    last_60d = [o for o in observations if (o["date"] or "") >= cutoff]
+    cutoff_60d = (today - timedelta(days=60)).isoformat()
+    cutoff_6mo = (today - timedelta(days=180)).isoformat()
+    cutoff_1yr = (today - timedelta(days=365)).isoformat()
+    last_60d = [o for o in observations if (o["date"] or "") >= cutoff_60d]
+    last_6mo = [o for o in observations if (o["date"] or "") >= cutoff_6mo]
+    last_1yr = [o for o in observations if (o["date"] or "") >= cutoff_1yr]
 
     lifetime_doss = _distribution_dossier(observations)
     last_10_doss = _distribution_dossier(last_10)
     last_60d_doss = _distribution_dossier(last_60d)
+    last_6mo_doss = _distribution_dossier(last_6mo)
+    last_1yr_doss = _distribution_dossier(last_1yr)
 
     def _delta(w: dict, key: str) -> Optional[float]:
         wv = w["runs"][key]
@@ -1152,11 +1191,17 @@ def _form_windows(observations: list[dict], today: date) -> dict:
     return {
         "last_10": last_10_doss,
         "last_60d": last_60d_doss,
+        "last_6mo": last_6mo_doss,
+        "last_1yr": last_1yr_doss,
         "delta": {
             "last_10_mean_minus_lifetime": _delta(last_10_doss, "mean_per_innings"),
             "last_10_median_minus_lifetime": _delta(last_10_doss, "median"),
             "last_60d_mean_minus_lifetime": _delta(last_60d_doss, "mean_per_innings"),
             "last_60d_median_minus_lifetime": _delta(last_60d_doss, "median"),
+            "last_6mo_mean_minus_lifetime": _delta(last_6mo_doss, "mean_per_innings"),
+            "last_6mo_median_minus_lifetime": _delta(last_6mo_doss, "median"),
+            "last_1yr_mean_minus_lifetime": _delta(last_1yr_doss, "mean_per_innings"),
+            "last_1yr_median_minus_lifetime": _delta(last_1yr_doss, "median"),
         },
     }
 
@@ -1169,17 +1214,19 @@ async def batting_distribution(
     as_of_date: Optional[str] = Query(
         None,
         description=(
-            "ISO date (YYYY-MM-DD) to anchor the form.last_60d window."
-            " Defaults to the server's today. Pin this for deterministic"
-            " regression tests; production callers leave it absent."
+            "ISO date (YYYY-MM-DD) to anchor the calendar-based form"
+            " windows (last_60d / last_6mo / last_1yr). Defaults to the"
+            " server's today. Pin this for deterministic regression"
+            " tests; production callers leave it absent."
         ),
     ),
 ):
     """Per-innings runs distribution dossier for a batter under the
     active filter scope.
 
-    Returns lifetime + form-window dossiers (last-10 innings + last-60
-    days) plus scope-derived suggested-splits navigation hints.
+    Returns lifetime + four form-window dossiers (last-10 innings +
+    last-60 days + last-6 months + last-1 year) plus scope-derived
+    suggested-splits navigation hints.
 
     Spec: internal_docs/spec-distribution-stats.md §8.
     """
