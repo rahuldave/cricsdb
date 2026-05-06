@@ -23,7 +23,7 @@ import { useSearchParams, useLocation } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
 import { seasonTag } from './scopeLinks'
 
-type Segment = { label: string; value: string }
+type Segment = { label: string; value: string; isHeading?: boolean }
 
 function buildSegments(
   filters: ReturnType<typeof useFilters>,
@@ -47,6 +47,13 @@ function buildSegments(
       segs.push({ label: 'Player', value: pathPlayer })
     }
   }
+
+  // SCOPE marker — separates page-identity (subject of the page) from
+  // the FilterBar narrowings that follow. Establishes a shared
+  // vocabulary: "scope" = the FilterBar-driven narrowings, distinct
+  // from the page identity (Player / Team / Venue / Compare). Inserted
+  // only when both segments-before AND segments-after exist.
+  const pathIdentityCount = segs.length
 
   // Identity filters (gender, team_type) — short labels.
   if (filters.gender) segs.push({ label: 'Gender', value: filters.gender === 'male' ? "men's" : filters.gender === 'female' ? "women's" : filters.gender })
@@ -114,6 +121,14 @@ function buildSegments(
   const pageNum = page ? parseInt(page, 10) : 0
   if (pageNum > 1) segs.push({ label: 'Page', value: String(pageNum) })
 
+  // Inject the SCOPE heading between path-identity and the rest.
+  // Only when BOTH sides have content (avoids "Player: X · SCOPE"
+  // alone on an unfiltered profile, and "SCOPE · men's" with no
+  // page identity).
+  if (pathIdentityCount > 0 && segs.length > pathIdentityCount) {
+    segs.splice(pathIdentityCount, 0, { label: 'SCOPE', value: '', isHeading: true })
+  }
+
   return segs
 }
 
@@ -166,9 +181,15 @@ export default function ScopeStatusStrip() {
         ) : segments.map((s, i) => (
           <span key={`${s.label}-${i}`} className="wisden-scope-strip-seg">
             {i > 0 && <span className="wisden-scope-strip-sep"> · </span>}
-            <span className="wisden-scope-strip-segLabel">{s.label}:</span>
-            {' '}
-            <span className="wisden-scope-strip-segValue">{s.value}</span>
+            {s.isHeading ? (
+              <span className="wisden-scope-strip-heading">{s.label}</span>
+            ) : (
+              <>
+                <span className="wisden-scope-strip-segLabel">{s.label}:</span>
+                {' '}
+                <span className="wisden-scope-strip-segValue">{s.value}</span>
+              </>
+            )}
           </span>
         ))}
         <button

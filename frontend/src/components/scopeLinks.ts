@@ -161,6 +161,59 @@ export function seasonTag(
   return ''
 }
 
+/**
+ * Compact one-line summary of the active scope, suitable for inline
+ * display next to a page title. Used to give the user an at-a-glance
+ * "what am I looking at" without consulting the status strip.
+ *
+ * Order: gender · (tournament OR team_type as fallback) · season ·
+ * rivalry · venue. Empty axes are skipped; returns "" for an unfiltered
+ * scope (caller hides the element).
+ *
+ * Mirrors the segment ordering of ScopeStatusStrip but in shorter form
+ * (no labels, just values, " · " separator). The status strip is the
+ * authoritative read; this is the glance read.
+ */
+export function abbreviateScope(scope: Partial<FilterParams>): string {
+  const parts: string[] = []
+
+  if (scope.gender === 'male') parts.push("men's")
+  else if (scope.gender === 'female') parts.push("women's")
+
+  if (scope.tournament) parts.push(scope.tournament)
+  else if (scope.team_type === 'club') parts.push('club')
+  else if (scope.team_type === 'international') parts.push('international')
+
+  const season = seasonTag(scope.season_from, scope.season_to)
+  if (season) parts.push(season)
+
+  if (scope.filter_team && scope.filter_opponent) {
+    parts.push(`${scope.filter_team} vs ${scope.filter_opponent}`)
+  } else if (scope.filter_team) {
+    parts.push(scope.filter_team)
+  } else if (scope.filter_opponent) {
+    parts.push(`vs ${scope.filter_opponent}`)
+  }
+
+  if (scope.filter_venue) parts.push(`at ${scope.filter_venue}`)
+
+  if (scope.team_class === 'full_member') parts.push('full members')
+  else if (scope.team_class === 'primary_club') parts.push('primary clubs')
+  else if (scope.team_class === 'secondary_club') parts.push('secondary clubs')
+
+  if (scope.series_type && scope.series_type !== 'all') {
+    const st = scope.series_type
+    parts.push(
+      st === 'bilateral' || st === 'bilateral_only' ? 'bilateral'
+      : st === 'icc' || st === 'tournament_only' ? 'ICC'
+      : st === 'club' ? 'club competitions'
+      : st,
+    )
+  }
+
+  return parts.join(' · ')
+}
+
 export interface PhraseTier {
   /** Phrase text, e.g. "at T20 World Cup" or "vs Australia" or "at IPL, 2024 vs CSK". */
   label: string

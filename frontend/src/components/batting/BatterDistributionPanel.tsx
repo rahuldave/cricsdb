@@ -36,21 +36,21 @@ const WINDOW_OPTIONS: { key: DistWindow; label: string; param: string; tooltip: 
 ]
 
 function LegendSwatch({ color }: { color: string }) {
-  // Solid color rectangle used as a legend swatch — replaces the
-  // em-dash glyph which was too thin to read against the cream
-  // background. 16×3px matches the visual weight of the actual
-  // sparkline lines (rolling-mean polyline + 20-run reference line).
+  // Solid color line used as a legend swatch. Matches the visual
+  // weight of the sparkline's own lines (rolling-mean polyline +
+  // 20-run reference line — both render at ~1.5px stroke once the
+  // SVG scales to full panel width).
   return (
     <span
       aria-hidden="true"
       style={{
         display: 'inline-block',
-        width: '16px',
-        height: '3px',
+        width: '14px',
+        height: '1.5px',
         background: color,
         verticalAlign: 'middle',
-        marginRight: '0.25rem',
-        marginBottom: '0.05rem',
+        marginRight: '0.3rem',
+        marginBottom: '0.1rem',
       }}
     />
   )

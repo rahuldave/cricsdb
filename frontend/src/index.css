@@ -1808,6 +1808,12 @@ a { color: inherit; }
   font-weight: 500;
 }
 .wisden-scope-strip-sep { color: var(--ink-faint); }
+.wisden-scope-strip-heading {
+  font-variant: all-small-caps;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--accent);
+}
 .wisden-scope-strip-copy {
   margin-left: auto;
   font-family: var(--serif);
