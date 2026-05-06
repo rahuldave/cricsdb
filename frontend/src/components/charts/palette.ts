@@ -51,6 +51,29 @@ export const WISDEN_RUN_TIERS: Record<
 }
 
 /**
+ * Wicket-tier coloring for the bowler distribution histogram (spec
+ * §12.2.2). Discrete bars at integer wickets 0..6+; tiers ladder
+ * up the rarity spectrum.
+ *
+ * Tiers:
+ *  - wicketless : 0   (muted slate — empty spell)
+ *  - building   : 1-2 (faint slate — modest impact)
+ *  - threefer   : 3   (sage green — "got going")
+ *  - fourfer    : 4   (ochre — match-shaping)
+ *  - fivefer    : 5+  (deeper gold — career-marker)
+ */
+export const WISDEN_WICKET_TIERS: Record<
+  'wicketless' | 'building' | 'threefer' | 'fourfer' | 'fivefer',
+  string
+> = {
+  wicketless: '#A8A091',  // faint slate-tan, distinct from active bars
+  building:   '#7090A8',  // muted indigo (1-2 wickets — modest)
+  threefer:   '#7A8E6A',  // sage — "got going"
+  fourfer:    WISDEN.ochre,
+  fivefer:    '#9C6B17',  // deeper gold
+}
+
+/**
  * High-contrast pair for two-innings charts (Worm, Manhattan) where the
  * default categorical palette runs ink+slate, which read too similarly
  * on cream. Pure ink against a saturated indigo gives a clear value
