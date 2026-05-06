@@ -61,7 +61,14 @@ api/
                           internal_docs/spec-distribution-stats.md §8.
                          Frontend panel: components/batting/* — see below.
     bowling.py        — /api/v1/bowlers/leaders (top 10 by SR + by economy, filter-sensitive)
-                         /api/v1/bowlers/{id}/summary|by-innings|vs-batters|by-over|by-phase|by-season|wickets
+                         /api/v1/bowlers/{id}/summary|by-innings|vs-batters|by-over|by-phase|by-season|wickets|distribution
+                         /distribution: per-innings bowling distribution dossier
+                          (three sibling blocks: wickets / runs_conceded /
+                          economy; lifetime + 4 form windows; phase
+                          decomposition; Wilson 95% CIs on every probability;
+                          ≥2-anchored conditional ladder; pool-derived SR + avg
+                          scalars; min_balls=12 default qualifying threshold).
+                          Spec: internal_docs/spec-distribution-stats.md §11.
     fielding.py       — /api/v1/fielders/leaders (top 10 fielders + top 10 keepers, volume-based)
                          /api/v1/fielders/{id}/summary|by-season|by-phase|by-over|dismissal-types|victims|by-innings
     keeping.py        — /api/v1/fielders/{id}/keeping/summary|by-season|by-innings|ambiguous (Tier 2)
@@ -104,8 +111,15 @@ scope_links.py        — suggested_splits(scope) — server-side mirror of
                          gender flip). Lockstep-tested with the TS impl via
                          tests/sanity/scope_splits_fixtures.json. Reusable
                          on any scoped page that wants "always-ahead"
-                         navigation; first consumer is /batters/{id}/distribution.
+                         navigation; consumed by both /batters/{id}/distribution
+                         and /bowlers/{id}/distribution.
                          Spec: internal_docs/spec-distribution-stats.md §8.7.
+wilson.py             — wilson_ci(num, denom) + prob_record(num, denom) —
+                         closed-form Wilson 95% CI for binomial proportions.
+                         Used by every probability field in the distribution
+                         dossiers. No scipy dependency; self-contained
+                         {value, num, denom, ci_low, ci_high} record.
+                         Spec: internal_docs/spec-distribution-stats.md §11.3.
 tournament_canonical.py — Shared canonical map (T20 WC variants → "T20 World Cup (Men)" etc.)
                          imported by filters.py + tournaments.py + reference.py for global
                          IN-variants expansion of tournament=X queries.

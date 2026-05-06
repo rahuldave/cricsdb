@@ -1130,6 +1130,142 @@ curl "http://localhost:8000/api/v1/bowlers/462411b3/summary?gender=male&team_typ
 **Note (CLAUDE.md convention):** bowling uses `runs_conceded` and
 `wickets`, NOT `runs`/`dismissals`. Don't reuse batting types.
 
+## `GET /api/v1/bowlers/{id}/distribution`
+
+Per-innings bowling distribution dossier. Three sibling
+distribution blocks under one master sample:
+
+- **`wickets`** — zero-inflated discrete count distribution
+  (per-innings wickets taken). Six simples
+  (`p_zero`/`p_geq_1`/`p_geq_2`/`p_geq_3`/`p_geq_4`/`p_geq_5`)
+  + three ≥2-anchored conditionals (`p_3_given_2`/`p_4_given_2`/
+  `p_5_given_2`). All conditional denominators equal `count(w ≥ 2)`
+  for stable noise across the rare-event upper rungs (chain
+  conditionals like `P(≥5│≥4)` would shrink the denominator
+  geometrically and produce ±20pp confidence intervals at the top
+  rung; anchoring keeps it bounded by `count(≥2)`).
+- **`runs_conceded`** — skewed continuous, simples only
+  (`p_leq_15`/`p_leq_25`/`p_geq_40`/`p_geq_50`).
+- **`economy`** — continuous per-over rate. Surfaces BOTH `pool`
+  (balls-weighted, the conventional career number) AND
+  `mean_per_innings` (unweighted mean of per-innings RPO) — they
+  answer different questions; histograms read against
+  `mean_per_innings` for visual centre-of-mass, summary text
+  reads against `pool`. Simples
+  `p_econ_leq_6`/`p_econ_leq_7`/`p_econ_geq_9`/`p_econ_geq_10`.
+
+Plus phase decomposition (powerplay/middle/death runs+balls+
+wickets per phase, plus per-innings phase columns on every
+observation), four form windows (last-10 innings, last-60d,
+last-6mo, last-1yr), pool-derived scalars (`pool_strike_rate`,
+`pool_average`), and scope-derived suggested-splits.
+
+**Every probability field** ships as
+`{ value, num, denom, ci_low, ci_high }` with a Wilson 95%
+confidence interval. `value`, `ci_low`, `ci_high` are `null`
+when `denom == 0` (undefined ratio).
+
+**Master sample** = per `(match, innings the bowler bowled in)`
+clearing the `min_balls` qualifying-spell threshold. Default
+`min_balls=12` (= 2 legal overs); pass `min_balls=0` to include
+1-ball cameos. The threshold is echoed back in
+`response.thresholds.min_balls`.
+
+Optional `as_of_date` (YYYY-MM-DD) anchors the calendar form
+windows deterministically; production callers omit it. Spec:
+`internal_docs/spec-distribution-stats.md` §11.
+
+```bash
+curl "http://localhost:8000/api/v1/bowlers/462411b3/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
+```
+
+```jsonc
+{
+  "scope": { "tournament": "Indian Premier League",
+             "season_from": "2024", "season_to": "2024" },
+  "thresholds": { "min_balls": 12 },
+  "lifetime": {
+    "n_innings": 13,
+    "pool_strike_rate": 15.55,
+    "pool_average": 17.05,
+    "wickets": {
+      "total": 20, "mean_per_innings": 1.5385, "median": 1,
+      "variance": 2.6026, "std": 1.6132,
+      "observations": [
+        { "innings_id": 11781, "match_id": 5879, "date": "2024-03-24",
+          "balls": 24, "runs_conceded": 15, "wickets": 3,
+          "dots": 13, "boundaries_conceded": 1,
+          "wides": 0, "noballs": 0,
+          "runs_pp": 4, "balls_pp": 6, "wickets_pp": 1,
+          "runs_mid": 2, "balls_mid": 6, "wickets_mid": 0,
+          "runs_death": 9, "balls_death": 12, "wickets_death": 2 }
+        // ... (13 entries, date-asc)
+      ],
+      "milestones": {
+        "p_zero":      { "value": 0.3846, "num": 5, "denom": 13, "ci_low": 0.1771, "ci_high": 0.6448 },
+        "p_geq_1":     { "value": 0.6154, "num": 8, "denom": 13, "ci_low": 0.3552, "ci_high": 0.8229 },
+        "p_geq_2":     { "value": 0.4615, "num": 6, "denom": 13, "ci_low": 0.2321, "ci_high": 0.7086 },
+        "p_geq_3":     { "value": 0.3077, "num": 4, "denom": 13, "ci_low": 0.1268, "ci_high": 0.5763 },
+        "p_geq_4":     { "value": 0.0769, "num": 1, "denom": 13, "ci_low": 0.0137, "ci_high": 0.3331 },
+        "p_geq_5":     { "value": 0.0769, "num": 1, "denom": 13, "ci_low": 0.0137, "ci_high": 0.3331 },
+        "p_3_given_2": { "value": 0.6667, "num": 4, "denom":  6, "ci_low": 0.3000, "ci_high": 0.9032 },
+        "p_4_given_2": { "value": 0.1667, "num": 1, "denom":  6, "ci_low": 0.0301, "ci_high": 0.5635 },
+        "p_5_given_2": { "value": 0.1667, "num": 1, "denom":  6, "ci_low": 0.0301, "ci_high": 0.5635 }
+      }
+    },
+    "runs_conceded": {
+      "total": 341, "mean_per_innings": 26.2308, "median": 23,
+      "variance": 70.859, "std": 8.4178,
+      "milestones": {
+        "p_leq_15": { "value": 0.0769, "num": 1, "denom": 13, "ci_low": 0.0137, "ci_high": 0.3331 },
+        "p_leq_25": { "value": 0.5385, "num": 7, "denom": 13, "ci_low": 0.2914, "ci_high": 0.7679 },
+        "p_geq_40": { "value": 0.0769, "num": 1, "denom": 13, "ci_low": 0.0137, "ci_high": 0.3331 },
+        "p_geq_50": { "value": 0.0,    "num": 0, "denom": 13, "ci_low": 0.0,    "ci_high": 0.2281 }
+      }
+    },
+    "economy": {
+      "pool": 6.5788, "mean_per_innings": 6.5727, "median_per_innings": 5.75,
+      "variance": 4.3645, "std": 2.0891,
+      "per_innings": [3.75, 9.0, 6.75 /* ... 13 entries */],
+      "milestones": {
+        "p_econ_leq_6":  { "value": 0.5385, "num": 7, "denom": 13, "ci_low": 0.2914, "ci_high": 0.7679 },
+        "p_econ_leq_7":  { "value": 0.6923, "num": 9, "denom": 13, "ci_low": 0.4237, "ci_high": 0.8732 },
+        "p_econ_geq_9":  { "value": 0.3077, "num": 4, "denom": 13, "ci_low": 0.1268, "ci_high": 0.5763 },
+        "p_econ_geq_10": { "value": 0.1538, "num": 2, "denom": 13, "ci_low": 0.0432, "ci_high": 0.4202 }
+      }
+    },
+    "phase": {
+      "powerplay": { "runs_total": 128, "balls_total": 126, "wickets_total":  6, "innings_active": 13 },
+      "middle":    { "runs_total":  62, "balls_total":  60, "wickets_total":  4, "innings_active": 11 },
+      "death":     { "runs_total": 151, "balls_total": 125, "wickets_total": 10, "innings_active": 13 }
+    }
+  },
+  "form": {
+    "last_10":  { "n_innings": 10, /* same shape — wickets/runs_conceded/economy/phase + scalars */ },
+    "last_60d": { "n_innings": 0,  /* null shape: pool stats null, milestones with zero denom */ },
+    "last_6mo": { "n_innings": 0,  /* ... */ },
+    "last_1yr": { "n_innings": 13, /* ... */ },
+    "delta": {
+      "last_10_wickets_mean_minus_lifetime":  0.1615,
+      "last_10_economy_pool_minus_lifetime":  0.0237,
+      "last_60d_wickets_mean_minus_lifetime": null,
+      "last_60d_economy_pool_minus_lifetime": null,
+      "last_6mo_wickets_mean_minus_lifetime": null,
+      "last_6mo_economy_pool_minus_lifetime": null,
+      "last_1yr_wickets_mean_minus_lifetime": 0.0,
+      "last_1yr_economy_pool_minus_lifetime": 0.0
+    }
+  },
+  "suggested_splits": [
+    { "label": "All Indian Premier League",
+      "params": { "tournament": "Indian Premier League" } },
+    { "label": "All cricket in 2024",
+      "params": { "season_from": "2024", "season_to": "2024" } },
+    { "label": "All-time", "params": {} }
+  ]
+}
+```
+
 ## Other endpoints (same shape pattern)
 
 - `GET /by-innings` — innings list with bowling figures. Params:
