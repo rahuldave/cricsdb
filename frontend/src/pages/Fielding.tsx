@@ -9,6 +9,7 @@ import PlayerSearch from '../components/PlayerSearch'
 import SeriesLink from '../components/SeriesLink'
 import FlagBadge from '../components/FlagBadge'
 import ScopeIndicator from '../components/ScopeIndicator'
+import ScopedPageHeader from '../components/ScopedPageHeader'
 import InningToggle from '../components/InningToggle'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
@@ -227,16 +228,16 @@ export default function Fielding() {
 
       {playerId && summary && !summaryFetch.loading && (
         <>
-          <h2 className="wisden-page-title">
+          <ScopedPageHeader filters={filters}>
             {summary.name}
             {summary.nationalities?.length > 0 && (
-              <span style={{ marginLeft: '0.6rem', display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+              <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
                 {summary.nationalities.map(n => (
                   <FlagBadge key={`${n.team}-${n.gender}`} team={n.team} gender={n.gender} size="lg" linkTo />
                 ))}
               </span>
             )}
-          </h2>
+          </ScopedPageHeader>
           <ScopeIndicator filters={filters} />
           <div className="wisden-statrow cols-6">
             <StatCard label="Catches" value={summary.catches} />
