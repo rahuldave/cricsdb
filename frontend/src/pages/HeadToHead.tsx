@@ -9,6 +9,7 @@ import PlayerSearch from '../components/PlayerSearch'
 import TeamSearch from '../components/TeamSearch'
 import SeriesLink from '../components/SeriesLink'
 import FlagBadge from '../components/FlagBadge'
+import ScopedPageHeader from '../components/ScopedPageHeader'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
@@ -261,7 +262,7 @@ function PlayerVsPlayer() {
 
       {enabled && data && !loading && !error && (
         <>
-          <h2 className="wisden-page-title">
+          <ScopedPageHeader filters={filters}>
             <Link to={`/batting?player=${encodeURIComponent(batterId)}`} className="comp-link" style={{ fontSize: 'inherit', fontWeight: 'inherit' }}>
               {data.batter.name}
             </Link>
@@ -289,7 +290,7 @@ function PlayerVsPlayer() {
                 />
               </span>
             )}
-          </h2>
+          </ScopedPageHeader>
 
           <div className="wisden-statrow cols-5">
             <StatCard label="Matches" value={data.summary.matches} />
