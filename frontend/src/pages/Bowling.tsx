@@ -21,14 +21,16 @@ import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import {
   getBowlerSummary, getBowlerInnings, getBowlerVsBatters, getBowlerByOver,
-  getBowlerByPhase, getBowlerBySeason, getBowlerWickets,
+  getBowlerByPhase, getBowlerBySeason, getBowlerWickets, getBowlerDistribution,
   getBowlingLeaders,
 } from '../api'
 import type {
   PlayerSearchResult, BowlingSummary, BowlingInnings, BatterMatchup,
   OverStats, PhaseStats, WicketAnalysis,
   BowlingLeaders, BowlingLeaderEntry, FilterParams,
+  BowlerDistribution,
 } from '../types'
+import BowlerDistributionPanel from '../components/bowling/BowlerDistributionPanel'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   if (fetch.loading) return <Spinner label="Loading…" />
@@ -60,6 +62,15 @@ export default function Bowling() {
   )
   const summary = summaryFetch.data
   useDocumentTitle(summary ? `${summary.name} — Bowling` : playerId ? null : 'Bowling')
+
+  // Distribution dossier — fetched alongside summary; drives the
+  // §12 Distribution panel between stat row 1 and stat row 2. Same
+  // filterDeps so it refetches on FilterBar / inning aux change.
+  const distFetch = useFetch<BowlerDistribution | null>(
+    () => playerId ? getBowlerDistribution(playerId, filters) : Promise.resolve(null),
+    filterDeps,
+  )
+  const distribution = distFetch.data
 
   // Self-correcting deep link — see Batting.tsx for the rationale.
   useEffect(() => {
@@ -196,6 +207,14 @@ export default function Bowling() {
             <StatCard label="Average" value={fmt(summary.average)} />
             <StatCard label="Economy" value={fmt(summary.economy)} />
           </div>
+          {playerId && (
+            <BowlerDistributionPanel
+              playerId={playerId}
+              distribution={distribution}
+              loading={distFetch.loading}
+              error={distFetch.error}
+            />
+          )}
           <div className="wisden-statrow cols-5">
             <StatCard label="Overs" value={summary.overs} />
             <StatCard label="Strike Rate" value={fmt(summary.strike_rate)} />
