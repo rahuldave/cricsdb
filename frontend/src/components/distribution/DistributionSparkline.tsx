@@ -55,6 +55,17 @@ const PLAYER_REF_COLOR = '#1A1714'  // WISDEN.ink — solid black for the player
 const GLOBAL_REF_COLOR = '#8A7D70'  // WISDEN.faint — gray-sand for the league anchor
 const ROLLING_MEAN_COLOR = '#7A1F1F'  // WISDEN.oxblood — reserved for rolling-mean overlay
 
+// Tunable visual weights — picked 2026-05-06 from a 4-combo
+// browser-agent A/B (Kohli + Bumrah, screenshots in /tmp/combo-*).
+// Bar 0.8 keeps tier colors clearly distinguishable without
+// drowning the lines; player line at 2px stands out as the
+// "this player" anchor; global line at 1.5px is subtler context;
+// rolling overlay at 1.2px is visible without overpowering.
+const BAR_OPACITY = 0.8
+const PLAYER_LINE_WIDTH = 2.0
+const GLOBAL_LINE_WIDTH = 1.5
+const ROLLING_LINE_WIDTH = 1.2
+
 export default function DistributionSparkline({
   points,
   playerReferenceValue,
@@ -115,7 +126,7 @@ export default function DistributionSparkline({
           x1={0} x2={VB_W}
           y1={globalY} y2={globalY}
           stroke={GLOBAL_REF_COLOR}
-          strokeWidth={0.9}
+          strokeWidth={GLOBAL_LINE_WIDTH}
           opacity={0.85}
           data-ref="global"
         />
@@ -125,7 +136,7 @@ export default function DistributionSparkline({
           x1={0} x2={VB_W}
           y1={playerY} y2={playerY}
           stroke={PLAYER_REF_COLOR}
-          strokeWidth={1.0}
+          strokeWidth={PLAYER_LINE_WIDTH}
           opacity={0.95}
           data-ref="player"
         />
@@ -149,7 +160,7 @@ export default function DistributionSparkline({
               width={Math.max(barW - 2 * barInset, 0.3)}
               height={h}
               fill={fill}
-              opacity={0.5}
+              opacity={BAR_OPACITY}
             />
           </a>
         )
@@ -158,7 +169,7 @@ export default function DistributionSparkline({
         <polyline
           fill="none"
           stroke={ROLLING_MEAN_COLOR}
-          strokeWidth={0.7}
+          strokeWidth={ROLLING_LINE_WIDTH}
           opacity={0.9}
           points={rollingPolyline}
           data-ref="rolling"
