@@ -35,6 +35,27 @@ const WINDOW_OPTIONS: { key: DistWindow; label: string; param: string; tooltip: 
     tooltip: 'Innings in the last 365 days — annual / loss-of-form gauge.' },
 ]
 
+function LegendSwatch({ color }: { color: string }) {
+  // Solid color rectangle used as a legend swatch — replaces the
+  // em-dash glyph which was too thin to read against the cream
+  // background. 16×3px matches the visual weight of the actual
+  // sparkline lines (rolling-mean polyline + 20-run reference line).
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: 'inline-block',
+        width: '16px',
+        height: '3px',
+        background: color,
+        verticalAlign: 'middle',
+        marginRight: '0.25rem',
+        marginBottom: '0.05rem',
+      }}
+    />
+  )
+}
+
 function pickDossier(dist: BatterDistribution, window: DistWindow): DistributionDossier {
   if (window === 'last_10') return dist.form.last_10
   if (window === 'last_60d') return dist.form.last_60d
@@ -160,11 +181,11 @@ export default function BatterDistributionPanel({
             }}>
               oldest ← bars (one per innings) → most recent
               {' · '}
-              <span style={{ color: 'var(--ink)' }}>—</span>{' 20-run line'}
+              <LegendSwatch color="var(--ink)" />{' 20-run line'}
               {window === 'scope' && (
                 <>
                   {' · '}
-                  <span style={{ color: '#7A1F1F' }}>—</span>{' 10-innings rolling mean'}
+                  <LegendSwatch color="#7A1F1F" />{' 10-innings rolling mean'}
                 </>
               )}
             </div>
