@@ -15,6 +15,11 @@
 
 import type { DistributionDossier } from '../../types'
 import ProbChip from '../distribution/ProbChip'
+import { WISDEN_TIER_TINTS } from '../charts/palette'
+
+const T_INDIGO = WISDEN_TIER_TINTS.indigo
+const T_SAGE   = WISDEN_TIER_TINTS.sage
+const T_OCHRE  = WISDEN_TIER_TINTS.ochre
 
 interface Props {
   dossier: DistributionDossier
@@ -88,12 +93,15 @@ export function MilestoneChipsRow({ dossier }: Props) {
       gap: '0.35rem',
       marginTop: '0.85rem',
     }}>
-      <ProbChip label="P(≤10)"     record={milestones.p_failure_10}  polarity="negative" />
-      <ProbChip label="P(≥30)"     record={milestones.p_30_plus}     polarity="positive" />
-      <ProbChip label="P(≥50)"     record={milestones.p_50_plus}     polarity="positive" />
-      <ProbChip label="P(≥100)"    record={milestones.p_100_plus}    polarity="positive" />
-      <ProbChip label="P(≥50│≥30)" record={milestones.p_50_given_30} polarity="neutral" />
-      <ProbChip label="P(≥70│≥50)" record={milestones.p_70_given_50} polarity="neutral" />
+      {/* Runs palette: 0-9 = failure (indigo) / 10-49 = building
+          (sage) / 50+ = impact (ochre). Conditionals reach the
+          impact tier (50+ / 70+) so they're ochre. */}
+      <ProbChip label="P(≤10)"     record={milestones.p_failure_10}  tint={T_INDIGO} />
+      <ProbChip label="P(≥30)"     record={milestones.p_30_plus}     tint={T_SAGE} />
+      <ProbChip label="P(≥50)"     record={milestones.p_50_plus}     tint={T_OCHRE} />
+      <ProbChip label="P(≥100)"    record={milestones.p_100_plus}    tint={T_OCHRE} />
+      <ProbChip label="P(≥50│≥30)" record={milestones.p_50_given_30} tint={T_OCHRE} />
+      <ProbChip label="P(≥70│≥50)" record={milestones.p_70_given_50} tint={T_OCHRE} />
     </div>
   )
 }

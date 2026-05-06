@@ -14,6 +14,11 @@
 import type { BowlerDossier, BowlerWicketsBlock,
               BowlerEconomyBlock, BowlerRunsConcededBlock } from '../../types'
 import ProbChip from '../distribution/ProbChip'
+import { WISDEN_TIER_TINTS } from '../charts/palette'
+
+const T_INDIGO = WISDEN_TIER_TINTS.indigo
+const T_SAGE   = WISDEN_TIER_TINTS.sage
+const T_OCHRE  = WISDEN_TIER_TINTS.ochre
 
 function fmtNum(v: number | null | undefined, digits = 2): string {
   if (v === null || v === undefined) return '—'
@@ -122,18 +127,20 @@ export function WicketsStatStrip({ block, dossier, n_innings }: WicketsProps) {
 
 export function WicketsChipsRow({ block }: { block: BowlerWicketsBlock }) {
   const m = block.milestones
+  // Wickets palette: 0 = wicketless (indigo) / 1-2 = building (sage) /
+  // 3+ = strike (ochre). Conditionals all about reaching strike-tier.
   return (
     <ChipRow>
-      <ProbChip label="P(0)"  record={m.p_zero}  polarity="negative" />
-      <ProbChip label="P(≥1)" record={m.p_geq_1} polarity="positive" />
-      <ProbChip label="P(≥2)" record={m.p_geq_2} polarity="positive" />
-      <ProbChip label="P(≥3)" record={m.p_geq_3} polarity="positive" />
-      <ProbChip label="P(≥4)" record={m.p_geq_4} polarity="positive" />
-      <ProbChip label="P(≥5)" record={m.p_geq_5} polarity="positive" />
+      <ProbChip label="P(0)"  record={m.p_zero}  tint={T_INDIGO} />
+      <ProbChip label="P(≥1)" record={m.p_geq_1} tint={T_SAGE} />
+      <ProbChip label="P(≥2)" record={m.p_geq_2} tint={T_SAGE} />
+      <ProbChip label="P(≥3)" record={m.p_geq_3} tint={T_OCHRE} />
+      <ProbChip label="P(≥4)" record={m.p_geq_4} tint={T_OCHRE} />
+      <ProbChip label="P(≥5)" record={m.p_geq_5} tint={T_OCHRE} />
       <ConditionalsSeparator />
-      <ProbChip label="P(≥3│≥2)" record={m.p_3_given_2} polarity="neutral" />
-      <ProbChip label="P(≥4│≥2)" record={m.p_4_given_2} polarity="neutral" />
-      <ProbChip label="P(≥5│≥2)" record={m.p_5_given_2} polarity="neutral" />
+      <ProbChip label="P(≥3│≥2)" record={m.p_3_given_2} tint={T_OCHRE} />
+      <ProbChip label="P(≥4│≥2)" record={m.p_4_given_2} tint={T_OCHRE} />
+      <ProbChip label="P(≥5│≥2)" record={m.p_5_given_2} tint={T_OCHRE} />
     </ChipRow>
   )
 }
@@ -169,12 +176,14 @@ export function EconomyStatStrip({ block }: EconomyProps) {
 
 export function EconomyChipsRow({ block }: EconomyProps) {
   const m = block.milestones
+  // Economy is lower-is-better: ≤6/≤7 are tight (ochre = good for
+  // bowler); ≥9/≥10 are loose (indigo = poor outcome).
   return (
     <ChipRow>
-      <ProbChip label="P(econ ≤6)"  record={m.p_econ_leq_6}  polarity="positive" />
-      <ProbChip label="P(econ ≤7)"  record={m.p_econ_leq_7}  polarity="positive" />
-      <ProbChip label="P(econ ≥9)"  record={m.p_econ_geq_9}  polarity="negative" />
-      <ProbChip label="P(econ ≥10)" record={m.p_econ_geq_10} polarity="negative" />
+      <ProbChip label="P(econ ≤6)"  record={m.p_econ_leq_6}  tint={T_OCHRE} />
+      <ProbChip label="P(econ ≤7)"  record={m.p_econ_leq_7}  tint={T_OCHRE} />
+      <ProbChip label="P(econ ≥9)"  record={m.p_econ_geq_9}  tint={T_INDIGO} />
+      <ProbChip label="P(econ ≥10)" record={m.p_econ_geq_10} tint={T_INDIGO} />
     </ChipRow>
   )
 }
@@ -210,12 +219,14 @@ export function RunsConcededStatStrip({ block }: RunsConcededProps) {
 
 export function RunsConcededChipsRow({ block }: RunsConcededProps) {
   const m = block.milestones
+  // Runs conceded is lower-is-better: ≤15/≤25 are tight (ochre);
+  // ≥40/≥50 are loose (indigo).
   return (
     <ChipRow>
-      <ProbChip label="P(≤15)" record={m.p_leq_15} polarity="positive" />
-      <ProbChip label="P(≤25)" record={m.p_leq_25} polarity="positive" />
-      <ProbChip label="P(≥40)" record={m.p_geq_40} polarity="negative" />
-      <ProbChip label="P(≥50)" record={m.p_geq_50} polarity="negative" />
+      <ProbChip label="P(≤15)" record={m.p_leq_15} tint={T_OCHRE} />
+      <ProbChip label="P(≤25)" record={m.p_leq_25} tint={T_OCHRE} />
+      <ProbChip label="P(≥40)" record={m.p_geq_40} tint={T_INDIGO} />
+      <ProbChip label="P(≥50)" record={m.p_geq_50} tint={T_INDIGO} />
     </ChipRow>
   )
 }

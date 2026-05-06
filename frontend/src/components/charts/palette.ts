@@ -26,17 +26,28 @@ export const WISDEN_PALETTE: string[] = [
 export const WISDEN_PHASES: string[] = [WISDEN.indigo, WISDEN.ochre, WISDEN.oxblood]
 
 /**
- * Three-tier coloring for distribution histograms + sparklines.
- * Spec: internal_docs/spec-distribution-stats.md §10.3 (revised
- * 2026-05-06 — collapsed from 5-tier to 3-tier to reduce
- * sparkline visual noise; the bin label still conveys the
- * exact range, the color tells you which tier).
+ * Three-tier coloring SHARED across distribution histograms,
+ * sparklines, AND probability chips. Spec:
+ * internal_docs/spec-distribution-stats.md §10.3 (revised
+ * 2026-05-06 — unified palette per user feedback that the chip
+ * polarity scheme didn't match the histogram tier scheme).
  *
- * Polarity convention:
- *   higher-is-better (runs / wickets / SR): low = indigo (poor),
- *     mid = faint slate-tan (typical), high = sage or gold (strong)
- *   lower-is-better (economy / runs conceded): low = sage (tight),
- *     mid = faint slate-tan, high = ochre (loose / leaked)
+ * The 3-tier palette uses semantically-mapped colors:
+ *   - INDIGO (#7090A8): poor outcome for the player
+ *   - SAGE   (#7A8E6A): regular / typical
+ *   - OCHRE  (#C9871F): really good — "hot"
+ *
+ * Polarity convention — colors are tied to OUTCOME for the player,
+ * not to bin index. So the same color means "good for player" on
+ * every tab, regardless of whether high-or-low values are good:
+ *   higher-is-better (runs / wickets / SR):
+ *     low value (poor)    → INDIGO
+ *     mid value (typical) → SAGE
+ *     high value (good)   → OCHRE
+ *   lower-is-better (economy / runs conceded):
+ *     low value (good)    → OCHRE
+ *     mid value (typical) → SAGE
+ *     high value (poor)   → INDIGO
  *
  * Reds are reserved for the rolling-mean overlay (oxbow) — not
  * used in tier coloring.
@@ -45,33 +56,59 @@ export const WISDEN_PHASES: string[] = [WISDEN.indigo, WISDEN.ochre, WISDEN.oxbl
 export const WISDEN_RUN_TIERS: Record<
   'failure' | 'building' | 'impact', string
 > = {
-  failure:  '#7090A8',  // muted indigo — got out cheap (0-9)
-  building: '#A8A091',  // faint slate-tan — typical (10-49)
-  impact:   '#7A8E6A',  // sage green — match-shaping (50+)
+  failure:  '#7090A8',  // indigo — got out cheap (0-9)
+  building: '#7A8E6A',  // sage — typical (10-49)
+  impact:   WISDEN.ochre,  // ochre — match-shaping (50+) ★
 }
 
 export const WISDEN_WICKET_TIERS: Record<
   'wicketless' | 'building' | 'strike', string
 > = {
-  wicketless: '#7090A8',  // muted indigo — no impact (0)
-  building:   '#A8A091',  // faint slate-tan — modest (1-2)
-  strike:     '#9C6B17',  // deeper gold — strong spell (3+, cricket-iconic)
+  wicketless: '#7090A8',  // indigo — no impact (0)
+  building:   '#7A8E6A',  // sage — modest impact (1-2)
+  strike:     WISDEN.ochre,  // ochre — strong spell (3+, cricket-iconic) ★
 }
 
 export const WISDEN_SR_TIERS: Record<
   'slow' | 'mid' | 'explosive', string
 > = {
-  slow:      '#7090A8',  // muted indigo — anchor / sub-100
-  mid:       '#A8A091',  // typical T20 strike rate
-  explosive: '#7A8E6A',  // sage — 150+ aggressor
+  slow:      '#7090A8',  // indigo — anchor / sub-100
+  mid:       '#7A8E6A',  // sage — typical T20 SR
+  explosive: WISDEN.ochre,  // ochre — 150+ aggressor ★
 }
 
 export const WISDEN_LOWER_TIERS: Record<
   'tight' | 'mid' | 'loose', string
 > = {
-  tight: '#7A8E6A',  // sage — good
-  mid:   '#A8A091',  // typical
-  loose: WISDEN.ochre,  // ochre — bad
+  tight: WISDEN.ochre,  // ochre — good (low econ / few runs conceded) ★
+  mid:   '#7A8E6A',     // sage — typical
+  loose: '#7090A8',     // indigo — poor outcome (high econ / many runs)
+}
+
+/**
+ * Chip-tint pairs (background fill + foreground text color) for
+ * each of the three semantic tiers. Used by ProbChip — each chip
+ * caller picks the tier its threshold falls in and looks up the
+ * matching tint. This is what makes the chip color match the
+ * histogram + sparkline bar at the same outcome.
+ */
+export const WISDEN_TIER_TINTS: Record<
+  'indigo' | 'sage' | 'ochre',
+  { bg: string; fg: string }
+> = {
+  indigo: { bg: 'rgba(112, 144, 168, 0.18)', fg: '#3F5A78' },
+  sage:   { bg: 'rgba(122, 142, 106, 0.18)', fg: '#3F5A2F' },
+  ochre:  { bg: 'rgba(201, 135, 31, 0.18)',  fg: '#6B4710' },
+}
+
+/** Map a tier color (from any of the WISDEN_*_TIERS palettes) to
+ *  its chip-tint pair. */
+export function tintForTierColor(color: string): { bg: string; fg: string } {
+  if (color === '#7090A8') return WISDEN_TIER_TINTS.indigo
+  if (color === '#7A8E6A') return WISDEN_TIER_TINTS.sage
+  if (color === WISDEN.ochre || color === '#C9871F') return WISDEN_TIER_TINTS.ochre
+  // Fallback: faint slate (was the old neutral chip styling)
+  return { bg: 'rgba(60, 91, 122, 0.10)', fg: '#3C5B7A' }
 }
 
 /**

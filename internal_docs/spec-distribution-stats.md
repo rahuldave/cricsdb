@@ -1351,14 +1351,31 @@ Established 2026-05-06 on the v2 form-windows extension.
   innings was he poor?" / "of his good spells, how many were
   big bags?" at a glance.
 
-  **3-tier collapse** — every metric uses **3 tiers max** (down
-  from 5) per user feedback that 5 colors made the sparkline
-  visually noisy. The bin label still conveys the exact range;
-  the color tells you which tier. Polarity convention:
+  **3-tier unified palette** (revised 2026-05-06) — every metric
+  uses **3 tiers max** AND the same 3 colors are shared across
+  histogram bars, sparkline bars, and probability chips. The bin
+  label still conveys the exact range; the color tells you which
+  tier — and a chip about a particular threshold uses the same
+  color as the histogram bar at that threshold.
+
+  Three semantic tier colors:
+  - **INDIGO** (`#7090A8`) — poor outcome for the player
+  - **SAGE**   (`#7A8E6A`) — regular / typical
+  - **OCHRE**  (`WISDEN.ochre`) — really good ("hot")
+
+  Polarity convention — colors are tied to OUTCOME for the player,
+  not to bin index. So the same color means "good for player" on
+  every tab:
   - Higher-is-better (runs / wickets / SR): low = indigo (poor),
-    mid = faint slate-tan (typical), high = sage or gold (strong)
-  - Lower-is-better (economy / runs conceded): low = sage (tight),
-    mid = faint slate-tan, high = ochre (loose)
+    mid = sage (typical), high = ochre (good)
+  - Lower-is-better (economy / runs conceded): low = ochre (good),
+    mid = sage (typical), high = indigo (poor)
+
+  Chip-tint helper: `WISDEN_TIER_TINTS` exports
+  `{indigo, sage, ochre}` → `{bg: rgba, fg: hex}` pairs. Each chip
+  caller picks the tier its threshold falls in (e.g.
+  `<ProbChip tint={T_OCHRE} ...>` for `P(≥3)` on the wickets tab,
+  matching the strike-tier histogram bar).
 
   Tier breaks:
   | Metric | low | mid | high |
