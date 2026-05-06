@@ -516,6 +516,146 @@ export interface BatterDistribution {
   suggested_splits: SuggestedSplit[]
 }
 
+// ─── Bowler distribution dossier ────────────────────────────────────────
+//
+// Mirror of /api/v1/bowlers/{id}/distribution. Spec:
+// internal_docs/spec-distribution-stats.md §11.8.
+
+/**
+ * Wilson 95% CI binomial proportion record. Used by every probability
+ * field across the distribution dossiers (bowler v1; batter retrofit
+ * pending). `value`, `ci_low`, `ci_high` are null when denom == 0
+ * (undefined ratio). Backend helper: api/wilson.py::prob_record.
+ */
+export interface ProbRecord {
+  value: number | null
+  num: number
+  denom: number
+  ci_low: number | null
+  ci_high: number | null
+}
+
+export interface BowlerInningsObservation {
+  innings_id: number
+  match_id: number
+  date: string | null
+  balls: number
+  runs_conceded: number
+  wickets: number
+  dots: number
+  boundaries_conceded: number
+  wides: number
+  noballs: number
+  runs_pp: number
+  balls_pp: number
+  wickets_pp: number
+  runs_mid: number
+  balls_mid: number
+  wickets_mid: number
+  runs_death: number
+  balls_death: number
+  wickets_death: number
+}
+
+export interface BowlerWicketsBlock {
+  total: number
+  mean_per_innings: number | null
+  median: number | null
+  variance: number | null
+  std: number | null
+  observations: BowlerInningsObservation[]
+  milestones: {
+    p_zero: ProbRecord
+    p_geq_1: ProbRecord
+    p_geq_2: ProbRecord
+    p_geq_3: ProbRecord
+    p_geq_4: ProbRecord
+    p_geq_5: ProbRecord
+    /** P(w ≥ 3 | w ≥ 2) — denom = count(≥2) for all conditionals (≥2-anchored ladder, spec §11.4.1). */
+    p_3_given_2: ProbRecord
+    p_4_given_2: ProbRecord
+    p_5_given_2: ProbRecord
+  }
+}
+
+export interface BowlerRunsConcededBlock {
+  total: number
+  mean_per_innings: number | null
+  median: number | null
+  variance: number | null
+  std: number | null
+  milestones: {
+    p_leq_15: ProbRecord
+    p_leq_25: ProbRecord
+    p_geq_40: ProbRecord
+    p_geq_50: ProbRecord
+  }
+}
+
+export interface BowlerEconomyBlock {
+  /** Pool / balls-weighted economy — the conventional career number. */
+  pool: number | null
+  /** Unweighted mean of per-innings economies — different from pool when innings vary in balls. */
+  mean_per_innings: number | null
+  median_per_innings: number | null
+  variance: number | null
+  std: number | null
+  /** Per-innings RPO list, derived at dossier-build time from observations. */
+  per_innings: number[]
+  milestones: {
+    p_econ_leq_6: ProbRecord
+    p_econ_leq_7: ProbRecord
+    p_econ_geq_9: ProbRecord
+    p_econ_geq_10: ProbRecord
+  }
+}
+
+export interface BowlerPhaseRollup {
+  runs_total: number
+  balls_total: number
+  wickets_total: number
+  innings_active: number
+}
+
+export interface BowlerDossier {
+  n_innings: number
+  /** Pool SR = total_balls / total_wickets when wickets > 0, else null. */
+  pool_strike_rate: number | null
+  /** Pool average = total_runs_conceded / total_wickets when wickets > 0, else null. */
+  pool_average: number | null
+  wickets: BowlerWicketsBlock
+  runs_conceded: BowlerRunsConcededBlock
+  economy: BowlerEconomyBlock
+  phase: {
+    powerplay: BowlerPhaseRollup
+    middle: BowlerPhaseRollup
+    death: BowlerPhaseRollup
+  }
+}
+
+export interface BowlerDistribution {
+  scope: Record<string, string>
+  thresholds: { min_balls: number }
+  lifetime: BowlerDossier
+  form: {
+    last_10: BowlerDossier
+    last_60d: BowlerDossier
+    last_6mo: BowlerDossier
+    last_1yr: BowlerDossier
+    delta: {
+      last_10_wickets_mean_minus_lifetime: number | null
+      last_10_economy_pool_minus_lifetime: number | null
+      last_60d_wickets_mean_minus_lifetime: number | null
+      last_60d_economy_pool_minus_lifetime: number | null
+      last_6mo_wickets_mean_minus_lifetime: number | null
+      last_6mo_economy_pool_minus_lifetime: number | null
+      last_1yr_wickets_mean_minus_lifetime: number | null
+      last_1yr_economy_pool_minus_lifetime: number | null
+    }
+  }
+  suggested_splits: SuggestedSplit[]
+}
+
 export interface BowlingSummary {
   person_id: string
   name: string
