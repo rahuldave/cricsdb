@@ -1,16 +1,14 @@
 # Spec — Distribution-shaped statistics on the API
 
 > **Status:** Inventory + cross-discipline framing remain DRAFT.
-> §8 (batter v1 backend distribution dossier) is **IMPLEMENTED**
-> 2026-05-05.
-> §9 (batter v1 frontend — Distribution panel on `/batting`) is
-> **IMPLEMENTED** 2026-05-05 across 5 commits (types + fetcher;
-> histogram + stat strip + tier palette; sparkline + form delta
-> + splits row; panel + Batting.tsx integration; integration test
-> + docs). Panel live at `/batting?player=X`. 21/21 integration
-> assertions pass against cricket.db. Numbers SQL-anchored at test
-> runtime (mean / median / P(≥50) / n_innings; inning=0 + inning=1
-> partition invariant).
+> §8 + §9 (batter v1 backend + frontend) **IMPLEMENTED** 2026-05-05.
+> v2 extension shipped 2026-05-06: 4-window form (added 6mo + 1y
+> alongside 10 + 60d), conditional milestones (p_50_given_30,
+> p_70_given_50, p_30_plus), "Scope" rename (was "Lifetime"),
+> two-row milestone chip layout, sparkline grey 20-run reference
+> line + labelled caption, stat row 2 "30s / 50s / 100s".
+> 258/258 sanity invariants pass; 21/21 integration assertions
+> pass against cricket.db.
 > Remaining open questions in §6 apply to the bowler / fielder /
 > team slices.
 
@@ -393,19 +391,33 @@ frontend spec.
 
 ### 8.4 Milestone probabilities
 
-CDF readouts of the runs distribution, normalised by `n_innings`:
+Two groups: **simples** (unconditional CDF readouts of the runs
+distribution, normalised by `n_innings`) and **conditionals**
+("going-on" probabilities — among innings that reached threshold A,
+what fraction reached the higher threshold B).
+
+**Simples** — denominator `n_innings`:
 
 | Field | Formula | Reading |
 |---|---|---|
-| `milestones.p_failure_10` | `count(o.runs ≤ 10) / n_innings` | "got out cheap" |
-| `milestones.p_25_plus` | `count(o.runs ≥ 25) / n_innings` | "got going" |
-| `milestones.p_50_plus` | `count(o.runs ≥ 50) / n_innings` | "match-shaping" |
-| `milestones.p_100_plus` | `count(o.runs ≥ 100) / n_innings` | "match-winning" |
+| `milestones.p_failure_10` | `count(runs ≤ 10) / n_innings` | "got out cheap" |
+| `milestones.p_25_plus` | `count(runs ≥ 25) / n_innings` | (kept for API back-compat; UI dropped 2026-05-06 in favor of p_30_plus) |
+| `milestones.p_30_plus` | `count(runs ≥ 30) / n_innings` | T20 "got going" baseline |
+| `milestones.p_50_plus` | `count(runs ≥ 50) / n_innings` | "match-shaping" |
+| `milestones.p_100_plus` | `count(runs ≥ 100) / n_innings` | "match-winning" |
 
-Thresholds pinned at 10 / 25 / 50 / 100 for v1. **Not** a
-configurable axis — keeps API surface small and makes cross-player
-comparison clean. 50s and 100s as raw counts go away — `p_50_plus
-× n_innings` and `p_100_plus × n_innings` recover the count.
+**Conditionals** — denominator is the *count of innings that
+reached the conditioning threshold*. Null when that count is 0
+(undefined ratio).
+
+| Field | Formula | Reading |
+|---|---|---|
+| `milestones.p_50_given_30` | `count(runs ≥ 50) / count(runs ≥ 30)` | of his "got going" innings, how often he pushed to a fifty |
+| `milestones.p_70_given_50` | `count(runs ≥ 70) / count(runs ≥ 50)` | of his fifties, how often he pushed past 70 |
+
+Conditionals carry a subset invariant: `count(≥A) ≤ count(≥B)` for
+A > B → ratio always in [0, 1]. Pinned in
+`tests/sanity/test_batter_distribution_invariants.py`.
 
 ### 8.5 Phase decomposition
 
@@ -451,30 +463,42 @@ check in §8.10). Same partition holds for `balls_total`.
 
 ### 8.6 Form windows
 
-Two windows, **same dossier shape as lifetime** — the entire `runs`,
-`milestones`, and `phase` blocks recompute on the windowed sample:
+Four windows, **same dossier shape as lifetime** — the entire
+`runs`, `milestones`, and `phase` blocks recompute on the windowed
+sample:
 
-| Window | Definition |
-|---|---|
-| `form.last_10` | `ORDER BY date DESC, innings_number DESC LIMIT 10` over the active filter |
-| `form.last_60d` | `WHERE date >= today() − 60 days` over the active filter; no `LIMIT` — sample size varies |
+| Window | Definition | Use |
+|---|---|---|
+| `form.last_10` | `ORDER BY date DESC, innings_number DESC LIMIT 10` | cricket-conventional "current form" |
+| `form.last_60d` | `WHERE date >= today() − 60 days` | calendar-anchored current form |
+| `form.last_6mo` | `WHERE date >= today() − 180 days` | medium-term arc |
+| `form.last_1yr` | `WHERE date >= today() − 365 days` | annual / loss-of-form gauge |
 
-Plus a `form.delta` block — one-glance reads:
+60 days is short enough to gauge current form but too short to
+detect a loss-of-form arc; the 6mo + 1y windows added 2026-05-06
+fill that gap.
+
+Plus a `form.delta` block — one-glance reads, two metrics × four
+windows = 8 entries:
 
 ```jsonc
 "form": {
   "delta": {
-    "last_10_mean_minus_lifetime":   <float>,
-    "last_10_median_minus_lifetime": <float>,
-    "last_60d_mean_minus_lifetime":   <float>,
-    "last_60d_median_minus_lifetime": <float>
+    "last_10_mean_minus_lifetime":    <float>,
+    "last_10_median_minus_lifetime":  <float>,
+    "last_60d_mean_minus_lifetime":    <float>,
+    "last_60d_median_minus_lifetime":  <float>,
+    "last_6mo_mean_minus_lifetime":    <float>,
+    "last_6mo_median_minus_lifetime":  <float>,
+    "last_1yr_mean_minus_lifetime":    <float>,
+    "last_1yr_median_minus_lifetime":  <float>
   }
 }
 ```
 
-Sparkline data is implicit — frontend reads
-`lifetime.runs.observations[]` (date-asc), takes the tail, overlays
-rolling-N mean. No separate endpoint.
+Sparkline data is implicit — frontend reads the active window's
+`runs.observations[]` (date-asc), overlays a rolling-N mean line on
+the Scope window only. No separate endpoint.
 
 ### 8.7 Suggested splits
 
@@ -1076,11 +1100,17 @@ splits arrive in one payload. No incremental loading.
 
 ### 9.7 Window toggle state — URL-encoded (revised 2026-05-05)
 
-URL key: `dist_window`. Values: `lifetime` (default — absent
-param) | `last_10` | `last_60d`. Read via `useSearchParams`
-(NOT `useFilters` — `dist_window` is panel-local, not a FilterBar
-field; adding it to FILTER_KEYS would pollute the link-builder
-contract).
+URL key: `dist_window`. Values: `scope` (default — absent param) |
+`last_10` | `last_60d` | `last_6mo` | `last_1yr`. Read via
+`useSearchParams` (NOT `useFilters` — `dist_window` is panel-local,
+not a FilterBar field; adding it to FILTER_KEYS would pollute the
+link-builder contract).
+
+The toggle label was renamed from "Lifetime" to "Scope" 2026-05-06.
+"Lifetime" was misleading on filtered scopes — IPL 2024 isn't a
+player's lifetime when that filter is active. The internal API
+field on the response stays named `lifetime` for backward compat;
+only the UI label and URL value changed.
 
 ```ts
 const [searchParams, setSearchParams] = useSearchParams()
