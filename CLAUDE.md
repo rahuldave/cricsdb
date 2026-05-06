@@ -136,6 +136,53 @@ text. From there on, audits should:
   are exploratory. Checked-in `tests/integration/<feature>.sh`
   assertions are durable.
 
+**Page header convention — `ScopedPageHeader` for every scoped page.**
+Every page that takes FilterBar narrowings (Batting / Bowling /
+Fielding / Players / Teams / Series / Venues / HeadToHead) renders
+its title via `frontend/src/components/ScopedPageHeader.tsx`:
+title content + flag on the left, "SCOPE <abbreviated narrowings>"
+small italic on the right, flex-wrap to a second row on mobile.
+The component reads `abbreviateScope(filters)` from
+`scopeLinks.ts`. Pass `omit={['tournament']}` etc. on dossier pages
+where the page subject IS one of the scope axes (Series omits
+`tournament`, Venues omits `filter_venue`) to avoid duplicating
+the title in the abbreviation. The status-strip "SCOPE" pseudo-
+segment between path-identity and FilterBar narrowings establishes
+the same vocabulary at the top of the page. New scoped page →
+use `ScopedPageHeader`, do NOT re-roll the H2 + flag JSX inline.
+
+**`abbreviateScope` is the source of truth for "what's in scope".**
+When you add a new FilterBar field or AuxParam that affects what
+data the user is looking at, ALSO add it to `abbreviateScope` in
+`scopeLinks.ts`. The 2026-05-06 inning-missing bug surfaced because
+inning is an AuxParam, not in `FILTER_KEYS`, and the abbreviation
+silently dropped it. The audit pattern: for every axis in
+`FilterParams`, ask "does setting this change what data is shown?"
+If yes, it's in scope and belongs in the abbreviation. The
+`ScopeStatusStrip` is the parallel reference list — both should
+emit the same axes.
+
+**URL state for "what view am I looking at".** Anything that
+selects between pre-fetched dossiers / view modes / windows /
+toggles MUST encode in the URL via `useUrlParam` so share-link
+reproducibility holds. The default value is encoded by ABSENCE
+of the param (saves URL noise on the canonical default).
+Per-panel keys use a panel-specific prefix (`dist_window` for the
+Distribution panel; `compareN_inning` for Compare slot inning
+override) so they don't collide. `feedback_state_location.md` —
+share-link reproducibility wins; if you send someone a link to
+"Kohli's last-10 form", the receiver should land on the same view.
+
+**Single-payload + window-toggle pattern.** When an endpoint can
+return multiple related views in one response (e.g. lifetime +
+last_10 + last_60d + last_6mo + last_1yr in
+`/api/v1/batters/{id}/distribution`), prefer a single roundtrip
+over per-view fetches. The frontend toggle then redraws from the
+in-memory payload — no refetch, instant switching. Cost: payload
+size grows linearly with N views. Acceptable when each view is
+the same shape and N is small (≤6). Spec:
+`internal_docs/spec-distribution-stats.md §8.6` + §9.2.1.
+
 **API-frontend type contract:** when a backend change drops a field
 from a response, drop it from the matching TypeScript interface in
 `frontend/src/types.ts` IN THE SAME COMMIT. Type-API divergence is

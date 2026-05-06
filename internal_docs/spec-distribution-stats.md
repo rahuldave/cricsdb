@@ -1247,13 +1247,147 @@ from §8 to verify rendering before commit 5.
 
 ---
 
-*Started 2026-05-04. Inventory + framing drafted first; batter v1
-backend (§8) drafted + IMPLEMENTED 2026-05-05 across 5 commits.
-Batter v1 frontend (§9) drafted + IMPLEMENTED 2026-05-05 across
-5 more commits — types + fetcher; histogram + stat strip + tier
-palette; sparkline + form delta + splits row; panel orchestrator
-+ Batting.tsx integration; integration test + docs. 21/21
-integration assertions pass; SQL-anchored Mean / Median / P(≥50)
-/ n_innings + inning=0/inning=1 partition invariant.
-Bowler / fielder / team distribution dossiers remain as sibling
-specs; no work done.*
+## 10. Patterns established for bowler / fielder / team slices
+
+The batter v1 slice (§8 + §9, plus the v2/v3/v4 follow-up commits
+2026-05-05 → 2026-05-06) settled a stack of conventions that the
+sibling specs should reuse. Don't re-decide these per discipline
+unless there's a concrete reason — that's how parallel helpers
+drift.
+
+### 10.1 Backend conventions
+
+- **Single-payload + window-toggle.** Return lifetime + every form
+  window (last_10 / last_60d / last_6mo / last_1yr) in ONE
+  response. Frontend toggle redraws from the in-memory payload;
+  no refetch on toggle. Same shape for every window — caller
+  picks the dossier by key.
+- **Pure aggregation function.** Separate the SQL master-sample
+  query from the aggregate-the-list pure function. The same pure
+  function powers lifetime AND each form window, AND falls cleanly
+  to a `null`-shape on n=0 (no exceptions on empty samples).
+  Reference: `_innings_master_sample` + `_distribution_dossier` +
+  `_form_windows` in `api/routers/batting.py`.
+- **Hard form windows, not exponential decay.** Last-10 (count-
+  bound, no calendar), last-60d / 6mo / 1yr (calendar-anchored).
+  Decay weighting is harder to communicate and not what users
+  mean by "form".
+- **`as_of_date` query param** for deterministic regression tests
+  on calendar-anchored windows. Production callers omit it
+  (defaults to today).
+- **Phase columns on every per-innings observation.** Even when
+  the discipline doesn't surface SR-by-phase yet, store the
+  per-phase (runs, balls) on each observation row so future
+  by-phase work is a pure derivation — no re-query, no schema
+  change.
+- **Conditional probabilities — null when denominator is 0.**
+  `p_50_given_30 = count(≥50) / count(≥30)` is undefined when
+  no innings reached 30. Subset invariant `count(≥A) ≤ count(≥B)`
+  for A > B keeps ratios in [0, 1]; pin in sanity tests.
+- **Match existing convention even when docs disagree.** The
+  'retired not out' exclusion in `how-stats-calculated.md` is
+  3-element, but every batting endpoint uses 2-element — new
+  endpoints follow the 2-element convention for cross-endpoint
+  consistency. Don't fork the rule for one new endpoint; fix
+  the doc-vs-code drift in a separate sweep if needed.
+- **Verify column names against schema.** `delivery.over_number`
+  is 0–19 (not `over_idx`); `wicket.kind` literals use
+  `'caught'` / `'run_out'` / `'caught_and_bowled'` (underscored
+  for multi-word). One sqlite3 query saves a half-hour of
+  debugging.
+
+### 10.2 Regression workflow
+
+When intentionally changing the response shape of an existing
+endpoint with a `urls.txt` inventory:
+
+1. Commit A: flip affected URLs `REG → NEW` (separate, earlier
+   commit — the runner keys on HEAD's `kind`).
+2. Commit B: backend shape change.
+3. Commit C: flip URLs `NEW → REG` (locks in new shape as the new
+   ground truth).
+
+Established 2026-05-06 on the v2 form-windows extension.
+
+### 10.3 Frontend / UX conventions
+
+- **`ScopedPageHeader`** is the canonical page header. Pass
+  `omit={[...]}` on dossier pages where the page subject would
+  duplicate a scope axis.
+- **URL state for window-toggle**. `?dist_window=lifetime|last_10|
+  last_60d|last_6mo|last_1yr`, default = absent param. Toggle
+  clicks land in browser history. Per-panel keys use a panel-
+  specific prefix (e.g. `dist_window` for Distribution panel) to
+  avoid collision.
+- **Histogram bin width-10, fixed edges, milestone-aligned.** Bins
+  comparable across players; render rule "always show through bin
+  [90,99] floor; above 99 truncate to bin containing max obs"
+  preserves distribution shape AND makes tail batters' empty
+  right side a recognizable bowler signal.
+- **Color tiers for runs distribution**: failure (0–9 muted red)
+  / building (10–49 neutral) / fifty (50–99 sage) / century
+  (100–149 ochre) / rare (150+ deeper gold). Defined as
+  `WISDEN_RUN_TIERS` in `palette.ts`.
+- **Probability chips in a single full-width flex row that wraps**
+  on narrow viewports. Not a stacked 2-row grid (vertically
+  asymmetric). Order: simples (P(≤10) P(≥30) P(≥50) P(≥100))
+  followed by conditionals (neutral slate polarity).
+- **Sparkline conventions**: solid black 20-run reference line
+  (NOT dashed — too faint); rolling-N mean overlay only on the
+  widest window where smoothing is meaningful (e.g. Scope/lifetime
+  with n ≥ 10, not on Last 10). Legend swatches: solid 14×1.5px
+  rectangles, NOT em-dash glyphs.
+- **Form-delta line is window-INDEPENDENT.** Reads from
+  `dossier.form.delta`; doesn't redraw when window toggle changes.
+  All windows shown side-by-side as a single flex-wrap line that
+  drops to multi-row on narrow viewports.
+- **Suggested-splits 4-tier ladder** (`scopeLinks.ts::suggestedSplits`,
+  Python mirror in `api/scope_links.py`):
+  T1 specific (drop season; keep tournament+type+series),
+  T2 type-only (drop tournament+series; keep type+season),
+  T3 all-cricket (drop type+tournament+series; keep season),
+  T4 all-time. Skip a tier when its drop is a no-op or the
+  result equals a later tier's params. Lockstep-tested via
+  `tests/sanity/scope_splits_fixtures.json`.
+- **`team_type` is a NARROWING axis, not identity.** Identity is
+  `gender` only across broaden splits. Opponent / venue isolation
+  links use a separate `_identity_with_type` helper that DOES
+  preserve team_type (so "vs Australia" reads in international
+  context).
+- **Mobile viewport check is mandatory** before commit. Inline
+  `style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(220px, 320px)' }}`
+  passes desktop verification but ZEROES the histogram on a 390-
+  wide phone. Use a `wisden-*` CSS class with a `@media
+  (max-width: 720px)` fallback to stack to single column.
+  `agent-browser set viewport 390 844 && reload` is the test.
+
+### 10.4 Test conventions
+
+- **Sanity invariants self-anchor against SQL.** Every numeric
+  assertion (n_innings, runs.total, mean, median, P(≥50)) must
+  derive from sqlite3 at runtime, never hardcoded.
+- **Lockstep fixtures for cross-language helpers.** A shared
+  JSON fixture drives BOTH the Python and TypeScript implementations
+  (e.g. `tests/sanity/scope_splits_fixtures.json` for
+  `suggested_splits` + `suggestedSplits`).
+- **Integration test exercises every entry point** (deep-link,
+  search-and-pick, click-after-mount on every shared toggle —
+  per the post-`be4d755` rule).
+- **Empty-scope marker** as a dedicated regression URL (e.g.
+  `?filter_venue=Nonexistent%20Ground`) catches the n=0 null-shape
+  branch.
+
+---
+
+*Started 2026-05-04. Inventory + framing drafted first.
+2026-05-05: batter v1 backend (§8) + frontend (§9) IMPLEMENTED
+across 10 atomic commits.
+2026-05-05 → 06: v2/v3/v4 follow-ups — extra form windows
+(6mo + 1y), conditional milestones (P≥50│≥30, P≥70│≥50),
+"Scope" rename, single-flex-row probabilities, suggested-splits
+4-tier ladder fix (was buggy on team_type and season ranges),
+sparkline solid 20-run line + 1.5px legend swatches,
+ScopedPageHeader rolled to all 8 scoped pages, mobile media-query
+fix.
+Patterns codified in §10 for sibling slices.
+Bowler / fielder / team distribution dossiers remain to be done.*
