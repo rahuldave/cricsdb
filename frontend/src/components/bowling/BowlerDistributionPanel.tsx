@@ -27,10 +27,13 @@ import {
   EconomyStatStrip, EconomyChipsRow,
   RunsConcededStatStrip, RunsConcededChipsRow,
 } from './BowlerStatStrips'
-import WicketsSparkline from './WicketsSparkline'
+import DistributionSparkline from './DistributionSparkline'
+import SeasonTickAxis from './SeasonTickAxis'
 import BowlerFormDeltaLine from './BowlerFormDeltaLine'
 import BowlerSuggestedSplitsRow from './BowlerSuggestedSplitsRow'
-import type { BowlerDistribution, BowlerDossier } from '../../types'
+import { WISDEN_WICKET_TIERS } from '../charts/palette'
+import { wicketBin, wicketTier } from './distributionBins'
+import type { BowlerDistribution, BowlerDossier, BowlerInningsObservation } from '../../types'
 
 type DistWindow = 'scope' | 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
 type DistMetric = 'wickets' | 'economy' | 'runs'
@@ -67,6 +70,41 @@ function pickDossier(dist: BowlerDistribution, window: DistWindow): BowlerDossie
   if (window === 'last_1yr') return dist.form.last_1yr
   return dist.lifetime
 }
+
+interface SparklineConfig {
+  valueAccessor: (o: BowlerInningsObservation) => number
+  referenceValue: number | null
+  colorAccessor?: (o: BowlerInningsObservation, v: number) => string
+  tooltipAccessor: (o: BowlerInningsObservation, v: number) => string
+  caption: string
+}
+
+function sparklineFor(metric: DistMetric, dossier: BowlerDossier): SparklineConfig {
+  if (metric === 'wickets') {
+    return {
+      valueAccessor: o => o.wickets,
+      referenceValue: dossier.wickets.mean_per_innings,
+      colorAccessor: (_o, v) => WISDEN_WICKET_TIERS[wicketTier(wicketBin(v))],
+      tooltipAccessor: (o, v) => `${o.date} · ${v} wkt${v === 1 ? '' : 's'} (${o.balls}b, ${o.runs_conceded}r)`,
+      caption: 'oldest ← bars (one per spell, height = wickets) → most recent · horizontal line = mean wkts/spell',
+    }
+  }
+  if (metric === 'economy') {
+    return {
+      valueAccessor: o => o.balls > 0 ? +(o.runs_conceded * 6 / o.balls).toFixed(2) : 0,
+      referenceValue: dossier.economy.pool,
+      tooltipAccessor: (o, v) => `${o.date} · econ ${v.toFixed(2)} (${o.runs_conceded}r in ${o.balls}b, ${o.wickets} wkt${o.wickets === 1 ? '' : 's'})`,
+      caption: 'oldest ← bars (one per spell, height = econ RPO) → most recent · horizontal line = career economy',
+    }
+  }
+  return {
+    valueAccessor: o => o.runs_conceded,
+    referenceValue: dossier.runs_conceded.mean_per_innings,
+    tooltipAccessor: (o, v) => `${o.date} · ${v}r conceded (${o.balls}b, ${o.wickets} wkt${o.wickets === 1 ? '' : 's'})`,
+    caption: 'oldest ← bars (one per spell, height = runs conceded) → most recent · horizontal line = mean runs/spell',
+  }
+}
+
 
 interface Props {
   playerId: string
@@ -221,18 +259,28 @@ export default function BowlerDistributionPanel({
           {metric === 'runs' && <RunsConcededChipsRow block={dossier.runs_conceded} />}
 
           <div style={{ marginTop: '0.75rem' }}>
-            <WicketsSparkline
-              observations={dossier.wickets.observations}
-              referenceWickets={dossier.wickets.mean_per_innings}
-            />
-            <div style={{
-              fontFamily: 'var(--serif)', fontStyle: 'italic',
-              fontSize: '0.7rem', color: 'var(--ink-faint)',
-              marginTop: '0.25rem',
-            }}>
-              oldest ← bars (one per spell, height = wickets) → most recent
-              {' · '}horizontal line = mean wkts/spell
-            </div>
+            {(() => {
+              const cfg = sparklineFor(metric, dossier)
+              return (
+                <>
+                  <DistributionSparkline
+                    observations={dossier.wickets.observations}
+                    valueAccessor={cfg.valueAccessor}
+                    referenceValue={cfg.referenceValue}
+                    colorAccessor={cfg.colorAccessor}
+                    tooltipAccessor={cfg.tooltipAccessor}
+                  />
+                  <SeasonTickAxis observations={dossier.wickets.observations} />
+                  <div style={{
+                    fontFamily: 'var(--serif)', fontStyle: 'italic',
+                    fontSize: '0.7rem', color: 'var(--ink-faint)',
+                    marginTop: '0.1rem',
+                  }}>
+                    {cfg.caption}
+                  </div>
+                </>
+              )
+            })()}
           </div>
 
           <BowlerFormDeltaLine dossier={distribution} />

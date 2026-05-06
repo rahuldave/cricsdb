@@ -221,8 +221,24 @@ echo ""
 echo "Test 4 · Window toggle URL state + sparkline metric-independence"
 
 # Sparkline svg present on Wickets tab
-spark_present_wkts=$(ab_eval "!!document.querySelector('$PANEL_SEL svg[aria-label=\"Per-innings wickets sparkline\"]')")
-assert_eq "Wickets sparkline visible on Wickets tab" "true" "$spark_present_wkts"
+spark_present_wkts=$(ab_eval "!!document.querySelector('$PANEL_SEL .wisden-dist-sparkline')")
+assert_eq "Sparkline visible on Wickets tab" "true" "$spark_present_wkts"
+
+# Season-tick axis present (per-tab independent)
+season_axis_wkts=$(ab_eval "!!document.querySelector('$PANEL_SEL [aria-label=\"Season tick axis\"]')")
+assert_eq "Season tick axis visible on Wickets tab" "true" "$season_axis_wkts"
+
+# Sparkline bar carries href to /matches/{match_id} (desktop nav)
+spark_first_href=$(unq "$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline a')?.getAttribute('href') || ''")")
+case "$spark_first_href" in
+  /matches/*) ok "Sparkline bar links to /matches/{id} (=$spark_first_href)" ;;
+  *) bad "Sparkline bar should link to /matches/{id}, got: $spark_first_href" ;;
+esac
+
+# Sparkline bar carries title (desktop hover tooltip with date)
+spark_first_title=$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline title')?.textContent || ''")
+assert_contains "Sparkline tooltip contains a date" "20" "$spark_first_title"
+assert_contains "Sparkline tooltip on Wickets tab mentions wkt" "wkt" "$spark_first_title"
 
 # Toggle to Last 10 + verify URL
 ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'Last 10').click()" >/dev/null
@@ -234,11 +250,16 @@ assert_contains "URL gains dist_window=last_10 on toggle" "dist_window=last_10" 
 form_visible=$(ab_eval "document.querySelector('$PANEL_SEL').innerText.includes('Form vs scope')")
 assert_eq "Form delta line visible after Last 10 toggle (window-independent)" "true" "$form_visible"
 
-# Switch to Economy tab while on Last 10 — sparkline should still be wickets-based
+# Switch to Economy tab — sparkline now switches data per metric
+# (per discussion 2026-05-06; was metric-independent in v1).
 ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'Economy').click()" >/dev/null
 settle 1
-spark_present_econ=$(ab_eval "!!document.querySelector('$PANEL_SEL svg[aria-label=\"Per-innings wickets sparkline\"]')")
-assert_eq "Wickets sparkline visible on Economy tab (metric-independent)" "true" "$spark_present_econ"
+spark_present_econ=$(ab_eval "!!document.querySelector('$PANEL_SEL .wisden-dist-sparkline')")
+assert_eq "Sparkline visible on Economy tab" "true" "$spark_present_econ"
+
+# Tooltip on Economy tab now mentions econ (per-tab data)
+spark_econ_title=$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline title')?.textContent || ''")
+assert_contains "Sparkline tooltip on Economy tab mentions econ" "econ" "$spark_econ_title"
 
 # Back to Scope (deletes dist_window) + Wickets (deletes dist_metric)
 ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'Scope').click()" >/dev/null
@@ -312,7 +333,7 @@ assert_contains "Empty-scope placeholder shown" "No qualifying spells" "$panel_t
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
-echo "Test 9 · Mobile viewport (390x844) — grid stacks"
+echo "Test 9 · Mobile viewport (390x844) — grid stacks + sparkline non-interactive"
 
 ab set viewport 390 844
 ab open "$BASE/bowling?player=$BUMRAH&$SCOPE"
@@ -327,6 +348,17 @@ mobile_grid=$(ab_eval "(() => {
   return allFullWidth ? 'stacked' : 'split-' + children.join(',')
 })()")
 assert_eq "Mobile grid stacks to single column" "stacked" "$mobile_grid"
+
+# Sparkline interaction is disabled on mobile (pointer-events:none on
+# bar links). Per discussion 2026-05-06: bars too narrow to be reliable
+# tap targets, hover doesn't exist on touch — mobile is impressionistic
+# only. Season-tick axis carries the date-context affordance.
+mobile_pe=$(ab_eval "getComputedStyle(document.querySelector('.wisden-dist-sparkline a'))?.pointerEvents")
+assert_eq "Mobile: sparkline bars have pointer-events: none" "none" "$mobile_pe"
+
+# Season tick axis still rendered on mobile
+mobile_season_present=$(ab_eval "!!document.querySelector('[aria-label=\"Season tick axis\"]')")
+assert_eq "Mobile: season tick axis still rendered" "true" "$mobile_season_present"
 
 # Reset viewport for downstream tests
 ab set viewport 1280 1024

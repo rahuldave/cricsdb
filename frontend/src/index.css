@@ -1832,6 +1832,15 @@ a { color: inherit; }
     grid-template-columns: 1fr;
     gap: 1rem;
   }
+  /* Mobile: distribution sparkline is purely impressionistic — bars
+     are too narrow on a 342px panel to be reliable tap targets, and
+     hover doesn't exist on touch. The season-tick axis below carries
+     the date-context affordance; the bars are visual only.
+     Per discussion 2026-05-06. */
+  .wisden-dist-sparkline a {
+    pointer-events: none;
+    cursor: default;
+  }
 }
 .wisden-scope-strip-copy {
   margin-left: auto;

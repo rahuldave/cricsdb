@@ -1332,11 +1332,26 @@ Established 2026-05-06 on the v2 form-windows extension.
   on narrow viewports. Not a stacked 2-row grid (vertically
   asymmetric). Order: simples (P(≤10) P(≥30) P(≥50) P(≥100))
   followed by conditionals (neutral slate polarity).
-- **Sparkline conventions**: solid black 20-run reference line
-  (NOT dashed — too faint); rolling-N mean overlay only on the
-  widest window where smoothing is meaningful (e.g. Scope/lifetime
-  with n ≥ 10, not on Last 10). Legend swatches: solid 14×1.5px
-  rectangles, NOT em-dash glyphs.
+- **Sparkline conventions**: solid black reference line (NOT
+  dashed — too faint) at the metric-appropriate anchor (20 runs
+  for batter; mean wkts / pool econ / mean runs for bowler tabs);
+  rolling-N mean overlay only on the widest window where smoothing
+  is meaningful (e.g. Scope/lifetime with n ≥ 10, not on Last 10).
+  Legend swatches: solid 14×1.5px rectangles, NOT em-dash glyphs.
+- **Sparkline interaction model** (revised 2026-05-06): desktop
+  bars are wrapped in `<a href="/matches/:matchId">` with hover
+  tooltip (date + key value). On mobile (< 720px), the bar
+  `<a>` elements get `pointer-events: none` via CSS — sparkline
+  is purely impressionistic; the season-tick axis below carries
+  date context. Reason: bar widths vary 26px → 1.5px depending
+  on observation count, and hover doesn't exist on touch.
+- **Season-tick axis** below the sparkline. For each unique
+  calendar year in the date-asc obs, place a tick + 2-digit-year
+  label (`'14`) at the percentage offset of the year's first obs.
+  Render as plain HTML with absolute positioning at percentage
+  offsets (NOT inside the SVG) — the SVG's
+  `preserveAspectRatio="none"` stretches foreignObject children
+  horizontally and overlaps labels at wide widths.
 - **Form-delta line is window-INDEPENDENT.** Reads from
   `dossier.form.delta`; doesn't redraw when window toggle changes.
   All windows shown side-by-side as a single flex-wrap line that
@@ -2138,20 +2153,55 @@ caution"; the value stays visible. `null` denom (impossible by
 construction for simples; possible for conditionals when no
 innings hit the anchor) renders as `—` not `0%`.
 
-#### 12.2.6 Sparkline
+#### 12.2.6 Sparkline (per-tab) + season-tick axis
 
-Per-innings wickets in chronological order, full panel width.
-Discrete bar style (each innings = one short vertical bar; bar
-height ∈ {0, 1, 2, 3, 4, 5+}) — renders the bowler's wicket-
-taking rhythm over time.
+Per-spell sparkline rendered chronologically across full panel
+width. Bar value depends on the active **metric tab**:
 
-Window-dependent: data is `currentWindow.wickets.observations`
-mapped to the wickets count.
+| Metric tab | Bar value | Reference line | Color |
+|---|---|---|---|
+| Wickets       | `o.wickets` (0..6+, discrete) | `wickets.mean_per_innings` | wicket-tier (`WISDEN_WICKET_TIERS`) |
+| Economy       | `o.runs_conceded × 6 / o.balls` (RPO) | `economy.pool` | neutral slate |
+| Runs conceded | `o.runs_conceded` (absolute) | `runs_conceded.mean_per_innings` | neutral slate |
 
-Optional: a thin horizontal line at `wickets.mean_per_innings`
-to reference the spell-by-spell variation. No rolling-N overlay
-in v1 (wickets are discrete; rolling means smear over the integer
-levels).
+(Revised 2026-05-06; the original v1 spec had the sparkline
+metric-INDEPENDENT — always wickets — but the per-tab data is
+the more honest "what happened in each game" signal under the
+metric the reader is currently inspecting.)
+
+**Below the sparkline: season-tick axis.** For each unique
+calendar year in the date-asc observation list, place a small
+tick + label (`'14`, `'24`, etc. — compact 2-digit year) at the
+x-position of that year's first observation. Adds calendar-anchor
+context to a sparkline that would otherwise be just "values over
+a sequence" — readers can locate a slump or hot streak in real
+cricket time. Renders as plain HTML with absolutely-positioned
+labels at percentage offsets (NOT inside the SVG), avoiding the
+`preserveAspectRatio="none"` foreignObject horizontal-stretch
+problem.
+
+**Desktop interaction** (≥ 720px viewport):
+
+- Hover any bar → native `<title>` tooltip: `2024-04-12 · 3 wkts
+  (24b, 15r)` (Wickets tab) or `2024-04-12 · econ 3.75 (15r in
+  24b, 3 wkts)` (Economy tab) etc.
+- Click any bar → navigate to `/matches/:matchId`. The bar is
+  wrapped in a React Router `<a>` with `onClick` calling
+  `useNavigate()`.
+
+**Mobile interaction** (< 720px viewport):
+
+- **None.** The bar `<a>` elements get `pointer-events: none` via
+  the `.wisden-dist-sparkline a { pointer-events: none }` rule
+  inside the `@media (max-width: 720px)` block.
+- Sparkline is purely impressionistic on mobile. Reasoning:
+  bar widths range from 26px (sparse bowler scopes, 13 spells)
+  down to 1.5px (career batter scopes, 250+ obs); inconsistent
+  tap targets are worse than no tap targets, and hover doesn't
+  exist on touch.
+- The season-tick axis carries the date-context affordance on
+  mobile; navigation to specific matches happens via the existing
+  By Innings tab.
 
 #### 12.2.7 Form delta line
 
