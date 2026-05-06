@@ -145,13 +145,14 @@ def assert_dossier_invariants(label: str, doss: dict) -> list[tuple[bool, str]]:
             f"avg={avg} n_dism={n_dism}",
         ))
 
-    # 8 — milestone denominator correctness
+    # 8 — milestone denominator correctness for the simples
     if n > 0:
         ms = doss["milestones"]
         runs_list = [o["runs"] for o in obs]
         for label_p, threshold, pred in [
             ("p_failure_10", 10, lambda r: r <= 10),
             ("p_25_plus", 25, lambda r: r >= 25),
+            ("p_30_plus", 30, lambda r: r >= 30),
             ("p_50_plus", 50, lambda r: r >= 50),
             ("p_100_plus", 100, lambda r: r >= 100),
         ]:
@@ -162,6 +163,37 @@ def assert_dossier_invariants(label: str, doss: dict) -> list[tuple[bool, str]]:
                 count_actual == count_from_p,
                 f"actual={count_actual} from_p={count_from_p} p={ms[label_p]} n={n}",
             ))
+
+        # 8b — conditional milestones: P(≥A | ≥B) = count(≥A) / count(≥B).
+        # Null when count(≥B) == 0 (denominator undefined). When the
+        # denominator IS set, count(≥A) MUST be ≤ count(≥B) (subset).
+        for label_p, num_thr, denom_thr in [
+            ("p_50_given_30", 50, 30),
+            ("p_70_given_50", 70, 50),
+        ]:
+            count_num = sum(1 for r in runs_list if r >= num_thr)
+            count_denom = sum(1 for r in runs_list if r >= denom_thr)
+            if count_denom == 0:
+                results.append(check(
+                    f"{label} · {label_p} null when no innings ≥{denom_thr}",
+                    ms[label_p] is None,
+                    f"got {ms[label_p]} (count_denom={count_denom})",
+                ))
+            else:
+                expected = count_num / count_denom
+                got = ms[label_p]
+                # Within rounding tolerance for the 4dp round.
+                results.append(check(
+                    f"{label} · {label_p} = count(≥{num_thr})/count(≥{denom_thr})",
+                    got is not None and abs(got - expected) < 1e-3,
+                    f"expected≈{expected:.4f} got={got} num={count_num} denom={count_denom}",
+                ))
+                # Subset invariant — count(≥A) ≤ count(≥B) for A > B.
+                results.append(check(
+                    f"{label} · {label_p} ≤ 1 (subset invariant)",
+                    got is not None and got <= 1.0 + 1e-9,
+                    f"got={got}",
+                ))
 
     return results
 
@@ -312,6 +344,8 @@ async def main() -> int:
         all_results += assert_dossier_invariants(f"{label}/lifetime", resp["lifetime"])
         all_results += assert_dossier_invariants(f"{label}/last_10", resp["form"]["last_10"])
         all_results += assert_dossier_invariants(f"{label}/last_60d", resp["form"]["last_60d"])
+        all_results += assert_dossier_invariants(f"{label}/last_6mo", resp["form"]["last_6mo"])
+        all_results += assert_dossier_invariants(f"{label}/last_1yr", resp["form"]["last_1yr"])
         all_results += assert_endpoint_invariants(label, resp)
         all_results += await assert_sql_anchor(label, resp, person_id, scope_dict)
 
