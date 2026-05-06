@@ -1944,9 +1944,9 @@ visually anchors to the SR/Economy/Wickets tiles in row 1.
 │ │  (active-tab histogram)         │ (active-tab stat strip)      │     │
 │ │  Wickets per innings (0..max)   │ Mean wkts        1.17        │     │
 │ │  ▆ ▇ ▅ ▃ ▁ ▁                    │ Median wkts      1           │     │
-│ │  0 1 2 3 4 5+                   │ Pool SR          18.4        │     │
-│ │                                 │ Pool econ        6.81        │     │
-│ │                                 │ Pool average     22.1        │     │
+│ │  0 1 2 3 4 5+                   │ Strike Rate      18.4        │     │
+│ │                                 │ Economy           6.81        │     │
+│ │                                 │ Average          22.1        │     │
 │ │                                 │                              │     │
 │ │                                 │ (active-tab milestone chips) │     │
 │ │                                 │ P(0) 31% · P(≥1) 69%         │     │
@@ -2091,15 +2091,35 @@ RPO shape". Power-user view, but a peer view.
 
 Right of the wickets histogram, label/value list:
 
-**Group 1 — point summaries** (vertical):
+**Group 1 — point summaries** (vertical, Wickets-tab labels shown):
 
 ```
 Mean wkts       1.17          ← wickets.mean_per_innings
 Median wkts     1             ← wickets.median
-Pool SR         18.4          ← lifetime.pool_strike_rate
-Pool econ       6.81          ← economy.pool
-Pool average    22.1          ← lifetime.pool_average
+Total wkts      102           ← wickets.total
+Strike Rate     18.4          ← lifetime.pool_strike_rate (balls / wicket)
+Economy         6.81          ← economy.pool (runs × 6 / balls)
+Average         22.1          ← lifetime.pool_average (runs / wicket)
 ```
+
+**Label convention (revised 2026-05-06).** The cricket-conventional
+career numbers — strike rate, economy, average — render under the
+plain cricket names, NOT prefixed with "Pool" (internal jargon).
+"Pool" / `lifetime.pool_*` is the API field name describing the
+implementation (balls-weighted aggregate of all qualifying-spell
+deliveries) and stays in the spec + types; the user-facing
+labels are just `Strike Rate` / `Economy` / `Average`. Each row
+carries a hover tooltip spelling out the formula + unit so a
+new-to-cricket user gets the unit ("balls per wicket", "runs per
+over", "runs per wicket") without needing the label to do that
+work.
+
+On the Economy tab, where we surface BOTH the career number and
+the per-innings statistics in the same strip, the labels keep
+the distinction explicit: `Economy` (career, balls-weighted) /
+`Mean / spell` (unweighted mean of per-spell economies — the
+histogram's centre of mass) / `Median / spell` (per-spell median).
+Tooltips spell out the difference.
 
 **Group 2 — milestone chips, two rows** (single flex container,
 flex-wrap, separator between simples and conditionals):
@@ -2352,7 +2372,7 @@ Mirror the §9.10 layout:
     `SUM(wickets)/COUNT(*)` over the qualifying-spell sample.
   - `P(≥3) NN%` chip matches
     `count(w ≥ 3)/n_innings × 100`.
-  - `Pool econ` text matches
+  - `Economy` (career, on the Economy tab) text matches
     `SUM(runs_total) × 6.0 / SUM(legal_balls)`.
 - Inning aux: with `?inning=0` and `?inning=1`, panel re-fetches;
   numbers change.

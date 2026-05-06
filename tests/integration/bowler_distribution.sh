@@ -178,8 +178,8 @@ WITH spells AS (
 )
 SELECT printf('%.2f', SUM(runs) * 6.0 / SUM(legal)) FROM spells
 ")
-dom_pool_econ=$(ab_eval "(() => { const t = document.querySelector('$PANEL_SEL').innerText; const m = t.match(/Pool econ\s*\n([\d.]+)/); return m ? m[1] : ''; })()")
-assert_eq "Economy tab Pool econ matches SQL" "$sql_pool_econ" "$dom_pool_econ"
+dom_pool_econ=$(ab_eval "(() => { const t = document.querySelector('$PANEL_SEL').innerText; const m = t.match(/(?<![\\w])Economy\s*\n([\d.]+)/); return m ? m[1] : ''; })()")
+assert_eq "Economy tab career Economy matches SQL pool" "$sql_pool_econ" "$dom_pool_econ"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
