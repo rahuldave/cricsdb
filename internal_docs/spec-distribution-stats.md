@@ -1332,12 +1332,32 @@ Established 2026-05-06 on the v2 form-windows extension.
   on narrow viewports. Not a stacked 2-row grid (vertically
   asymmetric). Order: simples (P(≤10) P(≥30) P(≥50) P(≥100))
   followed by conditionals (neutral slate polarity).
-- **Sparkline conventions**: solid black reference line (NOT
-  dashed — too faint) at the metric-appropriate anchor (20 runs
-  for batter; mean wkts / pool econ / mean runs for bowler tabs);
-  rolling-N mean overlay only on the widest window where smoothing
-  is meaningful (e.g. Scope/lifetime with n ≥ 10, not on Last 10).
-  Legend swatches: solid 14×1.5px rectangles, NOT em-dash glyphs.
+- **Sparkline conventions** (revised 2026-05-06): two reference
+  lines per metric tab — **solid black thicker** for the player's
+  scope baseline (`distribution.lifetime.X`, NOT the active form
+  window) + **gray thinner** for the gender-tiered global anchor
+  (`globalBaselines.ts`). Plus a **red oxblood** rolling-N mean
+  overlay on the Scope window when n ≥ 10 (skipped on form
+  windows because the sample is too short for smoothing to be
+  meaningful). Color reservations: red is **only** for the
+  rolling-mean overlay (NOT for tier coloring or reference lines);
+  the failure/wicketless histogram tier was flipped from muted
+  red to muted indigo (`#7090A8`) accordingly. Legend swatches:
+  solid 14×1.5–2px rectangles, NOT em-dash glyphs.
+- **Tier-coloured sparkline bars** (revised 2026-05-06): each
+  per-innings/per-spell bar is colored by its milestone tier
+  matching the histogram bins. Lets users scan the chronological
+  sparkline and answer "in how many great innings was he poor?"
+  / "of his good spells, how many were 5-fers?" at a glance.
+  - Batter Runs tab: `WISDEN_RUN_TIERS` (failure indigo / building
+    slate-tan / fifty sage / century ochre / rare deeper gold).
+  - Batter SR tab: continuous, no tiering (single neutral color).
+  - Bowler Wickets tab: `WISDEN_WICKET_TIERS` (wicketless slate-
+    tan / building indigo / threefer sage / fourfer ochre /
+    fivefer deeper gold).
+  - Bowler Economy + Runs Conceded tabs: `WISDEN_LOWER_IS_BETTER_TIERS`
+    — same five colors as the wicket ladder but reversed polarity
+    (sage at the LOW end = good; ochre/gold at the HIGH end = bad).
 - **Sparkline interaction model** (revised 2026-05-06): desktop
   bars are wrapped in `<a href="/matches/:matchId">` with hover
   tooltip (date + key value). On mobile (< 720px), the bar

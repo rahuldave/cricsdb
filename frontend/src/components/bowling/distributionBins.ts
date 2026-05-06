@@ -126,6 +126,36 @@ export function buildEconomyHistogramRows(
   return rows
 }
 
+// ─── Economy tier (sparkline bar coloring) ──────────────────────────
+//
+// Lower-is-better metric. Uses the same color ladder shape as the
+// wickets tiers but with reversed polarity (sage at the LOW end =
+// good economy; ochre/gold at the HIGH end = bad economy).
+
+export type EconomyTier =
+  | 'tight' | 'decent' | 'neutral' | 'expensive' | 'leaked'
+
+export function economyTier(rpo: number): EconomyTier {
+  if (rpo < 6) return 'tight'      // sage
+  if (rpo < 7) return 'decent'      // faint slate-tan
+  if (rpo < 9) return 'neutral'     // default slate
+  if (rpo < 10) return 'expensive'  // ochre
+  return 'leaked'                    // deeper gold
+}
+
+// ─── Runs-conceded tier (sparkline bar coloring) ────────────────────
+
+export type RunsConcededTier =
+  | 'tight' | 'decent' | 'neutral' | 'expensive' | 'leaked'
+
+export function runsConcededTier(runs: number): RunsConcededTier {
+  if (runs <= 15) return 'tight'
+  if (runs <= 25) return 'decent'
+  if (runs < 40) return 'neutral'
+  if (runs < 50) return 'expensive'
+  return 'leaked'
+}
+
 // ─── Runs conceded — continuous, width-5 bins ───────────────────────
 
 export interface RunsConcededBinRow {

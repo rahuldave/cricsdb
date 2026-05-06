@@ -257,6 +257,66 @@ assert_contains "Empty-scope placeholder shown" "No innings under this filter" "
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 8 · Sparkline tier colors + dual ref lines + rolling overlay (Runs tab)"
+
+ab open "$BASE/batting?player=$KOHLI&gender=male&tournament=Indian%20Premier%20League"
+settle 4
+
+# Tier coloring: bars colored by milestone tier (failure=indigo,
+# building=slate-tan, fifty=sage, century=ochre, rare=deeper-gold).
+# At least 4 unique fills should be visible across Kohli's IPL career.
+unique_colors=$(ab_eval "[...new Set(Array.from(document.querySelectorAll('.wisden-dist-sparkline rect')).map(r => r.getAttribute('fill')))].length")
+assert_contains "Runs sparkline has 4+ tier colors" "4" "$unique_colors$unique_colors$unique_colors$unique_colors$unique_colors"
+# Failure tier indigo (NOT red) — red reserved for rolling overlay
+fills=$(ab_eval "JSON.stringify([...new Set(Array.from(document.querySelectorAll('.wisden-dist-sparkline rect')).map(r => r.getAttribute('fill')))].sort())")
+case "$fills" in
+  *'#7090A8'*) ok "Runs sparkline includes indigo (failure tier)" ;;
+  *) bad "Runs sparkline missing indigo tier (failure should be #7090A8) — got: $fills" ;;
+esac
+case "$fills" in
+  *'#A03B3B'*) bad "Runs sparkline includes red — red is reserved for rolling overlay (palette regression)" ;;
+  *) ok "Runs sparkline has NO red bars (red reserved for oxbow)" ;;
+esac
+
+# Reference lines: player black + global gray
+player_stroke=$(unq "$(ab_eval "document.querySelector('.wisden-dist-sparkline line[data-ref=player]')?.getAttribute('stroke') || ''")")
+global_stroke=$(unq "$(ab_eval "document.querySelector('.wisden-dist-sparkline line[data-ref=global]')?.getAttribute('stroke') || ''")")
+assert_eq "Player line is black (#1A1714)" "#1A1714" "$player_stroke"
+assert_eq "Global line is gray (#8A7D70)" "#8A7D70" "$global_stroke"
+
+# Rolling-10 overlay on Scope window
+rolling_count=$(ab_eval "document.querySelectorAll('.wisden-dist-sparkline polyline[data-ref=rolling]').length")
+assert_eq "Rolling-10 overlay rendered on Scope window" "1" "$rolling_count"
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
+echo "Test 9 · Strike Rate metric tab"
+
+# Click SR tab
+ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button.wisden-seg')].find(b => b.innerText.trim() === 'Strike Rate')?.click()" >/dev/null
+settle 1
+url_sr=$(ab_eval "window.location.href" | tr -d '"')
+assert_contains "URL gains dist_metric=sr on SR tab click" "dist_metric=sr" "\"$url_sr\""
+
+# On SR tab the histogram + chips are hidden (continuous metric)
+hist_visible=$(ab_eval "!!document.querySelector('.wisden-dist-grid')")
+assert_eq "Histogram hidden on SR tab" "false" "$hist_visible"
+
+# Sparkline still rendered with SR-specific tooltip
+sr_tip=$(ab_eval "document.querySelector('.wisden-dist-sparkline title')?.textContent || ''")
+assert_contains "SR tab tooltip mentions SR" "SR" "$sr_tip"
+
+# Click back to Runs — URL deletes dist_metric
+ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button.wisden-seg')].find(b => b.innerText.trim() === 'Runs')?.click()" >/dev/null
+settle 1
+url_runs=$(ab_eval "window.location.href" | tr -d '"')
+case "$url_runs" in
+  *dist_metric*) bad "Runs click should DELETE dist_metric param: $url_runs" ;;
+  *) ok "Runs (default) click DELETES dist_metric param" ;;
+esac
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "─────────────────────────────────────────────────────────────────"
 echo "$PASS pass · $FAIL fail"
 if [ "$FAIL" -gt 0 ]; then

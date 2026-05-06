@@ -240,13 +240,23 @@ spark_first_title=$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-spa
 assert_contains "Sparkline tooltip contains a date" "20" "$spark_first_title"
 assert_contains "Sparkline tooltip on Wickets tab mentions wkt" "wkt" "$spark_first_title"
 
-# Two reference lines: player (green #3F7A4D) + global (black #1A1714)
+# Two reference lines: player (black #1A1714 thicker) + global (gray
+# #8A7D70). Revised 2026-05-06 — green clashed with the histogram
+# fifty/threefer sage tier; red is reserved for the rolling-mean
+# overlay.
 ref_count=$(ab_eval "document.querySelectorAll('$PANEL_SEL .wisden-dist-sparkline line[data-ref]').length")
 assert_eq "Sparkline renders BOTH reference lines (player + global)" "2" "$ref_count"
 player_stroke=$(unq "$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline line[data-ref=player]')?.getAttribute('stroke') || ''")")
 global_stroke=$(unq "$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline line[data-ref=global]')?.getAttribute('stroke') || ''")")
-assert_eq "Player line is green (#3F7A4D)" "#3F7A4D" "$player_stroke"
-assert_eq "Global line is black (#1A1714)" "#1A1714" "$global_stroke"
+assert_eq "Player line is black (#1A1714)" "#1A1714" "$player_stroke"
+assert_eq "Global line is gray (#8A7D70)" "#8A7D70" "$global_stroke"
+
+# Rolling-10 overlay (oxbow) on the Scope window — points >= 10
+# trigger the polyline.
+rolling_count=$(ab_eval "document.querySelectorAll('$PANEL_SEL .wisden-dist-sparkline polyline[data-ref=rolling]').length")
+assert_eq "Rolling-10 overlay rendered on Scope when n>=10" "1" "$rolling_count"
+rolling_stroke=$(unq "$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline polyline[data-ref=rolling]')?.getAttribute('stroke') || ''")")
+assert_eq "Rolling overlay is oxblood (#7A1F1F)" "#7A1F1F" "$rolling_stroke"
 
 # Gender-tiered global anchor: men's wickets/spell = 1
 legend=$(ab_eval "document.querySelector('.wisden-dist-sparkline')?.parentElement?.lastElementChild?.textContent || ''")

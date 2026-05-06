@@ -29,8 +29,9 @@ export const WISDEN_PHASES: string[] = [WISDEN.indigo, WISDEN.ochre, WISDEN.oxbl
  * Run-tier coloring for the per-innings runs histogram (batter
  * Distribution panel, spec-distribution-stats.md §9.2.2).
  *
- * Tiers:
- *  - failure   : 0–9 runs    (muted oxblood — got out cheap)
+ * Tiers (revised 2026-05-06 — failure flipped from red→indigo
+ * because red is reserved for the rolling-mean overlay):
+ *  - failure   : 0–9 runs    (muted indigo — got out cheap)
  *  - building  : 10–49 runs  (faint slate — "got going")
  *  - fifty     : 50–99 runs  (sage green — match-shaping innings)
  *  - century   : 100–149     (ochre gold — match-winning)
@@ -43,11 +44,28 @@ export const WISDEN_RUN_TIERS: Record<
   'failure' | 'building' | 'fifty' | 'century' | 'rare',
   string
 > = {
-  failure:  '#A03B3B',  // muted oxblood
+  failure:  '#7090A8',  // muted indigo (was muted oxblood — red reserved for oxbow)
   building: '#A8A091',  // faint slate-tan
   fifty:    '#7A8E6A',  // sage green
   century:  WISDEN.ochre,
   rare:     '#9C6B17',  // deeper gold
+}
+
+/**
+ * Lower-is-better tier coloring used by the bowler economy + runs-
+ * conceded sparklines. Same five colors as the wicket-tier ladder,
+ * but mapped with REVERSED polarity — sage (good) at the low end,
+ * deeper gold (bad) at the high end. Spec §12.2.6.
+ */
+export const WISDEN_LOWER_IS_BETTER_TIERS: Record<
+  'tight' | 'decent' | 'neutral' | 'expensive' | 'leaked',
+  string
+> = {
+  tight:     '#7A8E6A',  // sage — good
+  decent:    '#A8A091',  // faint slate-tan
+  neutral:   '#3C5B7A',  // default slate
+  expensive: WISDEN.ochre,
+  leaked:    '#9C6B17',  // deeper gold — bad
 }
 
 /**
