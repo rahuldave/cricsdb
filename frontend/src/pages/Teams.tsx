@@ -21,6 +21,7 @@ import InningToggle from '../components/InningToggle'
 import MetricDelta from '../components/MetricDelta'
 import TeamSearch from '../components/TeamSearch'
 import FlagBadge from '../components/FlagBadge'
+import ScopedPageHeader from '../components/ScopedPageHeader'
 import PlayerLink from '../components/PlayerLink'
 import { ScopeContext } from '../components/scopeLinks'
 import TeamCompareGrid from '../components/teams/TeamCompareGrid'
@@ -328,14 +329,14 @@ export default function Teams() {
               Refreshing…
             </div>
           )}
-          <h2 className="wisden-page-title">
+          <ScopedPageHeader filters={filters}>
             {selected}
             {/* FlagBadge returns null for franchise sides (they're not
                 in TEAM_TO_FLAG) — no need to branch on team_type. */}
-            <span style={{ marginLeft: '0.6rem', verticalAlign: 'middle' }}>
+            <span style={{ verticalAlign: 'middle' }}>
               <FlagBadge team={selected} size="lg" />
             </span>
-          </h2>
+          </ScopedPageHeader>
           {summary.gender_breakdown && (
             <div className="wisden-gender-notice">
               Showing combined men's &amp; women's. —{' '}
