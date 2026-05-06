@@ -138,26 +138,26 @@ assert_eq "Last 10 n_innings = min(10, lifetime_n)" "$expected_l10_n" "$dom_l10_
 
 # Form delta line stays the same — assert it's still present and
 # hasn't changed shape (window-independent per §9.2.5).
-form_delta_visible=$(ab_eval "document.querySelector('section[aria-label=\"Per-innings runs distribution\"]').innerText.includes('Form vs lifetime')")
+form_delta_visible=$(ab_eval "document.querySelector('section[aria-label=\"Per-innings runs distribution\"]').innerText.includes('Form vs scope')")
 assert_eq "Form delta line visible after Last 10 toggle (window-independent)" "true" "$form_delta_visible"
 
-# Back to Lifetime via toggle — URL should DELETE dist_window
-ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button')].find(b => b.innerText.includes('Lifetime')).click()" >/dev/null
+# Back to Scope (default) via toggle — URL should DELETE dist_window
+ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button')].find(b => b.innerText.trim() === 'Scope').click()" >/dev/null
 settle 1
-url_lifetime=$(ab_eval "window.location.href" | tr -d '"')
-case "$url_lifetime" in
-  *dist_window*) bad "Lifetime click DELETES dist_window param — still present in: $url_lifetime" ;;
-  *) ok "Lifetime click DELETES dist_window param" ;;
+url_scope=$(ab_eval "window.location.href" | tr -d '"')
+case "$url_scope" in
+  *dist_window*) bad "Scope click DELETES dist_window param — still present in: $url_scope" ;;
+  *) ok "Scope click DELETES dist_window param" ;;
 esac
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
 echo "Test 3 · Back-button restores prior window"
 
-# Navigate Lifetime → Last 10 → Last 60d, then back twice.
-ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button')].find(b => b.innerText.includes('Last 10')).click()" >/dev/null
+# Navigate Scope → Last 10 → Last 60d, then back.
+ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button')].find(b => b.innerText.trim() === 'Last 10').click()" >/dev/null
 settle 1
-ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button')].find(b => b.innerText.includes('Last 60d')).click()" >/dev/null
+ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button')].find(b => b.innerText.trim() === 'Last 60d').click()" >/dev/null
 settle 1
 
 # Back should restore Last 10 (dist_window=last_10)

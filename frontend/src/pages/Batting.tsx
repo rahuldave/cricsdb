@@ -237,7 +237,7 @@ export default function Batting() {
             <StatCard label="B/Four" value={fmt(summary.balls_per_four)} />
             <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary)} />
             <StatCard label="Dot %" value={summary.dot_pct != null ? `${summary.dot_pct}%` : '-'} />
-            <StatCard label="50s / 100s" value={`${summary.fifties} / ${summary.hundreds}`} />
+            <StatCard label="30s / 50s / 100s" value={`${summary.thirties} / ${summary.fifties} / ${summary.hundreds}`} />
           </div>
 
           <div className="wisden-tabs">

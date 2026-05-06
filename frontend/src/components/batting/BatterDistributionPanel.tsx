@@ -20,19 +20,30 @@ import FormDeltaLine from './FormDeltaLine'
 import SuggestedSplitsRow from './SuggestedSplitsRow'
 import type { BatterDistribution, DistributionDossier } from '../../types'
 
-type DistWindow = 'lifetime' | 'last_10' | 'last_60d'
+type DistWindow = 'scope' | 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
 
-const WINDOW_OPTIONS: { key: DistWindow; label: string; param: string }[] = [
-  { key: 'lifetime', label: 'Lifetime', param: '' },
-  { key: 'last_10',  label: 'Last 10',  param: 'last_10' },
-  { key: 'last_60d', label: 'Last 60d', param: 'last_60d' },
+const WINDOW_OPTIONS: { key: DistWindow; label: string; param: string; tooltip: string }[] = [
+  { key: 'scope',    label: 'Scope',    param: '',
+    tooltip: 'All innings under the active filter scope (NOT necessarily lifetime — IPL 2024 is "scope" when that filter is set).' },
+  { key: 'last_10',  label: 'Last 10',  param: 'last_10',
+    tooltip: 'Most recent 10 innings under the active filter scope.' },
+  { key: 'last_60d', label: 'Last 60d', param: 'last_60d',
+    tooltip: 'Innings in the last 60 days — current form.' },
+  { key: 'last_6mo', label: 'Last 6mo', param: 'last_6mo',
+    tooltip: 'Innings in the last 180 days — medium-term arc.' },
+  { key: 'last_1yr', label: 'Last 1y',  param: 'last_1yr',
+    tooltip: 'Innings in the last 365 days — annual / loss-of-form gauge.' },
 ]
 
 function pickDossier(dist: BatterDistribution, window: DistWindow): DistributionDossier {
   if (window === 'last_10') return dist.form.last_10
   if (window === 'last_60d') return dist.form.last_60d
+  if (window === 'last_6mo') return dist.form.last_6mo
+  if (window === 'last_1yr') return dist.form.last_1yr
   return dist.lifetime
 }
+
+const VALID_WINDOWS: ReadonlyArray<DistWindow> = ['last_10', 'last_60d', 'last_6mo', 'last_1yr']
 
 interface Props {
   playerId: string
@@ -45,9 +56,9 @@ export default function BatterDistributionPanel({
   playerId, distribution, loading, error,
 }: Props) {
   const [windowParam, setWindowParam] = useUrlParam('dist_window')
-  const window: DistWindow = (
-    windowParam === 'last_10' || windowParam === 'last_60d'
-  ) ? windowParam : 'lifetime'
+  const window: DistWindow = (VALID_WINDOWS as ReadonlyArray<string>).includes(windowParam)
+    ? (windowParam as DistWindow)
+    : 'scope'
 
   // Hide entirely on initial load + on hard error — caller's main
   // loading spinner / error banner already cover the page-level UX.
@@ -95,11 +106,7 @@ export default function BatterDistributionPanel({
               type="button"
               className={`wisden-seg${window === opt.key ? ' is-active' : ''}`}
               onClick={() => setWindowParam(opt.param)}
-              title={
-                opt.key === 'lifetime' ? 'All innings under the active filter scope.'
-                : opt.key === 'last_10' ? 'Most recent 10 innings under the active filter scope.'
-                : 'Innings in the last 60 days under the active filter scope.'
-              }
+              title={opt.tooltip}
             >{opt.label}</button>
           ))}
         </div>
@@ -142,8 +149,24 @@ export default function BatterDistributionPanel({
           <div style={{ marginTop: '0.75rem' }}>
             <RunsSparkline
               observations={dossier.runs.observations}
-              rollingWindow={window === 'lifetime' ? 10 : undefined}
+              rollingWindow={window === 'scope' ? 10 : undefined}
+              referenceRuns={20}
             />
+            <div style={{
+              fontFamily: 'var(--serif)', fontStyle: 'italic',
+              fontSize: '0.7rem', color: 'var(--ink-faint)',
+              marginTop: '0.25rem',
+            }}>
+              oldest ← bars (one per innings) → most recent
+              {' · '}
+              <span style={{ color: '#9C9C9C' }}>—</span>{' grey: 20-run line'}
+              {window === 'scope' && (
+                <>
+                  {' · '}
+                  <span style={{ color: '#7A1F1F' }}>—</span>{' red: 10-innings rolling mean'}
+                </>
+              )}
+            </div>
           </div>
           <FormDeltaLine dossier={distribution} />
         </>

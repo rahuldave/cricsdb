@@ -474,8 +474,13 @@ export interface DistributionDossier {
   milestones: {
     p_failure_10: number | null
     p_25_plus: number | null
+    p_30_plus: number | null
     p_50_plus: number | null
     p_100_plus: number | null
+    /** P(runs ≥ 50 | runs ≥ 30) — null when no innings reached 30. */
+    p_50_given_30: number | null
+    /** P(runs ≥ 70 | runs ≥ 50) — null when no innings reached 50. */
+    p_70_given_50: number | null
   }
   phase: {
     powerplay: DistributionPhaseRollup
@@ -495,11 +500,17 @@ export interface BatterDistribution {
   form: {
     last_10: DistributionDossier
     last_60d: DistributionDossier
+    last_6mo: DistributionDossier
+    last_1yr: DistributionDossier
     delta: {
       last_10_mean_minus_lifetime: number | null
       last_10_median_minus_lifetime: number | null
       last_60d_mean_minus_lifetime: number | null
       last_60d_median_minus_lifetime: number | null
+      last_6mo_mean_minus_lifetime: number | null
+      last_6mo_median_minus_lifetime: number | null
+      last_1yr_mean_minus_lifetime: number | null
+      last_1yr_median_minus_lifetime: number | null
     }
   }
   suggested_splits: SuggestedSplit[]

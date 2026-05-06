@@ -48,12 +48,18 @@ function StatRow({ label, value, accent }: { label: string; value: string; accen
 function MilestoneChip({ label, value, polarity }: {
   label: string
   value: string
-  polarity: 'positive' | 'negative'
+  polarity: 'positive' | 'negative' | 'neutral'
 }) {
   // Wisden palette slate + sage / oxblood — translucent fills so the
   // page background still reads through.
-  const bg = polarity === 'positive' ? 'rgba(122, 142, 106, 0.14)' : 'rgba(160, 59, 59, 0.12)'
-  const fg = polarity === 'positive' ? '#3F5A2F' : '#7A1F1F'
+  const bg =
+    polarity === 'positive' ? 'rgba(122, 142, 106, 0.14)'
+    : polarity === 'negative' ? 'rgba(160, 59, 59, 0.12)'
+    : 'rgba(60, 91, 122, 0.10)'  // neutral: faint slate
+  const fg =
+    polarity === 'positive' ? '#3F5A2F'
+    : polarity === 'negative' ? '#7A1F1F'
+    : '#3C5B7A'  // neutral slate
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'baseline', gap: '0.35rem',
@@ -90,10 +96,19 @@ export default function DistributionStatStrip({ dossier }: Props) {
           {n_innings} inns · {n_dismissals} outs · {n_innings - n_dismissals} not out
         </div>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-        <MilestoneChip label="P(≥50)" value={fmtPct(milestones.p_50_plus)} polarity="positive" />
-        <MilestoneChip label="P(≥100)" value={fmtPct(milestones.p_100_plus)} polarity="positive" />
-        <MilestoneChip label="P(≤10)" value={fmtPct(milestones.p_failure_10)} polarity="negative" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        {/* Simples — unconditional probabilities */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+          <MilestoneChip label="P(≤10)"  value={fmtPct(milestones.p_failure_10)} polarity="negative" />
+          <MilestoneChip label="P(≥30)"  value={fmtPct(milestones.p_30_plus)}    polarity="positive" />
+          <MilestoneChip label="P(≥50)"  value={fmtPct(milestones.p_50_plus)}    polarity="positive" />
+          <MilestoneChip label="P(≥100)" value={fmtPct(milestones.p_100_plus)}   polarity="positive" />
+        </div>
+        {/* Conditionals — "going-on" probabilities */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+          <MilestoneChip label="P(≥50│≥30)" value={fmtPct(milestones.p_50_given_30)} polarity="neutral" />
+          <MilestoneChip label="P(≥70│≥50)" value={fmtPct(milestones.p_70_given_50)} polarity="neutral" />
+        </div>
       </div>
     </div>
   )

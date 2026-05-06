@@ -16,11 +16,13 @@ interface Props {
   observations: InningsObservation[]
   /** Optional rolling-mean window. Skipped when observations.length < window. */
   rollingWindow?: number
+  /** Optional horizontal grey reference line at this runs value (e.g. 20). */
+  referenceRuns?: number
   height?: number
 }
 
 export default function RunsSparkline({
-  observations, rollingWindow, height = 36,
+  observations, rollingWindow, referenceRuns, height = 36,
 }: Props) {
   const series = useMemo(() => observations.map(o => o.runs), [observations])
   const rollingLine = useMemo(() => {
@@ -44,6 +46,13 @@ export default function RunsSparkline({
   // Inset a hair so adjacent bars don't visually merge at small width.
   const barInset = Math.min(barW * 0.15, 0.4)
 
+  // Reference line — drawn at the y-position equivalent to
+  // referenceRuns. Suppressed if the reference value would land
+  // off-chart (above max or below 0).
+  const refY = (referenceRuns !== undefined && referenceRuns > 0 && referenceRuns <= max)
+    ? height - (referenceRuns / max) * height
+    : null
+
   return (
     <svg
       viewBox={`0 0 ${VB_W} ${height}`}
@@ -51,6 +60,16 @@ export default function RunsSparkline({
       style={{ width: '100%', height, display: 'block' }}
       aria-label="Per-innings runs sparkline"
     >
+      {refY !== null && (
+        <line
+          x1={0} x2={VB_W}
+          y1={refY} y2={refY}
+          stroke="#9C9C9C"
+          strokeWidth={0.4}
+          strokeDasharray="0.6 0.6"
+          opacity={0.7}
+        />
+      )}
       {series.map((r, i) => {
         const h = (r / max) * height
         return (
