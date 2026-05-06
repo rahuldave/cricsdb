@@ -1,0 +1,7 @@
+innings_id,match_id,date,tournament,season,fielding_team,innings_number,ambiguous_reason,candidate_ids,candidate_names,resolved_keeper_id,resolved_source,notes
+26207,13101,2026-05-03,Pakistan Super League,2026,Hyderabad Kingsmen,1,multi_career,"bafb9238,f21043a5","Usman Khan,MDKJ Perera",,,
+26214,13105,2026-05-03,Indian Premier League,2026,Kolkata Knight Riders,0,no_candidate,,,,,
+26223,13109,2026-05-02,Indonesia tour of Malaysia,2026,Malaysia,1,multi_career,"415d30b6,6667067e","Virandeep Singh,Syed Aziz",,,
+26230,13113,2026-05-04,Indian Premier League,2026,Lucknow Super Giants,1,multi_career,"3241e3fd,919a3be2,989889ff","N Pooran,RR Pant,JP Inglis",,,
+26232,13114,2026-05-04,Indonesia tour of Malaysia,2026,Malaysia,1,multi_career,"1f13eba1,415d30b6,6667067e","Muhammad Haziq Aiman,Virandeep Singh,Syed Aziz",,,
+26233,13115,2026-05-05,Indonesia tour of Malaysia,2026,Malaysia,0,multi_career,"1f13eba1,415d30b6,6667067e","Muhammad Haziq Aiman,Virandeep Singh,Syed Aziz",,,
