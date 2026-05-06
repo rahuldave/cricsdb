@@ -145,10 +145,43 @@ def assert_dossier_invariants(label: str, doss: dict) -> list[tuple[bool, str]]:
             f"avg={avg} n_dism={n_dism}",
         ))
 
-    # 8 — milestone denominator correctness for the simples
+    # 8 — milestone denominator correctness for the simples (post-§13:
+    # every milestone is a ProbRecord {value, num, denom, ci_low, ci_high}.
     if n > 0:
         ms = doss["milestones"]
         runs_list = [o["runs"] for o in obs]
+
+        def _check_pr(pr: dict, ctx: str) -> None:
+            keys = {"value", "num", "denom", "ci_low", "ci_high"}
+            results.append(check(
+                f"{label} · {ctx} ProbRecord shape",
+                set(pr.keys()) == keys,
+                f"got {set(pr.keys())}",
+            ))
+            if pr["denom"] > 0:
+                # value × denom ≈ num — tolerance scales with denom (4dp round).
+                rnd_tol = max(0.01, pr["denom"] * 5e-5)
+                results.append(check(
+                    f"{label} · {ctx} value × denom ≈ num",
+                    abs(pr["value"] * pr["denom"] - pr["num"]) < rnd_tol,
+                    f"v={pr['value']} d={pr['denom']} n={pr['num']}",
+                ))
+                results.append(check(
+                    f"{label} · {ctx} ci_low ≤ value ≤ ci_high",
+                    pr["ci_low"] - 1e-4 <= pr["value"] <= pr["ci_high"] + 1e-4,
+                    f"({pr['ci_low']}, {pr['value']}, {pr['ci_high']})",
+                ))
+                results.append(check(
+                    f"{label} · {ctx} 0 ≤ ci_low",
+                    pr["ci_low"] >= 0,
+                    f"ci_low={pr['ci_low']}",
+                ))
+                results.append(check(
+                    f"{label} · {ctx} ci_high ≤ 1",
+                    pr["ci_high"] <= 1.0001,
+                    f"ci_high={pr['ci_high']}",
+                ))
+
         for label_p, threshold, pred in [
             ("p_failure_10", 10, lambda r: r <= 10),
             ("p_25_plus", 25, lambda r: r >= 25),
@@ -157,42 +190,52 @@ def assert_dossier_invariants(label: str, doss: dict) -> list[tuple[bool, str]]:
             ("p_100_plus", 100, lambda r: r >= 100),
         ]:
             count_actual = sum(1 for r in runs_list if pred(r))
-            count_from_p = round(ms[label_p] * n)
+            pr = ms[label_p]
+            _check_pr(pr, label_p)
             results.append(check(
-                f"{label} · {label_p} count consistency",
-                count_actual == count_from_p,
-                f"actual={count_actual} from_p={count_from_p} p={ms[label_p]} n={n}",
+                f"{label} · {label_p} num matches actual count",
+                pr["num"] == count_actual,
+                f"actual={count_actual} pr.num={pr['num']}",
+            ))
+            results.append(check(
+                f"{label} · {label_p} denom == n_innings",
+                pr["denom"] == n,
+                f"pr.denom={pr['denom']} n={n}",
             ))
 
-        # 8b — conditional milestones: P(≥A | ≥B) = count(≥A) / count(≥B).
-        # Null when count(≥B) == 0 (denominator undefined). When the
-        # denominator IS set, count(≥A) MUST be ≤ count(≥B) (subset).
+        # 8b — conditional milestones: denom = count(≥B). When count(≥B) == 0
+        # the prob_record returns {value:None, denom:0, ci:None,None}.
         for label_p, num_thr, denom_thr in [
             ("p_50_given_30", 50, 30),
             ("p_70_given_50", 70, 50),
         ]:
             count_num = sum(1 for r in runs_list if r >= num_thr)
             count_denom = sum(1 for r in runs_list if r >= denom_thr)
+            pr = ms[label_p]
+            _check_pr(pr, label_p)
+            results.append(check(
+                f"{label} · {label_p} denom == count(≥{denom_thr})",
+                pr["denom"] == count_denom,
+                f"pr.denom={pr['denom']} count(≥{denom_thr})={count_denom}",
+            ))
             if count_denom == 0:
                 results.append(check(
-                    f"{label} · {label_p} null when no innings ≥{denom_thr}",
-                    ms[label_p] is None,
-                    f"got {ms[label_p]} (count_denom={count_denom})",
+                    f"{label} · {label_p} value None when count(≥{denom_thr})==0",
+                    pr["value"] is None,
+                    f"got {pr['value']}",
                 ))
             else:
                 expected = count_num / count_denom
-                got = ms[label_p]
-                # Within rounding tolerance for the 4dp round.
                 results.append(check(
-                    f"{label} · {label_p} = count(≥{num_thr})/count(≥{denom_thr})",
-                    got is not None and abs(got - expected) < 1e-3,
-                    f"expected≈{expected:.4f} got={got} num={count_num} denom={count_denom}",
+                    f"{label} · {label_p} value ≈ count(≥{num_thr})/count(≥{denom_thr})",
+                    pr["value"] is not None and abs(pr["value"] - expected) < 1e-3,
+                    f"expected≈{expected:.4f} got={pr['value']}",
                 ))
-                # Subset invariant — count(≥A) ≤ count(≥B) for A > B.
+                # Subset invariant — value ≤ 1 (count(≥A) ≤ count(≥B) for A > B).
                 results.append(check(
                     f"{label} · {label_p} ≤ 1 (subset invariant)",
-                    got is not None and got <= 1.0 + 1e-9,
-                    f"got={got}",
+                    pr["value"] is not None and pr["value"] <= 1.0 + 1e-9,
+                    f"got={pr['value']}",
                 ))
 
     return results
