@@ -86,10 +86,13 @@ function sparklineFor(
     return {
       point: o => {
         const sr = perInningsSR(o.runs, o.balls)
+        const tier = srBinTier(srBinIndex(sr))
         return {
           date: o.date, matchId: o.match_id, value: sr,
           tooltip: `${o.date} · SR ${sr.toFixed(1)} (${o.runs}r in ${o.balls}b${o.dismissed ? '' : '*'})`,
-          color: WISDEN_SR_TIERS[srBinTier(srBinIndex(sr))],
+          color: WISDEN_SR_TIERS[tier],
+          // Indigo bars (slow) wash out at 0.8; full opacity.
+          opacity: tier === 'slow' ? 1.0 : undefined,
         }
       },
       playerReferenceValue: playerSR,
@@ -99,11 +102,16 @@ function sparklineFor(
     }
   }
   return {
-    point: o => ({
-      date: o.date, matchId: o.match_id, value: o.runs,
-      tooltip: `${o.date} · ${o.runs}r (${o.balls}b${o.dismissed ? '' : '*'})`,
-      color: WISDEN_RUN_TIERS[binTier(binIndex(o.runs))],
-    }),
+    point: o => {
+      const tier = binTier(binIndex(o.runs))
+      return {
+        date: o.date, matchId: o.match_id, value: o.runs,
+        tooltip: `${o.date} · ${o.runs}r (${o.balls}b${o.dismissed ? '' : '*'})`,
+        color: WISDEN_RUN_TIERS[tier],
+        // Indigo bars (failure) wash out at 0.8; full opacity.
+        opacity: tier === 'failure' ? 1.0 : undefined,
+      }
+    },
     playerReferenceValue: scopeLifetime.runs.mean_per_innings,
     globalReferenceValue: globals.runs,
     caption: 'oldest ← bars (one per innings, height = runs) → most recent',

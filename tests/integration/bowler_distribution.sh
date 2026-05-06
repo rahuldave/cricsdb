@@ -224,6 +224,17 @@ echo "Test 4 · Window toggle URL state + sparkline metric-independence"
 spark_present_wkts=$(ab_eval "!!document.querySelector('$PANEL_SEL .wisden-dist-sparkline')")
 assert_eq "Sparkline visible on Wickets tab" "true" "$spark_present_wkts"
 
+# Bar count must equal the qualifying-spell count (SQL-anchored).
+# Regression class: zero-value bars rendered with height=0 became
+# invisible, making it look like matches went missing.
+spark_bar_count=$(ab_eval "document.querySelectorAll('$PANEL_SEL .wisden-dist-sparkline rect[opacity]').length")
+assert_eq "Sparkline bar count == qualifying spells (SQL anchor)" "$sql_inns" "$spark_bar_count"
+
+# Even value=0 spells must be clickable — the below-baseline stub
+# gives them a min height. Verify NO bar has height=0 after the fix.
+zero_height_count=$(ab_eval "Array.from(document.querySelectorAll('$PANEL_SEL .wisden-dist-sparkline rect[opacity]')).filter(r => parseFloat(r.getAttribute('height')) <= 0).length")
+assert_eq "No invisible (height=0) bars — value=0 bars get a stub" "0" "$zero_height_count"
+
 # Season-tick axis present (per-tab independent)
 season_axis_wkts=$(ab_eval "!!document.querySelector('$PANEL_SEL [aria-label=\"Season tick axis\"]')")
 assert_eq "Season tick axis visible on Wickets tab" "true" "$season_axis_wkts"

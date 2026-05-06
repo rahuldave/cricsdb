@@ -33,6 +33,10 @@ export interface SparklinePoint {
   tooltip: string
   /** Optional per-bar color override (defaults to faint slate). */
   color?: string
+  /** Optional per-bar opacity override (defaults to BAR_OPACITY).
+   *  Used to make the indigo/blue tiers (failure / wicketless /
+   *  slow) fully opaque since they wash out worst at 0.8. */
+  opacity?: number
 }
 
 interface Props {
@@ -65,6 +69,11 @@ const BAR_OPACITY = 0.8
 const PLAYER_LINE_WIDTH = 2.0
 const GLOBAL_LINE_WIDTH = 1.5
 const ROLLING_LINE_WIDTH = 1.2
+// Below-baseline stub zone — every bar extends 4px below the
+// baseline so value=0 bars (ducks / wicketless spells) remain
+// visible as a 4px-tall colored strip and stay clickable for
+// match navigation. Per user feedback 2026-05-06.
+const STUB_HEIGHT = 4
 
 export default function DistributionSparkline({
   points,
@@ -89,9 +98,15 @@ export default function DistributionSparkline({
   const barW = VB_W / points.length
   const barInset = Math.min(barW * 0.15, 0.4)
 
+  // Two zones: value-bar zone above the baseline (size = height -
+  // STUB_HEIGHT), stub zone below (size = STUB_HEIGHT). Reference
+  // lines + rolling mean live in the value zone only.
+  const baselineY = height - STUB_HEIGHT
+  const valueZone = baselineY  // size of the value-bar zone
+
   const yFor = (v: number | null | undefined): number | null => {
     if (v === undefined || v === null || v <= 0 || v > max) return null
-    return height - (v / max) * height
+    return baselineY - (v / max) * valueZone
   }
   const playerY = yFor(playerReferenceValue)
   const globalY = yFor(globalReferenceValue)
@@ -105,7 +120,7 @@ export default function DistributionSparkline({
       for (let j = i - rollingWindow + 1; j <= i; j += 1) sum += points[j].value
       const mean = sum / rollingWindow
       const x = (i + 0.5) * barW
-      const y = height - (mean / max) * height
+      const y = baselineY - (mean / max) * valueZone
       xs.push(`${x},${y}`)
     }
     return xs.join(' ')
@@ -142,8 +157,12 @@ export default function DistributionSparkline({
         />
       )}
       {points.map((p, i) => {
-        const h = (p.value / max) * height
+        const value_h = (p.value / max) * valueZone
+        // Single rect spans value-bar (above baseline) + stub
+        // (below baseline). For value=0 only the stub renders;
+        // for value>0 the rect is value_h + STUB_HEIGHT tall.
         const fill = p.color ?? DEFAULT_COLOR
+        const opacity = p.opacity ?? BAR_OPACITY
         return (
           <a
             key={i}
@@ -156,15 +175,23 @@ export default function DistributionSparkline({
             <title>{p.tooltip}</title>
             <rect
               x={i * barW + barInset}
-              y={height - h}
+              y={baselineY - value_h}
               width={Math.max(barW - 2 * barInset, 0.3)}
-              height={h}
+              height={value_h + STUB_HEIGHT}
               fill={fill}
-              opacity={BAR_OPACITY}
+              opacity={opacity}
             />
           </a>
         )
       })}
+      {/* baseline rule — separates value-bar zone from stub zone */}
+      <line
+        x1={0} x2={VB_W}
+        y1={baselineY} y2={baselineY}
+        stroke="#1A1714"
+        strokeWidth={0.3}
+        opacity={0.35}
+      />
       {rollingPolyline && (
         <polyline
           fill="none"

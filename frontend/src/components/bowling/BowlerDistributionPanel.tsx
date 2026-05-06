@@ -92,11 +92,16 @@ function sparklineFor(
 ): SparklineConfig {
   if (metric === 'wickets') {
     return {
-      point: o => ({
-        date: o.date, matchId: o.match_id, value: o.wickets,
-        tooltip: `${o.date} · ${o.wickets} wkt${o.wickets === 1 ? '' : 's'} (${o.balls}b, ${o.runs_conceded}r)`,
-        color: WISDEN_WICKET_TIERS[wicketTier(wicketBin(o.wickets))],
-      }),
+      point: o => {
+        const tier = wicketTier(wicketBin(o.wickets))
+        return {
+          date: o.date, matchId: o.match_id, value: o.wickets,
+          tooltip: `${o.date} · ${o.wickets} wkt${o.wickets === 1 ? '' : 's'} (${o.balls}b, ${o.runs_conceded}r)`,
+          color: WISDEN_WICKET_TIERS[tier],
+          // Indigo bars (wicketless) wash out at 0.8; full opacity.
+          opacity: tier === 'wicketless' ? 1.0 : undefined,
+        }
+      },
       playerReferenceValue: scopeLifetime.wickets.mean_per_innings,
       globalReferenceValue: globals.wickets,
       caption: 'oldest ← bars (one per spell, height = wickets) → most recent',

@@ -287,6 +287,28 @@ global_stroke=$(unq "$(ab_eval "document.querySelector('.wisden-dist-sparkline l
 assert_eq "Player line is black (#1A1714)" "#1A1714" "$player_stroke"
 assert_eq "Global line is gray (#8A7D70)" "#8A7D70" "$global_stroke"
 
+# Bar count must equal SQL-anchored innings count (catches the
+# zero-height bar regression — ducks rendered with height=0 used
+# to vanish entirely). The current scope is Kohli/men/IPL (no
+# season filter), broader than the Test 1 scope.
+sql_kohli_men_ipl_inns=$(sql "
+SELECT COUNT(DISTINCT i.id)
+FROM delivery d
+JOIN innings i ON i.id = d.innings_id
+JOIN match m ON m.id = i.match_id
+WHERE d.batter_id = '$KOHLI'
+  AND d.extras_wides = 0 AND d.extras_noballs = 0
+  AND m.gender = 'male'
+  AND m.event_name = 'Indian Premier League'
+  AND i.super_over = 0
+")
+spark_bar_count=$(ab_eval "document.querySelectorAll('.wisden-dist-sparkline rect[opacity]').length")
+assert_eq "Sparkline bar count == lifetime n_innings (SQL anchor)" "$sql_kohli_men_ipl_inns" "$spark_bar_count"
+
+# No invisible bars — every value=0 (duck) bar gets the stub.
+zero_h=$(ab_eval "Array.from(document.querySelectorAll('.wisden-dist-sparkline rect[opacity]')).filter(r => parseFloat(r.getAttribute('height')) <= 0).length")
+assert_eq "No height=0 sparkline bars — ducks get a stub" "0" "$zero_h"
+
 # Rolling-10 overlay on Scope window
 rolling_count=$(ab_eval "document.querySelectorAll('.wisden-dist-sparkline polyline[data-ref=rolling]').length")
 assert_eq "Rolling-10 overlay rendered on Scope window" "1" "$rolling_count"
