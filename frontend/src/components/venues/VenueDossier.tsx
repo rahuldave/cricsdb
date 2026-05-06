@@ -20,6 +20,7 @@ import type {
 import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
 import InningToggle from '../InningToggle'
+import ScopedPageHeader from '../ScopedPageHeader'
 import DataTable from '../DataTable'
 import PlayerLink from '../PlayerLink'
 import TeamLink from '../TeamLink'
@@ -157,12 +158,12 @@ export default function VenueDossier({ venue }: { venue: string }) {
       <div className="wisden-breadcrumb mb-2">
         <Link to="/venues" className="comp-link">← All venues</Link>
       </div>
-      <h2 className="wisden-page-title">
+      <ScopedPageHeader filters={filters} omit={['filter_venue']}>
         {summary.venue}
         {summary.city && summary.city !== summary.venue && (
           <span className="wisden-tile-faint">{' · '}{summary.city}</span>
         )}
-      </h2>
+      </ScopedPageHeader>
       <div className="wisden-page-subtitle">
         {summary.country && <>{summary.country}{' · '}</>}
         {summary.matches.toLocaleString()} matches in scope
