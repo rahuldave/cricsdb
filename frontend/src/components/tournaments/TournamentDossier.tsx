@@ -17,6 +17,7 @@ import {
 } from '../../api'
 import StatCard from '../StatCard'
 import InningToggle from '../InningToggle'
+import ScopedPageHeader from '../ScopedPageHeader'
 import PlayerLink from '../PlayerLink'
 import PlayerSearch from '../PlayerSearch'
 import TeamLink from '../TeamLink'
@@ -437,7 +438,7 @@ export default function TournamentDossier({
 
   return (
     <div>
-      <h2 className="wisden-page-title">{headlineTitle}</h2>
+      <ScopedPageHeader filters={filters} omit={['tournament']}>{headlineTitle}</ScopedPageHeader>
       <div className="wisden-page-subtitle">
         {isSingleTournament && summary.editions > 0 && (
           <>

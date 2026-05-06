@@ -21,11 +21,19 @@ import { abbreviateScope } from './scopeLinks'
 
 interface Props {
   filters: FilterParams
+  /** Axes to exclude from the abbreviated scope — typically the
+   *  page's subject axis when it's already in the title. e.g. the
+   *  Series dossier omits 'tournament' (its H2 IS the tournament
+   *  name, so showing it again in the scope is redundant). */
+  omit?: (keyof FilterParams)[]
   children: ReactNode
 }
 
-export default function ScopedPageHeader({ filters, children }: Props) {
-  const abbrev = abbreviateScope(filters)
+export default function ScopedPageHeader({ filters, omit, children }: Props) {
+  const scoped: FilterParams = omit && omit.length > 0
+    ? { ...filters, ...Object.fromEntries(omit.map(k => [k, undefined])) }
+    : filters
+  const abbrev = abbreviateScope(scoped)
   return (
     <div style={{
       display: 'flex',
