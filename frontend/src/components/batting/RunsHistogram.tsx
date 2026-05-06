@@ -28,7 +28,7 @@ interface Props {
 // regardless of which tiers happen to be present in the rendered
 // rows.
 const TIER_ORDER: (keyof typeof WISDEN_RUN_TIERS)[] = [
-  'failure', 'building', 'fifty', 'century', 'rare',
+  'failure', 'building', 'impact',
 ]
 const COLOR_SCHEME = TIER_ORDER.map(t => WISDEN_RUN_TIERS[t])
 

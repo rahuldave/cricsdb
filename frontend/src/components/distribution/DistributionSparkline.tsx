@@ -149,7 +149,7 @@ export default function DistributionSparkline({
               width={Math.max(barW - 2 * barInset, 0.3)}
               height={h}
               fill={fill}
-              opacity={0.95}
+              opacity={0.5}
             />
           </a>
         )

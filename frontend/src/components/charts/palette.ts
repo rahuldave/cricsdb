@@ -26,69 +26,52 @@ export const WISDEN_PALETTE: string[] = [
 export const WISDEN_PHASES: string[] = [WISDEN.indigo, WISDEN.ochre, WISDEN.oxblood]
 
 /**
- * Run-tier coloring for the per-innings runs histogram (batter
- * Distribution panel, spec-distribution-stats.md §9.2.2).
+ * Three-tier coloring for distribution histograms + sparklines.
+ * Spec: internal_docs/spec-distribution-stats.md §10.3 (revised
+ * 2026-05-06 — collapsed from 5-tier to 3-tier to reduce
+ * sparkline visual noise; the bin label still conveys the
+ * exact range, the color tells you which tier).
  *
- * Tiers (revised 2026-05-06 — failure flipped from red→indigo
- * because red is reserved for the rolling-mean overlay):
- *  - failure   : 0–9 runs    (muted indigo — got out cheap)
- *  - building  : 10–49 runs  (faint slate — "got going")
- *  - fifty     : 50–99 runs  (sage green — match-shaping innings)
- *  - century   : 100–149     (ochre gold — match-winning)
- *  - rare      : 150+        (deeper gold — exceptional)
+ * Polarity convention:
+ *   higher-is-better (runs / wickets / SR): low = indigo (poor),
+ *     mid = faint slate-tan (typical), high = sage or gold (strong)
+ *   lower-is-better (economy / runs conceded): low = sage (tight),
+ *     mid = faint slate-tan, high = ochre (loose / leaked)
  *
- * Keys MUST match the strings emitted by `binTier()` in
- * components/batting/distributionBins.ts.
+ * Reds are reserved for the rolling-mean overlay (oxbow) — not
+ * used in tier coloring.
  */
+
 export const WISDEN_RUN_TIERS: Record<
-  'failure' | 'building' | 'fifty' | 'century' | 'rare',
-  string
+  'failure' | 'building' | 'impact', string
 > = {
-  failure:  '#7090A8',  // muted indigo (was muted oxblood — red reserved for oxbow)
-  building: '#A8A091',  // faint slate-tan
-  fifty:    '#7A8E6A',  // sage green
-  century:  WISDEN.ochre,
-  rare:     '#9C6B17',  // deeper gold
+  failure:  '#7090A8',  // muted indigo — got out cheap (0-9)
+  building: '#A8A091',  // faint slate-tan — typical (10-49)
+  impact:   '#7A8E6A',  // sage green — match-shaping (50+)
 }
 
-/**
- * Lower-is-better tier coloring used by the bowler economy + runs-
- * conceded sparklines. Same five colors as the wicket-tier ladder,
- * but mapped with REVERSED polarity — sage (good) at the low end,
- * deeper gold (bad) at the high end. Spec §12.2.6.
- */
-export const WISDEN_LOWER_IS_BETTER_TIERS: Record<
-  'tight' | 'decent' | 'neutral' | 'expensive' | 'leaked',
-  string
-> = {
-  tight:     '#7A8E6A',  // sage — good
-  decent:    '#A8A091',  // faint slate-tan
-  neutral:   '#3C5B7A',  // default slate
-  expensive: WISDEN.ochre,
-  leaked:    '#9C6B17',  // deeper gold — bad
-}
-
-/**
- * Wicket-tier coloring for the bowler distribution histogram (spec
- * §12.2.2). Discrete bars at integer wickets 0..6+; tiers ladder
- * up the rarity spectrum.
- *
- * Tiers:
- *  - wicketless : 0   (muted slate — empty spell)
- *  - building   : 1-2 (faint slate — modest impact)
- *  - threefer   : 3   (sage green — "got going")
- *  - fourfer    : 4   (ochre — match-shaping)
- *  - fivefer    : 5+  (deeper gold — career-marker)
- */
 export const WISDEN_WICKET_TIERS: Record<
-  'wicketless' | 'building' | 'threefer' | 'fourfer' | 'fivefer',
-  string
+  'wicketless' | 'building' | 'strike', string
 > = {
-  wicketless: '#A8A091',  // faint slate-tan, distinct from active bars
-  building:   '#7090A8',  // muted indigo (1-2 wickets — modest)
-  threefer:   '#7A8E6A',  // sage — "got going"
-  fourfer:    WISDEN.ochre,
-  fivefer:    '#9C6B17',  // deeper gold
+  wicketless: '#7090A8',  // muted indigo — no impact (0)
+  building:   '#A8A091',  // faint slate-tan — modest (1-2)
+  strike:     '#9C6B17',  // deeper gold — strong spell (3+, cricket-iconic)
+}
+
+export const WISDEN_SR_TIERS: Record<
+  'slow' | 'mid' | 'explosive', string
+> = {
+  slow:      '#7090A8',  // muted indigo — anchor / sub-100
+  mid:       '#A8A091',  // typical T20 strike rate
+  explosive: '#7A8E6A',  // sage — 150+ aggressor
+}
+
+export const WISDEN_LOWER_TIERS: Record<
+  'tight' | 'mid' | 'loose', string
+> = {
+  tight: '#7A8E6A',  // sage — good
+  mid:   '#A8A091',  // typical
+  loose: WISDEN.ochre,  // ochre — bad
 }
 
 /**

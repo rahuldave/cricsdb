@@ -262,11 +262,14 @@ echo "Test 8 · Sparkline tier colors + dual ref lines + rolling overlay (Runs t
 ab open "$BASE/batting?player=$KOHLI&gender=male&tournament=Indian%20Premier%20League"
 settle 4
 
-# Tier coloring: bars colored by milestone tier (failure=indigo,
-# building=slate-tan, fifty=sage, century=ochre, rare=deeper-gold).
-# At least 4 unique fills should be visible across Kohli's IPL career.
+# Tier coloring: bars colored by milestone tier — collapsed to 3-tier
+# 2026-05-06 (failure=indigo / building=slate-tan / impact=sage).
+# At least 2 unique fills should be visible (most players span 2+ tiers).
 unique_colors=$(ab_eval "[...new Set(Array.from(document.querySelectorAll('.wisden-dist-sparkline rect')).map(r => r.getAttribute('fill')))].length")
-assert_contains "Runs sparkline has 4+ tier colors" "4" "$unique_colors$unique_colors$unique_colors$unique_colors$unique_colors"
+case "$unique_colors" in
+  2|3) ok "Runs sparkline tier-colored ($unique_colors unique colors)" ;;
+  *) bad "Runs sparkline expected 2 or 3 tier colors, got: $unique_colors" ;;
+esac
 # Failure tier indigo (NOT red) — red reserved for rolling overlay
 fills=$(ab_eval "JSON.stringify([...new Set(Array.from(document.querySelectorAll('.wisden-dist-sparkline rect')).map(r => r.getAttribute('fill')))].sort())")
 case "$fills" in
@@ -298,13 +301,18 @@ settle 1
 url_sr=$(ab_eval "window.location.href" | tr -d '"')
 assert_contains "URL gains dist_metric=sr on SR tab click" "dist_metric=sr" "\"$url_sr\""
 
-# On SR tab the histogram + chips are hidden (continuous metric)
-hist_visible=$(ab_eval "!!document.querySelector('.wisden-dist-grid')")
-assert_eq "Histogram hidden on SR tab" "false" "$hist_visible"
+# SR tab now has its OWN histogram (post 2026-05-06 — was hidden in
+# v1; re-added with 3-tier coloring matching the SR sparkline).
+sr_hist_visible=$(ab_eval "!!document.querySelector('.wisden-dist-grid')")
+assert_eq "SR-specific histogram rendered on SR tab" "true" "$sr_hist_visible"
 
-# Sparkline still rendered with SR-specific tooltip
+# Sparkline rendered with SR-specific tooltip
 sr_tip=$(ab_eval "document.querySelector('.wisden-dist-sparkline title')?.textContent || ''")
 assert_contains "SR tab tooltip mentions SR" "SR" "$sr_tip"
+
+# SR stat strip computed client-side: "Career SR" label visible
+sr_strip_visible=$(ab_eval "document.querySelector('section[aria-label=\"Per-innings runs distribution\"]').innerText.includes('Career SR')")
+assert_eq "SR stat strip visible (client-side computed)" "true" "$sr_strip_visible"
 
 # Click back to Runs — URL deletes dist_metric
 ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button.wisden-seg')].find(b => b.innerText.trim() === 'Runs')?.click()" >/dev/null

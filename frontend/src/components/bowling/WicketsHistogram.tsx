@@ -24,7 +24,7 @@ interface Props {
 }
 
 const TIER_ORDER: (keyof typeof WISDEN_WICKET_TIERS)[] = [
-  'wicketless', 'building', 'threefer', 'fourfer', 'fivefer',
+  'wicketless', 'building', 'strike',
 ]
 const COLOR_SCHEME = TIER_ORDER.map(t => WISDEN_WICKET_TIERS[t])
 

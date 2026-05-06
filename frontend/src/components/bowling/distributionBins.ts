@@ -10,8 +10,7 @@
 
 // ─── Wickets — discrete integer bars ────────────────────────────────
 
-export type WicketBinTier =
-  | 'wicketless' | 'building' | 'threefer' | 'fourfer' | 'fivefer'
+export type WicketBinTier = 'wicketless' | 'building' | 'strike'
 
 export interface WicketBinRow {
   bin: number          // 0..6, 6 means "6+" catch-all
@@ -38,10 +37,8 @@ export function wicketLabel(idx: number): string {
 
 export function wicketTier(idx: number): WicketBinTier {
   if (idx === 0) return 'wicketless'
-  if (idx <= 2) return 'building'
-  if (idx === 3) return 'threefer'
-  if (idx === 4) return 'fourfer'
-  return 'fivefer'  // 5+
+  if (idx <= 2) return 'building'   // 1-2
+  return 'strike'                    // 3+
 }
 
 /**
@@ -81,6 +78,14 @@ export interface EconomyBinRow {
   bin: number
   label: string  // "<4", "4-5", ..., "12-13", "13+"
   count: number
+  tier: LowerIsBetterTier
+}
+
+/** Tier for an economy bin index (3-tier: tight / mid / loose). */
+function economyBinTier(idx: number): LowerIsBetterTier {
+  if (idx <= 3) return 'tight'   // bins covering RPO < 7
+  if (idx <= 5) return 'mid'     // 7-9 RPO
+  return 'loose'                  // ≥ 9 RPO
 }
 
 /**
@@ -121,6 +126,7 @@ export function buildEconomyHistogramRows(
       bin: i,
       label: economyLabel(i),
       count: counts[i],
+      tier: economyBinTier(i),
     })
   }
   return rows
@@ -132,28 +138,20 @@ export function buildEconomyHistogramRows(
 // wickets tiers but with reversed polarity (sage at the LOW end =
 // good economy; ochre/gold at the HIGH end = bad economy).
 
-export type EconomyTier =
-  | 'tight' | 'decent' | 'neutral' | 'expensive' | 'leaked'
+export type LowerIsBetterTier = 'tight' | 'mid' | 'loose'
 
-export function economyTier(rpo: number): EconomyTier {
-  if (rpo < 6) return 'tight'      // sage
-  if (rpo < 7) return 'decent'      // faint slate-tan
-  if (rpo < 9) return 'neutral'     // default slate
-  if (rpo < 10) return 'expensive'  // ochre
-  return 'leaked'                    // deeper gold
+/** Economy tier — < 7 tight, 7-9 mid, ≥ 9 loose. */
+export function economyTier(rpo: number): LowerIsBetterTier {
+  if (rpo < 7) return 'tight'
+  if (rpo < 9) return 'mid'
+  return 'loose'
 }
 
-// ─── Runs-conceded tier (sparkline bar coloring) ────────────────────
-
-export type RunsConcededTier =
-  | 'tight' | 'decent' | 'neutral' | 'expensive' | 'leaked'
-
-export function runsConcededTier(runs: number): RunsConcededTier {
-  if (runs <= 15) return 'tight'
-  if (runs <= 25) return 'decent'
-  if (runs < 40) return 'neutral'
-  if (runs < 50) return 'expensive'
-  return 'leaked'
+/** Runs-conceded tier — ≤ 25 tight, 25-40 mid, > 40 loose. */
+export function runsConcededTier(runs: number): LowerIsBetterTier {
+  if (runs <= 25) return 'tight'
+  if (runs <= 40) return 'mid'
+  return 'loose'
 }
 
 // ─── Runs conceded — continuous, width-5 bins ───────────────────────
@@ -162,6 +160,15 @@ export interface RunsConcededBinRow {
   bin: number
   label: string  // "0-4", "5-9", ..., "55-59", "60+"
   count: number
+  tier: LowerIsBetterTier
+}
+
+/** Tier for a runs-conceded bin index (3-tier: tight / mid / loose).
+ *  Bin width 5 starting at 0; thresholds at 25 and 40 runs. */
+function runsConcededBinTier(idx: number): LowerIsBetterTier {
+  if (idx <= 4) return 'tight'   // 0-24 runs
+  if (idx <= 7) return 'mid'     // 25-39 runs
+  return 'loose'                  // 40+ runs
 }
 
 /** Width-5 bin. runs ≥ 60 → 12 (60+ catch). */
@@ -198,6 +205,7 @@ export function buildRunsConcededHistogramRows(
       bin: i,
       label: runsConcededLabel(i),
       count: counts[i],
+      tier: runsConcededBinTier(i),
     })
   }
   return rows

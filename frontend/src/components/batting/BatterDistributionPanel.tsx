@@ -22,12 +22,13 @@
 
 import { useUrlParam } from '../../hooks/useUrlState'
 import RunsHistogram from './RunsHistogram'
+import SRHistogram from './SRHistogram'
 import DistributionStatStrip, { MilestoneChipsRow } from './DistributionStatStrip'
 import DistributionSparkline, { type SparklinePoint } from '../distribution/DistributionSparkline'
 import SeasonTickAxis from '../distribution/SeasonTickAxis'
 import { pickBattingBaseline, type GlobalBattingBaselines } from '../distribution/globalBaselines'
-import { binIndex, binTier } from './distributionBins'
-import { WISDEN_RUN_TIERS } from '../charts/palette'
+import { binIndex, binTier, srBinIndex, srBinTier, perInningsSR } from './distributionBins'
+import { WISDEN_RUN_TIERS, WISDEN_SR_TIERS } from '../charts/palette'
 import FormDeltaLine from './FormDeltaLine'
 import SuggestedSplitsRow from './SuggestedSplitsRow'
 import type { BatterDistribution, DistributionDossier, InningsObservation } from '../../types'
@@ -84,10 +85,11 @@ function sparklineFor(
     const playerSR = balls > 0 ? +(scopeLifetime.runs.total * 100 / balls).toFixed(2) : null
     return {
       point: o => {
-        const sr = o.balls > 0 ? +(o.runs * 100 / o.balls).toFixed(1) : 0
+        const sr = perInningsSR(o.runs, o.balls)
         return {
           date: o.date, matchId: o.match_id, value: sr,
           tooltip: `${o.date} · SR ${sr.toFixed(1)} (${o.runs}r in ${o.balls}b${o.dismissed ? '' : '*'})`,
+          color: WISDEN_SR_TIERS[srBinTier(srBinIndex(sr))],
         }
       },
       playerReferenceValue: playerSR,
@@ -107,6 +109,61 @@ function sparklineFor(
     caption: 'oldest ← bars (one per innings, height = runs) → most recent',
     globalLegend: `${globals.runs} runs/inn`,
   }
+}
+
+/** Pure stat strip for the SR tab — computed client-side from
+ *  the runs observations (no SR-specific dossier in the API yet). */
+function SRStatStrip({ dossier }: { dossier: DistributionDossier }) {
+  const obs = dossier.runs.observations
+  const srs = obs.filter(o => o.balls > 0).map(o => perInningsSR(o.runs, o.balls))
+  if (srs.length === 0) return null
+  const sorted = [...srs].sort((a, b) => a - b)
+  const median = sorted.length % 2
+    ? sorted[(sorted.length - 1) / 2]
+    : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+  const mean = srs.reduce((s, x) => s + x, 0) / srs.length
+  const balls = dossier.runs.balls_total
+  const poolSR = balls > 0 ? dossier.runs.total * 100 / balls : null
+  const variance = srs.length >= 2
+    ? srs.reduce((s, x) => s + (x - mean) ** 2, 0) / (srs.length - 1)
+    : 0
+  const std = Math.sqrt(variance)
+
+  function StatRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+    return (
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        alignItems: 'baseline', padding: '0.25rem 0',
+      }}>
+        <span style={{
+          fontFamily: 'var(--serif)', fontStyle: 'italic',
+          fontSize: '0.78rem', color: 'var(--ink-faint)',
+        }}>{label}</span>
+        <span className="num" style={{
+          fontFamily: 'var(--serif)',
+          fontSize: accent ? '1.15rem' : '1rem',
+          fontWeight: accent ? 600 : 500,
+          color: 'var(--ink)',
+        }}>{value}</span>
+      </div>
+    )
+  }
+  const fmt = (v: number | null, d = 1) => v === null ? '—' : v.toFixed(d)
+  return (
+    <div>
+      <StatRow label="Career SR" value={fmt(poolSR, 2)} accent />
+      <StatRow label="Mean / inn" value={fmt(mean, 1)} />
+      <StatRow label="Median / inn" value={fmt(median, 1)} accent />
+      <StatRow label="Std" value={fmt(std, 1)} />
+      <div style={{
+        fontFamily: 'var(--serif)', fontStyle: 'italic',
+        fontSize: '0.7rem', color: 'var(--ink-faint)',
+        textAlign: 'right', marginTop: '0.25rem',
+      }}>
+        {srs.length} inns with balls faced
+      </div>
+    </div>
+  )
 }
 
 function SparklineLegend({ globalLegend, showRolling }: {
@@ -253,10 +310,6 @@ export default function BatterDistributionPanel({
         </>
       ) : (
         <>
-          {/* Histogram + stat strip rendered for the Runs metric only.
-              The SR tab is sparkline-driven (per-innings SR is a
-              continuous distribution; the existing histogram is
-              integer-runs binned). */}
           {metric === 'runs' && (
             <>
               <div className="wisden-dist-grid">
@@ -265,6 +318,12 @@ export default function BatterDistributionPanel({
               </div>
               <MilestoneChipsRow dossier={dossier} />
             </>
+          )}
+          {metric === 'sr' && (
+            <div className="wisden-dist-grid">
+              <SRHistogram observations={dossier.runs.observations} />
+              <SRStatStrip dossier={dossier} />
+            </div>
           )}
 
           <div style={{ marginTop: '0.75rem' }}>

@@ -1344,20 +1344,41 @@ Established 2026-05-06 on the v2 form-windows extension.
   the failure/wicketless histogram tier was flipped from muted
   red to muted indigo (`#7090A8`) accordingly. Legend swatches:
   solid 14×1.5–2px rectangles, NOT em-dash glyphs.
-- **Tier-coloured sparkline bars** (revised 2026-05-06): each
-  per-innings/per-spell bar is colored by its milestone tier
-  matching the histogram bins. Lets users scan the chronological
-  sparkline and answer "in how many great innings was he poor?"
-  / "of his good spells, how many were 5-fers?" at a glance.
-  - Batter Runs tab: `WISDEN_RUN_TIERS` (failure indigo / building
-    slate-tan / fifty sage / century ochre / rare deeper gold).
-  - Batter SR tab: continuous, no tiering (single neutral color).
-  - Bowler Wickets tab: `WISDEN_WICKET_TIERS` (wicketless slate-
-    tan / building indigo / threefer sage / fourfer ochre /
-    fivefer deeper gold).
-  - Bowler Economy + Runs Conceded tabs: `WISDEN_LOWER_IS_BETTER_TIERS`
-    — same five colors as the wicket ladder but reversed polarity
-    (sage at the LOW end = good; ochre/gold at the HIGH end = bad).
+- **Tier-coloured sparkline bars + matching histograms** (revised
+  2026-05-06): each per-innings/per-spell bar is colored by its
+  milestone tier matching the histogram bins. Lets users scan
+  the chronological sparkline and answer "in how many great
+  innings was he poor?" / "of his good spells, how many were
+  big bags?" at a glance.
+
+  **3-tier collapse** — every metric uses **3 tiers max** (down
+  from 5) per user feedback that 5 colors made the sparkline
+  visually noisy. The bin label still conveys the exact range;
+  the color tells you which tier. Polarity convention:
+  - Higher-is-better (runs / wickets / SR): low = indigo (poor),
+    mid = faint slate-tan (typical), high = sage or gold (strong)
+  - Lower-is-better (economy / runs conceded): low = sage (tight),
+    mid = faint slate-tan, high = ochre (loose)
+
+  Tier breaks:
+  | Metric | low | mid | high |
+  |---|---|---|---|
+  | Batter Runs       | 0-9 (failure indigo)   | 10-49 (building) | 50+ (impact sage)      |
+  | Batter SR         | <100 (slow indigo)     | 100-149 (mid)    | 150+ (explosive sage)  |
+  | Bowler Wickets    | 0 (wicketless indigo)  | 1-2 (building)   | 3+ (strike gold)       |
+  | Bowler Economy    | <7 (tight sage)        | 7-9 (mid)        | ≥9 (loose ochre)       |
+  | Bowler Runs Conc. | ≤25 (tight sage)       | 25-40 (mid)      | >40 (loose ochre)      |
+
+  Both the histogram (BarChart `colorBy="tier"` + 3-color
+  scheme) AND the sparkline (per-bar `color` from the matching
+  tier helper) use the same palette per metric — the visual
+  encoding is consistent whichever chart you scan first.
+
+- **Sparkline bar opacity 0.5** so the reference lines (black
+  scope baseline + gray gender-global) and the rolling-mean
+  overlay (red) read clearly above the bar mass. Earlier
+  iterations at 0.85-0.95 made the lines harder to spot above
+  the dense bar texture on long careers.
 - **Sparkline interaction model** (revised 2026-05-06): desktop
   bars are wrapped in `<a href="/matches/:matchId">` with hover
   tooltip (date + key value). On mobile (< 720px), the bar

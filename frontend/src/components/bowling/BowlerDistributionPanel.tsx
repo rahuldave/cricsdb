@@ -32,7 +32,7 @@ import SeasonTickAxis from '../distribution/SeasonTickAxis'
 import { pickBowlingBaseline, type GlobalBowlingBaselines } from '../distribution/globalBaselines'
 import BowlerFormDeltaLine from './BowlerFormDeltaLine'
 import BowlerSuggestedSplitsRow from './BowlerSuggestedSplitsRow'
-import { WISDEN_WICKET_TIERS, WISDEN_LOWER_IS_BETTER_TIERS } from '../charts/palette'
+import { WISDEN_WICKET_TIERS, WISDEN_LOWER_TIERS } from '../charts/palette'
 import { wicketBin, wicketTier, economyTier, runsConcededTier } from './distributionBins'
 import type { BowlerDistribution, BowlerDossier, BowlerInningsObservation } from '../../types'
 
@@ -110,7 +110,7 @@ function sparklineFor(
         return {
           date: o.date, matchId: o.match_id, value: v,
           tooltip: `${o.date} · econ ${v.toFixed(2)} (${o.runs_conceded}r in ${o.balls}b, ${o.wickets} wkt${o.wickets === 1 ? '' : 's'})`,
-          color: WISDEN_LOWER_IS_BETTER_TIERS[economyTier(v)],
+          color: WISDEN_LOWER_TIERS[economyTier(v)],
         }
       },
       playerReferenceValue: scopeLifetime.economy.pool,
@@ -123,7 +123,7 @@ function sparklineFor(
     point: o => ({
       date: o.date, matchId: o.match_id, value: o.runs_conceded,
       tooltip: `${o.date} · ${o.runs_conceded}r conceded (${o.balls}b, ${o.wickets} wkt${o.wickets === 1 ? '' : 's'})`,
-      color: WISDEN_LOWER_IS_BETTER_TIERS[runsConcededTier(o.runs_conceded)],
+      color: WISDEN_LOWER_TIERS[runsConcededTier(o.runs_conceded)],
     }),
     playerReferenceValue: scopeLifetime.runs_conceded.mean_per_innings,
     globalReferenceValue: globals.runs,
