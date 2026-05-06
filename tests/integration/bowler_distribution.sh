@@ -240,6 +240,18 @@ spark_first_title=$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-spa
 assert_contains "Sparkline tooltip contains a date" "20" "$spark_first_title"
 assert_contains "Sparkline tooltip on Wickets tab mentions wkt" "wkt" "$spark_first_title"
 
+# Two reference lines: player (green #3F7A4D) + global (black #1A1714)
+ref_count=$(ab_eval "document.querySelectorAll('$PANEL_SEL .wisden-dist-sparkline line[data-ref]').length")
+assert_eq "Sparkline renders BOTH reference lines (player + global)" "2" "$ref_count"
+player_stroke=$(unq "$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline line[data-ref=player]')?.getAttribute('stroke') || ''")")
+global_stroke=$(unq "$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline line[data-ref=global]')?.getAttribute('stroke') || ''")")
+assert_eq "Player line is green (#3F7A4D)" "#3F7A4D" "$player_stroke"
+assert_eq "Global line is black (#1A1714)" "#1A1714" "$global_stroke"
+
+# Gender-tiered global anchor: men's wickets/spell = 1
+legend=$(ab_eval "document.querySelector('.wisden-dist-sparkline')?.parentElement?.lastElementChild?.textContent || ''")
+assert_contains "Wickets tab legend cites men's gender-global (1 wkts/spell)" "1 wkts/spell" "$legend"
+
 # Toggle to Last 10 + verify URL
 ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'Last 10').click()" >/dev/null
 settle 1

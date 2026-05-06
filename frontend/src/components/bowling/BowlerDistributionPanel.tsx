@@ -33,6 +33,7 @@ import BowlerFormDeltaLine from './BowlerFormDeltaLine'
 import BowlerSuggestedSplitsRow from './BowlerSuggestedSplitsRow'
 import { WISDEN_WICKET_TIERS } from '../charts/palette'
 import { wicketBin, wicketTier } from './distributionBins'
+import { pickGlobalBaseline, type GlobalBaselines } from './globalBaselines'
 import type { BowlerDistribution, BowlerDossier, BowlerInningsObservation } from '../../types'
 
 type DistWindow = 'scope' | 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
@@ -73,36 +74,84 @@ function pickDossier(dist: BowlerDistribution, window: DistWindow): BowlerDossie
 
 interface SparklineConfig {
   valueAccessor: (o: BowlerInningsObservation) => number
-  referenceValue: number | null
+  /** Player line — scope-baseline mean (the lifetime block of the
+   *  active filter scope). Constant across window toggles. */
+  playerReferenceValue: number | null
+  /** Global line — gender-tiered all-bowler centre. */
+  globalReferenceValue: number
   colorAccessor?: (o: BowlerInningsObservation, v: number) => string
   tooltipAccessor: (o: BowlerInningsObservation, v: number) => string
   caption: string
 }
 
-function sparklineFor(metric: DistMetric, dossier: BowlerDossier): SparklineConfig {
+function sparklineFor(
+  metric: DistMetric,
+  scopeLifetime: BowlerDossier,
+  globals: GlobalBaselines,
+): SparklineConfig {
   if (metric === 'wickets') {
     return {
       valueAccessor: o => o.wickets,
-      referenceValue: dossier.wickets.mean_per_innings,
+      playerReferenceValue: scopeLifetime.wickets.mean_per_innings,
+      globalReferenceValue: globals.wickets,
       colorAccessor: (_o, v) => WISDEN_WICKET_TIERS[wicketTier(wicketBin(v))],
       tooltipAccessor: (o, v) => `${o.date} · ${v} wkt${v === 1 ? '' : 's'} (${o.balls}b, ${o.runs_conceded}r)`,
-      caption: 'oldest ← bars (one per spell, height = wickets) → most recent · horizontal line = mean wkts/spell',
+      caption: 'oldest ← bars (one per spell, height = wickets) → most recent',
     }
   }
   if (metric === 'economy') {
     return {
       valueAccessor: o => o.balls > 0 ? +(o.runs_conceded * 6 / o.balls).toFixed(2) : 0,
-      referenceValue: dossier.economy.pool,
+      playerReferenceValue: scopeLifetime.economy.pool,
+      globalReferenceValue: globals.rpo,
       tooltipAccessor: (o, v) => `${o.date} · econ ${v.toFixed(2)} (${o.runs_conceded}r in ${o.balls}b, ${o.wickets} wkt${o.wickets === 1 ? '' : 's'})`,
-      caption: 'oldest ← bars (one per spell, height = econ RPO) → most recent · horizontal line = career economy',
+      caption: 'oldest ← bars (one per spell, height = econ RPO) → most recent',
     }
   }
   return {
     valueAccessor: o => o.runs_conceded,
-    referenceValue: dossier.runs_conceded.mean_per_innings,
+    playerReferenceValue: scopeLifetime.runs_conceded.mean_per_innings,
+    globalReferenceValue: globals.runs,
     tooltipAccessor: (o, v) => `${o.date} · ${v}r conceded (${o.balls}b, ${o.wickets} wkt${o.wickets === 1 ? '' : 's'})`,
-    caption: 'oldest ← bars (one per spell, height = runs conceded) → most recent · horizontal line = mean runs/spell',
+    caption: 'oldest ← bars (one per spell, height = runs conceded) → most recent',
   }
+}
+
+/** Tiny inline legend explaining the two reference lines. Both
+ *  always shown regardless of metric tab so the user learns the
+ *  encoding once. */
+function SparklineLegend({ globals, metric }: {
+  globals: GlobalBaselines
+  metric: DistMetric
+}) {
+  const globalNum = metric === 'wickets' ? globals.wickets
+                  : metric === 'economy' ? globals.rpo
+                  : globals.runs
+  const unit = metric === 'wickets' ? 'wkts/spell'
+             : metric === 'economy' ? 'RPO'
+             : 'runs/spell'
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '0.85rem',
+      fontFamily: 'var(--serif)', fontStyle: 'italic',
+      fontSize: '0.7rem', color: 'var(--ink-faint)',
+    }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+        <span aria-hidden="true" style={{
+          display: 'inline-block', width: 14, height: 1.5,
+          background: '#3F7A4D', verticalAlign: 'middle',
+        }} />
+        scope baseline
+      </span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+        <span aria-hidden="true" style={{
+          display: 'inline-block', width: 14, height: 1.5,
+          background: '#1A1714', verticalAlign: 'middle',
+        }} />
+        gender-global ({globalNum} {unit})
+      </span>
+    </span>
+  )
 }
 
 
@@ -260,23 +309,33 @@ export default function BowlerDistributionPanel({
 
           <div style={{ marginTop: '0.75rem' }}>
             {(() => {
-              const cfg = sparklineFor(metric, dossier)
+              const globals = pickGlobalBaseline(distribution.scope)
+              // Player line reads the SCOPE-level lifetime block,
+              // NOT the active window. So under a form window
+              // toggle the line stays put as the player's scope
+              // baseline (recent vs scope-norm reading); only a
+              // FilterBar narrowing moves it. See spec §12.2.6.
+              const cfg = sparklineFor(metric, distribution.lifetime, globals)
               return (
                 <>
                   <DistributionSparkline
                     observations={dossier.wickets.observations}
                     valueAccessor={cfg.valueAccessor}
-                    referenceValue={cfg.referenceValue}
+                    playerReferenceValue={cfg.playerReferenceValue}
+                    globalReferenceValue={cfg.globalReferenceValue}
                     colorAccessor={cfg.colorAccessor}
                     tooltipAccessor={cfg.tooltipAccessor}
                   />
                   <SeasonTickAxis observations={dossier.wickets.observations} />
                   <div style={{
+                    display: 'flex', flexWrap: 'wrap', alignItems: 'baseline',
+                    columnGap: '0.85rem', rowGap: '0.15rem',
+                    marginTop: '0.1rem',
                     fontFamily: 'var(--serif)', fontStyle: 'italic',
                     fontSize: '0.7rem', color: 'var(--ink-faint)',
-                    marginTop: '0.1rem',
                   }}>
-                    {cfg.caption}
+                    <span>{cfg.caption}</span>
+                    <SparklineLegend globals={globals} metric={metric} />
                   </div>
                 </>
               )

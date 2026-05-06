@@ -2158,11 +2158,39 @@ innings hit the anchor) renders as `—` not `0%`.
 Per-spell sparkline rendered chronologically across full panel
 width. Bar value depends on the active **metric tab**:
 
-| Metric tab | Bar value | Reference line | Color |
+| Metric tab | Bar value | Bar color |
+|---|---|---|
+| Wickets       | `o.wickets` (0..6+, discrete) | wicket-tier (`WISDEN_WICKET_TIERS`) |
+| Economy       | `o.runs_conceded × 6 / o.balls` (RPO) | neutral slate |
+| Runs conceded | `o.runs_conceded` (absolute) | neutral slate |
+
+**Two reference lines per metric** (revised 2026-05-06; v1 had a
+single mean line which was uninformative because every bar
+clusters around it):
+
+| Line | Color | Reads | Source |
 |---|---|---|---|
-| Wickets       | `o.wickets` (0..6+, discrete) | `wickets.mean_per_innings` | wicket-tier (`WISDEN_WICKET_TIERS`) |
-| Economy       | `o.runs_conceded × 6 / o.balls` (RPO) | `economy.pool` | neutral slate |
-| Runs conceded | `o.runs_conceded` (absolute) | `runs_conceded.mean_per_innings` | neutral slate |
+| Scope baseline | green (`WISDEN.forest` `#3F7A4D`) | "where this bowler usually sits under the active filter scope" | `distribution.lifetime.X` (the lifetime block of the filter scope, NOT the active form window — stays put across window toggles, only moves when a FilterBar narrowing changes the scope) |
+| Gender-global   | black (`WISDEN.ink` `#1A1714`)    | "where any bowler usually sits at this tier" | gender-tiered constants in `components/bowling/globalBaselines.ts` (`gender=male` → men's bucket; `gender=female` → women's; unset → all-T20) |
+
+Y-axis max is bumped to `max(data_max, player_ref, global_ref)`
+so the global anchor is always on-chart even when the player has
+been way below it across the whole window.
+
+**Global constants** (whole numbers, derived from `cricket.db`
+2026-05-06 across all qualifying spells ≥ 12 legal balls):
+
+```
+                wkts/spell  runs/spell  RPO
+Men   bucket    1           26          8
+Women bucket    1           20          6
+Unset bucket    1           25          7
+```
+
+Refresh the SQL yearly (the constants drift over time as the
+women's tier-2 game normalizes upward, etc.). The single SQL
+query lives in commit 6343779 and the values get updated in
+`globalBaselines.ts`.
 
 (Revised 2026-05-06; the original v1 spec had the sparkline
 metric-INDEPENDENT — always wickets — but the per-tab data is

@@ -32,8 +32,14 @@ interface Props {
   observations: BowlerInningsObservation[]
   /** Per-bar metric value extractor — wickets / economy / runs_conceded. */
   valueAccessor: (obs: BowlerInningsObservation) => number
-  /** Optional horizontal reference line (e.g. mean wkts, pool econ). */
-  referenceValue?: number | null
+  /** Player reference line — scope-baseline mean (the lifetime block).
+   *  Rendered as a green horizontal line (cricket-conventional "this is
+   *  this bowler's baseline under the active filter scope"). */
+  playerReferenceValue?: number | null
+  /** Global reference line — gender-tiered all-bowler centre. Rendered
+   *  as a black horizontal line (cricket-conventional "this is the
+   *  league anchor"). */
+  globalReferenceValue?: number | null
   /** Per-bar color (defaults to faint slate). */
   colorAccessor?: ColorAccessor
   /** Per-bar tooltip text (date + key value). */
@@ -42,11 +48,14 @@ interface Props {
 }
 
 const DEFAULT_COLOR = '#3C5B7A'  // WISDEN.slate
+const PLAYER_REF_COLOR = '#3F7A4D'  // WISDEN.forest — green for "this player"
+const GLOBAL_REF_COLOR = '#1A1714'  // WISDEN.ink — black for "league"
 
 export default function DistributionSparkline({
   observations,
   valueAccessor,
-  referenceValue,
+  playerReferenceValue,
+  globalReferenceValue,
   colorAccessor,
   tooltipAccessor,
   height = 36,
@@ -60,14 +69,24 @@ export default function DistributionSparkline({
   if (series.length === 0) return null
 
   const VB_W = 100
-  const max = Math.max(...series, 1)
+  // Max y = the larger of the data max OR the global ref (so the
+  // global anchor is always on-chart even when the player has been
+  // way below it across the whole window).
+  const dataMax = Math.max(...series, 1)
+  const max = Math.max(
+    dataMax,
+    globalReferenceValue ?? 0,
+    playerReferenceValue ?? 0,
+  )
   const barW = VB_W / series.length
   const barInset = Math.min(barW * 0.15, 0.4)
 
-  const refY = (referenceValue !== undefined && referenceValue !== null
-                && referenceValue > 0 && referenceValue <= max)
-    ? height - (referenceValue / max) * height
-    : null
+  const yFor = (v: number | null | undefined): number | null => {
+    if (v === undefined || v === null || v <= 0 || v > max) return null
+    return height - (v / max) * height
+  }
+  const playerY = yFor(playerReferenceValue)
+  const globalY = yFor(globalReferenceValue)
 
   return (
     <svg
@@ -77,13 +96,26 @@ export default function DistributionSparkline({
       style={{ width: '100%', height, display: 'block' }}
       aria-label="Per-innings distribution sparkline"
     >
-      {refY !== null && (
+      {/* Global line (black) FIRST so the player line draws on top
+          when they overlap. */}
+      {globalY !== null && (
         <line
           x1={0} x2={VB_W}
-          y1={refY} y2={refY}
-          stroke="#1A1714"
+          y1={globalY} y2={globalY}
+          stroke={GLOBAL_REF_COLOR}
           strokeWidth={0.5}
-          opacity={0.85}
+          opacity={0.7}
+          data-ref="global"
+        />
+      )}
+      {playerY !== null && (
+        <line
+          x1={0} x2={VB_W}
+          y1={playerY} y2={playerY}
+          stroke={PLAYER_REF_COLOR}
+          strokeWidth={0.6}
+          opacity={0.9}
+          data-ref="player"
         />
       )}
       {observations.map((o, i) => {
