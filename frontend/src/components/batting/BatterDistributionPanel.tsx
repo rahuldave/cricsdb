@@ -14,7 +14,7 @@
 
 import { useUrlParam } from '../../hooks/useUrlState'
 import RunsHistogram from './RunsHistogram'
-import DistributionStatStrip from './DistributionStatStrip'
+import DistributionStatStrip, { MilestoneChipsRow } from './DistributionStatStrip'
 import RunsSparkline from './RunsSparkline'
 import FormDeltaLine from './FormDeltaLine'
 import SuggestedSplitsRow from './SuggestedSplitsRow'
@@ -141,11 +141,12 @@ export default function BatterDistributionPanel({
             display: 'grid',
             gridTemplateColumns: 'minmax(0, 1fr) minmax(220px, 320px)',
             gap: '1.5rem',
-            alignItems: 'stretch',
+            alignItems: 'start',
           }}>
             <RunsHistogram dossier={dossier} />
             <DistributionStatStrip dossier={dossier} />
           </div>
+          <MilestoneChipsRow dossier={dossier} />
           <div style={{ marginTop: '0.75rem' }}>
             <RunsSparkline
               observations={dossier.runs.observations}
@@ -159,7 +160,7 @@ export default function BatterDistributionPanel({
             }}>
               oldest ← bars (one per innings) → most recent
               {' · '}
-              <span style={{ color: 'var(--ink)' }}>--</span>{' 20-run line'}
+              <span style={{ color: 'var(--ink)' }}>—</span>{' 20-run line'}
               {window === 'scope' && (
                 <>
                   {' · '}

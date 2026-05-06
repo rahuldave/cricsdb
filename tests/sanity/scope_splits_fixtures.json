@@ -5,9 +5,11 @@
     "expected": []
   },
   {
-    "name": "identity-only scope (gender + team_type) — no narrowing axes set, no splits",
+    "name": "team_type only — all-time broadens (team_type is a narrowing axis, not identity)",
     "scope": {"gender": "male", "team_type": "club"},
-    "expected": []
+    "expected": [
+      {"label": "All-time", "params": {"gender": "male"}}
+    ]
   },
   {
     "name": "tournament + single season — three broadens",
@@ -58,15 +60,16 @@
     ]
   },
   {
-    "name": "opponent only — isolate + drop pair",
+    "name": "opponent + team_type — broaden type + opponent isolate/drop",
     "scope": {"gender": "male", "team_type": "international", "filter_opponent": "Australia"},
     "expected": [
+      {"label": "All-time", "params": {"gender": "male"}},
       {"label": "vs Australia, all-time", "params": {"gender": "male", "team_type": "international", "filter_opponent": "Australia"}},
       {"label": "vs all opponents", "params": {"gender": "male", "team_type": "international"}}
     ]
   },
   {
-    "name": "tournament + season + opponent — five splits",
+    "name": "tournament + season + opponent (no team_type) — five splits",
     "scope": {"gender": "male", "tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024", "filter_opponent": "Chennai Super Kings"},
     "expected": [
       {"label": "All Indian Premier League", "params": {"gender": "male", "tournament": "Indian Premier League"}},
@@ -74,6 +77,36 @@
       {"label": "All-time", "params": {"gender": "male"}},
       {"label": "vs Chennai Super Kings, all-time", "params": {"gender": "male", "filter_opponent": "Chennai Super Kings"}},
       {"label": "vs all opponents", "params": {"gender": "male", "tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024"}}
+    ]
+  },
+  {
+    "name": "club + tournament + season range — four-tier broadening (Kohli's URL)",
+    "scope": {"gender": "male", "team_type": "club", "tournament": "Indian Premier League", "season_from": "2024", "season_to": "2026"},
+    "expected": [
+      {"label": "All Indian Premier League", "params": {"gender": "male", "team_type": "club", "tournament": "Indian Premier League"}},
+      {"label": "All club cricket in 2024–2026", "params": {"gender": "male", "team_type": "club", "season_from": "2024", "season_to": "2026"}},
+      {"label": "All cricket in 2024–2026", "params": {"gender": "male", "season_from": "2024", "season_to": "2026"}},
+      {"label": "All-time", "params": {"gender": "male"}}
+    ]
+  },
+  {
+    "name": "international + bilateral + season — four-tier broadening (no tournament)",
+    "scope": {"gender": "male", "team_type": "international", "series_type": "bilateral", "season_from": "2024", "season_to": "2024"},
+    "expected": [
+      {"label": "All bilaterals", "params": {"gender": "male", "team_type": "international", "series_type": "bilateral"}},
+      {"label": "All international cricket in 2024", "params": {"gender": "male", "team_type": "international", "season_from": "2024", "season_to": "2024"}},
+      {"label": "All cricket in 2024", "params": {"gender": "male", "season_from": "2024", "season_to": "2024"}},
+      {"label": "All-time", "params": {"gender": "male"}}
+    ]
+  },
+  {
+    "name": "international + tournament + season — four-tier (T20 WC pattern)",
+    "scope": {"gender": "male", "team_type": "international", "tournament": "ICC Men's T20 World Cup", "season_from": "2024", "season_to": "2024"},
+    "expected": [
+      {"label": "All ICC Men's T20 World Cup", "params": {"gender": "male", "team_type": "international", "tournament": "ICC Men's T20 World Cup"}},
+      {"label": "All international cricket in 2024", "params": {"gender": "male", "team_type": "international", "season_from": "2024", "season_to": "2024"}},
+      {"label": "All cricket in 2024", "params": {"gender": "male", "season_from": "2024", "season_to": "2024"}},
+      {"label": "All-time", "params": {"gender": "male"}}
     ]
   },
   {

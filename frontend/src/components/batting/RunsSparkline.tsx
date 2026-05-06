@@ -66,7 +66,6 @@ export default function RunsSparkline({
           y1={refY} y2={refY}
           stroke={WISDEN.ink}
           strokeWidth={0.5}
-          strokeDasharray="0.8 0.8"
           opacity={0.85}
         />
       )}

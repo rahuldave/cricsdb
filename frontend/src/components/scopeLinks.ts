@@ -366,7 +366,9 @@ export function resolveScopePhrases(
 //
 // Spec: internal_docs/spec-distribution-stats.md §8.7.
 
-const IDENTITY_KEYS_FOR_SPLITS = ['gender', 'team_type'] as const
+// Gender only — team_type is a narrowing axis, NOT identity. See the
+// Python mirror for the rationale (api/scope_links.py).
+const IDENTITY_KEYS_FOR_SPLITS = ['gender'] as const
 
 export interface SplitSuggestion {
   label: string
@@ -386,6 +388,20 @@ function _identityForSplits(scope: Partial<FilterParams>): Record<string, string
   return id
 }
 
+function _identityWithType(scope: Partial<FilterParams>): Record<string, string> {
+  const id = _identityForSplits(scope)
+  const tt = scope.team_type
+  if (_truthy(tt as string | null | undefined)) id.team_type = tt as string
+  return id
+}
+
+function _seriesLabel(seriesType: string): string {
+  if (seriesType === 'bilateral') return 'bilaterals'
+  if (seriesType === 'icc') return 'ICC events'
+  if (seriesType === 'club') return 'club competitions'
+  return seriesType
+}
+
 function _withoutKeys(
   scope: Partial<FilterParams>,
   ...drop: string[]
@@ -401,11 +417,16 @@ function _withoutKeys(
 export function suggestedSplits(scope: Partial<FilterParams>): SplitSuggestion[] {
   const splits: SplitSuggestion[] = []
   const identity = _identityForSplits(scope)
+  const identityWithType = _identityWithType(scope)
 
   const tournament = _truthy(scope.tournament) ? scope.tournament! : null
+  const seriesType = _truthy(scope.series_type) ? scope.series_type! : null
+  const teamType = _truthy(scope.team_type) ? scope.team_type! : null
   const seasonFrom = _truthy(scope.season_from) ? scope.season_from! : null
   const seasonTo = _truthy(scope.season_to) ? scope.season_to! : null
   const hasTournament = !!tournament
+  const hasSeriesType = !!seriesType
+  const hasTeamType = !!teamType
   const hasAnySeason = !!seasonFrom || !!seasonTo
 
   const opponent = _truthy(scope.filter_opponent) ? scope.filter_opponent! : null
@@ -418,32 +439,55 @@ export function suggestedSplits(scope: Partial<FilterParams>): SplitSuggestion[]
     return p
   }
 
-  // Tournament × season axis — branch on hasAnySeason (single OR range),
-  // not hasSingleSeason. A 3-year range is just as broadenable as a
-  // single season; only the human-readable label changes (uses
-  // seasonTag for "2024-2026" / "2024+" / etc.).
+  const seasonLabel = seasonTag(seasonFrom, seasonTo)
+  const seasonSuffix = hasAnySeason ? ` in ${seasonLabel}` : ''
+
+  // Four-tier broadening ladder. See api/scope_links.py for the full
+  // rationale; behavior is lockstep-tested with the Python mirror via
+  // tests/sanity/scope_splits_fixtures.json.
+
+  // T1 — specific (tournament wins; series_type fallback).
   if (hasTournament && hasAnySeason && tournament) {
-    const seasonLabel = seasonTag(seasonFrom, seasonTo)
+    const p: Record<string, string> = { ...identity }
+    if (hasTeamType) p.team_type = teamType!
+    if (hasSeriesType) p.series_type = seriesType!
+    p.tournament = tournament
+    splits.push({ label: `All ${tournament}`, params: p })
+  } else if (hasSeriesType && hasAnySeason && !hasTournament && seriesType) {
+    const p: Record<string, string> = { ...identity }
+    if (hasTeamType) p.team_type = teamType!
+    p.series_type = seriesType
+    splits.push({ label: `All ${_seriesLabel(seriesType)}`, params: p })
+  }
+
+  // T2 — type-only (drop tournament + series_type; keep team_type + season).
+  if (hasTeamType && (hasTournament || hasSeriesType) && teamType) {
+    const typeLbl = teamType === 'club' ? 'club' : 'international'
     splits.push({
-      label: `All ${tournament}`,
-      params: { ...identity, tournament },
+      label: `All ${typeLbl} cricket${seasonSuffix}`,
+      params: { ...identity, team_type: teamType, ...seasonParams() },
     })
+  }
+
+  // T3 — all cricket in season (drop type + tournament + series_type).
+  if (hasAnySeason && (hasTeamType || hasTournament || hasSeriesType)) {
     splits.push({
-      label: `All cricket in ${seasonLabel}`,
+      label: `All cricket${seasonSuffix}`,
       params: { ...identity, ...seasonParams() },
     })
-    splits.push({ label: 'All-time', params: { ...identity } })
-  } else if (hasTournament && !hasAnySeason) {
-    splits.push({ label: 'All-time', params: { ...identity } })
-  } else if (hasAnySeason && !hasTournament) {
+  }
+
+  // T4 — all-time.
+  if (hasTournament || hasSeriesType || hasTeamType || hasAnySeason) {
     splits.push({ label: 'All-time', params: { ...identity } })
   }
 
-  // Opponent axis
+  // Opponent axis (independent — keeps team_type so "vs Australia"
+  // reads in the international context the user is in).
   if (opponent) {
     splits.push({
       label: `vs ${opponent}, all-time`,
-      params: { ...identity, filter_opponent: opponent },
+      params: { ...identityWithType, filter_opponent: opponent },
     })
     splits.push({
       label: 'vs all opponents',
@@ -451,11 +495,11 @@ export function suggestedSplits(scope: Partial<FilterParams>): SplitSuggestion[]
     })
   }
 
-  // Venue axis
+  // Venue axis (same shape).
   if (venue) {
     splits.push({
       label: `at ${venue}, all-time`,
-      params: { ...identity, filter_venue: venue },
+      params: { ...identityWithType, filter_venue: venue },
     })
     splits.push({
       label: 'at all venues',

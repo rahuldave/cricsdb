@@ -1,13 +1,14 @@
 /**
  * Stat strip for the batter Distribution panel — the right-hand
- * column beside the histogram. Spec:
+ * column beside the histogram, plus a separate full-width milestone-
+ * chips row exported alongside. Spec:
  * internal_docs/spec-distribution-stats.md §9.2.3.
  *
- * Two stacked groups:
- *   1. Point summaries: Mean / Median / Std / CV / Average.
- *      Median + CV are highlighted (the user's named asks).
- *   2. Milestone chips: P(≥50), P(≥100), P(≤10). Color-coded by
- *      polarity (green for positive milestones, red for failure).
+ * The point summaries (Mean / Median / Std / CV / Average) live
+ * adjacent to the histogram. Milestone chips (simples + conditionals,
+ * 6 total) render as a separate full-width flex-wrap row OUTSIDE the
+ * histogram-grid so the panel reads less vertically asymmetric — see
+ * MilestoneChipsRow below.
  *
  * Pure presentational — reads `dossier` props only.
  */
@@ -75,39 +76,52 @@ function MilestoneChip({ label, value, polarity }: {
 }
 
 export default function DistributionStatStrip({ dossier }: Props) {
-  const { runs, milestones, n_innings, n_dismissals } = dossier
+  const { runs, n_innings, n_dismissals } = dossier
   const cv = (runs.mean_per_innings && runs.mean_per_innings > 0 && runs.std !== null)
     ? runs.std / runs.mean_per_innings
     : null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <div>
-        <StatRow label="Mean / inn" value={fmtNum(runs.mean_per_innings, 1)} />
-        <StatRow label="Median" value={fmtNum(runs.median, 0)} accent />
-        <StatRow label="Std" value={fmtNum(runs.std, 1)} />
-        <StatRow label="CV" value={fmtNum(cv, 2)} accent />
-        <StatRow label="Average" value={fmtNum(runs.average, 2)} />
-        <div style={{
-          fontFamily: 'var(--serif)', fontStyle: 'italic',
-          fontSize: '0.7rem', color: 'var(--ink-faint)',
-          textAlign: 'right', marginTop: '0.25rem',
-        }}>
-          {n_innings} inns · {n_dismissals} outs · {n_innings - n_dismissals} not out
-        </div>
+    <div>
+      <StatRow label="Mean / inn" value={fmtNum(runs.mean_per_innings, 1)} />
+      <StatRow label="Median" value={fmtNum(runs.median, 0)} accent />
+      <StatRow label="Std" value={fmtNum(runs.std, 1)} />
+      <StatRow label="CV" value={fmtNum(cv, 2)} accent />
+      <StatRow label="Average" value={fmtNum(runs.average, 2)} />
+      <div style={{
+        fontFamily: 'var(--serif)', fontStyle: 'italic',
+        fontSize: '0.7rem', color: 'var(--ink-faint)',
+        textAlign: 'right', marginTop: '0.25rem',
+      }}>
+        {n_innings} inns · {n_dismissals} outs · {n_innings - n_dismissals} not out
       </div>
-      {/* All probabilities — single flex row that wraps naturally on
-          narrow viewports. Simples (negative + positive polarity)
-          followed by conditionals (neutral slate) so the eye reads
-          unconditional first, then "going-on" rates. */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-        <MilestoneChip label="P(≤10)"     value={fmtPct(milestones.p_failure_10)}  polarity="negative" />
-        <MilestoneChip label="P(≥30)"     value={fmtPct(milestones.p_30_plus)}     polarity="positive" />
-        <MilestoneChip label="P(≥50)"     value={fmtPct(milestones.p_50_plus)}     polarity="positive" />
-        <MilestoneChip label="P(≥100)"    value={fmtPct(milestones.p_100_plus)}    polarity="positive" />
-        <MilestoneChip label="P(≥50│≥30)" value={fmtPct(milestones.p_50_given_30)} polarity="neutral" />
-        <MilestoneChip label="P(≥70│≥50)" value={fmtPct(milestones.p_70_given_50)} polarity="neutral" />
-      </div>
+    </div>
+  )
+}
+
+/**
+ * Full-width milestone-probability chip row. Renders all six
+ * probabilities (4 simples + 2 conditionals) in a single
+ * flex-wrap container so on wide viewports they sit on one line
+ * across the panel, and on narrow viewports they wrap naturally.
+ * Order: simples (P(≤10), P(≥30), P(≥50), P(≥100)) first,
+ * conditionals (P(≥50│≥30), P(≥70│≥50)) last.
+ */
+export function MilestoneChipsRow({ dossier }: Props) {
+  const { milestones } = dossier
+  return (
+    <div style={{
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '0.35rem',
+      marginTop: '0.85rem',
+    }}>
+      <MilestoneChip label="P(≤10)"     value={fmtPct(milestones.p_failure_10)}  polarity="negative" />
+      <MilestoneChip label="P(≥30)"     value={fmtPct(milestones.p_30_plus)}     polarity="positive" />
+      <MilestoneChip label="P(≥50)"     value={fmtPct(milestones.p_50_plus)}     polarity="positive" />
+      <MilestoneChip label="P(≥100)"    value={fmtPct(milestones.p_100_plus)}    polarity="positive" />
+      <MilestoneChip label="P(≥50│≥30)" value={fmtPct(milestones.p_50_given_30)} polarity="neutral" />
+      <MilestoneChip label="P(≥70│≥50)" value={fmtPct(milestones.p_70_given_50)} polarity="neutral" />
     </div>
   )
 }
