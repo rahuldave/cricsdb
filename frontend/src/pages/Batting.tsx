@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
 import { useFilterDeps } from '../hooks/useFilterDeps'
-import { abbreviateScope } from '../components/scopeLinks'
+import ScopedPageHeader from '../components/ScopedPageHeader'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch, type FetchState } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -207,54 +207,16 @@ export default function Batting() {
 
       {playerId && summary && !summaryFetch.loading && (
         <>
-          {/* Header — name + flag on the left, abbreviated scope on the
-              right. Flex-wraps on narrow viewports so the scope tag
-              drops to a second line below the name + flag. */}
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'baseline',
-            columnGap: '1rem',
-            rowGap: '0.25rem',
-            marginBottom: '1rem',
-          }}>
-            <h2 className="wisden-page-title" style={{
-              margin: 0,
-              display: 'inline-flex',
-              alignItems: 'baseline',
-              gap: '0.6rem',
-            }}>
-              {summary.name}
-              {summary.nationalities?.length > 0 && (
-                <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
-                  {summary.nationalities.map(n => (
-                    <FlagBadge key={`${n.team}-${n.gender}`} team={n.team} gender={n.gender} size="lg" linkTo />
-                  ))}
-                </span>
-              )}
-            </h2>
-            {(() => {
-              const abbrev = abbreviateScope(filters)
-              return abbrev ? (
-                <span style={{
-                  fontFamily: 'var(--serif)',
-                  fontStyle: 'italic',
-                  fontSize: '0.95rem',
-                  color: 'var(--ink-faint)',
-                }}>
-                  <span style={{
-                    fontVariant: 'all-small-caps',
-                    letterSpacing: '0.08em',
-                    fontWeight: 700,
-                    fontStyle: 'normal',
-                    color: 'var(--accent)',
-                    marginRight: '0.4rem',
-                  }}>scope</span>
-                  {abbrev}
-                </span>
-              ) : null
-            })()}
-          </div>
+          <ScopedPageHeader filters={filters}>
+            {summary.name}
+            {summary.nationalities?.length > 0 && (
+              <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                {summary.nationalities.map(n => (
+                  <FlagBadge key={`${n.team}-${n.gender}`} team={n.team} gender={n.gender} size="lg" linkTo />
+                ))}
+              </span>
+            )}
+          </ScopedPageHeader>
           <ScopeIndicator filters={filters} />
           <div className="wisden-statrow cols-5">
             <StatCard label="Matches" value={summary.matches} />
