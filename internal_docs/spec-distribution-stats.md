@@ -470,9 +470,22 @@ sample:
 | Window | Definition | Use |
 |---|---|---|
 | `form.last_10` | `ORDER BY date DESC, innings_number DESC LIMIT 10` | cricket-conventional "current form" |
-| `form.last_60d` | `WHERE date >= today() − 60 days` | calendar-anchored current form |
-| `form.last_6mo` | `WHERE date >= today() − 180 days` | medium-term arc |
-| `form.last_1yr` | `WHERE date >= today() − 365 days` | annual / loss-of-form gauge |
+| `form.last_60d` | `WHERE date >= anchor − 60 days` | scope-anchored current form |
+| `form.last_6mo` | `WHERE date >= anchor − 180 days` | medium-term arc |
+| `form.last_1yr` | `WHERE date >= anchor − 365 days` | annual / loss-of-form gauge |
+
+**`anchor` (revised 2026-05-07)** — `min(today, max_obs_date)`.
+For active players in unconstrained scopes the anchor IS today,
+so the windows mean the same as the original "today minus N days."
+For retired players (Gayle, ABdV) and tightly-scoped subjects
+(IPL 2016 only), the anchor follows the data — the windows then
+mean "the last N calendar days OF SCOPE," producing meaningful
+form readings instead of empty windows. Aligns with the
+scope-anchored philosophy already used by `last_10` (a count
+window over the master sample) and the FilterBar `last-3` /
+`prev-3` / `first-3` season buttons.
+
+Empty observations → anchor = today (windows trivially empty).
 
 60 days is short enough to gauge current form but too short to
 detect a loss-of-form arc; the 6mo + 1y windows added 2026-05-06
@@ -1743,14 +1756,15 @@ boundaries; sanity check in §11.7). Same partition holds for
 
 ### 11.5 Form windows
 
-Reuse the §8.6 mechanism verbatim. Same four windows:
+Reuse the §8.6 mechanism verbatim, including the scope-anchored
+cutoff `anchor = min(today, max_obs_date)`:
 
 | Window | Definition |
 |---|---|
 | `form.last_10` | `ORDER BY date DESC, innings_number DESC LIMIT 10` |
-| `form.last_60d` | `WHERE date >= today() − 60 days` |
-| `form.last_6mo` | `WHERE date >= today() − 180 days` |
-| `form.last_1yr` | `WHERE date >= today() − 365 days` |
+| `form.last_60d` | `WHERE date >= anchor − 60 days` |
+| `form.last_6mo` | `WHERE date >= anchor − 180 days` |
+| `form.last_1yr` | `WHERE date >= anchor − 365 days` |
 
 Each window has the **full dossier shape** — `wickets`,
 `runs_conceded`, `economy`, `phase`, and the cross-block scalars.
@@ -2707,14 +2721,16 @@ At the dossier level (alongside `n_matches`):
 
 ### 13.4 Form windows
 
-Reuse the §8.6 mechanism. Same four windows, **match-grain**:
+Reuse the §8.6 mechanism, including the scope-anchored cutoff
+`anchor = min(today, max_obs_date)`. Same four windows,
+**match-grain**:
 
 | Window | Definition |
 |---|---|
 | `form.last_10` | `ORDER BY date DESC, match_id DESC LIMIT 10` over observations |
-| `form.last_60d` | `WHERE date >= today() − 60 days` |
-| `form.last_6mo` | `WHERE date >= today() − 180 days` |
-| `form.last_1yr` | `WHERE date >= today() − 365 days` |
+| `form.last_60d` | `WHERE date >= anchor − 60 days` |
+| `form.last_6mo` | `WHERE date >= anchor − 180 days` |
+| `form.last_1yr` | `WHERE date >= anchor − 365 days` |
 
 Each window has the **full dossier shape** — `catches`,
 `run_outs`, `stumpings` (when applicable), and the top-level
@@ -3724,8 +3740,10 @@ stumpings block always ships).
   - `_distribution_dossier_team_fielding(observations)` — three
     count blocks (`catches`, `run_outs`, `stumpings`) + scalars.
 - **Form windows**: one slicer per discipline (mirrors
-  bowler/fielder pattern). Reuses the existing
-  `(today - timedelta(days=N)).isoformat()` cutoff convention.
+  bowler/fielder pattern). Uses the scope-anchored cutoff
+  `anchor = min(today, max_obs_date)` from §8.6 — for inactive
+  teams (Rising Pune Supergiants, Deccan Chargers) the windows
+  follow the data, not today.
 - **Wilson + suggested_splits**: existing modules (`api/wilson.py`,
   `api/scope_links.py`) — no new code.
 - **Filter handling**: `FilterParams.filter_team` IGNORED on

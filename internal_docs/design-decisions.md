@@ -1364,6 +1364,90 @@ true)` one-shot on Batting/Bowling/Fielding landings, which
 pinned the last 3 calendar seasons on arrival. That auto-default
 was removed at user request on 2026-04-20.
 
+## Form-window cutoffs are scope-anchored, not today-anchored
+
+The Distribution panel's calendar form windows (`last_60d`,
+`last_6mo`, `last_1yr`) compute their cutoffs against
+**`anchor = min(today, max_obs_date)`** — NOT today directly.
+For active players in unconstrained scopes the anchor IS today
+(today < or ≈ max_obs_date) → behavior matches the original
+"today minus N days." For retired players (Gayle, ABdV) and
+tightly-scoped subjects (e.g. one season filter), the anchor
+follows the data — the windows then mean "the last N calendar
+days OF SCOPE."
+
+Why: the original today-anchored cutoffs were inconsistent with
+the rest of the codebase's scope-anchored idioms (`last_10`
+counts back through the master sample; FilterBar's `last-3` /
+`prev-3` / `first-3` season buttons are scope/player-aware).
+For a retired player at all-time scope, today-anchoring
+produced empty form windows and a mostly-`—` form delta line.
+For a tightly-scoped active player (e.g. Kohli IPL 2016 only),
+clicking the `last_1yr` toggle would show empty data because
+the calendar window pointed to 2025-2026 but the scope held
+2016. The user-flagged regression on 2026-05-07 was the IPL
+2016 case.
+
+Implementation in `_form_windows_*` helpers across batter v1
+(§8.6), bowler v1 (§11.5), fielder v1 (§13.4) routers — single
+helper computes the anchor and shares it across the four
+calendar cutoffs. Empty observations fall through to today
+(windows are trivially empty anyway). `as_of_date` query param
+still pins `today` for deterministic regression — the
+`min(today, max_obs_date)` rule means it still anchors when the
+scope has data through `today`; otherwise the data wins.
+
+Spec: `internal_docs/spec-distribution-stats.md §8.6` (defines
+the anchor; §11.5 / §13.4 / §16 reference it).
+
+## Dormancy badge — visual indicator when scope's last activity isn't today
+
+Companion to the scope-anchored form-window cutoff. When a
+player or team's last match in scope is more than 60 days
+before today, a faint italic badge appears next to the subject
+name in `ScopedPageHeader` AND inside the `ScopeStatusStrip`
+"Showing:" bar:
+
+| Days since last match in scope | Badge |
+|---|---|
+| ≤ 60 | (none — the entity is active in scope) |
+| 61–180 | `(0 in 60d)` |
+| 181–365 | `(0 in 6mo)` |
+| > 365 | `(0 in 1y+)` |
+
+Reads "this entity has 0 matches in the last N days within the
+active scope." Stays factual for sabbaticals, injuries,
+dropped-from-squad, retirees — all the same data state, no
+inference about cause. Deliberately NOT labeled `RET` or
+`retired`: cricket databases can't distinguish "retired" from
+"dropped" or "injured" from match-absence alone.
+
+The threshold-tier text is a feature: it tells the reader how
+stale the data they're looking at actually is. A badge of
+`(0 in 60d)` on a current player suggests dropped from squad
+or injured; `(0 in 1y+)` on Gayle suggests retirement-without-
+formal-announcement. The reader interprets, the badge just
+asserts the gap.
+
+**Wiring** — `last_match_date` ships as a top-level field on
+the four summary endpoints (`/api/v1/{batters,bowlers,fielders}/{id}/summary`,
+`/api/v1/teams/{team}/summary`) AND on the `lifetime` block of
+the three distribution endpoints (so the panel can render the
+badge without a second fetch). Frontend: `DormancyContext`
+provider; pages populate from the summary fetch they already
+do; `ScopedPageHeader` and `ScopeStatusStrip` consume.
+
+Page-aware: only fires on pages whose subject has an obvious
+"last match" interpretation — Batting / Bowling / Fielding /
+Teams. The home page, /matches scorecard, /help, etc. don't
+get the badge (they have no subject).
+
+**Scope-aware:** the badge measures the gap between today and
+the **scope's** max date — not the player's all-time max date.
+So Kohli on `?tournament=Indian Premier League&season_to=2016`
+gets `(0 in 1y+)` because the scope's data ends in 2016, even
+though Kohli has been active since.
+
 ## Regression runner: REG→NEW flip lands BEFORE the shape change
 
 `./tests/regression/run.sh <feature>` classifies each URL diff using
