@@ -3229,6 +3229,964 @@ at ≥2 because rare events on a discrete count behave differently
 
 ---
 
+## 16. Team v1 — distribution dossiers (DRAFT)
+
+> Sibling of §8 (batter), §11 (bowler), §13 (fielder). Three
+> separate per-discipline endpoints under the existing
+> `/api/v1/teams/{team}/<discipline>/...` nesting:
+> `/batting/distribution`, `/bowling/distribution`,
+> `/fielding/distribution`. One per Teams-page tab; each tab's
+> Distribution panel fetches only its own discipline's payload.
+>
+> Three endpoints, NOT one combined endpoint. API consistency
+> demands it — every existing team analytic is split per
+> discipline (`/batting/summary`, `/bowling/summary`, etc.; see
+> `api/routers/teams.py`). The panel-per-tab mount on the
+> frontend matches that split exactly: each tab fetches what it
+> needs.
+>
+> Reuses every §10.1 backend convention — Wilson 95% CI via
+> `prob_record(num, denom)` from §11.3, single-payload + window-
+> toggle (§10.1), pure-aggregator-over-observations pattern
+> shared with lifetime + form windows. The team-specific design
+> calls (wider 50-run milestone gaps, over-aware doubling /
+> finishing probabilities at the 10-over checkpoint) are
+> settled below before any code is written.
+>
+> **Status: DRAFT — not yet implemented.** Pending build per
+> §16.8.
+
+### 16.1 Common conventions across all three endpoints
+
+**Endpoint URLs.** Three siblings:
+
+```
+GET /api/v1/teams/{team}/batting/distribution
+GET /api/v1/teams/{team}/bowling/distribution
+GET /api/v1/teams/{team}/fielding/distribution
+```
+
+All three accept the same query string: `{FilterParams}` plus
+optional `as_of_date=YYYY-MM-DD` to anchor the calendar form
+windows for deterministic regression. `team` is the team's
+canonical name as it appears in the FilterBar team-search.
+
+**Master-sample grain.** All three are per-innings:
+- Team batting: one row per innings the team batted.
+- Team bowling: one row per innings the team bowled (= the
+  opponent's batting innings).
+- Team fielding: one row per innings the team fielded (= the
+  opponent's batting innings; identical to bowling). T20 has
+  one batting innings per team per match, so "per-innings"
+  collapses to "per-match" for the team-fielding case but the
+  observation row stays innings-keyed for consistency with
+  team bowling.
+
+**Filter scope.**  The team's name itself is a path-param, NOT
+a FilterParams field — use `m.team1 = :team OR m.team2 = :team`
+at match level, then narrow the innings to the relevant side
+per discipline:
+- Batting: `i.team = :team` (team is batting in the innings).
+- Bowling / Fielding: `i.team != :team` AND match-level pair
+  matches (the opp is batting; team is fielding/bowling).
+
+`FilterParams.filter_team` must be IGNORED on these endpoints
+(the team-path-param IS the subject; FilterParams.filter_team
+would either duplicate it or constrain to a different team).
+`FilterParams.filter_opponent` works as expected (narrows to
+matches against that opponent). Other axes (gender, team_type,
+tournament, season, venue, team_class, series_type) all apply
+verbatim.
+
+**Form windows.** Same four as §10.1: `last_10`, `last_60d`,
+`last_6mo`, `last_1yr`. `last_10` is the team's 10 most recent
+innings (NOT 10 most recent matches; for batting + bowling the
+distinction matters when the team played both sides on
+back-to-back days). For the team-fielding endpoint the
+distinction collapses (1 fielding innings per match).
+
+**Wilson 95% CI.** Every probability ships via
+`prob_record(num, denom)` from §11.3. No new helper.
+
+**Suggested splits.** Same `api/scope_links.py::suggested_splits`
+helper. The scope record passed in is the FilterParams-derived
+scope dict; the team-path-param is NOT included in the splits
+(splits broaden filter axes; the team itself is the dossier
+subject).
+
+**Out of v1 across all three:**
+
+- Toss-decision conditional matrix (bat-first vs field-first
+  win % across (toss-won, toss-lost) × (chose-bat, chose-bowl)).
+  Sibling slice; not part of the Distribution panel. Tracked
+  separately (`project_team_form_toss` in user memory).
+- Identity-bearing sibling fields (`highest_total`,
+  `lowest_all_out`, `best_pair`) — already on the existing
+  `/teams/{team}/batting/summary` etc. endpoints; not folded
+  into the distribution dossier (per §5).
+- Home/away/neutral split. Future v2.
+- Won/lost conditional probabilities (e.g. "P(≥180│won)") —
+  conditioning on outcome is a different question shape;
+  defer.
+
+### 16.2 Team batting — `/api/v1/teams/{team}/batting/distribution`
+
+#### 16.2.1 Per-innings observation row
+
+| Column | Definition |
+|---|---|
+| `innings_id` | `innings.id` |
+| `match_id` | `innings.match_id` |
+| `innings_number` | 1 or 2 (first or second batting innings of the match) |
+| `date` | `match.date` (used for ordering + form windows) |
+| `runs` | `SUM(d.runs_total)` for the innings (final score) |
+| `balls` | `COUNT(legal balls)` faced |
+| `wickets` | `COUNT(wickets fallen in the innings)` (any kind) |
+| `runs_at_10` | cumulative `SUM(d.runs_total)` over the first 60 legal balls (over-number 0 to 9 inclusive) |
+| `wickets_at_10` | cumulative wickets fallen over the first 60 legal balls |
+| `reached_10_overs` | `1` if the innings included at least 60 legal balls; `0` otherwise |
+| `runs_pp` / `balls_pp` / `wickets_pp` | overs 1-6 (over_number 0-5) — phase rollup, mirrors batter §8.5 |
+| `runs_mid` / `balls_mid` / `wickets_mid` | overs 7-15 (over_number 6-14) |
+| `runs_death` / `balls_death` / `wickets_death` | overs 16-20 (over_number 15-19) |
+
+**`reached_10_overs` definition rationale.** Innings curtailed
+by rain / D-L / chase ending before 10 overs are excluded from
+every "at 10" probability denom (see §16.2.3). All-out before
+10 overs is also `reached_10_overs = 0` — the snapshot doesn't
+exist; the all-out itself is captured as the regular `runs`
+final and surfaces in the absolute-bin milestones.
+
+Filtered + grouped per the FilterParams scope; ordered
+`match.date ASC, innings.innings_number ASC`.
+
+#### 16.2.2 Aggregate calculations — two sibling blocks
+
+`runs` (skewed continuous) and `run_rate` (continuous, per-over).
+Each is a self-contained dossier computed by a pure function.
+
+**`runs` block:**
+
+| Field | Formula |
+|---|---|
+| `total` | `sum(o.runs)` |
+| `mean_per_innings` | `total / n_innings` |
+| `median` | `median([o.runs])` |
+| `variance` / `std` | sample variance / sqrt |
+| `escalation_ratio_median` | median of `final_runs / runs_at_10` over innings with `reached_10_overs=1 AND runs_at_10 > 0` (paired stat for the doubling chip; §16.2.3) |
+| `observations` | full per-innings tuple list |
+
+**Milestones — `runs` block, simples (denom = `n_innings`):**
+
+| Field | Reading | Tier color |
+|---|---|---|
+| `p_lt_100`  | "collapse" | INDIGO |
+| `p_geq_100` | "got there" | SAGE |
+| `p_geq_150` | "par-plus" | SAGE |
+| `p_geq_200` | "explosive" | OCHRE |
+| `p_geq_230` | "elite" | OCHRE |
+
+**Conditional chain ladder** (each rung's denom = the rung
+below — matches the batter §8 conversion narrative; the natural
+cricket reading is "got past N → kicked on past M"):
+
+| Field | Formula |
+|---|---|
+| `p_150_given_100` | `count(≥150) / count(≥100)` |
+| `p_200_given_150` | `count(≥200) / count(≥150)` |
+| `p_230_given_200` | `count(≥230) / count(≥200)` |
+
+**Over-aware doubling** (denom = innings with
+`reached_10_overs = 1 AND runs_at_10 > 0`; the latter avoids
+0/0 division when a team is 0 at 10):
+
+| Field | Formula | Reading |
+|---|---|---|
+| `p_double_at_10` | `count(final_runs ≥ 2 × runs_at_10) / denom` | "given X at halfway, doubled" |
+
+`escalation_ratio_median` (above) is the paired magnitude stat —
+"how big is the typical escalation?" Pairs with `p_double_at_10`
+on the chip strip.
+
+**`run_rate` block** (continuous, per-over):
+
+| Field | Formula | Note |
+|---|---|---|
+| `pool` | `(total_runs × 6) / total_balls` | balls-weighted; the conventional career RR |
+| `mean_per_innings` | `mean([o.runs × 6 / o.balls])` | unweighted mean of per-innings RR |
+| `median_per_innings` | `median(per-innings RR)` | |
+| `variance` / `std` | sample variance of per-innings RR | |
+| `per_innings` | `[o.runs × 6 / o.balls for o in obs if o.balls > 0]` |
+
+**Milestones — `run_rate` block, simples** (high RR is good for
+batting — polarity FLIPPED relative to bowler economy):
+
+| Field | Reading | Tier color |
+|---|---|---|
+| `p_rr_leq_7` | "slow" | INDIGO |
+| `p_rr_leq_8` | "par-low" | SAGE |
+| `p_rr_geq_9` | "fast" | OCHRE |
+| `p_rr_geq_10`| "explosive" | OCHRE |
+
+#### 16.2.3 Phase rollup
+
+Same shape as bowler v1 §11.4.5:
+
+```jsonc
+"phase": {
+  "powerplay": { "runs_total": ..., "balls_total": ..., "wickets_total": ..., "innings_active": ... },
+  "middle":    { ... },
+  "death":     { ... }
+}
+```
+
+`innings_active` always equals `n_innings` for batting (every
+innings has at least one ball in PP for batting teams) — kept
+for shape symmetry with bowling.
+
+#### 16.2.4 Form windows + delta
+
+Same four windows. Delta block surfaces:
+
+```jsonc
+"form": {
+  "delta": {
+    "last_10_runs_mean_minus_lifetime":         <float>,
+    "last_10_run_rate_pool_minus_lifetime":     <float>,
+    "last_60d_runs_mean_minus_lifetime":        <float>,
+    "last_60d_run_rate_pool_minus_lifetime":    <float>,
+    /* ... 8 entries total: 4 windows × 2 metrics */
+  }
+}
+```
+
+#### 16.2.5 Endpoint shape
+
+```
+GET /api/v1/teams/{team}/batting/distribution?{FilterParams}&as_of_date=YYYY-MM-DD
+```
+
+Response shape mirrors §11.7 (bowler) but with the team-batting
+blocks. Single-payload + window-toggle pattern.
+
+### 16.3 Team bowling — `/api/v1/teams/{team}/bowling/distribution`
+
+#### 16.3.1 Per-innings observation row
+
+Same shape as §16.2.1 but the innings is the OPPONENT's batting.
+Side-neutral team filter — pair `(m.team1, m.team2)` includes
+`:team`; innings table row is the OTHER side's batting.
+
+| Column | Definition |
+|---|---|
+| `innings_id` | `innings.id` (the opp's batting innings) |
+| `match_id` | `innings.match_id` |
+| `innings_number` | 1 or 2 |
+| `date` | `match.date` |
+| `runs_conceded` | `SUM(d.runs_total)` over the innings (= opp's final score) |
+| `balls` | legal balls bowled (= legal balls faced by opp) |
+| `wickets` | wickets the team took. Kind-exclusion: `wicket.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')` for **bowler-credited** wickets; for the team's bowling-side total INCLUDE run-outs (the team caused them; mirrors how `team-bowling/summary` already does it). Document the exact list. |
+| `runs_at_10` | cumulative opp runs over first 60 legal balls |
+| `wickets_at_10` | cumulative wickets (team's bowling-side total, including run-outs) over first 60 legal balls |
+| `reached_10_overs` | `1` if opp innings included ≥ 60 legal balls; else `0` |
+| `runs_pp` / `balls_pp` / `wickets_pp` | overs 1-6 |
+| `runs_mid` / `balls_mid` / `wickets_mid` | overs 7-15 |
+| `runs_death` / `balls_death` / `wickets_death` | overs 16-20 |
+
+#### 16.3.2 Three sibling blocks
+
+`wickets`, `runs_conceded`, `economy` — sibling of bowler v1
+(§11.4) but at team grain.
+
+**`wickets` block:**
+
+| Field | Formula |
+|---|---|
+| `total` / `mean_per_innings` / `median` / `variance` / `std` | sample stats over `o.wickets` |
+| `observations` | per-innings tuple list |
+
+Milestones (denom = `n_innings_bowled`):
+
+| Field | Reading | Tier color |
+|---|---|---|
+| `p_leq_3` | "got bashed" | INDIGO |
+| `p_geq_5` | "broke the back" | SAGE |
+| `p_geq_7` | "in command" | OCHRE |
+| `p_eq_10` | "bowled them out" | OCHRE |
+
+Conditional ladder anchored at `≥5`:
+
+| Field | Formula |
+|---|---|
+| `p_7_given_5`  | `count(w ≥ 7) / count(w ≥ 5)` |
+| `p_10_given_5` | `count(w = 10) / count(w ≥ 5)` |
+
+Over-aware (denom = innings with `reached_10_overs = 1`):
+
+| Field | Formula | Reading |
+|---|---|---|
+| `p_geq_3_at_10`        | `count(wickets_at_10 ≥ 3) / denom`              | "early breakthrough rate" |
+| `p_eq_10_given_3_at_10`| `count(wickets=10 AND wickets_at_10≥3) / count(wickets_at_10≥3)` | "finishing rate after early breakthrough" |
+
+**`runs_conceded` block** — mirror of team-batting `runs`, with
+polarity flipped color-wise:
+
+| Field | Formula |
+|---|---|
+| `total` / `mean_per_innings` / `median` / `variance` / `std` | sample stats |
+| `escalation_ratio_median` | median of `runs_conceded / runs_at_10` over innings with `reached_10_overs=1 AND runs_at_10 > 0` |
+
+Simples (denom = `n_innings_bowled`):
+
+| Field | Reading | Tier color |
+|---|---|---|
+| `p_lt_100`  | "shut them down"      | OCHRE |
+| `p_lt_150`  | "kept it tight"       | SAGE  |
+| `p_geq_150` | "leaked some"         | SAGE  |
+| `p_geq_200` | "got hit"             | INDIGO |
+| `p_geq_230` | "blown apart"         | INDIGO |
+
+Conditional chain ladder (the leakage chain — same shape as
+team-batting's runs ladder, polarity flipped):
+
+| Field | Formula |
+|---|---|
+| `p_150_given_100` | `count(≥150) / count(≥100)` |
+| `p_200_given_150` | `count(≥200) / count(≥150)` |
+| `p_230_given_200` | `count(≥230) / count(≥200)` |
+
+Note: chip tooltips note that climbing here is BAD for the
+team's bowling (INDIGO tinted across the chain). Wilson CI on
+`p_230_given_200` will often render small-n styling; that's
+honest.
+
+Over-aware doubling (denom = innings with
+`reached_10_overs=1 AND runs_at_10 > 0`):
+
+| Field | Formula | Reading |
+|---|---|---|
+| `p_double_at_10` | `count(runs_conceded ≥ 2 × runs_at_10) / denom` | "opp doubled on us from halfway" — INDIGO |
+
+**`economy` block** — sibling of bowler v1 (§11.4.3) but at
+team grain. Same shape, same milestones (`p_econ_leq_6/7`,
+`p_econ_geq_9/10`), tier colors per §11.4.3.
+
+#### 16.3.3 Phase rollup
+
+Same shape as bowler v1 §11.4.5; team-aggregate of bowling-
+side runs/balls/wickets per phase.
+
+#### 16.3.4 Form windows + delta
+
+Three deltas per window (one per block focal stat):
+
+```jsonc
+"form": {
+  "delta": {
+    "last_10_wickets_mean_minus_lifetime":            <float>,
+    "last_10_runs_conceded_mean_minus_lifetime":      <float>,
+    "last_10_economy_pool_minus_lifetime":            <float>,
+    /* ... 12 entries total: 4 windows × 3 metrics */
+  }
+}
+```
+
+### 16.4 Team fielding — `/api/v1/teams/{team}/fielding/distribution`
+
+#### 16.4.1 Per-innings observation row
+
+| Column | Definition |
+|---|---|
+| `innings_id` | `innings.id` (the opp's batting innings; team is fielding) |
+| `match_id` | `innings.match_id` |
+| `innings_number` | 1 or 2 |
+| `date` | `match.date` |
+| `catches` | `COUNT(fc WHERE kind='caught' AND COALESCE(is_substitute,0)=0 AND fielder_id ∈ team's matchplayers)` |
+| `run_outs` | same shape, `kind='run_out'` |
+| `stumpings` | same shape, `kind='stumped'` |
+| `wickets_total` | wickets fallen in the innings (any kind) — denominator for fielder-ratio tooltip |
+| `substitute_catches` | catches by sub-fielders for this team in this innings (footnote / tooltip stat) |
+
+Master sample is per-innings of opponent batting where one of
+the team's matchplayers was field-credited.
+
+#### 16.4.2 Three sibling count blocks
+
+Mirror of player-fielder §13.3 but at team grain. Tab structure
+identical: Catches / Run-outs / Stumpings.
+
+**Catches block:**
+
+| Field | Formula |
+|---|---|
+| `total` / `mean_per_innings` / `median` / `variance` / `std` | sample stats over `o.catches` |
+| `observations` | per-innings tuples |
+
+Milestones (denom = `n_innings_fielded`):
+
+| Field | Reading | Tier color |
+|---|---|---|
+| `p_eq_0`    | "no fielder catches" (rare for teams; usually 1+) | INDIGO |
+| `p_geq_3`   | "fielders contributing"                          | SAGE |
+| `p_geq_5`   | "catching well"                                  | OCHRE |
+| `p_geq_7`   | "fielding masterclass"                           | OCHRE |
+
+No conditional ladder for catches at team grain (the simples
+already span the meaningful range; conditioning on `≥3` would
+shrink denoms without adding signal).
+
+**Run-outs block** — sparse even at team level:
+
+| Field | Reading | Tier color |
+|---|---|---|
+| `p_eq_0`  | "no run-outs"                          | INDIGO |
+| `p_eq_1`  | "athletic moment"                      | SAGE |
+| `p_geq_2` | "sharp fielding match" (rare; ~5-10%)  | OCHRE |
+
+Same three-simple shape as player-fielder §13.3. Sum-to-1
+invariant.
+
+**Stumpings block** — depends on whether team had a designated
+keeper that match. Per existing keeper-assignment Tier 2:
+
+| Field | Reading | Tier color |
+|---|---|---|
+| `p_eq_0`  | "no stumpings" | INDIGO |
+| `p_eq_1`  | "one stumping" | SAGE |
+| `p_geq_2` | "multi-stump"  | OCHRE |
+
+UNLIKE player-fielder §13: the stumpings block is ALWAYS
+emitted at team grain (every senior team has had at least one
+keeper in their history; pruning the tab is unnecessary). For
+emerging teams with `total = 0`, the block ships with all
+zeros and Wilson CIs spanning [0, 1] — the chip styling
+already handles small-n / zero-event cases.
+
+#### 16.4.3 Top-level scalars
+
+| Field | Formula |
+|---|---|
+| `n_innings_fielded` | `len(observations)` |
+| `wickets_total` | `sum(o.wickets_total)` — denominator for fielder-ratio (tooltip / dismissal mix derivation) |
+| `substitute_catches` | `sum(o.substitute_catches)` — footnote scalar |
+
+Per-innings sparkline tooltip enrichment uses
+`o.wickets_total` to read "vs MI · 4 catches of 7 wickets" —
+the dismissal-ratio framing the user asked about, embedded in
+the existing tooltip rather than as a separate widget.
+
+#### 16.4.4 Form windows + delta
+
+Same four windows. Delta block surfaces three means per
+window (one per block):
+
+```jsonc
+"form": {
+  "delta": {
+    "last_10_catches_mean_minus_lifetime":   <float>,
+    "last_10_run_outs_mean_minus_lifetime":  <float>,
+    "last_10_stumpings_mean_minus_lifetime": <float>,
+    /* ... 12 entries total: 4 windows × 3 metrics */
+  }
+}
+```
+
+No null-coercion (unlike player-fielder §13 — the team
+stumpings block always ships).
+
+### 16.5 Implementation pointers (backend)
+
+- **Three new endpoints** in `api/routers/teams.py`. Slot
+  alphabetically next to the existing per-discipline endpoints:
+  - `team_batting_distribution` after `team_batting_summary`
+    (line ~1664).
+  - `team_bowling_distribution` after `team_bowling_summary`
+    (line ~2579).
+  - `team_fielding_distribution` after `team_fielding_summary`
+    (line ~3399).
+- **Helpers per discipline**, each colocated with its endpoint
+  block:
+  - `_innings_master_sample_team_batting(db, team, filters,
+    aux)` — per-innings rows where `i.team = team`. Side-aligned
+    filter (`build()`, not `build_side_neutral`).
+  - `_innings_master_sample_team_bowling(db, team, filters, aux)`
+    — per-innings rows of the OPP's batting where match is
+    team's. Side-neutral filter (`build_side_neutral()`) PLUS
+    explicit `i.team != :team`.
+  - `_innings_master_sample_team_fielding(db, team, filters, aux)`
+    — same as bowling but counts fielding events from the
+    team's matchplayer list rather than wickets.
+- **Pure aggregators**, three:
+  - `_distribution_dossier_team_batting(observations)` — two
+    sibling blocks (`runs`, `run_rate`) + phase rollup.
+  - `_distribution_dossier_team_bowling(observations)` — three
+    blocks (`wickets`, `runs_conceded`, `economy`) + phase
+    rollup.
+  - `_distribution_dossier_team_fielding(observations)` — three
+    count blocks (`catches`, `run_outs`, `stumpings`) + scalars.
+- **Form windows**: one slicer per discipline (mirrors
+  bowler/fielder pattern). Reuses the existing
+  `(today - timedelta(days=N)).isoformat()` cutoff convention.
+- **Wilson + suggested_splits**: existing modules (`api/wilson.py`,
+  `api/scope_links.py`) — no new code.
+- **Filter handling**: `FilterParams.filter_team` IGNORED on
+  these endpoints (the team-path-param dominates). Document in
+  each endpoint docstring.
+
+### 16.6 Tests
+
+**Sanity** — three new files mirroring the bowler/fielder
+pattern:
+
+- `tests/sanity/test_team_batting_distribution_invariants.py`
+- `tests/sanity/test_team_bowling_distribution_invariants.py`
+- `tests/sanity/test_team_fielding_distribution_invariants.py`
+
+Each ~80-150 SQL-anchored assertions across 4-5 scopes:
+- Marquee teams (Mumbai Indians / Chennai Super Kings / India men).
+- An emerging team with sparse data.
+- Empty scope (filter_venue = nonexistent).
+
+Per-discipline invariants:
+
+**Batting:**
+- `n_innings == len(observations)` lifetime + every form window.
+- `runs.total == sum(o.runs)`.
+- `runs.mean_per_innings × n_innings ≈ runs.total`.
+- For every milestone: `value × denom ≈ num`; CI bounds; chain
+  ladder denom invariant: `p_150_given_100.denom == count(≥100)`,
+  etc.
+- `p_double_at_10.denom == count(reached_10_overs=1 AND runs_at_10 > 0)`.
+- `escalation_ratio_median × runs_at_10` distribution matches the
+  observation-derived ratio set.
+- `run_rate.pool == runs.total × 6 / sum_balls` exact.
+- Phase partition invariant.
+
+**Bowling:**
+- Mirror of batting + the bowler-specific bowled vs run-out
+  attribution invariants.
+- `wickets.total ≤ 10 × n_innings_bowled` (T20 ceiling).
+- `p_geq_3_at_10` / `p_eq_10_given_3_at_10` numerator/denominator
+  cross-check vs observation list.
+- Subset invariant: `count(w ≥ k) ≤ count(w ≥ k−1)` for k = 1..10.
+
+**Fielding:**
+- Three-simples-sum-to-1 per block (catches sums to 1 across
+  `p_eq_0 + p_geq_3 + ...`? No — these aren't a partition;
+  catches simples are P(=0), P(≥3), P(≥5), P(≥7); they don't
+  exhaust the space. ONLY the run_outs / stumpings blocks
+  partition exhaustively at 0/1/≥2). Catches: subset
+  monotonicity instead.
+- Substitute reconciliation: `catches.total + substitute_catches`
+  equals the existing `/teams/{team}/fielding/summary.catches`
+  for the same scope.
+- Wickets-total cross-check: `wickets_total ≥ catches + run_outs
+  + stumpings + bowled-only` (catches ≤ wickets-fallen always).
+
+**Regression** — three URL inventories:
+
+- `tests/regression/team_batting_distribution/urls.txt`
+- `tests/regression/team_bowling_distribution/urls.txt`
+- `tests/regression/team_fielding_distribution/urls.txt`
+
+~15 URLs each: 4 marquee teams × scopes (all-time, IPL, IPL by
+season, vs-team, at-venue, season-only, empty scope). Same
+`as_of_date=2025-01-01` pin.
+
+**No agent-browser integration test in v1 backend** — API-only
+slice. Integration arrives with the frontend (§17.6).
+
+### 16.7 Implementation order — eight atomic backend commits
+
+1. `team-batting: /teams/{team}/batting/distribution endpoint` —
+   master sample + dossier + form-windows + route.
+2. `sanity: team batting distribution invariants` — ~120
+   assertions per §16.6.
+3. `regression: team_batting_distribution urls.txt` — 15-URL
+   inventory.
+4. `team-bowling: /teams/{team}/bowling/distribution endpoint`.
+5. `sanity: team bowling distribution invariants`.
+6. `regression: team_bowling_distribution urls.txt`.
+7. `team-fielding: /teams/{team}/fielding/distribution endpoint`.
+8. `sanity: team fielding distribution invariants` +
+   `regression: team_fielding_distribution urls.txt` (these
+   two land together since the fielding endpoint reuses most
+   of the count-block aggregator from §13).
+
+After each regression run reports `0 REG drifted, N NEW
+changed, 0 NEW unchanged`, flip `NEW → REG` in a separate
+follow-up commit per regression-harness discipline (CLAUDE.md).
+
+---
+
+## 17. Team v1 frontend — Distribution panels on `/teams` (DRAFT)
+
+> Sibling of §9 (batter), §12 (bowler), §14 (fielder). Three
+> Distribution panels, one mounted at the TOP of each existing
+> discipline tab content area on `frontend/src/pages/Teams.tsx`:
+> Batting tab → `TeamBattingDistributionPanel`, Bowling tab →
+> `TeamBowlingDistributionPanel`, Fielding tab →
+> `TeamFieldingDistributionPanel`. Each panel fetches only its
+> own discipline's endpoint (§16); the panel-per-tab placement
+> matches the existing pattern (every team analytic — by-season,
+> by-phase, top-batters, etc. — already lives inside its
+> discipline's tab).
+>
+> Reuses every §10.3 frontend convention — INDIGO/SAGE/OCHRE
+> 3-tier palette, Wilson CI tooltips on `ProbChip`, oxblood form
+> deltas with self-anchoring scope-baseline row (per
+> `feedback_form_color_oxblood` + `feedback_delta_lines_self_anchor`),
+> uniform stat-strip schema with Mean ↔ Std together (per
+> `feedback_std_needs_mean`), `DistributionSparkline` with
+> per-innings/per-match bars and match-link mouseover.
+
+### 17.1 Layout
+
+The three panels mount independently at the top of their
+respective Teams-page tab content areas:
+
+```
+┌────────────────────────────────────────────────────────┐
+│ Teams page header (ScopedPageHeader)                   │
+│ Stat row (Matches / Wins / Toss / etc.)                │
+│ ────────────────────────────────────────────────────── │
+│ Tabs: [Batting] [Bowling] [Fielding] [Partnerships]... │
+│ ────────────────────────────────────────────────────── │
+│                                                        │
+│   <Active tab content>                                 │
+│                                                        │
+│   ┌──────────────────────────────────────────────┐     │
+│   │ TeamXxxDistributionPanel (this slice)        │     │
+│   │ — window toggle + metric tabs                │     │
+│   │ — histogram + stat strip + chips             │     │
+│   │ — sparkline + season-tick axis               │     │
+│   │ — form-delta line (baseline + deltas)        │     │
+│   │ — suggested-splits row                       │     │
+│   └──────────────────────────────────────────────┘     │
+│                                                        │
+│   <Existing analytics — by-season, by-phase, top-N>    │
+│                                                        │
+└────────────────────────────────────────────────────────┘
+```
+
+The panel sits ABOVE the existing per-discipline analytics
+inside the tab. Switching the top-level tab swaps the panel
+along with the rest of the tab content (each panel is mounted
+inside its tab's render branch).
+
+### 17.2 Common conventions
+
+**URL state — page-suffix `_t` to prevent cross-page bleed.**
+The team page now shares the same panel pattern as
+`/batting?player=`, `/bowling?player=`, `/fielding?player=`.
+URL state keys are suffixed `_t` (team) so navigating between
+player pages and team pages doesn't carry incompatible
+metric/window states:
+
+- `?dist_window_t=scope|last_10|last_60d|last_6mo|last_1yr`
+- `?dist_metric_t_bat=runs|run_rate` (batting tab)
+- `?dist_metric_t_bowl=wickets|runs_conceded|economy` (bowling tab)
+- `?dist_metric_t_field=catches|run_outs|stumpings` (fielding tab)
+
+Defaults are encoded by ABSENCE of the param. Only one
+`dist_window_t` because a single window applies across all
+three discipline tabs (the user's "form arc" is the same
+question regardless of discipline).
+
+**Palette & polarity:**
+
+| Discipline / metric | INDIGO (poor) | SAGE (typical) | OCHRE (good) |
+|---|---|---|---|
+| Batting · Runs | <100 | 100-200 | ≥200 |
+| Batting · Run Rate | ≤7 (slow) | 7-9 | ≥9 (explosive) |
+| Bowling · Wickets | ≤3 | 4-6 | ≥7 |
+| Bowling · Runs Conceded | ≥200 | 100-200 | <100 (FLIP — low is good) |
+| Bowling · Economy | ≥9 (loose) | 7-9 | ≤7 (tight) |
+| Fielding · Catches | 0 | 1-4 | ≥5 |
+| Fielding · Run-outs | 0 | 1 | ≥2 |
+| Fielding · Stumpings | 0 | 1 | ≥2 |
+
+**Reference lines on every sparkline:**
+
+- **Black solid 2px** — scope baseline (this team's lifetime
+  mean in the active filter scope).
+- **Gray 1.5px** — gender-global team baseline (whole-number
+  rounded; e.g. men's IPL team innings ≈ 167 runs, women's
+  ≈ 130). New constants in
+  `frontend/src/components/distribution/globalBaselines.ts`
+  (extend the existing per-bowler constants with team-level
+  entries).
+- **Oxblood 1.2px rolling-N mean overlay** — Lifetime/Scope
+  window only, when `n_innings ≥ 10`. Same convention as
+  bowler/batter.
+
+**Sparkline mouseover linking to matches.** Each bar carries
+the match link (`<a href="/matches/{match_id}">`) per existing
+`DistributionSparkline` convention. Tooltip text is per-tab
+(see each panel section below).
+
+### 17.3 Team Batting panel (`TeamBattingDistributionPanel`)
+
+Mounted at the top of the Batting tab in `Teams.tsx`. Two
+metric tabs: **Runs** (default) and **Run Rate**.
+
+**Runs tab anatomy:**
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ Per-innings team batting distribution  [Scope|10|60d|6mo|1y]     │
+│ [ Runs ] [ Run Rate ]                                            │
+│                                                                  │
+│ ┌─────────────────────────────────┬──────────────────────────┐   │
+│ │  (active-tab histogram)         │ Innings        178       │   │
+│ │  Width-10 bars, 0..250+ floor   │ Mean / innings 162.4     │   │
+│ │  INDIGO <100 / SAGE 100-199 /   │ Median         158       │   │
+│ │  OCHRE ≥200                     │ Std             34.1     │   │
+│ │                                 │                          │   │
+│ │                                 │ Milestone chips:         │   │
+│ │                                 │ P(<100) 12% · P(≥100) 88%│   │
+│ │                                 │ P(≥150) 64% · P(≥200) 21%│   │
+│ │                                 │ P(≥230)  6%              │   │
+│ │                                 │ ── conversion (chain) ──│   │
+│ │                                 │ P(≥150│≥100) 73%         │   │
+│ │                                 │ P(≥200│≥150) 33%         │   │
+│ │                                 │ P(≥230│≥200) 29%         │   │
+│ │                                 │ ── doubling at 10 ──    │   │
+│ │                                 │ P(≥2× final│x at 10) 31% │   │
+│ │                                 │  median ratio  1.85×     │   │
+│ └─────────────────────────────────┴──────────────────────────┘   │
+│                                                                  │
+│ ▁▃▂▅▁▇▂▁▃▆▅▁▂▆▇▅▁  ← per-innings sparkline (height = team runs) │
+│ ──────  scope baseline 162.4   gender-global 156   rolling-10  │
+│                                                                  │
+│ Scope baseline / innings · runs 162.4 · RR 8.05                  │
+│ Form (Δ vs baseline): last 10 runs +4.1 RR +0.20 · last 60d ...  │
+│                                                                  │
+│ Compare to:  All IPL  ·  All cricket 2024  ·  All-time           │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Histogram primitive — reuse `RunsHistogram.tsx`** from
+`frontend/src/components/batting/`. The width-10 bins primitive
+is identical for team-batting; the per-bar tier coloring
+follows the team-batting palette above (INDIGO <100, SAGE
+100-199, OCHRE ≥200). The `categoryAccessor`/`valueAccessor`/
+`colorBy` props on `BarChart` already accept arbitrary
+configurations; just pass team-tier-binning helpers from a new
+`distributionBins.ts` colocated in
+`frontend/src/components/teams-distribution/`.
+
+**Run Rate tab** — discrete-ish bars at width-1 RPO from 4 to
+13+. Reuse `EconomyHistogram.tsx` from
+`frontend/src/components/bowling/` with the FLIPPED polarity
+(`COLOR_SCHEME` reversed: ≤6 INDIGO, 7-9 SAGE, ≥9 OCHRE).
+Stat strip: `Pool RR`, `Mean / innings`, `Median / innings`,
+`Std`. Chips: `P(RR ≤7)`, `P(RR ≤8)`, `P(RR ≥9)`, `P(RR ≥10)`.
+
+**Sparkline** — per-innings bars in chronological order, height
+= team runs (for Runs tab) or team RR (for Run Rate tab). Bar
+opacity 0.8 default, INDIGO override to 1.0 (matches existing
+convention so under-100 bars stay visible at the small height).
+Bar tooltip per tab:
+- Runs: `"YYYY-MM-DD · 178/4 (20 ov, RR 8.9) — vs MI"` (rich;
+  uses `o.wickets`, `o.balls`, opponent from match metadata).
+- Run Rate: same content but lead with the RR value.
+
+**Reference lines:** scope-baseline = `runs.mean_per_innings`
+(black 2px); gender-global = `globalBaselines.team_innings_runs`
+(gray 1.5px, whole-number per user spec); rolling-10 mean
+oxblood overlay on Lifetime only.
+
+### 17.4 Team Bowling panel (`TeamBowlingDistributionPanel`)
+
+Mounted at the top of the Bowling tab. Three metric tabs:
+**Wickets** (default), **Runs Conceded**, **Economy**.
+
+**Wickets tab** — discrete bars at integer wicket counts 0..10
+(team can take all 10). Reuse `WicketsHistogram.tsx` primitive
+from bowling/, but extend the bin floor to 10 (player bowler
+defaulted to 5+ catch-all; team bowler shows full 0..10 range).
+
+Stat strip: `Innings bowled`, `Wickets total`, `Mean wickets`,
+`Median`, `Std`, `Pool SR (balls/wkt)`.
+
+Chips:
+- Simples (denom = `n_innings_bowled`): `P(≤3)`, `P(≥5)`,
+  `P(≥7)`, `P(=10)`.
+- Conditionals (anchor `≥5`): `P(≥7│≥5)`, `P(=10│≥5)`.
+- Over-aware: `P(≥3 at 10)`, `P(=10│≥3 at 10)` ("early
+  breakthrough" + "finishing rate").
+
+**Runs Conceded tab** — same width-10 histogram primitive as
+team-batting Runs but FLIPPED polarity (low conceded = OCHRE,
+high = INDIGO). Stat strip mirrors batting's Runs strip.
+
+Chips:
+- Simples: `P(<100)`, `P(<150)`, `P(≥150)`, `P(≥200)`,
+  `P(≥230)` — flipped tints (`<` = OCHRE, `≥` = INDIGO).
+- Conditional chain: `P(≥150│≥100)`, `P(≥200│≥150)`,
+  `P(≥230│≥200)` — INDIGO across (climbing here is bad).
+- Over-aware: `P(opp ≥2× final│x at 10)` + `median ratio` —
+  the leakage version of doubling. INDIGO.
+
+**Economy tab** — same as bowler v1 §12.2.3, just at team
+grain. Reuse `EconomyHistogram.tsx` directly; chip thresholds
+identical (`p_econ_leq_6/7`, `p_econ_geq_9/10`).
+
+**Sparkline** — per-innings bars; height = wickets-taken (for
+Wickets tab) / runs-conceded (for Runs Conceded tab) / RPO
+(for Economy tab). Tooltip per tab:
+- Wickets: `"YYYY-MM-DD · 7/120 (oppo all out 16.4 ov) — vs RCB"`
+  (carries dismissal-mix subtotal in tooltip as deferred-v2
+  tease: `"  (5 caught · 1 bowled · 1 LBW)"`. Hidden behind a
+  `dismissal-mix` data attribute initially; surface in v2 when
+  the donut sibling lands).
+- Runs Conceded: leads with conceded total + opp's wickets-lost.
+- Economy: leads with RPO + (runs/balls) detail.
+
+### 17.5 Team Fielding panel (`TeamFieldingDistributionPanel`)
+
+Mounted at the top of the Fielding tab. Three metric tabs:
+**Catches** (default), **Run-outs**, **Stumpings**.
+
+Mirrors player-fielder §14 anatomy with two team-grain
+adjustments:
+
+1. **Histogram bins** — Catches uses bars 0..7 (continuous-ish
+   discrete; team typically catches 3-5 per match). Run-outs
+   and Stumpings keep the player-fielder 3-bar `0/1/≥2` shape
+   (still rare at team grain).
+2. **Stumpings tab is ALWAYS rendered** (every senior team
+   has had a keeper at some point). For zero-stumping windows
+   the tab still mounts; chips show 0% with [0, 0] CIs and
+   small-n styling — honest, not hidden.
+
+**Stat strip** — uniform schema across all three tabs (per
+`feedback_std_needs_mean`): `Innings fielded`, `Total {metric}`,
+`Mean / innings`, `Median`, `Std`. Plus on Catches tab only:
+`+ N substitute catches (excluded)` footnote when
+`substitute_catches > 0`.
+
+**Chips per tab:**
+
+| Tab | Chips |
+|---|---|
+| Catches  | `P(=0)` INDIGO · `P(≥3)` SAGE · `P(≥5)` OCHRE · `P(≥7)` OCHRE |
+| Run-outs | `P(=0)` INDIGO · `P(=1)` SAGE · `P(≥2)` OCHRE |
+| Stumpings| `P(=0)` INDIGO · `P(=1)` SAGE · `P(≥2)` OCHRE |
+
+**Sparkline tooltip — fielder-ratio enrichment.** Per-bar
+tooltip on the Catches tab shows the dismissal-ratio context
+the user asked about, embedded in the existing tooltip rather
+than as a separate widget:
+
+`"YYYY-MM-DD · 4 catches of 7 wickets — vs RCB"`
+
+Reads from the per-innings observation's `wickets_total` and
+`catches`. The "X of Y" framing answers the dismissal-mix
+question without crowding the visual. Run-outs and Stumpings
+tooltips stay simpler (`"YYYY-MM-DD · 1 run-out — vs RCB"`).
+
+**Reference line at y=1** for Catches and Run-outs tabs (same
+as player-fielder); mean overlay for Stumpings (keepers-mean
+informative at team grain since teams with established keepers
+hit ~0.3 stumpings/match).
+
+### 17.6 Components inventory
+
+New directory: `frontend/src/components/teams-distribution/`.
+
+| Component | File | Reuse from |
+|---|---|---|
+| `TeamBattingDistributionPanel` | `teams-distribution/TeamBattingDistributionPanel.tsx` | new top-level container |
+| `TeamBowlingDistributionPanel` | `teams-distribution/TeamBowlingDistributionPanel.tsx` | new top-level container |
+| `TeamFieldingDistributionPanel`| `teams-distribution/TeamFieldingDistributionPanel.tsx` | new top-level container |
+| Stat strips + chips rows       | inline in each panel; conditional schema per tab | new |
+| `RunsHistogram` (width-10)     | already shipped at `batting/RunsHistogram.tsx` | direct reuse via prop config |
+| `WicketsHistogram` (discrete 0..10) | already shipped at `bowling/WicketsHistogram.tsx`; extend bin-floor to 10 | extend |
+| `EconomyHistogram` (width-1 RPO) | already shipped at `bowling/EconomyHistogram.tsx` | direct reuse |
+| `CountHistogram` (3 bars 0/1/≥2) | already shipped at `fielding/CountHistogram.tsx` | direct reuse for run_outs/stumpings; new variant for team-catches (0..7 bars) |
+| `DistributionSparkline`        | already shipped at `distribution/DistributionSparkline.tsx` | direct reuse |
+| `SeasonTickAxis`               | already shipped at `distribution/SeasonTickAxis.tsx` | direct reuse |
+| `ProbChip`                     | already shipped at `distribution/ProbChip.tsx` | direct reuse |
+| `WindowToggle`                 | already shipped (inline buttons in §9.2.1) | direct reuse via copy |
+| `globalBaselines.ts`           | already shipped at `distribution/globalBaselines.ts`; ADD `pickTeamBattingBaseline`, `pickTeamBowlingBaseline`, `pickTeamFieldingBaseline` | extend |
+| Form-delta line + suggested-splits row | per-discipline new components (sibling of `FielderFormDeltaLine`) | new but small |
+
+**`distributionBins.ts` colocated in
+`teams-distribution/`** — pure helpers for tier mapping at
+team-batting (`teamRunsBin`, `teamRunsTier`, etc.).
+
+### 17.7 Tests
+
+**Integration** — three SQL-anchored shell scripts:
+
+- `tests/integration/team_batting_distribution.sh`
+- `tests/integration/team_bowling_distribution.sh`
+- `tests/integration/team_fielding_distribution.sh`
+
+Each ~25 assertions. Common pattern:
+
+1. Panel section exists (per `aria-label`).
+2. Stat-strip headline numbers match SQL anchors (innings count,
+   total runs/wickets/catches).
+3. Histogram bar count matches the expected bin count
+   (width-10: variable; team-wickets: 11; fielding-catches: 8;
+   fielding-run-outs/stumpings: 3).
+4. **Sparkline bar count == n_innings** from SQL — codified
+   per-item-chart rule (CLAUDE.md "Sparkline / per-item chart
+   bar count must match SQL"). No height=0 bars hidden.
+5. Chip percentages match SQL-derived `count(condition) /
+   denom × 100`. Test all simples + 1-2 conditionals + 1
+   over-aware probability per tab.
+6. Chip tier-color coordination (INDIGO/SAGE/OCHRE matches the
+   threshold band).
+7. Window toggle URL state: `?dist_window_t=last_10` reproduces
+   from share-link.
+8. Metric tab URL state per discipline: `?dist_metric_t_bat=run_rate`
+   etc.
+9. Mobile viewport (390×844) — panel renders without overflow.
+10. **Doubling probability cross-check** — the chip's
+    `value × denom = num` invariant on the over-aware
+    probability, computed via direct SQL on the master sample.
+11. Match-link on sparkline bar — first bar's `<a href>`
+    contains `/matches/<id>` matching the SQL-derived
+    chronologically-first match.
+
+**Sanity** — three new files (§16.6).
+
+**Regression** — three new URL inventories (§16.6).
+
+### 17.8 Implementation order — twelve atomic frontend commits
+
+Per discipline (4 commits each × 3 disciplines = 12):
+
+1. `team-batting-frontend: types + api fetcher` — 
+   `TeamBattingDistribution` types + `getTeamBattingDistribution()`
+   in `api.ts`. `tsc -b` clean.
+2. `team-batting-frontend: TeamBattingDistributionPanel` —
+   primitive composition: panel container + window toggle +
+   metric tabs + stat strip + chips + sparkline + form-delta
+   line + suggested-splits row. Reuse `RunsHistogram` and
+   `EconomyHistogram` via prop config.
+3. `team-batting-frontend: panel mounted on Teams.tsx Batting
+   tab` — paste at top of the tab content.
+4. `tests: team_batting_distribution integration` — SQL-anchored
+   per §17.7.
+
+Repeat for bowling (commits 5-8) and fielding (commits 9-12).
+
+After each integration test passes, run `agent-browser` against
+`/teams?team=Mumbai%20Indians&tab=Batting` (etc.) at both
+desktop (1280×800) and mobile (390×844) viewports per the
+verification rule.
+
+`globalBaselines.ts` extension lands in commit 1 (or a
+preceding standalone commit if the team baselines need a
+populate-script first; check `bucket_baseline_dispatch.py` for
+the existing per-team computation pipeline).
+
+---
+
 *Started 2026-05-04. Inventory + framing drafted first.
 2026-05-05: batter v1 backend (§8) + frontend (§9) IMPLEMENTED
 across 10 atomic commits.
@@ -3254,4 +4212,13 @@ stumpings (mean overlay). Sanity (1510 assertions across 4 fielder
 integration (27 assertions including SQL-anchored chip values,
 keeper/non-keeper tab visibility, mobile viewport). Renumbered
 existing Wilson-CI retrofit §13 → §15.
-Team distribution dossier remains to be done.*
+2026-05-07 (later): team v1 spec drafted (§16 backend + §17
+frontend). Three sibling endpoints — batting / bowling / fielding
+distribution — one panel mounted inside each existing Teams-page
+tab. Wider milestone ladder (100/150/200/230 anchors at 50-run
+gaps), over-aware probabilities (`P(≥2x | x at 10)` doubling for
+batting + bowling-conceded, `P(=10 | ≥3 at 10)` finishing for
+bowling-wickets), oxblood form deltas with self-anchoring
+baseline row, INDIGO/SAGE/OCHRE 3-tier palette throughout. Per-
+innings observation row gains `runs_at_10` + `wickets_at_10`.
+Pending implementation.*
