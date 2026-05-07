@@ -1430,12 +1430,22 @@ formal-announcement. The reader interprets, the badge just
 asserts the gap.
 
 **Wiring** — `last_match_date` ships as a top-level field on
-the four summary endpoints (`/api/v1/{batters,bowlers,fielders}/{id}/summary`,
-`/api/v1/teams/{team}/summary`) AND on the `lifetime` block of
-the three distribution endpoints (so the panel can render the
-badge without a second fetch). Frontend: `DormancyContext`
-provider; pages populate from the summary fetch they already
-do; `ScopedPageHeader` and `ScopeStatusStrip` consume.
+the `lifetime` block of the three distribution endpoints
+(`/api/v1/{batters,bowlers,fielders}/{id}/distribution`; team
+distribution endpoints will follow the same convention per
+§16). Distribution fetches already happen on every page that
+mounts the panel (Batting / Bowling / Fielding / future Teams
+tab); the badge reads from there — no summary-endpoint shape
+change, no rotation across the 17 regression files that test
+summary URLs. Frontend: `DormancyContext` provider; pages
+populate from the distribution fetch they already do;
+`ScopedPageHeader` and `ScopeStatusStrip` consume.
+
+**Pages without a Distribution panel** (the legacy /players
+overview page composed from four summary fetches) do NOT get
+the badge. Acceptable scope limit — the badge is most
+informative paired with the form-delta line, which only the
+Distribution panel surfaces.
 
 Page-aware: only fires on pages whose subject has an obvious
 "last match" interpretation — Batting / Bowling / Fielding /
