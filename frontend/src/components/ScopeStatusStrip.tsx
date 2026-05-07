@@ -22,6 +22,7 @@ import { useState } from 'react'
 import { useSearchParams, useLocation } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
 import { seasonTag } from './scopeLinks'
+import DormancyBadge from './DormancyBadge'
 
 type Segment = { label: string; value: string; isHeading?: boolean }
 
@@ -192,6 +193,7 @@ export default function ScopeStatusStrip() {
             )}
           </span>
         ))}
+        <DormancyBadge />
         <button
           type="button"
           className="wisden-scope-strip-copy"

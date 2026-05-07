@@ -18,6 +18,7 @@
 import type { ReactNode } from 'react'
 import type { FilterParams } from '../types'
 import { abbreviateScope } from './scopeLinks'
+import DormancyBadge from './DormancyBadge'
 
 interface Props {
   filters: FilterParams
@@ -50,6 +51,7 @@ export default function ScopedPageHeader({ filters, omit, children }: Props) {
         gap: '0.6rem',
       }}>
         {children}
+        <DormancyBadge />
       </h2>
       {abbrev && (
         <span style={{

@@ -461,6 +461,8 @@ export interface DistributionDossier {
   n_innings: number
   n_dismissals: number
   n_notouts: number
+  /** Max observation date in the scope (ISO YYYY-MM-DD). Null when scope is empty. Drives the dormancy badge. Only on the `lifetime` dossier — form-window dossiers may inherit it via the same shape but it's primarily meaningful on lifetime. */
+  last_match_date?: string | null
   runs: {
     total: number
     balls_total: number
@@ -619,6 +621,8 @@ export interface BowlerPhaseRollup {
 
 export interface BowlerDossier {
   n_innings: number
+  /** Max observation date in the scope (ISO YYYY-MM-DD). Drives the dormancy badge on the lifetime block. */
+  last_match_date?: string | null
   /** Pool SR = total_balls / total_wickets when wickets > 0, else null. */
   pool_strike_rate: number | null
   /** Pool average = total_runs_conceded / total_wickets when wickets > 0, else null. */
@@ -685,6 +689,8 @@ export interface FielderCountBlock {
 
 export interface FielderDossier {
   n_matches: number
+  /** Max observation date in the scope (ISO YYYY-MM-DD). Drives the dormancy badge on the lifetime block. */
+  last_match_date?: string | null
   /** Sum of keeperassignment rows for this player in scope. Drives the conditional stumpings tab — only present when > 0. */
   innings_kept: number
   /** Substitute catches in scope — surfaced for reconciliation against /summary. Excluded from `catches.total`. */

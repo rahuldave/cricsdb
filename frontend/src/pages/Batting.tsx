@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
 import { useFilterDeps } from '../hooks/useFilterDeps'
 import ScopedPageHeader from '../components/ScopedPageHeader'
+import { useDormancy } from '../components/DormancyContext'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch, type FetchState } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -75,6 +76,15 @@ export default function Batting() {
     filterDeps,
   )
   const distribution = distFetch.data
+
+  // Plumb scope's last_match_date into DormancyContext so the
+  // ScopedPageHeader + ScopeStatusStrip badges render. Cleared
+  // when player changes / dossier loads empty.
+  const { setLastMatchDate } = useDormancy()
+  useEffect(() => {
+    setLastMatchDate(distribution?.lifetime?.last_match_date ?? null)
+    return () => setLastMatchDate(null)
+  }, [distribution, setLastMatchDate])
 
   // Self-correcting deep link — if a user lands on /batting?player=X
   // without a gender filter, infer it from the player's international

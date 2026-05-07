@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
+import { DormancyProvider } from './components/DormancyContext'
 import Home from './pages/Home'
 import Teams from './pages/Teams'
 import Batting from './pages/Batting'
@@ -24,6 +25,7 @@ function LegacyTournamentsRedirect() {
 export default function App() {
   return (
     <BrowserRouter>
+      <DormancyProvider>
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<Home />} />
@@ -42,6 +44,7 @@ export default function App() {
           <Route path="/help/usage" element={<HelpUsage />} />
         </Route>
       </Routes>
+      </DormancyProvider>
     </BrowserRouter>
   )
 }

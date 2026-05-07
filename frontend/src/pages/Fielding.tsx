@@ -11,6 +11,7 @@ import SeriesLink from '../components/SeriesLink'
 import FlagBadge from '../components/FlagBadge'
 import ScopeIndicator from '../components/ScopeIndicator'
 import ScopedPageHeader from '../components/ScopedPageHeader'
+import { useDormancy } from '../components/DormancyContext'
 import InningToggle from '../components/InningToggle'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
@@ -71,6 +72,14 @@ export default function Fielding() {
     filterDeps,
   )
   const distribution = distFetch.data
+
+  // Plumb dormancy from distribution lifetime; cleared on unmount /
+  // player change. See components/DormancyContext.
+  const { setLastMatchDate } = useDormancy()
+  useEffect(() => {
+    setLastMatchDate(distribution?.lifetime?.last_match_date ?? null)
+    return () => setLastMatchDate(null)
+  }, [distribution, setLastMatchDate])
   useDocumentTitle(summary ? `${summary.name} — Fielding` : playerId ? null : 'Fielding')
 
   // Self-correcting deep link — see Batting.tsx for the rationale.
