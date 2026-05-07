@@ -1281,32 +1281,88 @@ more:
   without the stepped-up broader tiers that only make sense on stats
   tables where they're anchored to a preceding number.
 
-## FilterBar "last 3 seasons" — scope-aware quick-select button
+## FilterBar season-window quick-select buttons — scope-aware AND player-aware
 
-`components/FilterBar.tsx` exposes `last 3` alongside `all-time` and
-`latest`. Pins `season_from`/`season_to` to the last 3 entries in the
-scoped seasons list (the list itself is already narrowed by
-gender/team_type/tournament/filter_team/filter_opponent/filter_venue/
-series_type via `getSeasons`). So:
+`components/FilterBar.tsx` exposes four hyphenated quick-select
+buttons that pin `season_from`/`season_to` to a calculated slice of
+the scoped seasons list:
 
-- `/batting` → last 3 calendar seasons (2025, 2025/26, 2026)
-- `/series?tournament=Indian+Premier+League` → last 3 IPL seasons
-  (2024, 2025, 2026)
-- `/series?filter_team=India&filter_opponent=Australia&series_type=icc`
-  → last 3 Ind-vs-Aus WC meetings (2013/14, 2015/16, 2024) — rivalry
-  + ICC scope all narrow the list before the slice.
+```
+first-3 | all-time | prev-3 | last-3 | latest
+```
 
-Replaces the old automatic `useDefaultSeasonWindow(filters, true)`
-one-shot on Batting/Bowling/Fielding landings, which pinned the last
-3 calendar seasons on arrival. That auto-default was removed at user
-request on 2026-04-20 — discipline landings now open all-time; the
-user opt-in via `last 3` covers the rare case where the old default
-was what they wanted. Hook file remains unused for possible future
-opt-in callers.
+Layout is left-to-right time-arc: earliest career chunk → reset →
+prior arc → recent arc → single most-recent season. `all-time`
+sits between `first-3` and `prev-3` because it's the reset that
+clears whichever arc you're in.
 
-Shows when `seasons.length >= 3`. Tooltip lists the three seasons
-verbatim ("Last 3 seasons in scope (2025, 2025/26, 2026)") so users
-aren't misled by the display-collapsed "2025–2026" range.
+The buttons all derive their slice from the same `seasons` array
+fetched by `getSeasons`. The list is already narrowed by every
+FilterBar axis (gender / team_type / tournament / filter_team /
+filter_opponent / filter_venue / team_class / series_type) plus
+the page-context `team` (set on `/teams?team=X`) and — as of
+2026-05-07 — the page-context `player` (set on
+`/{batting|bowling|fielding}?player=X`).
+
+**Player-aware enhancement (2026-05-07).** Before this change,
+`getSeasons` did NOT receive the `player` URL param, so on player
+pages the `seasons` array reflected the *broader gender/tournament
+scope* rather than the player's actual career-in-scope. For
+retired players this was wrong: clicking `last-3` on AB de
+Villiers' batting page (last played 2021) set the season filter
+to 2024/25/26 — seasons he didn't play, so the panel showed
+empty data. Now the FilterBar reads `params.get('player')` and
+forwards it to `getSeasons` as `?person_id=`; the backend
+`/api/v1/seasons` endpoint joins `matchplayer` to narrow to
+seasons the player actually appeared in. All four quick-select
+buttons (`first-3`, `prev-3`, `last-3`, `latest`) become
+player-aware automatically via the same array.
+
+**`person_id` vs `player` naming.** The frontend URL convention
+is `?player=<id>` (every page uses `player`). The backend
+reference router uses `person_id` (matches the matchplayer
+schema). `getSeasons` accepts `player` and forwards it as
+`person_id` to the API — preserves both conventions, no
+breaking changes to existing URLs.
+
+**From / To dropdown narrowing.** A consequence of the
+player-aware fetch: on `/batting?player=ABdV&all-time`, the
+season picker now only shows seasons ABdV played (2008-2021),
+not the full dataset range (2008-2026). Better UX — the picker
+no longer offers seasons that yield zero data — but it IS a
+visible behavior change that callers should know.
+
+**Behavioral matrix:**
+
+| Page context | `seasons` array reflects |
+|---|---|
+| Landing (no team, no player) | every season in the gender/tournament/etc. scope |
+| `/teams?team=X` | seasons team X played in scope |
+| `/{batting,bowling,fielding}?player=X` | seasons player X played in scope |
+| `/teams?team=X` + `?player=Y` (hypothetical) | seasons player Y played for/against team X in scope (intersection) |
+
+**Compare-tab callers unchanged.** `SlotScopeEditor` and
+`AddCompareSlot` (in `components/teams/`) continue to pass
+`team` only (never `player`); their "previous season" pick
+stays team-anchored. `useDefaultSeasonWindow` is dead code (per
+the auto-default removal 2026-04-20) and unaffected.
+
+**Visibility gates.** Each button hides when its slice would be
+out of bounds:
+- `first-3`: `seasons.length >= 3`
+- `prev-3`: `seasons.length >= 6`
+- `last-3`: `seasons.length >= 3`
+- `latest`: `seasons.length >= 1`
+
+Tooltips list the seasons verbatim ("Previous 3 seasons before
+the most recent 3 (2018, 2019, 2020)") so users aren't misled
+by display-collapsed "2018–2020" ranges or by the abstract
+"first/prev/last" labels.
+
+Replaces the old automatic `useDefaultSeasonWindow(filters,
+true)` one-shot on Batting/Bowling/Fielding landings, which
+pinned the last 3 calendar seasons on arrival. That auto-default
+was removed at user request on 2026-04-20.
 
 ## Regression runner: REG→NEW flip lands BEFORE the shape change
 
