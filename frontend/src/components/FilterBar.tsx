@@ -233,6 +233,16 @@ export default function FilterBar() {
     const to = latest[latest.length - 1]
     setUrlParams({ season_from: from, season_to: to })
   }
+  const setPrevN = (n: number) => {
+    // Scope-aware prev-N — the N seasons immediately before the
+    // last-N window. Useful for "form" comparisons where the
+    // current arc is "last 3" and the prior arc is "prev 3."
+    if (seasons.length < 2 * n) return
+    const prev = seasons.slice(-2 * n, -n)
+    const from = prev[0]
+    const to = prev[prev.length - 1]
+    setUrlParams({ season_from: from, season_to: to })
+  }
   const clearAll = () => setUrlParams({
     gender: '', team_type: '', tournament: '',
     season_from: '', season_to: '', filter_venue: '',
@@ -377,6 +387,12 @@ export default function FilterBar() {
             title="Clear season range — show all-time">
             all-time
           </button>
+          {seasons.length >= 6 && (
+            <button type="button" onClick={() => setPrevN(3)} className="wisden-reset"
+              title={`Previous 3 seasons before the most recent 3 (${seasons.slice(-6, -3).join(', ')}) — useful as the prior-arc comparison to "last 3"`}>
+              prev 3
+            </button>
+          )}
           {seasons.length >= 3 && (
             <button type="button" onClick={() => setLastN(3)} className="wisden-reset"
               title={`Last 3 seasons in scope (${seasons.slice(-3).join(', ')})`}>
