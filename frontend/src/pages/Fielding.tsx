@@ -22,14 +22,15 @@ import {
   getFielderSummary, getFielderBySeason, getFielderByPhase, getFielderByOver,
   getFielderDismissalTypes, getFielderVictims, getFielderInnings,
   getFielderKeepingSummary, getFielderKeepingBySeason, getFielderKeepingInnings,
-  getFieldingLeaders,
+  getFieldingLeaders, getFielderDistribution,
 } from '../api'
 import type {
   PlayerSearchResult, FieldingSummary, FieldingSeason, FieldingPhase,
   FieldingVictim, FieldingInnings,
   KeepingSummary, KeepingSeason, KeepingInnings,
-  FieldingLeaders, FilterParams,
+  FieldingLeaders, FielderDistribution, FilterParams,
 } from '../types'
+import FielderDistributionPanel from '../components/fielding/FielderDistributionPanel'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   if (fetch.loading) return <Spinner label="Loading…" />
@@ -61,6 +62,14 @@ export default function Fielding() {
     filterDeps,
   )
   const summary = summaryFetch.data
+
+  // Per-match fielding distribution dossier — drives the §14
+  // Distribution panel between the count tiles row and the tabs.
+  const distFetch = useFetch<FielderDistribution | null>(
+    () => playerId ? getFielderDistribution(playerId, filters) : Promise.resolve(null),
+    filterDeps,
+  )
+  const distribution = distFetch.data
   useDocumentTitle(summary ? `${summary.name} — Fielding` : playerId ? null : 'Fielding')
 
   // Self-correcting deep link — see Batting.tsx for the rationale.
@@ -247,6 +256,13 @@ export default function Fielding() {
             <StatCard label="Matches" value={summary.matches} />
             <StatCard label="Dis/Match" value={fmt(summary.dismissals_per_match)} />
           </div>
+
+          <FielderDistributionPanel
+            playerId={playerId}
+            distribution={distribution}
+            loading={distFetch.loading}
+            error={distFetch.error}
+          />
 
           <div className="wisden-tabs">
             {(summary.innings_kept > 0
