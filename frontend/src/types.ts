@@ -656,6 +656,60 @@ export interface BowlerDistribution {
   suggested_splits: SuggestedSplit[]
 }
 
+// ─── Fielder distribution dossier ───────────────────────────────────────
+//
+// Mirror of /api/v1/fielders/{id}/distribution. Spec:
+// internal_docs/spec-distribution-stats.md §13.
+
+export interface FielderObservation {
+  match_id: number
+  date: string | null
+  catches: number
+  run_outs: number
+  stumpings: number
+  is_keeper: 0 | 1
+}
+
+export interface FielderCountBlock {
+  total: number
+  mean_per_match: number | null
+  median: number | null
+  variance: number | null
+  std: number | null
+  milestones: {
+    p_zero: ProbRecord
+    p_one: ProbRecord
+    p_geq_2: ProbRecord
+  }
+}
+
+export interface FielderDossier {
+  n_matches: number
+  /** Sum of keeperassignment rows for this player in scope. Drives the conditional stumpings tab — only present when > 0. */
+  innings_kept: number
+  /** Substitute catches in scope — surfaced for reconciliation against /summary. Excluded from `catches.total`. */
+  substitute_catches: number
+  observations: FielderObservation[]
+  catches: FielderCountBlock
+  run_outs: FielderCountBlock
+  /** Null when innings_kept === 0 (non-keeper). */
+  stumpings: FielderCountBlock | null
+}
+
+export interface FielderDistribution {
+  scope: Record<string, string>
+  lifetime: FielderDossier
+  form: {
+    last_10: FielderDossier
+    last_60d: FielderDossier
+    last_6mo: FielderDossier
+    last_1yr: FielderDossier
+    /** 12 entries: 4 windows × 3 metrics. Stumpings deltas are null for non-keepers. */
+    delta: Record<string, number | null>
+  }
+  suggested_splits: SuggestedSplit[]
+}
+
 export interface BowlingSummary {
   person_id: string
   name: string

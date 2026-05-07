@@ -149,6 +149,8 @@ export const getFielderVictims = (id: string, filters?: F & { limit?: number }) 
   fetchApi<{ victims: import('./types').FieldingVictim[] }>(`/api/v1/fielders/${id}/victims`, filters as Record<string, string>)
 export const getFielderInnings = (id: string, filters?: F & { limit?: number; offset?: number }) =>
   fetchApi<{ innings: import('./types').FieldingInnings[]; total: number }>(`/api/v1/fielders/${id}/by-innings`, filters as Record<string, string>)
+export const getFielderDistribution = (id: string, filters?: F & { as_of_date?: string }) =>
+  fetchApi<import('./types').FielderDistribution>(`/api/v1/fielders/${id}/distribution`, filters as Record<string, string>)
 
 // Composed player overview — four summary endpoints in parallel.
 // `.catch(() => null)` per sub-fetch so a 404 on one discipline
