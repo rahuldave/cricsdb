@@ -24,6 +24,12 @@ function siteStatsMeta(): Plugin {
 export default defineConfig({
   plugins: [react(), tailwindcss(), siteStatsMeta()],
   server: {
+    // `host: true` binds to BOTH IPv4 and IPv6 instead of vite's
+    // default IPv6-only `localhost`. Safari prefers IPv4 and gets
+    // ECONNREFUSED on the default binding; curl/agent-browser pick
+    // IPv6 and work. User-flagged 2026-05-08 ("safari can't make a
+    // connection to localhost").
+    host: true,
     proxy: {
       '/api': 'http://localhost:8000',
     },
