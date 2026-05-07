@@ -121,6 +121,41 @@ task shipped 4-of-6 route patterns and deferred the two that
 needed an `await db.q(...)` lookup. The fix isn't more deferral
 discipline — it's finishing the job.
 
+**On bug reports — understand the bug first, propose, then wait.**
+When the user reports a bug ("X doesn't work", "Y looks broken",
+"why does Z behave like this"), the response sequence is:
+1. **Reproduce.** Load the URL with agent-browser, query the DB,
+   run the test. Confirm what's actually wrong before forming a
+   hypothesis. (See "DO NOT SPECULATE" above.)
+2. **Identify the root cause.** Code path, data state, design
+   choice — name the actual mechanism, not a plausible-sounding
+   guess.
+3. **Explain to the user what you found AND propose 1-3 possible
+   fixes with trade-offs.** Two-three sentences each, not a wall
+   of code.
+4. **WAIT for the user's call.** Do NOT ship the fix in the same
+   turn unless explicitly told to ("just fix it"). The user
+   knows their codebase and may pick a different fix than what
+   you'd propose, OR may decide the behavior is correct and the
+   bug report was a misunderstanding.
+
+This rule is stricter than "discuss design before coding"
+because bug reports often LOOK like routine fixes but turn out
+to be design questions in disguise. User flagged 2026-05-08
+after a session where a bug report ("status bar broken") got
+fixed (clicking all-time button now sets explicit range) but
+the actual user intent was different (auto-apply on landing).
+Mid-session ship landed the wrong fix; round-trip wasted.
+
+Tells you're about to skip this rule:
+- You jump to a code edit without first reading what's there.
+- You announce "Going to ship this now" / "Implementing the
+  fix" before the user has confirmed the diagnosis.
+- Auto mode is on and you treat it as a license to ship without
+  pause — auto mode is for routine work, NOT for bug-fix
+  decisions. Bug reports always pause for explicit
+  confirmation.
+
 **Audit prompt discipline:** when asking agent-browser to verify, ask
 for RAW OUTPUT, not verdicts. "List every section header with the first
 row label per column" is checkable. "Verify all sections render" is a
