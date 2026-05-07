@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import statistics
+from datetime import date, timedelta
 from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
@@ -9,6 +11,8 @@ from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
 from ..aux_clauses import splice_aux_join_clauses
 from ..player_nationality import player_nationalities
+from ..scope_links import suggested_splits, scope_dict_from_filters
+from ..wilson import prob_record
 
 router = APIRouter(prefix="/api/v1/fielders", tags=["Fielding"])
 
@@ -596,3 +600,307 @@ async def fielding_by_innings(
         })
 
     return {"innings": innings_list, "total": total}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Per-match fielder distribution dossier — three sibling count blocks
+# (catches / run_outs / stumpings) with three-simple milestone
+# probabilities (P=0 / P=1 / P≥2), Wilson 95% CIs, and four form
+# windows. Stumpings block emitted only for players with
+# innings_kept > 0 in scope. Spec: internal_docs/spec-distribution-stats.md §13.
+
+
+async def _match_master_sample_fielder(
+    db, person_id: str, filters: FilterParams, aux: AuxParams,
+) -> tuple[list[dict], int]:
+    """Materialise per-match observation rows for a fielder under the
+    active filter scope. One row per match the player appears on the
+    team sheet (matchplayer.person_id = id). Returns (observations,
+    substitute_catches). Spec §13.2.
+
+    Match-grain filtering — drop has_innings_join. Side-neutral team
+    filter — fielding credits live on the OPPOSITE-side innings.
+    Inning aux is no-op for fielder (events span both innings; per
+    spec §13.1).
+    """
+    # Match-level scope clause (no innings join). Side-neutral so
+    # filter_team and filter_opponent apply at match level.
+    where, params = filters.build_side_neutral(has_innings_join=False, aux=aux)
+    params["person_id"] = person_id
+    match_where = where if where else "1=1"
+
+    # Single CTE-based query. player_matches is the scope-filtered
+    # match list; fielding_per_match and keeping_per_match are
+    # constrained only by player id (LEFT JOIN to player_matches
+    # carries the scope filter).
+    rows = await db.q(
+        f"""
+        WITH player_matches AS (
+            SELECT mp.match_id,
+                   MIN(md.date) AS date
+            FROM matchplayer mp
+            JOIN match m ON m.id = mp.match_id
+            LEFT JOIN matchdate md ON md.match_id = mp.match_id
+            WHERE mp.person_id = :person_id AND {match_where}
+            GROUP BY mp.match_id
+        ),
+        fielding_per_match AS (
+            SELECT i.match_id,
+                   SUM(CASE WHEN fc.kind = 'caught'
+                            AND COALESCE(fc.is_substitute, 0) = 0
+                            THEN 1 ELSE 0 END) AS catches,
+                   SUM(CASE WHEN fc.kind = 'run_out'
+                            AND COALESCE(fc.is_substitute, 0) = 0
+                            THEN 1 ELSE 0 END) AS run_outs,
+                   SUM(CASE WHEN fc.kind = 'stumped'
+                            THEN 1 ELSE 0 END) AS stumpings
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            WHERE fc.fielder_id = :person_id
+            GROUP BY i.match_id
+        ),
+        keeping_per_match AS (
+            SELECT i.match_id,
+                   COUNT(*) AS kept_innings
+            FROM keeperassignment ka
+            JOIN innings i ON i.id = ka.innings_id
+            WHERE ka.keeper_id = :person_id
+            GROUP BY i.match_id
+        )
+        SELECT pm.match_id,
+               COALESCE(pm.date, '') AS date,
+               COALESCE(fpm.catches, 0) AS catches,
+               COALESCE(fpm.run_outs, 0) AS run_outs,
+               COALESCE(fpm.stumpings, 0) AS stumpings,
+               COALESCE(kpm.kept_innings, 0) AS kept_innings
+        FROM player_matches pm
+        LEFT JOIN fielding_per_match fpm ON fpm.match_id = pm.match_id
+        LEFT JOIN keeping_per_match kpm ON kpm.match_id = pm.match_id
+        ORDER BY pm.date ASC, pm.match_id ASC
+        """,
+        params,
+    )
+    observations = [
+        {
+            "match_id": r["match_id"],
+            "date": r["date"],
+            "catches": r["catches"] or 0,
+            "run_outs": r["run_outs"] or 0,
+            "stumpings": r["stumpings"] or 0,
+            "kept_innings": r["kept_innings"] or 0,
+            "is_keeper": 1 if (r["kept_innings"] or 0) > 0 else 0,
+        }
+        for r in rows
+    ]
+
+    # Substitute catches — same scope, separate scalar for
+    # reconciliation against /fielders/{id}/summary.
+    sub_rows = await db.q(
+        f"""
+        SELECT COUNT(*) AS sub_catches
+        FROM fieldingcredit fc
+        JOIN delivery d ON d.id = fc.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE fc.fielder_id = :person_id
+          AND fc.kind = 'caught'
+          AND fc.is_substitute = 1
+          AND {match_where}
+        """,
+        params,
+    )
+    substitute_catches = (sub_rows[0]["sub_catches"] if sub_rows else 0) or 0
+    return observations, substitute_catches
+
+
+def _count_block(observations: list[dict], key: str) -> dict:
+    """Sibling count block — `catches` / `run_outs` / `stumpings`.
+    Three simples (P=0 / P=1 / P≥2), denom = n_matches. Spec §13.3.1."""
+    n = len(observations)
+    vals = [o[key] for o in observations]
+
+    if n == 0:
+        keys = ["p_zero", "p_one", "p_geq_2"]
+        return {
+            "total": 0,
+            "mean_per_match": None,
+            "median": None,
+            "variance": None,
+            "std": None,
+            "milestones": {k: prob_record(0, 0) for k in keys},
+        }
+
+    total = sum(vals)
+    mean = total / n
+    median = statistics.median(vals)
+    variance = statistics.variance(vals) if n >= 2 else 0.0
+    std = variance ** 0.5
+
+    def _count_eq(v: int) -> int:
+        return sum(1 for x in vals if x == v)
+
+    def _count_geq(v: int) -> int:
+        return sum(1 for x in vals if x >= v)
+
+    return {
+        "total": total,
+        "mean_per_match": round(mean, 4),
+        "median": median,
+        "variance": round(variance, 4),
+        "std": round(std, 4),
+        "milestones": {
+            "p_zero":  prob_record(_count_eq(0), n),
+            "p_one":   prob_record(_count_eq(1), n),
+            "p_geq_2": prob_record(_count_geq(2), n),
+        },
+    }
+
+
+def _distribution_dossier_fielder(
+    observations: list[dict], substitute_catches: int,
+) -> dict:
+    """Pure aggregate. Three count blocks + top-level scalars. The
+    stumpings block is null when innings_kept == 0 (non-keepers).
+    Spec §13.3."""
+    n = len(observations)
+    innings_kept = sum(o["kept_innings"] for o in observations)
+
+    return {
+        "n_matches": n,
+        "innings_kept": innings_kept,
+        "substitute_catches": substitute_catches,
+        "observations": [
+            {
+                "match_id": o["match_id"],
+                "date": o["date"],
+                "catches": o["catches"],
+                "run_outs": o["run_outs"],
+                "stumpings": o["stumpings"],
+                "is_keeper": o["is_keeper"],
+            }
+            for o in observations
+        ],
+        "catches": _count_block(observations, "catches"),
+        "run_outs": _count_block(observations, "run_outs"),
+        "stumpings": _count_block(observations, "stumpings") if innings_kept > 0 else None,
+    }
+
+
+def _form_windows_fielder(
+    observations: list[dict], substitute_catches_total: int, today: date,
+) -> dict:
+    """Slice the date-asc observation list into four match-grain form
+    windows, run the dossier on each, emit the fielder-specific delta
+    block (three means per window, stumpings nullable). Spec §13.4.
+
+    Substitute-catches scalar inside form windows is derived as the
+    fraction of the lifetime total proportional to the window's
+    n_matches share — substitutes are rare (≤ a handful per career)
+    and per-match attribution would require a second filtered query
+    per window. The dossier-level scalar is the authoritative number;
+    form-window values are informational only.
+    """
+    last_10 = observations[-10:]
+    cutoff_60d = (today - timedelta(days=60)).isoformat()
+    cutoff_6mo = (today - timedelta(days=180)).isoformat()
+    cutoff_1yr = (today - timedelta(days=365)).isoformat()
+    last_60d = [o for o in observations if (o["date"] or "") >= cutoff_60d]
+    last_6mo = [o for o in observations if (o["date"] or "") >= cutoff_6mo]
+    last_1yr = [o for o in observations if (o["date"] or "") >= cutoff_1yr]
+
+    # Form-window subs scalar: proportional share. Lifetime carries the
+    # authoritative count.
+    n_total = len(observations)
+    def _sub_share(window_obs: list[dict]) -> int:
+        if n_total == 0 or substitute_catches_total == 0:
+            return 0
+        return round(substitute_catches_total * len(window_obs) / n_total)
+
+    lifetime_doss = _distribution_dossier_fielder(observations, substitute_catches_total)
+    last_10_doss = _distribution_dossier_fielder(last_10, _sub_share(last_10))
+    last_60d_doss = _distribution_dossier_fielder(last_60d, _sub_share(last_60d))
+    last_6mo_doss = _distribution_dossier_fielder(last_6mo, _sub_share(last_6mo))
+    last_1yr_doss = _distribution_dossier_fielder(last_1yr, _sub_share(last_1yr))
+
+    def _delta(window_doss: dict, key: str) -> Optional[float]:
+        wb = window_doss.get(key)
+        lb = lifetime_doss.get(key)
+        if wb is None or lb is None:
+            return None
+        wv = wb.get("mean_per_match")
+        lv = lb.get("mean_per_match")
+        if wv is None or lv is None:
+            return None
+        return round(wv - lv, 4)
+
+    delta = {}
+    for win_name, win_doss in [
+        ("last_10", last_10_doss),
+        ("last_60d", last_60d_doss),
+        ("last_6mo", last_6mo_doss),
+        ("last_1yr", last_1yr_doss),
+    ]:
+        for metric in ("catches", "run_outs", "stumpings"):
+            delta[f"{win_name}_{metric}_mean_minus_lifetime"] = _delta(win_doss, metric)
+
+    return {
+        "last_10": last_10_doss,
+        "last_60d": last_60d_doss,
+        "last_6mo": last_6mo_doss,
+        "last_1yr": last_1yr_doss,
+        "delta": delta,
+    }
+
+
+@router.get("/{person_id}/distribution")
+async def fielding_distribution(
+    person_id: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    as_of_date: Optional[str] = Query(
+        None,
+        description=(
+            "ISO date (YYYY-MM-DD) to anchor the calendar form windows"
+            " (last_60d / last_6mo / last_1yr). Defaults to today;"
+            " pin for deterministic regression tests."
+        ),
+    ),
+):
+    """Per-match fielding distribution dossier.
+
+    Returns three sibling count blocks under one master sample —
+    `catches`, `run_outs`, and `stumpings` (null for non-keepers) —
+    plus four form windows (last_10 / last_60d / last_6mo / last_1yr),
+    a `substitute_catches` reconciliation scalar, and scope-derived
+    suggested-splits navigation hints.
+
+    Master sample is per-match (one row per match the player appears
+    in `matchplayer`). Substitute catches are excluded from the
+    distribution and surfaced separately. Caught-and-bowled is bowler-
+    credited and lives on the bowling dossier.
+
+    Every probability ships as `{value, num, denom, ci_low, ci_high}`
+    with a Wilson 95% CI. Three simples per block: `p_zero`, `p_one`,
+    `p_geq_2`.
+
+    Spec: internal_docs/spec-distribution-stats.md §13.
+    """
+    db = get_db()
+    today = date.fromisoformat(as_of_date) if as_of_date else date.today()
+
+    observations, substitute_catches = await _match_master_sample_fielder(
+        db, person_id, filters, aux,
+    )
+    lifetime = _distribution_dossier_fielder(observations, substitute_catches)
+    form = _form_windows_fielder(observations, substitute_catches, today)
+
+    scope = scope_dict_from_filters(filters)
+    splits = suggested_splits(scope)
+
+    return {
+        "scope": {k: v for k, v in scope.items() if v},
+        "lifetime": lifetime,
+        "form": form,
+        "suggested_splits": splits,
+    }
