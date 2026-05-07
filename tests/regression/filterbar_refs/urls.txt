@@ -37,13 +37,14 @@ REG sea_team_tournament               /api/v1/seasons?team=Mumbai%20Indians&tour
 NEW sea_venue_wankhede                /api/v1/seasons?filter_venue=Wankhede%20Stadium
 NEW sea_rivalry_pair                  /api/v1/seasons?filter_team=India&filter_opponent=Australia&gender=male&team_type=international
 NEW sea_series_icc_team               /api/v1/seasons?team=India&gender=male&team_type=international&series_type=icc
-# person_id (added 2026-05-07) — narrows seasons to those the player
-# played in. Active player (Kohli, ba607b88) span is wide; retired
-# player (ABdV, c4487b84) span ENDS at his last season — proves the
-# retired-player gap is fixed.
-NEW sea_player_kohli_all              /api/v1/seasons?person_id=ba607b88
-NEW sea_player_abdv_all               /api/v1/seasons?person_id=c4487b84
-NEW sea_player_abdv_ipl               /api/v1/seasons?person_id=c4487b84&tournament=Indian%20Premier%20League
+# person_id (added 2026-05-07; locked at REG after the v1 capture
+# passed `0 REG drifted, 3 NEW unchanged`) — narrows seasons to
+# those the player played in. Active player (Kohli, ba607b88) span
+# is wide; retired player (ABdV, c4487b84) span ENDS at his last
+# season — proves the retired-player gap is fixed.
+REG sea_player_kohli_all              /api/v1/seasons?person_id=ba607b88
+REG sea_player_abdv_all               /api/v1/seasons?person_id=c4487b84
+REG sea_player_abdv_ipl               /api/v1/seasons?person_id=c4487b84&tournament=Indian%20Premier%20League
 # v3 team_class FilterBar — generated NEW URLs (one-shot)
 # Source: each row mirrors a REG row in urls.txt with &team_class=full_member appended.
 # Filter: only intl-context REG entries qualify.
