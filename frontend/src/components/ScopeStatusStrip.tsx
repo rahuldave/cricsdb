@@ -24,7 +24,6 @@ import { useFilters } from '../hooks/useFilters'
 import { useFetch } from '../hooks/useFetch'
 import { getSeasons } from '../api'
 import { seasonTag } from './scopeLinks'
-import DormancyBadge from './DormancyBadge'
 
 type Segment = {
   label: string
@@ -260,7 +259,6 @@ export default function ScopeStatusStrip() {
             )}
           </span>
         ))}
-        <DormancyBadge />
         <button
           type="button"
           className="wisden-scope-strip-copy"

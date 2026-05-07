@@ -11,7 +11,7 @@ import { useDormancy, dormancyGapDays, dormancyBadgeText } from './DormancyConte
 export default function DormancyBadge() {
   const { lastMatchDate } = useDormancy()
   const gap = dormancyGapDays(lastMatchDate)
-  const text = dormancyBadgeText(gap)
+  const text = dormancyBadgeText(gap, lastMatchDate)
   if (!text) return null
   return (
     <span

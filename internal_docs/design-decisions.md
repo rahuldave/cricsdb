@@ -1405,32 +1405,39 @@ the anchor; §11.5 / §13.4 / §16 reference it).
 Companion to the scope-anchored form-window cutoff. When a
 player or team's last match in scope is more than 60 days
 before today, a faint italic badge appears next to the subject
-name in `ScopedPageHeader` AND inside the `ScopeStatusStrip`
-"Showing:" bar:
+name in `ScopedPageHeader`. **Page header only** (revised
+2026-05-08) — earlier draft also rendered it inside the
+`ScopeStatusStrip` "Showing:" bar but was dropped because the
+status strip describes URL state, while dormancy is derived
+player state. Same reason the all-time season range computes
+in the strip without mutating the URL: don't conflate axes.
 
-| Days since last match in scope | Badge |
+**Hybrid duration / calendar text** (revised 2026-05-08):
+
+| Gap from today | Badge |
 |---|---|
-| ≤ 60 | (none — the entity is active in scope) |
-| 61–180 | `(0 in 60d)` |
-| 181–365 | `(0 in 6mo)` |
-| > 365 | `(0 in 1y+)` |
+| ≤ 60 days | (none — the entity is active in scope) |
+| 61–364 days | `5 months since last match` (rounded to nearest month, min 2) |
+| ≥ 365 days | `last match: Oct 2021` (calendar — month + year) |
 
-Reads "this entity has 0 matches in the last N days within the
-active scope." Stays factual for sabbaticals, injuries,
-dropped-from-squad, retirees — all the same data state, no
-inference about cause. Deliberately NOT labeled `RET` or
-`retired`: cricket databases can't distinguish "retired" from
-"dropped" or "injured" from match-absence alone.
+Reads naturally. The earlier `(0 in 60d/6mo/1y+)` form was
+data-speak — a reader had to parse "0 [matches] in [the last]
+1y+" backwards. Worse, the "1y+" ceiling silently understated
+dormancies of 4-5 years (ABdV last match 2021-10-11 → showed
+"1y+" when it's actually 4.5y). Anchoring on the date for
+year-plus gaps removes the ceiling artifact AND gives the
+reader a concrete reference ("Oct 2021" → reader does the
+mental math themselves with familiar units).
 
-The threshold-tier text is a feature: it tells the reader how
-stale the data they're looking at actually is. A badge of
-`(0 in 60d)` on a current player suggests dropped from squad
-or injured; `(0 in 1y+)` on Gayle suggests retirement-without-
-formal-announcement. The reader interprets, the badge just
-asserts the gap.
+Stays factual for sabbaticals, injuries, dropped-from-squad,
+retirees — all the same data state, no inference about cause.
+Deliberately NOT labeled `RET` or `retired`: cricket databases
+can't distinguish "retired" from "dropped" or "injured" from
+match-absence alone.
 
-**Wiring** — `last_match_date` ships as a top-level field on
-the `lifetime` block of the three distribution endpoints
+**Wiring** — page-header only (NOT status strip per the
+2026-05-08 revision). `last_match_date` ships as a top-level
+field on the `lifetime` block of the three distribution endpoints
 (`/api/v1/{batters,bowlers,fielders}/{id}/distribution`; team
 distribution endpoints will follow the same convention per
 §16). Distribution fetches already happen on every page that

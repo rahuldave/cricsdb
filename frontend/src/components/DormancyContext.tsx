@@ -57,12 +57,40 @@ export function dormancyGapDays(
   return Math.max(0, Math.floor(ms / 86400000))
 }
 
-/** Tiered badge text per the design-decisions.md threshold table.
- *  Returns null below the 60d threshold (badge hidden — entity is
- *  active in scope). */
-export function dormancyBadgeText(gapDays: number): string | null {
-  if (gapDays > 365) return '(0 in 1y+)'
-  if (gapDays > 180) return '(0 in 6mo)'
-  if (gapDays > 60)  return '(0 in 60d)'
-  return null
+/** Hybrid badge text — duration under 12 months, calendar over.
+ *  Returns null when gap ≤ 60 days (badge hidden; entity is
+ *  active in scope) or when lastMatchDate is invalid.
+ *
+ *  Spec: design-decisions.md "Dormancy badge" — language revised
+ *  2026-05-08. Earlier `(0 in 60d/6mo/1y+)` form was data-speak;
+ *  this form reads naturally:
+ *    61-364 days  → "5 months since last match"
+ *    ≥ 365 days   → "last match: Oct 2021"
+ *  Anchoring on a date avoids the artificial ceiling that
+ *  understated ABdV's 4.5-year gap as "1y+".
+ */
+export function dormancyBadgeText(
+  gapDays: number,
+  lastMatchDate: string | null,
+): string | null {
+  if (gapDays <= 60) return null
+  if (gapDays < 365) {
+    // Round to nearest month — 30.5 days/month gives 2-12 months
+    // for gaps in [61, 364].
+    const months = Math.max(2, Math.round(gapDays / 30.5))
+    return `${months} months since last match`
+  }
+  // ≥ 1 year — calendar form. Reader does the math on familiar
+  // year units (Oct 2021 → "that's a long time ago") instead of
+  // a numeric duration that needs unpacking.
+  if (!lastMatchDate) return null
+  const d = new Date(lastMatchDate)
+  if (Number.isNaN(d.getTime())) return null
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  // Use UTC accessors — the ISO date is date-only (no time
+  // component) so the local timezone could shift it by a day
+  // and flip the month at month-boundaries. UTC keeps the
+  // string display stable.
+  return `last match: ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
 }
