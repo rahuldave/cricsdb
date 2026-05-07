@@ -185,8 +185,12 @@ curl "http://localhost:8000/api/v1/tournaments?team_type=club&gender=male"
 
 ## `GET /api/v1/seasons`
 
-List seasons in chronological order. Accepts `team`, `gender`,
-`team_type`, `tournament` to narrow.
+List seasons in chronological order. Accepts every FilterBar axis
+(`team`, `gender`, `team_type`, `tournament`, `filter_team`,
+`filter_opponent`, `filter_venue`, `team_class`, `series_type`)
+plus the rivalry pair (when `filter_team` + `filter_opponent` are
+both set, narrows to seasons the two teams actually met) and —
+added 2026-05-07 — `person_id` for player-aware narrowing.
 
 ```bash
 curl "http://localhost:8000/api/v1/seasons"
@@ -195,6 +199,44 @@ curl "http://localhost:8000/api/v1/seasons"
 ```json
 { "seasons": ["2004/05", "2005", "2005/06", "…", "2025/26", "2026"] }
 ```
+
+### `person_id` — player-aware narrowing
+
+When set, the result is intersected with seasons the player
+appeared in (matchplayer join). The FilterBar passes the page's
+current `?player=<id>` URL param as `?person_id=<id>` so the
+From/To dropdowns + the `first-3` / `prev-3` / `last-3` /
+`latest` quick-select buttons all reflect the player's actual
+career-in-scope rather than the broader dataset. Fixes the
+retired-player gap — clicking `last-3` on AB de Villiers'
+batting page now sets the season filter to `2019/20`-`2021`
+(his actual final seasons) rather than `2024`-`2026` (the
+dataset's recent seasons, which would show empty data).
+
+```bash
+# Active player — Kohli's seasons span 2007/08 to current.
+curl "http://localhost:8000/api/v1/seasons?person_id=ba607b88"
+```
+
+```json
+{ "seasons": ["2007/08", "2009", "…", "2025", "2026"] }
+```
+
+```bash
+# Retired player — AB de Villiers' seasons end at 2021.
+curl "http://localhost:8000/api/v1/seasons?person_id=c4487b84&tournament=Indian%20Premier%20League"
+```
+
+```json
+{ "seasons": ["2007/08", "2009", "2009/10", "…", "2020/21", "2021"] }
+```
+
+`person_id` composes with the other filter axes via intersection
+— `?tournament=Indian Premier League&person_id=c4487b84` returns
+only IPL seasons ABdV played. The frontend `getSeasons()` wrapper
+in `frontend/src/api.ts` accepts `player` (the URL convention)
+and forwards it as `person_id` to this endpoint so callers don't
+need to know the backend convention.
 
 ## `GET /api/v1/teams`
 
