@@ -18,36 +18,36 @@
 # All REG — documents current behaviour of the v1 endpoint.
 
 # ── lifetime totals across primary axes ──────────────────────────
-REG dist_bumrah_all_time               /api/v1/bowlers/462411b3/distribution?as_of_date=2025-01-01
-REG dist_bumrah_men_intl               /api/v1/bowlers/462411b3/distribution?gender=male&team_type=international&as_of_date=2025-01-01
-REG dist_bumrah_ipl                    /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
-REG dist_bumrah_ipl_2024               /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
-REG dist_bumrah_ipl_2023               /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2023&season_to=2023&as_of_date=2025-01-01
+NEW dist_bumrah_all_time               /api/v1/bowlers/462411b3/distribution?as_of_date=2025-01-01
+NEW dist_bumrah_men_intl               /api/v1/bowlers/462411b3/distribution?gender=male&team_type=international&as_of_date=2025-01-01
+NEW dist_bumrah_ipl                    /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
+NEW dist_bumrah_ipl_2024               /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
+NEW dist_bumrah_ipl_2023               /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2023&season_to=2023&as_of_date=2025-01-01
 
 # ── opponent narrowing ───────────────────────────────────────────
-REG dist_bumrah_vs_csk_ipl             /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_opponent=Chennai%20Super%20Kings&as_of_date=2025-01-01
+NEW dist_bumrah_vs_csk_ipl             /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_opponent=Chennai%20Super%20Kings&as_of_date=2025-01-01
 
 # ── Rashid Khan (leg-spinner — different econ + SR shape) ────────
-REG dist_rashid_all_time               /api/v1/bowlers/5f547c8b/distribution?as_of_date=2025-01-01
-REG dist_rashid_ipl                    /api/v1/bowlers/5f547c8b/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
-REG dist_rashid_ipl_2024               /api/v1/bowlers/5f547c8b/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
+NEW dist_rashid_all_time               /api/v1/bowlers/5f547c8b/distribution?as_of_date=2025-01-01
+NEW dist_rashid_ipl                    /api/v1/bowlers/5f547c8b/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
+NEW dist_rashid_ipl_2024               /api/v1/bowlers/5f547c8b/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
 
 # ── Boult (left-arm pacer; PP specialist) ────────────────────────
-REG dist_boult_ipl                     /api/v1/bowlers/a818c1be/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
-REG dist_boult_men_intl                /api/v1/bowlers/a818c1be/distribution?gender=male&team_type=international&as_of_date=2025-01-01
+NEW dist_boult_ipl                     /api/v1/bowlers/a818c1be/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
+NEW dist_boult_men_intl                /api/v1/bowlers/a818c1be/distribution?gender=male&team_type=international&as_of_date=2025-01-01
 
 # ── Kohli (part-time bowler — small-sample stress) ───────────────
-REG dist_kohli_part_time_all_time      /api/v1/bowlers/ba607b88/distribution?as_of_date=2025-01-01
-REG dist_kohli_part_time_min0          /api/v1/bowlers/ba607b88/distribution?min_balls=0&as_of_date=2025-01-01
+NEW dist_kohli_part_time_all_time      /api/v1/bowlers/ba607b88/distribution?as_of_date=2025-01-01
+NEW dist_kohli_part_time_min0          /api/v1/bowlers/ba607b88/distribution?min_balls=0&as_of_date=2025-01-01
 
 # ── min_balls threshold variation ────────────────────────────────
-REG dist_bumrah_min0                   /api/v1/bowlers/462411b3/distribution?min_balls=0&as_of_date=2025-01-01
-REG dist_bumrah_min18                  /api/v1/bowlers/462411b3/distribution?min_balls=18&as_of_date=2025-01-01
-REG dist_bumrah_min24_full_overs       /api/v1/bowlers/462411b3/distribution?min_balls=24&as_of_date=2025-01-01
+NEW dist_bumrah_min0                   /api/v1/bowlers/462411b3/distribution?min_balls=0&as_of_date=2025-01-01
+NEW dist_bumrah_min18                  /api/v1/bowlers/462411b3/distribution?min_balls=18&as_of_date=2025-01-01
+NEW dist_bumrah_min24_full_overs       /api/v1/bowlers/462411b3/distribution?min_balls=24&as_of_date=2025-01-01
 
 # ── inning-aux narrowing (page-local AuxParam) ───────────────────
-REG dist_bumrah_ipl_inning0            /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=0&as_of_date=2025-01-01
-REG dist_bumrah_ipl_inning1            /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=1&as_of_date=2025-01-01
+NEW dist_bumrah_ipl_inning0            /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=0&as_of_date=2025-01-01
+NEW dist_bumrah_ipl_inning1            /api/v1/bowlers/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=1&as_of_date=2025-01-01
 
 # ── empty scope (no matches) — regression marker for empty handling
-REG dist_bumrah_at_nonexistent_venue   /api/v1/bowlers/462411b3/distribution?filter_venue=Nonexistent%20Ground&as_of_date=2025-01-01
+NEW dist_bumrah_at_nonexistent_venue   /api/v1/bowlers/462411b3/distribution?filter_venue=Nonexistent%20Ground&as_of_date=2025-01-01
