@@ -189,15 +189,22 @@ async def list_seasons(
     filter_venue: Optional[str] = Query(None),
     series_type: Optional[str] = Query(None),
     team_class: Optional[str] = Query(None, description="full_member (intl-only) / primary_club / secondary_club (club-only) — silent no-op when team_type doesn't match"),
+    person_id: Optional[str] = Query(None, description="Page-context player id (e.g. when on /batting?player=X). Narrows seasons to those the player appeared in (matchplayer join). Combined with other axes via intersection — `?tournament=IPL&person_id=ba607b88` returns IPL seasons Kohli played."),
 ):
     """Seasons narrowed by every FilterBar field the page has set —
     team / gender / team_type / tournament / filter_venue — plus
     page-local series_type and the rivalry pair (filter_team +
-    filter_opponent). When tournament=IPL, only IPL seasons are
+    filter_opponent), and (added 2026-05-07) the page-context
+    `person_id` so the From/To pickers and the FilterBar's
+    `first-3` / `prev-3` / `last-3` / `latest` quick-select buttons
+    reflect the player's actual career-in-scope rather than the
+    broader dataset. When tournament=IPL, only IPL seasons are
     returned — so the From/To pickers can't offer 2009/10 (a Champions
     League season) or 2026 (a season MI has played but IPL hasn't
     entered yet). filter_venue=Wankhede narrows to seasons that
-    actually saw matches there.
+    actually saw matches there. person_id=ba607b88 (Kohli) narrows
+    to seasons Kohli played; for retired players this fixes the
+    "click last-3 → empty page" gap.
 
     season_from / season_to are intentionally NOT accepted here — the
     endpoint builds the list the From/To pickers choose from (self-
@@ -222,6 +229,20 @@ async def list_seasons(
         parts.append("(m.team1 = :filter_team OR m.team2 = :filter_team)")
         params["filter_team"] = filter_team
     where = " AND ".join(parts) if parts else "1=1"
+
+    # Player narrowing — intersect with seasons the player appeared in
+    # (matchplayer.person_id = :person_id). Index on
+    # ix_matchplayer_person_id makes the join cheap. EXISTS subquery
+    # keeps the outer SELECT DISTINCT path unchanged so the rest of the
+    # filter stack composes the same way.
+    if person_id:
+        parts_with_player = parts + [
+            "EXISTS (SELECT 1 FROM matchplayer mp"
+            "        WHERE mp.match_id = m.id AND mp.person_id = :person_id)"
+        ]
+        where = " AND ".join(parts_with_player)
+        params["person_id"] = person_id
+
     rows = await db.q(
         f"""
         SELECT DISTINCT m.season FROM match m
