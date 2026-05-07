@@ -148,7 +148,13 @@ export default function FilterBar() {
     const updates: Record<string, string> = { gender: v }
     if (tournament) {
       const t = tournaments.find(x => x.event_name === tournament)
-      if (t && v && t.gender !== v) updates.tournament = ''
+      // Clear the tournament when (a) user picked a specific gender
+      // that doesn't match the tournament, OR (b) user cleared the
+      // gender entirely — otherwise the auto-correct deep-link
+      // effect at the top of this component re-asserts the gender
+      // from the tournament's metadata, "springing back" to the
+      // value the user just cleared. Cascade-clear instead.
+      if (t && (!v || t.gender !== v)) updates.tournament = ''
     }
     setUrlParams(updates)
   }
@@ -157,7 +163,8 @@ export default function FilterBar() {
     const updates: Record<string, string> = { team_type: v }
     if (tournament) {
       const t = tournaments.find(x => x.event_name === tournament)
-      if (t && v && t.team_type !== v) updates.tournament = ''
+      // Same cascade-clear rule as setGender — see comment above.
+      if (t && (!v || t.team_type !== v)) updates.tournament = ''
     }
     setUrlParams(updates)
   }
