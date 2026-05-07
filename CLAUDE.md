@@ -515,3 +515,107 @@ assert_eq "No height=0 bars (would be invisible)" "0" "$zero_h"
 The class of bug this catches: any per-item chart where some
 items render at zero size (height/width/area) and silently vanish
 from the DOM-visible count even though they exist in the data.
+
+## Scope-anchored form-window cutoffs
+
+Distribution-panel calendar form windows (`last_60d` / `last_6mo`
+/ `last_1yr`) compute cutoffs against `anchor = min(today,
+max_obs_date)`, NOT today directly. For active subjects in
+unconstrained scopes the anchor IS today; for retired subjects
+(Gayle, ABdV) and tightly-scoped subjects the anchor follows
+the data — the windows mean "the last N calendar days OF
+SCOPE." Today-direct cutoffs produced empty windows for
+retired players and for filter-pinned scopes (e.g. Kohli@IPL
+2016 with `dist_window=last_1yr`); user-flagged 2026-05-08.
+
+Single helper at `api/form_windows.py::scope_anchor`. All
+three distribution slices import it. New endpoints (e.g. team
+distribution, future v2 follow-ups) MUST use it; do NOT
+re-introduce raw `today - timedelta(days=N)` cutoffs.
+
+Spec: `internal_docs/spec-distribution-stats.md §8.6` +
+`internal_docs/design-decisions.md` "Form-window cutoffs are
+scope-anchored, not today-anchored".
+
+## Player/team-aware seasons + scope-anchored quick-select buttons
+
+`/api/v1/seasons` accepts `?person_id=` and `?team=` so the
+seasons array reflects the subject's actual career-in-scope.
+Frontend `getSeasons()` forwards the URL `?player=` as
+`?person_id=` (preserves both naming conventions).
+
+The FilterBar quick-select buttons (`first-3` / `all-time` /
+`prev-3` / `last-3` / `latest`) all read from this array →
+all are subject-aware automatically. Concretely:
+- `last-3` on AB de Villiers' page sets the range to
+  2019/20-2021 (his actual final seasons), NOT 2024-2026 (the
+  dataset's latest).
+- `first-3` on Kohli sets 2007/08-2009/10 (his earliest 3),
+  NOT the dataset's earliest.
+
+Adding a new FilterBar season button or extending the
+seasons-narrowing logic? The seasons fetch is already
+subject-aware; just slice the array. Don't re-fetch with
+different args. New /seasons-consuming endpoints elsewhere?
+Honour the `person_id` / `team` query params symmetrically
+unless there's a specific reason not to.
+
+Spec: `internal_docs/design-decisions.md` "FilterBar
+season-window quick-select buttons — scope-aware AND
+player-aware".
+
+## Status bar derives "all-time" range; URL stays clean
+
+When a subject is in URL (`?player=X` or `?team=X`) and the
+user hasn't picked a season range, `ScopeStatusStrip` derives
+`Season: 2005/06–2021 (all-time)` from the seasons fetch and
+displays it with an italic faint `(all-time)` suffix to signal
+"computed, not picked." **The URL is NOT auto-mutated.**
+
+Why URL-clean: an earlier auto-default
+(`useDefaultSeasonWindow`) silently wrote `season_from`/`to`
+on landings. User flagged: "I changed my mind — landings now
+open all-time by default rather than silently pinning"
+(commit `700d11b`, 2026-04-20). The keyword was *silently*.
+
+Rule: the URL is a faithful record of user choice. Computed
+values display in the status bar with a visual cue, never as
+URL params written without user action. If you find yourself
+adding a `setUrlParams` call in a `useEffect` to "make the URL
+explicit" — STOP. Compute it for display instead.
+
+Spec: `internal_docs/design-decisions.md` "Status bar
+computes the all-time season range".
+
+## Dormancy badge — page-header only, hybrid duration/calendar text
+
+When a subject's last match in scope is more than 60 days
+before today, a small italic badge renders next to the subject
+name in `ScopedPageHeader`:
+
+| Gap | Badge |
+|---|---|
+| ≤ 60 days | (hidden — active in scope) |
+| 61-364 days | `5 months since last match` |
+| ≥ 365 days | `last match: Oct 2021` |
+
+Page header ONLY (NOT in the status strip — strip describes
+URL state, dormancy is derived player state; same axis-
+separation principle as the status-bar derive-without-mutate
+rule).
+
+Anchoring on a date (calendar form) for year-plus gaps avoids
+the artificial ceiling of an earlier `(0 in 1y+)` form, which
+silently understated multi-year dormancies (ABdV's 4.5y
+dormancy showed as "1y+" — under-stated by 3.5 years).
+
+Wired via `last_match_date` field on the distribution
+endpoints' lifetime block; pages populate `DormancyContext`
+after the dossier fetch. Adding a new subject-page Distribution
+panel? Plumb `last_match_date` into the context the same way.
+Adding a new endpoint that needs the dormancy signal? Surface
+`last_match_date` on the lifetime block, not on a sibling
+summary endpoint (avoids 200-URL regression rotations across
+unrelated suites).
+
+Spec: `internal_docs/design-decisions.md` "Dormancy badge".
