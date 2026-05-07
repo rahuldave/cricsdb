@@ -389,14 +389,14 @@ export default function FilterBar() {
           </button>
           {seasons.length >= 6 && (
             <button type="button" onClick={() => setPrevN(3)} className="wisden-reset"
-              title={`Previous 3 seasons before the most recent 3 (${seasons.slice(-6, -3).join(', ')}) — useful as the prior-arc comparison to "last 3"`}>
-              prev 3
+              title={`Previous 3 seasons before the most recent 3 (${seasons.slice(-6, -3).join(', ')}) — useful as the prior-arc comparison to "last-3"`}>
+              prev-3
             </button>
           )}
           {seasons.length >= 3 && (
             <button type="button" onClick={() => setLastN(3)} className="wisden-reset"
               title={`Last 3 seasons in scope (${seasons.slice(-3).join(', ')})`}>
-              last 3
+              last-3
             </button>
           )}
           {latestInScope && (
