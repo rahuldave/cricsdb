@@ -21,10 +21,19 @@
 import { useState } from 'react'
 import { useSearchParams, useLocation } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
+import { useFetch } from '../hooks/useFetch'
+import { getSeasons } from '../api'
 import { seasonTag } from './scopeLinks'
 import DormancyBadge from './DormancyBadge'
 
-type Segment = { label: string; value: string; isHeading?: boolean }
+type Segment = {
+  label: string
+  value: string
+  isHeading?: boolean
+  /** Italic faint suffix appended after `value` — e.g. "(all-time)"
+   *  on a derived season range to signal "computed, not picked." */
+  derivedSuffix?: string
+}
 
 function buildSegments(
   filters: ReturnType<typeof useFilters>,
@@ -34,6 +43,7 @@ function buildSegments(
   pathCompare: string | null,
   tab: string | null,
   page: string | null,
+  derivedSeasonRange: string | null,
 ): Segment[] {
   const segs: Segment[] = []
 
@@ -73,9 +83,16 @@ function buildSegments(
     segs.push({ label: 'vs Opponent', value: filters.filter_opponent })
   }
 
-  // Season range.
+  // Season range — explicit if user picked one; derived "(all-time)"
+  // if not (and we have a derived range, i.e. subject is set + seasons
+  // fetch has resolved). Spec: design-decisions.md "Status bar
+  // computes the all-time season range".
   const season = seasonTag(filters.season_from, filters.season_to)
-  if (season) segs.push({ label: 'Season', value: season })
+  if (season) {
+    segs.push({ label: 'Season', value: season })
+  } else if (derivedSeasonRange) {
+    segs.push({ label: 'Season', value: derivedSeasonRange, derivedSuffix: '(all-time)' })
+  }
 
   // Venue filter (filter_venue), distinct from path venue.
   if (filters.filter_venue && !pathVenue) {
@@ -151,9 +168,49 @@ export default function ScopeStatusStrip() {
   const pathCompare = params.get('compare')
   const tab = params.get('tab')
   const page = params.get('page')
+  const seriesType = params.get('series_type') || undefined
+
+  // Derived "all-time" season range — only when user hasn't picked
+  // a range AND a subject path-param is in URL. Fetches /seasons
+  // with the same scope params FilterBar uses; the response is
+  // typically already in the browser cache from FilterBar's own
+  // fetch. Spec: design-decisions.md "Status bar computes the
+  // all-time season range".
+  const showDerivedSeason = !filters.season_from && !filters.season_to && !!(pathPlayer || pathTeam)
+  const seasonsFetch = useFetch(
+    () => showDerivedSeason
+      ? getSeasons({
+          team: pathTeam || undefined,
+          player: pathPlayer || undefined,
+          gender: filters.gender,
+          team_type: filters.team_type,
+          tournament: filters.tournament,
+          filter_team: filters.filter_team,
+          filter_opponent: filters.filter_opponent,
+          filter_venue: filters.filter_venue,
+          team_class: filters.team_class,
+          series_type: seriesType,
+        })
+      : Promise.resolve(null),
+    [
+      showDerivedSeason, pathTeam, pathPlayer,
+      filters.gender, filters.team_type, filters.tournament,
+      filters.filter_team, filters.filter_opponent, filters.filter_venue,
+      filters.team_class, seriesType,
+    ],
+  )
+  const derivedSeasonRange: string | null = (() => {
+    if (!showDerivedSeason) return null
+    const seasons = seasonsFetch.data?.seasons ?? []
+    if (seasons.length === 0) return null
+    const first = seasons[0]
+    const last = seasons[seasons.length - 1]
+    return first === last ? first : `${first}–${last}`
+  })()
 
   const segments = buildSegments(
     filters, pathTeam, pathVenue, pathPlayer, pathCompare, tab, page,
+    derivedSeasonRange,
   )
 
   const handleCopy = async () => {
@@ -189,6 +246,16 @@ export default function ScopeStatusStrip() {
                 <span className="wisden-scope-strip-segLabel">{s.label}:</span>
                 {' '}
                 <span className="wisden-scope-strip-segValue">{s.value}</span>
+                {s.derivedSuffix && (
+                  <>
+                    {' '}
+                    <span style={{
+                      fontFamily: 'var(--serif)',
+                      fontStyle: 'italic',
+                      color: 'var(--ink-faint)',
+                    }}>{s.derivedSuffix}</span>
+                  </>
+                )}
               </>
             )}
           </span>

@@ -1458,6 +1458,69 @@ So Kohli on `?tournament=Indian Premier League&season_to=2016`
 gets `(0 in 1y+)` because the scope's data ends in 2016, even
 though Kohli has been active since.
 
+## Status bar computes the "all-time" season range — URL stays clean
+
+When a user lands on a subject page (`?player=X` or `?team=X`)
+with **no** season filter set, the `ScopeStatusStrip` "Showing:"
+bar derives and displays the subject's implicit season range —
+e.g. `Season: 2005/06–2021 (all-time)` for AB de Villiers — so
+the reader can see what "all-time" means for THIS subject in
+THIS scope. The URL stays clean (no `season_from` / `season_to`
+params auto-mutated onto it).
+
+**Why URL-clean rather than URL-mutating.** An earlier auto-default
+(`useDefaultSeasonWindow`, shipped 2026-04-15 / removed
+2026-04-20) silently wrote `season_from` + `season_to` to the URL
+on Batting/Bowling/Fielding landings to pin them at "last 3
+seasons." User flagged: "I changed my mind — the landings now
+open all-time by default rather than **silently** pinning"
+(commit 700d11b). The keyword was *silently* — the underlying
+value (visible recent default) wasn't the problem, the URL
+mutation was. Users were sharing links and seeing season params
+they hadn't picked appear in the URL bar.
+
+The current rule keeps that lesson: the URL is a faithful record
+of what the user has explicitly chosen. Computed/derived values
+display in the status bar — visibly marked as derived (the
+italic `(all-time)` suffix) — without writing back to the URL.
+Sharing the link sends a clean URL; the recipient's status bar
+re-derives the same display from their own seasons fetch.
+
+**Visibility gate.** Only fires when:
+- `season_from` AND `season_to` are both absent (user hasn't
+  picked a range), AND
+- The URL has a subject path-param (`player` OR `team`) — on a
+  landing without a subject, the derived range would be the
+  dataset's full span (e.g. 2004/05–2026), which is not useful
+  context.
+
+**Visual contract.** A regular `Season:` segment in the strip:
+- User-picked: `Season: 2018` or `Season: 2018–2020` (existing).
+- Derived: `Season: 2005/06–2021 (all-time)` — same `Season:`
+  prefix, same value font, with a faint italic `(all-time)`
+  suffix that signals "computed, not picked."
+- Single-season subject: `Season: 2016 (all-time)` (e.g. a
+  player whose entire career fits in one season tag).
+
+**Source of truth.** The strip fetches `/api/v1/seasons` with
+the same scope params FilterBar uses (gender / team_type /
+tournament / venue / rivalry pair / series_type / page-team /
+page-player). The seasons fetch is player-aware (per the
+2026-05-07 enhancement) — so a retired player's derived range
+ends at their last season, not 2026.
+
+**Page header (`ScopedPageHeader`) does NOT show the derived
+range.** Page header is terse (subject name + flag +
+abbreviated scope); status bar is the verbose / derived layer.
+Keeping them at different verbosity levels prevents redundant
+display.
+
+**Companion to the dormancy badge.** Dormancy answers "how stale
+is this data?" while the derived range answers "what's the
+implicit time scope?" Both render in the status bar; both are
+about making implicit information explicit without polluting
+the URL.
+
 ## Regression runner: REG→NEW flip lands BEFORE the shape change
 
 `./tests/regression/run.sh <feature>` classifies each URL diff using
