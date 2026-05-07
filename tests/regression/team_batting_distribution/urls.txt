@@ -1,0 +1,47 @@
+# Team-batting distribution dossier — endpoint inventory.
+#
+# Subjects (4 marquee teams × scopes per spec §16.6):
+#   Mumbai Indians       (IPL franchise — busiest single-team scope)
+#   Chennai Super Kings  (sibling IPL franchise — different home venue)
+#   India                (men's international — multi-tournament arc)
+#   Australia            (men's international — bilateral + ICC events)
+#
+# `as_of_date` is pinned on every URL so calendar form windows
+# (last_60d / last_6mo / last_1yr) are deterministic across runs.
+# Production callers omit it; the regression harness pins it
+# because md5-diff requires byte-stability.
+#
+# `FilterParams.filter_team` is IGNORED on these endpoints — the
+# team path-param dominates. So no `filter_team=` here; the team
+# is always in the path. `filter_opponent`, `filter_venue`, and
+# every other axis apply normally.
+#
+# All REG — documents current behaviour of the v1 endpoint.
+
+# ── Mumbai Indians (marquee IPL franchise) ───────────────────────
+REG dist_mi_all_time              /api/v1/teams/Mumbai%20Indians/batting/distribution?as_of_date=2025-01-01
+REG dist_mi_ipl                   /api/v1/teams/Mumbai%20Indians/batting/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
+REG dist_mi_ipl_2024              /api/v1/teams/Mumbai%20Indians/batting/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
+REG dist_mi_ipl_2023              /api/v1/teams/Mumbai%20Indians/batting/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2023&season_to=2023&as_of_date=2025-01-01
+REG dist_mi_vs_csk_ipl            /api/v1/teams/Mumbai%20Indians/batting/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_opponent=Chennai%20Super%20Kings&as_of_date=2025-01-01
+REG dist_mi_at_wankhede           /api/v1/teams/Mumbai%20Indians/batting/distribution?filter_venue=Wankhede%20Stadium%2C%20Mumbai&as_of_date=2025-01-01
+
+# ── Chennai Super Kings (sibling franchise) ──────────────────────
+REG dist_csk_all_time             /api/v1/teams/Chennai%20Super%20Kings/batting/distribution?as_of_date=2025-01-01
+REG dist_csk_ipl_2023             /api/v1/teams/Chennai%20Super%20Kings/batting/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2023&season_to=2023&as_of_date=2025-01-01
+
+# ── India men (international marquee) ────────────────────────────
+REG dist_ind_men_all_time         /api/v1/teams/India/batting/distribution?gender=male&team_type=international&as_of_date=2025-01-01
+REG dist_ind_vs_pak_men           /api/v1/teams/India/batting/distribution?gender=male&team_type=international&filter_opponent=Pakistan&as_of_date=2025-01-01
+REG dist_ind_men_2024             /api/v1/teams/India/batting/distribution?gender=male&team_type=international&season_from=2024&season_to=2024&as_of_date=2025-01-01
+
+# ── Australia men ────────────────────────────────────────────────
+REG dist_aus_men_all_time         /api/v1/teams/Australia/batting/distribution?gender=male&team_type=international&as_of_date=2025-01-01
+REG dist_aus_vs_ind_men           /api/v1/teams/Australia/batting/distribution?gender=male&team_type=international&filter_opponent=India&as_of_date=2025-01-01
+
+# ── inning-aux narrowing (page-local AuxParam) ───────────────────
+REG dist_mi_ipl_inning0           /api/v1/teams/Mumbai%20Indians/batting/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=0&as_of_date=2025-01-01
+REG dist_mi_ipl_inning1           /api/v1/teams/Mumbai%20Indians/batting/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=1&as_of_date=2025-01-01
+
+# ── empty scope (no matches) — regression marker for empty handling
+REG dist_mi_at_nonexistent_venue  /api/v1/teams/Mumbai%20Indians/batting/distribution?filter_venue=Nonexistent%20Ground&as_of_date=2025-01-01
