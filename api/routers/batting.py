@@ -13,6 +13,7 @@ from ..aux_clauses import splice_aux_join_clauses
 from ..player_nationality import player_nationalities
 from ..scope_links import suggested_splits, scope_dict_from_filters
 from ..wilson import prob_record
+from ..form_windows import scope_anchor
 
 router = APIRouter(prefix="/api/v1/batters", tags=["Batting"])
 
@@ -1149,16 +1150,18 @@ def _form_windows(observations: list[dict], today: date) -> dict:
     delta block comparing each window's mean / median to the
     full-scope sample. Spec §8.6.
 
-    Window definitions:
+    Window definitions (anchor = min(today, max_obs_date), revised
+    2026-05-07):
       - last_10:   ORDER BY date DESC LIMIT 10 (no calendar dependence).
-      - last_60d:  match.date >= today − 60 days (recent form).
-      - last_6mo:  match.date >= today − 180 days (medium-term arc).
-      - last_1yr:  match.date >= today − 365 days (loss-of-form gauge).
+      - last_60d:  match.date >= anchor − 60 days (recent form).
+      - last_6mo:  match.date >= anchor − 180 days (medium-term arc).
+      - last_1yr:  match.date >= anchor − 365 days (loss-of-form gauge).
     """
+    anchor = scope_anchor(observations, today)
     last_10 = observations[-10:]
-    cutoff_60d = (today - timedelta(days=60)).isoformat()
-    cutoff_6mo = (today - timedelta(days=180)).isoformat()
-    cutoff_1yr = (today - timedelta(days=365)).isoformat()
+    cutoff_60d = (anchor - timedelta(days=60)).isoformat()
+    cutoff_6mo = (anchor - timedelta(days=180)).isoformat()
+    cutoff_1yr = (anchor - timedelta(days=365)).isoformat()
     last_60d = [o for o in observations if (o["date"] or "") >= cutoff_60d]
     last_6mo = [o for o in observations if (o["date"] or "") >= cutoff_6mo]
     last_1yr = [o for o in observations if (o["date"] or "") >= cutoff_1yr]

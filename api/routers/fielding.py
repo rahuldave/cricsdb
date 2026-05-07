@@ -13,6 +13,7 @@ from ..aux_clauses import splice_aux_join_clauses
 from ..player_nationality import player_nationalities
 from ..scope_links import suggested_splits, scope_dict_from_filters
 from ..wilson import prob_record
+from ..form_windows import scope_anchor
 
 router = APIRouter(prefix="/api/v1/fielders", tags=["Fielding"])
 
@@ -801,10 +802,11 @@ def _form_windows_fielder(
     per window. The dossier-level scalar is the authoritative number;
     form-window values are informational only.
     """
+    anchor = scope_anchor(observations, today)
     last_10 = observations[-10:]
-    cutoff_60d = (today - timedelta(days=60)).isoformat()
-    cutoff_6mo = (today - timedelta(days=180)).isoformat()
-    cutoff_1yr = (today - timedelta(days=365)).isoformat()
+    cutoff_60d = (anchor - timedelta(days=60)).isoformat()
+    cutoff_6mo = (anchor - timedelta(days=180)).isoformat()
+    cutoff_1yr = (anchor - timedelta(days=365)).isoformat()
     last_60d = [o for o in observations if (o["date"] or "") >= cutoff_60d]
     last_6mo = [o for o in observations if (o["date"] or "") >= cutoff_6mo]
     last_1yr = [o for o in observations if (o["date"] or "") >= cutoff_1yr]
