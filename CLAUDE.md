@@ -382,3 +382,101 @@ their backs.
 User feedback that drove this rule (2026-04-27): "shouldn't a grid
 not have this problem?" — yes. If the answer to that question is
 "in principle yes but I took a shortcut," refactor.
+
+## Distribution-panel color discipline (3-tier palette)
+
+**One semantic 3-tier palette is shared across histograms,
+sparklines, AND probability chips on every distribution panel.**
+Never let chip colors drift from the histogram tier color of the
+same threshold — that "the chip is green but the bar at this
+value is gray" inconsistency is what the user flagged twice on
+2026-05-06 ("the colors of the pills did not change in response
+to our color changes" / "Why is the color co-ordination off?").
+
+The three semantic tiers (`frontend/src/components/charts/palette.ts`):
+- **INDIGO** `#7090A8` — poor outcome for the player
+- **SAGE**   `#7A8E6A` — typical
+- **OCHRE**  `WISDEN.ochre` — really good ("hot")
+
+**Polarity convention** — color is tied to OUTCOME for the player,
+not bin index:
+- Higher-is-better metrics (runs, wickets, SR): low→indigo,
+  mid→sage, high→ochre.
+- Lower-is-better metrics (economy, runs conceded): low→ochre,
+  mid→sage, high→indigo (polarity flipped — low econ is good).
+
+**Chip-tint helper:** `WISDEN_TIER_TINTS` exports `{indigo, sage,
+ochre}` → `{bg: rgba, fg: hex}` pairs. The `ProbChip` component
+takes a `tint` prop directly (not a `polarity`); each chip caller
+picks the tier its threshold falls in. So `<ProbChip
+tint={T_OCHRE} ...>` for `P(≥3)` on the wickets tab matches the
+strike-tier histogram bar at value 3.
+
+**Reds are reserved for the rolling-mean overlay (oxbow)** —
+NEVER used in tier coloring. The "failure"/"wicketless" tier was
+flipped from muted red to muted indigo on 2026-05-06 so red
+exclusively signals the rolling overlay.
+
+**Sparkline visual contract** (codified
+`frontend/src/components/distribution/DistributionSparkline.tsx`):
+- Bar opacity 0.8 (blue/indigo tier overrides to 1.0 — washes
+  out worst at 0.8); per-bar `opacity` field on `SparklinePoint`.
+- Reference lines: black scope-baseline (2px) + gray gender-global
+  (1.5px) + red rolling-10 mean (1.2px) on the Scope window only.
+- Below-baseline 4px stub zone — every bar (including value=0)
+  has a clickable footprint; the user-flagged "missing matches"
+  bug was zero-height bars vanishing.
+- Mobile (< 720px): bar `<a>`s get `pointer-events: none` —
+  sparkline is impressionistic only; navigation via the season-
+  tick axis context + the page's existing By Innings tab.
+
+Spec: `internal_docs/spec-distribution-stats.md` §10.3 +
+§12.2.6.
+
+## FilterBar cascade-clear rule (auto-correct loops)
+
+**When the user clears a coupled filter (gender / team_type),
+also clear any dependent narrowing (tournament).** The FilterBar
+runs auto-correct deep-link effects that fill missing fields from
+a tournament's metadata (e.g. tournament=IPL → team_type=club).
+If the user then clears team_type back to "All" but tournament
+stays, the auto-correct re-asserts team_type=club from the
+tournament. "Spring-back" UX bug — flagged 2026-05-06.
+
+The fix in `setGender` / `setTeamType`: cascade-clear the
+dependent tournament when v is empty OR mismatched. Pattern:
+```ts
+if (t && (!v || t.team_type !== v)) updates.tournament = ''
+```
+NOT `if (t && v && t.team_type !== v)` — the `&& v &&`
+short-circuits on the user's "clear" click.
+
+**When adding a NEW auto-correct deep-link effect:** make sure
+the user-clearing path on every filter that participates also
+cascade-clears the inferred narrowings — otherwise the auto-
+correct loop fights the user. Test coverage:
+`tests/integration/filterbar_cascade_clear.sh`.
+
+## Sparkline / per-item chart bar count must match SQL
+
+**Any chart rendering one bar per (innings / spell / match /
+event) MUST have an integration assertion that the rendered bar
+count equals the SQL-anchored item count.** The user-flagged
+"missing matches" bug on 2026-05-06 was 15 wicketless spells
+rendering with `height=0` → invisible AND unclickable; SQL said
+45 spells, the user counted ~30 visible bars.
+
+Pattern (see `tests/integration/bowler_distribution.sh` Test 1
++ `batter_distribution.sh` Test 8):
+```bash
+sql_n=$(sql "$INNS_SQL")
+dom_n=$(ab_eval "document.querySelectorAll('.wisden-dist-sparkline rect[opacity]').length")
+assert_eq "Bar count == SQL n_innings" "$sql_n" "$dom_n"
+
+zero_h=$(ab_eval "Array.from(...).filter(r => parseFloat(r.getAttribute('height')) <= 0).length")
+assert_eq "No height=0 bars (would be invisible)" "0" "$zero_h"
+```
+
+The class of bug this catches: any per-item chart where some
+items render at zero size (height/width/area) and silently vanish
+from the DOM-visible count even though they exist in the data.

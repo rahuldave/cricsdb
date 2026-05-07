@@ -264,8 +264,40 @@ frontend/src/
     charts/                    — BarChart, LineChart, ScatterChart, DonutChart wrappers (responsive),
                                    HeatmapChart, BubbleMatrix,
                                    WormChart, ManhattanChart, InningsGridChart, MatchupGridChart.
-                                   palette.ts: WISDEN_PALETTE / WISDEN_PHASES / WISDEN_RUN_TIERS
-                                   (per-innings runs histogram tier colors).
+                                   palette.ts: WISDEN_PALETTE / WISDEN_PHASES; the unified
+                                   3-tier distribution palette WISDEN_RUN_TIERS /
+                                   WISDEN_WICKET_TIERS / WISDEN_SR_TIERS / WISDEN_LOWER_TIERS
+                                   (all share indigo/sage/ochre — see CLAUDE.md
+                                   "Distribution-panel color discipline"); WISDEN_TIER_TINTS
+                                   chip-tint pairs + tintForTierColor() lookup.
+    distribution/              — Shared primitives across batter + bowler Distribution panels
+                                   (lifted 2026-05-06 from components/bowling/ when batter
+                                   adopted the same sparkline). Spec
+                                   internal_docs/spec-distribution-stats.md §10 + §12.2.6:
+                                   DistributionSparkline       generic per-innings sparkline; takes
+                                                                 SparklinePoint[] (caller maps obs to
+                                                                 {date, matchId, value, tooltip,
+                                                                 color, opacity}); dual reference lines
+                                                                 (black scope + gray gender-global) +
+                                                                 oxbow rolling-mean overlay; below-
+                                                                 baseline 4px stub for value=0
+                                                                 clickability; mobile pointer-events:
+                                                                 none via @media (max-width: 720px)
+                                   SeasonTickAxis              HTML axis (NOT inside SVG) below the
+                                                                 sparkline; absolute-positioned
+                                                                 2-digit year ticks ('14, '24) at
+                                                                 percentage offsets of each year's
+                                                                 first observation
+                                   globalBaselines.ts          gender-tiered league anchors. Bowling:
+                                                                 wickets/runs/RPO per spell. Batting:
+                                                                 runs/SR per innings. Whole-number
+                                                                 constants from cricket.db (refresh
+                                                                 query in commit 91eaaad / 1036e9c)
+                                   ProbChip                    shared probability chip; takes a
+                                                                 `tint: {bg, fg}` from
+                                                                 WISDEN_TIER_TINTS — chip color
+                                                                 matches the histogram tier of its
+                                                                 threshold (revised 2026-05-06)
     batting/                   — Batter Distribution panel (spec-distribution-stats.md §9):
                                    BatterDistributionPanel    top-level orchestrator on /batting?player=X,
                                                                  mounted between stat row 1 (Avg) and
