@@ -40,6 +40,14 @@ export default function FilterBar() {
   const teamForFetch = pathTeam || filterTeam
   const opponentForFetch = pathTeam ? undefined : filterOpponent
   const seriesType = params.get('series_type') || undefined
+  // Page-context player (set on /batting?player=X etc.). Forwarded to
+  // /api/v1/seasons so the From/To dropdown options + the
+  // first-3 / prev-3 / last-3 / latest quick-select buttons all
+  // narrow to the player's actual career-in-scope. Fixes the
+  // retired-player gap (e.g. clicking last-3 on AB de Villiers no
+  // longer sets the filter to seasons he didn't play). Compare-tab
+  // callers don't pass player and stay team-anchored.
+  const playerForFetch = params.get('player') || undefined
   // Scope signature — every field that affects what /tournaments
   // returns. Compared against `fetchedScope` below for synchronous
   // staleness detection.
@@ -72,6 +80,7 @@ export default function FilterBar() {
       ...filters,
       team: teamForFetch,
       series_type: seriesType,
+      player: playerForFetch,
     })
       .then(d => { setSeasons(d.seasons); setSeasonsError(false) })
       .catch(err => {
@@ -79,7 +88,7 @@ export default function FilterBar() {
         setSeasonsError(true)
       })
   }, [
-    teamForFetch, seriesType,
+    teamForFetch, seriesType, playerForFetch,
     filters.gender, filters.team_type, filters.tournament,
     filters.filter_team, filters.filter_opponent, filters.filter_venue,
   ])
@@ -223,11 +232,24 @@ export default function FilterBar() {
     // via the seasons-fetch effect above.
     setUrlParams({ season_from: latestInScope, season_to: latestInScope })
   }
+  const setFirstN = (n: number) => {
+    // Scope-aware first-N — first N entries of the seasons list.
+    // Player-aware on player pages: the seasons list is narrowed
+    // to the player's career-in-scope, so first-3 reflects each
+    // player's debut arc rather than the dataset's earliest seasons.
+    if (seasons.length < n) return
+    const first = seasons.slice(0, n)
+    const from = first[0]
+    const to = first[first.length - 1]
+    setUrlParams({ season_from: from, season_to: to })
+  }
   const setLastN = (n: number) => {
     if (seasons.length === 0) return
     // Scope-aware last-N — seasons list is already narrowed by
     // gender/team_type/tournament via the seasons-fetch effect. Takes
     // the last N entries (API returns chronological ascending).
+    // Player-aware (2026-05-07): for retired players the list ends at
+    // their last season, so this no longer gives empty pages.
     const latest = seasons.slice(-n)
     const from = latest[0]
     const to = latest[latest.length - 1]
@@ -383,6 +405,12 @@ export default function FilterBar() {
             <option value="">{seasonsError ? '⚠' : 'To'}</option>
             {seasons.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
+          {seasons.length >= 3 && (
+            <button type="button" onClick={() => setFirstN(3)} className="wisden-reset"
+              title={`First 3 seasons in scope (${seasons.slice(0, 3).join(', ')})${playerForFetch ? " — the player's earliest seasons" : ''}`}>
+              first-3
+            </button>
+          )}
           <button type="button" onClick={clearSeasons} className="wisden-reset"
             title="Clear season range — show all-time">
             all-time

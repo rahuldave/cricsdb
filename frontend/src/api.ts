@@ -43,11 +43,24 @@ type ReferenceCtx = F & {
   team?: string
   opponent?: string
   series_type?: string
+  /** Frontend URL convention: `?player=<id>`. /api/v1/seasons accepts
+   *  this as `person_id`; the wrapper below renames before send so
+   *  callers don't need to know the backend convention. Player-aware
+   *  seasons fix the retired-player gap on first-3 / last-3 buttons —
+   *  see internal_docs/design-decisions.md "FilterBar season-window
+   *  quick-select buttons". */
+  player?: string
 }
 export const getTournaments = (ctx?: ReferenceCtx) =>
   fetchApi<{ tournaments: Tournament[] }>('/api/v1/tournaments', ctx as Record<string, string>)
-export const getSeasons = (ctx?: ReferenceCtx) =>
-  fetchApi<{ seasons: string[] }>('/api/v1/seasons', ctx as Record<string, string>)
+export const getSeasons = (ctx?: ReferenceCtx) => {
+  // Translate frontend `player` → backend `person_id`. Strip the
+  // frontend-side key so it doesn't double-up in the query string.
+  if (!ctx) return fetchApi<{ seasons: string[] }>('/api/v1/seasons')
+  const { player, ...rest } = ctx
+  const sendCtx = player ? { ...rest, person_id: player } : rest
+  return fetchApi<{ seasons: string[] }>('/api/v1/seasons', sendCtx as Record<string, string>)
+}
 export const getTeams = (filters?: F & { q?: string }) =>
   fetchApi<{ teams: TeamInfo[] }>('/api/v1/teams', filters as Record<string, string>)
 export const searchPlayers = (
