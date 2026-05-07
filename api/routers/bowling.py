@@ -1340,6 +1340,11 @@ async def bowling_distribution(
     lifetime = _distribution_dossier_bowler(observations)
     form = _form_windows_bowler(observations, today)
 
+    # last_match_date — drives the frontend dormancy badge.
+    # Spec §11 + design-decisions.md "Dormancy badge".
+    obs_dates = [o["date"] for o in observations if o.get("date")]
+    lifetime["last_match_date"] = max(obs_dates) if obs_dates else None
+
     scope = scope_dict_from_filters(filters)
     splits = suggested_splits(scope)
 

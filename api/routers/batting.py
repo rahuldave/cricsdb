@@ -1228,6 +1228,13 @@ async def batting_distribution(
     lifetime = _distribution_dossier(observations)
     form = _form_windows(observations, today)
 
+    # last_match_date — the scope's max observation date. Drives the
+    # frontend dormancy badge (`(0 in 60d)` etc.) when the gap from
+    # today exceeds the threshold. Spec §8 + design-decisions.md
+    # "Dormancy badge".
+    obs_dates = [o["date"] for o in observations if o.get("date")]
+    lifetime["last_match_date"] = max(obs_dates) if obs_dates else None
+
     scope = scope_dict_from_filters(filters)
     splits = suggested_splits(scope)
 

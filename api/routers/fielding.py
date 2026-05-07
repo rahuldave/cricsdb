@@ -897,6 +897,11 @@ async def fielding_distribution(
     lifetime = _distribution_dossier_fielder(observations, substitute_catches)
     form = _form_windows_fielder(observations, substitute_catches, today)
 
+    # last_match_date — drives the frontend dormancy badge.
+    # Spec §13 + design-decisions.md "Dormancy badge".
+    obs_dates = [o["date"] for o in observations if o.get("date")]
+    lifetime["last_match_date"] = max(obs_dates) if obs_dates else None
+
     scope = scope_dict_from_filters(filters)
     splits = suggested_splits(scope)
 
