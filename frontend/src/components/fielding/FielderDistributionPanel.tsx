@@ -111,15 +111,16 @@ export default function FielderDistributionPanel({
     return WINDOW_OPTIONS.find(o => o.key === w)?.label ?? 'this window'
   }
 
-  // Sparkline reference line: y=1 for catches/run_outs (the "did
-  // anything happen this match?" anchor); player's mean for stumpings
-  // (informative for keepers).
+  // Sparkline reference line: y=1 for catches/run_outs (the
+  // "did at least one happen this match?" anchor — bars at or
+  // above the line are 1+, bars below are zero stubs); player's
+  // mean for stumpings (keepers' means carry information).
   const lifetimeStumpings = distribution.lifetime.stumpings
   function sparklineRef(): { player: number | null; global: number | null } {
     if (metric === 'stumpings') {
       return { player: lifetimeStumpings?.mean_per_match ?? null, global: null }
     }
-    return { player: null, global: 1 }  // y=1 reference
+    return { player: null, global: 1 }
   }
 
   function sparklinePoint(o: FielderObservation): SparklinePoint {
@@ -258,20 +259,26 @@ export default function FielderDistributionPanel({
                       columnGap: '0.85rem', rowGap: '0.15rem', flexWrap: 'wrap',
                     }}>
                       {metric === 'stumpings' && refs.player !== null ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <span>
                           <span aria-hidden="true" style={{
                             display: 'inline-block', width: 14, height: 2,
                             background: '#1A1714',
+                            verticalAlign: 'middle',
+                            marginRight: '0.3rem',
+                            position: 'relative', top: '-0.1em',
                           }} />
                           mean {refs.player.toFixed(2)}/match
                         </span>
                       ) : (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <span>
                           <span aria-hidden="true" style={{
                             display: 'inline-block', width: 14, height: 1.5,
                             background: '#8A7D70',
+                            verticalAlign: 'middle',
+                            marginRight: '0.3rem',
+                            position: 'relative', top: '-0.1em',
                           }} />
-                          y=1 reference
+                          1 {metric === 'run_outs' ? 'run-out' : 'catch'} line
                         </span>
                       )}
                     </span>
