@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import statistics
+from datetime import date, timedelta
 from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams, _is_set
+from ..form_windows import scope_anchor
 from ..full_members import ICC_FULL_MEMBERS
 from ..metrics_metadata import wrap_metric
+from ..scope_links import scope_dict_from_filters, suggested_splits
 from ..tournament_canonical import series_type as series_type_for, canonicalize
+from ..wilson import prob_record
 
 router = APIRouter(prefix="/api/v1/teams", tags=["Teams"])
 
@@ -1668,6 +1673,380 @@ async def team_batting_summary(
     aux: AuxParams = Depends(),
 ):
     return await _compute_batting_summary(team, filters, aux)
+
+
+# ============================================================
+# Team batting — distribution dossier (spec §16.2).
+# Per-innings observation row + two sibling blocks (runs +
+# run_rate) + phase rollup + four form windows. Reuses
+# `_team_innings_clause` (side='batting') for filter scope.
+# `FilterParams.filter_team` is IGNORED — the path-param
+# dominates per spec §16.1.
+# ============================================================
+
+
+async def _innings_master_sample_team_batting(
+    team: str, filters: FilterParams, aux: AuxParams,
+) -> list[dict]:
+    """Per-innings observation rows for the team's batting innings
+    (`i.team = :team`), under the active filter scope. Spec §16.2.1.
+
+    Wickets exclude `'retired hurt'` and `'retired not out'` —
+    matches the existing team-batting/by-phase convention so
+    wickets-fallen here is consistent with `wickets_lost` elsewhere
+    in the team-batting endpoints.
+    """
+    db = get_db()
+    where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
+    rows = await db.q(
+        f"""
+        SELECT
+            i.id AS innings_id,
+            i.match_id,
+            i.innings_number,
+            (SELECT md.date FROM matchdate md WHERE md.match_id = i.match_id
+             ORDER BY md.date LIMIT 1) AS date,
+            SUM(d.runs_total) AS runs,
+            SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
+                     THEN 1 ELSE 0 END) AS balls,
+            SUM(CASE WHEN w.id IS NOT NULL THEN 1 ELSE 0 END) AS wickets,
+            SUM(CASE WHEN d.over_number BETWEEN 0 AND 9
+                     THEN d.runs_total ELSE 0 END) AS runs_at_10,
+            SUM(CASE WHEN d.over_number BETWEEN 0 AND 9 AND w.id IS NOT NULL
+                     THEN 1 ELSE 0 END) AS wickets_at_10,
+            SUM(CASE WHEN d.over_number BETWEEN 0 AND 9
+                     AND d.extras_wides = 0 AND d.extras_noballs = 0
+                     THEN 1 ELSE 0 END) AS legal_balls_first_10,
+            -- Phase: powerplay (overs 1-6, over_number 0-5)
+            SUM(CASE WHEN d.over_number BETWEEN 0 AND 5
+                     THEN d.runs_total ELSE 0 END) AS runs_pp,
+            SUM(CASE WHEN d.over_number BETWEEN 0 AND 5
+                     AND d.extras_wides = 0 AND d.extras_noballs = 0
+                     THEN 1 ELSE 0 END) AS balls_pp,
+            SUM(CASE WHEN d.over_number BETWEEN 0 AND 5 AND w.id IS NOT NULL
+                     THEN 1 ELSE 0 END) AS wickets_pp,
+            -- Phase: middle (overs 7-15, over_number 6-14)
+            SUM(CASE WHEN d.over_number BETWEEN 6 AND 14
+                     THEN d.runs_total ELSE 0 END) AS runs_mid,
+            SUM(CASE WHEN d.over_number BETWEEN 6 AND 14
+                     AND d.extras_wides = 0 AND d.extras_noballs = 0
+                     THEN 1 ELSE 0 END) AS balls_mid,
+            SUM(CASE WHEN d.over_number BETWEEN 6 AND 14 AND w.id IS NOT NULL
+                     THEN 1 ELSE 0 END) AS wickets_mid,
+            -- Phase: death (overs 16-20, over_number 15-19)
+            SUM(CASE WHEN d.over_number BETWEEN 15 AND 19
+                     THEN d.runs_total ELSE 0 END) AS runs_death,
+            SUM(CASE WHEN d.over_number BETWEEN 15 AND 19
+                     AND d.extras_wides = 0 AND d.extras_noballs = 0
+                     THEN 1 ELSE 0 END) AS balls_death,
+            SUM(CASE WHEN d.over_number BETWEEN 15 AND 19 AND w.id IS NOT NULL
+                     THEN 1 ELSE 0 END) AS wickets_death
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        LEFT JOIN wicket w ON w.delivery_id = d.id
+            AND w.kind NOT IN ('retired hurt', 'retired not out')
+        WHERE {where}
+        GROUP BY i.id
+        ORDER BY date ASC, i.innings_number ASC
+        """,
+        params,
+    )
+    out = []
+    for r in rows:
+        legal_first_10 = r["legal_balls_first_10"] or 0
+        out.append({
+            "innings_id": r["innings_id"],
+            "match_id": r["match_id"],
+            "innings_number": r["innings_number"],
+            "date": r["date"],
+            "runs": r["runs"] or 0,
+            "balls": r["balls"] or 0,
+            "wickets": r["wickets"] or 0,
+            "runs_at_10": r["runs_at_10"] or 0,
+            "wickets_at_10": r["wickets_at_10"] or 0,
+            "reached_10_overs": 1 if legal_first_10 >= 60 else 0,
+            "runs_pp": r["runs_pp"] or 0,
+            "balls_pp": r["balls_pp"] or 0,
+            "wickets_pp": r["wickets_pp"] or 0,
+            "runs_mid": r["runs_mid"] or 0,
+            "balls_mid": r["balls_mid"] or 0,
+            "wickets_mid": r["wickets_mid"] or 0,
+            "runs_death": r["runs_death"] or 0,
+            "balls_death": r["balls_death"] or 0,
+            "wickets_death": r["wickets_death"] or 0,
+        })
+    return out
+
+
+def _runs_block_team_batting(observations: list[dict]) -> dict:
+    """`runs` block — skewed continuous + simples + chain-ladder
+    conditionals + over-aware doubling. Spec §16.2.2."""
+    n = len(observations)
+    runs = [o["runs"] for o in observations]
+
+    if n == 0:
+        keys = [
+            "p_lt_100", "p_geq_100", "p_geq_150", "p_geq_200", "p_geq_230",
+            "p_150_given_100", "p_200_given_150", "p_230_given_200",
+            "p_double_at_10",
+        ]
+        return {
+            "total": 0,
+            "mean_per_innings": None,
+            "median": None,
+            "variance": None,
+            "std": None,
+            "escalation_ratio_median": None,
+            "observations": [],
+            "milestones": {k: prob_record(0, 0) for k in keys},
+        }
+
+    total = sum(runs)
+    mean = total / n
+    median = statistics.median(runs)
+    variance = statistics.variance(runs) if n >= 2 else 0.0
+    std = variance ** 0.5
+
+    def _count_lt(v: int) -> int:
+        return sum(1 for r in runs if r < v)
+
+    def _count_geq(v: int) -> int:
+        return sum(1 for r in runs if r >= v)
+
+    geq_100 = _count_geq(100)
+    geq_150 = _count_geq(150)
+    geq_200 = _count_geq(200)
+    geq_230 = _count_geq(230)
+
+    # Over-aware doubling — denom is innings with `reached_10_overs=1
+    # AND runs_at_10 > 0` (avoids 0/0 when team is 0 at halfway).
+    doubling_pool = [
+        o for o in observations
+        if o["reached_10_overs"] == 1 and o["runs_at_10"] > 0
+    ]
+    doubling_denom = len(doubling_pool)
+    doubling_num = sum(
+        1 for o in doubling_pool
+        if o["runs"] >= 2 * o["runs_at_10"]
+    )
+    ratios = [o["runs"] / o["runs_at_10"] for o in doubling_pool]
+    escalation_median = round(statistics.median(ratios), 4) if ratios else None
+
+    return {
+        "total": total,
+        "mean_per_innings": round(mean, 4),
+        "median": median,
+        "variance": round(variance, 4),
+        "std": round(std, 4),
+        "escalation_ratio_median": escalation_median,
+        "observations": observations,
+        "milestones": {
+            "p_lt_100":  prob_record(_count_lt(100), n),
+            "p_geq_100": prob_record(geq_100, n),
+            "p_geq_150": prob_record(geq_150, n),
+            "p_geq_200": prob_record(geq_200, n),
+            "p_geq_230": prob_record(geq_230, n),
+            # Chain ladder — each rung's denom is the rung below.
+            "p_150_given_100": prob_record(geq_150, geq_100),
+            "p_200_given_150": prob_record(geq_200, geq_150),
+            "p_230_given_200": prob_record(geq_230, geq_200),
+            # Over-aware doubling.
+            "p_double_at_10": prob_record(doubling_num, doubling_denom),
+        },
+    }
+
+
+def _run_rate_block_team_batting(observations: list[dict]) -> dict:
+    """`run_rate` block — continuous per-over rate distribution. Both
+    `pool` (balls-weighted, the conventional career RR) and
+    `mean_per_innings` (unweighted mean of per-innings RR) ship.
+    Spec §16.2.2."""
+    n = len(observations)
+
+    if n == 0:
+        keys = ["p_rr_leq_7", "p_rr_leq_8", "p_rr_geq_9", "p_rr_geq_10"]
+        return {
+            "pool": None,
+            "mean_per_innings": None,
+            "median_per_innings": None,
+            "variance": None,
+            "std": None,
+            "per_innings": [],
+            "milestones": {k: prob_record(0, 0) for k in keys},
+        }
+
+    total_runs = sum(o["runs"] for o in observations)
+    total_balls = sum(o["balls"] for o in observations)
+    pool = (total_runs * 6.0 / total_balls) if total_balls > 0 else None
+
+    per_innings = [round(o["runs"] * 6.0 / o["balls"], 4)
+                   for o in observations if o["balls"] > 0]
+    mean_pi = sum(per_innings) / len(per_innings) if per_innings else None
+    median_pi = statistics.median(per_innings) if per_innings else None
+    variance = statistics.variance(per_innings) if len(per_innings) >= 2 else 0.0
+    std = variance ** 0.5
+
+    def _count_leq(v: float) -> int:
+        return sum(1 for e in per_innings if e <= v)
+
+    def _count_geq(v: float) -> int:
+        return sum(1 for e in per_innings if e >= v)
+
+    return {
+        "pool": round(pool, 4) if pool is not None else None,
+        "mean_per_innings": round(mean_pi, 4) if mean_pi is not None else None,
+        "median_per_innings": round(median_pi, 4) if median_pi is not None else None,
+        "variance": round(variance, 4),
+        "std": round(std, 4),
+        "per_innings": per_innings,
+        "milestones": {
+            "p_rr_leq_7":  prob_record(_count_leq(7.0), n),
+            "p_rr_leq_8":  prob_record(_count_leq(8.0), n),
+            "p_rr_geq_9":  prob_record(_count_geq(9.0), n),
+            "p_rr_geq_10": prob_record(_count_geq(10.0), n),
+        },
+    }
+
+
+def _phase_rollup_team_batting(observations: list[dict]) -> dict:
+    """Per-phase rollup: runs + balls + wickets + innings_active.
+    Spec §16.2.3."""
+    out = {}
+    keys = {
+        "powerplay": ("runs_pp", "balls_pp", "wickets_pp"),
+        "middle":    ("runs_mid", "balls_mid", "wickets_mid"),
+        "death":     ("runs_death", "balls_death", "wickets_death"),
+    }
+    for name, (rk, bk, wk) in keys.items():
+        out[name] = {
+            "runs_total": sum(o[rk] for o in observations),
+            "balls_total": sum(o[bk] for o in observations),
+            "wickets_total": sum(o[wk] for o in observations),
+            "innings_active": sum(1 for o in observations if o[bk] > 0),
+        }
+    return out
+
+
+def _distribution_dossier_team_batting(observations: list[dict]) -> dict:
+    """Pure aggregate. Two sibling blocks (`runs` + `run_rate`) +
+    phase rollup. Same shape used for lifetime + form windows.
+    Spec §16.2."""
+    return {
+        "n_innings": len(observations),
+        "runs": _runs_block_team_batting(observations),
+        "run_rate": _run_rate_block_team_batting(observations),
+        "phase": _phase_rollup_team_batting(observations),
+    }
+
+
+def _form_windows_team_batting(
+    observations: list[dict], today: date,
+) -> dict:
+    """Slice the date-asc observation list into four form windows,
+    run the dossier on each, emit the team-batting delta block (8
+    entries: 4 windows × 2 metrics — runs_mean + run_rate_pool).
+    Calendar cutoffs scope-anchored per `form_windows.scope_anchor`.
+    Spec §16.2.4."""
+    anchor = scope_anchor(observations, today)
+    last_10 = observations[-10:]
+    cutoff_60d = (anchor - timedelta(days=60)).isoformat()
+    cutoff_6mo = (anchor - timedelta(days=180)).isoformat()
+    cutoff_1yr = (anchor - timedelta(days=365)).isoformat()
+    last_60d = [o for o in observations if (o["date"] or "") >= cutoff_60d]
+    last_6mo = [o for o in observations if (o["date"] or "") >= cutoff_6mo]
+    last_1yr = [o for o in observations if (o["date"] or "") >= cutoff_1yr]
+
+    lifetime_doss = _distribution_dossier_team_batting(observations)
+    last_10_doss = _distribution_dossier_team_batting(last_10)
+    last_60d_doss = _distribution_dossier_team_batting(last_60d)
+    last_6mo_doss = _distribution_dossier_team_batting(last_6mo)
+    last_1yr_doss = _distribution_dossier_team_batting(last_1yr)
+
+    def _delta_runs(w: dict) -> Optional[float]:
+        wv = w["runs"]["mean_per_innings"]
+        lv = lifetime_doss["runs"]["mean_per_innings"]
+        if wv is None or lv is None:
+            return None
+        return round(wv - lv, 4)
+
+    def _delta_rr(w: dict) -> Optional[float]:
+        wv = w["run_rate"]["pool"]
+        lv = lifetime_doss["run_rate"]["pool"]
+        if wv is None or lv is None:
+            return None
+        return round(wv - lv, 4)
+
+    return {
+        "last_10": last_10_doss,
+        "last_60d": last_60d_doss,
+        "last_6mo": last_6mo_doss,
+        "last_1yr": last_1yr_doss,
+        "delta": {
+            "last_10_runs_mean_minus_lifetime":      _delta_runs(last_10_doss),
+            "last_10_run_rate_pool_minus_lifetime":  _delta_rr(last_10_doss),
+            "last_60d_runs_mean_minus_lifetime":     _delta_runs(last_60d_doss),
+            "last_60d_run_rate_pool_minus_lifetime": _delta_rr(last_60d_doss),
+            "last_6mo_runs_mean_minus_lifetime":     _delta_runs(last_6mo_doss),
+            "last_6mo_run_rate_pool_minus_lifetime": _delta_rr(last_6mo_doss),
+            "last_1yr_runs_mean_minus_lifetime":     _delta_runs(last_1yr_doss),
+            "last_1yr_run_rate_pool_minus_lifetime": _delta_rr(last_1yr_doss),
+        },
+    }
+
+
+@router.get("/{team}/batting/distribution")
+async def team_batting_distribution(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    as_of_date: Optional[str] = Query(
+        None,
+        description=(
+            "ISO date (YYYY-MM-DD) to anchor the calendar form windows"
+            " (last_60d / last_6mo / last_1yr). Defaults to today;"
+            " pin for deterministic regression tests."
+        ),
+    ),
+):
+    """Per-innings team-batting distribution dossier.
+
+    Two sibling distribution blocks under one master sample —
+    `runs` (skewed continuous; chain-ladder conditionals at
+    100/150/200/230 + over-aware doubling at the 10-over checkpoint)
+    and `run_rate` (continuous per-over) — plus phase decomposition,
+    four form windows (last_10 / last_60d / last_6mo / last_1yr),
+    and scope-derived suggested-splits navigation hints.
+
+    Every probability field ships as `{value, num, denom, ci_low,
+    ci_high}` with a Wilson 95% CI. Calendar form windows use a
+    scope-anchored cutoff (`min(today, max_obs_date)`) so retired
+    teams get non-empty windows.
+
+    `FilterParams.filter_team` is IGNORED — the team path-param
+    dominates. `FilterParams.filter_opponent` works as expected.
+
+    Spec: internal_docs/spec-distribution-stats.md §16.2.
+    """
+    today = date.fromisoformat(as_of_date) if as_of_date else date.today()
+
+    observations = await _innings_master_sample_team_batting(team, filters, aux)
+    lifetime = _distribution_dossier_team_batting(observations)
+    form = _form_windows_team_batting(observations, today)
+
+    obs_dates = [o["date"] for o in observations if o.get("date")]
+    lifetime["last_match_date"] = max(obs_dates) if obs_dates else None
+
+    scope = scope_dict_from_filters(filters)
+    splits = suggested_splits(scope)
+
+    return {
+        "team": team,
+        "scope": {k: v for k, v in scope.items() if v},
+        "lifetime": lifetime,
+        "form": form,
+        "suggested_splits": splits,
+    }
 
 
 async def _team_batting_by_season_baseline(team, filters, aux):
