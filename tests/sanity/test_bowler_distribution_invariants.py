@@ -239,6 +239,18 @@ def assert_endpoint_invariants(label: str, resp: dict) -> list[tuple[bool, str]]
     for w in ("last_10", "last_60d", "last_6mo", "last_1yr"):
         out.extend(assert_dossier_invariants(f"{label}.form.{w}", resp["form"][w]))
 
+    # last_match_date — present on lifetime; equals max obs date.
+    # Drives the frontend dormancy badge. Spec §11 +
+    # internal_docs/design-decisions.md "Dormancy badge".
+    lifetime_obs = resp["lifetime"]["wickets"]["observations"]
+    obs_dates = [o["date"] for o in lifetime_obs if o.get("date")]
+    expected_lmd = max(obs_dates) if obs_dates else None
+    out.append(check(
+        f"{label}: lifetime.last_match_date == max(observations.date)",
+        resp["lifetime"].get("last_match_date") == expected_lmd,
+        f"got={resp['lifetime'].get('last_match_date')}, expected={expected_lmd}",
+    ))
+
     # Inv 2: last_10 is the date-asc tail
     lifetime_obs = resp["lifetime"]["wickets"]["observations"]
     last_10_obs = resp["form"]["last_10"]["wickets"]["observations"]

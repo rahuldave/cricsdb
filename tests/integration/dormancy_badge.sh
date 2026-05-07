@@ -100,29 +100,39 @@ assert_eq "Kohli — no dormancy badge" "NONE" "$kohli_badge"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
-echo "Test 3 · DOM — retired Gayle, badge PRESENT '(0 in 1y+)'"
+echo "Test 3 · DOM — retired Gayle, calendar badge 'last match: Mon YYYY'"
 
 ab open "$BASE/batting?player=$GAYLE&gender=male"
 settle 3
 
-# Page header: subject name + flag + badge
+# Page header: subject name + flag + badge.
+# Gayle's last match is 2022-02-18 → Feb 2022. Gap > 365d so
+# calendar form fires.
 title_text=$(ab_eval "document.querySelector('.wisden-page-title')?.textContent")
-assert_contains "Gayle title contains '(0 in 1y+)' badge" "(0 in 1y+)" "$title_text"
+assert_contains "Gayle title contains 'last match:'" "last match:" "$title_text"
+assert_contains "Gayle title contains 'Feb 2022'" "Feb 2022" "$title_text"
 
-# Status bar: should have the badge too
+# Status bar: badge dropped from strip per 2026-05-08 revision —
+# strip describes URL state, dormancy is derived player state.
 status_text=$(ab_eval "document.querySelector('.wisden-scope-strip')?.textContent")
-assert_contains "Gayle status strip contains '(0 in 1y+)'" "(0 in 1y+)" "$status_text"
+case "$status_text" in
+  *"last match:"*|*"since last match"*) bad "Status strip should NOT contain dormancy badge — got: $status_text" ;;
+  *) ok "Status strip does NOT contain dormancy badge (page-header only)" ;;
+esac
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
-echo "Test 4 · Scope-aware — Kohli @ IPL 2016 → badge fires"
+echo "Test 4 · Scope-aware — Kohli @ IPL 2016 → calendar badge"
 
 ab open "$BASE/batting?player=$KOHLI&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016"
 settle 3
 
 scoped_title=$(ab_eval "document.querySelector('.wisden-page-title')?.textContent")
-# 2016 is > 1 year ago at any plausible test date past 2017
-assert_contains "Kohli IPL 2016 title contains '(0 in 1y+)'" "(0 in 1y+)" "$scoped_title"
+# Last IPL 2016 match was May 2016 → gap > 1y, calendar form fires
+# with "last match: May 2016" or similar (range slightly varies by
+# scope's actual max).
+assert_contains "Kohli IPL 2016 title contains 'last match:'" "last match:" "$scoped_title"
+assert_contains "Kohli IPL 2016 title contains '2016'" "2016" "$scoped_title"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
