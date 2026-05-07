@@ -6,6 +6,7 @@ import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch, type FetchState } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import PlayerSearch from '../components/PlayerSearch'
+import PlayerQuickStart from '../components/PlayerQuickStart'
 import SeriesLink from '../components/SeriesLink'
 import FlagBadge from '../components/FlagBadge'
 import ScopeIndicator from '../components/ScopeIndicator'
@@ -167,8 +168,12 @@ export default function Bowling() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="mb-8">
+      <div className="mb-8" style={{
+        display: 'flex', flexWrap: 'wrap', alignItems: 'baseline',
+        columnGap: '1.25rem', rowGap: '0.5rem',
+      }}>
         <PlayerSearch role="bowler" onSelect={handleSelect} placeholder="Search for a bowler…" />
+        {!playerId && <PlayerQuickStart discipline="bowling" basePath="/bowling" />}
       </div>
 
       {/* InningToggle visible on BOTH the landing leaderboards and
