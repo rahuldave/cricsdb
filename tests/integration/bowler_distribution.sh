@@ -153,6 +153,23 @@ assert_eq "P(≥3│≥2) conditional matches SQL count(≥3)/count(≥2)" "$sql
 p3g2_title=$(ab_eval "[...document.querySelectorAll('$PANEL_SEL [title]')].find(el => el.innerText.includes('P(≥3│≥2)'))?.title || ''")
 assert_contains "P(≥3│≥2) chip title shows n=$sql_geq2" "n=$sql_geq2" "$p3g2_title"
 
+# CHIP-COLOR TIER COORDINATION (revised 2026-05-06).
+# Chips must use the same tier color as the histogram bar at the
+# same outcome. Wickets palette: 0 = indigo (poor) / 1-2 = sage
+# (typical) / 3+ = ochre (great). The chip's bg is an rgba tint of
+# the tier color.
+chip_bg() {
+  ab_eval "[...document.querySelectorAll('$PANEL_SEL [title]')].find(el => el.innerText.startsWith('$1'))?.style.background || ''"
+}
+p_zero_bg=$(unq "$(chip_bg "P(0)")")
+p_geq1_bg=$(unq "$(chip_bg "P(≥1)")")
+p_geq3_bg=$(unq "$(chip_bg "P(≥3)")")
+p_3g2_bg=$(unq "$(chip_bg "P(≥3│≥2)")")
+assert_contains "P(0) chip uses indigo tint (poor outcome)"        "rgba(112, 144, 168" "$p_zero_bg"
+assert_contains "P(≥1) chip uses sage tint (typical outcome)"      "rgba(122, 142, 106" "$p_geq1_bg"
+assert_contains "P(≥3) chip uses ochre tint (good outcome)"        "rgba(201, 135, 31"  "$p_geq3_bg"
+assert_contains "P(≥3│≥2) conditional uses ochre tint (good outcome)" "rgba(201, 135, 31" "$p_3g2_bg"
+
 # ─────────────────────────────────────────────────────────────────
 echo ""
 echo "Test 2 · Metric tab URL state — Economy tab"

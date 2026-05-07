@@ -281,6 +281,22 @@ case "$fills" in
   *) ok "Runs sparkline has NO red bars (red reserved for oxbow)" ;;
 esac
 
+# CHIP-COLOR TIER COORDINATION — chip backgrounds must match the
+# histogram tier of their threshold (revised 2026-05-06).
+chip_bg() {
+  ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] [title]')].find(el => el.innerText.startsWith('$1'))?.style.background || ''"
+}
+p_le10_bg=$(unq "$(chip_bg "P(≤10)")")
+p_geq30_bg=$(unq "$(chip_bg "P(≥30)")")
+p_geq50_bg=$(unq "$(chip_bg "P(≥50)")")
+p_geq100_bg=$(unq "$(chip_bg "P(≥100)")")
+p_50g30_bg=$(unq "$(chip_bg "P(≥50│≥30)")")
+assert_contains "P(≤10) chip uses indigo tint (poor)"            "rgba(112, 144, 168" "$p_le10_bg"
+assert_contains "P(≥30) chip uses sage tint (typical)"           "rgba(122, 142, 106" "$p_geq30_bg"
+assert_contains "P(≥50) chip uses ochre tint (impact)"           "rgba(201, 135, 31"  "$p_geq50_bg"
+assert_contains "P(≥100) chip uses ochre tint (impact)"          "rgba(201, 135, 31"  "$p_geq100_bg"
+assert_contains "P(≥50│≥30) conditional uses ochre tint (impact)" "rgba(201, 135, 31" "$p_50g30_bg"
+
 # Reference lines: player black + global gray
 player_stroke=$(unq "$(ab_eval "document.querySelector('.wisden-dist-sparkline line[data-ref=player]')?.getAttribute('stroke') || ''")")
 global_stroke=$(unq "$(ab_eval "document.querySelector('.wisden-dist-sparkline line[data-ref=global]')?.getAttribute('stroke') || ''")")
