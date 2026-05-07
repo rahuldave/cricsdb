@@ -62,23 +62,6 @@ function ChipRow({ children }: { children: React.ReactNode }) {
   )
 }
 
-function ConditionalsSeparator() {
-  return (
-    <div style={{
-      width: '100%', display: 'flex', alignItems: 'center',
-      gap: '0.5rem', marginTop: '0.45rem', marginBottom: '-0.2rem',
-      fontFamily: 'var(--serif)', fontStyle: 'italic',
-      fontSize: '0.7rem', color: 'var(--ink-faint)',
-    }}>
-      <span style={{ flex: 1, height: 1, background: 'var(--ink-faint)',
-                     opacity: 0.3 }} />
-      <span>conditionals · anchor ≥2</span>
-      <span style={{ flex: 1, height: 1, background: 'var(--ink-faint)',
-                     opacity: 0.3 }} />
-    </div>
-  )
-}
-
 // ─── Wickets tab ─────────────────────────────────────────────────────
 
 interface WicketsProps {
@@ -137,7 +120,6 @@ export function WicketsChipsRow({ block }: { block: BowlerWicketsBlock }) {
       <ProbChip label="P(≥3)" record={m.p_geq_3} tint={T_OCHRE} />
       <ProbChip label="P(≥4)" record={m.p_geq_4} tint={T_OCHRE} />
       <ProbChip label="P(≥5)" record={m.p_geq_5} tint={T_OCHRE} />
-      <ConditionalsSeparator />
       <ProbChip label="P(≥3│≥2)" record={m.p_3_given_2} tint={T_OCHRE} />
       <ProbChip label="P(≥4│≥2)" record={m.p_4_given_2} tint={T_OCHRE} />
       <ProbChip label="P(≥5│≥2)" record={m.p_5_given_2} tint={T_OCHRE} />
