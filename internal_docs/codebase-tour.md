@@ -71,6 +71,11 @@ api/
                           Spec: internal_docs/spec-distribution-stats.md §11.
     fielding.py       — /api/v1/fielders/leaders (top 10 fielders + top 10 keepers, volume-based)
                          /api/v1/fielders/{id}/summary|by-season|by-phase|by-over|dismissal-types|victims|by-innings
+                         /api/v1/fielders/{id}/distribution (per-match dossier — three sibling
+                          count blocks: catches / run_outs / stumpings*; three-simple
+                          milestones P=0/P=1/P≥2 with Wilson 95% CI; four form windows;
+                          stumpings null for non-keepers via Tier-2 keeperassignment).
+                         Spec: internal_docs/spec-distribution-stats.md §13.
     keeping.py        — /api/v1/fielders/{id}/keeping/summary|by-season|by-innings|ambiguous (Tier 2)
     head_to_head.py   — /api/v1/head-to-head/{batter_id}/{bowler_id}
     matches.py        — /api/v1/matches list, /matches/{id}/scorecard, /matches/{id}/innings-grid
@@ -324,6 +329,31 @@ frontend/src/
                                                                  current ?inning= aux on navigation
                                    distributionBins.ts        pure helpers (binIndex / binLabel /
                                                                  binTier / buildHistogramRows)
+    fielding/                  — Fielder Distribution panel (spec-distribution-stats.md §14):
+                                   FielderDistributionPanel    top-level orchestrator on /fielding?player=X,
+                                                                 mounted between count tiles and Tabs;
+                                                                 window toggle + metric tabs URL-encoded
+                                                                 as ?dist_window_f= / ?dist_metric_f=
+                                                                 (suffixed _f to prevent cross-page bleed
+                                                                 with bowler panel)
+                                   CountHistogram              fixed-bin discrete 3-bar primitive (0/1/≥2);
+                                                                 INDIGO/SAGE/OCHRE per §10.3 palette;
+                                                                 reused across all three metric tabs
+                                   FielderStatStrip            tab-dependent strip — drops Mean / match
+                                                                 for catches/run-outs (uninteresting at
+                                                                 ~0.3 for non-keepers); shows it on
+                                                                 stumpings tab where keepers' means carry
+                                                                 information
+                                   FielderChipsRow             three milestone chips P(=0)/P(=1)/P(≥2)
+                                                                 partitioning the match sample exhaustively
+                                   FielderFormDeltaLine        up to 3 deltas per window (catches /
+                                                                 run-outs / stumpings); stumpings entries
+                                                                 omitted entirely for non-keepers
+                                   FielderSuggestedSplitsRow   navigates to /fielding with the split
+                                                                 scope; preserves dist_metric_f /
+                                                                 dist_window_f / inning across hops
+                                   distributionBins.ts         pure helper buildCountHistogramRows
+                                                                 (3-bin partition over an observation key)
     tournaments/               — TournamentsLanding (sectioned grids + men's/women's rivalry tiles),
                                    TournamentDossier (shared dossier UI for tournament OR rivalry
                                    scope; reused by HeadToHead Team-vs-Team mode)

@@ -1302,6 +1302,78 @@ curl "http://localhost:8000/api/v1/fielders/a757b0d8/summary?gender=male&team_ty
 
 `innings_kept > 0` signals to the frontend to show the Keeping tab.
 
+## `GET /api/v1/fielders/{id}/distribution`
+
+Per-match fielding distribution dossier — three sibling count blocks
+(catches / run_outs / stumpings) with three-simple milestones
+(`P=0` / `P=1` / `P≥2`), Wilson 95% CIs, and four form windows.
+Master sample is per-MATCH (not per-innings); fielding events span
+both opponent-batting innings, so the natural unit is the match.
+
+Stumpings block is `null` for non-keepers (`innings_kept == 0`);
+the frontend uses this to hide the Stumpings tab. Substitute catches
+are excluded from `catches.total` and surfaced separately as
+`substitute_catches` for reconciliation against `/summary.catches`.
+Caught-and-bowled is bowler-credited and lives on the bowling
+distribution dossier.
+
+```bash
+curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/distribution?tournament=Indian%20Premier%20League&as_of_date=2025-01-01"
+```
+
+```jsonc
+{
+  "scope": { "tournament": "Indian Premier League" },
+  "lifetime": {
+    "n_matches": 277,
+    "innings_kept": 245,
+    "substitute_catches": 0,
+    "observations": [
+      { "match_id": 6027, "date": "2008-04-19",
+        "catches": 0, "run_outs": 0, "stumpings": 0, "is_keeper": 0 }
+      // … 277 entries total, date-asc
+    ],
+    "catches": {
+      "total": 158, "mean_per_match": 0.57, "median": 0,
+      "variance": 0.64, "std": 0.80,
+      "milestones": {
+        "p_zero":  { "value": 0.58, "num": 161, "denom": 277, "ci_low": 0.52, "ci_high": 0.64 },
+        "p_one":   { "value": 0.31, "num":  85, "denom": 277, "ci_low": 0.26, "ci_high": 0.36 },
+        "p_geq_2": { "value": 0.11, "num":  31, "denom": 277, "ci_low": 0.08, "ci_high": 0.15 }
+      }
+    },
+    "run_outs":  { /* same shape as catches */ },
+    "stumpings": { /* same shape; null when innings_kept == 0 */ }
+  },
+  "form": {
+    "last_10":  { /* full lifetime-shape dossier */ },
+    "last_60d": { /* … */ },
+    "last_6mo": { /* … */ },
+    "last_1yr": { /* … */ },
+    "delta": {
+      "last_10_catches_mean_minus_lifetime":   -0.06,
+      "last_10_run_outs_mean_minus_lifetime":  -0.10,
+      "last_10_stumpings_mean_minus_lifetime": -0.02,
+      "last_60d_catches_mean_minus_lifetime":  null,
+      // … 12 entries total: 4 windows × 3 metrics. Stumpings deltas
+      // null for non-keepers.
+    }
+  },
+  "suggested_splits": [
+    { "label": "All-time", "params": {} }
+  ]
+}
+```
+
+`as_of_date` (optional ISO date) anchors the calendar form windows
+for deterministic regression tests; production callers omit it.
+
+Three-simples invariant: `p_zero + p_one + p_geq_2 == 1.0` per
+block. The frontend Distribution panel renders three discrete bars
+in the INDIGO/SAGE/OCHRE palette to match.
+
+Spec: `internal_docs/spec-distribution-stats.md` §13.
+
 ## Other endpoints
 
 - `GET /by-season` — dismissals per season split by kind.

@@ -2551,7 +2551,625 @@ After commit 4, browser-agent through the 20 regression URLs.
 
 ---
 
-## 13. Wilson-CI retrofit on batter conditionals (DRAFT)
+## 13. Fielder v1 — distribution dossier (IMPLEMENTED)
+
+> Sibling of §8 (batter) and §11 (bowler). Single endpoint, three
+> sibling distribution blocks — catches / run-outs /
+> (stumpings, keeper-only). The simplest of the three discipline
+> dossiers per §3.3 + §7: per-match discrete counts dominated by
+> zeros, tiny range (≤5 catches, ≤3 stumpings, ≤2 run-outs / match
+> in T20). Reuses every §10.1 backend convention; the fielder-
+> specific design calls (per-match unit, three milestones —
+> `P(=0)` / `P(=1)` / `P(≥2)`, conditional stumpings tab, no phase
+> decomposition, no per-innings ratios) are settled below before
+> any code is written.
+>
+> **Status: DRAFT — not yet implemented.** Pending build per the
+> §13.9 implementation order.
+
+### 13.1 Scope pinning
+
+**In v1:**
+
+- Endpoint: `GET /api/v1/fielders/{id}/distribution?{FilterParams}&as_of_date=YYYY-MM-DD`.
+- **Master sample: per-match tuple** — one row per match the
+  player appears on the team sheet (`matchplayer.person_id = id`)
+  under the filter scope. **Not per-innings.** Fielding events
+  span both opponent-batting innings; the natural unit is the
+  match itself (per spec §3.3). One bar per match on the
+  sparkline; one per-match tuple in the histogram sample.
+- **Three sibling distribution blocks** under one payload:
+  - `catches` — per-match catch count (§4 shape 2, extreme
+    zero-inflation).
+  - `run_outs` — per-match run-out count, same shape, sparser
+    tail.
+  - `stumpings` — per-match stumping count, **only emitted when
+    `innings_kept > 0`** (Tier-2 keeper detection per
+    `keeperassignment`). Field is `null` for non-keepers.
+- **Substitute catches excluded** from the `catches` sample.
+  Surfaced separately as a top-level `substitute_catches` scalar
+  for reconciliation against `/fielders/{id}/summary`. Subs field
+  partial innings; including them inflates the per-match count
+  for matches the player wasn't really on.
+- **Caught-and-bowled excluded entirely** — it's bowler-credited
+  and lives on the bowling dossier.
+- Form windows: last_10 / last_60d / last_6mo / last_1yr — same
+  dossier shape as the lifetime block (single-payload + window-
+  toggle, §10.1). Unit is **matches**, not innings —
+  `last_10 = ten most recent matches`.
+- Suggested splits embedded — calls
+  `api/scope_links.py::suggested_splits` unchanged.
+- Every existing `FilterParams` axis honoured. Side-neutral team
+  filtering at match grain (reuses the existing `_fielding_filter`
+  pattern, dropping `has_innings_join`).
+- **Wilson 95% CI** on every probability via `prob_record(num,
+  denom)` from §11.3. No new helper.
+
+**Explicitly out of v1:**
+
+- **Phase decomposition.** A catch *has* a phase (the over the
+  wicket fell), but the dossier unit is the match, and "P(catch
+  in death overs)" is mostly position-dependent (slip vs deep)
+  which the existing By-Phase tab already covers volumetrically.
+- **Per-innings observation row.** A single match can produce
+  catches across both opponent innings; bucketing into per-innings
+  makes the keeper sample asymmetric (only the bowling-team
+  innings). Per-match is the honest unit.
+- **Conditional milestones.** No `P(≥2│≥1)` ladder. Three
+  simples (`P(=0)`, `P(=1)`, `P(≥2)`) cover the discrete count
+  exhaustively; conditioning on `≥1` shrinks denom by ~3× without
+  adding signal a simple already exposes.
+- ~~Mean-per-match hidden on catches / run-outs tabs.~~ Initial
+  draft hid the mean on non-keeper tabs (it sits at ~0.3 and looks
+  uninformative on its own), but quoting Std in the same strip
+  without a Mean to anchor it is incoherent. **Revised 2026-05-07:
+  uniform schema — Matches / Total / Mean per match / Median / Std
+  on all three tabs.** Spread of a count distribution still needs
+  a centre.
+- **Frontend / UI** — covered separately in §14.
+- **Team distribution dossier** — sibling spec.
+
+### 13.2 Per-match observation row
+
+For fielder `id` under `FilterParams F`, materialise one row per
+match the player appeared on the team sheet, in scope.
+
+| Column | Definition |
+|---|---|
+| `match_id` | `matchplayer.match_id` |
+| `date` | `match.date` (used for ordering + form windows) |
+| `catches` | `COUNT(fieldingcredit WHERE kind = 'caught' AND COALESCE(is_substitute, 0) = 0 AND fielder_id = id AND innings.match_id = match_id)` |
+| `run_outs` | same shape, `kind = 'run_out'` (substitute-exclusion still applies) |
+| `stumpings` | same shape, `kind = 'stumped'` (no substitute filter — sub keepers are not a thing) |
+| `is_keeper` | `1` if any `keeperassignment.keeper_id = id` for any innings of this match; `0` otherwise |
+
+Master-sample SQL filter uses `_fielding_filter` adapted to
+match-grain (drop `has_innings_join=True`). Side-neutral team
+filtering — fielder credits live on opposite-side innings.
+
+Ordered `match.date ASC, match_id ASC` — date-asc ensures
+`observations[]` doubles as the sparkline data without a sort.
+
+**No qualifying-spell threshold.** Bowler v1 used `min_balls=12`
+to drop cameo overs; the fielder analogue would be "did the
+player field in at least one innings of the match", but
+`matchplayer` membership already encodes that. A non-keeper who
+plays the full match and takes zero catches is the *typical*
+case, not a cameo.
+
+### 13.3 Aggregate calculations — three sibling blocks
+
+Each block is a self-contained dossier computed by a pure function
+over `obs[]`. The three blocks have **identical shape** (only the
+source column differs); a single `_count_block(obs, key)` helper
+produces all three.
+
+#### 13.3.1 `catches` / `run_outs` / `stumpings` block
+
+| Field | Formula | Note |
+|---|---|---|
+| `total` | `sum(o[key])` | pool count over the window |
+| `median` | `median([o[key] for o in obs])` | usually 0 |
+| `variance` / `std` | sample variance / sqrt | |
+| `mean_per_match` | `total / n_matches` | computed always; only surfaced in the stat strip on the stumpings tab (§14.2.4) |
+
+`observations[]` lives at the dossier level (one shared list with
+`catches` / `run_outs` / `stumpings` / `is_keeper` columns), not
+duplicated per block.
+
+**Milestones — three simples, denom = `n_matches`:**
+
+| Field | Formula | Reading | Tier color |
+|---|---|---|---|
+| `p_zero` | `count(x == 0) / n_matches` | "blanked" | INDIGO |
+| `p_one` | `count(x == 1) / n_matches` | "ticked over" | SAGE |
+| `p_geq_2` | `count(x ≥ 2) / n_matches` | "multi-event match" | OCHRE |
+
+**Three simples sum to 1** within rounding (sanity invariant in
+§13.8). The three colors map directly to the histogram bars of
+the same name.
+
+No conditionals. No upper-rung milestones — counts cap at ~5/match
+for catches and ~2/match for run-outs in T20; `P(≥3)` on
+non-keepers would be < 1% with denom = career n_matches.
+
+Every probability ships via `prob_record(num, denom)` from §11.3.
+
+#### 13.3.2 Top-level scalars
+
+At the dossier level (alongside `n_matches`):
+
+| Field | Formula | Note |
+|---|---|---|
+| `n_matches` | `len(observations)` | denom for all three blocks' simples |
+| `innings_kept` | sum of `keeperassignment` rows for the player in scope | drives the conditional-tab decision: stumpings block is emitted only when `> 0` |
+| `substitute_catches` | `COUNT(fieldingcredit WHERE kind = 'caught' AND is_substitute = 1)` in scope | footnote — surfaced for full reconciliation against `/fielders/{id}/summary`; not part of any distribution block |
+
+### 13.4 Form windows
+
+Reuse the §8.6 mechanism. Same four windows, **match-grain**:
+
+| Window | Definition |
+|---|---|
+| `form.last_10` | `ORDER BY date DESC, match_id DESC LIMIT 10` over observations |
+| `form.last_60d` | `WHERE date >= today() − 60 days` |
+| `form.last_6mo` | `WHERE date >= today() − 180 days` |
+| `form.last_1yr` | `WHERE date >= today() − 365 days` |
+
+Each window has the **full dossier shape** — `catches`,
+`run_outs`, `stumpings` (when applicable), and the top-level
+scalars. `innings_kept` recomputes per window (a keeper who
+stops keeping mid-career sees the stumpings block disappear in
+recent windows — correct behaviour).
+
+`form.delta` block — three deltas per window, on `mean_per_match`:
+
+```jsonc
+"form": {
+  "delta": {
+    "last_10_catches_mean_minus_lifetime":  +0.05,
+    "last_10_run_outs_mean_minus_lifetime": -0.01,
+    "last_10_stumpings_mean_minus_lifetime": +0.20,
+    "last_60d_catches_mean_minus_lifetime":  ...,
+    ...
+  }
+}
+```
+
+Stumpings deltas are `null` when lifetime `innings_kept == 0`.
+The form delta line is the one place the small means surface for
+non-keeper tabs — "is he in form?" is exactly what the form line
+exists to answer.
+
+### 13.5 Suggested splits
+
+No change to `api/scope_links.py`. Same `suggested_splits(scope)`
+helper from §8.7.
+
+### 13.6 Endpoint shape
+
+```
+GET /api/v1/fielders/{id}/distribution?{FilterParams}&as_of_date=YYYY-MM-DD
+```
+
+`as_of_date` (ISO date, optional) — anchors the calendar form
+windows for deterministic regression tests.
+
+Response sketch (single window shown; lifetime + each form window
+have identical shape):
+
+```jsonc
+{
+  "scope": { "tournament": "IPL", ... },
+  "lifetime": {
+    "n_matches": 142,
+    "innings_kept": 0,
+    "substitute_catches": 3,
+    "observations": [
+      { "match_id": "...", "date": "2024-04-12",
+        "catches": 2, "run_outs": 0, "stumpings": 0, "is_keeper": 0 },
+      ...
+    ],
+    "catches": {
+      "total": 71,
+      "mean_per_match": 0.50,
+      "median": 0,
+      "variance": 0.62,
+      "std": 0.79,
+      "milestones": {
+        "p_zero":  { "value": 0.61, "num": 87, "denom": 142, "ci_low": 0.53, "ci_high": 0.69 },
+        "p_one":   { "value": 0.30, "num": 42, "denom": 142, "ci_low": 0.23, "ci_high": 0.38 },
+        "p_geq_2": { "value": 0.09, "num": 13, "denom": 142, "ci_low": 0.05, "ci_high": 0.15 }
+      }
+    },
+    "run_outs": {
+      "total": 8, "mean_per_match": 0.06, "median": 0,
+      "variance": 0.07, "std": 0.26,
+      "milestones": {
+        "p_zero":  { ... },
+        "p_one":   { ... },
+        "p_geq_2": { ... }
+      }
+    },
+    "stumpings": null
+  },
+  "form": {
+    "last_10":  { /* full lifetime-shape dossier */ },
+    "last_60d": { ... },
+    "last_6mo": { ... },
+    "last_1yr": { ... },
+    "delta": {
+      "last_10_catches_mean_minus_lifetime":   +0.05,
+      "last_10_run_outs_mean_minus_lifetime":  -0.01,
+      "last_10_stumpings_mean_minus_lifetime": null,
+      ...
+    }
+  },
+  "suggested_splits": [ ... ]
+}
+```
+
+### 13.7 Implementation pointers
+
+- **New endpoint** at `fielding_distribution` in
+  `api/routers/fielding.py`. Mirrors siblings.
+- **`_match_master_sample_fielder(db, person_id, filters, aux)`**
+  — reuses `_fielding_filter` adapted to match-grain.
+- **`_distribution_dossier_fielder(observations)`** — pure
+  function. Returns `null` for the stumpings block when
+  `innings_kept == 0`. Empty samples return a sane null shape.
+- **`_count_block(obs, key)`** — single helper used three times
+  (`'catches'`, `'run_outs'`, `'stumpings'`).
+- **`_form_windows_fielder(observations, today)`** — slices the
+  observation list into the four windows, runs the aggregator on
+  each, emits the delta block (stumpings-mean nullable).
+- **`api/wilson.py`** — already shipped via §11.3.
+
+### 13.8 Tests
+
+**Sanity** (`tests/sanity/test_fielder_distribution_invariants.py`)
+— ~80 assertions across 4 scopes (a non-keeper outfielder /
+slip / a keeper like Dhoni / a keeper-only window for a
+mostly-non-keeper player). Each assertion derives expected
+values from sqlite3 against `cricket.db` at runtime per the
+SQL-anchored rule.
+
+- `n_matches == len(observations)` for `lifetime` and every form
+  window.
+- `last_10.observations` is the contiguous date-asc tail.
+- **Three-simples-sum-to-1 invariant**: for each block,
+  `p_zero.value + p_one.value + p_geq_2.value == 1.0` (within
+  rounding).
+- For every milestone: `value × denom ≈ num`; `ci_low ≤ value ≤
+  ci_high`; `0 ≤ ci_low`; `ci_high ≤ 1`.
+- `catches.total == sum(o.catches for o in observations)` (and
+  for run_outs, stumpings).
+- `mean_per_match × n_matches ≈ total` per block.
+- `stumpings is null` ⟺ `innings_kept == 0`. Both sides tested.
+- **Substitute reconciliation**: `catches.total +
+  substitute_catches == /fielders/{id}/summary.catches` for the
+  same scope.
+- Form-window monotonicity: `last_10.n_matches ≤ 10`.
+
+**Regression** (`tests/regression/fielder_distribution/urls.txt`)
+— ~16-URL inventory: 4 marquee fielders × scopes (all-time, IPL,
+IPL by season, vs-team, at-venue, season-only, empty scope —
+keeper AND non-keeper present). `as_of_date=2025-01-01` pinned.
+
+**No agent-browser integration test in v1 backend** — API-only
+slice. Integration arrives with the frontend (§14.6).
+
+### 13.9 Implementation order — three atomic backend commits
+
+1. `fielding: /fielders/{id}/distribution endpoint` —
+   `_match_master_sample_fielder` + `_distribution_dossier_fielder`
+   + `_count_block` + `_form_windows_fielder` + the route.
+2. `sanity: fielder distribution invariants` — ~80-assertion
+   suite per §13.8.
+3. `regression: fielder_distribution urls.txt` — 16-URL
+   inventory, all 200 against the live endpoint.
+
+After commit 3, run `./tests/regression/run.sh
+fielder_distribution` and confirm `0 REG drifted, 16 NEW
+changed, 0 NEW unchanged`. Then flip `NEW → REG` to lock the
+shape. (One fewer commit than bowler — no Wilson helper, no
+suggested_splits validation step.)
+
+---
+
+## 14. Fielder v1 frontend — Distribution panel on `/fielding?player=X` (IMPLEMENTED)
+
+> Sibling of §9 (batter) and §12 (bowler). Lands the new
+> Distribution panel on `frontend/src/pages/Fielding.tsx`.
+> Consumes the §13 endpoint. Reuses every §10.3 frontend
+> convention; fielder-specific extensions are the **discrete
+> 3-bar histogram** (`0 / 1 / ≥2` per tab), the **conditional
+> stumpings tab** (only rendered for keepers), and the
+> **tab-dependent stat-strip schema** (drop mean for non-stumpings
+> tabs).
+>
+> **In scope:** window toggle (Scope / Last 10 / Last 60d / Last
+> 6mo / Last 1yr); **metric tabs** (Catches / Run-outs /
+> Stumpings* — last is keeper-only); per-tab 3-bar histogram in
+> the §10.3 INDIGO/SAGE/OCHRE palette; milestone chips with
+> Wilson CI tooltips; chronological per-match sparkline (switches
+> with the metric tab — height = events of that metric in the
+> match); **horizontal reference line at y=1** on Catches and
+> Run-outs tabs; **mean overlay** on Stumpings tab; form delta
+> line; suggested-splits row.
+>
+> **Out of v1 frontend:** phase decomposition UI (no phase data
+> in the §13 response); Compare-tab integration; "league
+> baseline fielder" overlay (future league-baseline slice).
+
+### 14.1 Layout
+
+The Distribution panel inserts **between row 1 and the Tabs row**
+on `/fielding?player=X` — anchored to the count tiles in row 1.
+
+### 14.2 Distribution panel anatomy
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ Distribution                  [Scope | 10 | 60d | 6mo | 1y]            │  window toggle
+│ [ Catches ] [ Run-outs ] [ Stumpings* ]                                │  metric tabs (* keeper only)
+│                                                                        │
+│ ┌─────────────────────────────────┬──────────────────────────────┐     │
+│ │  (active-tab histogram, 3 bars) │ (active-tab stat strip)      │     │
+│ │   ▆                              │ Matches          142         │     │
+│ │   ▇                              │ Total catches    71          │     │
+│ │   ▆     ▃     ▁                  │ Median            0          │     │
+│ │   0     1    ≥2                  │   (no avg/match shown)       │     │
+│ │                                 │                              │     │
+│ │                                 │ (milestone chips, single row)│     │
+│ │                                 │ P(=0) 61%  P(=1) 30%  P(≥2)9%│     │
+│ └─────────────────────────────────┴──────────────────────────────┘     │
+│                                                                        │
+│ ▁▁▆▁▁▆▆▁▁▁▆▆▁▆▁▁▁▆▁  ← per-match sparkline (heights = catches/match)  │
+│ ───────────────────  ← reference line at y=1                          │
+│                                                                        │
+│ Form: 10  cat +0.05  ro −0.01    60d ...    6mo ...    1y ...          │
+│                                                                        │
+│ Compare to:  All IPL  ·  All cricket 2024  ·  All-time                 │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+The Stumpings tab variant differs in three ways: stat strip adds
+**Mean stumpings/match**; sparkline reference line is the player's
+mean (red overlay, like batter/bowler); form line includes the
+stumpings-mean delta.
+
+#### 14.2.1 Metric tab URL state — `?dist_metric_f=`
+
+Param name `dist_metric_f` (suffixed `_f` for fielder, parallel
+to `dist_metric` for bowler — prevents cross-page bleed when the
+user moves between Bowling and Fielding tabs in one session).
+Values: `catches` (default, encoded by absence) | `run_outs` |
+`stumpings`. Selecting `stumpings` on a non-keeper falls back to
+`catches` silently (the tab isn't rendered).
+
+#### 14.2.2 Window toggle — same mechanism as §9.2.1
+
+URL state `?dist_window_f=`. Same five values as batter/bowler.
+
+#### 14.2.3 Histogram — discrete 3 bars
+
+Three bars at `0`, `1`, `≥2`, x-axis labels `0 / 1 / ≥2`, y-axis
+auto-scaled to the tallest bar (`p_zero` is almost always
+tallest). Bar tints: INDIGO / SAGE / OCHRE per spec §10.3.
+Bar opacity 0.8 default with INDIGO at 1.0 (matches sparkline
+override convention to keep the worst tier visible at 0.8).
+
+**Linear y-axis.** Log scale was discussed and rejected: the
+3-bar histogram has only three values to compare and the
+visual contrast at linear scale is already informative ("the
+zero bar dwarfs everything" IS the story). Log toggle deferred
+to v2 if multi-discipline log support lands across all panels.
+
+Each bar's tooltip: `"<count> matches (<percentage>%)"` —
+mirrors the bowler-wickets discrete bars.
+
+#### 14.2.4 Stat strip — uniform schema (revised 2026-05-07)
+
+All three tabs render the same row set:
+`Matches`, `Total <metric>`, `Mean per match`, `Median`, `Std`.
+
+Earlier draft hid `Mean per match` on catches / run-outs (~0.3 looks
+uninformative for a non-keeper outfielder), but the Std row is
+incoherent without a centre to anchor it. Spread of a count
+distribution still needs a mean — even when the mean itself reads
+"this fielder takes a catch every third match." Uniformity wins
+over per-tab schema variation.
+
+Below the strip, **milestone chips** in a single flex row:
+
+| Chip | Tint | Reading |
+|---|---|---|
+| `P(=0)` | INDIGO | "blanked" rate |
+| `P(=1)` | SAGE | "ticked over" rate |
+| `P(≥2)` | OCHRE | "multi-event" rate |
+
+Hover/tap reveals Wilson CI: `61% (53–69%)`. Same `ProbChip`
+component as bowler (§12.4).
+
+#### 14.2.5 Sparkline — per-tab, per-match grain
+
+One bar per match in chronological order. Height = events of
+the active metric in that match (`o.catches`, `o.run_outs`, or
+`o.stumpings`). Reuses `DistributionSparkline.tsx` with a new
+`granularity="match"` prop (string label only — no behaviour
+change beyond the season-tick axis hover text reading
+"Match #X on YYYY-MM-DD" instead of "Innings #X").
+
+**Reference line:**
+
+| Tab | Reference line | Rationale |
+|---|---|---|
+| Catches | horizontal at **y=1** (gray, 1.5px) | "did anything happen this match?" — mean too low to anchor |
+| Run-outs | horizontal at **y=1** (gray, 1.5px) | same |
+| Stumpings | mean overlay (red, 1.2px) — same as batter/bowler rolling | keeper means are 1.5–2.5/match; informative |
+
+**Bar opacity** — same 0.8 default with INDIGO override to 1.0
+to keep zero-height bars visible (rendered in the 4px stub-zone
+per the existing convention). Without the stub zone, the most
+common match outcome (zero events) silently disappears from
+the DOM-visible count — exactly the bug class flagged in the
+bowler/batter sparkline rollout.
+
+**Mobile:** `pointer-events: none` on the bar `<a>`s below
+720px, mirroring the bowler/batter convention.
+
+#### 14.2.6 Form delta line (revised 2026-05-07)
+
+Two lines. The first shows the absolute scope-lifetime mean per
+match so the deltas on the second line are self-anchoring — a
+first-time reader doesn't have to remember or derive the baseline:
+
+```
+Scope baseline / match · cat 0.51 · ro 0.11 · st 0.08
+Form (Δ vs baseline): last 10 cat −0.11 ro −0.01 st +0.02 · last 60d ... · last 6mo ... · last 1y ...
+```
+
+Stumpings entries omitted entirely (both baseline and delta) for
+non-keeper players (`lifetime.stumpings === null`). The Δ symbol
+on the second line carries the math; the baseline row above
+defines what "vs baseline" means for each axis.
+
+**Color discipline:** delta values render in **oxblood** (`#7A1F1F`)
+regardless of sign. Form is a rolling concept; oxblood is the
+codebase's established hue for it (sparkline rolling-mean overlay
+uses the same value). Sign (`+`/`−`) carries direction. **No
+green/red polarity** — that would conflate "above baseline" with
+"good," and the form delta dossier doesn't make that value
+judgment for fielders. The `—` sentinel renders in faint when the
+window has no qualifying matches in scope.
+
+#### 14.2.7 Suggested-splits row
+
+Identical to §9.2.6 / §12.2.8.
+
+### 14.3 Empty / sparse states
+
+- `n_matches == 0` → placeholder card "No matches in scope" with
+  a link back to "All IPL" / "All-time" splits.
+- `n_matches < 10` → still render the dossier; chips show Wilson
+  CIs, which carry the small-n honesty story without suppression.
+- Stumpings tab on non-keeper → tab not in DOM; selecting via
+  URL falls back to Catches.
+
+### 14.4 Types — `frontend/src/types.ts`
+
+```typescript
+export type FielderCountBlock = {
+  total: number
+  median: number
+  variance: number
+  std: number
+  mean_per_match: number
+  milestones: {
+    p_zero: ProbRecord
+    p_one: ProbRecord
+    p_geq_2: ProbRecord
+  }
+}
+
+export type FielderObservation = {
+  match_id: string
+  date: string
+  catches: number
+  run_outs: number
+  stumpings: number
+  is_keeper: 0 | 1
+}
+
+export type FielderDistributionWindow = {
+  n_matches: number
+  innings_kept: number
+  substitute_catches: number
+  observations: FielderObservation[]
+  catches: FielderCountBlock
+  run_outs: FielderCountBlock
+  stumpings: FielderCountBlock | null  // null when innings_kept == 0
+}
+
+export type FielderDistribution = {
+  scope: ScopeRecord
+  lifetime: FielderDistributionWindow
+  form: {
+    last_10: FielderDistributionWindow
+    last_60d: FielderDistributionWindow
+    last_6mo: FielderDistributionWindow
+    last_1yr: FielderDistributionWindow
+    delta: Record<string, number | null>  // 12 entries: 4 windows × 3 metrics
+  }
+  suggested_splits: SplitSuggestion[]
+}
+```
+
+`tsc -b` catches consumers who try to read `stumpings.total` on
+a non-keeper.
+
+### 14.5 Components
+
+| Component | File | Reuse from |
+|---|---|---|
+| `<FielderDistributionPanel/>` | `frontend/src/components/distribution/FielderDistributionPanel.tsx` | new — top-level container |
+| `<FielderHistogram/>` | `frontend/src/components/distribution/FielderHistogram.tsx` | new — discrete 3-bar primitive |
+| stat strip + milestone chips | inline in panel | new |
+| `<DistributionSparkline/>` | already shipped | extend `granularity` prop to accept `"match"` |
+| `<ProbChip/>` | already shipped (§12.4) | direct reuse |
+| `<WindowToggle/>` | already shipped (§9.2.1) | direct reuse |
+
+### 14.6 Tests
+
+**Integration** (`tests/integration/fielder_distribution.sh`) —
+SQL-anchored per §10.4.
+
+1. Bar count == 3 always (the histogram has fixed bins).
+2. **Bar height sums to `n_matches`** — the three bars partition
+   the match sample exhaustively; sanity check that the DOM bars
+   match the SQL counts.
+3. Stumpings tab present iff `innings_kept > 0`. Two fixtures:
+   keeper player (tab present, click reveals stumpings histogram)
+   + outfielder (tab absent, no DOM node).
+4. **Sparkline bar count == `n_matches`** from SQL — codified
+   per-item-chart rule (CLAUDE.md "Sparkline / per-item chart bar
+   count must match SQL"). Per-tab: the active metric's bar
+   count must match the corresponding SQL count.
+5. Reference line: y=1 visible on Catches/Run-outs tabs;
+   mean-overlay visible on Stumpings tab.
+6. Window toggle URL: `?dist_window_f=last_10` reproduces from
+   share-link.
+7. Metric tab URL: `?dist_metric_f=run_outs` reproduces from
+   share-link.
+8. Mobile viewport (390×844): histogram + sparkline + chips
+   render without overflow; pointer-events disabled on sparkline
+   bars below 720px.
+
+**Sanity** assertions extend §13.8 with the three-simples-sum-
+to-1 check at the API layer; integration covers the DOM side.
+
+### 14.7 Implementation order — four atomic frontend commits
+
+1. `fielding: types + api fetcher` — `FielderDistribution` types
+   and `fetchFielderDistribution()` in `api.ts`. `tsc -b` clean.
+2. `fielding: <FielderHistogram/> + <FielderDistributionPanel/>`
+   — discrete 3-bar primitive + container with metric-tab +
+   window-toggle wiring + stat strip + chips + sparkline.
+3. `fielding: panel mounted on /fielding?player=X` — paste the
+   panel between row 1 and the tabs row; conditional stumpings
+   tab visibility wired off `innings_kept > 0`.
+4. `tests: integration/fielder_distribution.sh` — 8-test
+   SQL-anchored assertion script per §14.6.
+
+After commit 4, run `agent-browser` against `/fielding?player=`
+for a known keeper (Dhoni) and a known outfielder (Kohli) at
+both desktop (1280×800) and mobile (390×844) viewports per the
+verification rule.
+
+---
+
+## 15. Wilson-CI retrofit on batter conditionals (DRAFT)
 
 Adding Wilson confidence intervals to bowler probabilities (§11.3)
 makes the existing batter `milestones` shape — bare scalars — the
@@ -2623,5 +3241,17 @@ ScopedPageHeader rolled to all 8 scoped pages, mobile media-query
 fix.
 Patterns codified in §10 for sibling slices.
 2026-05-06: bowler v1 spec drafted (§11 backend + §12 frontend +
-§13 Wilson-CI batter retrofit). Pending implementation.
-Fielder / team distribution dossiers remain to be done.*
+§15 Wilson-CI batter retrofit, originally numbered §13).
+Pending implementation.
+2026-05-07: fielder v1 spec drafted AND implemented end-to-end
+(§13 backend + §14 frontend). Three sibling count blocks
+(catches / run-outs / stumpings*), per-match unit, three-simples
+histogram (P=0/P=1/P≥2) in the 3-tier palette, conditional
+stumpings tab via `innings_kept > 0`, mean-per-match in stat strip
+only on stumpings tab, sparkline reference line at y=1 except
+stumpings (mean overlay). Sanity (1510 assertions across 4 fielder
++ empty scopes), regression (15-URL inventory locked at REG),
+integration (27 assertions including SQL-anchored chip values,
+keeper/non-keeper tab visibility, mobile viewport). Renumbered
+existing Wilson-CI retrofit §13 → §15.
+Team distribution dossier remains to be done.*
