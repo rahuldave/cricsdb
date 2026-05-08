@@ -15,6 +15,7 @@ import {
   getTeamBowlingSummary, getTeamBowlingBySeason, getTeamBowlingByPhase, getTeamBowlingByInning, getTeamTopBowlers,
   getTeamBowlingPhaseSeasonHeatmap, getTeamBowlingDistribution,
   getTeamFieldingSummary, getTeamFieldingBySeason, getTeamFieldingByInning, getTeamTopFielders,
+  getTeamFieldingDistribution,
   getTeamPartnershipsByWicket, getTeamPartnershipsBestPairs, getTeamPartnershipsHeatmap, getTeamPartnershipsTop, getTeamPartnershipsByInning, getTeamPartnershipsSummary,
 } from '../api'
 import StatCard from '../components/StatCard'
@@ -28,6 +29,7 @@ import { ScopeContext } from '../components/scopeLinks'
 import TeamCompareGrid from '../components/teams/TeamCompareGrid'
 import TeamBattingDistributionPanel from '../components/teams-distribution/TeamBattingDistributionPanel'
 import TeamBowlingDistributionPanel from '../components/teams-distribution/TeamBowlingDistributionPanel'
+import TeamFieldingDistributionPanel from '../components/teams-distribution/TeamFieldingDistributionPanel'
 import AddCompareSlot from '../components/teams/AddCompareSlot'
 import {
   useCompareSlots, AVG_SENTINEL, OVERRIDABLE_SLOT_KEYS, clearSlotUpdates,
@@ -48,6 +50,7 @@ import type {
   BattingPhaseSeasonHeatmap, BowlingPhaseSeasonHeatmap,
   TeamBowlingSummary, TeamBowlingSeason, TeamBowlingPhase, TeamBowlingInning, TeamTopBowler,
   TeamBowlingDistribution,
+  TeamFieldingDistribution,
   TeamFieldingSummary, TeamFieldingSeason, TeamFieldingInning, TeamTopFielder,
   PartnershipByWicket, PartnershipPairEntry, PartnershipBestPairsResponse,
   PartnershipHeatmap, PartnershipTopEntry,
@@ -961,6 +964,12 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
     () => getTeamTopFielders(team, { ...filters, limit: 5 }),
     filterDeps,
   )
+  // Per-innings distribution dossier — drives the §17.5
+  // TeamFieldingDistributionPanel mounted at the top of the tab.
+  const distFetch = useFetch<TeamFieldingDistribution | null>(
+    () => getTeamFieldingDistribution(team, filters),
+    filterDeps,
+  )
 
   if (summary.loading) return <Spinner label="Loading fielding…" />
   if (summary.error) return <ErrorBanner message={`Fielding: ${summary.error}`} onRetry={summary.refetch} />
@@ -982,6 +991,12 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
 
   return (
     <div className="space-y-6">
+      <TeamFieldingDistributionPanel
+        team={team}
+        distribution={distFetch.data}
+        loading={distFetch.loading}
+        error={distFetch.error}
+      />
       <div className="wisden-statrow">
         <StatCard label="Matches" value={s.matches.value ?? 0} />
         <StatCard label="Catches" value={(s.catches.value ?? 0).toLocaleString()} />
