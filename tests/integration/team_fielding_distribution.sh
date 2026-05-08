@@ -94,6 +94,7 @@ assert_eq "Innings fielded count matches SQL" "$sql_n" "$dom_n"
 # Total catches credited to MI matchplayers (substitutes excluded).
 # Catch credits in fieldingcredit live in innings via delivery; filter
 # by fielder being one of MI's matchplayers in that match.
+# Convention 3: catches is inclusive — kind IN ('caught','caught_and_bowled').
 sql_catches=$(sql "
 SELECT COALESCE(SUM(c), 0) FROM (
   SELECT i.id, (
@@ -103,7 +104,7 @@ SELECT COALESCE(SUM(c), 0) FROM (
                         AND mp.team = '$TEAM'
                         AND mp.person_id = fc.fielder_id
     WHERE dd.innings_id = i.id
-      AND fc.kind = 'caught'
+      AND fc.kind IN ('caught', 'caught_and_bowled')
       AND fc.is_substitute = 0
   ) AS c
   FROM delivery d
@@ -180,7 +181,7 @@ SELECT COUNT(*) FROM (
                         AND mp.team = '$TEAM'
                         AND mp.person_id = fc.fielder_id
     WHERE dd.innings_id = i.id
-      AND fc.kind = 'caught'
+      AND fc.kind IN ('caught', 'caught_and_bowled')
       AND fc.is_substitute = 0
   ) AS c
   FROM delivery d
