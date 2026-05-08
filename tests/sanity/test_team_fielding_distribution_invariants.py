@@ -332,7 +332,10 @@ async def assert_sql_anchor(
 
     # Catches / run_outs / stumpings totals
     fc_filters: dict[str, str] = {
-        "catches":   "fc.kind = 'caught' AND COALESCE(fc.is_substitute,0) = 0",
+        # Convention 3 — catches inclusive of caught-and-bowled (2026-05-08
+        # fix; predicate matches the endpoint at api/routers/teams.py
+        # _innings_master_sample_team_fielding).
+        "catches":   "fc.kind IN ('caught','caught_and_bowled') AND COALESCE(fc.is_substitute,0) = 0",
         "run_outs":  "fc.kind = 'run_out' AND COALESCE(fc.is_substitute,0) = 0",
         "stumpings": "fc.kind = 'stumped'",
     }

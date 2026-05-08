@@ -287,7 +287,9 @@ async def assert_sql_anchor(
     )
     sql_n_matches = rows[0]["n"] if rows else 0
 
-    # Catches: non-substitute, scope-bound
+    # Catches: non-substitute, scope-bound. Convention 3 — caught-and-
+    # bowled is folded into catches (2026-05-08 fix; predicate matches
+    # the endpoint at api/routers/fielding.py).
     rows = await deps._db.q(
         f"""
         SELECT COUNT(*) AS c
@@ -296,7 +298,7 @@ async def assert_sql_anchor(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE fc.fielder_id = :pid
-          AND fc.kind = 'caught'
+          AND fc.kind IN ('caught', 'caught_and_bowled')
           AND COALESCE(fc.is_substitute, 0) = 0
           AND {match_where}
         """,
