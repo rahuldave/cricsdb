@@ -835,6 +835,150 @@ export interface TeamBattingDistribution {
   suggested_splits: SuggestedSplit[]
 }
 
+// ─── Team bowling distribution dossier ──────────────────────────────────
+//
+// Mirror of /api/v1/teams/{team}/bowling/distribution. Spec:
+// internal_docs/spec-distribution-stats.md §16.3 (backend) + §17.4 (frontend).
+
+export interface TeamBowlingInningsObservation {
+  innings_id: number
+  match_id: number
+  innings_number: number
+  date: string | null
+  /** Runs conceded — opposition's total against this team's bowlers. */
+  runs_conceded: number
+  /** Legal balls bowled in the innings (wides + no-balls excluded). */
+  balls: number
+  /** Wickets credited to the team (includes run-outs; 4-kind exclusion list — diverges from team-bowling/summary which is bowler-credited). */
+  wickets: number
+  /** Opposition runs at end of over 10. */
+  runs_at_10: number
+  /** Opposition wickets fallen by end of over 10. */
+  wickets_at_10: number
+  /** 1 when the innings reached over 10, else 0 — denominator gate for over-aware probabilities. */
+  reached_10_overs: 0 | 1
+  runs_pp: number
+  balls_pp: number
+  wickets_pp: number
+  runs_mid: number
+  balls_mid: number
+  wickets_mid: number
+  runs_death: number
+  balls_death: number
+  wickets_death: number
+}
+
+export interface TeamBowlingWicketsBlock {
+  total: number
+  mean_per_innings: number | null
+  median: number | null
+  variance: number | null
+  std: number | null
+  observations: TeamBowlingInningsObservation[]
+  milestones: {
+    p_leq_3: ProbRecord
+    p_geq_5: ProbRecord
+    p_geq_7: ProbRecord
+    p_eq_10: ProbRecord
+    /** P(wkts ≥ 7 | wkts ≥ 5) — denom = count(≥5). */
+    p_7_given_5: ProbRecord
+    p_10_given_5: ProbRecord
+    /** Over-aware: P(opp wickets_at_10 ≥ 3 | reached_10_overs=1) — early breakthrough. */
+    p_geq_3_at_10: ProbRecord
+    /** Over-aware: P(final wickets = 10 | wickets_at_10 ≥ 3) — finishing rate. */
+    p_eq_10_given_3_at_10: ProbRecord
+  }
+}
+
+export interface TeamBowlingRunsConcededBlock {
+  total: number
+  mean_per_innings: number | null
+  median: number | null
+  variance: number | null
+  std: number | null
+  /** Median of `final_runs_conceded / runs_at_10` over innings with reached_10_overs=1 AND runs_at_10 > 0 — paired with `p_double_at_10`. */
+  escalation_ratio_median: number | null
+  milestones: {
+    p_lt_100: ProbRecord
+    p_lt_150: ProbRecord
+    p_geq_150: ProbRecord
+    p_geq_200: ProbRecord
+    p_geq_230: ProbRecord
+    /** Conditional chain: P(conceded ≥ 150 | conceded ≥ 100) — climbing here is bad. */
+    p_150_given_100: ProbRecord
+    p_200_given_150: ProbRecord
+    p_230_given_200: ProbRecord
+    /** Over-aware: P(final_runs_conceded ≥ 2 × runs_at_10 | reached_10_overs=1, runs_at_10>0). */
+    p_double_at_10: ProbRecord
+  }
+}
+
+export interface TeamBowlingEconomyBlock {
+  /** Pool economy — total_runs_conceded × 6 / total_legal_balls (balls-weighted, conventional career). */
+  pool: number | null
+  mean_per_innings: number | null
+  median_per_innings: number | null
+  variance: number | null
+  std: number | null
+  /** Per-innings RPO list aligned with wickets.observations. */
+  per_innings: number[]
+  milestones: {
+    p_econ_leq_6: ProbRecord
+    p_econ_leq_7: ProbRecord
+    p_econ_geq_9: ProbRecord
+    p_econ_geq_10: ProbRecord
+  }
+}
+
+export interface TeamBowlingPhaseRollup {
+  runs_total: number
+  balls_total: number
+  wickets_total: number
+  innings_active: number
+}
+
+export interface TeamBowlingDossier {
+  n_innings: number
+  /** Max observation date in the scope (ISO YYYY-MM-DD). Drives the dormancy badge on the lifetime block. */
+  last_match_date?: string | null
+  wickets: TeamBowlingWicketsBlock
+  runs_conceded: TeamBowlingRunsConcededBlock
+  economy: TeamBowlingEconomyBlock
+  phase: {
+    powerplay: TeamBowlingPhaseRollup
+    middle: TeamBowlingPhaseRollup
+    death: TeamBowlingPhaseRollup
+  }
+}
+
+export interface TeamBowlingDistribution {
+  team: string
+  scope: Record<string, string>
+  lifetime: TeamBowlingDossier
+  form: {
+    last_10: TeamBowlingDossier
+    last_60d: TeamBowlingDossier
+    last_6mo: TeamBowlingDossier
+    last_1yr: TeamBowlingDossier
+    /** 12 entries: 4 windows × 3 metrics (wickets.mean, runs_conceded.mean, economy.pool). */
+    delta: {
+      last_10_wickets_mean_minus_lifetime: number | null
+      last_10_runs_conceded_mean_minus_lifetime: number | null
+      last_10_economy_pool_minus_lifetime: number | null
+      last_60d_wickets_mean_minus_lifetime: number | null
+      last_60d_runs_conceded_mean_minus_lifetime: number | null
+      last_60d_economy_pool_minus_lifetime: number | null
+      last_6mo_wickets_mean_minus_lifetime: number | null
+      last_6mo_runs_conceded_mean_minus_lifetime: number | null
+      last_6mo_economy_pool_minus_lifetime: number | null
+      last_1yr_wickets_mean_minus_lifetime: number | null
+      last_1yr_runs_conceded_mean_minus_lifetime: number | null
+      last_1yr_economy_pool_minus_lifetime: number | null
+    }
+  }
+  suggested_splits: SuggestedSplit[]
+}
+
 export interface BowlingSummary {
   person_id: string
   name: string

@@ -235,6 +235,8 @@ export const getTeamTopBowlers = (team: string, filters?: F & { limit?: number }
   fetchApi<{ top_bowlers: import('./types').TeamTopBowler[] }>(`/api/v1/teams/${te(team)}/bowling/top-bowlers`, filters as Record<string, string>)
 export const getTeamBowlingPhaseSeasonHeatmap = (team: string, filters?: F) =>
   fetchApi<import('./types').BowlingPhaseSeasonHeatmap>(`/api/v1/teams/${te(team)}/bowling/phase-season-heatmap`, filters as Record<string, string>)
+export const getTeamBowlingDistribution = (team: string, filters?: F & { as_of_date?: string }) =>
+  fetchApi<import('./types').TeamBowlingDistribution>(`/api/v1/teams/${te(team)}/bowling/distribution`, filters as Record<string, string>)
 
 export const getTeamFieldingSummary = (team: string, filters?: F) =>
   fetchApi<import('./types').TeamFieldingSummary>(`/api/v1/teams/${te(team)}/fielding/summary`, filters as Record<string, string>)
