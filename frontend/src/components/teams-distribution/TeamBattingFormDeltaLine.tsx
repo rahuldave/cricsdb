@@ -9,7 +9,7 @@
  * Color discipline (CLAUDE.md "Form deltas in oxblood — sign carries
  * direction"): every delta value renders in oxblood regardless of
  * sign. The +/− sign carries direction; the color asserts "this is
- * form, vs scope baseline." No green/red polarity.
+ * form, vs scope average." No green/red polarity.
  *
  * Layout: scope-baseline row above the delta row so each delta is
  * self-anchoring — a reader doesn't have to remember/derive the
@@ -72,7 +72,7 @@ export default function TeamBattingFormDeltaLine({ dossier }: Props) {
       lineHeight: 1.4,
     }}>
       <div>
-        Scope baseline / innings · runs {fmtMean(lifetime.runs.mean_per_innings, 1)}
+        Scope average / innings · runs {fmtMean(lifetime.runs.mean_per_innings, 1)}
         {' · '}RR {fmtMean(lifetime.run_rate.pool, 2)}
       </div>
       <div style={{

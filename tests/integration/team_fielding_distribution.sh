@@ -342,8 +342,8 @@ esac
 echo ""
 echo "Test 8 · Form-delta line — oxblood deltas, scope-baseline above"
 
-has_scope_baseline=$(ab_eval "/Scope baseline \/ innings/.test(document.querySelector('$PANEL_SEL').innerText)")
-assert_eq "Form-delta line shows scope baseline above" "true" "$has_scope_baseline"
+has_scope_baseline=$(ab_eval "/Scope average \/ innings/.test(document.querySelector('$PANEL_SEL').innerText)")
+assert_eq "Form-delta line shows scope average above" "true" "$has_scope_baseline"
 
 oxblood_count=$(ab_eval "[...document.querySelectorAll('$PANEL_SEL span.num')].filter(s => /^[+−][0-9]/.test(s.innerText) && s.style.color === 'rgb(122, 31, 31)').length")
 non_oxblood=$(ab_eval "[...document.querySelectorAll('$PANEL_SEL span.num')].filter(s => /^[+−][0-9]/.test(s.innerText) && s.style.color !== 'rgb(122, 31, 31)' && s.style.color !== '').length")

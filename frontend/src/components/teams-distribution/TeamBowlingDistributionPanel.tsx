@@ -195,7 +195,7 @@ function SparklineLegend({ globalLegend, showRolling }: {
       fontFamily: 'var(--serif)', fontStyle: 'italic',
       fontSize: '0.7rem', color: 'var(--ink-faint)',
     }}>
-      <span><Swatch color="#1A1714" h={2} />scope baseline</span>
+      <span><Swatch color="#1A1714" h={2} />scope average</span>
       <span><Swatch color="#8A7D70" h={1.5} />gender-global ({globalLegend})</span>
       {showRolling && (
         <span><Swatch color="#7A1F1F" h={1.5} />rolling-10 mean</span>

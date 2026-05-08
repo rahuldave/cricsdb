@@ -11,7 +11,7 @@
  * per-bar color override. Component knows nothing about
  * Bowler vs Batter observation shapes.
  *
- * Two reference lines per spec §12.2.6 — green scope baseline
+ * Two reference lines per spec §12.2.6 — green scope average
  * (where this player usually sits) + black gender-global
  * (where any player at this tier usually sits).
  *

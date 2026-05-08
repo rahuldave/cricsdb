@@ -10,7 +10,7 @@
  * **oxblood** regardless of sign. Form is a rolling concept across
  * the codebase visually associated with oxblood (rolling-mean
  * overlay on sparklines uses #7A1F1F). Sign carries direction (+/−);
- * color asserts "this is form, vs scope baseline." No green/red
+ * color asserts "this is form, vs scope average." No green/red
  * polarity — that conflates "above baseline" with "good," which
  * isn't what a fielder distribution dossier is asserting.
  *
@@ -75,7 +75,7 @@ export default function FielderFormDeltaLine({ dossier }: Props) {
       lineHeight: 1.4,
     }}>
       <div>
-        Scope baseline / match · cat {fmtMean(lifetime.catches.mean_per_match)}
+        Scope average / match · cat {fmtMean(lifetime.catches.mean_per_match)}
         {' · '}ro {fmtMean(lifetime.run_outs.mean_per_match)}
         {isKeeper && <> · st {fmtMean(lifetime.stumpings?.mean_per_match)}</>}
       </div>

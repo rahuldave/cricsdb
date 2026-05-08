@@ -70,7 +70,7 @@ export default function TeamBowlingFormDeltaLine({ dossier }: Props) {
       lineHeight: 1.4,
     }}>
       <div>
-        Scope baseline / innings · wkts {fmtMean(lifetime.wickets.mean_per_innings, 2)}
+        Scope average / innings · wkts {fmtMean(lifetime.wickets.mean_per_innings, 2)}
         {' · '}runs {fmtMean(lifetime.runs_conceded.mean_per_innings, 1)}
         {' · '}RPO {fmtMean(lifetime.economy.pool, 2)}
       </div>

@@ -66,7 +66,7 @@ export default function TeamFieldingFormDeltaLine({ dossier }: Props) {
       lineHeight: 1.4,
     }}>
       <div>
-        Scope baseline / innings · catches {fmtMean(lifetime.catches.mean_per_innings, 2)}
+        Scope average / innings · catches {fmtMean(lifetime.catches.mean_per_innings, 2)}
         {' · '}run-outs {fmtMean(lifetime.run_outs.mean_per_innings, 2)}
         {' · '}stumpings {fmtMean(lifetime.stumpings.mean_per_innings, 2)}
       </div>

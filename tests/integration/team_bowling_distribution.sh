@@ -379,8 +379,8 @@ echo ""
 echo "Test 10 · Form-delta line — oxblood deltas, scope-baseline above"
 
 # Two-line layout per CLAUDE.md "Delta lines need the baseline visible"
-has_scope_baseline=$(ab_eval "/Scope baseline \/ innings/.test(document.querySelector('$PANEL_SEL').innerText)")
-assert_eq "Form-delta line shows scope baseline above" "true" "$has_scope_baseline"
+has_scope_baseline=$(ab_eval "/Scope average \/ innings/.test(document.querySelector('$PANEL_SEL').innerText)")
+assert_eq "Form-delta line shows scope average above" "true" "$has_scope_baseline"
 
 # Form deltas all in oxblood (#7A1F1F = rgb(122, 31, 31)) per CLAUDE.md
 # "Form deltas in oxblood; sign carries direction".

@@ -14,7 +14,7 @@
  * Sparkline now uses the lifted DistributionSparkline with:
  *   - Tier-coloured bars on the Runs tab (matching the histogram
  *     bins — failure/building/fifty/century/rare).
- *   - Dual reference lines: black scope baseline + gray gender-
+ *   - Dual reference lines: black scope average + gray gender-
  *     global anchor (BATTING_GLOBAL_* in distribution/globalBaselines).
  *   - Rolling-10 mean overlay (oxblood/red) on the Scope window
  *     when n ≥ 10.
@@ -197,7 +197,7 @@ function SparklineLegend({ globalLegend, showRolling }: {
       fontFamily: 'var(--serif)', fontStyle: 'italic',
       fontSize: '0.7rem', color: 'var(--ink-faint)',
     }}>
-      <span><Swatch color="#1A1714" h={2} />scope baseline</span>
+      <span><Swatch color="#1A1714" h={2} />scope average</span>
       <span><Swatch color="#8A7D70" />gender-global ({globalLegend})</span>
       {showRolling && (
         <span><Swatch color="#7A1F1F" />rolling-10 mean</span>
