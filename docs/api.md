@@ -844,6 +844,299 @@ Numeric metrics envelope-wrapped; identity-bearing `highest` +
 }
 ```
 
+### Distribution dossiers (per-innings)
+
+Three sibling endpoints — one per discipline — that mirror the per-
+player distribution dossiers (`/batters/{id}/distribution`, etc.)
+at team grain. Each is a self-contained per-innings dossier with
+two or three sibling distribution blocks under one master sample,
+phase rollup, four scope-anchored form windows (`last_10` /
+`last_60d` / `last_6mo` / `last_1yr`), Wilson 95% CIs on every
+probability, and scope-derived suggested-splits.
+
+`FilterParams.filter_team` is IGNORED — the team path-param
+dominates. `FilterParams.filter_opponent` works as expected.
+Optional `as_of_date` (YYYY-MM-DD) anchors the calendar form
+windows deterministically; production callers omit it. Spec:
+`internal_docs/spec-distribution-stats.md` §16.
+
+#### `GET /api/v1/teams/{team}/batting/distribution`
+
+Master sample = each innings the team batted (`i.team = :team`).
+Two sibling blocks: `runs` (skewed continuous; chain-ladder
+conditionals at 100/150/200/230 + over-aware doubling at the
+10-over checkpoint) + `run_rate` (continuous per-over; flipped
+polarity vs. bowler economy — high RR is good for batting). Per-
+innings observation row carries `runs_at_10` / `wickets_at_10` /
+`reached_10_overs` for the over-aware probabilities + the
+escalation-ratio paired magnitude stat.
+
+```bash
+curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/batting/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
+```
+
+```jsonc
+{
+  "team": "Mumbai Indians",
+  "scope": { "tournament": "Indian Premier League",
+             "season_from": "2024", "season_to": "2024" },
+  "lifetime": {
+    "n_innings": 14,
+    "runs": {
+      "total": 2568, "mean_per_innings": 183.4286, "median": 182.5,
+      "variance": 1537.0, "std": 39.205,
+      "escalation_ratio_median": 2.1009,
+      "observations": [
+        { "innings_id": 11782, "match_id": 5879, "innings_number": 1,
+          "date": "2024-03-24",
+          "runs": 162, "balls": 120, "wickets": 9,
+          "runs_at_10": 88, "wickets_at_10": 2, "reached_10_overs": 1,
+          "runs_pp": 52, "balls_pp": 36, "wickets_pp": 2,
+          "runs_mid": 74, "balls_mid": 54, "wickets_mid": 1,
+          "runs_death": 36, "balls_death": 30, "wickets_death": 6 }
+        // ... 14 rows, date-asc
+      ],
+      "milestones": {
+        // simples (denom = n_innings)
+        "p_lt_100":  { "value": 0.0,    "num": 0,  "denom": 14, "ci_low": 0.0,  "ci_high": 0.2153 },
+        "p_geq_100": { "value": 1.0,    "num": 14, "denom": 14, ... },
+        "p_geq_150": { "value": 0.7143, "num": 10, "denom": 14, ... },
+        "p_geq_200": { "value": 0.2143, "num": 3,  "denom": 14, ... },
+        "p_geq_230": { "value": 0.2143, "num": 3,  "denom": 14, ... },
+        // chain ladder — denom = the rung below
+        "p_150_given_100": { "value": 0.7143, "num": 10, "denom": 14, ... },
+        "p_200_given_150": { "value": 0.3,    "num": 3,  "denom": 10, ... },
+        "p_230_given_200": { "value": 1.0,    "num": 3,  "denom": 3,  ... },
+        // over-aware: denom = innings with reached_10_overs=1 AND runs_at_10>0
+        "p_double_at_10":  { "value": 0.6429, "num": 9,  "denom": 14, ... }
+      }
+    },
+    "run_rate": {
+      "pool": 9.594, "mean_per_innings": 9.6296,
+      "median_per_innings": 9.55, "variance": 0.4861, "std": 0.6972,
+      "per_innings": [9.6, 8.55, /* ... */],
+      "milestones": {
+        "p_rr_leq_7":  {...}, "p_rr_leq_8":  {...},
+        "p_rr_geq_9":  {...}, "p_rr_geq_10": {...}
+      }
+    },
+    "phase": {
+      "powerplay": { "runs_total": 789,  "balls_total": 504, "wickets_total": 25, "innings_active": 14 },
+      "middle":    { "runs_total": 1131, "balls_total": 756, "wickets_total": 35, "innings_active": 14 },
+      "death":     { "runs_total": 648,  "balls_total": 346, "wickets_total": 36, "innings_active": 14 }
+    },
+    "last_match_date": "2024-05-17"
+  },
+  "form": {
+    "last_10":  { "n_innings": 10, "runs": {...}, "run_rate": {...}, "phase": {...} },
+    "last_60d": { "n_innings": 14, ... },
+    "last_6mo": { "n_innings": 14, ... },
+    "last_1yr": { "n_innings": 14, ... },
+    "delta": {
+      // 8 entries: 4 windows × 2 metrics (runs_mean + run_rate_pool)
+      "last_10_runs_mean_minus_lifetime":      -1.5286,
+      "last_10_run_rate_pool_minus_lifetime":   0.072,
+      // ... last_60d / last_6mo / last_1yr deltas
+    }
+  },
+  "suggested_splits": [
+    { "label": "All Indian Premier League", "params": { "tournament": "Indian Premier League" } },
+    { "label": "All cricket in 2024", "params": { "season_from": "2024", "season_to": "2024" } },
+    { "label": "All-time", "params": {} }
+  ]
+}
+```
+
+Wickets here is the team-batting "wickets fallen" count and excludes
+`'retired hurt'` / `'retired not out'` (matches the existing team-
+batting/by-phase convention).
+
+#### `GET /api/v1/teams/{team}/bowling/distribution`
+
+Master sample = the OPPONENT's batting innings under the active
+filter scope (side-neutral team filter — match has the team, the
+innings's batting side is NOT the team). Three sibling blocks:
+
+- **`wickets`** — discrete count + simples (`p_leq_3`, `p_geq_5`,
+  `p_geq_7`, `p_eq_10`) + ≥5-anchored conditionals (`p_7_given_5`,
+  `p_10_given_5`) + over-aware `p_geq_3_at_10` ("early
+  breakthrough") and `p_eq_10_given_3_at_10` ("finishing rate
+  after early breakthrough").
+- **`runs_conceded`** — mirror of team-batting `runs` polarity-
+  flipped (low conceded is good). Five simples
+  (`p_lt_100`/`p_lt_150`/`p_geq_150`/`p_geq_200`/`p_geq_230`) +
+  chain ladder + over-aware doubling (`p_double_at_10` —
+  "opp doubled on us from halfway").
+- **`economy`** — sibling of bowler v1 economy block, at team
+  grain. Same pool / per-innings / median schema; same milestones
+  (`p_econ_leq_6/7`, `p_econ_geq_9/10`).
+
+**Wickets exclusion list (TEAM-CREDITED).** The wickets count on
+this endpoint INCLUDES run-outs — the team caused them (a fielder
+threw the ball). Excluded kinds: `'retired hurt'`, `'retired out'`,
+`'retired not out'`, `'obstructing the field'` (the four non-team-
+credited kinds). This DIVERGES from `/teams/{team}/bowling/summary`
+which uses the bowler-credited 5-element exclusion list (also
+excludes `'run out'`). Both numbers are correct — they answer
+different questions ("how many wickets did this team take?" vs
+"how many wickets did our bowlers take?"). See `internal_docs/
+design-decisions.md` "Team-bowling distribution wicket count"
+for rationale.
+
+```bash
+curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/bowling/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
+```
+
+```jsonc
+{
+  "team": "Mumbai Indians",
+  "scope": { "tournament": "Indian Premier League",
+             "season_from": "2024", "season_to": "2024" },
+  "lifetime": {
+    "n_innings": 14,
+    "wickets": {
+      "total": 85, "mean_per_innings": 6.0714, "median": 6.0,
+      "variance": 6.9945, "std": 2.6447,
+      "observations": [
+        { "innings_id": 11781, "match_id": 5879, "innings_number": 0,
+          "date": "2024-03-24",
+          "runs_conceded": 168, "balls": 120, "wickets": 6,
+          "runs_at_10": 82, "wickets_at_10": 2, "reached_10_overs": 1,
+          "runs_pp": 47, "balls_pp": 36, "wickets_pp": 1,
+          "runs_mid": 77, "balls_mid": 54, "wickets_mid": 2,
+          "runs_death": 44, "balls_death": 30, "wickets_death": 3 }
+        // ... 14 rows
+      ],
+      "milestones": {
+        // simples (denom = n_innings)
+        "p_leq_3":  { "value": 0.1429, "num": 2,  "denom": 14, ... },
+        "p_geq_5":  { "value": 0.6429, "num": 9,  "denom": 14, ... },
+        "p_geq_7":  { "value": 0.4286, "num": 6,  "denom": 14, ... },
+        "p_eq_10":  { "value": 0.1429, "num": 2,  "denom": 14, ... },
+        // ≥5-anchored conditionals (stable denom)
+        "p_7_given_5":   { "value": 0.6667, "num": 6, "denom": 9, ... },
+        "p_10_given_5":  { "value": 0.2222, "num": 2, "denom": 9, ... },
+        // over-aware
+        "p_geq_3_at_10":         { "value": 0.3571, "num": 5, "denom": 14, ... },
+        "p_eq_10_given_3_at_10": { "value": 0.4,    "num": 2, "denom": 5,  ... }
+      }
+    },
+    "runs_conceded": {
+      "total": 2660, "mean_per_innings": 190.0, "median": 188.0,
+      "variance": ..., "std": ...,
+      "escalation_ratio_median": 2.022,
+      "milestones": {
+        // simples — polarity flipped vs. team-batting (low = good)
+        "p_lt_100":  {...}, "p_lt_150":  {...},
+        "p_geq_150": {...}, "p_geq_200": {...}, "p_geq_230": {...},
+        // chain ladder (the leakage chain — INDIGO across)
+        "p_150_given_100": {...}, "p_200_given_150": {...}, "p_230_given_200": {...},
+        // over-aware
+        "p_double_at_10": {...}
+      }
+    },
+    "economy": {
+      "pool": 9.9069, "mean_per_innings": 9.8699,
+      "median_per_innings": 9.95, "variance": ..., "std": ...,
+      "per_innings": [...],
+      "milestones": { "p_econ_leq_6": {...}, "p_econ_leq_7": {...},
+                      "p_econ_geq_9": {...}, "p_econ_geq_10": {...} }
+    },
+    "phase": { "powerplay": {...}, "middle": {...}, "death": {...} },
+    "last_match_date": "2024-05-17"
+  },
+  "form": {
+    "last_10": {...}, "last_60d": {...}, "last_6mo": {...}, "last_1yr": {...},
+    "delta": {
+      // 12 entries: 4 windows × 3 metrics
+      // (wickets_mean + runs_conceded_mean + economy_pool)
+    }
+  },
+  "suggested_splits": [...]
+}
+```
+
+#### `GET /api/v1/teams/{team}/fielding/distribution`
+
+Master sample = the OPPONENT's batting innings; counts fielding
+events credited to any of the team's matchplayers in that match
+(substitutes are tracked separately on the `substitute_catches`
+scalar). Three sibling count blocks:
+
+- **`catches`** — 4 simples (`p_eq_0`, `p_geq_3`, `p_geq_5`,
+  `p_geq_7`); no conditional ladder.
+- **`run_outs`** — 3-simple partition (`p_eq_0`, `p_eq_1`,
+  `p_geq_2`); sums to 1.
+- **`stumpings`** — same 3-simple partition. **ALWAYS shipped at
+  team grain** — every senior team has had a keeper at some
+  point; zero-event scopes ship all-zero chips with small-n CIs
+  rather than null. (Diverges from player-fielder
+  `/fielders/{id}/distribution`, where the stumpings block is
+  null for non-keepers.)
+
+Top-level scalars: `n_innings_fielded`, `wickets_total` (any-kind
+count for the fielder-ratio tooltip "X catches of Y wickets"),
+`substitute_catches`.
+
+```bash
+curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/fielding/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
+```
+
+```jsonc
+{
+  "team": "Mumbai Indians",
+  "scope": { "tournament": "Indian Premier League",
+             "season_from": "2024", "season_to": "2024" },
+  "lifetime": {
+    "n_innings_fielded": 14,
+    "wickets_total": 85,
+    "substitute_catches": 1,
+    "observations": [
+      { "innings_id": 11781, "match_id": 5879, "innings_number": 0,
+        "date": "2024-03-24",
+        "catches": 5, "run_outs": 0, "stumpings": 0,
+        "substitute_catches": 0, "wickets_total": 6 }
+      // ... 14 rows
+    ],
+    "catches": {
+      "total": 55, "mean_per_innings": 3.9286, "median": 4.0,
+      "variance": ..., "std": ...,
+      "milestones": {
+        "p_eq_0":  { "value": 0.0714, "num": 1,  "denom": 14, ... },
+        "p_geq_3": { "value": 0.9286, "num": 13, "denom": 14, ... },
+        "p_geq_5": { "value": 0.2857, "num": 4,  "denom": 14, ... },
+        "p_geq_7": { "value": 0.0,    "num": 0,  "denom": 14, ... }
+      }
+    },
+    "run_outs": {
+      "total": 8, "mean_per_innings": 0.5714, ...,
+      "milestones": {
+        "p_eq_0":  { "value": 0.6429, "num": 9, "denom": 14, ... },
+        "p_eq_1":  { "value": 0.1429, "num": 2, "denom": 14, ... },
+        "p_geq_2": { "value": 0.2143, "num": 3, "denom": 14, ... }
+      }
+    },
+    "stumpings": {
+      "total": 0, "mean_per_innings": 0.0, ...,
+      "milestones": {
+        "p_eq_0":  { "value": 1.0, "num": 14, "denom": 14, ... },
+        "p_eq_1":  { "value": 0.0, "num": 0,  "denom": 14, ... },
+        "p_geq_2": { "value": 0.0, "num": 0,  "denom": 14, ... }
+      }
+    },
+    "last_match_date": "2024-05-17"
+  },
+  "form": {
+    "last_10": {...}, "last_60d": {...}, "last_6mo": {...}, "last_1yr": {...},
+    "delta": {
+      // 12 entries: 4 windows × 3 metrics
+      // (catches_mean + run_outs_mean + stumpings_mean)
+    }
+  },
+  "suggested_splits": [...]
+}
+```
+
 ## Compare metric envelope
 
 The 5 team-compare summary endpoints —

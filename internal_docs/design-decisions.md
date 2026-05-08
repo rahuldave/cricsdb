@@ -49,6 +49,23 @@ The bowling router filters `kind NOT IN ('run out', 'retired hurt', 'retired out
 
 For batting dismissals, we exclude `retired hurt` and `retired out` (voluntary exits) but include run outs.
 
+### Team-bowling distribution wicket count — INCLUDES run-outs (diverges from /summary)
+
+`/api/v1/teams/{team}/bowling/distribution` (spec §16.3) uses a TEAM-CREDITED wicket count that **includes run-outs**, while the sibling `/teams/{team}/bowling/summary` uses the bowler-credited count from `BOWLER_WICKET_EXCLUDE` (excludes run-outs). The exclusion lists differ by exactly one kind:
+
+| Endpoint | Excluded kinds | Question it answers |
+|---|---|---|
+| `/teams/{team}/bowling/summary` | `'run out'`, `'retired hurt'`, `'retired out'`, `'retired not out'`, `'obstructing the field'` | "How many wickets did this team's BOWLERS take?" |
+| `/teams/{team}/bowling/distribution` | `'retired hurt'`, `'retired out'`, `'retired not out'`, `'obstructing the field'` | "How many wickets did this TEAM take?" |
+
+**Why the divergence is correct (not a bug to fix):**
+
+A run-out is a fielding event the team caused — a sharp throw or a relay. Crediting it to the team in a per-innings team-performance dossier is natural ("we took 7 wickets that game" includes the run-out the keeper effected). Crediting it to bowlers in `/summary` is also natural — that's the conventional career-numbers reading for bowlers.
+
+Numerically: for Mumbai Indians all-time, distribution-wickets = 1999 vs summary-wickets ≈ 1808 (Δ ≈ 191 run-outs over ~324 innings ≈ 0.6 run-outs per innings, plausible). Both numbers are correct; conflating them would force one to lie.
+
+If a future contributor sees these and tries to align them, the right answer is "leave them divergent and document the question each is answering" — exactly what this entry does. The earlier draft of spec §16.3.1 wrongly claimed the distribution slice "mirrored team-bowling/summary"; spec text fixed 2026-05-08 alongside the implementation.
+
 ### Boundary detection
 
 A four is `runs_batter = 4` unless `runs_non_boundary` is set (221 cases in the dataset — typically overthrows or all-run fours). A six is always `runs_batter = 6`. The SQL:

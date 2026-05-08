@@ -41,6 +41,21 @@ api/
                          _inning_match_filter helper (derived match-id subquery —
                          "team batted in inning X"). Spec:
                          internal_docs/spec-inning-split.md.
+                         /api/v1/teams/{team}/{batting|bowling|fielding}/distribution
+                         — three sibling per-innings distribution dossiers
+                          (master sample = team's own batting innings for
+                          batting; the OPP's batting innings for bowling +
+                          fielding). Two/three sibling blocks per dossier
+                          (runs + run_rate / wickets + runs_conceded + economy
+                          / catches + run_outs + stumpings); chain-ladder
+                          conditionals + over-aware probabilities (`p_double_at_10`
+                          for batting + bowling-conceded; `p_geq_3_at_10` +
+                          `p_eq_10_given_3_at_10` for bowling-wickets); four
+                          scope-anchored form windows. Wickets on
+                          /bowling/distribution are TEAM-CREDITED (include
+                          run-outs) — diverges from /bowling/summary's
+                          bowler-credited count. Spec:
+                          internal_docs/spec-distribution-stats.md §16.
                          The 5 compare summary endpoints (team_summary,
                          team_batting_summary, team_bowling_summary,
                          team_fielding_summary, team_partnerships_summary) wrap

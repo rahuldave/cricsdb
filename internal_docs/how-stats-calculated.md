@@ -513,6 +513,112 @@ axis is separate from per-innings".
 
 ---
 
+## Distribution-dossier probabilities (team v1)
+
+The team-distribution endpoints (`/api/v1/teams/{team}/{batting|
+bowling|fielding}/distribution`, spec §16) introduce three formula
+families beyond the player-distribution endpoints. Every probability
+ships through `api.wilson.prob_record(num, denom)` as `{value, num,
+denom, ci_low, ci_high}` with a Wilson 95% CI; `value` is `null`
+when `denom == 0`.
+
+### Chain-ladder conversion probabilities (team batting + bowling)
+
+Cricket's natural conversion narrative — "got past N → kicked on past
+M" — runs as a chain where each rung's denominator is the rung
+below:
+
+```
+p_150_given_100 = count(score ≥ 150) / count(score ≥ 100)
+p_200_given_150 = count(score ≥ 200) / count(score ≥ 150)
+p_230_given_200 = count(score ≥ 230) / count(score ≥ 200)
+```
+
+Why chain (vs. fixed anchor like the bowler `p_*_given_2`): for
+batting/runs-conceded the upper rungs aren't rare events (innings
+≥150 is a normal IPL total); the natural reading is "given we got
+to 150, did we kick on?" not "given anyone got to 100, the
+conditional through the chain." For bowler wickets, ≥5 is rare and
+≥2 is the stable anchor — so wicket conditionals stay anchored
+(`p_3_given_2`/`p_4_given_2`/`p_5_given_2` for player bowlers;
+`p_7_given_5`/`p_10_given_5` for team bowling).
+
+### Over-aware doubling — `p_double_at_10`
+
+For team batting + team-bowling-conceded, the doubling probability
+captures "given X runs at the 10-over checkpoint, did the side
+reach (at least) 2X by innings end?":
+
+```
+denom = count(reached_10_overs == 1 AND runs_at_10 > 0)
+num   = count of those innings where final_runs >= 2 × runs_at_10
+p_double_at_10 = num / denom (Wilson 95% CI)
+```
+
+Why both gating conditions:
+- `reached_10_overs == 1` excludes innings curtailed by rain / D-L
+  / chase-ending before 10 overs (where the snapshot doesn't exist).
+  An innings is "reached_10" if it included ≥ 60 legal balls.
+- `runs_at_10 > 0` avoids the 0/0 when a side is 0 at halfway
+  (some innings = 1 wides until ball 60 is rare but possible at
+  amateur grade).
+
+Paired magnitude — `escalation_ratio_median`:
+
+```
+ratios = [final_runs / runs_at_10 for o in doubling_pool]
+escalation_ratio_median = median(ratios)  (None if pool empty)
+```
+
+This answers "by how much did the typical innings escalate?" — a
+1.85× median paired with `p_double_at_10 = 0.31` reads as "innings
+typically grew 1.85×, and 31% reached or exceeded 2.0×."
+
+### Over-aware breakthrough + finishing — `p_geq_3_at_10` /
+### `p_eq_10_given_3_at_10` (team bowling wickets)
+
+```
+denom_breakthrough = count(reached_10_overs == 1)
+num_breakthrough   = count(reached_10 AND wickets_at_10 >= 3)
+p_geq_3_at_10 = num_breakthrough / denom_breakthrough
+
+# "Finishing rate after early breakthrough":
+denom_finishing = count(reached_10 AND wickets_at_10 >= 3)
+num_finishing   = count(reached_10 AND wickets_at_10 >= 3 AND wickets == 10)
+p_eq_10_given_3_at_10 = num_finishing / denom_finishing
+```
+
+This answers two related questions: "how often did we get an early
+breakthrough?" and "given the early breakthrough, how often did we
+finish them off?"
+
+### Wicket attribution on team-bowling distribution
+
+Wicket counts on `/teams/{team}/bowling/distribution` are TEAM-
+CREDITED — they include run-outs (the team caused them by fielding
+the ball). Excluded kinds:
+
+```
+'retired hurt', 'retired out', 'retired not out', 'obstructing the field'
+```
+
+This DIVERGES from `/teams/{team}/bowling/summary`, which uses the
+bowler-credited 5-element exclusion (`BOWLER_WICKET_EXCLUDE` —
+also drops `'run out'`). Both numbers are correct; they answer
+different questions ("wickets the team took" vs "wickets the
+team's bowlers took"). See `internal_docs/design-decisions.md`
+"Team-bowling distribution wicket count" for full rationale.
+
+### Wickets fallen on team-batting distribution
+
+Wickets-fallen on `/teams/{team}/batting/distribution` excludes
+`'retired hurt'` and `'retired not out'` (matches the existing
+team-batting/by-phase convention — these are voluntary exits, not
+wickets the team "lost"). Run-outs and retired-out DO count as
+wickets fallen.
+
+---
+
 *Started 2026-04-28 after a user question revealed the avg col was
 displaying pool totals where it should display per-team averages
 for results metrics. Grow this doc whenever a new "wait, how is

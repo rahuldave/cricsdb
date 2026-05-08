@@ -3245,7 +3245,7 @@ at ≥2 because rare events on a discrete count behave differently
 
 ---
 
-## 16. Team v1 — distribution dossiers (DRAFT)
+## 16. Team v1 — distribution dossiers (IMPLEMENTED)
 
 > Sibling of §8 (batter), §11 (bowler), §13 (fielder). Three
 > separate per-discipline endpoints under the existing
@@ -3269,8 +3269,11 @@ at ≥2 because rare events on a discrete count behave differently
 > finishing probabilities at the 10-over checkpoint) are
 > settled below before any code is written.
 >
-> **Status: DRAFT — not yet implemented.** Pending build per
-> §16.8.
+> **Status: IMPLEMENTED 2026-05-08** across 9 commits (3 per
+> discipline — endpoint + sanity + regression). 8936 SQL-anchored
+> sanity assertions across 5 scopes per discipline; 48 regression
+> URLs locked at REG. See dated session log at the foot of this
+> file.
 
 ### 16.1 Common conventions across all three endpoints
 
@@ -3500,7 +3503,7 @@ Side-neutral team filter — pair `(m.team1, m.team2)` includes
 | `date` | `match.date` |
 | `runs_conceded` | `SUM(d.runs_total)` over the innings (= opp's final score) |
 | `balls` | legal balls bowled (= legal balls faced by opp) |
-| `wickets` | wickets the team took. Kind-exclusion: `wicket.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')` for **bowler-credited** wickets; for the team's bowling-side total INCLUDE run-outs (the team caused them; mirrors how `team-bowling/summary` already does it). Document the exact list. |
+| `wickets` | TEAM-CREDITED wicket count — INCLUDES run-outs (the team caused them by fielding the ball). Excluded kinds: `'retired hurt'`, `'retired out'`, `'retired not out'`, `'obstructing the field'`. ⚠ This DIVERGES from `/teams/{team}/bowling/summary`, which uses the bowler-credited 5-element exclusion (`BOWLER_WICKET_EXCLUDE` — also drops `'run out'`). Both numbers are correct; they answer different questions ("wickets the team took" vs "wickets the team's bowlers took"). The distribution slice intentionally uses the broader team-credited count since it's a per-innings dossier of team performance, not bowler attribution. See `internal_docs/design-decisions.md` "Team-bowling distribution wicket count" for rationale. |
 | `runs_at_10` | cumulative opp runs over first 60 legal balls |
 | `wickets_at_10` | cumulative wickets (team's bowling-side total, including run-outs) over first 60 legal balls |
 | `reached_10_overs` | `1` if opp innings included ≥ 60 legal balls; else `0` |
@@ -4239,4 +4242,19 @@ batting + bowling-conceded, `P(=10 | ≥3 at 10)` finishing for
 bowling-wickets), oxblood form deltas with self-anchoring
 baseline row, INDIGO/SAGE/OCHRE 3-tier palette throughout. Per-
 innings observation row gains `runs_at_10` + `wickets_at_10`.
-Pending implementation.*
+2026-05-08: team v1 BACKEND IMPLEMENTED (§16). Nine commits —
+3 per discipline (endpoint + sanity + regression). Three new
+endpoints registered at /api/v1/teams/{team}/{batting|bowling|
+fielding}/distribution. 8936 SQL-anchored sanity assertions
+total (2456 batting + 4165 bowling + 2315 fielding) across 5
+scopes per discipline plus an empty-scope edge case. 48
+regression URLs (16 per discipline) locked at REG with
+as_of_date=2025-01-01. Spec §16.3.1 wicket-exclusion clause
+clarified: team-bowling/distribution uses team-credited wickets
+(includes run-outs; 4-kind exclusion list); team-bowling/summary
+remains bowler-credited (BOWLER_WICKET_EXCLUDE — 5-kind list).
+The earlier draft text claimed the distribution slice "mirrored
+team-bowling/summary" — incorrect; the divergence is intentional
+and codified in design-decisions.md.
+Frontend (§17) pending — twelve atomic commits across three
+panels per §17.8.*

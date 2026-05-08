@@ -416,6 +416,68 @@ on 2026-04-19. They cover work that doesn't slot into a single A–Q
 letter (cross-cutting refactors, audit walks, infra fixes, follow-up
 batches) and serves as the "what shipped on day X" history.
 
+### Shipped 2026-05-08 (Team distribution dossiers — backend §16 IMPLEMENTED)
+
+Three sibling per-innings distribution endpoints under
+`/api/v1/teams/{team}/{batting|bowling|fielding}/distribution`,
+mirroring the existing per-player distribution dossiers
+(/batters/{id}/distribution etc.) at team grain. Spec
+`internal_docs/spec-distribution-stats.md` §16. Nine commits —
+3 per discipline (endpoint + sanity + regression).
+
+**Per-discipline shape:**
+- **Batting** — master sample = team's batting innings. Two
+  sibling blocks: `runs` (chain-ladder conditionals
+  100/150/200/230 + over-aware doubling `p_double_at_10` +
+  `escalation_ratio_median`) and `run_rate` (continuous per-over,
+  flipped polarity vs. bowler economy).
+- **Bowling** — master sample = OPP's batting innings. Three
+  sibling blocks: `wickets` (≥5-anchored ladder + over-aware
+  `p_geq_3_at_10` early breakthrough + `p_eq_10_given_3_at_10`
+  finishing rate), `runs_conceded` (mirror of team-batting runs,
+  polarity flipped), `economy` (sibling of bowler v1 §11.4.3).
+  Wickets count is TEAM-CREDITED (includes run-outs); diverges
+  from /bowling/summary's bowler-credited count by design.
+- **Fielding** — master sample = OPP's batting innings; counts
+  events credited to any of the team's matchplayers. Three count
+  blocks: `catches` (4 simples 0/≥3/≥5/≥7), `run_outs` and
+  `stumpings` (3-simple partition each). Stumpings ALWAYS shipped
+  at team grain (unlike player-fielder §13).
+
+**Cross-cutting:**
+- All three reuse `prob_record(num, denom)` from `api/wilson.py`
+  (Wilson 95% CI), `scope_anchor` from `api/form_windows.py` for
+  scope-anchored cutoffs, `suggested_splits` from
+  `api/scope_links.py`, and `_team_innings_clause` (side='batting'
+  or 'fielding') for filter scope. `FilterParams.filter_team`
+  is IGNORED — path-param dominates.
+- Per-innings observation row gains `runs_at_10`, `wickets_at_10`,
+  `reached_10_overs` for the over-aware probabilities.
+- 8/12-entry form delta blocks (4 windows × N metrics — 2 for
+  batting, 3 for bowling + fielding).
+
+**Tests:**
+- 8936 SQL-anchored sanity assertions total (2456 batting + 4165
+  bowling + 2315 fielding) across 5 scopes per discipline plus an
+  empty-scope edge case. Files:
+  `tests/sanity/test_team_{batting,bowling,fielding}_distribution_invariants.py`.
+- 48 regression URLs (16 per discipline) locked at REG with
+  `as_of_date=2025-01-01` for byte-stable baselines. Files:
+  `tests/regression/team_{batting,bowling,fielding}_distribution/urls.txt`.
+
+**Spec correction:** §16.3.1 had earlier claimed the team-bowling
+wicket count "mirrors how team-bowling/summary already does it".
+Inaccurate — the existing /bowling/summary uses `BOWLER_WICKET_EXCLUDE`
+(excludes run-outs); the distribution slice intentionally INCLUDES
+run-outs since the team caused them. Spec text rewritten in this
+session; rationale codified in `design-decisions.md` "Team-bowling
+distribution wicket count".
+
+**Frontend pending:** §17 (twelve atomic frontend commits across
+three panels — `TeamBattingDistributionPanel` /
+`TeamBowlingDistributionPanel` / `TeamFieldingDistributionPanel`
+mounted at the top of each existing Teams-page tab content area).
+
 ### Shipped 2026-04-29 (DOM-tests Batch 4 — Players + Venues + Matches + Charts)
 
 21 scripts + 1 harness extension across 11 commits, completing the
