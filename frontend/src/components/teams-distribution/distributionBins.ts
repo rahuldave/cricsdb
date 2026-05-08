@@ -281,3 +281,84 @@ export function buildTeamConcedeRPOHistogramRows(
   }
   return rows
 }
+
+// ─── Team Fielding — Catches (0..7 floor), Run-outs / Stumpings (0/1/≥2) ──
+//
+// Per spec §17.5: team-grain catches use a wider 0..7 histogram (since
+// teams catch 3-5 per innings typically); run-outs and stumpings keep
+// the player-fielder 3-bar partition.
+
+export type TeamFieldingTier = 'low' | 'mid' | 'high'
+
+export interface TeamCatchesBinRow {
+  bin: number
+  label: string
+  count: number
+  tier: TeamFieldingTier
+}
+
+/** Catches tier per spec §17.2 — 0 INDIGO (none caught) /
+ *  1-4 SAGE (typical) / ≥5 OCHRE (sharp fielding). */
+export function teamCatchesTier(c: number): TeamFieldingTier {
+  if (c === 0) return 'low'
+  if (c <= 4) return 'mid'
+  return 'high'
+}
+
+export function buildTeamCatchesHistogramRows(
+  observations: { catches: number }[],
+): TeamCatchesBinRow[] {
+  const counts = new Array(11).fill(0)
+  let maxC = 0
+  for (const o of observations) {
+    const i = Math.max(0, Math.min(10, o.catches))
+    counts[i] += 1
+    if (o.catches > maxC) maxC = o.catches
+  }
+  // Always render bins 0..7 so charts compare across teams; extend
+  // tail when an observation reaches 8+.
+  const lastIdx = Math.max(7, maxC)
+  const rows: TeamCatchesBinRow[] = []
+  for (let i = 0; i <= lastIdx; i += 1) {
+    rows.push({
+      bin: i,
+      label: String(i),
+      count: counts[i],
+      tier: teamCatchesTier(i),
+    })
+  }
+  return rows
+}
+
+// Run-outs + Stumpings — 3-bar partition (0 / 1 / ≥2). Same shape as
+// player-fielder; tier mapping per spec §17.2:
+//   Run-outs: 0 INDIGO / 1 SAGE / ≥2 OCHRE
+//   Stumpings: 0 INDIGO / 1 SAGE / ≥2 OCHRE
+
+export interface TeamCount3BinRow {
+  bin: number       // 0, 1, 2 (the ≥2 bucket sits at bin index 2)
+  label: string
+  count: number
+  tier: TeamFieldingTier
+}
+
+export function teamCount3Tier(idx: number): TeamFieldingTier {
+  if (idx === 0) return 'low'
+  if (idx === 1) return 'mid'
+  return 'high'
+}
+
+export function buildTeamCount3HistogramRows(
+  observations: { value: number }[],
+): TeamCount3BinRow[] {
+  const counts = [0, 0, 0]
+  for (const o of observations) {
+    const i = o.value === 0 ? 0 : o.value === 1 ? 1 : 2
+    counts[i] += 1
+  }
+  return [
+    { bin: 0, label: '0',  count: counts[0], tier: 'low'  },
+    { bin: 1, label: '1',  count: counts[1], tier: 'mid'  },
+    { bin: 2, label: '≥2', count: counts[2], tier: 'high' },
+  ]
+}

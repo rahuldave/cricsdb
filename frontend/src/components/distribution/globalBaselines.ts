@@ -165,3 +165,47 @@ export function pickTeamBowlingBaseline(
   if (g === 'female') return TEAM_BOWLING_GLOBAL_WOMEN
   return TEAM_BOWLING_GLOBAL_ALL_T20
 }
+
+// ─── Team-fielding baselines ──────────────────────────────────────────
+//
+// Per-innings team fielding (super-over excluded), 2026-05-08 snapshot.
+// Catches exclude substitutes per spec §16.4.
+//
+//   Bucket             innings  catches/inn  run_outs/inn  stumpings/inn
+//   ─────────────────  ───────  ───────────  ────────────  ─────────────
+//   All men             19,952  3.93         0.54          0.18
+//   All women            6,088  2.86         0.99          0.33
+//   All T20             26,040  3.68         0.65          0.21
+//
+// Whole-number rounded for the integer-y metrics (catches, run_outs);
+// stumpings rounds to 0 across the board so the gender-global line
+// won't render visibly — the scope-baseline (team's lifetime mean,
+// typically ~0.2-0.5) becomes the visible reference on that tab.
+
+export interface GlobalTeamFieldingBaselines {
+  /** Mean catches per team-innings (substitute catches excluded). */
+  catches: number
+  /** Mean run-outs per team-innings. */
+  run_outs: number
+  /** Mean stumpings per team-innings — typically 0 at whole-number resolution. */
+  stumpings: number
+}
+
+export const TEAM_FIELDING_GLOBAL_ALL_T20: GlobalTeamFieldingBaselines = {
+  catches: 4, run_outs: 1, stumpings: 0,
+}
+export const TEAM_FIELDING_GLOBAL_MEN: GlobalTeamFieldingBaselines = {
+  catches: 4, run_outs: 1, stumpings: 0,
+}
+export const TEAM_FIELDING_GLOBAL_WOMEN: GlobalTeamFieldingBaselines = {
+  catches: 3, run_outs: 1, stumpings: 0,
+}
+
+export function pickTeamFieldingBaseline(
+  scope: Record<string, string>,
+): GlobalTeamFieldingBaselines {
+  const g = scope.gender
+  if (g === 'male') return TEAM_FIELDING_GLOBAL_MEN
+  if (g === 'female') return TEAM_FIELDING_GLOBAL_WOMEN
+  return TEAM_FIELDING_GLOBAL_ALL_T20
+}
