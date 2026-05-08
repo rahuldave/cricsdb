@@ -4329,7 +4329,11 @@ async def _innings_master_sample_team_fielding(
             (SELECT COUNT(*) FROM fieldingcredit fc
              JOIN delivery d ON d.id = fc.delivery_id
              WHERE d.innings_id = i.id
-               AND fc.kind = 'caught'
+               -- Convention 3 (codified 2026-04-26 in /summary): catches
+               -- is the inclusive total. caught_and_bowled is a sub-count
+               -- of catches, broken out separately on /summary but rolled
+               -- into the totals on every endpoint that surfaces catches.
+               AND fc.kind IN ('caught', 'caught_and_bowled')
                AND COALESCE(fc.is_substitute, 0) = 0
                AND fc.fielder_id IN
                  (SELECT mp.person_id FROM matchplayer mp

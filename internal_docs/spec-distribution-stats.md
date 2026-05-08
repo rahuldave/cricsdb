@@ -2652,7 +2652,7 @@ match the player appeared on the team sheet, in scope.
 |---|---|
 | `match_id` | `matchplayer.match_id` |
 | `date` | `match.date` (used for ordering + form windows) |
-| `catches` | `COUNT(fieldingcredit WHERE kind = 'caught' AND COALESCE(is_substitute, 0) = 0 AND fielder_id = id AND innings.match_id = match_id)` |
+| `catches` | `COUNT(fieldingcredit WHERE kind IN ('caught','caught_and_bowled') AND COALESCE(is_substitute, 0) = 0 AND fielder_id = id AND innings.match_id = match_id)` — inclusive of caught-and-bowled per Convention 3 |
 | `run_outs` | same shape, `kind = 'run_out'` (substitute-exclusion still applies) |
 | `stumpings` | same shape, `kind = 'stumped'` (no substitute filter — sub keepers are not a thing) |
 | `is_keeper` | `1` if any `keeperassignment.keeper_id = id` for any innings of this match; `0` otherwise |
@@ -3619,7 +3619,7 @@ Three deltas per window (one per block focal stat):
 | `match_id` | `innings.match_id` |
 | `innings_number` | 1 or 2 |
 | `date` | `match.date` |
-| `catches` | `COUNT(fc WHERE kind='caught' AND COALESCE(is_substitute,0)=0 AND fielder_id ∈ team's matchplayers)` |
+| `catches` | `COUNT(fc WHERE kind IN ('caught','caught_and_bowled') AND COALESCE(is_substitute,0)=0 AND fielder_id ∈ team's matchplayers)` — inclusive of caught-and-bowled per Convention 3 |
 | `run_outs` | same shape, `kind='run_out'` |
 | `stumpings` | same shape, `kind='stumped'` |
 | `wickets_total` | wickets fallen in the innings (any kind) — denominator for fielder-ratio tooltip |

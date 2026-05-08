@@ -2111,3 +2111,38 @@ The protocol's litmus test: a clause that needs alias-availability
 handling (alias not always in scope, build() must gate it). For
 clauses that are always safe to emit (e.g. a match-level boolean
 filter), prefer adding to `FilterBarParams.build` directly.
+
+## Convention 3 applies to distribution endpoints, not just /summary
+
+When `/{team}/fielding/summary` and `/{player}/fielding/summary`
+were unified on 2026-04-26, "Convention 3" was codified: the
+`catches` field is the **inclusive total** — `caught` plus
+`caught_and_bowled` — with `caught_and_bowled` separately broken
+out as a sub-count. Consumers summing `catches + caught_and_bowled`
+would double-count.
+
+The two distribution endpoints shipped later:
+- `/api/v1/teams/{team}/fielding/distribution` (§16.4, 2026-05-08
+  backend)
+- `/api/v1/fielders/{id}/distribution` (§13, 2026-05-07 backend)
+
+inadvertently counted only `kind = 'caught'`, dropping C&B.
+Surfaced 2026-05-08 by the user querying "isn't C&B a catch
+too?" while reviewing the team-fielding integration test.
+Quantified for MI in IPL: 1047 reported vs 1112 actual (~6%
+silently missing); for the four player-fielder regression
+subjects the gap is zero (none are bowlers).
+
+**Rule going forward:** any new endpoint that surfaces a
+`catches` headline at fielder OR team grain MUST count
+`kind IN ('caught', 'caught_and_bowled')` AND coalesce
+`is_substitute` to 0 by default. Substitute_catches is the
+exception — it's a reconciliation scalar, surfaced to verify
+totals against /summary; predicate stays `kind = 'caught'`
+only because (a) substitutes can't bowl by Law, so no C&B
+substitutes exist anyway, and (b) widening the predicate
+adds zero numeric signal.
+
+The fix shipped as a 5-commit series (regression-flip →
+backend → sanity re-anchor → integration test → REG re-lock)
+on 2026-05-08.

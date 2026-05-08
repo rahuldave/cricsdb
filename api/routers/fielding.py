@@ -647,7 +647,11 @@ async def _match_master_sample_fielder(
         ),
         fielding_per_match AS (
             SELECT i.match_id,
-                   SUM(CASE WHEN fc.kind = 'caught'
+                   -- Convention 3 (codified 2026-04-26 in /fielding/summary):
+                   -- catches is the inclusive total — caught_and_bowled
+                   -- is a sub-count rolled into catches everywhere a
+                   -- single "catches" headline is surfaced.
+                   SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
                             AND COALESCE(fc.is_substitute, 0) = 0
                             THEN 1 ELSE 0 END) AS catches,
                    SUM(CASE WHEN fc.kind = 'run_out'
