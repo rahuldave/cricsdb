@@ -122,3 +122,46 @@ export function pickTeamBattingBaseline(
   if (g === 'female') return TEAM_BATTING_GLOBAL_WOMEN
   return TEAM_BATTING_GLOBAL_ALL_T20
 }
+
+// ─── Team-bowling baselines ───────────────────────────────────────────
+//
+// Per-innings team bowling — same denominator as team-batting (every
+// batting innings is a bowling-team innings). 2026-05-08 snapshot:
+//
+//   Bucket             innings  wkts/inn  runs/inn  pool RPO
+//   ─────────────────  ───────  ────────  ────────  ────────
+//   All men             19,952  6.28      147.7     7.99
+//   All women            6,088  6.05      112.4     6.28
+//   All T20             26,040  6.23      139.5     7.60
+//
+// Wicket-counting follows §16.3.1's team-credited 4-kind exclusion
+// list (run-outs counted; retired/obstructing excluded). Whole-number
+// rounded per spec §17.2.
+
+export interface GlobalTeamBowlingBaselines {
+  /** Mean wickets credited per team-innings. */
+  wickets: number
+  /** Mean runs conceded per team-innings. */
+  runs: number
+  /** Pool RPO — total_runs_conceded × 6 / total_legal_balls. */
+  rpo: number
+}
+
+export const TEAM_BOWLING_GLOBAL_ALL_T20: GlobalTeamBowlingBaselines = {
+  wickets: 6, runs: 140, rpo: 8,
+}
+export const TEAM_BOWLING_GLOBAL_MEN: GlobalTeamBowlingBaselines = {
+  wickets: 6, runs: 148, rpo: 8,
+}
+export const TEAM_BOWLING_GLOBAL_WOMEN: GlobalTeamBowlingBaselines = {
+  wickets: 6, runs: 112, rpo: 6,
+}
+
+export function pickTeamBowlingBaseline(
+  scope: Record<string, string>,
+): GlobalTeamBowlingBaselines {
+  const g = scope.gender
+  if (g === 'male') return TEAM_BOWLING_GLOBAL_MEN
+  if (g === 'female') return TEAM_BOWLING_GLOBAL_WOMEN
+  return TEAM_BOWLING_GLOBAL_ALL_T20
+}

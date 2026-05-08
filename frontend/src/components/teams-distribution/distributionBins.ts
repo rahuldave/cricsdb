@@ -142,3 +142,142 @@ export function buildTeamRunRateHistogramRows(
   }
   return rows
 }
+
+// ─── Team-bowling Wickets — discrete bars 0..10 ─────────────────────
+//
+// Always renders the full 11-bar [0..10] range so every team's chart
+// is comparable, even when the active scope tops out at 6 wickets.
+
+export type TeamWicketsBinTier = 'low' | 'mid' | 'high'
+
+export interface TeamWicketsBinRow {
+  bin: number  // 0..10
+  label: string
+  count: number
+  tier: TeamWicketsBinTier
+}
+
+/** Tier from raw wicket count — ≤3 = poor (INDIGO), 4-6 = typical
+ *  (SAGE), ≥7 = strong (OCHRE) per spec §17.2. */
+export function teamWicketsTier(w: number): TeamWicketsBinTier {
+  if (w <= 3) return 'low'
+  if (w <= 6) return 'mid'
+  return 'high'
+}
+
+export function buildTeamWicketsHistogramRows(
+  observations: { wickets: number }[],
+): TeamWicketsBinRow[] {
+  const counts = new Array(11).fill(0)
+  for (const o of observations) {
+    const i = Math.max(0, Math.min(10, o.wickets))
+    counts[i] += 1
+  }
+  const rows: TeamWicketsBinRow[] = []
+  for (let i = 0; i <= 10; i += 1) {
+    rows.push({
+      bin: i,
+      label: String(i),
+      count: counts[i],
+      tier: teamWicketsTier(i),
+    })
+  }
+  return rows
+}
+
+// ─── Team-bowling Runs Conceded — width-10, FLIPPED polarity ───────
+//
+// Bin scheme is identical to team-batting Runs (width-10 bars 0..250+);
+// tier polarity is INVERTED — low conceded = ochre (good for bowler),
+// high conceded = indigo (poor for bowler). Spec §17.2 + §17.4.
+
+export type TeamRunsConcededBinTier = 'low' | 'mid' | 'high'
+
+export interface TeamRunsConcededBinRow {
+  bin: number
+  label: string
+  count: number
+  tier: TeamRunsConcededBinTier
+}
+
+/** Tier from raw runs-conceded value. Naming convention preserved
+ *  (low/mid/high describe the BIN, not the outcome) — the panel's
+ *  TIER_TO_COLOR map flips: <100 → ochre, 100-199 → sage, ≥200 → indigo. */
+export function teamRunsConcededTier(runs: number): TeamRunsConcededBinTier {
+  if (runs < 100) return 'low'
+  if (runs < 200) return 'mid'
+  return 'high'
+}
+
+export function buildTeamRunsConcededHistogramRows(
+  observations: { runs_conceded: number }[],
+): TeamRunsConcededBinRow[] {
+  // Reuse team-batting binner — same width-10 bins, same labels.
+  const counts = new Array(26).fill(0)
+  let maxRuns = -1
+  for (const o of observations) {
+    const i = teamRunsBin(o.runs_conceded)
+    counts[i] += 1
+    if (o.runs_conceded > maxRuns) maxRuns = o.runs_conceded
+  }
+  const lastIdx = Math.max(19, maxRuns >= 0 ? teamRunsBin(maxRuns) : 19)
+  const rows: TeamRunsConcededBinRow[] = []
+  for (let i = 0; i <= lastIdx; i += 1) {
+    rows.push({
+      bin: i,
+      label: teamRunsLabel(i),
+      count: counts[i],
+      tier: teamRunsConcededTier(i * 10),
+    })
+  }
+  return rows
+}
+
+// ─── Team-bowling Economy — width-1 RPO, normal bowler polarity ────
+//
+// Same bin scheme as team-batting RR, but tier polarity matches
+// bowler-economy convention: ≤7 RPO = OCHRE (tight), 7-9 = SAGE
+// (typical), ≥9 = INDIGO (loose). Spec §17.4.
+
+export type TeamConcedeRPOBinTier = 'low' | 'mid' | 'high'
+
+export interface TeamConcedeRPOBinRow {
+  bin: number
+  label: string
+  count: number
+  tier: TeamConcedeRPOBinTier
+}
+
+/** Tier names preserve direction (low=lowest bin index = lowest RPO).
+ *  Color flip lives in the panel's TIER_TO_COLOR for this tab. */
+export function teamConcedeRPOTier(rpo: number): TeamConcedeRPOBinTier {
+  if (rpo < 7) return 'low'
+  if (rpo < 9) return 'mid'
+  return 'high'
+}
+
+export function buildTeamConcedeRPOHistogramRows(
+  perInnings: number[],
+): TeamConcedeRPOBinRow[] {
+  const counts = new Array(11).fill(0)
+  let maxRR = 0
+  for (const e of perInnings) {
+    const i = teamRRBin(e)
+    counts[i] += 1
+    if (e > maxRR) maxRR = e
+  }
+  const lastIdx = Math.max(9, teamRRBin(maxRR))
+  const rows: TeamConcedeRPOBinRow[] = []
+  for (let i = 0; i <= lastIdx; i += 1) {
+    // Bin index maps back to a representative RPO at lo of the bucket
+    // (idx 0 = <4, idx 1 = 4-5 → tier from rpo=4, etc.).
+    const repRpo = i === 0 ? 3 : i + 3
+    rows.push({
+      bin: i,
+      label: teamRRLabel(i),
+      count: counts[i],
+      tier: teamConcedeRPOTier(repRpo),
+    })
+  }
+  return rows
+}
