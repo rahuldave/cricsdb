@@ -113,6 +113,10 @@ export interface TeamSummary {
    *  the Compare tab — when a club team's universe collapses to a
    *  singleton (RCB → IPL), the avg col labels as the tournament. */
   tournaments_in_scope: string[]
+  /** Most recent match date in scope (ISO YYYY-MM-DD). Drives the
+   *  dormancy badge on the Teams page header via DormancyContext.
+   *  Null when the team has no matches in scope. */
+  last_match_date: string | null
 }
 
 /** Keeper info attached to each innings on the scorecard endpoint. */

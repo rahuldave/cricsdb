@@ -6,6 +6,7 @@ import { useFilterDeps } from '../hooks/useFilterDeps'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useDormancy } from '../components/DormancyContext'
 import {
   getTeamSummary, getTeamByseason, getTeamVs, getTeamResults,
   getTeamOpponentsMatrix, getTeamPlayersBySeason, getTeamsLanding,
@@ -244,6 +245,16 @@ export default function Teams() {
     filterDeps,
   )
   const summary = summaryFetch.data
+
+  // Plumb the team's last appearance into DormancyContext so the
+  // ScopedPageHeader badge renders. Independent of which discipline
+  // tab is active — dormancy is a team-level fact. Cleared when the
+  // selected team changes / no team is picked.
+  const { setLastMatchDate } = useDormancy()
+  useEffect(() => {
+    setLastMatchDate(summary?.last_match_date ?? null)
+    return () => setLastMatchDate(null)
+  }, [summary, setLastMatchDate])
 
   const seasonsFetch = useFetch<{ seasons: TeamSeasonRecord[] } | null>(
     () => selected ? getTeamByseason(selected, filters) : Promise.resolve(null),

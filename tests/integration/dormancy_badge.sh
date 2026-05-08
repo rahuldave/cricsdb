@@ -198,6 +198,53 @@ esac
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 6 · Team page — last_match_date on /summary, badge in header"
+# Spec: docs/api.md /teams/{team}/summary "last_match_date" entry.
+# Sourced via _team_filter_clause + JOIN matchdate; team-level fact
+# (independent of which discipline tab is active).
+
+# Active team — Mumbai Indians, last match recent → no badge.
+mi_api_lmd=$(curl -sS "$API/api/v1/teams/Mumbai%20Indians/summary" | python3 -c "import json,sys; print(json.load(sys.stdin).get('last_match_date'))")
+mi_sql_lmd=$(sqlite3 "$DB" "
+  SELECT MAX(md.date)
+  FROM match m
+  JOIN matchdate md ON md.match_id = m.id
+  WHERE m.team1 = 'Mumbai Indians' OR m.team2 = 'Mumbai Indians'
+")
+assert_eq "MI last_match_date matches SQL" "$mi_sql_lmd" "$mi_api_lmd"
+
+ab open "$BASE/teams?team=Mumbai%20Indians"
+settle 3
+mi_badge=$(ab_eval "document.querySelector('.wisden-dormancy-badge')?.textContent || 'NONE'")
+assert_eq "Mumbai Indians (active) — no dormancy badge" "NONE" "$mi_badge"
+
+# Disbanded team — Pune Warriors, last match 2013-05-19 (~13y).
+# Year-plus form fires: 'last match: May 2013'.
+pw_api_lmd=$(curl -sS "$API/api/v1/teams/Pune%20Warriors/summary" | python3 -c "import json,sys; print(json.load(sys.stdin).get('last_match_date'))")
+pw_sql_lmd=$(sqlite3 "$DB" "
+  SELECT MAX(md.date)
+  FROM match m
+  JOIN matchdate md ON md.match_id = m.id
+  WHERE m.team1 = 'Pune Warriors' OR m.team2 = 'Pune Warriors'
+")
+assert_eq "Pune Warriors last_match_date matches SQL" "$pw_sql_lmd" "$pw_api_lmd"
+
+ab open "$BASE/teams?team=Pune%20Warriors"
+settle 3
+pw_title=$(ab_eval "document.querySelector('.wisden-page-title')?.textContent")
+assert_contains "Pune Warriors title contains 'last match:'" "last match:" "$pw_title"
+assert_contains "Pune Warriors title contains 'May 2013'" "May 2013" "$pw_title"
+
+# Team status strip should NOT contain the badge (page-header only,
+# matching player-page convention).
+pw_strip=$(ab_eval "document.querySelector('.wisden-scope-strip')?.textContent")
+case "$pw_strip" in
+  *"last match:"*|*"since last match"*) bad "Team status strip should NOT contain dormancy badge — got: $pw_strip" ;;
+  *) ok "Team status strip does NOT contain dormancy badge (page-header only)" ;;
+esac
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "─────────────────────────────────"
 echo "Dormancy badge integration: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then
