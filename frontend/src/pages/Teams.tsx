@@ -13,7 +13,7 @@ import {
   getTeamBattingSummary, getTeamBattingBySeason, getTeamBattingByPhase, getTeamBattingByInning, getTeamTopBatters,
   getTeamBattingPhaseSeasonHeatmap, getTeamBattingDistribution,
   getTeamBowlingSummary, getTeamBowlingBySeason, getTeamBowlingByPhase, getTeamBowlingByInning, getTeamTopBowlers,
-  getTeamBowlingPhaseSeasonHeatmap,
+  getTeamBowlingPhaseSeasonHeatmap, getTeamBowlingDistribution,
   getTeamFieldingSummary, getTeamFieldingBySeason, getTeamFieldingByInning, getTeamTopFielders,
   getTeamPartnershipsByWicket, getTeamPartnershipsBestPairs, getTeamPartnershipsHeatmap, getTeamPartnershipsTop, getTeamPartnershipsByInning, getTeamPartnershipsSummary,
 } from '../api'
@@ -27,6 +27,7 @@ import PlayerLink from '../components/PlayerLink'
 import { ScopeContext } from '../components/scopeLinks'
 import TeamCompareGrid from '../components/teams/TeamCompareGrid'
 import TeamBattingDistributionPanel from '../components/teams-distribution/TeamBattingDistributionPanel'
+import TeamBowlingDistributionPanel from '../components/teams-distribution/TeamBowlingDistributionPanel'
 import AddCompareSlot from '../components/teams/AddCompareSlot'
 import {
   useCompareSlots, AVG_SENTINEL, OVERRIDABLE_SLOT_KEYS, clearSlotUpdates,
@@ -46,6 +47,7 @@ import type {
   TeamBattingDistribution,
   BattingPhaseSeasonHeatmap, BowlingPhaseSeasonHeatmap,
   TeamBowlingSummary, TeamBowlingSeason, TeamBowlingPhase, TeamBowlingInning, TeamTopBowler,
+  TeamBowlingDistribution,
   TeamFieldingSummary, TeamFieldingSeason, TeamFieldingInning, TeamTopFielder,
   PartnershipByWicket, PartnershipPairEntry, PartnershipBestPairsResponse,
   PartnershipHeatmap, PartnershipTopEntry,
@@ -764,6 +766,13 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
     () => getTeamBowlingPhaseSeasonHeatmap(team, filters),
     filterDeps,
   )
+  // Per-innings distribution dossier — drives the §17.4
+  // TeamBowlingDistributionPanel mounted at the top of the tab.
+  // Same filterDeps so it refetches on FilterBar / inning aux change.
+  const distFetch = useFetch<TeamBowlingDistribution | null>(
+    () => getTeamBowlingDistribution(team, filters),
+    filterDeps,
+  )
 
   if (summary.loading) return <Spinner label="Loading bowling…" />
   if (summary.error) return <ErrorBanner message={`Bowling: ${summary.error}`} onRetry={summary.refetch} />
@@ -786,6 +795,12 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
 
   return (
     <div className="space-y-6">
+      <TeamBowlingDistributionPanel
+        team={team}
+        distribution={distFetch.data}
+        loading={distFetch.loading}
+        error={distFetch.error}
+      />
       <div className="wisden-statrow">
         <StatCard label="Innings" value={s.innings_bowled.value ?? 0} />
         <StatCard label="Overs" value={(s.overs.value ?? 0).toFixed(1)} />
