@@ -716,6 +716,121 @@ export interface FielderDistribution {
   suggested_splits: SuggestedSplit[]
 }
 
+// ─── Team batting distribution dossier ──────────────────────────────────
+//
+// Mirror of /api/v1/teams/{team}/batting/distribution. Spec:
+// internal_docs/spec-distribution-stats.md §16.2.
+
+export interface TeamBattingInningsObservation {
+  innings_id: number
+  match_id: number
+  innings_number: number
+  date: string | null
+  runs: number
+  balls: number
+  wickets: number
+  /** Team total runs at end of over 10 (start-of-mid). */
+  runs_at_10: number
+  /** Wickets fallen by end of over 10. */
+  wickets_at_10: number
+  /** 1 when the innings reached over 10, else 0 — denominator gate for over-aware probabilities. */
+  reached_10_overs: 0 | 1
+  runs_pp: number
+  balls_pp: number
+  wickets_pp: number
+  runs_mid: number
+  balls_mid: number
+  wickets_mid: number
+  runs_death: number
+  balls_death: number
+  wickets_death: number
+}
+
+export interface TeamBattingRunsBlock {
+  total: number
+  mean_per_innings: number | null
+  median: number | null
+  variance: number | null
+  std: number | null
+  /** Median of `final_runs / runs_at_10` over innings with reached_10_overs=1 AND runs_at_10 > 0 — paired with `p_double_at_10`. */
+  escalation_ratio_median: number | null
+  observations: TeamBattingInningsObservation[]
+  milestones: {
+    p_lt_100: ProbRecord
+    p_geq_100: ProbRecord
+    p_geq_150: ProbRecord
+    p_geq_200: ProbRecord
+    p_geq_230: ProbRecord
+    /** P(runs ≥ 150 | runs ≥ 100) — chain-ladder; denom = count(≥100). */
+    p_150_given_100: ProbRecord
+    p_200_given_150: ProbRecord
+    p_230_given_200: ProbRecord
+    /** Over-aware: P(final ≥ 2 × runs_at_10 | reached_10_overs=1, runs_at_10>0). */
+    p_double_at_10: ProbRecord
+  }
+}
+
+export interface TeamBattingRunRateBlock {
+  /** Pool RR — total_runs / total_balls × 6 (balls-weighted, conventional career RR). */
+  pool: number | null
+  mean_per_innings: number | null
+  median_per_innings: number | null
+  variance: number | null
+  std: number | null
+  /** Per-innings RR list aligned with runs.observations. */
+  per_innings: number[]
+  milestones: {
+    p_rr_leq_7: ProbRecord
+    p_rr_leq_8: ProbRecord
+    p_rr_geq_9: ProbRecord
+    p_rr_geq_10: ProbRecord
+  }
+}
+
+export interface TeamBattingPhaseRollup {
+  runs_total: number
+  balls_total: number
+  wickets_total: number
+  innings_active: number
+}
+
+export interface TeamBattingDossier {
+  n_innings: number
+  /** Max observation date in the scope (ISO YYYY-MM-DD). Drives the dormancy badge on the lifetime block. */
+  last_match_date?: string | null
+  runs: TeamBattingRunsBlock
+  run_rate: TeamBattingRunRateBlock
+  phase: {
+    powerplay: TeamBattingPhaseRollup
+    middle: TeamBattingPhaseRollup
+    death: TeamBattingPhaseRollup
+  }
+}
+
+export interface TeamBattingDistribution {
+  team: string
+  scope: Record<string, string>
+  lifetime: TeamBattingDossier
+  form: {
+    last_10: TeamBattingDossier
+    last_60d: TeamBattingDossier
+    last_6mo: TeamBattingDossier
+    last_1yr: TeamBattingDossier
+    /** 8 entries: 4 windows × 2 metrics (runs.mean, run_rate.pool). */
+    delta: {
+      last_10_runs_mean_minus_lifetime: number | null
+      last_10_run_rate_pool_minus_lifetime: number | null
+      last_60d_runs_mean_minus_lifetime: number | null
+      last_60d_run_rate_pool_minus_lifetime: number | null
+      last_6mo_runs_mean_minus_lifetime: number | null
+      last_6mo_run_rate_pool_minus_lifetime: number | null
+      last_1yr_runs_mean_minus_lifetime: number | null
+      last_1yr_run_rate_pool_minus_lifetime: number | null
+    }
+  }
+  suggested_splits: SuggestedSplit[]
+}
+
 export interface BowlingSummary {
   person_id: string
   name: string
