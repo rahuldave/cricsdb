@@ -455,6 +455,24 @@ async def team_summary(
         if canon
     })
 
+    # Last match date — drives the dormancy badge on the Teams page
+    # header (CLAUDE.md "Dormancy badge — page-header only"). Sourced
+    # from the team's last appearance in scope, NOT one of the three
+    # discipline distribution endpoints — the team's dormancy is a
+    # team-level fact, independent of which discipline panel is
+    # active. Wired via DormancyContext.setLastMatchDate from the
+    # Teams.tsx page level (above tab-routing).
+    date_rows = await db.q(
+        f"""
+        SELECT MAX(md.date) AS last_match_date
+        FROM match m
+        JOIN matchdate md ON md.match_id = m.id
+        WHERE {filt}
+        """,
+        params,
+    )
+    last_match_date = date_rows[0]["last_match_date"] if date_rows else None
+
     # Per-team-averaged scope_avg values land in each envelope. Pool
     # totals (sr.*) are pre-divided into s_* above; team-side values
     # (matches, wins, …) stay as raw counts for THIS team.
@@ -475,6 +493,7 @@ async def team_summary(
         "keepers": keepers,
         "keeper_ambiguous_innings": keeper_ambiguous,
         "tournaments_in_scope": tournaments_in_scope,
+        "last_match_date": last_match_date,
     }
 
 

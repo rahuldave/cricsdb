@@ -562,7 +562,8 @@ curl "http://localhost:8000/api/v1/teams/India/summary?gender=male&team_type=int
     { "person_id": "919a3be2", "name": "RR Pant", "innings_kept": 36 }
   ],
   "keeper_ambiguous_innings": 18,
-  "tournaments_in_scope": ["Indian Premier League"]
+  "tournaments_in_scope": ["Indian Premier League"],
+  "last_match_date": "2026-03-08"
 }
 ```
 
@@ -570,6 +571,13 @@ curl "http://localhost:8000/api/v1/teams/India/summary?gender=male&team_type=int
 Compare tab — when a club team's universe collapses to a singleton
 (RCB → IPL), the avg col labels as the tournament instead of the
 generic "Men's club average".
+
+`last_match_date` is the team's most recent match in scope (ISO
+YYYY-MM-DD). Drives the dormancy badge in the team-page header
+via DormancyContext — gap > 60 days renders a small italic
+"5 months since last match" / "last match: Oct 2021" badge per
+the standard dormancy ladder. Null when the team has no matches
+in scope.
 
 ## `GET /api/v1/teams/{team}/results`
 
