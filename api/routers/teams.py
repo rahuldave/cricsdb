@@ -4269,6 +4269,320 @@ async def team_fielding_summary(
     }
 
 
+# ============================================================
+# Team fielding — distribution dossier (spec §16.4).
+# Per-innings observation row of the OPP's batting innings; counts
+# fielding events credited to ANY of the team's matchplayers in
+# that match. Three sibling count blocks (catches / run_outs /
+# stumpings) + four scope-anchored form windows. Reuses
+# _team_innings_clause(side='fielding') for the side-neutral
+# filter scope.
+#
+# Catches block: 4 milestones (p_eq_0, p_geq_3/5/7), no ladder.
+# Run-outs / Stumpings: 3-simple partition (p_eq_0, p_eq_1,
+# p_geq_2). Stumpings is ALWAYS shipped (unlike player-fielder
+# §13 where the block is null for non-keepers).
+# ============================================================
+
+
+async def _innings_master_sample_team_fielding(
+    team: str, filters: FilterParams, aux: AuxParams,
+) -> list[dict]:
+    """Per-innings observation rows of the OPPONENT's batting
+    innings; counts fielding events credited to any of the team's
+    matchplayers (subs handled separately as `substitute_catches`).
+    Spec §16.4.1.
+
+    Scalar-subquery pattern per innings — keeps the SQL parallel
+    structure between catches / run_outs / stumpings / sub_catches
+    / wickets_total without a multi-CTE assembly.
+    """
+    db = get_db()
+    where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
+    rows = await db.q(
+        f"""
+        SELECT
+            i.id AS innings_id,
+            i.match_id,
+            i.innings_number,
+            (SELECT md.date FROM matchdate md WHERE md.match_id = i.match_id
+             ORDER BY md.date LIMIT 1) AS date,
+            (SELECT COUNT(*) FROM fieldingcredit fc
+             JOIN delivery d ON d.id = fc.delivery_id
+             WHERE d.innings_id = i.id
+               AND fc.kind = 'caught'
+               AND COALESCE(fc.is_substitute, 0) = 0
+               AND fc.fielder_id IN
+                 (SELECT mp.person_id FROM matchplayer mp
+                  WHERE mp.match_id = i.match_id AND mp.team = :team)
+            ) AS catches,
+            (SELECT COUNT(*) FROM fieldingcredit fc
+             JOIN delivery d ON d.id = fc.delivery_id
+             WHERE d.innings_id = i.id
+               AND fc.kind = 'run_out'
+               AND COALESCE(fc.is_substitute, 0) = 0
+               AND fc.fielder_id IN
+                 (SELECT mp.person_id FROM matchplayer mp
+                  WHERE mp.match_id = i.match_id AND mp.team = :team)
+            ) AS run_outs,
+            (SELECT COUNT(*) FROM fieldingcredit fc
+             JOIN delivery d ON d.id = fc.delivery_id
+             WHERE d.innings_id = i.id
+               AND fc.kind = 'stumped'
+               AND fc.fielder_id IN
+                 (SELECT mp.person_id FROM matchplayer mp
+                  WHERE mp.match_id = i.match_id AND mp.team = :team)
+            ) AS stumpings,
+            (SELECT COUNT(*) FROM fieldingcredit fc
+             JOIN delivery d ON d.id = fc.delivery_id
+             WHERE d.innings_id = i.id
+               AND fc.kind = 'caught'
+               AND fc.is_substitute = 1
+            ) AS substitute_catches,
+            (SELECT COUNT(*) FROM wicket w
+             JOIN delivery d ON d.id = w.delivery_id
+             WHERE d.innings_id = i.id
+            ) AS wickets_total
+        FROM innings i
+        JOIN match m ON m.id = i.match_id
+        WHERE {where}
+        ORDER BY date ASC, i.innings_number ASC
+        """,
+        params,
+    )
+    return [
+        {
+            "innings_id": r["innings_id"],
+            "match_id": r["match_id"],
+            "innings_number": r["innings_number"],
+            "date": r["date"],
+            "catches": r["catches"] or 0,
+            "run_outs": r["run_outs"] or 0,
+            "stumpings": r["stumpings"] or 0,
+            "substitute_catches": r["substitute_catches"] or 0,
+            "wickets_total": r["wickets_total"] or 0,
+        }
+        for r in rows
+    ]
+
+
+def _catches_block_team_fielding(observations: list[dict]) -> dict:
+    """`catches` block — 4 simples (p_eq_0, p_geq_3/5/7), no ladder
+    (the simples already span the meaningful range; conditioning
+    on ≥3 would shrink denoms without adding signal). Spec §16.4.2."""
+    n = len(observations)
+    vals = [o["catches"] for o in observations]
+
+    if n == 0:
+        keys = ["p_eq_0", "p_geq_3", "p_geq_5", "p_geq_7"]
+        return {
+            "total": 0,
+            "mean_per_innings": None,
+            "median": None,
+            "variance": None,
+            "std": None,
+            "milestones": {k: prob_record(0, 0) for k in keys},
+        }
+
+    total = sum(vals)
+    mean = total / n
+    median = statistics.median(vals)
+    variance = statistics.variance(vals) if n >= 2 else 0.0
+    std = variance ** 0.5
+
+    def _count_eq(v: int) -> int:
+        return sum(1 for x in vals if x == v)
+
+    def _count_geq(v: int) -> int:
+        return sum(1 for x in vals if x >= v)
+
+    return {
+        "total": total,
+        "mean_per_innings": round(mean, 4),
+        "median": median,
+        "variance": round(variance, 4),
+        "std": round(std, 4),
+        "milestones": {
+            "p_eq_0":  prob_record(_count_eq(0), n),
+            "p_geq_3": prob_record(_count_geq(3), n),
+            "p_geq_5": prob_record(_count_geq(5), n),
+            "p_geq_7": prob_record(_count_geq(7), n),
+        },
+    }
+
+
+def _three_simple_block_team_fielding(
+    observations: list[dict], key: str,
+) -> dict:
+    """Sibling 3-simple count block — `run_outs` / `stumpings`.
+    Three simples (p_eq_0 / p_eq_1 / p_geq_2) that partition the
+    sample exactly (sum to 1). Spec §16.4.2."""
+    n = len(observations)
+    vals = [o[key] for o in observations]
+
+    if n == 0:
+        keys = ["p_eq_0", "p_eq_1", "p_geq_2"]
+        return {
+            "total": 0,
+            "mean_per_innings": None,
+            "median": None,
+            "variance": None,
+            "std": None,
+            "milestones": {k: prob_record(0, 0) for k in keys},
+        }
+
+    total = sum(vals)
+    mean = total / n
+    median = statistics.median(vals)
+    variance = statistics.variance(vals) if n >= 2 else 0.0
+    std = variance ** 0.5
+
+    def _count_eq(v: int) -> int:
+        return sum(1 for x in vals if x == v)
+
+    def _count_geq(v: int) -> int:
+        return sum(1 for x in vals if x >= v)
+
+    return {
+        "total": total,
+        "mean_per_innings": round(mean, 4),
+        "median": median,
+        "variance": round(variance, 4),
+        "std": round(std, 4),
+        "milestones": {
+            "p_eq_0":  prob_record(_count_eq(0), n),
+            "p_eq_1":  prob_record(_count_eq(1), n),
+            "p_geq_2": prob_record(_count_geq(2), n),
+        },
+    }
+
+
+def _distribution_dossier_team_fielding(observations: list[dict]) -> dict:
+    """Pure aggregate. Three count blocks + top-level scalars.
+    Stumpings block is ALWAYS shipped (every senior team has had a
+    keeper at some point); zero-event scopes ship with all-zero
+    chips and small-n CIs rather than null. Spec §16.4."""
+    n = len(observations)
+    return {
+        "n_innings_fielded": n,
+        "wickets_total": sum(o["wickets_total"] for o in observations),
+        "substitute_catches": sum(o["substitute_catches"] for o in observations),
+        "observations": observations,
+        "catches": _catches_block_team_fielding(observations),
+        "run_outs": _three_simple_block_team_fielding(observations, "run_outs"),
+        "stumpings": _three_simple_block_team_fielding(observations, "stumpings"),
+    }
+
+
+def _form_windows_team_fielding(
+    observations: list[dict], today: date,
+) -> dict:
+    """Slice the date-asc observation list into four form windows,
+    run the dossier on each, emit a 12-entry delta block (4 windows
+    × 3 metrics: catches_mean, run_outs_mean, stumpings_mean minus
+    lifetime). Spec §16.4.4."""
+    anchor = scope_anchor(observations, today)
+    last_10 = observations[-10:]
+    cutoff_60d = (anchor - timedelta(days=60)).isoformat()
+    cutoff_6mo = (anchor - timedelta(days=180)).isoformat()
+    cutoff_1yr = (anchor - timedelta(days=365)).isoformat()
+    last_60d = [o for o in observations if (o["date"] or "") >= cutoff_60d]
+    last_6mo = [o for o in observations if (o["date"] or "") >= cutoff_6mo]
+    last_1yr = [o for o in observations if (o["date"] or "") >= cutoff_1yr]
+
+    lifetime_doss = _distribution_dossier_team_fielding(observations)
+    last_10_doss = _distribution_dossier_team_fielding(last_10)
+    last_60d_doss = _distribution_dossier_team_fielding(last_60d)
+    last_6mo_doss = _distribution_dossier_team_fielding(last_6mo)
+    last_1yr_doss = _distribution_dossier_team_fielding(last_1yr)
+
+    def _delta(window_doss: dict, key: str) -> Optional[float]:
+        wv = window_doss[key]["mean_per_innings"]
+        lv = lifetime_doss[key]["mean_per_innings"]
+        if wv is None or lv is None:
+            return None
+        return round(wv - lv, 4)
+
+    delta = {}
+    for window_name, window_doss in (
+        ("last_10", last_10_doss),
+        ("last_60d", last_60d_doss),
+        ("last_6mo", last_6mo_doss),
+        ("last_1yr", last_1yr_doss),
+    ):
+        delta[f"{window_name}_catches_mean_minus_lifetime"] = _delta(window_doss, "catches")
+        delta[f"{window_name}_run_outs_mean_minus_lifetime"] = _delta(window_doss, "run_outs")
+        delta[f"{window_name}_stumpings_mean_minus_lifetime"] = _delta(window_doss, "stumpings")
+
+    return {
+        "last_10": last_10_doss,
+        "last_60d": last_60d_doss,
+        "last_6mo": last_6mo_doss,
+        "last_1yr": last_1yr_doss,
+        "delta": delta,
+    }
+
+
+@router.get("/{team}/fielding/distribution")
+async def team_fielding_distribution(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    as_of_date: Optional[str] = Query(
+        None,
+        description=(
+            "ISO date (YYYY-MM-DD) to anchor the calendar form windows"
+            " (last_60d / last_6mo / last_1yr). Defaults to today;"
+            " pin for deterministic regression tests."
+        ),
+    ),
+):
+    """Per-innings team-fielding distribution dossier.
+
+    Three sibling count blocks under one master sample —
+    `catches` (4 simples: p_eq_0 + p_geq_3/5/7), `run_outs` (3-
+    simple partition), `stumpings` (3-simple partition; ALWAYS
+    shipped at team grain) — plus form windows, top-level
+    scalars (`wickets_total`, `substitute_catches`), and scope-
+    derived suggested-splits navigation hints.
+
+    Master sample is the OPPONENT's batting innings under the
+    active filter scope. Catches/run_outs/stumpings count fielding
+    events credited to any of the team's matchplayers for that
+    match (substitute fielders are tracked separately via the
+    `substitute_catches` scalar — they're not on the team sheet).
+    `wickets_total` is the all-kinds wicket-fallen count for the
+    fielder-ratio tooltip ("X catches of Y wickets").
+
+    Every probability field ships as `{value, num, denom, ci_low,
+    ci_high}` with a Wilson 95% CI.
+
+    `FilterParams.filter_team` is IGNORED — the team path-param
+    dominates. `FilterParams.filter_opponent` works as expected.
+
+    Spec: internal_docs/spec-distribution-stats.md §16.4.
+    """
+    today = date.fromisoformat(as_of_date) if as_of_date else date.today()
+
+    observations = await _innings_master_sample_team_fielding(team, filters, aux)
+    lifetime = _distribution_dossier_team_fielding(observations)
+    form = _form_windows_team_fielding(observations, today)
+
+    obs_dates = [o["date"] for o in observations if o.get("date")]
+    lifetime["last_match_date"] = max(obs_dates) if obs_dates else None
+
+    scope = scope_dict_from_filters(filters)
+    splits = suggested_splits(scope)
+
+    return {
+        "team": team,
+        "scope": {k: v for k, v in scope.items() if v},
+        "lifetime": lifetime,
+        "form": form,
+        "suggested_splits": splits,
+    }
+
+
 @router.get("/{team}/fielding/by-season")
 async def team_fielding_by_season(
     team: str,
