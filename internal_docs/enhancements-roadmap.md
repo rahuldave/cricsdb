@@ -473,15 +473,21 @@ run-outs since the team caused them. Spec text rewritten in this
 session; rationale codified in `design-decisions.md` "Team-bowling
 distribution wicket count".
 
-**Frontend status (§17):** Batting panel shipped 2026-05-08
-(commits 1-4 — types/fetcher, panel + statstrips + form-delta +
-splits, Teams.tsx Batting-tab mount, integration test).
-Bowling panel shipped 2026-05-08 (commits 5-8 — same arc; 42-PASS
-SQL-anchored integration test). Fielding panel (commits 9-12)
-pending. The team-bowling Pool SR (balls/wkt) is computed at
-render time — the API doesn't surface it directly; deriving from
-`runs_conceded.total × 6 / economy.pool / wickets.total` saves a
-dedicated lifetime field.
+**Frontend status (§17): IMPLEMENTED 2026-05-08.** All 12 commits
+shipped — batting (1-4), bowling (5-8), fielding (9-12) panels
+mounted at the top of each Teams-page discipline tab. Three
+SQL-anchored integration scripts, all green:
+- `team_batting_distribution.sh` — 34 PASS
+- `team_bowling_distribution.sh` — 42 PASS
+- `team_fielding_distribution.sh` — 38 PASS
+
+**Two derived-at-render-time decisions worth noting:**
+- The team-bowling Pool SR (balls/wkt) is computed at render
+  time from `runs_conceded.total × 6 / economy.pool /
+  wickets.total` — the API doesn't surface a dedicated field.
+- The team-fielding tooltip enrichment ("X catches of Y wickets")
+  reads per-innings `wickets_total` from the observation row,
+  giving the dismissal-mix ratio without a separate widget.
 
 ### Shipped 2026-04-29 (DOM-tests Batch 4 — Players + Venues + Matches + Charts)
 

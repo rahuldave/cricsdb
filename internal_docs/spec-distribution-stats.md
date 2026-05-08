@@ -3839,7 +3839,7 @@ follow-up commit per regression-harness discipline (CLAUDE.md).
 
 ---
 
-## 17. Team v1 frontend — Distribution panels on `/teams` (DRAFT)
+## 17. Team v1 frontend — Distribution panels on `/teams` (IMPLEMENTED)
 
 > Sibling of §9 (batter), §12 (bowler), §14 (fielder). Three
 > Distribution panels, one mounted at the TOP of each existing

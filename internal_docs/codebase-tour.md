@@ -384,6 +384,17 @@ frontend/src/
                                                                  render time from runs_conceded.total ×
                                                                  6 / economy.pool / wickets.total — the
                                                                  API doesn't surface it directly
+                                   TeamFieldingDistributionPanel Fielding tab — three metric tabs
+                                                                 (Catches default, Run-outs, Stumpings);
+                                                                 ?dist_metric_t_field=. Stumpings tab
+                                                                 ALWAYS renders at team grain (zero-
+                                                                 stumping windows show 0% honestly).
+                                                                 Catches: NEW 0..7-bar histogram + 4
+                                                                 chips P(=0)/P(≥3)/P(≥5)/P(≥7);
+                                                                 Run-outs + Stumpings: 0/1/≥2 partition
+                                                                 (3 chips). Sparkline tooltip on
+                                                                 Catches: "X catches of Y wickets"
+                                                                 reading per-innings wickets_total
                                    TeamBattingStatStrips        / TeamBowlingStatStrips: per-metric
                                                                  stat-strip + chips-row pairs. Wickets
                                                                  chips include the over-aware
