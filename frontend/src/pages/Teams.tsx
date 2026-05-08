@@ -594,6 +594,10 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
         distribution={distFetch.data}
         loading={distFetch.loading}
         error={distFetch.error}
+        leagueAvg={{
+          runs: s.total_runs?.scope_avg ?? null,
+          runRate: s.run_rate?.scope_avg ?? null,
+        }}
       />
       {/* All rows are 5-up so the cards stay the same width across rows
           and Dot % doesn't orphan. Same pattern as the player Batting
@@ -803,6 +807,11 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
         distribution={distFetch.data}
         loading={distFetch.loading}
         error={distFetch.error}
+        leagueAvg={{
+          wickets: s.wickets?.scope_avg ?? null,
+          runsConceded: s.runs_conceded?.scope_avg ?? null,
+          economy: s.economy?.scope_avg ?? null,
+        }}
       />
       <div className="wisden-statrow">
         <StatCard label="Innings" value={s.innings_bowled.value ?? 0} />
@@ -996,6 +1005,11 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
         distribution={distFetch.data}
         loading={distFetch.loading}
         error={distFetch.error}
+        leagueAvg={{
+          catches: s.catches?.scope_avg ?? null,
+          runOuts: s.run_outs?.scope_avg ?? null,
+          stumpings: s.stumpings?.scope_avg ?? null,
+        }}
       />
       <div className="wisden-statrow">
         <StatCard label="Matches" value={s.matches.value ?? 0} />

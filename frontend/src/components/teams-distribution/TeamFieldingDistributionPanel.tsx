@@ -164,8 +164,9 @@ function sparklineFor(
 
 /** Tiny inline legend explaining the reference lines + rolling mean.
  *  Mirrors TeamBattingDistributionPanel's SparklineLegend. */
-function SparklineLegend({ globalLegend, showRolling }: {
+function SparklineLegend({ globalLegend, leagueLegend, showRolling }: {
   globalLegend: string
+  leagueLegend: string | null
   showRolling: boolean
 }) {
   // Swatch alignment pattern per commit b770918 — see
@@ -187,6 +188,9 @@ function SparklineLegend({ globalLegend, showRolling }: {
       fontSize: '0.7rem', color: 'var(--ink-faint)',
     }}>
       <span><Swatch color="#1A1714" h={2} />scope average</span>
+      {leagueLegend && (
+        <span><Swatch color="#3F7A4D" h={1.5} />{leagueLegend}</span>
+      )}
       <span><Swatch color="#8A7D70" h={1.5} />gender-global ({globalLegend})</span>
       {showRolling && (
         <span><Swatch color="#7A1F1F" h={1.5} />rolling-10 mean</span>
@@ -200,10 +204,15 @@ interface Props {
   distribution: TeamFieldingDistribution | null
   loading: boolean
   error: string | null
+  /** Same-scope league averages from the existing /summary envelope.
+   *  - `catches` ← `summary.catches.scope_avg` (per-innings).
+   *  - `runOuts` ← `summary.run_outs.scope_avg`.
+   *  - `stumpings` ← `summary.stumpings.scope_avg`. */
+  leagueAvg?: { catches: number | null; runOuts: number | null; stumpings: number | null }
 }
 
 export default function TeamFieldingDistributionPanel({
-  team, distribution, loading, error,
+  team, distribution, loading, error, leagueAvg,
 }: Props) {
   const [windowParam, setWindowParam] = useUrlParam('dist_window_t')
   const [metricParam, setMetricParam] = useUrlParam('dist_metric_t_field')
@@ -376,12 +385,25 @@ export default function TeamFieldingDistributionPanel({
               // where smoothing reads as form-arc rather than noise;
               // skipped on Last 10 / 60d / 6mo / 1y (samples too short).
               const showRolling = window === 'scope' && points.length >= 10
+              const league = metric === 'run_outs'
+                ? leagueAvg?.runOuts ?? null
+                : metric === 'stumpings'
+                  ? leagueAvg?.stumpings ?? null
+                  : leagueAvg?.catches ?? null
+              const leagueLegend = league !== null
+                ? `league avg ${league.toFixed(2)} ${
+                    metric === 'run_outs' ? 'run-out/inn'
+                    : metric === 'stumpings' ? 'stumping/inn'
+                    : 'catches/inn'
+                  }`
+                : null
               return (
                 <>
                   <DistributionSparkline
                     points={points}
                     playerReferenceValue={cfg.playerReferenceValue}
                     globalReferenceValue={cfg.globalReferenceValue}
+                    leagueReferenceValue={league}
                     rollingWindow={showRolling ? 10 : undefined}
                   />
                   <SeasonTickAxis dates={dossier.observations.map(o => o.date)} />
@@ -393,7 +415,11 @@ export default function TeamFieldingDistributionPanel({
                     fontSize: '0.7rem', color: 'var(--ink-faint)',
                   }}>
                     <span>{cfg.caption}</span>
-                    <SparklineLegend globalLegend={cfg.globalLegend} showRolling={showRolling} />
+                    <SparklineLegend
+                      globalLegend={cfg.globalLegend}
+                      leagueLegend={leagueLegend}
+                      showRolling={showRolling}
+                    />
                   </div>
                 </>
               )

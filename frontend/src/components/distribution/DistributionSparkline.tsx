@@ -41,10 +41,17 @@ export interface SparklinePoint {
 
 interface Props {
   points: SparklinePoint[]
-  /** Player reference line — scope-baseline mean. Solid black, thicker. */
+  /** Player reference line — scope average mean. Solid black, thicker. */
   playerReferenceValue?: number | null
   /** Global reference line — gender-tiered league centre. Gray, thicker. */
   globalReferenceValue?: number | null
+  /** League reference line — same-scope league average (the
+   *  comparable team-of-its-class number under the active filter
+   *  scope). Forest green, 1.5px. Distinct from `globalReferenceValue`
+   *  which spans ALL T20 cricket at gender grain; this one respects
+   *  every active filter except the team narrowing. Wired from team
+   *  panels via the existing /summary endpoint's `scope_avg` envelope. */
+  leagueReferenceValue?: number | null
   /** Rolling-N mean overlay (oxbow). Skipped when points.length < N.
    *  Use only on the widest window where smoothing is meaningful. */
   rollingWindow?: number
@@ -57,6 +64,7 @@ const DEFAULT_COLOR = '#3C5B7A'  // WISDEN.slate
 // rolling-mean overlay (oxbow). Black + gray are unambiguous.
 const PLAYER_REF_COLOR = '#1A1714'  // WISDEN.ink — solid black for the player anchor
 const GLOBAL_REF_COLOR = '#8A7D70'  // WISDEN.faint — gray-sand for the league anchor
+const LEAGUE_REF_COLOR = '#3F7A4D'  // WISDEN.forest — same-scope league average
 const ROLLING_MEAN_COLOR = '#7A1F1F'  // WISDEN.oxblood — reserved for rolling-mean overlay
 
 // Tunable visual weights — picked 2026-05-06 from a 4-combo
@@ -68,6 +76,7 @@ const ROLLING_MEAN_COLOR = '#7A1F1F'  // WISDEN.oxblood — reserved for rolling
 const BAR_OPACITY = 0.8
 const PLAYER_LINE_WIDTH = 2.0
 const GLOBAL_LINE_WIDTH = 1.5
+const LEAGUE_LINE_WIDTH = 1.5
 const ROLLING_LINE_WIDTH = 1.2
 // Below-baseline stub zone — every bar extends 4px below the
 // baseline so value=0 bars (ducks / wicketless spells) remain
@@ -79,6 +88,7 @@ export default function DistributionSparkline({
   points,
   playerReferenceValue,
   globalReferenceValue,
+  leagueReferenceValue,
   rollingWindow,
   height = 36,
 }: Props) {
@@ -88,12 +98,13 @@ export default function DistributionSparkline({
 
   const VB_W = 100
   const dataMax = Math.max(...points.map(p => p.value), 1)
-  // Y-axis max bumped to keep both reference lines on-chart even
+  // Y-axis max bumped to keep all three reference lines on-chart even
   // when data is far below them. See spec §12.2.6.
   const max = Math.max(
     dataMax,
     globalReferenceValue ?? 0,
     playerReferenceValue ?? 0,
+    leagueReferenceValue ?? 0,
   )
   const barW = VB_W / points.length
   const barInset = Math.min(barW * 0.15, 0.4)
@@ -110,6 +121,7 @@ export default function DistributionSparkline({
   }
   const playerY = yFor(playerReferenceValue)
   const globalY = yFor(globalReferenceValue)
+  const leagueY = yFor(leagueReferenceValue)
 
   // Rolling mean overlay — anchor each point at the END of its window.
   const rollingPolyline: string | null = (() => {
@@ -134,8 +146,9 @@ export default function DistributionSparkline({
       style={{ width: '100%', height, display: 'block' }}
       aria-label="Per-innings distribution sparkline"
     >
-      {/* Global line (gray) FIRST so the player line draws on top
-          when they overlap. */}
+      {/* Reference lines drawn back-to-front (gray global → forest
+          league → black player) so the most-specific anchor (this
+          team's scope mean) draws on top of the broader contexts. */}
       {globalY !== null && (
         <line
           x1={0} x2={VB_W}
@@ -144,6 +157,16 @@ export default function DistributionSparkline({
           strokeWidth={GLOBAL_LINE_WIDTH}
           opacity={0.85}
           data-ref="global"
+        />
+      )}
+      {leagueY !== null && (
+        <line
+          x1={0} x2={VB_W}
+          y1={leagueY} y2={leagueY}
+          stroke={LEAGUE_REF_COLOR}
+          strokeWidth={LEAGUE_LINE_WIDTH}
+          opacity={0.9}
+          data-ref="league"
         />
       )}
       {playerY !== null && (

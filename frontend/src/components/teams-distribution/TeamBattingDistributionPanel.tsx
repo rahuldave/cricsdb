@@ -149,8 +149,11 @@ function sparklineFor(
 
 /** Tiny inline legend explaining the reference lines + rolling mean.
  *  Mirrors BowlerDistributionPanel's SparklineLegend. */
-function SparklineLegend({ globalLegend, showRolling }: {
+function SparklineLegend({ globalLegend, leagueLegend, showRolling }: {
   globalLegend: string
+  /** Forest-green league average label, e.g. "league avg 135.9 runs/inn"
+   *  for the same scope. Hidden when null. */
+  leagueLegend: string | null
   showRolling: boolean
 }) {
   // Swatch alignment pattern per commit b770918: NO inline-flex
@@ -176,6 +179,9 @@ function SparklineLegend({ globalLegend, showRolling }: {
       fontSize: '0.7rem', color: 'var(--ink-faint)',
     }}>
       <span><Swatch color="#1A1714" h={2} />scope average</span>
+      {leagueLegend && (
+        <span><Swatch color="#3F7A4D" h={1.5} />{leagueLegend}</span>
+      )}
       <span><Swatch color="#8A7D70" h={1.5} />gender-global ({globalLegend})</span>
       {showRolling && (
         <span><Swatch color="#7A1F1F" h={1.5} />rolling-10 mean</span>
@@ -189,10 +195,16 @@ interface Props {
   distribution: TeamBattingDistribution | null
   loading: boolean
   error: string | null
+  /** Same-scope league averages for the green reference line on the
+   *  sparkline. Sourced from the existing /summary endpoint's
+   *  scope_avg envelope (already fetched by the parent BattingTab).
+   *  - `runs` → `summary.total_runs.scope_avg` (per-innings).
+   *  - `runRate` → `summary.run_rate.scope_avg`. */
+  leagueAvg?: { runs: number | null; runRate: number | null }
 }
 
 export default function TeamBattingDistributionPanel({
-  team, distribution, loading, error,
+  team, distribution, loading, error, leagueAvg,
 }: Props) {
   const [windowParam, setWindowParam] = useUrlParam('dist_window_t')
   const [metricParam, setMetricParam] = useUrlParam('dist_metric_t_bat')
@@ -344,12 +356,21 @@ export default function TeamBattingDistributionPanel({
               // where smoothing reads as form-arc rather than noise;
               // skipped on Last 10 / 60d / 6mo / 1y (samples too short).
               const showRolling = window === 'scope' && points.length >= 10
+              const league = metric === 'run_rate'
+                ? leagueAvg?.runRate ?? null
+                : leagueAvg?.runs ?? null
+              const leagueLegend = league !== null
+                ? (metric === 'run_rate'
+                    ? `league avg ${league.toFixed(2)} RPO`
+                    : `league avg ${league.toFixed(1)} runs/inn`)
+                : null
               return (
                 <>
                   <DistributionSparkline
                     points={points}
                     playerReferenceValue={cfg.playerReferenceValue}
                     globalReferenceValue={cfg.globalReferenceValue}
+                    leagueReferenceValue={league}
                     rollingWindow={showRolling ? 10 : undefined}
                   />
                   <SeasonTickAxis dates={dossier.runs.observations.map(o => o.date)} />
@@ -361,7 +382,11 @@ export default function TeamBattingDistributionPanel({
                     fontSize: '0.7rem', color: 'var(--ink-faint)',
                   }}>
                     <span>{cfg.caption}</span>
-                    <SparklineLegend globalLegend={cfg.globalLegend} showRolling={showRolling} />
+                    <SparklineLegend
+                      globalLegend={cfg.globalLegend}
+                      leagueLegend={leagueLegend}
+                      showRolling={showRolling}
+                    />
                   </div>
                 </>
               )
