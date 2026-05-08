@@ -246,6 +246,8 @@ export const getTeamFieldingByInning = (team: string, filters?: F) =>
   fetchApi<{ innings: import('./types').TeamFieldingInning[] }>(`/api/v1/teams/${te(team)}/fielding/by-inning`, filters as Record<string, string>)
 export const getTeamTopFielders = (team: string, filters?: F & { limit?: number }) =>
   fetchApi<{ top_fielders: import('./types').TeamTopFielder[] }>(`/api/v1/teams/${te(team)}/fielding/top-fielders`, filters as Record<string, string>)
+export const getTeamFieldingDistribution = (team: string, filters?: F & { as_of_date?: string }) =>
+  fetchApi<import('./types').TeamFieldingDistribution>(`/api/v1/teams/${te(team)}/fielding/distribution`, filters as Record<string, string>)
 
 export const getTeamPartnershipsByWicket = (team: string, filters?: F & { side?: 'batting' | 'bowling' }) =>
   fetchApi<{ team: string; side: 'batting' | 'bowling'; by_wicket: import('./types').PartnershipByWicket[] }>(

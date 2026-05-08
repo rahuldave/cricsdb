@@ -979,6 +979,108 @@ export interface TeamBowlingDistribution {
   suggested_splits: SuggestedSplit[]
 }
 
+// ─── Team fielding distribution dossier ─────────────────────────────────
+//
+// Mirror of /api/v1/teams/{team}/fielding/distribution. Spec:
+// internal_docs/spec-distribution-stats.md §16.4 (backend) + §17.5 (frontend).
+//
+// Differs from the player-fielder dossier (§13/§14) in two ways:
+//   1. `stumpings` is ALWAYS non-null at team grain (every senior team
+//      has had a keeper at some point — for zero-stumping windows the
+//      block still mounts with count=0, mean=0).
+//   2. The Catches block carries 4 milestones (P=0/P≥3/P≥5/P≥7) — the
+//      spec's wider milestone ladder for team grain. Run-outs and
+//      stumpings keep the player-fielder 3-simple shape.
+
+export interface TeamFieldingObservation {
+  innings_id: number
+  match_id: number
+  innings_number: number
+  date: string | null
+  catches: number
+  run_outs: number
+  stumpings: number
+  /** Substitute catches credited to the team in this innings (excluded from `catches`). */
+  substitute_catches: number
+  /** Total opposition wickets in the innings — denominator for the
+   *  "X catches of Y wickets" sparkline tooltip on the Catches tab. */
+  wickets_total: number
+}
+
+export interface TeamFieldingCatchesBlock {
+  total: number
+  mean_per_innings: number | null
+  median: number | null
+  variance: number | null
+  std: number | null
+  milestones: {
+    p_eq_0: ProbRecord
+    p_geq_3: ProbRecord
+    p_geq_5: ProbRecord
+    p_geq_7: ProbRecord
+  }
+}
+
+export interface TeamFieldingCountBlock {
+  total: number
+  mean_per_innings: number | null
+  median: number | null
+  variance: number | null
+  std: number | null
+  milestones: {
+    p_eq_0: ProbRecord
+    p_eq_1: ProbRecord
+    p_geq_2: ProbRecord
+  }
+}
+
+export interface TeamFieldingDossier {
+  /** Note the field name divergence from player-fielder's `n_matches` /
+   *  team-batting/bowling's `n_innings`. Distribution endpoint reports
+   *  per-innings counts. */
+  n_innings_fielded: number
+  /** Total opposition wickets across the master sample — referenced in
+   *  the dismissal-mix footer and the tooltip enrichment. */
+  wickets_total: number
+  /** Substitute catches in scope — surfaced for reconciliation; excluded from `catches.total`. */
+  substitute_catches: number
+  /** Max observation date in the scope (ISO YYYY-MM-DD). Drives the dormancy badge on the lifetime block. */
+  last_match_date?: string | null
+  observations: TeamFieldingObservation[]
+  catches: TeamFieldingCatchesBlock
+  run_outs: TeamFieldingCountBlock
+  /** ALWAYS present at team grain. */
+  stumpings: TeamFieldingCountBlock
+}
+
+export interface TeamFieldingDistribution {
+  team: string
+  scope: Record<string, string>
+  lifetime: TeamFieldingDossier
+  form: {
+    last_10: TeamFieldingDossier
+    last_60d: TeamFieldingDossier
+    last_6mo: TeamFieldingDossier
+    last_1yr: TeamFieldingDossier
+    /** 12 entries: 4 windows × 3 metrics. */
+    delta: {
+      last_10_catches_mean_minus_lifetime: number | null
+      last_10_run_outs_mean_minus_lifetime: number | null
+      last_10_stumpings_mean_minus_lifetime: number | null
+      last_60d_catches_mean_minus_lifetime: number | null
+      last_60d_run_outs_mean_minus_lifetime: number | null
+      last_60d_stumpings_mean_minus_lifetime: number | null
+      last_6mo_catches_mean_minus_lifetime: number | null
+      last_6mo_run_outs_mean_minus_lifetime: number | null
+      last_6mo_stumpings_mean_minus_lifetime: number | null
+      last_1yr_catches_mean_minus_lifetime: number | null
+      last_1yr_run_outs_mean_minus_lifetime: number | null
+      last_1yr_stumpings_mean_minus_lifetime: number | null
+    }
+  }
+  suggested_splits: SuggestedSplit[]
+}
+
 export interface BowlingSummary {
   person_id: string
   name: string
