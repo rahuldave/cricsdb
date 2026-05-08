@@ -369,6 +369,33 @@ frontend/src/
                                                                  dist_window_f / inning across hops
                                    distributionBins.ts         pure helper buildCountHistogramRows
                                                                  (3-bin partition over an observation key)
+    teams-distribution/        — Team Distribution panels (spec-distribution-stats.md §17):
+                                   TeamBattingDistributionPanel  Batting tab on /teams?team=X — two metric
+                                                                 tabs (Runs default, Run Rate); URL state
+                                                                 suffixed _t (?dist_window_t= +
+                                                                 ?dist_metric_t_bat=) to prevent cross-page
+                                                                 bleed with player panels
+                                   TeamBowlingDistributionPanel  Bowling tab — three metric tabs (Wickets
+                                                                 default, Runs Conceded, Economy);
+                                                                 ?dist_metric_t_bowl=. Runs Conceded +
+                                                                 Economy use the FLIPPED tier palette
+                                                                 (low conceded / low RPO = ochre).
+                                                                 Pool SR (balls/wkt) is derived at
+                                                                 render time from runs_conceded.total ×
+                                                                 6 / economy.pool / wickets.total — the
+                                                                 API doesn't surface it directly
+                                   TeamBattingStatStrips        / TeamBowlingStatStrips: per-metric
+                                                                 stat-strip + chips-row pairs. Wickets
+                                                                 chips include the over-aware
+                                                                 P(≥3 at 10) + P(=10│≥3 at 10) early-
+                                                                 breakthrough / finishing-rate pair
+                                   TeamBattingFormDeltaLine     / TeamBowlingFormDeltaLine: oxblood
+                                                                 deltas with self-anchoring scope-baseline
+                                                                 row (CLAUDE.md "Delta lines need the
+                                                                 baseline visible")
+                                   distributionBins.ts          width-10 team Runs + width-1 RPO + 0..10
+                                                                 wickets binners + tier helpers shared
+                                                                 across all three team panels
     tournaments/               — TournamentsLanding (sectioned grids + men's/women's rivalry tiles),
                                    TournamentDossier (shared dossier UI for tournament OR rivalry
                                    scope; reused by HeadToHead Team-vs-Team mode)

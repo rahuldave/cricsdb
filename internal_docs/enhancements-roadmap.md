@@ -473,10 +473,15 @@ run-outs since the team caused them. Spec text rewritten in this
 session; rationale codified in `design-decisions.md` "Team-bowling
 distribution wicket count".
 
-**Frontend pending:** §17 (twelve atomic frontend commits across
-three panels — `TeamBattingDistributionPanel` /
-`TeamBowlingDistributionPanel` / `TeamFieldingDistributionPanel`
-mounted at the top of each existing Teams-page tab content area).
+**Frontend status (§17):** Batting panel shipped 2026-05-08
+(commits 1-4 — types/fetcher, panel + statstrips + form-delta +
+splits, Teams.tsx Batting-tab mount, integration test).
+Bowling panel shipped 2026-05-08 (commits 5-8 — same arc; 42-PASS
+SQL-anchored integration test). Fielding panel (commits 9-12)
+pending. The team-bowling Pool SR (balls/wkt) is computed at
+render time — the API doesn't surface it directly; deriving from
+`runs_conceded.total × 6 / economy.pool / wickets.total` saves a
+dedicated lifetime field.
 
 ### Shipped 2026-04-29 (DOM-tests Batch 4 — Players + Venues + Matches + Charts)
 
