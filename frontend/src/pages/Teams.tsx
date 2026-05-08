@@ -10,7 +10,7 @@ import {
   getTeamSummary, getTeamByseason, getTeamVs, getTeamResults,
   getTeamOpponentsMatrix, getTeamPlayersBySeason, getTeamsLanding,
   getTeamBattingSummary, getTeamBattingBySeason, getTeamBattingByPhase, getTeamBattingByInning, getTeamTopBatters,
-  getTeamBattingPhaseSeasonHeatmap,
+  getTeamBattingPhaseSeasonHeatmap, getTeamBattingDistribution,
   getTeamBowlingSummary, getTeamBowlingBySeason, getTeamBowlingByPhase, getTeamBowlingByInning, getTeamTopBowlers,
   getTeamBowlingPhaseSeasonHeatmap,
   getTeamFieldingSummary, getTeamFieldingBySeason, getTeamFieldingByInning, getTeamTopFielders,
@@ -25,6 +25,7 @@ import ScopedPageHeader from '../components/ScopedPageHeader'
 import PlayerLink from '../components/PlayerLink'
 import { ScopeContext } from '../components/scopeLinks'
 import TeamCompareGrid from '../components/teams/TeamCompareGrid'
+import TeamBattingDistributionPanel from '../components/teams-distribution/TeamBattingDistributionPanel'
 import AddCompareSlot from '../components/teams/AddCompareSlot'
 import {
   useCompareSlots, AVG_SENTINEL, OVERRIDABLE_SLOT_KEYS, clearSlotUpdates,
@@ -41,6 +42,7 @@ import type {
   TeamSummary, TeamSeasonRecord, TeamVsOpponent, TeamResult,
   OpponentRollup, OpponentsMatrix, TeamPlayersBySeason, TeamsLanding,
   TeamBattingSummary, TeamBattingSeason, TeamBattingPhase, TeamBattingInning, TeamTopBatter,
+  TeamBattingDistribution,
   BattingPhaseSeasonHeatmap, BowlingPhaseSeasonHeatmap,
   TeamBowlingSummary, TeamBowlingSeason, TeamBowlingPhase, TeamBowlingInning, TeamTopBowler,
   TeamFieldingSummary, TeamFieldingSeason, TeamFieldingInning, TeamTopFielder,
@@ -542,6 +544,13 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
     () => getTeamBattingPhaseSeasonHeatmap(team, filters),
     filterDeps,
   )
+  // Per-innings distribution dossier — drives the §17
+  // TeamBattingDistributionPanel mounted at the top of the tab.
+  // Same filterDeps so it refetches on FilterBar / inning aux change.
+  const distFetch = useFetch<TeamBattingDistribution | null>(
+    () => getTeamBattingDistribution(team, filters),
+    filterDeps,
+  )
 
   if (summary.loading) return <Spinner label="Loading batting…" />
   if (summary.error) return <ErrorBanner message={`Batting: ${summary.error}`} onRetry={summary.refetch} />
@@ -564,6 +573,12 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
 
   return (
     <div className="space-y-6">
+      <TeamBattingDistributionPanel
+        team={team}
+        distribution={distFetch.data}
+        loading={distFetch.loading}
+        error={distFetch.error}
+      />
       {/* All rows are 5-up so the cards stay the same width across rows
           and Dot % doesn't orphan. Same pattern as the player Batting
           page (Batting.tsx). Combined 50s/100s + Highest/Lowest cards
