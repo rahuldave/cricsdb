@@ -168,32 +168,28 @@ function SparklineLegend({ globalLegend, showRolling }: {
   globalLegend: string
   showRolling: boolean
 }) {
+  // Swatch alignment pattern per commit b770918 — see
+  // TeamBattingDistributionPanel comment for rationale.
   const Swatch = ({ color, h = 1.5 }: { color: string; h?: number }) => (
     <span aria-hidden="true" style={{
       display: 'inline-block', width: 14, height: h,
-      background: color, verticalAlign: 'middle',
+      background: color,
+      verticalAlign: 'middle',
+      marginRight: '0.3rem',
+      position: 'relative', top: '-0.1em',
     }} />
   )
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap',
+      display: 'inline-flex', alignItems: 'baseline', flexWrap: 'wrap',
       columnGap: '0.85rem', rowGap: '0.15rem',
       fontFamily: 'var(--serif)', fontStyle: 'italic',
       fontSize: '0.7rem', color: 'var(--ink-faint)',
     }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-        <Swatch color="#1A1714" h={2} />
-        scope baseline
-      </span>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-        <Swatch color="#8A7D70" h={1.5} />
-        gender-global ({globalLegend})
-      </span>
+      <span><Swatch color="#1A1714" h={2} />scope baseline</span>
+      <span><Swatch color="#8A7D70" h={1.5} />gender-global ({globalLegend})</span>
       {showRolling && (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-          <Swatch color="#7A1F1F" h={1.5} />
-          rolling-10 mean
-        </span>
+        <span><Swatch color="#7A1F1F" h={1.5} />rolling-10 mean</span>
       )}
     </span>
   )
