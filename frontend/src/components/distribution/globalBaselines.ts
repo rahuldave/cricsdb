@@ -83,3 +83,42 @@ export function pickBattingBaseline(
   if (g === 'female') return BATTING_GLOBAL_WOMEN
   return BATTING_GLOBAL_ALL_T20
 }
+
+// ─── Team-batting baselines ───────────────────────────────────────────
+//
+// Per-innings team batting (super-over excluded), 2026-05-08 snapshot:
+//
+//   Bucket             innings  runs/inn  mean RR  pool RR
+//   ─────────────────  ───────  ────────  ───────  ───────
+//   All men             19,952  147.7     8.03     7.99
+//   All women            6,088  112.4     6.34     6.28
+//   All T20             26,040  139.5     7.63     7.60
+//
+// Whole-number rounded per spec §17.2 — "men's IPL team innings ≈ 167
+// runs" is an IPL-specific anchor; gender-global is a wider centre.
+
+export interface GlobalTeamBattingBaselines {
+  /** Mean runs per innings at team grain. */
+  runs: number
+  /** Pool RR — total_runs * 6 / total_balls (balls-weighted). */
+  rr: number
+}
+
+export const TEAM_BATTING_GLOBAL_ALL_T20: GlobalTeamBattingBaselines = {
+  runs: 140, rr: 8,
+}
+export const TEAM_BATTING_GLOBAL_MEN: GlobalTeamBattingBaselines = {
+  runs: 148, rr: 8,
+}
+export const TEAM_BATTING_GLOBAL_WOMEN: GlobalTeamBattingBaselines = {
+  runs: 112, rr: 6,
+}
+
+export function pickTeamBattingBaseline(
+  scope: Record<string, string>,
+): GlobalTeamBattingBaselines {
+  const g = scope.gender
+  if (g === 'male') return TEAM_BATTING_GLOBAL_MEN
+  if (g === 'female') return TEAM_BATTING_GLOBAL_WOMEN
+  return TEAM_BATTING_GLOBAL_ALL_T20
+}
