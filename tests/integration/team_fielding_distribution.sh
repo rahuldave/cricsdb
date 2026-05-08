@@ -366,6 +366,40 @@ ab set viewport 1280 800
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 10 · League scope-comparison reference line + legend (Catches default)"
+
+ab open "$BASE/teams?team=$TEAM_URL&tab=Fielding&$SCOPE_URL"
+settle 4
+
+API_BASE="${API_BASE:-http://localhost:8000}"
+api_summary=$(curl -s "$API_BASE/api/v1/teams/$TEAM_URL/fielding/summary?$SCOPE_URL")
+api_catches_sa=$(echo "$api_summary" | python3 -c "
+import json, sys
+r = json.load(sys.stdin)
+v = r['catches']['scope_avg']
+print(f'{v:.2f}' if v is not None else '')")
+
+league_line=$(ab_eval "!!document.querySelector('$PANEL_SEL svg.wisden-dist-sparkline line[data-ref=\"league\"]')")
+assert_eq "league reference line renders on Catches tab" "true" "$league_line"
+league_stroke=$(ab_eval "document.querySelector('$PANEL_SEL svg.wisden-dist-sparkline line[data-ref=\"league\"]')?.getAttribute('stroke') || ''")
+assert_eq "league line uses forest green (Catches)" "#3F7A4D" "$league_stroke"
+legend_text=$(ab_eval "Array.from(document.querySelectorAll('$PANEL_SEL div,$PANEL_SEL span')).find(el => /league avg/.test(el.innerText) && el.children.length < 30)?.innerText || ''")
+assert_contains "Catches legend includes league avg label" "league avg $api_catches_sa catches/inn" "$legend_text"
+
+# Switch to Run-outs tab and verify the league line redraws with
+# the run_outs scope_avg.
+ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'Run-outs').click()" >/dev/null
+settle 1
+api_ro_sa=$(echo "$api_summary" | python3 -c "
+import json, sys
+r = json.load(sys.stdin)
+v = r['run_outs']['scope_avg']
+print(f'{v:.2f}' if v is not None else '')")
+ro_legend=$(ab_eval "Array.from(document.querySelectorAll('$PANEL_SEL div,$PANEL_SEL span')).find(el => /league avg/.test(el.innerText) && el.children.length < 30)?.innerText || ''")
+assert_contains "Run-outs legend includes league avg label" "league avg $api_ro_sa run-out/inn" "$ro_legend"
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "─────────────────────────────────"
 echo "Team-fielding Distribution integration: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

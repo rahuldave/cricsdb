@@ -406,6 +406,41 @@ ab set viewport 1280 800
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 12 · League scope-comparison reference line + legend (Wickets default)"
+
+# Reload at default viewport on the default tab.
+ab open "$BASE/teams?team=$TEAM_URL&tab=Bowling&$SCOPE_URL"
+settle 4
+
+API_BASE="${API_BASE:-http://localhost:8000}"
+api_summary=$(curl -s "$API_BASE/api/v1/teams/$TEAM_URL/bowling/summary?$SCOPE_URL")
+api_wickets_sa=$(echo "$api_summary" | python3 -c "
+import json, sys
+r = json.load(sys.stdin)
+v = r['wickets']['scope_avg']
+print(f'{v:.2f}' if v is not None else '')")
+
+league_line=$(ab_eval "!!document.querySelector('$PANEL_SEL svg.wisden-dist-sparkline line[data-ref=\"league\"]')")
+assert_eq "league reference line renders on Wickets tab" "true" "$league_line"
+league_stroke=$(ab_eval "document.querySelector('$PANEL_SEL svg.wisden-dist-sparkline line[data-ref=\"league\"]')?.getAttribute('stroke') || ''")
+assert_eq "league line uses forest green (Wickets)" "#3F7A4D" "$league_stroke"
+legend_text=$(ab_eval "Array.from(document.querySelectorAll('$PANEL_SEL div,$PANEL_SEL span')).find(el => /league avg/.test(el.innerText) && el.children.length < 30)?.innerText || ''")
+assert_contains "Wickets legend includes league avg label" "league avg $api_wickets_sa wkts/inn" "$legend_text"
+
+# Switch to Economy tab and verify the league line redraws with
+# the economy scope_avg.
+ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'Economy').click()" >/dev/null
+settle 1
+api_econ_sa=$(echo "$api_summary" | python3 -c "
+import json, sys
+r = json.load(sys.stdin)
+v = r['economy']['scope_avg']
+print(f'{v:.2f}' if v is not None else '')")
+econ_legend=$(ab_eval "Array.from(document.querySelectorAll('$PANEL_SEL div,$PANEL_SEL span')).find(el => /league avg/.test(el.innerText) && el.children.length < 30)?.innerText || ''")
+assert_contains "Economy legend includes league avg label" "league avg $api_econ_sa RPO" "$econ_legend"
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "─────────────────────────────────"
 echo "Team-bowling Distribution integration: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

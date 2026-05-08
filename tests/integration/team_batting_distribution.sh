@@ -339,6 +339,78 @@ ab set viewport 1280 800
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 11 · League scope-comparison reference line + legend"
+
+# Reload at default viewport so the rest of the assertions run
+# against the desktop layout.
+ab open "$BASE/teams?team=$TEAM_URL&tab=Batting&$SCOPE_URL"
+settle 4
+
+API_BASE="${API_BASE:-http://localhost:8000}"
+api_summary=$(curl -s "$API_BASE/api/v1/teams/$TEAM_URL/batting/summary?$SCOPE_URL")
+api_runs_scope_avg=$(echo "$api_summary" | python3 -c "
+import json, sys
+r = json.load(sys.stdin)
+v = r['total_runs']['scope_avg']
+print(f'{v:.1f}' if v is not None else '')")
+
+# Assert the new <line data-ref='league'> exists in the sparkline
+league_line=$(ab_eval "!!document.querySelector('$PANEL_SEL svg.wisden-dist-sparkline line[data-ref=\"league\"]')")
+assert_eq "league reference line renders in sparkline" "true" "$league_line"
+
+# Assert the line's stroke is forest green (#3F7A4D)
+league_stroke=$(ab_eval "document.querySelector('$PANEL_SEL svg.wisden-dist-sparkline line[data-ref=\"league\"]')?.getAttribute('stroke') || ''")
+assert_eq "league line uses forest green" "#3F7A4D" "$league_stroke"
+
+# Legend contains "league avg X.X runs/inn" matching API scope_avg
+legend_text=$(ab_eval "Array.from(document.querySelectorAll('$PANEL_SEL div,$PANEL_SEL span')).find(el => /league avg/.test(el.innerText) && el.children.length < 30)?.innerText || ''")
+assert_contains "legend includes league avg label" "league avg $api_runs_scope_avg runs/inn" "$legend_text"
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
+echo "Test 12 · 'Avg innings total' StatCard has withScopeAvg subtitle"
+
+# Pull innings + total runs from API; compute the team's per-innings
+# value and the expected (val - scope_avg) / scope_avg %.
+read api_value api_pct <<<$(echo "$api_summary" | python3 -c "
+import json, sys
+r = json.load(sys.stdin)
+runs = r['total_runs']['value'] or 0
+inn = r['innings_batted']['value'] or 0
+sa = r['total_runs']['scope_avg']
+if inn > 0 and sa and sa > 0:
+    v = runs / inn
+    pct = ((v - sa) / sa) * 100
+    print(f'{v:.1f} {pct:+.1f}')
+else:
+    print('— —')")
+
+# DOM card text — strip whitespace
+card_text=$(ab_eval "Array.from(document.querySelectorAll('.wisden-statrow .wisden-stat')).find(c => /Avg innings total/.test(c.textContent))?.textContent.replace(/\s+/g,'') || ''")
+# Expected: "Avg innings total{value}vs avg{scope_avg}↑+X.X%" or similar
+expected_value_match=$(ab_eval "Array.from(document.querySelectorAll('.wisden-statrow .wisden-stat')).find(c => /Avg innings total/.test(c.textContent))?.textContent.match(/Avg innings total\s*([\d.]+)/)?.[1] || ''")
+assert_eq "Avg innings total value matches SQL-derived" "$api_value" "$expected_value_match"
+
+# Subtitle contains "vs avg X.X" — card_text was already
+# whitespace-stripped above, so match against the no-space form.
+expected_sa=$(echo "$api_summary" | python3 -c "
+import json, sys
+r = json.load(sys.stdin)
+sa = r['total_runs']['scope_avg']
+print(f'{sa:.1f}' if sa is not None else '')")
+assert_contains "Avg innings total subtitle has 'vs avg' scope-comparison" "vsavg$expected_sa" "$card_text"
+
+# Sign-aligned chip — ↑ when team avg > scope_avg, ↓ otherwise
+team_val=$(echo "$api_value" | tr -d '"')
+scope_val=$expected_sa
+expected_arrow=$(awk -v a="$team_val" -v b="$scope_val" 'BEGIN { print (a+0 > b+0) ? "↑" : (a+0 < b+0) ? "↓" : "·" }')
+assert_contains "Avg innings total chip arrow direction" "$expected_arrow" "$card_text"
+
+# Reset viewport one more time in case any prior step changed it
+ab set viewport 1280 800
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "─────────────────────────────────"
 echo "Team-batting Distribution integration: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then
