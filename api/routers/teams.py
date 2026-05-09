@@ -1504,8 +1504,14 @@ async def _batting_aggregates_baseline(team, filters, aux):
             "match_id": lo["lowest_all_out_match_id"],
             "innings_number": (lo["lowest_all_out_innings_number"] or 0) + 1,
         }
+    innings_batted = r.get("innings_batted") or 0
+    # avg_innings_total = pool_runs / innings_count. Computed server-side
+    # so the team-page StatCard's value AND scope_avg flow through the
+    # same code path (audit §4.2). NOT touched by _apply_batting_per_innings
+    # (rate, not a count) — already per-innings by construction.
+    avg_innings_total = round(total_runs / innings_batted, 1) if innings_batted else None
     out = {
-        "innings_batted": r.get("innings_batted") or 0,
+        "innings_batted": innings_batted,
         "total_runs": total_runs,
         "legal_balls": legal_balls,
         "run_rate": _safe_div(total_runs, legal_balls, 6),
@@ -1515,6 +1521,7 @@ async def _batting_aggregates_baseline(team, filters, aux):
         "sixes": sixes,
         "fifties": r.get("fifties") or 0,
         "hundreds": r.get("hundreds") or 0,
+        "avg_innings_total": avg_innings_total,
         "avg_1st_innings_total": avg_1st,
         "avg_2nd_innings_total": avg_2nd,
         "highest_total": highest_total,
@@ -1628,6 +1635,9 @@ async def _batting_aggregates_live(
     fifties = sum(1 for r in player_inn_rows if 50 <= (r["r"] or 0) < 100)
     hundreds = sum(1 for r in player_inn_rows if (r["r"] or 0) >= 100)
 
+    # avg_innings_total = pool_runs / innings_count. Same shape as the
+    # baseline path. Audit §4.2.
+    avg_innings_total = round(total_runs / innings_batted, 1) if innings_batted else None
     out = {
         "innings_batted": innings_batted,
         "total_runs": total_runs,
@@ -1639,6 +1649,7 @@ async def _batting_aggregates_live(
         "sixes": sixes,
         "fifties": fifties,
         "hundreds": hundreds,
+        "avg_innings_total": avg_innings_total,
         "avg_1st_innings_total": avg_1st,
         "avg_2nd_innings_total": avg_2nd,
         "highest_total": highest_total,
@@ -1678,6 +1689,12 @@ async def _compute_batting_summary(
         "sixes": wrap_metric(t["sixes"], s["sixes"], "sixes", sample_size=legal),
         "fifties": wrap_metric(t["fifties"], s["fifties"], "fifties", sample_size=t["innings_batted"]),
         "hundreds": wrap_metric(t["hundreds"], s["hundreds"], "hundreds", sample_size=t["innings_batted"]),
+        # avg_innings_total — server-side per-innings runs avg (audit §4.2).
+        # Replaces the synthetic envelope at Teams.tsx:651-674 that mixed
+        # client-computed value with server scope_avg. Both sides now flow
+        # through _batting_aggregates → _apply_batting_per_innings, so any
+        # future change to per-innings normalisation applies symmetrically.
+        "avg_innings_total": wrap_metric(t["avg_innings_total"], s["avg_innings_total"], "avg_innings_total", sample_size=t["innings_batted"]),
         "avg_1st_innings_total": wrap_metric(t["avg_1st_innings_total"], s["avg_1st_innings_total"], "avg_1st_innings_total", sample_size=t["innings_batted"]),
         "avg_2nd_innings_total": wrap_metric(t["avg_2nd_innings_total"], s["avg_2nd_innings_total"], "avg_2nd_innings_total", sample_size=t["innings_batted"]),
         "highest_total": t["highest_total"],

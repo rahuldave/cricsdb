@@ -57,6 +57,7 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     "hundreds":         None,
     "avg_1st_innings_total": "higher_better",
     "avg_2nd_innings_total": "higher_better",
+    "avg_innings_total":     "higher_better",
 
     # ── bowling (per-team — fielding side) ─────────────────────────
     "innings_bowled":   None,
