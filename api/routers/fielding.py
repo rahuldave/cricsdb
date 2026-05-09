@@ -93,7 +93,11 @@ async def fielding_leaders(
         f"""
         SELECT fc.fielder_id AS person_id,
                COUNT(*) AS total,
-               SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+               -- catches is the inclusive total per Convention 3 —
+               -- caught_and_bowled is a sub-count broken out as `c_and_b`
+               -- so consumers know how the total composes.
+               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                        THEN 1 ELSE 0 END) AS catches,
                SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
                SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
                SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS c_and_b
@@ -130,7 +134,12 @@ async def fielding_leaders(
         f"""
         SELECT fc.fielder_id AS person_id,
                COUNT(*) AS total,
-               SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+               -- Convention 3: catches inclusive of caught_and_bowled.
+               -- (Keepers don't bowl by default position so this is a
+               -- structural-zero in practice, but the predicate keeps
+               -- consistency with /leaders + /summary.)
+               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                        THEN 1 ELSE 0 END) AS catches,
                SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings
         FROM fieldingcredit fc {ka_join}
         WHERE {ka_where}
@@ -202,7 +211,7 @@ async def fielding_summary(
         params,
     )
 
-    catches = 0
+    caught_only = 0
     stumpings = 0
     run_outs = 0
     caught_and_bowled = 0
@@ -210,7 +219,7 @@ async def fielding_summary(
 
     for r in kind_rows:
         if r["kind"] == "caught":
-            catches = r["cnt"]
+            caught_only = r["cnt"]
             substitute_catches = r["sub_cnt"] or 0
         elif r["kind"] == "stumped":
             stumpings = r["cnt"]
@@ -219,7 +228,11 @@ async def fielding_summary(
         elif r["kind"] == "caught_and_bowled":
             caught_and_bowled = r["cnt"]
 
-    total = catches + stumpings + run_outs + caught_and_bowled
+    # Convention 3: catches headline is INCLUSIVE of caught_and_bowled.
+    # caught_and_bowled is exposed as a sub-count sibling so consumers
+    # can see the breakdown but summing both would double-count.
+    catches = caught_only + caught_and_bowled
+    total = catches + stumpings + run_outs
 
     # Match count from matchplayer
     match_where, match_params = filters.build(has_innings_join=False, aux=aux)
@@ -305,11 +318,11 @@ async def fielding_by_season(
     )
 
     from collections import defaultdict
-    seasons = defaultdict(lambda: {"catches": 0, "stumpings": 0, "run_outs": 0, "caught_and_bowled": 0})
+    seasons = defaultdict(lambda: {"caught_only": 0, "stumpings": 0, "run_outs": 0, "caught_and_bowled": 0})
     for r in rows:
         s = seasons[r["season"]]
         if r["kind"] == "caught":
-            s["catches"] = r["cnt"]
+            s["caught_only"] = r["cnt"]
         elif r["kind"] == "stumped":
             s["stumpings"] = r["cnt"]
         elif r["kind"] == "run_out":
@@ -320,10 +333,12 @@ async def fielding_by_season(
     by_season = []
     for season in sorted(seasons.keys()):
         s = seasons[season]
-        total = s["catches"] + s["stumpings"] + s["run_outs"] + s["caught_and_bowled"]
+        # Convention 3: catches inclusive of caught_and_bowled.
+        catches = s["caught_only"] + s["caught_and_bowled"]
+        total = catches + s["stumpings"] + s["run_outs"]
         by_season.append({
             "season": season,
-            "catches": s["catches"],
+            "catches": catches,
             "stumpings": s["stumpings"],
             "run_outs": s["run_outs"],
             "caught_and_bowled": s["caught_and_bowled"],
@@ -364,11 +379,11 @@ async def fielding_by_phase(
     )
 
     from collections import defaultdict
-    phases = defaultdict(lambda: {"catches": 0, "stumpings": 0, "run_outs": 0, "caught_and_bowled": 0})
+    phases = defaultdict(lambda: {"caught_only": 0, "stumpings": 0, "run_outs": 0, "caught_and_bowled": 0})
     for r in rows:
         p = phases[r["phase"]]
         if r["kind"] == "caught":
-            p["catches"] = r["cnt"]
+            p["caught_only"] = r["cnt"]
         elif r["kind"] == "stumped":
             p["stumpings"] = r["cnt"]
         elif r["kind"] == "run_out":
@@ -384,11 +399,13 @@ async def fielding_by_phase(
         if phase not in phases:
             continue
         p = phases[phase]
-        total = p["catches"] + p["stumpings"] + p["run_outs"] + p["caught_and_bowled"]
+        # Convention 3: catches inclusive of caught_and_bowled.
+        catches = p["caught_only"] + p["caught_and_bowled"]
+        total = catches + p["stumpings"] + p["run_outs"]
         by_phase.append({
             "phase": phase,
             "overs": phase_labels[phase],
-            "catches": p["catches"],
+            "catches": catches,
             "stumpings": p["stumpings"],
             "run_outs": p["run_outs"],
             "caught_and_bowled": p["caught_and_bowled"],
@@ -552,8 +569,12 @@ async def fielding_by_innings(
             (SELECT md.date FROM matchdate md WHERE md.match_id = i.match_id
              ORDER BY md.date LIMIT 1) as date,
             m.event_name as tournament,
-            SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) as catches,
-            SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) as caught_and_bowled,
+            -- Convention 3: catches inclusive of caught_and_bowled at SQL.
+            -- (Previous shape was caught-only here + python addition at
+            -- line 614; collapsed into a single inclusive predicate so
+            -- there's only one source of truth.)
+            SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                     THEN 1 ELSE 0 END) as catches,
             SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) as stumpings,
             SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) as run_outs,
             COUNT(*) as total
@@ -594,7 +615,7 @@ async def fielding_by_innings(
             "date": r["date"],
             "opponent": opponent,
             "tournament": r["tournament"],
-            "catches": r["catches"] + r["caught_and_bowled"],
+            "catches": r["catches"],  # already inclusive (Convention 3)
             "stumpings": r["stumpings"],
             "run_outs": r["run_outs"],
             "total": r["total"],

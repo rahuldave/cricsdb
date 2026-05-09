@@ -986,7 +986,9 @@ async def tournament_summary(
         WITH per_match_fielder AS (
           SELECT fc.fielder_id, i.match_id,
                  CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS fielder_team,
-                 SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+                 -- Convention 3: catches inclusive of caught_and_bowled.
+                 SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                          THEN 1 ELSE 0 END) AS catches,
                  SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
                  SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
                  SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS caught_bowled,
@@ -2443,12 +2445,16 @@ async def tournament_fielders_leaders(
     params.update(inn_params)
     params["lim"] = limit
 
-    # By total dismissals (catches + stumpings + run-outs + c&b)
+    # By total dismissals (catches + stumpings + run-outs)
+    # Note: catches is INCLUSIVE of c_and_b per Convention 3, so total
+    # is just catches + stumpings + run_outs (no separate +c_and_b).
+    # COUNT(*) in `total` already counts every kind once including C&B.
     disp_rows = await db.q(
         f"""
         SELECT fc.fielder_id AS person_id,
                COUNT(*) AS total,
-               SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                        THEN 1 ELSE 0 END) AS catches,
                SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
                SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
                SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS c_and_b
@@ -2472,7 +2478,8 @@ async def tournament_fielders_leaders(
         f"""
         SELECT fc.fielder_id AS person_id,
                COUNT(*) AS total,
-               SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                        THEN 1 ELSE 0 END) AS catches,
                SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
                SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
                SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS c_and_b
@@ -2497,7 +2504,12 @@ async def tournament_fielders_leaders(
         f"""
         SELECT ka.keeper_id AS person_id,
                SUM(CASE WHEN fc.kind IN ('caught','stumped') THEN 1 ELSE 0 END) AS total,
-               SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+               -- Convention 3: catches inclusive of caught_and_bowled.
+               -- Keepers structurally don't bowl so this is identical
+               -- to caught-only in practice; predicate kept consistent
+               -- with /leaders + /summary.
+               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                        THEN 1 ELSE 0 END) AS catches,
                SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings
         FROM keeperassignment ka
         JOIN innings i ON i.id = ka.innings_id
@@ -2600,7 +2612,9 @@ async def tournament_fielder_scope_stats(
     disp_rows = await db.q(
         f"""
         SELECT COUNT(*) AS total,
-               SUM(CASE WHEN fc.kind = 'caught' THEN 1 ELSE 0 END) AS catches,
+               -- Convention 3: catches inclusive of caught_and_bowled.
+               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                        THEN 1 ELSE 0 END) AS catches,
                SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
                SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
                SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS c_and_b
