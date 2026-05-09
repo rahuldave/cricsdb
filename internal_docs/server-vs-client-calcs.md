@@ -132,7 +132,7 @@ CLAUDE.md "Scope-anchored form-window cutoffs."
 
 | Metric | Endpoint | Formula | File:line | Predicates |
 |---|---|---|---|---|
-| `catches` | `/leaders` | `count(fc.kind = 'caught')` | `fielding.py:96` | ⚠️ NOT inclusive of `caught_and_bowled` — see §3.1 |
+| `catches` | `/leaders` | `count(fc.kind IN ('caught','caught_and_bowled'))` | `fielding.py:96` | ✅ INCLUSIVE per Convention 3 (post-2026-05-09) |
 | `c_and_b` | `/leaders` | `count(fc.kind = 'caught_and_bowled')` | `fielding.py:99` | exposed as sibling — total = catches+stumpings+run_outs+c_and_b |
 | `stumpings` | `/leaders` | `count(fc.kind = 'stumped')` | `fielding.py:97` | |
 | `run_outs` | `/leaders` | `count(fc.kind = 'run_out')` | `fielding.py:98` | |
@@ -145,7 +145,7 @@ CLAUDE.md "Scope-anchored form-window cutoffs."
 
 | Metric | Endpoint | Formula | File:line | Predicates |
 |---|---|---|---|---|
-| `keeping_catches` | `/keeping/summary` | `count(kind IN ('caught','caught_and_bowled'))` | `keeping.py:113` | ✅ INCLUSIVE — but notice this path uses inclusive while sibling `/fielders/{id}/summary` does NOT (§3.1) |
+| `keeping_catches` | `/keeping/summary` | `count(kind IN ('caught','caught_and_bowled'))` | `keeping.py:113` | ✅ INCLUSIVE per Convention 3 (sibling `/fielders/{id}/summary` also inclusive post-2026-05-09 §3.1) |
 | `byes_per_innings` | `/keeping/summary` | `byes_conceded / innings_kept` | `keeping.py:170` | innings_kept > 0 |
 | `keeping_dismissals_per_innings` | `/keeping/summary` | `(stumpings + keeping_catches + run_outs) / innings_kept` | `keeping.py:172` | innings_kept > 0 |
 
@@ -314,48 +314,51 @@ computed `delta_pct` — see ⚠️ §4.2.
 
 Same metric, multiple endpoints. Ranked by user-impact risk.
 
-### §3.1 ⚠️ HIGH — `catches` semantics differ across fielding endpoints
+### §3.1 ✅ RESOLVED 2026-05-09 — `catches` now inclusive across all fielding endpoints
 
-**The pattern:**
-- `/fielders/{id}/distribution.lifetime.catches.total` = `count(kind IN ('caught','caught_and_bowled') AND is_substitute=0)` — **inclusive**, post-2026-05-08 fix.
-- `/fielders/{id}/summary.catches` = `count(kind = 'caught')` — **NOT inclusive**; `caught_and_bowled` is exposed as a separate sibling field.
-- `/fielders/leaders.catches` = same non-inclusive count; `c_and_b` exposed separately.
-- `/fielders/{id}/keeping/summary.keeping_catches` = `count(kind IN ('caught','caught_and_bowled'))` — **inclusive**.
+**Resolution:** every fielding endpoint that surfaces a `catches`
+headline now uses `count(kind IN ('caught','caught_and_bowled'))`
+per CLAUDE.md Convention 3. `caught_and_bowled` is exposed as a
+sibling sub-count for transparency. Backend change in commit
+`5b52fd9`; frontend de-double-count fix in `0b541f5`.
 
-**Live evidence (2026-05-09):**
+**Live evidence — Bumrah's all-scope fielding summary:**
 ```
-Bumrah /summary:      catches=27, c_and_b=10, total=43
-Bumrah /distribution: catches.total=37  ← (27 + 10) — inclusive
+Pre-fix:  catches=27, caught_and_bowled=10, total=43
+          (user reading `summary.catches` undercounts by 10)
+Post-fix: catches=37, caught_and_bowled=10, total=43
+          (user reads inclusive 37; sub-count visible in c_and_b)
 ```
 
-**Risk profile.** Data is correct on both sides — `/summary`
-splits caught vs C&B as siblings and computes `total_dismissals`
-correctly. But the FIELD NAMED `catches` means different things
-on the two endpoints. A consumer (frontend, Series page, Match
-table) reading `summary.catches` thinking it's the inclusive
-total will under-count by exactly the number of C&B dismissals.
-For Bumrah that's 27% of his career catches; for MI's IPL
-fielding total, ~6%.
+**Pages now showing the corrected number:**
+- `/fielding?player=X` page-header "Catches" StatCard
+- `/players?player=X` Players-page summary row
+- `/series` Fielders sub-tab leaderboards
+- Tournament dossier "best fielding in single match"
 
-**CLAUDE.md authority:** "When writing or auditing any endpoint
-that surfaces a `catches` headline at fielder OR team grain, the
-predicate MUST be `fc.kind IN ('caught','caught_and_bowled')` AND
-`COALESCE(fc.is_substitute, 0) = 0`." → /summary endpoints are
-**non-compliant**.
+**Endpoint coverage (all updated):**
+- `api/routers/fielding.py`: `/leaders`, `/{id}/summary`,
+  `/by-season`, `/by-phase`, `/by-innings` (paired SQL+python
+  collapse), `/keeping/leaders` (cosmetic — keepers don't bowl).
+- `api/routers/tournaments.py`: `/series/fielders-leaders`
+  (by_dismissals + by_run_outs + by_keeper_dismissals),
+  best-fielding-in-single-match, /tournament-personal-fielding.
 
-**Affected files:**
-- `api/routers/fielding.py:96` (leaders), `:213` (summary), and
-  the per-season / per-phase blocks at `:308`, `:367`.
+**Substitute exception preserved.** `fielding.py:712` substitute
+catches predicate still uses `kind = 'caught'` only — substitutes
+can't bowl by Law (per CLAUDE.md exception note). Zero functional
+impact.
 
-**Phase-2 sanity test pattern:**
-```python
-for endpoint_pair in (
-    ("/fielders/X/summary", "/fielders/X/distribution"),
-    ("/fielders/leaders", aggregate from /distribution per fielder),
-):
-    assert summary_response.catches + summary_response.caught_and_bowled \
-           == distribution_response.catches.total
-```
+**Tested by:** `tests/sanity/test_catches_convention3.py` —
+algebraic identity simplified to
+`summary.catches - distribution.substitute_catches == distribution.catches.total`
+plus Convention 3 lock-down `summary.catches >= summary.caught_and_bowled`
+on every (player, scope) tuple including Bumrah. 51 pass.
+
+**Regression coverage:** 33 URL flips (REG→NEW→REG dance) across
+`tests/regression/fielding/urls.txt` and
+`tests/regression/players/urls.txt`. 0 REG drifted post-fix; new
+shape locked.
 
 ### §3.2 ⚠️ MED — `dots` predicate differs batting vs bowling
 
