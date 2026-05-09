@@ -23,6 +23,7 @@ in dedicated docs — go there before making assumptions.
 - Landing pages on every search-bar tab + Compare slots + Series/H2H/Venues structure: `internal_docs/landing-pages.md`
 - API reference (every endpoint, curl, response): `docs/api.md` — also `/api/docs` (Swagger) and `/api/redoc` on local + prod
 - Stat formulas (run rate, economy, win %, per-innings/per-team transforms): `internal_docs/how-stats-calculated.md`
+- Server-vs-client calc inventory + cross-endpoint divergence audit (Phase 1): `internal_docs/server-vs-client-calcs.md` — read before changing any predicate or shipping a new derived metric
 - Design decisions (over-numbering, db.q params, legal balls, URL state, scope-link architecture, FilterBarParams/AuxParams, etc.): `internal_docs/design-decisions.md`
 - URL state discipline: `internal_docs/url-state.md`
 - Link components (TeamLink / PlayerLink / SeriesLink contract — read before writing ANY navigation): `internal_docs/links.md`
