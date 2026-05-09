@@ -412,28 +412,37 @@ include run-outs (the batter IS dismissed) and obstructing.
 wicket attribution` covers this. ✅ — flagged here only as an
 inventory completeness item.
 
-### §3.5 ⚠️ LOW — DLS / forfeited / declared innings: no codified handling
+### §3.5 ✅ RESOLVED 2026-05-09 — DLS / forfeited / declared
 
-Searches for `target_runs`, `target_overs`, `i.declared`,
-`i.forfeited` across `api/routers/` return zero hits. The
-schema HAS these columns; the API doesn't currently filter or
-branch on them.
+**Resolution:** keep the current behaviour (no filter, no
+branch on `target_overs`). Codified in
+`how-stats-calculated.md` "DLS-truncated innings (target_overs
+< 20) — INCLUDED everywhere."
 
-**Risk surfaces:**
-- A DLS-truncated innings counts as a "real" innings in
-  `n_innings`, contributing per-innings normalisations that may
-  understate.
-- A forfeited innings (rare in T20 but legal) is treated as a
-  zero-run innings in any per-innings aggregator.
-- A declared innings (effectively impossible in T20 but the
-  column exists) is similarly treated as the actual innings.
+**Reasoning:**
+- Overs/balls-denominator stats are DLS-safe by construction —
+  they use actual legal-ball counts from the `delivery` table,
+  never assume 20 overs. Verified by grep: zero hardcoded `20`
+  or `20.0` denominators in `api/routers/`.
+- Innings-denominator stats correctly include DLS innings as
+  one innings each. A 90-run DLS chase that ended in over 12
+  is structurally identical to a 90-run fast chase that ended
+  in over 12 of a normal 20-over game — both are one innings
+  of 90 runs in cricket terms. Filtering DLS without also
+  filtering fast chases would be inconsistent.
+- `declared` and `forfeited` columns exist but have zero rows
+  in the T20 data. The Phase-2 sanity test asserts they stay
+  at zero — non-zero would surface a schema/data change
+  warranting a re-decision.
 
-**Phase-2 audit:** count rows with `target_runs IS NOT NULL` (DLS)
-or `forfeited=1` or `declared=1` in the current DB. If non-trivial,
-explicitly decide whether to filter or flag. Per quick check: T20
-has very few DLS innings; the bigger concern is whether
-per-innings averages should exclude DLS or treat them as full
-innings.
+Concrete impact (MI/IPL): 0.36 runs/innings swing on "Avg
+innings total" from including DLS — small at scale, larger on
+narrow scopes; accepted as the correct cricket story.
+
+**Tested by:** `tests/sanity/test_predicate_invariants.py` —
+prints the variant inventory (super_over / DLS / declared /
+forfeited counts) at every run, and asserts declared+forfeited
+remain at zero.
 
 ### §3.6 ⚠️ LOW — Team `/summary` scope envelope vs `/scope/averages/...` endpoints
 
@@ -711,10 +720,15 @@ asserts:
   NON-trivial and currently unfiltered everywhere); 0 declared;
   0 forfeited.
 
-**Decision pending:** whether per-innings normalisations should
-exclude DLS innings. The 724-innings count is large enough to
-matter for any "average innings total" or "per-innings RR" stat.
-Add a CLAUDE.md rule once decided.
+**Decision (2026-05-09):** keep DLS innings counted as 1 innings
+each in per-innings denominators. Overs-denominator stats are
+already DLS-safe (they use actual legal-ball counts, not assumed
+20 overs). The cricket logic: a DLS-shortened chase is
+structurally identical to a fast chase that ended early — both
+played one innings, both scored runs. Filtering DLS but not
+fast-chase innings would be inconsistent. Codified in
+`how-stats-calculated.md` "DLS-truncated innings — INCLUDED
+everywhere."
 
 ### §6.6 Substitute catches in /leaders
 

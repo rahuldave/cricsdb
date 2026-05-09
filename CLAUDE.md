@@ -658,6 +658,58 @@ against /summary, not part of the catches block.
 Spec: `internal_docs/design-decisions.md` "Convention 3 applies
 to distribution endpoints, not just /summary".
 
+## DLS-truncated innings — INCLUDED everywhere (no filter)
+
+DLS-shortened chases (`innings.target_overs < 20`) are NOT
+filtered or branched on anywhere in `api/routers/`. ~5.9% of
+2nd innings in `cricket.db` are DLS-shortened (724 of 12,248).
+The handling is intentional and codified — when adding any new
+metric or endpoint, do NOT introduce a `target_overs` filter
+without re-reading the resolution.
+
+**Two-class rule:**
+
+- **Overs/balls-denominator stats** (run rate, economy, SR,
+  boundary %, dot %, phase rates) — DLS-safe by construction.
+  Every overs-denominator stat divides by actual legal-ball
+  counts from the `delivery` table; never by an assumed-20-overs
+  number. Verified: zero hardcoded `20` or `20.0` denominators
+  in `api/routers/`. A 12-over DLS chase contributes its real
+  ~60-72 legal balls and the math works correctly.
+
+- **Innings-denominator stats** (Avg innings total, mean_per_innings,
+  wickets_lost / innings_batted, dismissals_per_match) — DLS
+  innings count as 1 innings each. The cricket logic: a 90-run
+  DLS chase that ended in over 12 is structurally identical to
+  a 90-run fast chase that ended in over 12 of a normal 20-over
+  game. Both played one innings, both scored runs, both ended
+  early. Filtering DLS without also filtering fast-chase /
+  all-out-early innings would be inconsistent.
+
+**Tells you might be about to break this:**
+- You're tempted to add `WHERE i.target_overs IS NULL OR i.target_overs = 20`
+  to a per-innings denominator. → Don't. The mixed treatment
+  with fast-chase innings is the bug.
+- You're hardcoding `20` as a divisor anywhere — even inside a
+  comment-stripped formula. → Use the actual ball count from the
+  delivery table.
+- A new endpoint surfaces a "per-innings X" — verify it uses
+  `count(distinct innings.id)` consistently and doesn't accidentally
+  filter DLS via a JOIN that requires `target_overs = 20`.
+
+**Concrete impact** (Mumbai Indians IPL): 0.36 runs/innings swing
+on Avg innings total from including DLS — small at scale, larger
+on narrow scopes; accepted as the correct cricket story.
+
+**Tested by:** `tests/sanity/test_predicate_invariants.py` —
+prints variant-axis inventory + asserts `declared`/`forfeited`
+stay at zero (non-zero ⇒ schema/data changed and policy needs
+re-decision).
+
+Spec: `internal_docs/how-stats-calculated.md` "DLS-truncated
+innings (target_overs < 20) — INCLUDED everywhere" +
+`internal_docs/server-vs-client-calcs.md` §3.5.
+
 ## Legend swatch alignment in distribution panels
 
 When rendering a `<swatch> + <label>` pair inside a row that uses

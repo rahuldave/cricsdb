@@ -385,6 +385,65 @@ Most metrics EXCLUDE super-over deliveries via `i.super_over = 0`
 in the WHERE clause. Some endpoints intentionally include them
 (check the SQL — see `bowling.py`'s comment about leaderboards).
 
+### DLS-truncated innings (`target_overs < 20`) — INCLUDED everywhere
+
+About 5.9% of 2nd innings in `cricket.db` are DLS-shortened
+chases (`target_overs < 20`, with values ranging 5.0–19.3).
+**Zero routers in `api/routers/` filter or branch on
+`target_overs`** — every aggregation treats a DLS-truncated
+innings the same as a full 20-over innings. This is intentional;
+the audit (project_invariants_audit, server-vs-client-calcs.md
+§3.5 / §6.5) confirmed it on 2026-05-09.
+
+The reasoning splits by what the stat's denominator is:
+
+**Stats with overs/balls as denominator — DLS-safe by construction.**
+Run rate, economy, boundary %, dot %, batter SR, bowler SR
+(balls/wkt), phase rates (powerplay/middle/death) ALL divide by
+the actual count of legal balls bowled (`SUM(CASE WHEN
+extras_wides=0 AND extras_noballs=0 THEN 1 ELSE 0 END)` or
+similar). A 12-over DLS chase contributes its real ~60–72 legal
+balls; the math works out correctly. There's no hardcoded `20`
+or `20.0` denominator in `api/routers/` (verified by grep).
+
+**Stats with innings as denominator — KEEP DLS innings counted.**
+Avg innings total, `mean_per_innings`, `wickets_lost /
+innings_batted`, `dismissals_per_match` etc. all use innings (or
+match) count as the denominator. A DLS-shortened innings counts
+as 1 innings.
+
+The cricket logic: a 90/4 in 12 overs from a DLS-shortened chase
+is structurally identical to a 90/4 fast chase that completed
+in 12 overs of a normal 20-over game (e.g. small target, quick
+finish). Both played one innings, both scored runs, both ended
+early. Filtering DLS but not fast-chase / all-out-early innings
+would be inconsistent. So the team that scored 90 in a 12-over
+DLS chase contributes its 90 runs and its 1 innings to the
+average innings total — pulling the average down slightly,
+which is the correct cricket story.
+
+**Concrete impact** (Mumbai Indians IPL):
+- 287 innings total / 46,905 runs → avg innings total **163.43**
+- If DLS innings excluded: 284 innings / 46,517 runs → **163.79**
+- The 3 DLS-truncated MI innings averaged 129 runs each.
+
+The 0.36 swing is small for high-volume scopes; larger for
+narrow scopes (a team with 20 innings, 5 of them DLS, sees a
+proportionally bigger effect).
+
+**Edge case.** `_phase_per_innings` in `scope_averages.py:502`
+divides phase totals by ALL innings (not "innings that reached
+this phase"). A DLS innings ending in over 11 contributes 0
+death-phase balls to the average — but the same is true for any
+all-out innings ending in over 11, or any fast chase ending
+early. DLS doesn't introduce this; it just shares the existing
+treatment. Worth knowing about, not actionable.
+
+**`declared` and `forfeited` columns.** Schema has them; T20
+data has zero rows with either set. `tests/sanity/test_predicate_invariants.py`
+asserts the count stays at zero — non-zero ⇒ schema/data
+changed and the policy needs a re-decision.
+
 ### Phase boundaries
 
 See "Bowling/Phase boundaries" above. Identical for batting.
