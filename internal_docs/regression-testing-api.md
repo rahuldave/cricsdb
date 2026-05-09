@@ -196,11 +196,13 @@ git stash push -u -m "regression-test-head-capture" -- \
   frontend/src/<frontend-files>
 ```
 
-Wait ~3 seconds for uvicorn's reloader, then sanity-check that you're
-really on HEAD:
+Wait ~8 seconds for uvicorn's reloader (3s isn't enough — the
+reloader picks up file changes in ~5-7s; capturing too early
+gets the stale state and silently reports "0 NEW changed"),
+then sanity-check that you're really on HEAD:
 
 ```bash
-sleep 3
+sleep 8
 curl -s 'http://localhost:8000/api/v1/<a-known-NEW-url>' \
   | python3 -m json.tool | head
 # expect: values that demonstrate the HEAD bug
@@ -216,7 +218,7 @@ Then capture:
 
 ```bash
 git stash pop
-sleep 3
+sleep 8
 curl -s 'http://localhost:8000/api/v1/<a-known-NEW-url>' \
   | python3 -m json.tool | head
 # expect: values that demonstrate the patched fix

@@ -96,7 +96,7 @@ if ! git diff --quiet; then
   git stash push -m "$STASH_MSG-full" || { echo "git stash (full) failed"; exit 1; }
 fi
 
-sleep 3  # uvicorn --reload settle
+sleep 8  # uvicorn --reload settle (3s wasn't enough — reloader picks up file change in ~5-7s)
 echo "Capturing HEAD..."
 capture "$WORK/head"
 
@@ -106,7 +106,7 @@ while git stash list | grep -q "$STASH_MSG"; do
   git stash pop || { echo "git stash pop failed"; break; }
 done
 
-sleep 3
+sleep 8  # uvicorn --reload settle after pop
 echo "Capturing patched..."
 capture "$WORK/patched"
 
