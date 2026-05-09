@@ -648,31 +648,12 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
         <StatCard label="Lowest all-out"
           value={s.lowest_all_out_total ? String(s.lowest_all_out_total.runs) : '-'} />
         <StatCard label="Avg innings total"
-          value={(s.innings_batted.value ?? 0) > 0
-            ? ((s.total_runs.value ?? 0) / (s.innings_batted.value ?? 1)).toFixed(1)
+          value={s.avg_innings_total.value != null
+            ? s.avg_innings_total.value.toFixed(1)
             : '-'}
-          subtitle={(() => {
-            // Mirror the existing 1st/2nd-inn `withScopeAvg` subtitle:
-            // pair this team's all-innings mean with the league's
-            // per-innings average for the same scope. The
-            // `total_runs.scope_avg` envelope already carries the
-            // per-innings number (135.9-ish unfiltered; respects every
-            // active filter except the team narrowing), so no extra
-            // fetch.
-            const innings = s.innings_batted.value ?? 0
-            const runs = s.total_runs.value ?? 0
-            const scopeAvg = s.total_runs.scope_avg
-            if (innings <= 0 || scopeAvg == null || scopeAvg <= 0) return null
-            const value = runs / innings
-            const env = {
-              value: +value.toFixed(1),
-              scope_avg: scopeAvg,
-              delta_pct: ((value - scopeAvg) / scopeAvg) * 100,
-              direction: 'higher_better' as const,
-              sample_size: innings,
-            }
-            return <MetricDelta env={env} withScopeAvg fmt={1} />
-          })()} />
+          subtitle={s.avg_innings_total.value != null
+            ? <MetricDelta env={s.avg_innings_total} withScopeAvg fmt={1} />
+            : null} />
       </div>
 
       {/* Line charts only when there are 2+ seasons — one data point

@@ -487,45 +487,49 @@ the summary card on top vs the SR-tab strip below.
 `/{id}/summary.strike_rate` and `/{id}/distribution.runs.total *
 100 / runs.balls_total`; assert agreement to 2 dp.
 
-### §4.2 ⚠️ HIGH — "Avg innings total" team StatCard mixes client value with server scope_avg
+### §4.2 ✅ RESOLVED 2026-05-09 — "Avg innings total" now server-side envelope
 
-- **Server:** `/teams/{team}/batting/summary.total_runs.value`,
-  `.innings_batted.value`, and `.total_runs.scope_avg`
-  (server-computed via the dual-query envelope).
-- **Client (`Teams.tsx:651-674`):**
-  - `value = total_runs.value / innings_batted.value` — client computes the player's per-innings runs.
-  - `delta_pct = (value - scope_avg) / scope_avg * 100` — client computes delta against the server's `total_runs.scope_avg`.
-  - Renders both via a synthetic `MetricDelta` envelope.
+**Resolution:** added `avg_innings_total` envelope to
+`/teams/{team}/batting/summary` via commit `a0b9c0a` (backend) +
+frontend simplification in the same arc. Both the team value and
+the league `scope_avg` now flow through `_batting_aggregates` →
+`_apply_batting_per_innings` — single code path, no divergence
+surface. Frontend `Teams.tsx:651-674` simplified from a 24-line
+synthetic-envelope construction to a 5-line plain `MetricDelta`
+consumer.
 
-**Why this is the highest-risk pattern in the audit.** The
-`scope_avg` field is the LEAGUE's per-innings runs (computed on
-`team=None`); the client's `value` is THIS team's per-innings runs.
-The two are SUPPOSED to compare. But they're computed by
-different code paths:
-- Server `scope_avg`: `sum(league_runs) / sum(league_innings)`
-  via the SQL aggregator.
-- Client `value`: `team_runs / team_innings` where each is its
-  own server-side aggregate.
+**Live verification (MI/IPL post-fix):**
+```
+avg_innings_total.value      = 163.4   ← server-computed (matches pre-fix client compute exactly)
+avg_innings_total.scope_avg  = 161.2   ← server league baseline
+avg_innings_total.delta_pct  = +1.4%   ← server-computed via wrap_metric
+```
 
-A future edit to the server's per-innings denominator (e.g.
-"exclude super-over innings" — already done; "exclude DLS
-innings" — not done) would update `scope_avg` but NOT the
-denominator the client uses to compute `value` (because the
-client uses `innings_batted` which is its own count).
+**Pre-fix description (kept for context):** Client computed
+`value = total_runs.value / innings_batted.value` and
+`delta_pct = (value - scope_avg) / scope_avg * 100` using the
+server-supplied `total_runs.scope_avg`. The two sides flowed
+through different code paths — a future change to per-innings
+normalisation on the server would not propagate symmetrically to
+the client's value.
 
-**Concrete failure case.** If `total_runs` and `innings_batted`
-each apply slightly different filters (e.g. one excludes a
-truncated innings, the other doesn't), `value = total_runs/
-innings_batted` is no longer the team's true per-innings mean.
-Comparing against `scope_avg` (which uses the SAME pair on the
-league side) introduces an asymmetric error.
+**Tested by:** `tests/integration/team_batting_distribution.sh`
+Test 14 (added 2026-05-09). Asserts across 3 teams (MI, CSK, RCB)
+that:
+- DOM-rendered Avg innings total == API `avg_innings_total.value`
+- Subtitle contains the API `scope_avg`
+- Arrow direction matches sign of `delta_pct`
+- `scope_avg(avg_innings_total)` IDENTICAL across teams (cross-team
+  league-baseline lock-down)
+- `avg_innings_total.value == total_runs.value / innings_batted.value`
+  (legacy-compat anchor — proves the server-side computation matches
+  what the client used to do)
 
-**Phase-2 fix:** either (a) move the computation server-side —
-add `avg_innings_total` to the team batting summary envelope with
-its own server-side dual-query — OR (b) at minimum, add a sanity
-test asserting `total_runs.value / innings_batted.value` equals
-`(total_runs.value_LEAGUE / innings_batted.value_LEAGUE)` divided
-by `unique_teams` to within a few percent on a fixed scope.
+11 NEW assertions; 0 fail.
+
+**Regression coverage:** 5 team-batting-summary URL flips
+(REG→NEW→REG dance) in `tests/regression/teams/urls.txt`.
+0 REG drifted; new shape locked.
 
 ### §4.3 ⚠️ MED — Pool SR (balls/wkt) on bowler + team-bowling Wickets strips
 

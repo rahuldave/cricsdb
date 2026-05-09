@@ -30,7 +30,7 @@ REG team_vs_opponent_ind_aus          /api/v1/teams/India/vs/Australia?gender=ma
 # ── ball-level tabs: Batting ─────────────────────────────────────
 # Chip envelopes on summary + by-phase carry per-innings scope_avg
 # (perf-bucket-baselines.md "What 'average' means").
-NEW team_batting_summary_india        /api/v1/teams/India/batting/summary?gender=male&team_type=international
+REG team_batting_summary_india        /api/v1/teams/India/batting/summary?gender=male&team_type=international
 REG team_batting_by_season_india      /api/v1/teams/India/batting/by-season?gender=male&team_type=international
 REG team_batting_by_phase_india       /api/v1/teams/India/batting/by-phase?gender=male&team_type=international
 REG team_batting_top_batters_india    /api/v1/teams/India/batting/top-batters?gender=male&team_type=international&limit=5
@@ -59,7 +59,7 @@ REG team_partnerships_top_india       /api/v1/teams/India/partnerships/top?gende
 REG team_partnerships_bowling_summary /api/v1/teams/India/partnerships/summary?gender=male&team_type=international&side=bowling
 
 # ── club-team variant (Mumbai Indians) ───────────────────────────
-NEW team_mi_batting_summary           /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG team_mi_batting_summary           /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
 REG team_mi_bowling_top               /api/v1/teams/Mumbai%20Indians/bowling/top-bowlers?gender=male&team_type=club&tournament=Indian%20Premier%20League&limit=3
 
 # ── reference (FilterBar support) ────────────────────────────────
@@ -80,7 +80,7 @@ REG team_players_by_season_india_fm                    /api/v1/teams/India/playe
 REG team_opponents_india_fm                            /api/v1/teams/India/opponents?gender=male&team_type=international&team_class=full_member
 REG team_opponents_matrix_india_fm                     /api/v1/teams/India/opponents-matrix?gender=male&team_type=international&top_n=5&team_class=full_member
 REG team_vs_opponent_ind_aus_fm                        /api/v1/teams/India/vs/Australia?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member
-NEW team_batting_summary_india_fm                      /api/v1/teams/India/batting/summary?gender=male&team_type=international&team_class=full_member
+REG team_batting_summary_india_fm                      /api/v1/teams/India/batting/summary?gender=male&team_type=international&team_class=full_member
 REG team_batting_by_season_india_fm                    /api/v1/teams/India/batting/by-season?gender=male&team_type=international&team_class=full_member
 REG team_batting_by_phase_india_fm                     /api/v1/teams/India/batting/by-phase?gender=male&team_type=international&team_class=full_member
 REG team_batting_top_batters_india_fm                  /api/v1/teams/India/batting/top-batters?gender=male&team_type=international&limit=5&team_class=full_member
@@ -115,7 +115,7 @@ REG team_players_by_season_india_bilat                 /api/v1/teams/India/playe
 REG team_opponents_india_bilat                         /api/v1/teams/India/opponents?gender=male&team_type=international&series_type=bilateral_only
 REG team_opponents_matrix_india_bilat                  /api/v1/teams/India/opponents-matrix?gender=male&team_type=international&top_n=5&series_type=bilateral_only
 REG team_vs_opponent_ind_aus_bilat                     /api/v1/teams/India/vs/Australia?gender=male&team_type=international&season_from=2024&season_to=2025&series_type=bilateral_only
-NEW team_batting_summary_india_bilat                   /api/v1/teams/India/batting/summary?gender=male&team_type=international&series_type=bilateral_only
+REG team_batting_summary_india_bilat                   /api/v1/teams/India/batting/summary?gender=male&team_type=international&series_type=bilateral_only
 REG team_batting_by_season_india_bilat                 /api/v1/teams/India/batting/by-season?gender=male&team_type=international&series_type=bilateral_only
 REG team_batting_by_phase_india_bilat                  /api/v1/teams/India/batting/by-phase?gender=male&team_type=international&series_type=bilateral_only
 REG team_batting_top_batters_india_bilat               /api/v1/teams/India/batting/top-batters?gender=male&team_type=international&limit=5&series_type=bilateral_only
@@ -141,21 +141,21 @@ REG ref_tournaments_india_bilat                        /api/v1/tournaments?team=
 # ── Slot-override + chip-baseline alignment (spec-slot-override-chip-alignment.md) ──
 # REG: lock the old chip_team_class back-compat path. Must stay byte-identical
 #      across the spec rollout — Commit 5 only adds a deprecation comment.
-NEW team_batting_summary_aus_chip_team_class_fm        /api/v1/teams/Australia/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2025&chip_team_class=full_member
+REG team_batting_summary_aus_chip_team_class_fm        /api/v1/teams/Australia/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2025&chip_team_class=full_member
 # NEW: __any__ sentinel on standard FilterBar fields decodes as no-narrowing.
 #      Different output from no-__any__ baseline — asserts the decoder fires.
 NEW team_summary_rcb_season_any                        /api/v1/teams/Royal%20Challengers%20Bengaluru/summary?gender=male&team_type=club&season_from=__any__&season_to=__any__
 # NEW: chip_baseline_scope_json overrides the legacy chip alignment paths.
 #      Payload = base64({gender:male, team_type:club}) — broaden RCB 2025 chip baseline to all-clubs.
-NEW team_batting_summary_rcb_2025_chip_baseline_clubs  /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&chip_baseline_scope_json=eyJnZW5kZXIiOiAibWFsZSIsICJ0ZWFtX3R5cGUiOiAiY2x1YiJ9
+REG team_batting_summary_rcb_2025_chip_baseline_clubs  /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&chip_baseline_scope_json=eyJnZW5kZXIiOiAibWFsZSIsICJ0ZWFtX3R5cGUiOiAiY2x1YiJ9
 # NEW: chip_baseline_scope_json with a payload that carries scope_to_team — verify the
 #      decode threads scope_to_team into the resulting AuxParams.
-NEW team_batting_summary_rcb_chip_baseline_scope_to_team /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&chip_baseline_scope_json=eyJnZW5kZXIiOiAibWFsZSIsICJ0ZWFtX3R5cGUiOiAiY2x1YiIsICJzY29wZV90b190ZWFtIjogIlJveWFsIENoYWxsZW5nZXJzIEJlbmdhbHVydSJ9
+REG team_batting_summary_rcb_chip_baseline_scope_to_team /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&chip_baseline_scope_json=eyJnZW5kZXIiOiAibWFsZSIsICJ0ZWFtX3R5cGUiOiAiY2x1YiIsICJzY29wZV90b190ZWFtIjogIlJveWFsIENoYWxsZW5nZXJzIEJlbmdhbHVydSJ9
 
 # ── Inning-split (spec-inning-split.md) commits 1 + 2 ──
 # Commit 1: ?inning=0|1 narrowing on existing summary endpoints.
-NEW team_batting_summary_rcb_inn0      /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=0
-NEW team_batting_summary_rcb_inn1      /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=1
+REG team_batting_summary_rcb_inn0      /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=0
+REG team_batting_summary_rcb_inn1      /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=1
 NEW team_bowling_summary_rcb_inn0      /api/v1/teams/Royal%20Challengers%20Bengaluru/bowling/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=0
 NEW team_fielding_summary_rcb_inn0     /api/v1/teams/Royal%20Challengers%20Bengaluru/fielding/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=0
 NEW team_summary_rcb_inn0              /api/v1/teams/Royal%20Challengers%20Bengaluru/summary?gender=male&team_type=club&season_from=2025&season_to=2025&inning=0
@@ -183,7 +183,7 @@ NEW team_opponents_mi_pri                /api/v1/teams/Mumbai%20Indians/opponent
 NEW team_opponents_matrix_mi_pri         /api/v1/teams/Mumbai%20Indians/opponents-matrix?gender=male&team_type=club&top_n=5&team_class=primary_club
 NEW team_players_by_season_mi_pri        /api/v1/teams/Mumbai%20Indians/players-by-season?gender=male&team_type=club&season_from=2024&season_to=2024&team_class=primary_club
 NEW team_vs_opponent_mi_csk_pri          /api/v1/teams/Mumbai%20Indians/vs/Chennai%20Super%20Kings?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
-NEW team_batting_summary_mi_pri          /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+REG team_batting_summary_mi_pri          /api/v1/teams/Mumbai%20Indians/batting/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
 NEW team_batting_by_season_mi_pri        /api/v1/teams/Mumbai%20Indians/batting/by-season?gender=male&team_type=club&team_class=primary_club
 NEW team_batting_by_phase_mi_pri         /api/v1/teams/Mumbai%20Indians/batting/by-phase?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
 NEW team_batting_top_batters_mi_pri      /api/v1/teams/Mumbai%20Indians/batting/top-batters?gender=male&team_type=club&season_from=2024&season_to=2025&limit=5&team_class=primary_club
@@ -202,7 +202,7 @@ NEW team_opponents_surrey_sec            /api/v1/teams/Surrey/opponents?gender=m
 NEW team_opponents_matrix_surrey_sec     /api/v1/teams/Surrey/opponents-matrix?gender=male&team_type=club&top_n=5&team_class=secondary_club
 NEW team_players_by_season_surrey_sec    /api/v1/teams/Surrey/players-by-season?gender=male&team_type=club&season_from=2024&season_to=2024&team_class=secondary_club
 NEW team_vs_opponent_surrey_somerset_sec /api/v1/teams/Surrey/vs/Somerset?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
-NEW team_batting_summary_surrey_sec      /api/v1/teams/Surrey/batting/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+REG team_batting_summary_surrey_sec      /api/v1/teams/Surrey/batting/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
 NEW team_batting_by_season_surrey_sec    /api/v1/teams/Surrey/batting/by-season?gender=male&team_type=club&team_class=secondary_club
 NEW team_batting_by_phase_surrey_sec     /api/v1/teams/Surrey/batting/by-phase?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
 NEW team_batting_top_batters_surrey_sec  /api/v1/teams/Surrey/batting/top-batters?gender=male&team_type=club&season_from=2024&season_to=2025&limit=5&team_class=secondary_club

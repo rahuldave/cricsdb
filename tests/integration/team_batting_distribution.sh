@@ -474,6 +474,89 @@ assert_eq "scope_avg(total_runs) is in plausible per-innings range (50–250)" \
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 14 · avg_innings_total server-envelope DOM-vs-API agreement (§4.2)"
+# Audit §4.2 fix: avg_innings_total is now a server-side envelope on
+# /teams/{team}/batting/summary (was previously synthesized client-side
+# from total_runs.value / innings_batted.value, mixing client value
+# with server scope_avg). Verify across 3 teams that:
+#   1. The DOM-rendered "Avg innings total" value matches the new
+#      server-side avg_innings_total.value.
+#   2. The subtitle scope_avg matches avg_innings_total.scope_avg.
+#   3. The arrow direction matches the sign of delta_pct.
+#   4. The scope_avg is identical across teams in the same scope
+#      (cross-team lock-down — also covered by Test 13 on total_runs,
+#      this catches the new field's separate envelope).
+
+for TEAM_TUPLE in "Mumbai%20Indians:Mumbai Indians" "Chennai%20Super%20Kings:Chennai Super Kings" "Royal%20Challengers%20Bengaluru:Royal Challengers Bengaluru"; do
+  T_URL="${TEAM_TUPLE%%:*}"
+  T_NAME="${TEAM_TUPLE#*:}"
+  api=$(curl -s "$API_BASE/api/v1/teams/$T_URL/batting/summary?$SCOPE_URL")
+
+  # Extract envelope fields
+  api_value=$(echo "$api" | python3 -c "
+import json, sys
+v = json.load(sys.stdin)['avg_innings_total']['value']
+print(f'{v:.1f}' if v is not None else '')")
+  api_scope_avg=$(echo "$api" | python3 -c "
+import json, sys
+v = json.load(sys.stdin)['avg_innings_total']['scope_avg']
+print(f'{v:.1f}' if v is not None else '')")
+  api_delta=$(echo "$api" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)['avg_innings_total']['delta_pct']
+print(d if d is not None else '')")
+
+  # Open the team's Batting tab and read the StatCard
+  ab open "$BASE/teams?team=$T_URL&tab=Batting&$SCOPE_URL"
+  settle 4
+  card_text=$(ab_eval "Array.from(document.querySelectorAll('.wisden-statrow .wisden-stat')).find(c => /Avg innings total/.test(c.textContent))?.textContent.replace(/\s+/g,' ').trim() || ''")
+  dom_value=$(ab_eval "Array.from(document.querySelectorAll('.wisden-statrow .wisden-stat')).find(c => /Avg innings total/.test(c.textContent))?.textContent.match(/Avg innings total\s*([\d.]+)/)?.[1] || ''")
+
+  assert_eq "$T_NAME · DOM avg_innings_total == API avg_innings_total.value" \
+    "$api_value" "$dom_value"
+
+  assert_contains "$T_NAME · subtitle has 'vs avg' + scope_avg" \
+    "vs avg $api_scope_avg" "$card_text"
+
+  # Arrow direction sanity
+  case "$api_delta" in
+    "") ;;
+    -*) expected_arrow="↓" ;;
+    *)  expected_arrow="↑" ;;
+  esac
+  if [ -n "$api_delta" ]; then
+    assert_contains "$T_NAME · arrow direction matches delta sign" \
+      "$expected_arrow" "$card_text"
+  fi
+done
+
+# Cross-team scope_avg lock-down: avg_innings_total.scope_avg must be
+# IDENTICAL for MI and CSK in the same scope (league baseline is
+# team-independent — same property Test 13 asserts on total_runs).
+mi_aitsa=$(curl -s "$API_BASE/api/v1/teams/Mumbai%20Indians/batting/summary?$SCOPE_URL" \
+  | python3 -c "import json, sys; print(json.load(sys.stdin)['avg_innings_total']['scope_avg'])")
+csk_aitsa=$(curl -s "$API_BASE/api/v1/teams/Chennai%20Super%20Kings/batting/summary?$SCOPE_URL" \
+  | python3 -c "import json, sys; print(json.load(sys.stdin)['avg_innings_total']['scope_avg'])")
+assert_eq "scope_avg(avg_innings_total) IDENTICAL across teams (league baseline)" \
+  "$mi_aitsa" "$csk_aitsa"
+
+# Pre-fix invariant: avg_innings_total.value ≈ total_runs.value / innings_batted.value
+# (1 dp difference acceptable due to rounding). This is the safety check
+# that the server-side computation matches what the client used to do.
+mi_total=$(curl -s "$API_BASE/api/v1/teams/Mumbai%20Indians/batting/summary?$SCOPE_URL")
+mi_legacy=$(echo "$mi_total" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+v = d['total_runs']['value'] / d['innings_batted']['value']
+print(f'{v:.1f}')")
+mi_new=$(echo "$mi_total" | python3 -c "
+import json, sys
+print(f'{json.load(sys.stdin)[\"avg_innings_total\"][\"value\"]:.1f}')")
+assert_eq "avg_innings_total.value matches client-style total_runs/innings_batted" \
+  "$mi_legacy" "$mi_new"
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "─────────────────────────────────"
 echo "Team-batting Distribution integration: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

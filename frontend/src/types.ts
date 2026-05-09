@@ -1502,6 +1502,7 @@ export interface TeamBattingSummary {
   sixes: MetricEnvelope
   fifties: MetricEnvelope
   hundreds: MetricEnvelope
+  avg_innings_total: MetricEnvelope
   avg_1st_innings_total: MetricEnvelope
   avg_2nd_innings_total: MetricEnvelope
   highest_total: TeamInningsTotal | null
