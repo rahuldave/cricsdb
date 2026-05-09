@@ -3185,12 +3185,23 @@ verification rule.
 
 ---
 
-## 15. Wilson-CI retrofit on batter conditionals (DRAFT)
+## 15. Wilson-CI retrofit on batter conditionals (IMPLEMENTED)
+
+> **Status: IMPLEMENTED** as part of the bowler v1 arc (commit
+> `ce347e5` — "batting: milestones → ProbRecord shape (Wilson CIs)";
+> originally landed under §13 numbering, now §15). Backend +
+> frontend types + `ProbChip` migration + sanity Wilson assertions
+> + regression flip all shipped together. Integration test gained
+> a sixth assertion block 2026-05-09 (Test 10) covering the
+> tooltip text via API-anchored JS-formatted expected, locking
+> the `95% CI [lo%–hi%], n=denom` contract on every visible chip
+> across the panel.
 
 Adding Wilson confidence intervals to bowler probabilities (§11.3)
-makes the existing batter `milestones` shape — bare scalars — the
-inconsistent one. Retrofit the batter endpoint so every probability
-across the project uses the same `prob_record(num, denom)` shape.
+made the existing batter `milestones` shape — bare scalars — the
+inconsistent one. The retrofit flipped the batter endpoint so every
+probability across the project uses the same `prob_record(num, denom)`
+shape.
 
 **Affected endpoint:** `GET /api/v1/batters/{id}/distribution`.
 

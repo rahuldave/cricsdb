@@ -363,6 +363,53 @@ esac
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 10 · Wilson-CI tooltips on milestone chips (§15 retrofit)"
+# Per spec §15 / §11.3: every milestone ProbRecord ships
+# {value, num, denom, ci_low, ci_high}. The chip's `title` attr
+# carries `95% CI [lo%–hi%], n=denom`. Anchor expected text
+# against the API at runtime — never re-derive Wilson in shell.
+
+# Re-open with Runs tab default + Lifetime window for a stable scope
+# (test 9 may have left the panel on the SR tab).
+ab open "$BASE/batting?player=$KOHLI&$SCOPE"
+settle 4
+
+# Pull raw API floats — formatting happens in JS via ab_eval so the
+# expected text and the rendered DOM tooltip both pass through V8's
+# Number.toFixed. Anything else (Python %.1f, ROUND_HALF_UP, etc.)
+# drifts on .5-boundary binary-float values where the IEEE 754
+# representation isn't actually the printed decimal — JS reads the
+# binary truth.
+api_raw=$(curl -s "http://localhost:8000/api/v1/batters/$KOHLI/distribution?$SCOPE" \
+  | python3 -c "
+import json, sys
+m = json.load(sys.stdin)['lifetime']['milestones']
+for k, label in [('p_failure_10','P(≤10)'), ('p_30_plus','P(≥30)'),
+                 ('p_50_plus','P(≥50)'), ('p_100_plus','P(≥100)'),
+                 ('p_50_given_30','P(≥50│≥30)'), ('p_70_given_50','P(≥70│≥50)')]:
+    pr = m[k]
+    if pr['denom'] > 0:
+        # tab-separated: label, ci_low_raw, ci_high_raw, denom
+        print(f'{label}\t{pr[\"ci_low\"]}\t{pr[\"ci_high\"]}\t{pr[\"denom\"]}')
+    else:
+        print(f'{label}\t\t\t0')
+")
+
+while IFS=$'\t' read -r label ci_low ci_high denom; do
+  [ -z "$label" ] && continue
+  if [ "$denom" = "0" ]; then
+    expected="n=0 (no qualifying innings)"
+  else
+    fmt_lo=$(unq "$(ab_eval "(${ci_low} * 100).toFixed(1)")")
+    fmt_hi=$(unq "$(ab_eval "(${ci_high} * 100).toFixed(1)")")
+    expected="95% CI [${fmt_lo}%–${fmt_hi}%], n=${denom}"
+  fi
+  dom_title=$(unq "$(ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] [title]')].find(el => el.innerText.startsWith('$label'))?.getAttribute('title') || ''")")
+  assert_eq "$label tooltip = API Wilson CI" "$expected" "$dom_title"
+done <<< "$api_raw"
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "─────────────────────────────────────────────────────────────────"
 echo "$PASS pass · $FAIL fail"
 if [ "$FAIL" -gt 0 ]; then
