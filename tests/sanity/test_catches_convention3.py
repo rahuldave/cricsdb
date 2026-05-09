@@ -13,27 +13,32 @@ against its own SQL with the same bug.
 
 These assertions cross the endpoint boundary:
 
-  §6.1 — `/{id}/summary.catches + /{id}/summary.caught_and_bowled
-         - /{id}/distribution.substitute_catches
+  §6.1 — `/{id}/summary.catches - /{id}/distribution.substitute_catches
          == /{id}/distribution.lifetime.catches.total`
 
-         Why the substitute correction:
-           summary.catches      = count(kind='caught')      [all subs]
-           summary.c_and_b      = count(kind='c_and_b')     [implicitly non-sub: subs can't bowl]
-           distribution.catches.total = count(kind IN ('caught','c_and_b') AND is_substitute=0)
-           distribution.substitute_catches = count(kind='caught' AND is_substitute=1)
+         Post-2026-05-09 fix (commit 5b52fd9), summary.catches is
+         INCLUSIVE of caught_and_bowled per Convention 3.
 
-         Algebra: (sub_C + non-sub_C) + non-sub_CB - sub_C
+         summary.catches            = count(kind IN ('caught','c_and_b'))   [all subs]
+         summary.c_and_b            = count(kind='c_and_b')                  [implicitly non-sub: subs can't bowl]
+         distribution.catches.total = count(kind IN ('caught','c_and_b') AND is_substitute=0)
+         distribution.subs          = count(kind='caught' AND is_substitute=1)
+
+         Algebra: (sub_C + non-sub_C + non-sub_CB) - sub_C
                   == non-sub_C + non-sub_CB == distribution.catches.total
 
   §6.6 — `/leaders.catches` per row INCLUDES substitute catches
-         (no is_substitute=0 filter at fielding.py:96). So:
-            leaders.catches >= distribution.catches_for_caught_only
-         where distribution_caught_only = catches.total - c_and_b
-         (since /distribution.catches.total is inclusive of C&B
-         and excludes subs). The strict equality holds when
-         substitute_catches == 0 and some C&B exist; otherwise
-         the gap quantifies the substitute leak.
+         (no is_substitute=0 filter at fielding.py:96). Post-fix,
+         leaders.catches is also INCLUSIVE of caught_and_bowled.
+         The substitute-leak identity:
+            leaders.catches - distribution.catches.total
+              == distribution.substitute_catches
+
+         Algebra (post-fix):
+            leaders.catches            = (sub_C + non-sub_C) + non-sub_CB
+            distribution.catches.total = non-sub_C + non-sub_CB
+            ⇒ difference               = sub_C
+            distribution.substitute_catches = sub_C ✓
 
 Subjects deliberately include a bowler (Bumrah, JJ Bumrah,
 462411b3) because the existing
@@ -103,8 +108,12 @@ def check(label: str, ok: bool, detail: str = "") -> tuple[bool, str]:
 async def assert_summary_distribution_agree(
     label: str, person_id: str, scope: dict,
 ) -> list[tuple[bool, str]]:
-    """§6.1 — summary.catches + summary.c_and_b - distribution.substitute_catches
-              == distribution.catches.total."""
+    """§6.1 — summary.catches - distribution.substitute_catches
+              == distribution.catches.total.
+
+    Post-2026-05-09: summary.catches is INCLUSIVE of caught_and_bowled
+    (Convention 3). The c_and_b sibling is no longer needed in the
+    identity — it's already inside summary.catches."""
     out = []
     f = make_filters(**scope)
     a = make_aux()
@@ -119,14 +128,24 @@ async def assert_summary_distribution_agree(
     d_total = dist["lifetime"]["catches"]["total"]
     d_subs = dist["lifetime"]["substitute_catches"]
 
-    lhs = s_catches + s_cb - d_subs
+    lhs = s_catches - d_subs
     out.append(check(
-        f"{label}: summary.(catches + c_and_b) - distribution.substitute_catches "
+        f"{label}: summary.catches - distribution.substitute_catches "
         f"== distribution.catches.total",
         lhs == d_total,
-        f"summary.catches={s_catches} summary.c_and_b={s_cb} "
+        f"summary.catches={s_catches} "
         f"distribution.substitute_catches={d_subs} → LHS={lhs}; "
         f"distribution.catches.total={d_total}",
+    ))
+
+    # Convention 3 lock-down: caught_and_bowled is a SUB-COUNT of catches,
+    # not a sibling to be summed. Asserting summary.catches >= summary.c_and_b
+    # surfaces any future regression where catches drops back to caught-only.
+    out.append(check(
+        f"{label}: summary.catches >= summary.caught_and_bowled "
+        f"(Convention 3 — c_and_b is a sub-count of catches, not a sibling)",
+        s_catches >= s_cb,
+        f"summary.catches={s_catches} summary.c_and_b={s_cb}",
     ))
 
     # Also cross-check: substitute_catches matches summary's reconciliation
@@ -187,23 +206,26 @@ async def assert_leaders_substitute_leak(label: str, scope: dict) -> list[tuple[
             person_id=pid, filters=f, aux=a, as_of_date=AS_OF,
         )
         d_subs = dist["lifetime"]["substitute_catches"]
-        d_caught_only = dist["lifetime"]["catches"]["total"] - row["c_and_b"]
-        # /leaders.catches excludes C&B (separate column). The relationship:
-        #   leaders.catches  = count(kind='caught', any sub status)
-        #                    = (non-sub caught) + (sub caught)
-        #   distribution.catches.total - leaders.c_and_b
-        #                    = (non-sub caught + non-sub C&B) - non-sub C&B
-        #                    = non-sub caught
-        #   ⇒ leaders.catches - (distribution.catches.total - leaders.c_and_b)
-        #     should equal distribution.substitute_catches.
-        sub_via_diff = row["catches"] - d_caught_only
+        # Post-fix: leaders.catches is INCLUSIVE of c_and_b.
+        # Algebra:
+        #   leaders.catches            = (non-sub_C + non-sub_CB) + sub_C
+        #   distribution.catches.total = (non-sub_C + non-sub_CB)
+        #   ⇒ difference               = sub_C = distribution.substitute_catches
+        sub_via_diff = row["catches"] - dist["lifetime"]["catches"]["total"]
         out.append(check(
-            f"{label}: {pid} — leaders.catches - (dist.catches.total - leaders.c_and_b)"
-            f" == distribution.substitute_catches",
+            f"{label}: {pid} — leaders.catches - dist.catches.total "
+            f"== distribution.substitute_catches",
             sub_via_diff == d_subs,
-            f"leaders.catches={row['catches']} leaders.c_and_b={row['c_and_b']} "
+            f"leaders.catches={row['catches']} "
             f"dist.catches.total={dist['lifetime']['catches']['total']} "
             f"dist.subs={d_subs} → diff={sub_via_diff}",
+        ))
+        # Convention 3 lock-down on /leaders too: c_and_b ≤ catches
+        out.append(check(
+            f"{label}: {pid} — leaders.catches >= leaders.c_and_b "
+            f"(Convention 3 sub-count contract on /leaders)",
+            row["catches"] >= row["c_and_b"],
+            f"catches={row['catches']} c_and_b={row['c_and_b']}",
         ))
         if d_subs > 0:
             leak_observed += 1

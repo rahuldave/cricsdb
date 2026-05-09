@@ -521,7 +521,7 @@ function FieldingLandingBoard({ filters, filterDeps }: FieldingLandingBoardProps
                   <Link to={fielderLink(r.person_id)} className="comp-link">{r.name}</Link>
                 </td>
                 <td className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{r.total}</td>
-                <td className="num" style={{ textAlign: 'right' }}>{r.catches + (r.c_and_b ?? 0)}</td>
+                <td className="num" style={{ textAlign: 'right' }}>{r.catches}</td>
                 <td className="num" style={{ textAlign: 'right' }}>{r.stumpings}</td>
                 <td className="num" style={{ textAlign: 'right' }}>{r.run_outs ?? 0}</td>
               </tr>
