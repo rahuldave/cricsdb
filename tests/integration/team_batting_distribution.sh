@@ -411,6 +411,69 @@ ab set viewport 1280 800
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 13 · scope_avg is team-independent (§6.3 cross-team lock-down)"
+# Phase-2 audit (project_invariants_audit §6.3): the "Avg innings
+# total" StatCard mixes a client-computed `value`
+# (total_runs/innings_batted for this team) with a server-supplied
+# `scope_avg` (the league per-innings mean). If the two ever drift
+# in their predicates, the delta_pct misleads.
+#
+# We can't directly assert "client value uses the same predicates
+# as server scope_avg" without surfacing avg_innings_total
+# server-side. But scope_avg is the LEAGUE mean — it should be
+# IDENTICAL across calls for different teams, same scope. If
+# /teams/MI/.../summary.scope_avg != /teams/CSK/.../summary.scope_avg
+# for the same gender/team_type/tournament, the dual-query
+# pattern is broken (or reading some team-specific filter).
+#
+# Two-team sanity: pick another IPL team, compare scope_avg fields
+# byte-for-byte against the existing $api_summary. They MUST agree.
+
+OTHER_TEAM_URL="Chennai%20Super%20Kings"
+api_summary_other=$(curl -s "$API_BASE/api/v1/teams/$OTHER_TEAM_URL/batting/summary?$SCOPE_URL")
+
+mi_scope_runs=$(echo "$api_summary" | python3 -c "
+import json, sys
+r = json.load(sys.stdin); print(r['total_runs']['scope_avg'])")
+csk_scope_runs=$(echo "$api_summary_other" | python3 -c "
+import json, sys
+r = json.load(sys.stdin); print(r['total_runs']['scope_avg'])")
+assert_eq "scope_avg(total_runs) IDENTICAL for MI vs CSK in same scope (league mean)" \
+  "$mi_scope_runs" "$csk_scope_runs"
+
+mi_scope_innings=$(echo "$api_summary" | python3 -c "
+import json, sys
+r = json.load(sys.stdin); print(r['innings_batted']['scope_avg'])")
+csk_scope_innings=$(echo "$api_summary_other" | python3 -c "
+import json, sys
+r = json.load(sys.stdin); print(r['innings_batted']['scope_avg'])")
+assert_eq "scope_avg(innings_batted) IDENTICAL for MI vs CSK in same scope" \
+  "$mi_scope_innings" "$csk_scope_innings"
+
+mi_scope_avg1st=$(echo "$api_summary" | python3 -c "
+import json, sys
+r = json.load(sys.stdin); print(r['avg_1st_innings_total']['scope_avg'])")
+csk_scope_avg1st=$(echo "$api_summary_other" | python3 -c "
+import json, sys
+r = json.load(sys.stdin); print(r['avg_1st_innings_total']['scope_avg'])")
+assert_eq "scope_avg(avg_1st_innings_total) IDENTICAL for MI vs CSK in same scope" \
+  "$mi_scope_avg1st" "$csk_scope_avg1st"
+
+# Also verify: scope_avg(total_runs) ≈ scope_avg(avg_1st_innings_total)
+# only after dividing by innings — these are different shapes
+# (total_runs.scope_avg is per-innings, avg_1st_innings_total.scope_avg
+# is also per-innings BUT only for 1st innings). So they SHOULDN'T
+# be equal but should both be in plausible per-innings range.
+inv_check=$(echo "$mi_scope_runs" | python3 -c "
+import sys
+v = float(sys.stdin.read().strip())
+print('plausible' if 50 < v < 250 else 'IMPLAUSIBLE')
+")
+assert_eq "scope_avg(total_runs) is in plausible per-innings range (50–250)" \
+  "plausible" "$inv_check"
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "─────────────────────────────────"
 echo "Team-batting Distribution integration: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

@@ -608,7 +608,12 @@ catches one ⚠️ flag.
 
 ### §6.1 Cross-endpoint catches inclusivity (catches highest-risk)
 
-Add `tests/sanity/test_catches_convention3.py`:
+**Tested by:** `tests/sanity/test_catches_convention3.py` —
+shipped 2026-05-09. 24 assertions across 6 (player, scope) tuples
+including Bumrah (the C&B incident's marquee subject who was
+missing from the existing reconciliation). All pass currently —
+locks down the agreement so any future predicate drift on either
+side surfaces immediately.
 
 ```python
 # For 5 fixed (player_id, scope) tuples covering bowlers + batters:
@@ -631,7 +636,12 @@ assertion is durable.
 
 ### §6.2 Server-vs-client value agreement on the batter SR-tab
 
-Add to `tests/integration/batter_distribution.sh`:
+**Tested by:** `tests/integration/batter_distribution.sh` Test 11
+— shipped 2026-05-09. Asserts both:
+- Server `/summary.strike_rate` == `/distribution.runs.total*100/balls_total` (cross-endpoint)
+- DOM "Career SR" == JS-formatted client SR (DOM-vs-derived)
+
+Both formatted via `ab_eval` so JS rounding agrees on both sides.
 
 ```bash
 api_summary_sr=$(curl -s "$API/batters/$KOHLI/summary?$SCOPE" \
@@ -643,7 +653,14 @@ assert_eq "Server SR == DOM SR-tab Career SR" "$api_summary_sr" "$dom_career_sr"
 
 ### §6.3 "Avg innings total" delta-pct against league-side
 
-Add to `tests/integration/team_batting_distribution.sh`:
+**Tested by:** `tests/integration/team_batting_distribution.sh`
+Tests 12 + 13 (Test 12 was pre-existing; Test 13 added 2026-05-09).
+Test 12 asserts `dom_value == round(runs/innings, 1)` (DOM matches
+client computation). Test 13 adds the cross-team lock-down:
+`scope_avg` MUST be identical for `/teams/MI/batting/summary` and
+`/teams/CSK/batting/summary` in the same scope, since scope_avg is
+the LEAGUE mean and team-independent. Catches the "team filter
+leaking into scope_avg" bug class.
 
 ```bash
 # Server: total_runs.scope_avg is per-innings (already verified by Test 11/12)
@@ -658,7 +675,12 @@ assert_eq "Avg innings total = total_runs/innings_batted" "$expected_value" "$do
 
 ### §6.4 Dots-predicate semantic-equivalence sanity (SQL-level)
 
-Add to `tests/sanity/test_predicates.py`:
+**Tested by:** `tests/sanity/test_predicate_invariants.py` —
+shipped 2026-05-09. Asserts all three predicate counts are equal
+on `cricket.db`, AND asserts the underlying schema invariant
+`runs_total = runs_batter + runs_extras` holds for every row.
+On the current DB: 1,125,498 dots match all three predicates;
+0 schema violations.
 
 ```python
 # Assert that the three different dot predicates count the same rows
@@ -673,22 +695,44 @@ assert n1 == n2 == n3
 
 ### §6.5 DLS / forfeited audit (one-time inventory query)
 
-Run once and document in `how-stats-calculated.md`:
+**Tested by:** `tests/sanity/test_predicate_invariants.py` —
+shipped 2026-05-09. Prints variant inventory at every run AND
+asserts:
+- super_over fraction stays under 5% (auto-filtered).
+- target_overs > 20 NEVER (T20 schema invariant).
+- declared / forfeited stay at 0 (non-zero means schema changed
+  and we need to re-decide filter policy).
+- DLS-truncated count stays under 10% of 2nd innings (audit
+  framing stays accurate as DB grows).
 
-```sql
-SELECT COUNT(*) FROM innings WHERE target_runs IS NOT NULL;
-SELECT COUNT(*) FROM innings WHERE forfeited = 1;
-SELECT COUNT(*) FROM innings WHERE declared = 1;
-```
+**Current numbers (2026-05-09):**
+- 26,234 total innings; 194 super_over (0.74%); 11,524 full-T20
+  chases; **724 DLS-truncated chases** (5.91% of 2nd innings —
+  NON-trivial and currently unfiltered everywhere); 0 declared;
+  0 forfeited.
 
-If non-zero, decide policy: filter out, OR document that they're
-included.
+**Decision pending:** whether per-innings normalisations should
+exclude DLS innings. The 724-innings count is large enough to
+matter for any "average innings total" or "per-innings RR" stat.
+Add a CLAUDE.md rule once decided.
 
 ### §6.6 Substitute catches in /leaders
 
-Verify `/leaders.catches` includes substitute catches; if so,
-codify (either by exclusion or by acknowledgment in
-`how-stats-calculated.md`).
+**Tested by:** `tests/sanity/test_catches_convention3.py::assert_leaders_substitute_leak`
+— shipped 2026-05-09. Walks top-10 of `/fielders/leaders` and
+asserts the algebraic identity:
+```
+leaders.catches - (distribution.catches.total - leaders.c_and_b)
+  == distribution.substitute_catches
+```
+which decomposes the leak: leaders.catches = (non-sub C + sub C)
+while distribution.catches.total - c_and_b = non-sub C only. The
+difference is exactly the substitute leak.
+
+Confirmed currently: /leaders DOES count substitute catches in
+its `catches` column. Whether to filter them out is a product
+decision pending — the assertion locks down the current behaviour
+either way.
 
 ---
 

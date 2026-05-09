@@ -410,6 +410,49 @@ done <<< "$api_raw"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 11 · Server SR (/summary.strike_rate) == client-derived Career SR (§6.2)"
+# Phase-2 audit (project_invariants_audit §6.2): the batter
+# /distribution endpoint doesn't return strike_rate, so the SR-tab
+# computes it client-side from runs.total * 100 / balls_total. The
+# /summary endpoint has its OWN strike_rate computation. If the two
+# code paths ever diverge in their predicates (legal-balls,
+# super_over, …), the player page would silently show two different
+# SR numbers. Lock down the agreement.
+
+ab open "$BASE/batting?player=$KOHLI&$SCOPE"
+settle 4
+# Click into the SR tab so the Career SR strip is visible
+ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button')].find(b => b.innerText.trim() === 'Strike Rate')?.click()" >/dev/null
+settle 1
+
+# Server SR — fetch from /summary
+api_summary_sr=$(curl -s "http://localhost:8000/api/v1/batters/$KOHLI/summary?$SCOPE" \
+  | python3 -c "import json, sys; print(json.load(sys.stdin)['strike_rate'])")
+# Server runs + balls — fetch from /distribution
+api_dist_runs=$(curl -s "http://localhost:8000/api/v1/batters/$KOHLI/distribution?$SCOPE" \
+  | python3 -c "import json, sys; d=json.load(sys.stdin)['lifetime']['runs']; print(d['total'])")
+api_dist_balls=$(curl -s "http://localhost:8000/api/v1/batters/$KOHLI/distribution?$SCOPE" \
+  | python3 -c "import json, sys; d=json.load(sys.stdin)['lifetime']['runs']; print(d['balls_total'])")
+
+# Cross-endpoint sanity (§6.2): /summary.strike_rate should equal
+# /distribution.runs.total * 100 / balls_total to within 1 dp.
+sr_from_dist=$(python3 -c "print(round($api_dist_runs * 100 / $api_dist_balls, 1))")
+assert_eq "Server /summary.strike_rate == /distribution.runs.total*100/balls_total" \
+  "$api_summary_sr" "$sr_from_dist"
+
+# DOM "Career SR" value — client-rendered (.toFixed(2)). Match
+# expected via the same JS path so the boundary-rounding agrees.
+expected_sr_2dp=$(unq "$(ab_eval "($api_dist_runs * 100 / $api_dist_balls).toFixed(2)")")
+dom_career_sr=$(unq "$(ab_eval "(() => { const t = document.querySelector('section[aria-label=\"Per-innings runs distribution\"]').innerText; const m = t.match(/Career SR\s*\n([\d.]+)/); return m ? m[1] : ''; })()")")
+assert_eq "DOM Career SR == JS-formatted (runs*100/balls).toFixed(2)" \
+  "$expected_sr_2dp" "$dom_career_sr"
+
+# Click back to Runs tab to leave the page in default state
+ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button.wisden-seg')].find(b => b.innerText.trim() === 'Runs')?.click()" >/dev/null
+settle 1
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "─────────────────────────────────────────────────────────────────"
 echo "$PASS pass · $FAIL fail"
 if [ "$FAIL" -gt 0 ]; then
