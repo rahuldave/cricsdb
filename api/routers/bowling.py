@@ -248,7 +248,7 @@ async def bowling_summary(
             SUM(CASE WHEN d.runs_batter = 4
                      AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes,
-            SUM(CASE WHEN d.runs_total = 0 THEN 1 ELSE 0 END) as dots
+            SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) as dots
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
@@ -533,7 +533,7 @@ async def bowling_vs_batters(
             SUM(CASE WHEN d.runs_batter = 4
                      AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours_conceded,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes_conceded,
-            SUM(CASE WHEN d.runs_total = 0 THEN 1 ELSE 0 END) as dots
+            SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) as dots
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
@@ -595,7 +595,7 @@ async def bowling_by_over(
             SUM(CASE WHEN d.runs_batter = 4
                      AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes,
-            SUM(CASE WHEN d.runs_total = 0 THEN 1 ELSE 0 END) as dots
+            SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) as dots
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
@@ -655,7 +655,7 @@ async def bowling_by_phase(
             SUM(CASE WHEN d.runs_batter = 4
                      AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes,
-            SUM(CASE WHEN d.runs_total = 0 THEN 1 ELSE 0 END) as dots
+            SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) as dots
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
@@ -710,7 +710,7 @@ async def bowling_by_phase(
             SUM(CASE WHEN d.runs_batter = 4
                      AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes,
-            SUM(CASE WHEN d.runs_total = 0 THEN 1 ELSE 0 END) as dots
+            SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) as dots
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
@@ -767,7 +767,7 @@ async def bowling_by_season(
             SUM(CASE WHEN d.runs_batter = 4
                      AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes,
-            SUM(CASE WHEN d.runs_total = 0 THEN 1 ELSE 0 END) as dots,
+            SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) as dots,
             COUNT(DISTINCT d.innings_id) as innings
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id

@@ -360,28 +360,40 @@ on every (player, scope) tuple including Bumrah. 51 pass.
 `tests/regression/players/urls.txt`. 0 REG drifted post-fix; new
 shape locked.
 
-### §3.2 ⚠️ MED — `dots` predicate differs batting vs bowling
+### §3.2 ✅ RESOLVED 2026-05-09 — `dots` predicate canonicalised
 
-| Caller | Predicate | File:line |
-|---|---|---|
-| Batting (5 sites: leaders, summary, by-innings, by-over, by-phase, distribution) | `runs_batter = 0 AND runs_extras = 0` | `batting.py:234, 440, 513, 585, 660` |
-| Bowling (most sites — leaders, summary, etc.) | `runs_total = 0` | `bowling.py:251, 536, 598, 658, 713, 770` |
-| Bowling (`/distribution` only) | `runs_total = 0 AND extras_wides = 0 AND extras_noballs = 0` | `bowling.py:457` |
+**Resolution:** all 14 inline-variant dots predicates across
+`api/routers/{batting,bowling,head_to_head}.py` converted to the
+canonical defensive form already used by 14 other sites in
+`teams.py`, `scope_averages.py`, `venues.py`, `tournaments.py`:
 
-**Are they semantically equivalent?**
-- `runs_total = 0` ⇒ NO runs of any kind ⇒ no wides (always ≥1 run), no noballs (always ≥1), no batter runs, no byes/legbyes. So this *is* a "legal ball with no run" predicate by construction.
-- `runs_batter = 0 AND runs_extras = 0` requires `runs_batter=0` AND total extras=0. If `runs_extras` includes byes+legbyes, this is the same set as `runs_total=0`.
-- Verify by SQL: `SELECT COUNT(*) FROM delivery WHERE runs_total=0` vs `... WHERE runs_batter=0 AND runs_extras=0`. Should be equal on the same scope.
+```sql
+SUM(CASE WHEN d.runs_total = 0
+         AND d.extras_wides = 0
+         AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots
+```
 
-**Why the variation matters even if semantically equal:**
-1. A future schema change (e.g. adding a delivery column that
-   feeds runs_batter without feeding runs_extras) would silently
-   break exactly one of these two predicates.
-2. Reading the code, a maintainer can't tell at a glance whether
-   batting and bowling agree on "what's a dot."
+The canonical form is self-documenting (any reader sees
+"no run AND not a wide AND not a noball" → unambiguous "legal
+dot ball") and robust to a hypothetical schema change that splits
+`runs_total` into multiple components. Equivalence to the prior
+forms is locked by `tests/sanity/test_predicate_invariants.py`
+(asserts the three variant forms count identical rows on the
+current DB).
 
-**Phase-2 sanity test:** SQL-level — for a fixed scope, assert
-`count(runs_total=0)` equals `count(runs_batter=0 AND runs_extras=0)`.
+**Sites converted:**
+- `batting.py` 6 SQL sites (5 + 1 in distribution path)
+- `bowling.py` 6 SQL sites (the bare `runs_total = 0` form)
+- `head_to_head.py` 1 site
+- `bowling.py:974` already canonical (clauses reordered, semantically identical)
+
+**Regression:** 0 REG drifted across batting + bowling + head_to_head
+(118 REG matched). Pure refactor — no response-shape or value
+changes; just the SQL text.
+
+**Backstop:** `tests/sanity/test_predicate_invariants.py` continues
+to assert all three predicate forms count identical rows. Any
+future drift surfaces immediately.
 
 ### §3.3 ⚠️ MED — Bowling `/by-innings` economy uses all-deliveries; `/summary` economy uses legal-balls
 

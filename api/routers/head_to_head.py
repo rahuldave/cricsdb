@@ -78,7 +78,7 @@ async def head_to_head(
             SUM(CASE WHEN d.runs_batter = 4
                      AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes,
-            SUM(CASE WHEN d.runs_batter = 0 AND d.runs_extras = 0 THEN 1 ELSE 0 END) as dots
+            SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) as dots
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
