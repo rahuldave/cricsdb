@@ -395,21 +395,46 @@ changes; just the SQL text.
 to assert all three predicate forms count identical rows. Any
 future drift surfaces immediately.
 
-### §3.3 ⚠️ MED — Bowling `/by-innings` economy uses all-deliveries; `/summary` economy uses legal-balls
+### §3.3 ❌ NOT A BUG (audit error, retracted 2026-05-09)
 
-**Bowling `/{id}/summary.economy` = `runs_conceded * 6 / legal_balls`** (`bowling.py:388`)
+**Original Phase-1 claim:** `/bowlers/{id}/by-innings.economy` uses
+all-deliveries denominator, `/summary.economy` uses legal-balls
+→ different numbers for wide-heavy bowlers.
 
-**Bowling `/{id}/by-innings.economy` = `runs_conceded * 6 / balls` (all-deliveries)** (`bowling.py:491`)
+**Verification (2026-05-09):** FALSE. Both endpoints use legal balls.
+The audit-generating Explore agent saw `_safe_div(runs, balls, 6)`
+at `bowling.py:491` and assumed `balls` was all-deliveries — but
+the SQL upstream at `bowling.py:451` aliases:
+```sql
+SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
+         THEN 1 ELSE 0 END) as balls
+```
+i.e. `balls` IS already legal-balls. The python local variable
+name is misleading but the value is correct.
 
-The denominator differs: summary excludes wides/noballs, by-innings includes them. A bowler who concedes 30 off 24 legal balls plus 4 wides:
-- `/summary` economy = 30*6/24 = 7.50
-- `/by-innings` economy for that match = 34*6/28 = 7.29 (if wides+noballs add 4 extras and 4 illegal balls)
+**Live evidence (Bumrah recent spells):** every per-innings
+`economy` value matches `runs * 6 / legal_balls` exactly across
+10 spells; none match the all-deliveries formula.
 
-⚠️ Per-innings economy will read LOWER than the summary's pool economy on bowlers who concede many wides. This may be intentional (the bowler's "how many runs went out per ball you bowled" is the all-deliveries measure) — but it should be documented in `how-stats-calculated.md`. Not currently called out there.
+```
+date         runs balls wides   API_econ  legal_calc  all_calc
+2026-03-08    15    24     1     3.75       3.75       3.6
+2026-03-05    33    24     1     8.25       8.25       7.92
+2026-02-22    15    24     0     3.75       3.75       3.75
+...
+```
 
-**Phase-2 sanity test:** verify by curl on a known-wide-heavy
-bowler that the summary economy and `sum(runs_conceded)*6 / sum(all_balls)`
-from /by-innings agree. If not, the inconsistency is real.
+**Lesson:** the Phase-1 inventory agent read variable names without
+tracing back to the SQL aliases. The audit doc baked in this error;
+my own follow-up explanation perpetuated it. CLAUDE.md "DO NOT
+SPECULATE — verify before proposing a fix or explanation" applies
+to audit findings too — verify each before treating it as actionable.
+
+**Optional follow-up (not a bug, low priority):** rename the python
+local + response field `balls` → `legal_balls` in `/by-innings`
+response shape to remove the variable-name confusion. Pure
+cosmetics; would require a regression-flip dance for the rename.
+Skip unless cleanup pass.
 
 ### §3.4 ⚠️ LOW — Wicket-attribution exclusions differ batting vs bowling (BY DESIGN, but not documented as such)
 
@@ -479,10 +504,18 @@ future refactor of one path must touch the other.
 Same value computed on BOTH server AND client. Each is a candidate
 divergence-bug surface.
 
-### §4.1 ⚠️ MED — Career SR on the batter Distribution panel
+### §4.1 ⚠️ MED — Career SR on the batter Distribution panel (verified 2026-05-09)
+
+**Verified real:** `/batters/{id}/distribution.lifetime.runs` does
+NOT include a `strike_rate` field (keys: `total, balls_total,
+mean_per_innings, median, variance, std, average, observations`).
+The frontend computes `poolSR = runs.total * 100 / balls` at
+`BatterDistributionPanel.tsx:134` and renders as "Career SR" at
+line 162. Same player page also shows server-computed
+`/summary.strike_rate` at the top.
 
 - **Server:** `/batters/{id}/summary.strike_rate` = `runs * 100 / balls`
-- **Client (Distribution panel SR-tab):** `runs.total * 100 / runs.balls_total` from `BatterDistributionPanel.tsx:85`
+- **Client (Distribution panel SR-tab):** `runs.total * 100 / runs.balls_total` from `BatterDistributionPanel.tsx:134`
 
 Both compute strike rate. Different code paths, both rounded
 differently (server: 2 dp via `_safe_div(..., 2)`; client:
@@ -543,10 +576,15 @@ that:
 (REG→NEW→REG dance) in `tests/regression/teams/urls.txt`.
 0 REG drifted; new shape locked.
 
-### §4.3 ⚠️ MED — Pool SR (balls/wkt) on bowler + team-bowling Wickets strips
+### §4.3 ⚠️ MED — Pool SR (balls/wkt) on bowler + team-bowling Wickets strips (verified 2026-05-09)
+
+**Verified real:** team-bowling `/distribution.lifetime` keys
+include `wickets, runs_conceded, economy, phase, last_match_date`
+— no `balls.total` or `strike_rate`. The frontend reconstructs
+balls via the algebra cascade.
 
 - **Server:** `economy.pool` (RPO) and `total_wickets` (count).
-- **Client (`TeamBowlingStatStrips.tsx:86-88`):**
+- **Client (`TeamBowlingStatStrips.tsx:85-87`):**
   ```
   poolSR = (runs_conceded.total * 6) / economy.pool / wickets.total
   ```
@@ -605,7 +643,7 @@ spec is a UI-only smoothing; no server counterpart — by design.
 - **§3.2** dots predicate (batting `runs_batter=0 AND runs_extras=0` vs bowling `runs_total=0` vs bowling-distribution `runs_total=0 AND extras_wides=0 AND extras_noballs=0`)
 - **§3.4** wicket-kind exclusions (batting 2 kinds; bowling 4 kinds — by design)
 
-### §5.2 Substitute fielder predicate inconsistencies
+### §5.2 Substitute fielder predicate inconsistencies (verified 2026-05-09)
 
 | Caller | `is_substitute` predicate | File:line |
 |---|---|---|
@@ -614,17 +652,33 @@ spec is a UI-only smoothing; no server counterpart — by design.
 | `/leaders.catches` | No is_substitute filter — substitute catches counted in the catches column | `fielding.py:96` ⚠️ |
 | `/keeping/summary.keeping_catches` | Implicit: only innings where person was the keeper, so by definition not substitute | `keeping.py:113` |
 
-⚠️ `/leaders.catches` doesn't filter substitutes. So a fielder
-who logged 5 substitute catches has them counted toward their
-total. Verify with: count of substitute catches on a fielder
-with non-zero subs, compared against the difference between
-`/leaders` and `/{id}/distribution.catches.total`.
+**Verified real but practically invisible.** Top fielders by
+substitute catches in the DB:
+
+```
+Mohammad Nawaz  10
+CJ Dala          8
+J Suchith        8
+RK Singh         7
+DJ Hooda         7
+```
+
+None of these appear in any top-N total-dismissals leaderboard
+(visible at /fielding) — they're back-bench bowlers/all-rounders.
+So the leaderboards users actually see (top 10 by total dismissals)
+are not visibly polluted. Algebraic identity locked by
+`tests/sanity/test_catches_convention3.py::assert_leaders_substitute_leak`.
+
+**Cost to fix:** ~1 commit — add `AND COALESCE(fc.is_substitute, 0) = 0`
+to `fielding.py:96`. Triggers a regression URL flip if any
+leaderboard row's catches count actually changes (likely none in
+top-N).
 
 ### §5.3 Legal-balls definition
 
 - **Batting:** `extras_wides = 0 AND extras_noballs = 0` (everywhere).
 - **Bowling /summary:** Same predicate.
-- **Bowling /by-innings:** Uses **all_deliveries** (not legal-balls) for the `balls` denominator. See §3.3.
+- **Bowling /by-innings:** Uses legal-balls (the python local `balls` is misleadingly named but the SQL alias is the legal-balls count). See §3.3 for verification — the original audit claim of all-deliveries was wrong.
 - **Fielding:** No legal-balls filter — a catch on a wide is still a catch. ✅ correct.
 
 ---
