@@ -619,3 +619,122 @@ summary endpoint (avoids 200-URL regression rotations across
 unrelated suites).
 
 Spec: `internal_docs/design-decisions.md` "Dormancy badge".
+
+## Catches counts include caught-and-bowled (Convention 3)
+
+When writing or auditing any endpoint that surfaces a `catches`
+headline at fielder OR team grain, the predicate MUST be
+`fc.kind IN ('caught', 'caught_and_bowled')` AND
+`COALESCE(fc.is_substitute, 0) = 0`. C&B is a catch — both in
+cricket terms and in this codebase's "Convention 3" (codified
+2026-04-26 across all `/summary` endpoints; the contract is
+"`catches` is the inclusive total, `caught_and_bowled` is a
+sub-count broken out separately so consumers summing both would
+double-count").
+
+The two distribution endpoints shipped 2026-05-07/08 inadvertently
+counted `kind = 'caught'` only, silently dropping ~6% of MI's IPL
+catches and 27% of Bumrah's career catches before being fixed
+2026-05-08. The spec text and the integration test SQL both
+shared the bug — SQL-anchoring tests against the buggy API
+predicate is internally consistent but semantically wrong.
+
+**Substitute_catches is the explicit exception** — predicate
+stays `kind = 'caught'` only because substitutes can't bowl by
+Law (zero C&B-by-substitute exists in the data) AND it's a
+reconciliation scalar surfaced separately for verification
+against /summary, not part of the catches block.
+
+**Tells you might be about to repeat the bug:**
+- Typing `kind = 'caught'` for a catches headline → inclusive
+  predicate per Convention 3.
+- Reading spec §13/§16 from memory and trusting the text — the
+  spec was wrong before the 2026-05-08 fix.
+- Integration test passes with `kind = 'caught'` → verify
+  against `/summary`'s catches count (which uses the inclusive
+  predicate) as a cross-check before trusting.
+
+Spec: `internal_docs/design-decisions.md` "Convention 3 applies
+to distribution endpoints, not just /summary".
+
+## Legend swatch alignment in distribution panels
+
+When rendering a `<swatch> + <label>` pair inside a row that uses
+`align-items: baseline` (every distribution panel's sparkline
+caption row), do NOT wrap the pair in `<span style="display:
+inline-flex; align-items: center">`. The inline-flex baseline
+resolves to bottom-of-swatch (the inline-block child), which sits
+ABOVE the surrounding text baselines and pushes the label
+visibly lower than the leading caption ("oldest ← bars … → most
+recent") on the same row.
+
+Pattern (from commit b770918, applied to all 5 distribution
+panels 2026-05-08):
+
+```jsx
+<span>
+  <span aria-hidden="true" style={{
+    display: 'inline-block', width: 14, height: 1.5,
+    background: COLOR,
+    verticalAlign: 'middle',
+    marginRight: '0.3rem',
+    position: 'relative', top: '-0.1em',  // optical-centre nudge
+  }} />
+  label text
+</span>
+```
+
+The `top: -0.1em` nudge sits the swatch at the optical centre of
+the text x-height (which differs from the geometric centre when
+the font has descenders).
+
+## Distribution-panel reference lines — three semantic anchors
+
+The team distribution sparklines render up to four reference
+lines, three of which carry distinct semantic meanings (the
+fourth is the rolling-mean overlay). Naming + color discipline:
+
+| Line | Color | Reads | Source |
+|---|---|---|---|
+| **Scope average** | black `#1A1714` 2px | THIS team's mean over its actual innings in the active scope (1st + 2nd combined unless `?inning=` filter is active) | `lifetime.X.mean_per_innings` from the distribution endpoint |
+| **League avg** | forest `#3F7A4D` 1.5px | EVERY team's mean over its innings in the active scope (the same-scope league baseline) | `summary.X.scope_avg` from the existing `/summary` endpoint envelope — already fetched by the parent tab; no new HTTP roundtrip |
+| **Gender-global** | gray `#8A7D70` 1.5px | EVERY team's mean across ALL T20 cricket at gender grain (whole-number anchor; ignores other filters) | hard-coded constants in `globalBaselines.ts` (refresh yearly) |
+| **Rolling-10 mean** | oxblood `#7A1F1F` 1.2px | 10-innings rolling-mean overlay on the Scope window only when n_innings ≥ 10 | derived from `observations[]` |
+
+**Wiring discipline:** when adding a new metric tab to a team
+panel, plumb the per-metric `scope_avg` from the parent's
+summary fetch into the panel's `leagueAvg` prop. Don't add a
+backend field for it on the distribution endpoint — the
+duplication forces a regression-suite churn AND mismatches the
+existing `MetricDelta withScopeAvg` plumbing pattern that all
+the StatCard subtitles use.
+
+## Integration tests anchor against /summary's scope_avg, not re-derived SQL
+
+When testing a UI element that displays a value the API computes
+via the dual-query envelope pattern (the `team=None` league-side
+fetch combined with the team-side fetch — used for every
+`MetricEnvelope.scope_avg` field), pull the expected value from
+the `/summary` endpoint via `curl` rather than re-deriving it in
+SQL. Same self-anchoring discipline as the SQL-vs-DOM tests, but
+the source of truth is the API instead of the database — because
+the API is the actual computation under test.
+
+Pattern (see `tests/integration/team_batting_distribution.sh`
+Test 11 / 12):
+
+```bash
+api_summary=$(curl -s "$API_BASE/api/v1/teams/$TEAM_URL/batting/summary?$SCOPE_URL")
+expected_scope_avg=$(echo "$api_summary" | python3 -c "
+import json, sys
+print(f'{json.load(sys.stdin)[\"total_runs\"][\"scope_avg\"]:.1f}')")
+dom_legend=$(ab_eval "...legend element innerText...")
+assert_contains "legend matches API scope_avg" "league avg $expected_scope_avg" "$dom_legend"
+```
+
+Re-deriving league-avg in SQL inside the integration test is
+brittle (the league-avg computation has 200+ lines of denominator
+logic — `_apply_fielding_per_innings`, super-over exclusion,
+inning-aux halving, etc.) AND tests the wrong layer. The /summary
+endpoint's own sanity tests cover the SQL-vs-API correctness; the
+integration test covers the API-vs-DOM plumbing.
