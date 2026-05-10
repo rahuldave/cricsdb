@@ -436,7 +436,7 @@ response shape to remove the variable-name confusion. Pure
 cosmetics; would require a regression-flip dance for the rename.
 Skip unless cleanup pass.
 
-### §3.4 ⚠️ LOW — Wicket-attribution exclusions differ batting vs bowling (BY DESIGN, but not documented as such)
+### §3.4 ✅ verified — Wicket-attribution exclusions BY DESIGN (re-verified 2026-05-09)
 
 | Caller | Excluded `wicket.kind` | File:line |
 |---|---|---|
@@ -484,18 +484,19 @@ prints the variant inventory (super_over / DLS / declared /
 forfeited counts) at every run, and asserts declared+forfeited
 remain at zero.
 
-### §3.6 ⚠️ LOW — Team `/summary` scope envelope vs `/scope/averages/...` endpoints
+### §3.6 ✅ verified — Helpers shared between team `/summary` and `/scope/averages/*` (re-verified 2026-05-09)
 
 Both compute the league-side aggregate via the same `team=None`
-dual-query pattern. They share helpers (`_apply_results_per_team`,
-`_apply_batting_per_innings` in `scope_averages.py`). Risk is
-that ANY divergence — different filter handling, different super_over
-treatment — would silently produce different scope_avg numbers
-on two siblings of the same data.
+dual-query pattern. They share helpers — `scope_averages.py:31-35`
+imports `_apply_batting_per_innings`, `_apply_bowling_per_innings`,
+`_apply_fielding_per_innings`, `_apply_partnerships_per_innings`,
+`_apply_results_per_team` from `teams.py` (originally lived in
+teams.py; the audit said scope_averages.py — wrong location, right
+conclusion).
 
-**Currently synchronized?** Yes — both go through
-`scope_averages.py` helpers. Flagged as a "watch this" item: any
-future refactor of one path must touch the other.
+**Currently synchronised** — verified live, helpers cross-imported.
+Flagged as a watch-item: any future refactor of these helpers
+applies to both endpoints automatically.
 
 ---
 
@@ -608,7 +609,7 @@ it's an unnecessary derivation; the API could just surface
 bowler distribution endpoint envelope. Eliminates the
 reconstruction.
 
-### §4.4 ⚠️ LOW — Coefficient of Variation (`std/mean`)
+### §4.4 ✅ verified — CV is single-site client computation (re-verified 2026-05-09)
 
 - **Server:** Doesn't compute CV directly; surfaces `std` and
   `mean_per_innings` as siblings.
@@ -619,20 +620,37 @@ Single client computation; no server counterpart. Listed here for
 completeness — a future decision to surface CV server-side should
 delete the client-side computation.
 
-### §4.5 ⚠️ LOW — Per-innings SR (SR-tab observations)
+### §4.5 ⚠️ MED — Per-innings SR computed by TWO endpoints (audit re-verified 2026-05-09)
 
-- **Server:** Doesn't compute per-innings SR for the batter
-  distribution endpoint. Surfaces per-innings `runs` + `balls`.
-- **Client (`distributionBins.ts:82-84`, `BatterDistributionPanel.tsx:124-128`):** `sr = runs * 100 / balls` per innings.
+**Re-verification update:** the original audit said "single client
+computation, no duplication." That was **wrong**. The same
+per-innings SR is computed in TWO places:
 
-Single client computation; no duplication. Listed for
-completeness — if a future endpoint surfaces per-innings SR (e.g.
-`/by-innings.strike_rate` already does), reconcile.
+- **Server (`/by-innings.strike_rate`):** server-computed at
+  `batting.py:366`. Powers the per-match innings table on
+  `/batting?player=X`.
+- **Client (`distributionBins.ts:82-84` + `BatterDistributionPanel.tsx:124-128`):**
+  `sr = runs * 100 / balls` per innings, derived from
+  `/distribution.observations`. Powers histogram binning + SR-tab
+  stat strip on the Distribution panel.
 
-### §4.6 ⚠️ LOW — Rolling-10 mean overlay on sparkline
+Same player page surfaces both: the per-match innings table reads
+the server's per-innings SR, the Distribution panel SR-tab reads
+the client-derived per-innings SR. Today they agree (same SQL
+formula, same inputs). Future predicate drift on either side
+breaks the agreement silently.
 
-Computed entirely client-side on the observations array. The
-spec is a UI-only smoothing; no server counterpart — by design.
+**Cost to fix:** Same pattern as §4.1 — surface
+per-innings SR on `/distribution.observations` so the frontend
+reads instead of recomputes. Combine with §4.1 fix in one arc
+(both are "/distribution should expose SR").
+
+### §4.6 ✅ verified — Rolling-10 mean overlay client-only (no duplication)
+
+Verified 2026-05-09: no `rolling`/`moving_mean` field anywhere in
+`api/`. Computed entirely client-side at
+`DistributionSparkline.tsx`. UI smoothing layer; not a derived
+metric in the data sense. By design.
 
 ---
 
