@@ -227,6 +227,55 @@ For the avg col, `matches_played` is the per-team match count
 (see "Per-team" transform above), so the rate is comparable
 team-to-team.
 
+### Substitute fielders — INCLUDED in /leaders, EXCLUDED in /distribution (intentional asymmetry)
+
+A substitute fielder is a player not in either side's named XI
+who comes on as a temporary fielder (replacing an injured/
+suspended fielder). Cricsheet records substitute catches with
+`fc.is_substitute = 1` and the substitute's `person_id` as
+`fc.fielder_id`. By Law a substitute can field but cannot bowl
+or bat — so substitute C&B doesn't exist; substitute_catches
+covers only `kind = 'caught'`.
+
+Two endpoints surface fielding catches headlines and they
+**intentionally apply different is_substitute predicates** —
+this is by design, not a bug. Decision codified 2026-05-09 after
+audit §5.2 review.
+
+| Endpoint | `is_substitute` predicate | Why |
+|---|---|---|
+| `/fielders/leaders.catches` | NO filter — substitute catches counted | Volume leaderboard; ranks "who took the most catches in this scope, period." A sub who took 5 catches took 5 catches. |
+| `/fielders/{id}/distribution` (per-match `catches`) | `is_substitute = 0` filter | Master sample is `matchplayer`-based (matches in the squad). A sub took catches in matches NOT in the matchplayer sample → counting them would miscalibrate per-match averages (numerator from outside the sample, denominator from inside). |
+| `/fielders/{id}/distribution.lifetime.substitute_catches` | `is_substitute = 1` (sibling scalar) | Reconciliation field exposing the count of sub catches separately, so consumers can audit `summary.catches - distribution.substitute_catches == distribution.catches.total`. |
+| `/fielders/{id}/summary.catches` | NO filter (post-2026-05-09 Convention 3 fix) | Lifetime headline; same volume framing as /leaders. Substitute catches included. |
+| `/fielders/{id}/summary.substitute_catches` | `is_substitute = 1` | Reconciliation scalar (mirrors /distribution). |
+
+**The asymmetry is structural, not normative.** /distribution's
+exclusion is a sample-denominator consistency guard (the master
+sample doesn't include sub-only matches), NOT a value judgment
+that subs don't deserve credit. Cricket-record-wise, substitute
+catches DO count toward a player's totals — what's debated is
+how to display them. We've chosen: count in volume contexts
+(/leaders, /summary), exclude in per-match contexts
+(/distribution per-observation), and surface
+substitute_catches as a sibling field everywhere it matters
+for reconciliation.
+
+**Practical impact.** Top-N fielding leaderboards (sorted by
+total dismissals) are dominated by full-time keepers and
+specialist outfielders who don't sub. Players with non-trivial
+substitute counts (Mohammad Nawaz 10, CJ Dala 8, J Suchith 8 in
+the current DB) are nowhere near top-N total-dismissal leaders;
+the leaderboard the user sees is unaffected. The asymmetry only
+becomes visible if you query a lower-rank fielder and compare
+their /leaders catches vs their /distribution catches.total.
+
+**Tested by:** `tests/sanity/test_catches_convention3.py::assert_leaders_substitute_leak`
+asserts the algebraic identity
+`leaders.catches - distribution.catches.total == distribution.substitute_catches`
+on the men intl scope. Locks down the asymmetry — any future
+predicate change that breaks the identity surfaces immediately.
+
 ### Keeper identification
 
 There's no keeper field in cricsheet — we infer it via a 4-layer

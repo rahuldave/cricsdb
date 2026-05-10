@@ -658,6 +658,50 @@ against /summary, not part of the catches block.
 Spec: `internal_docs/design-decisions.md` "Convention 3 applies
 to distribution endpoints, not just /summary".
 
+## Substitute fielders — INCLUDED in /leaders, EXCLUDED in /distribution (by design)
+
+The two endpoints apply different `is_substitute` predicates **intentionally**:
+
+- `/fielders/leaders.catches` — NO `is_substitute` filter. Volume
+  leaderboard ranks "who took the most catches in scope, period."
+- `/fielders/{id}/distribution` per-match `catches` —
+  `is_substitute = 0` filter. The master sample is `matchplayer`-
+  based (matches the player was in the squad); substitute
+  appearances aren't in that sample, so counting substitute
+  catches against the matchplayer denominator would miscalibrate
+  per-match averages.
+- `/fielders/{id}/distribution.lifetime.substitute_catches` —
+  sibling reconciliation scalar (`is_substitute = 1`).
+- `/fielders/{id}/summary.catches` — NO filter (volume framing,
+  matches /leaders).
+
+The asymmetry is **structural** (sample-denominator consistency),
+NOT a normative judgment that subs don't deserve credit. A sub
+who took a catch took a catch — leaderboards reflect that;
+per-match-rate panels can't fold them in without breaking the
+denominator.
+
+**Tells you might be about to break this:**
+- Adding `AND is_substitute = 0` to `/fielders/leaders.catches`
+  to "fix consistency" — DON'T. The asymmetry is intentional.
+- Adding a sub-only match to /distribution's master sample to
+  "include sub catches" — would change /distribution's semantic
+  axis from "matches you played in the squad" to something
+  fuzzier; not the right fix.
+- A new endpoint surfacing a `catches` headline that joins
+  `matchplayer` for the master sample — apply `is_substitute = 0`
+  on the catches predicate to match /distribution. New endpoint
+  that's pure volume aggregation (no matchplayer join) — leave
+  subs in to match /leaders.
+
+**Tested by:** `tests/sanity/test_catches_convention3.py::assert_leaders_substitute_leak`
+locks the algebraic identity
+`leaders.catches - distribution.catches.total == distribution.substitute_catches`.
+
+Spec: `internal_docs/how-stats-calculated.md` §Fielding
+"Substitute fielders — INCLUDED in /leaders, EXCLUDED in
+/distribution (intentional asymmetry)".
+
 ## DLS-truncated innings — INCLUDED everywhere (no filter)
 
 DLS-shortened chases (`innings.target_overs < 20`) are NOT

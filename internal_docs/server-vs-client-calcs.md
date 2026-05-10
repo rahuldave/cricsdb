@@ -661,7 +661,7 @@ metric in the data sense. By design.
 - **§3.2** dots predicate (batting `runs_batter=0 AND runs_extras=0` vs bowling `runs_total=0` vs bowling-distribution `runs_total=0 AND extras_wides=0 AND extras_noballs=0`)
 - **§3.4** wicket-kind exclusions (batting 2 kinds; bowling 4 kinds — by design)
 
-### §5.2 Substitute fielder predicate inconsistencies (verified 2026-05-09)
+### §5.2 ✅ RESOLVED 2026-05-09 — Substitute asymmetry is intentional (documented)
 
 | Caller | `is_substitute` predicate | File:line |
 |---|---|---|
@@ -670,27 +670,43 @@ metric in the data sense. By design.
 | `/leaders.catches` | No is_substitute filter — substitute catches counted in the catches column | `fielding.py:96` ⚠️ |
 | `/keeping/summary.keeping_catches` | Implicit: only innings where person was the keeper, so by definition not substitute | `keeping.py:113` |
 
-**Verified real but practically invisible.** Top fielders by
-substitute catches in the DB:
+**Resolution:** the asymmetry is **kept by design**, not patched
+to uniformity. The audit's original framing of "/distribution
+excludes subs" gave the impression that /distribution was making
+a value judgment about substitutes. It isn't — /distribution's
+`is_substitute=0` filter is a sample-denominator consistency
+guard. The master sample is `matchplayer`-based (matches the
+player was in the squad); substitute appearances aren't in that
+sample. Counting substitute catches against the matchplayer
+denominator would miscalibrate per-match averages.
 
-```
-Mohammad Nawaz  10
-CJ Dala          8
-J Suchith        8
-RK Singh         7
-DJ Hooda         7
-```
+`/leaders` doesn't have a matchplayer join — it's pure
+volume-counting over `fieldingcredit`. Counting substitute
+catches there is consistent with the data: a sub who took 5
+catches took 5 catches, leaderboard ranks accordingly.
 
-None of these appear in any top-N total-dismissals leaderboard
-(visible at /fielding) — they're back-bench bowlers/all-rounders.
-So the leaderboards users actually see (top 10 by total dismissals)
-are not visibly polluted. Algebraic identity locked by
-`tests/sanity/test_catches_convention3.py::assert_leaders_substitute_leak`.
+So the two endpoints answer **different questions**:
+- `/leaders` — "who took the most catches in scope?" (volume) → subs counted
+- `/distribution` per-match — "what's your fielding pattern in your matches?" (per-match rate) → subs excluded
+- `/distribution.substitute_catches` — sibling reconciliation scalar so consumers can see the gap
 
-**Cost to fix:** ~1 commit — add `AND COALESCE(fc.is_substitute, 0) = 0`
-to `fielding.py:96`. Triggers a regression URL flip if any
-leaderboard row's catches count actually changes (likely none in
-top-N).
+**Practical impact ≈ 0.** Top-N fielding leaderboards are
+dominated by full-time keepers and outfielders who don't sub.
+Players with non-trivial substitute counts (Mohammad Nawaz 10,
+CJ Dala 8, J Suchith 8, RK Singh 7, DJ Hooda 7) are nowhere near
+top-N total-dismissal leaders. The asymmetry is invisible in
+the rendered UI.
+
+**Codified in:** `internal_docs/how-stats-calculated.md` §Fielding
+"Substitute fielders — INCLUDED in /leaders, EXCLUDED in
+/distribution (intentional asymmetry)" with the full predicate
+table and reasoning. Future readers won't re-litigate.
+
+**Tested by:** `tests/sanity/test_catches_convention3.py::assert_leaders_substitute_leak`
+locks the algebraic identity
+`leaders.catches - distribution.catches.total == distribution.substitute_catches`.
+Any future predicate change that breaks the asymmetry surfaces
+immediately.
 
 ### §5.3 Legal-balls definition
 
