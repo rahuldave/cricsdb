@@ -1022,13 +1022,20 @@ async def _innings_master_sample(
         """,
         params,
     )
-    return [
-        {
+    def _build(r: dict) -> dict:
+        runs = r["runs"] or 0
+        balls = r["balls"] or 0
+        return {
             "innings_id": r["innings_id"],
             "match_id": r["match_id"],
             "date": r["date"],
-            "runs": r["runs"] or 0,
-            "balls": r["balls"] or 0,
+            "runs": runs,
+            "balls": balls,
+            # Per-innings SR — server-computed (audit §4.5) so the
+            # Distribution panel SR-tab + histogram bin via the same
+            # value /by-innings.strike_rate uses elsewhere on the page.
+            # Null when balls=0 (e.g. dismissed without facing a ball).
+            "strike_rate": round(runs * 100 / balls, 2) if balls > 0 else None,
             "dismissed": bool(r["dismissed"]),
             "fours": r["fours"] or 0,
             "sixes": r["sixes"] or 0,
@@ -1040,8 +1047,7 @@ async def _innings_master_sample(
             "runs_death": r["runs_death"] or 0,
             "balls_death": r["balls_death"] or 0,
         }
-        for r in rows
-    ]
+    return [_build(r) for r in rows]
 
 
 def _distribution_dossier(observations: list[dict]) -> dict:
@@ -1113,6 +1119,11 @@ def _distribution_dossier(observations: list[dict]) -> dict:
             "innings_active": sum(1 for o in observations if o[balls_key] > 0),
         }
 
+    # Career SR for this scope — pool runs * 100 / pool balls. Server-
+    # computed (audit §4.1) so the Distribution panel SR-tab reads
+    # rather than recomputing client-side from runs.total / balls_total.
+    # Null when balls_total = 0 (empty scope).
+    strike_rate = round(total_runs * 100 / total_balls, 2) if total_balls > 0 else None
     return {
         "n_innings": n,
         "n_dismissals": n_dismissals,
@@ -1125,6 +1136,7 @@ def _distribution_dossier(observations: list[dict]) -> dict:
             "variance": round(variance, 2),
             "std": round(std, 2),
             "average": round(average, 2) if average is not None else None,
+            "strike_rate": strike_rate,
             "observations": observations,
         },
         "milestones": {
