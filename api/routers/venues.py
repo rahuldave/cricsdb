@@ -54,15 +54,72 @@ async def list_venues(
     q: Optional[str] = Query(None, description="Substring match on venue name OR city, case-insensitive"),
     limit: int = Query(50, ge=1, le=500),
 ):
-    """Scope-narrowed venue list for the FilterBar typeahead.
+    """Venue typeahead — scoped to gender × team_type only.
 
     Returns `{venues: [{venue, city, country, matches}, …]}` sorted by
     match count DESC. When `q` provided, matches substring against
     `venue` OR `city` (case-insensitive). When absent, caps at `limit`
     (default 50) so initial dropdown on focus is small.
+
+    **Scope policy (decided 2026-05-09).** The typeahead's job is to
+    help the user SELECT a venue, not to predict what the active
+    filter combination would return. So we strip every filter EXCEPT
+    `gender` + `team_type`:
+
+      - `filter_team`, `filter_opponent` — stripped. On the
+        India-vs-Australia rivalry page, typing "Wankhede" used to
+        return 0 (Wankhede has never hosted Ind-vs-Aus); now it
+        returns Wankhede with its full match count, and the page
+        the user navigates to correctly renders "0 Ind-vs-Aus
+        matches at Wankhede".
+      - `tournament`, `season_from`, `season_to` — stripped, same
+        reasoning. User typing the venue name shouldn't be
+        pre-filtered by tournament/season; the result page applies
+        those.
+      - `filter_venue` — stripped (self-referential).
+      - `team_class`, `series_type` — stripped (refinements that
+        shouldn't restrict typeahead discovery).
+      - `aux.inning` — irrelevant to venue list.
+      - `gender` + `team_type` — KEPT. These segment cricket into
+        broad universes (men's intl vs women's club etc.) where it
+        IS useful to scope: a women's-T20 user typing "Eden Gardens"
+        probably doesn't want suggestions from a venue that's never
+        hosted women's matches.
+
+    The `matches` count returned IS scoped to gender × team_type —
+    it represents "how many matches of YOUR universe at this venue",
+    so the dropdown still ranks meaningfully.
+
+    Documented in `internal_docs/how-stats-calculated.md` §Scope
+    conventions. Marked "may revisit" — if real users find
+    gender×team_type too restrictive (e.g. a women's-cricket user
+    wants to discover that a venue exists in men's data), bump
+    further.
     """
     db = get_db()
-    where, params = _strip_venue(filters, aux=aux)
+    # Build minimal scope: only gender + team_type. Stripping happens
+    # by null-ing the other FilterParams before calling build.
+    saved = (
+        filters.tournament, filters.season_from, filters.season_to,
+        filters.team, filters.opponent, filters.venue,
+        filters.team_class, filters.series_type,
+    )
+    filters.tournament = None
+    filters.season_from = None
+    filters.season_to = None
+    filters.team = None
+    filters.opponent = None
+    filters.venue = None
+    filters.team_class = None
+    filters.series_type = None
+    try:
+        # Pass aux=None too — aux.inning is innings-level, irrelevant
+        # to venue selection.
+        where, params = filters.build(has_innings_join=False, aux=None)
+    finally:
+        (filters.tournament, filters.season_from, filters.season_to,
+         filters.team, filters.opponent, filters.venue,
+         filters.team_class, filters.series_type) = saved
 
     clauses = ["m.venue IS NOT NULL"]
     if where:

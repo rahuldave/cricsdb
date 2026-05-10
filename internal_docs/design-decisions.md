@@ -91,6 +91,58 @@ The `filter_team` and `filter_opponent` query parameter names use the `filter_` 
 
 Super overs (`innings.super_over = 1`) are always excluded from stats.
 
+### Venue typeahead scope: gender × team_type only (may revisit)
+
+The `/api/v1/venues` typeahead endpoint deliberately strips MOST
+FilterBar narrowings before querying — only `gender` and
+`team_type` are kept. So on the India-vs-Australia rivalry page
+(`?filter_team=India&filter_opponent=Australia`), typing
+"Wankhede" returns Wankhede with its full match count rather
+than 0; the page the user navigates to then correctly renders
+"0 Ind-vs-Aus matches at Wankhede" via the existing empty-state
+placeholder.
+
+**Why strip rivalry/tournament/season filters but keep gender +
+team_type:**
+
+- The typeahead's job is to help the user SELECT a venue, not to
+  predict what the active filter combination would return.
+  Hiding venues from autocomplete because they don't match every
+  active filter prevents legitimate queries (the empty answer
+  for "Ind-vs-Aus at Wankhede" is correct cricket; the user
+  should be able to ask).
+- gender × team_type segments cricket into broad universes
+  (men's intl vs women's club etc.). A women's-T20 user typing
+  "Eden Gardens" probably DOES want suggestions scoped to
+  women's matches at Eden — finer than gender×team_type would
+  be too broad; coarser would be too fine.
+- The `matches` count returned IS scoped to gender × team_type,
+  so dropdown ranking stays meaningful within the user's
+  universe.
+
+**Stripped:** `filter_team`, `filter_opponent`, `tournament`,
+`season_from`, `season_to`, `filter_venue`, `team_class`,
+`series_type`, `aux.inning`.
+
+**Kept:** `gender`, `team_type`.
+
+**Decision date:** 2026-05-09. Marked **may revisit** — if real
+users find gender×team_type too restrictive (e.g. a
+women's-cricket user wants to discover that a venue exists in
+men's data), bump to fully unscoped, OR add a separate
+discovery endpoint. If too lax (e.g. men's-cricket user gets
+overwhelmed by club venues that happen to share names), tighten.
+
+`/api/v1/venues/landing` (the country-grouped venue directory
+on the /venues tab) keeps the existing `_strip_venue` behavior
+(strip filter_venue only) because it's a different surface —
+landing pages reflect the active scope by design.
+
+Implementation: `api/routers/venues.py::list_venues` null-outs
+the stripped attributes on FilterParams before calling `build()`,
+restores them in a `try/finally`. Local mutation pattern —
+FilterParams instance is per-request.
+
 ### `team_class` is polymorphic over `team_type`
 
 `team_class` is a single FilterBar key that dispatches on the
