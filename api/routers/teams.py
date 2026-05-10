@@ -3337,10 +3337,24 @@ def _phase_rollup_team_bowling(observations: list[dict]) -> dict:
 def _distribution_dossier_team_bowling(observations: list[dict]) -> dict:
     """Pure aggregate. Three sibling blocks (wickets + runs_conceded
     + economy) + phase rollup. Spec §16.3."""
+    wickets_block = _wickets_block_team_bowling(observations)
+    runs_block = _runs_conceded_block_team_bowling(observations)
+    # pool_strike_rate (balls/wkt) + pool_average (runs/wkt) — server-
+    # computed (audit §4.3) so TeamBowlingStatStrips.tsx can read these
+    # directly instead of cascade-deriving balls via runs*6/economy.
+    # Mirrors the bowler /distribution endpoint's pool_strike_rate +
+    # pool_average fields.
+    total_balls = sum(o.get("balls") or 0 for o in observations)
+    total_runs = runs_block.get("total") or 0
+    total_wickets = wickets_block.get("total") or 0
+    pool_strike_rate = round(total_balls / total_wickets, 4) if total_wickets > 0 else None
+    pool_average = round(total_runs / total_wickets, 4) if total_wickets > 0 else None
     return {
         "n_innings": len(observations),
-        "wickets": _wickets_block_team_bowling(observations),
-        "runs_conceded": _runs_conceded_block_team_bowling(observations),
+        "pool_strike_rate": pool_strike_rate,
+        "pool_average": pool_average,
+        "wickets": wickets_block,
+        "runs_conceded": runs_block,
         "economy": _economy_block_team_bowling(observations),
         "phase": _phase_rollup_team_bowling(observations),
     }
