@@ -947,6 +947,10 @@ export interface TeamBowlingDossier {
   n_innings: number
   /** Max observation date in the scope (ISO YYYY-MM-DD). Drives the dormancy badge on the lifetime block. */
   last_match_date?: string | null
+  /** Pool strike rate (balls/wkt) — server-computed (audit §4.3). Null when total_wickets=0. */
+  pool_strike_rate: number | null
+  /** Pool bowling average (runs/wkt) — server-computed (audit §4.3). Null when total_wickets=0. */
+  pool_average: number | null
   wickets: TeamBowlingWicketsBlock
   runs_conceded: TeamBowlingRunsConcededBlock
   economy: TeamBowlingEconomyBlock

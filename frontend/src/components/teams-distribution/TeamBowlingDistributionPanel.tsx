@@ -341,8 +341,7 @@ export default function TeamBowlingDistributionPanel({
                 />
                 <WicketsStatStrip
                   block={dossier.wickets}
-                  runs_conceded_total={dossier.runs_conceded.total}
-                  economy_pool={dossier.economy.pool}
+                  pool_strike_rate={dossier.pool_strike_rate}
                   n_innings={dossier.n_innings}
                 />
               </>

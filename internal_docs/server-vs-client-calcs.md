@@ -577,7 +577,7 @@ that:
 (REG→NEW→REG dance) in `tests/regression/teams/urls.txt`.
 0 REG drifted; new shape locked.
 
-### §4.3 ⚠️ MED — Pool SR (balls/wkt) on bowler + team-bowling Wickets strips (verified 2026-05-09)
+### §4.3 ✅ RESOLVED 2026-05-09 — pool_strike_rate now server-side on team-bowling /distribution
 
 **Verified real:** team-bowling `/distribution.lifetime` keys
 include `wickets, runs_conceded, economy, phase, last_match_date`

@@ -441,6 +441,39 @@ assert_contains "Economy legend includes league avg label" "league avg $api_econ
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 13 · Server pool_strike_rate = DOM Pool SR (audit §4.3 fix)"
+# Audit §4.3 fix: backend now exposes pool_strike_rate +
+# pool_average on the team-bowling /distribution lifetime envelope.
+# Frontend reads pool_strike_rate directly instead of cascade-deriving
+# balls via runs_conceded * 6 / economy.pool. Verify across 3 teams.
+
+API_BASE="${API_BASE:-http://localhost:8000}"
+
+for TEAM_TUPLE in "Mumbai%20Indians:Mumbai Indians" "Chennai%20Super%20Kings:Chennai Super Kings" "Royal%20Challengers%20Bengaluru:Royal Challengers Bengaluru"; do
+  T_URL="${TEAM_TUPLE%%:*}"
+  T_NAME="${TEAM_TUPLE#*:}"
+
+  api_psr=$(curl -s "$API_BASE/api/v1/teams/$T_URL/bowling/distribution?$SCOPE_URL" \
+    | python3 -c "
+import json, sys
+v = json.load(sys.stdin)['lifetime'].get('pool_strike_rate')
+print(v if v is not None else 'MISSING')")
+  case "$api_psr" in
+    MISSING) bad "$T_NAME · pool_strike_rate field present" ;;
+    *)       ok "$T_NAME · pool_strike_rate field present (=$api_psr)" ;;
+  esac
+
+  # DOM read: open team Bowling tab, read "Pool SR (balls/wkt)" cell
+  ab open "$BASE/teams?team=$T_URL&tab=Bowling&$SCOPE_URL"
+  settle 4
+  dom_psr=$(unq "$(ab_eval "(() => { const t = document.body.innerText; const m = t.match(/Pool SR \(balls\/wkt\)\s*\n([\d.]+)/); return m ? m[1] : ''; })()")")
+  expected_1dp=$(unq "$(ab_eval "(${api_psr}).toFixed(1)")")
+  assert_eq "$T_NAME · DOM Pool SR == server pool_strike_rate (.toFixed(1))" \
+    "$expected_1dp" "$dom_psr"
+done
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "─────────────────────────────────"
 echo "Team-bowling Distribution integration: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

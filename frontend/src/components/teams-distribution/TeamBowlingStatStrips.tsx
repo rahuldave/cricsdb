@@ -72,21 +72,14 @@ function ChipRow({ children }: { children: React.ReactNode }) {
 
 interface WicketsProps {
   block: TeamBowlingWicketsBlock
-  /** runs_conceded.total + economy.pool — needed to derive Pool SR
-   *  (balls/wkt) without an explicit field on the API response. */
-  runs_conceded_total: number
-  economy_pool: number | null
+  /** Server-computed Pool SR (balls/wkt) on the parent dossier — added
+   *  audit §4.3 to remove the cascade derivation that previously
+   *  reconstructed balls via runs_conceded * 6 / economy.pool. */
+  pool_strike_rate: number | null
   n_innings: number
 }
 
-export function WicketsStatStrip({ block, runs_conceded_total, economy_pool, n_innings }: WicketsProps) {
-  // Pool SR = total_legal_balls / total_wickets, derived from
-  // economy.pool = runs_conceded * 6 / total_balls.
-  const poolSR = (
-    block.total > 0 && economy_pool && economy_pool > 0
-      ? (runs_conceded_total * 6) / economy_pool / block.total
-      : null
-  )
+export function WicketsStatStrip({ block, pool_strike_rate, n_innings }: WicketsProps) {
   return (
     <div>
       <StatRow
@@ -110,7 +103,7 @@ export function WicketsStatStrip({ block, runs_conceded_total, economy_pool, n_i
         tooltip="Total wickets credited across all innings in this scope + window."
       />
       <StatRow
-        label="Pool SR (balls/wkt)" value={fmtNum(poolSR, 1)}
+        label="Pool SR (balls/wkt)" value={fmtNum(pool_strike_rate, 1)}
         tooltip="Balls bowled per wicket taken across the full sample. Lower = stronger strike rate."
       />
     </div>
