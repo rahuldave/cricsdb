@@ -41,9 +41,9 @@ type DistMetric = 'wickets' | 'economy' | 'runs'
 
 const WINDOW_OPTIONS: { key: DistWindow; label: string; param: string; tooltip: string }[] = [
   { key: 'scope',    label: 'Scope',    param: '',
-    tooltip: 'All qualifying spells under the active filter scope.' },
+    tooltip: 'All qualifying innings under the active filter scope.' },
   { key: 'last_10',  label: 'Last 10',  param: 'last_10',
-    tooltip: 'Most recent 10 qualifying spells.' },
+    tooltip: 'Most recent 10 qualifying innings.' },
   { key: 'last_60d', label: 'Last 60d', param: 'last_60d',
     tooltip: 'Spells in the last 60 days — current form.' },
   { key: 'last_6mo', label: 'Last 6mo', param: 'last_6mo',
@@ -81,7 +81,7 @@ interface SparklineConfig {
   /** Global line — gender-tiered all-bowler centre. */
   globalReferenceValue: number
   caption: string
-  /** "8 RPO" / "1 wkts/spell" / "26 runs/spell" — for the legend. */
+  /** "8 RPO" / "1 wkts/inn" / "26 runs/inn" — for the legend. */
   globalLegend: string
 }
 
@@ -104,8 +104,8 @@ function sparklineFor(
       },
       playerReferenceValue: scopeLifetime.wickets.mean_per_innings,
       globalReferenceValue: globals.wickets,
-      caption: 'oldest ← bars (one per spell, height = wickets) → most recent',
-      globalLegend: `${globals.wickets} wkts/spell`,
+      caption: 'oldest ← bars (one per innings, height = wickets) → most recent',
+      globalLegend: `${globals.wickets} wkts/inn`,
     }
   }
   if (metric === 'economy') {
@@ -120,7 +120,7 @@ function sparklineFor(
       },
       playerReferenceValue: scopeLifetime.economy.pool,
       globalReferenceValue: globals.rpo,
-      caption: 'oldest ← bars (one per spell, height = econ RPO) → most recent',
+      caption: 'oldest ← bars (one per innings, height = econ RPO) → most recent',
       globalLegend: `${globals.rpo} RPO`,
     }
   }
@@ -132,8 +132,8 @@ function sparklineFor(
     }),
     playerReferenceValue: scopeLifetime.runs_conceded.mean_per_innings,
     globalReferenceValue: globals.runs,
-    caption: 'oldest ← bars (one per spell, height = runs conceded) → most recent',
-    globalLegend: `${globals.runs} runs/spell`,
+    caption: 'oldest ← bars (one per innings, height = runs conceded) → most recent',
+    globalLegend: `${globals.runs} runs/inn`,
   }
 }
 
@@ -275,7 +275,7 @@ export default function BowlerDistributionPanel({
           fontStyle: 'italic',
           color: 'var(--ink-faint)',
         }}>
-          No qualifying spells (≥ {minBalls} balls) under this filter — try
+          No qualifying innings (≥ {minBalls} balls) under this filter — try
           widening the scope, or add <code>?min_balls=0</code> to include
           short cameos.
         </div>
@@ -288,7 +288,7 @@ export default function BowlerDistributionPanel({
             fontStyle: 'italic',
             color: 'var(--ink-faint)',
           }}>
-            No qualifying spells in {windowLabel(window)} under this filter.
+            No qualifying innings in {windowLabel(window)} under this filter.
           </div>
           <BowlerFormDeltaLine dossier={distribution} />
         </>

@@ -286,9 +286,9 @@ assert_eq "Rolling-10 overlay rendered on Scope when n>=10" "1" "$rolling_count"
 rolling_stroke=$(unq "$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline polyline[data-ref=rolling]')?.getAttribute('stroke') || ''")")
 assert_eq "Rolling overlay is oxblood (#7A1F1F)" "#7A1F1F" "$rolling_stroke"
 
-# Gender-tiered global anchor: men's wickets/spell = 1
+# Gender-tiered global anchor: men's wickets/inn = 1
 legend=$(ab_eval "document.querySelector('.wisden-dist-sparkline')?.parentElement?.lastElementChild?.textContent || ''")
-assert_contains "Wickets tab legend cites men's gender-global (1 wkts/spell)" "1 wkts/spell" "$legend"
+assert_contains "Wickets tab legend cites men's gender-global (1 wkts/inn)" "1 wkts/inn" "$legend"
 
 # Toggle to Last 10 + verify URL
 ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'Last 10').click()" >/dev/null
@@ -379,7 +379,7 @@ echo "Test 8 · Empty-scope renders placeholder"
 ab open "$BASE/bowling?player=$BUMRAH&filter_venue=Nonexistent%20Ground"
 settle 4
 panel_text=$(ab_eval "document.querySelector('$PANEL_SEL').innerText")
-assert_contains "Empty-scope placeholder shown" "No qualifying spells" "$panel_text"
+assert_contains "Empty-scope placeholder shown" "No qualifying innings" "$panel_text"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""

@@ -75,15 +75,15 @@ export function WicketsStatStrip({ block, dossier, n_innings }: WicketsProps) {
     <div>
       <StatRow
         label="Mean wkts" value={fmtNum(block.mean_per_innings, 2)} accent
-        tooltip="Average wickets per qualifying spell. Wickets total ÷ number of spells."
+        tooltip="Average wickets per qualifying innings (one bowling innings per match in T20). Wickets total ÷ number of innings."
       />
       <StatRow
         label="Median wkts" value={fmtNum(block.median, 0)}
-        tooltip="Middle value of wickets-per-spell. Less affected by 5-fer outliers than the mean."
+        tooltip="Middle value of wickets-per-innings. Less affected by 5-fer outliers than the mean."
       />
       <StatRow
         label="Total wkts" value={fmtNum(block.total, 0)}
-        tooltip="Total wickets across all qualifying spells in this scope + window."
+        tooltip="Total wickets across all qualifying innings in this scope + window."
       />
       <StatRow
         label="Strike Rate" value={fmtNum(dossier.pool_strike_rate, 1)} accent
@@ -102,7 +102,7 @@ export function WicketsStatStrip({ block, dossier, n_innings }: WicketsProps) {
         fontSize: '0.7rem', color: 'var(--ink-faint)',
         textAlign: 'right', marginTop: '0.25rem',
       }}>
-        {n_innings} qualifying spell{n_innings === 1 ? '' : 's'}
+        {n_innings} qualifying innings
       </div>
     </div>
   )
@@ -141,16 +141,16 @@ export function EconomyStatStrip({ block }: EconomyProps) {
         tooltip="Career economy in scope: total runs × 6 ÷ total balls. The conventional career RPO."
       />
       <StatRow
-        label="Mean / spell" value={fmtNum(block.mean_per_innings, 2)}
-        tooltip="Unweighted mean of per-spell economies. Differs from career economy when spells vary in length — each spell here counts equally regardless of how many balls were bowled."
+        label="Mean / inn" value={fmtNum(block.mean_per_innings, 2)}
+        tooltip="Unweighted mean of per-innings economies. Differs from career economy when innings vary in length — each innings here counts equally regardless of how many balls were bowled."
       />
       <StatRow
-        label="Median / spell" value={fmtNum(block.median_per_innings, 2)} accent
-        tooltip="Middle value of per-spell economies — the histogram's centre of mass. Less affected by one expensive over."
+        label="Median / inn" value={fmtNum(block.median_per_innings, 2)} accent
+        tooltip="Middle value of per-innings economies — the histogram's centre of mass. Less affected by one expensive over."
       />
       <StatRow
         label="Std" value={fmtNum(block.std, 2)}
-        tooltip="Standard deviation of per-spell economies. Higher std = bowler runs hot-and-cold; lower = consistent night-to-night."
+        tooltip="Standard deviation of per-innings economies. Higher std = bowler runs hot-and-cold; lower = consistent night-to-night."
       />
     </div>
   )
@@ -181,19 +181,19 @@ export function RunsConcededStatStrip({ block }: RunsConcededProps) {
     <div>
       <StatRow
         label="Total" value={fmtNum(block.total, 0)}
-        tooltip="Total runs conceded across all qualifying spells in this scope + window."
+        tooltip="Total runs conceded across all qualifying innings in this scope + window."
       />
       <StatRow
-        label="Mean / spell" value={fmtNum(block.mean_per_innings, 1)} accent
-        tooltip="Average runs conceded per qualifying spell. Total runs ÷ number of spells."
+        label="Mean / inn" value={fmtNum(block.mean_per_innings, 1)} accent
+        tooltip="Average runs conceded per qualifying innings. Total runs ÷ number of innings."
       />
       <StatRow
-        label="Median / spell" value={fmtNum(block.median, 0)} accent
-        tooltip="Middle value of runs-per-spell. Less affected by one expensive outing than the mean."
+        label="Median / inn" value={fmtNum(block.median, 0)} accent
+        tooltip="Middle value of runs-per-innings. Less affected by one expensive outing than the mean."
       />
       <StatRow
         label="Std" value={fmtNum(block.std, 1)}
-        tooltip="Standard deviation of runs-per-spell. Higher std = swingy outings; lower = predictable spell-to-spell."
+        tooltip="Standard deviation of runs-per-innings. Higher std = swingy outings; lower = predictable innings-to-innings."
       />
     </div>
   )

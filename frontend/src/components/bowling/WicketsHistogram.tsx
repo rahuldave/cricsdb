@@ -42,7 +42,7 @@ export default function WicketsHistogram({ block, title, height = 220 }: Props) 
       colorBy="tier"
       colorScheme={COLOR_SCHEME}
       title={title}
-      categoryLabel="Wickets in spell"
+      categoryLabel="Wickets in innings"
       valueLabel="Innings"
       height={height}
     />

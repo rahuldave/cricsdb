@@ -309,7 +309,7 @@ frontend/src/
                                                                  percentage offsets of each year's
                                                                  first observation
                                    globalBaselines.ts          gender-tiered league anchors. Bowling:
-                                                                 wickets/runs/RPO per spell. Batting:
+                                                                 wickets/runs/RPO per innings. Batting:
                                                                  runs/SR per innings. Whole-number
                                                                  constants from cricket.db (refresh
                                                                  query in commit 91eaaad / 1036e9c)
