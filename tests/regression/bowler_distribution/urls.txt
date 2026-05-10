@@ -11,7 +11,7 @@
 # Production callers omit it; the regression harness pins it
 # because md5-diff requires byte-stability.
 #
-# `min_balls` defaults to 12 (qualifying-spell threshold).
+# `min_balls` defaults to 12 (qualifying-innings threshold).
 # Inventory exercises both default and min_balls=0 to catch the
 # threshold-conditional path.
 #

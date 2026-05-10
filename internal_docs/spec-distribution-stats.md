@@ -1358,7 +1358,7 @@ Established 2026-05-06 on the v2 form-windows extension.
   red to muted indigo (`#7090A8`) accordingly. Legend swatches:
   solid 14×1.5–2px rectangles, NOT em-dash glyphs.
 - **Tier-coloured sparkline bars + matching histograms** (revised
-  2026-05-06): each per-innings/per-spell bar is colored by its
+  2026-05-06): each per-innings/per-innings bar is colored by its
   milestone tier matching the histogram bins. Lets users scan
   the chronological sparkline and answer "in how many great
   innings was he poor?" / "of his good spells, how many were
@@ -1470,7 +1470,7 @@ Established 2026-05-06 on the v2 form-windows extension.
 > Sibling of §8. Bowler-only, single endpoint, three sibling
 > distribution blocks under one master sample. Reuses every §10.1
 > backend convention; the bowler-specific design calls (master
-> sample shape, qualifying-spell threshold, anchored conditional
+> sample shape, qualifying-innings threshold, anchored conditional
 > ladder, Wilson confidence intervals on every probability,
 > derived strike-rate / average) are settled below before any
 > code is written.
@@ -1484,7 +1484,7 @@ Established 2026-05-06 on the v2 form-windows extension.
 
 - Endpoint: `GET /api/v1/bowlers/{id}/distribution?{FilterParams}&min_balls=12&as_of_date=YYYY-MM-DD`.
 - Master sample: per-innings tuple — one row per `(match, innings
-  the bowler bowled in)` clearing the `min_balls` qualifying-spell
+  the bowler bowled in)` clearing the `min_balls` qualifying-innings
   threshold.
 - **Three sibling distribution blocks** under one payload:
   - `wickets` — zero-inflated discrete count (§4 shape 2).
@@ -1567,14 +1567,14 @@ so side-neutral team filtering is required (NOT the side-aligned
 **Qualifying threshold applied at master-sample time**: `HAVING
 balls >= :min_balls` after the GROUP BY. Every downstream
 aggregate, every form window, every milestone is computed over
-the qualifying-spell sample — there is no "all spells including
+the qualifying-innings sample — there is no "all spells including
 cameos" view at v1. Cameo cricket (1-over fillers) is tracked by
 existing endpoints; it's deliberate noise here.
 
 `min_balls` default `12` (= 2 legal overs). The API accepts 0 (no
 filter) for completeness; `agent-browser` and `tests/integration`
 exercise both default and `min_balls=0`. UI default and the
-documented "qualifying spell" definition stay at 12. Bumping to
+documented "qualifying innings" definition stay at 12. Bumping to
 18 (3 overs) is a UX call for v2 if the noise floor still bothers
 us; the param is the knob.
 
@@ -1688,7 +1688,7 @@ Every probability ships via `prob_record(num, denom)` from §11.3
 
 | Field | Reading |
 |---|---|
-| `p_leq_15` | "tight in absolute" — under 15 runs in a qualifying spell |
+| `p_leq_15` | "tight in absolute" — under 15 runs in a qualifying innings |
 | `p_leq_25` | "decent" |
 | `p_geq_40` | "expensive" |
 | `p_geq_50` | "leaked" — career-bad spell |
@@ -1805,7 +1805,7 @@ includes the same `suggested_splits` field in its response.
 GET /api/v1/bowlers/{id}/distribution?{FilterParams}&min_balls=12&as_of_date=YYYY-MM-DD
 ```
 
-`min_balls` (int, default 12, ge=0) — qualifying-spell threshold.
+`min_balls` (int, default 12, ge=0) — qualifying-innings threshold.
 `as_of_date` (ISO date, optional) — anchors the calendar form
 windows for deterministic regression tests.
 
@@ -2193,7 +2193,7 @@ Average         22.1          ← lifetime.pool_average (runs / wicket)
 career numbers — strike rate, economy, average — render under the
 plain cricket names, NOT prefixed with "Pool" (internal jargon).
 "Pool" / `lifetime.pool_*` is the API field name describing the
-implementation (balls-weighted aggregate of all qualifying-spell
+implementation (balls-weighted aggregate of all qualifying-innings
 deliveries) and stays in the spec + types; the user-facing
 labels are just `Strike Rate` / `Economy` / `Average`. Each row
 carries a hover tooltip spelling out the formula + unit so a
@@ -2204,8 +2204,8 @@ work.
 On the Economy tab, where we surface BOTH the career number and
 the per-innings statistics in the same strip, the labels keep
 the distinction explicit: `Economy` (career, balls-weighted) /
-`Mean / spell` (unweighted mean of per-spell economies — the
-histogram's centre of mass) / `Median / spell` (per-spell median).
+`Mean / inn` (unweighted mean of per-innings economies — the
+histogram's centre of mass) / `Median / inn` (per-innings median).
 Tooltips spell out the difference.
 
 **Group 2 — milestone chips, two rows** (single flex container,
@@ -2227,7 +2227,7 @@ innings hit the anchor) renders as `—` not `0%`.
 
 #### 12.2.6 Sparkline (per-tab) + season-tick axis
 
-Per-spell sparkline rendered chronologically across full panel
+Per-innings sparkline rendered chronologically across full panel
 width. Bar value depends on the active **metric tab**:
 
 | Metric tab | Bar value | Bar color |
@@ -2250,10 +2250,10 @@ so the global anchor is always on-chart even when the player has
 been way below it across the whole window.
 
 **Global constants** (whole numbers, derived from `cricket.db`
-2026-05-06 across all qualifying spells ≥ 12 legal balls):
+2026-05-06 across all qualifying innings ≥ 12 legal balls):
 
 ```
-                wkts/spell  runs/spell  RPO
+                wkts/inn  runs/inn  RPO
 Men   bucket    1           26          8
 Women bucket    1           20          6
 Unset bucket    1           25          7
@@ -2327,12 +2327,12 @@ each via existing `PlayerLink` per `internal_docs/links.md`.
 Three cases (mirrors §9.3):
 
 1. **No player selected** → panel doesn't render; `BowlingLandingBoard`.
-2. **Lifetime `n_innings == 0`** → "No qualifying spells (≥ 12
+2. **Lifetime `n_innings == 0`** → "No qualifying innings (≥ 12
    balls) under this filter — try widening the scope, or add
    `min_balls=0` to include cameos." Suggested-splits row still
    renders.
 3. **Window `n_innings == 0` but lifetime non-empty** → window
-   pane shows "No qualifying spells in the last 10 / 60d / 6mo /
+   pane shows "No qualifying innings in the last 10 / 60d / 6mo /
    1y under this filter"; toggle stays active.
 
 ### 12.4 Types — `frontend/src/types.ts`
@@ -2519,7 +2519,7 @@ Mirror the §9.10 layout:
   fade styling class.
 - Numeric anchors via `sqlite3 cricket.db`:
   - `Mean wkts` text matches
-    `SUM(wickets)/COUNT(*)` over the qualifying-spell sample.
+    `SUM(wickets)/COUNT(*)` over the qualifying-innings sample.
   - `P(≥3) NN%` chip matches
     `count(w ≥ 3)/n_innings × 100`.
   - `Economy` (career, on the Economy tab) text matches
@@ -2664,7 +2664,7 @@ filtering — fielder credits live on opposite-side innings.
 Ordered `match.date ASC, match_id ASC` — date-asc ensures
 `observations[]` doubles as the sparkline data without a sort.
 
-**No qualifying-spell threshold.** Bowler v1 used `min_balls=12`
+**No qualifying-innings threshold.** Bowler v1 used `min_balls=12`
 to drop cameo overs; the fielder analogue would be "did the
 player field in at least one innings of the match", but
 `matchplayer` membership already encodes that. A non-keeper who

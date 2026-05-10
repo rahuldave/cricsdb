@@ -948,7 +948,7 @@ async def _innings_master_sample_bowler(
 ) -> list[dict]:
     """Materialise per-innings observation rows for a bowler under the
     active filter scope. One row per (match, innings the bowler bowled
-    in) clearing the `min_balls` qualifying-spell threshold.
+    in) clearing the `min_balls` qualifying-innings threshold.
 
     Uses _bowling_all_filter so wides/no-balls deliveries are included
     in runs_conceded (matches the bowling_summary convention); legal-
@@ -1300,7 +1300,7 @@ async def bowling_distribution(
     min_balls: int = Query(
         12, ge=0,
         description=(
-            "Qualifying-spell threshold — only innings where the bowler"
+            "Qualifying-innings threshold — only innings where the bowler"
             " bowled at least this many legal balls are included in the"
             " master sample. Default 12 (= 2 legal overs); 0 disables"
             " the filter (includes 1-ball cameos)."

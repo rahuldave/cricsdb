@@ -1509,7 +1509,7 @@ confidence interval. `value`, `ci_low`, `ci_high` are `null`
 when `denom == 0` (undefined ratio).
 
 **Master sample** = per `(match, innings the bowler bowled in)`
-clearing the `min_balls` qualifying-spell threshold. Default
+clearing the `min_balls` qualifying-innings threshold. Default
 `min_balls=12` (= 2 legal overs); pass `min_balls=0` to include
 1-ball cameos. The threshold is echoed back in
 `response.thresholds.min_balls`.

@@ -303,7 +303,7 @@ async def assert_sql_anchor(
         params["st"] = scope["season_to"]
     where = " AND ".join(clauses)
 
-    # n_innings (qualifying spells), sum_balls (legal), runs_conceded
+    # n_innings (qualifying innings), sum_balls (legal), runs_conceded
     # (all deliveries — matches endpoint), wickets (4-element exclusion).
     rows = await deps._db.q(
         f"""
