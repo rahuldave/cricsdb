@@ -84,13 +84,15 @@ export function perInningsSR(runs: number, balls: number): number {
 }
 
 export function buildSRHistogramRows(
-  observations: { runs: number; balls: number }[],
+  observations: { runs: number; balls: number; strike_rate: number | null }[],
 ): SRBinRow[] {
   const counts = new Array(9).fill(0)
   let maxSR = -1
   for (const o of observations) {
-    if (o.balls === 0) continue
-    const sr = perInningsSR(o.runs, o.balls)
+    // Server-computed strike_rate (audit §4.5). Null only when balls=0;
+    // skip those observations from the SR histogram (no SR to bin).
+    if (o.strike_rate === null) continue
+    const sr = o.strike_rate
     const i = srBinIndex(sr)
     counts[i] += 1
     if (sr > maxSR) maxSR = sr

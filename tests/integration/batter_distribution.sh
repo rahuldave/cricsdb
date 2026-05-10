@@ -453,6 +453,71 @@ settle 1
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 12 · /distribution.lifetime.runs.strike_rate present + matches DOM (§4.1+§4.5)"
+# Audit §4.1+§4.5 fix: SR is now server-side on /distribution
+# (lifetime.runs.strike_rate + per-observation strike_rate).
+# Assert the new fields exist AND DOM reads them (not the old
+# client recomputation).
+
+api_dist=$(curl -s "http://localhost:8000/api/v1/batters/$KOHLI/distribution?$SCOPE")
+
+# Server now exposes strike_rate on lifetime.runs — verify presence + value
+api_lifetime_sr=$(echo "$api_dist" | python3 -c "
+import json, sys
+sr = json.load(sys.stdin)['lifetime']['runs'].get('strike_rate')
+print(sr if sr is not None else 'MISSING')")
+case "$api_lifetime_sr" in
+  MISSING) bad "lifetime.runs.strike_rate field present" ;;
+  *)       ok "lifetime.runs.strike_rate field present (=$api_lifetime_sr)" ;;
+esac
+
+# Identity: lifetime.runs.strike_rate must equal runs.total*100/balls_total
+expected_lifetime_sr=$(echo "$api_dist" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)['lifetime']['runs']
+print(round(d['total'] * 100 / d['balls_total'], 2))")
+assert_eq "lifetime.runs.strike_rate matches runs.total*100/balls_total" \
+  "$expected_lifetime_sr" "$api_lifetime_sr"
+
+# Server now exposes strike_rate per observation — verify shape
+api_obs_sr_present=$(echo "$api_dist" | python3 -c "
+import json, sys
+obs = json.load(sys.stdin)['lifetime']['runs']['observations']
+print('all_have_field' if all('strike_rate' in o for o in obs) else 'MISSING_ON_SOME')")
+assert_eq "every observation has strike_rate field" "all_have_field" "$api_obs_sr_present"
+
+# Per-observation identity: o.strike_rate ≈ o.runs * 100 / o.balls
+api_obs_sr_correct=$(echo "$api_dist" | python3 -c "
+import json, sys
+obs = json.load(sys.stdin)['lifetime']['runs']['observations']
+ok = True
+for o in obs:
+    if o['balls'] == 0:
+        if o['strike_rate'] is not None: ok = False; break
+    else:
+        expected = round(o['runs'] * 100 / o['balls'], 2)
+        if abs((o['strike_rate'] or 0) - expected) > 1e-9: ok = False; break
+print('all_correct' if ok else 'MISMATCH')")
+assert_eq "per-observation strike_rate matches runs*100/balls" "all_correct" "$api_obs_sr_correct"
+
+# DOM Career SR should match the server's new lifetime.runs.strike_rate.
+# Already covered by Test 11 (which compares to JS-formatted compute) but
+# this is the structural lock — DOM is reading the new field directly.
+ab open "$BASE/batting?player=$KOHLI&$SCOPE"
+settle 4
+ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button')].find(b => b.innerText.trim() === 'Strike Rate')?.click()" >/dev/null
+settle 1
+expected_sr_2dp=$(unq "$(ab_eval "(${api_lifetime_sr}).toFixed(2)")")
+dom_career_sr=$(unq "$(ab_eval "(() => { const t = document.querySelector('section[aria-label=\"Per-innings runs distribution\"]').innerText; const m = t.match(/Career SR\s*\n([\d.]+)/); return m ? m[1] : ''; })()")")
+assert_eq "DOM Career SR == server lifetime.runs.strike_rate (2dp)" \
+  "$expected_sr_2dp" "$dom_career_sr"
+
+# Click back to Runs tab
+ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button.wisden-seg')].find(b => b.innerText.trim() === 'Runs')?.click()" >/dev/null
+settle 1
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "─────────────────────────────────────────────────────────────────"
 echo "$PASS pass · $FAIL fail"
 if [ "$FAIL" -gt 0 ]; then

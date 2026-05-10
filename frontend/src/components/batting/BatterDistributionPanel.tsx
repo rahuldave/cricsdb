@@ -27,7 +27,7 @@ import DistributionStatStrip, { MilestoneChipsRow } from './DistributionStatStri
 import DistributionSparkline, { type SparklinePoint } from '../distribution/DistributionSparkline'
 import SeasonTickAxis from '../distribution/SeasonTickAxis'
 import { pickBattingBaseline, type GlobalBattingBaselines } from '../distribution/globalBaselines'
-import { binIndex, binTier, srBinIndex, srBinTier, perInningsSR } from './distributionBins'
+import { binIndex, binTier, srBinIndex, srBinTier } from './distributionBins'
 import { WISDEN_RUN_TIERS, WISDEN_SR_TIERS } from '../charts/palette'
 import FormDeltaLine from './FormDeltaLine'
 import SuggestedSplitsRow from './SuggestedSplitsRow'
@@ -81,11 +81,13 @@ function sparklineFor(
   globals: GlobalBattingBaselines,
 ): SparklineConfig {
   if (metric === 'sr') {
-    const balls = scopeLifetime.runs.balls_total
-    const playerSR = balls > 0 ? +(scopeLifetime.runs.total * 100 / balls).toFixed(2) : null
+    // Career SR: server-computed (audit §4.1) on lifetime.runs.
+    const playerSR = scopeLifetime.runs.strike_rate
     return {
       point: o => {
-        const sr = perInningsSR(o.runs, o.balls)
+        // Per-innings SR: server-computed (audit §4.5) on each observation;
+        // null only when balls=0 (no balls faced — fall back to 0 for binning).
+        const sr = o.strike_rate ?? 0
         const tier = srBinTier(srBinIndex(sr))
         return {
           date: o.date, matchId: o.match_id, value: sr,
@@ -122,16 +124,21 @@ function sparklineFor(
 /** Pure stat strip for the SR tab — computed client-side from
  *  the runs observations (no SR-specific dossier in the API yet). */
 function SRStatStrip({ dossier }: { dossier: DistributionDossier }) {
+  // Per-innings SR + Career SR both server-computed (audit §4.1 + §4.5).
+  // Mean / median / std of per-innings SR are derived from observations
+  // here — pure aggregates, no DB-dependent predicates, so client-side
+  // is fine.
   const obs = dossier.runs.observations
-  const srs = obs.filter(o => o.balls > 0).map(o => perInningsSR(o.runs, o.balls))
+  const srs = obs
+    .filter((o): o is typeof o & { strike_rate: number } => o.strike_rate !== null)
+    .map(o => o.strike_rate)
   if (srs.length === 0) return null
   const sorted = [...srs].sort((a, b) => a - b)
   const median = sorted.length % 2
     ? sorted[(sorted.length - 1) / 2]
     : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
   const mean = srs.reduce((s, x) => s + x, 0) / srs.length
-  const balls = dossier.runs.balls_total
-  const poolSR = balls > 0 ? dossier.runs.total * 100 / balls : null
+  const poolSR = dossier.runs.strike_rate
   const variance = srs.length >= 2
     ? srs.reduce((s, x) => s + (x - mean) ** 2, 0) / (srs.length - 1)
     : 0

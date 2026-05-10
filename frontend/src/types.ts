@@ -443,6 +443,9 @@ export interface InningsObservation {
   date: string | null
   runs: number
   balls: number
+  /** Per-innings strike rate computed server-side as runs*100/balls.
+   *  Null when balls=0 (e.g. dismissed without facing a ball). Audit §4.5. */
+  strike_rate: number | null
   dismissed: boolean
   fours: number
   sixes: number
@@ -475,6 +478,9 @@ export interface DistributionDossier {
     variance: number | null
     std: number | null
     average: number | null
+    /** Career SR for the scope = total*100/balls_total. Server-computed
+     *  (audit §4.1). Null when balls_total=0. */
+    strike_rate: number | null
     observations: InningsObservation[]
   }
   milestones: {

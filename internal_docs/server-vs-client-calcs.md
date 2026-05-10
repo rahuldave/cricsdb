@@ -505,7 +505,7 @@ applies to both endpoints automatically.
 Same value computed on BOTH server AND client. Each is a candidate
 divergence-bug surface.
 
-### §4.1 ⚠️ MED — Career SR on the batter Distribution panel (verified 2026-05-09)
+### §4.1 + §4.5 ✅ RESOLVED 2026-05-09 — SR now server-side on /distribution
 
 **Verified real:** `/batters/{id}/distribution.lifetime.runs` does
 NOT include a `strike_rate` field (keys: `total, balls_total,
@@ -620,7 +620,7 @@ Single client computation; no server counterpart. Listed here for
 completeness — a future decision to surface CV server-side should
 delete the client-side computation.
 
-### §4.5 ⚠️ MED — Per-innings SR computed by TWO endpoints (audit re-verified 2026-05-09)
+### §4.5 ✅ RESOLVED 2026-05-09 — see §4.1 (combined fix)
 
 **Re-verification update:** the original audit said "single client
 computation, no duplication." That was **wrong**. The same
