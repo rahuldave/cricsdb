@@ -26,6 +26,35 @@ export const WISDEN_PALETTE: string[] = [
 export const WISDEN_PHASES: string[] = [WISDEN.indigo, WISDEN.ochre, WISDEN.oxblood]
 
 /**
+ * Traffic-light W/L palette for the Splits Mosaic.
+ *
+ *   WON   = muted green — won the match (traffic-go, cricket-positive)
+ *   TIED  = muted amber — tied / no-result (sits between)
+ *   LOST  = brick red   — lost
+ *
+ * Reserved for outcome encoding in the Splits Mosaic ONLY. NOT
+ * used as a fill anywhere else: the indigo/sage/ochre tier palette
+ * owns metric magnitude (low/typical/high), and oxblood owns the
+ * rolling-mean overlay (1.2px stroke). Reds are deliberately
+ * avoided elsewhere — the traffic-light vocabulary is familiar
+ * and reserved here so a viewer reading the mosaic immediately
+ * recognizes "wins / ties / losses" without needing a legend key.
+ *
+ * Hexes muted for cream (#FAF7F0) background. RED distinct from
+ * oxblood (#7A1F1F) so a W/L cell and a rolling-mean overlay
+ * never visually collide. GREEN brighter than forest #3F7A4D
+ * (the league-average reference stroke) to read as a fill at
+ * cell scale.
+ *
+ * Spec: internal_docs/spec-splits-mosaic.md §2.2.
+ */
+export const WISDEN_WL = {
+  won:   '#4B7A3B',
+  tied:  '#C9A636',
+  lost:  '#B85450',
+} as const
+
+/**
  * Three-tier coloring SHARED across distribution histograms,
  * sparklines, AND probability chips. Spec:
  * internal_docs/spec-distribution-stats.md §10.3 (revised
