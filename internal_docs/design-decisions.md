@@ -2198,3 +2198,65 @@ adds zero numeric signal.
 The fix shipped as a 5-commit series (regression-flip →
 backend → sanity re-anchor → integration test → REG re-lock)
 on 2026-05-08.
+
+## `result` / `toss_outcome` are AuxParams, not FILTER_KEYS
+
+The 2026-05-11 Splits Mosaic spec adds two new match-level
+filters from the path team's POV — `result` (won/lost/tied)
+and `toss_outcome` (won/lost). Both are AuxParams (declared on
+`AuxParams` in `api/filters.py`), NOT on `FilterBarParams`. Two
+reasons:
+
+1. They're subject-POV-relative — only meaningful when a path
+   `:team` is bound. Adding them to FilterBar would surface
+   user-visible controls on pages where they're tautological
+   or undefined (Series, Venues, Search).
+2. They keep the 10-key FilterBar ceiling intact. AuxParams is
+   the codified home for page-local narrowings that don't bleed
+   into the global UI contract.
+
+Frontend abbreviation / status-strip / compare-slot overrides
+must still include them — same "audit FilterParams + AuxParams
+when extending scope helpers" rule as `inning`. Spec:
+`internal_docs/spec-splits-mosaic.md` §2.
+
+## Splits endpoint requires `?team=` for aux outcome filters (400 otherwise)
+
+`/api/v1/teams/splits` returns the joint (toss × inning ×
+result) distribution. The endpoint accepts an optional
+`?team=` for two response modes:
+
+- **Landing** (no `?team=`): unpivoted league-side cells (every
+  match contributes 2 team-views, one per side).
+- **Team-detail** (`?team=X`): dual-query envelope (team-side
+  cells + league-side baseline + per-cell deltas).
+
+`aux.result` and `aux.toss_outcome` only make sense when a
+subject team is bound — without one, "won" means "any winning
+team-view" which is tautologically 50% of the unpivot. The
+endpoint returns HTTP 400 if either aux is set without `?team=`,
+making the asymmetry observable instead of silently degenerate.
+
+`aux.inning` works fine without `?team=` (each unpivoted team-
+view independently batted first or second).
+
+Spec: `internal_docs/spec-splits-mosaic.md` §1.4.
+
+## League baseline in /splits uses team_view unpivot
+
+The /splits league-side query unpivots each match into two
+team-view rows (one per side, both team1 and team2) before the
+GROUP BY. So `league_total_n = 2 × match_count_in_scope`. This
+is the clean way to compute the league baseline: every team
+contributes its own POV to the joint distribution. A match
+where team A wins after winning the toss batting first
+contributes two cells: (`toss=won, inn=0, result=won`) for A
+AND (`toss=lost, inn=1, result=lost`) for B. The unpivot makes
+the per-team-view shares symmetric across the league.
+
+The team-side query (when `?team=X` is set) filters the
+unpivot to just X's team-view, so its denominator is just X's
+match count. Per-cell deltas compare team-share to league-
+share at the same filter scope.
+
+Spec: `internal_docs/spec-splits-mosaic.md` §1.4.

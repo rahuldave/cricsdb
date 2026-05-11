@@ -461,6 +461,74 @@ curl "http://localhost:8000/api/v1/teams/landing?gender=male&team_type=club&tour
   }
 ```
 
+## `GET /api/v1/teams/splits`
+
+Joint distribution of (toss outcome × team innings × match result)
+for the Splits Mosaic. Spec: `internal_docs/spec-splits-mosaic.md`.
+
+Two modes:
+
+- **Landing** (no `?team=`) — league-side cells from unpivoting every
+  match in scope into two team-views (one per side). Each match
+  contributes 2 rows to the joint distribution.
+- **Team-detail** (`?team=X` set) — team-side cells + league-side
+  baseline at the same filter scope + per-cell deltas
+  (`share - league_share`, and relative `delta_pct`). Same envelope
+  pattern as the `scope_avg` field on `/teams/{team}/summary`.
+
+Aux narrowings honoured at the cell level (post-GROUP BY). When
+`?result=` or `?toss_outcome=` is set without `?team=`, the endpoint
+returns HTTP 400 — both filters are subject-POV-relative and have no
+meaning without a team subject.
+
+```bash
+# Landing
+curl "http://localhost:8000/api/v1/teams/splits?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024"
+
+# Team-detail
+curl "http://localhost:8000/api/v1/teams/splits?team=Royal%20Challengers%20Bengaluru&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024"
+```
+
+```json
+{
+  "subject": { "team": "Royal Challengers Bengaluru" },
+  "scope_total_n": 15,
+  "league_total_n": 142,
+  "cells": [
+    {
+      "toss_outcome": "lost",
+      "inning": 0,
+      "result": "lost",
+      "n": 4,
+      "share": 0.2667,
+      "wilson_lo": 0.109,
+      "wilson_hi": 0.5195,
+      "league_share": 0.169,
+      "delta": 0.0977,
+      "delta_pct": 57.8
+    }
+  ],
+  "marginals": {
+    "toss_outcome": {
+      "won":  { "n": 7, "share": 0.4667, "wilson_lo": ..., "wilson_hi": ...,
+                "league_share": 0.5141, "delta": -0.0474, "delta_pct": -9.2 },
+      "lost": { "n": 8, "share": 0.5333, ... }
+    },
+    "inning":  { "0": { ... }, "1": { ... } },
+    "result":  { "won": { ... }, "lost": { ... }, "tied": { ... } }
+  }
+}
+```
+
+Cell coordinates:
+- `toss_outcome`: `"won"` / `"lost"`
+- `inning`: `0` (batted first) / `1` (batted second)
+- `result`: `"won"` / `"lost"` / `"tied"` (last collapses tied + no-result)
+
+Subject-POV gate:
+- `?result=won` without `?team=` → 400 `"?result= requires ?team= (subject POV needed)."`
+- `?toss_outcome=won` without `?team=` → 400 `"?toss_outcome= requires ?team= (subject POV needed)."`
+
 ## `GET /api/v1/batters/leaders`
 
 Top-N batters by average and by strike rate, with min-sample

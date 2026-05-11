@@ -30,6 +30,10 @@ api/
                          accepts team + opponent for rivalry-pair intersection),
                          /seasons, /teams, /players
     teams.py          — /api/v1/teams/landing (two-column directory, filter-sensitive)
+                         /api/v1/teams/splits (joint toss × inning × result
+                         distribution; landing = league unpivot, ?team= = dual
+                         envelope with deltas — Splits Mosaic backing endpoint,
+                         spec internal_docs/spec-splits-mosaic.md)
                          /api/v1/teams/{team}/summary|results|vs/{opponent}|by-season
                          /api/v1/teams/{team}/players-by-season (roster + bat avg + bowl SR + turnover)
                          plus batting/bowling/fielding/partnerships endpoints + opponents-matrix.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import statistics
 from datetime import date, timedelta
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Optional
 
 from ..dependencies import get_db
@@ -323,6 +323,262 @@ async def teams_landing(
             "women_franchise": women_franchise,
             "other": other_club,
         },
+    }
+
+
+# ============================================================
+# /splits — Splits Mosaic backing endpoint (Spec: spec-splits-mosaic.md §1.3-1.5)
+#
+# Joint distribution of (toss_outcome × team_inning × result) over
+# the active filter scope. Two modes:
+#   - Landing (?team= absent): league-side only. Cells reflect the
+#     unpivoted "team-views" of every match in scope (each match
+#     contributes 2 team-views, one per side). Aux filters
+#     result / toss_outcome are 400-rejected here — both are
+#     subject-POV filters that need a team to evaluate against.
+#   - Team-detail (?team=X set): dual-query envelope. Team-side
+#     cells + league-side cells at the same filter scope + per-cell
+#     deltas (share - league_share) / league_share × 100. Same
+#     envelope pattern as /summary's scope_avg.
+#
+# Aux filters honoured at endpoint level (cell-level post-filter):
+#   inning, result, toss_outcome — restricted cells flow through
+#   to the response. Marginals are always over the FULL 12-cell
+#   grid pre-cell-filter so the frontend can still render
+#   marginals when the user has filtered.
+# ============================================================
+
+def _cell_label_for_aux(
+    toss_outcome: str, team_inning: int, result: str,
+    aux: AuxParams,
+) -> bool:
+    """Cell-level post-filter: True iff this (toss_outcome, team_inning,
+    result) cell should appear in the response given the aux narrowings.
+    """
+    if aux.toss_outcome is not None and aux.toss_outcome != toss_outcome:
+        return False
+    if aux.inning is not None and aux.inning != team_inning:
+        return False
+    if aux.result is not None and aux.result != result:
+        return False
+    return True
+
+
+async def _splits_cells(
+    where: str, params: dict, team_filter: str | None,
+) -> tuple[list[dict], int]:
+    """Run the team_views-unpivot GROUP BY and return raw cell rows
+    plus the total team-view count (sum of all cell n).
+
+    `team_filter`, if set, is added as `AND tv.team_view = :_sp_team` —
+    used for the team-side query. Caller binds :_sp_team into params.
+    """
+    db = get_db()
+    extra = f" AND tv.team_view = :_sp_team" if team_filter else ""
+    sql = f"""
+    WITH team_views AS (
+      SELECT m.id AS match_id, m.team1 AS team_view FROM match m WHERE {where}
+      UNION ALL
+      SELECT m.id AS match_id, m.team2 AS team_view FROM match m WHERE {where}
+    )
+    SELECT
+      CASE WHEN tv.team_view = m.toss_winner THEN 'won' ELSE 'lost' END AS toss_outcome,
+      CASE WHEN (m.toss_decision = 'bat' AND m.toss_winner = tv.team_view)
+             OR (m.toss_decision = 'field' AND m.toss_winner <> tv.team_view)
+           THEN 0 ELSE 1 END AS team_inning,
+      CASE WHEN m.outcome_winner = tv.team_view THEN 'won'
+           WHEN m.outcome_winner IS NULL THEN 'tied'
+           ELSE 'lost' END AS result,
+      COUNT(*) AS n
+    FROM team_views tv
+    JOIN match m ON m.id = tv.match_id
+    WHERE m.toss_winner IS NOT NULL{extra}
+    GROUP BY toss_outcome, team_inning, result
+    """
+    rows = await db.q(sql, params)
+    out = [
+        {"toss_outcome": r["toss_outcome"], "inning": r["team_inning"],
+         "result": r["result"], "n": r["n"]}
+        for r in rows
+    ]
+    total = sum(c["n"] for c in out)
+    return out, total
+
+
+def _marginals(cells: list[dict], total: int) -> dict:
+    """Aggregate marginal counts + Wilson CIs over the 3 axes.
+
+    `total` is the denominator for share (sum of all cell n).
+    """
+    from ..wilson import wilson_ci
+    out: dict[str, dict] = {
+        "toss_outcome": {}, "inning": {}, "result": {},
+    }
+    for axis in out:
+        sums: dict = {}
+        for c in cells:
+            sums[c[axis]] = sums.get(c[axis], 0) + c["n"]
+        for v, n in sums.items():
+            lo, hi = wilson_ci(n, total)
+            key = str(v) if axis == "inning" else v
+            out[axis][key] = {
+                "n": n,
+                "share": round(n / total, 4) if total else None,
+                "wilson_lo": round(lo, 4) if lo is not None else None,
+                "wilson_hi": round(hi, 4) if hi is not None else None,
+            }
+    return out
+
+
+@router.get("/splits")
+async def team_splits(
+    team: Optional[str] = Query(
+        None,
+        description=(
+            "Optional team name. When set, response carries team-side"
+            " cells + league-side baseline + per-cell deltas. When"
+            " absent (landing case), response carries league-side only."
+        ),
+    ),
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    """Joint (toss × inning × result) distribution.
+
+    Spec: internal_docs/spec-splits-mosaic.md §1.3.
+    """
+    # ── Subject-POV gate ─────────────────────────────────────────────
+    if not team:
+        if aux.result is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="?result= requires ?team= (subject POV needed).",
+            )
+        if aux.toss_outcome is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="?toss_outcome= requires ?team= (subject POV needed).",
+            )
+
+    # ── Build base WHERE (filter scope, no team binding) ─────────────
+    # We null out filters.team / filters.opponent so the same WHERE
+    # works for both the league-side (unpivot all team-views) and
+    # team-side (restrict to one team-view) queries.
+    saved_team = filters.team
+    saved_opp = filters.opponent
+    filters.team = None
+    filters.opponent = None
+    try:
+        base_where, base_params = filters.build(has_innings_join=False, aux=aux)
+    finally:
+        filters.team = saved_team
+        filters.opponent = saved_opp
+    base_where = base_where or "1=1"
+
+    # ── League side ──────────────────────────────────────────────────
+    league_cells_all, league_total = await _splits_cells(
+        base_where, dict(base_params), team_filter=None,
+    )
+    league_marginals = _marginals(league_cells_all, league_total)
+
+    # ── Team side (only when team is set) ───────────────────────────
+    team_cells_all: list[dict] = []
+    team_total = 0
+    team_marginals: dict = {}
+    if team:
+        team_params = dict(base_params)
+        team_params["_sp_team"] = team
+        team_cells_all, team_total = await _splits_cells(
+            base_where, team_params, team_filter=":_sp_team",
+        )
+        team_marginals = _marginals(team_cells_all, team_total)
+
+    # ── Cell-level aux filter (post-GROUP BY) ────────────────────────
+    league_cells = [
+        c for c in league_cells_all
+        if _cell_label_for_aux(c["toss_outcome"], c["inning"], c["result"], aux)
+    ]
+    team_cells = [
+        c for c in team_cells_all
+        if _cell_label_for_aux(c["toss_outcome"], c["inning"], c["result"], aux)
+    ]
+
+    # ── Compute per-cell shares + Wilson CIs ─────────────────────────
+    from ..wilson import wilson_ci
+    out_cells: list[dict] = []
+    if team:
+        # Team-detail: each cell carries team-side share + league baseline + delta.
+        league_n_by_key = {
+            (c["toss_outcome"], c["inning"], c["result"]): c["n"]
+            for c in league_cells_all
+        }
+        for c in team_cells:
+            key = (c["toss_outcome"], c["inning"], c["result"])
+            league_n_for_cell = league_n_by_key.get(key, 0)
+            share = round(c["n"] / team_total, 4) if team_total else None
+            league_share = round(league_n_for_cell / league_total, 4) if league_total else None
+            delta = (share - league_share) if (share is not None and league_share is not None) else None
+            delta_pct = (
+                round((share - league_share) / league_share * 100, 1)
+                if (share is not None and league_share not in (None, 0))
+                else None
+            )
+            lo, hi = wilson_ci(c["n"], team_total)
+            out_cells.append({
+                "toss_outcome": c["toss_outcome"],
+                "inning": c["inning"],
+                "result": c["result"],
+                "n": c["n"],
+                "share": share,
+                "wilson_lo": round(lo, 4) if lo is not None else None,
+                "wilson_hi": round(hi, 4) if hi is not None else None,
+                "league_share": league_share,
+                "delta": round(delta, 4) if delta is not None else None,
+                "delta_pct": delta_pct,
+            })
+    else:
+        for c in league_cells:
+            lo, hi = wilson_ci(c["n"], league_total)
+            out_cells.append({
+                "toss_outcome": c["toss_outcome"],
+                "inning": c["inning"],
+                "result": c["result"],
+                "n": c["n"],
+                "share": round(c["n"] / league_total, 4) if league_total else None,
+                "wilson_lo": round(lo, 4) if lo is not None else None,
+                "wilson_hi": round(hi, 4) if hi is not None else None,
+            })
+
+    # ── Marginals with deltas (team-detail mode) ─────────────────────
+    if team:
+        marginals_out: dict = {}
+        for axis in ("toss_outcome", "inning", "result"):
+            marginals_out[axis] = {}
+            for key, t_entry in team_marginals[axis].items():
+                l_entry = league_marginals[axis].get(key, {})
+                t_share = t_entry.get("share")
+                l_share = l_entry.get("share")
+                d = (t_share - l_share) if (t_share is not None and l_share is not None) else None
+                dp = (
+                    round((t_share - l_share) / l_share * 100, 1)
+                    if (t_share is not None and l_share not in (None, 0))
+                    else None
+                )
+                marginals_out[axis][key] = {
+                    **t_entry,
+                    "league_share": l_share,
+                    "delta": round(d, 4) if d is not None else None,
+                    "delta_pct": dp,
+                }
+    else:
+        marginals_out = league_marginals
+
+    return {
+        "subject": {"team": team} if team else None,
+        "scope_total_n": team_total if team else league_total,
+        "league_total_n": league_total if team else None,
+        "cells": out_cells,
+        "marginals": marginals_out,
     }
 
 
