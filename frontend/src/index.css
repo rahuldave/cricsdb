@@ -2176,10 +2176,147 @@ a { color: inherit; }
 /* Confusion-matrix layout: CSS grid with explicit corner cell.
    gridTemplateColumns is set inline (9rem corner + proportional toss
    columns from the marginal data). */
+/* Outer mosaic grid:
+   ┌─────────────┬──────────────────┐
+   │ corner      │ col-headers row  │
+   ├─────────────┼──────────────────┤
+   │ row-headers │   CELL AREA      │
+   │ column      │                  │
+   └─────────────┴──────────────────┘
+   Headers sit in fixed strips; cell area stretches to fill. */
 .wisden-splits-table {
   display: grid;
-  gap: 0.25rem;
+  /* Column 2 is `auto` so it sizes to the cell-area's content
+     width (= sum of visible quadrant widths). When an aux filter
+     removes a column of quadrants, the cell area shrinks
+     horizontally — no more empty half. Vertical analog handled
+     by `grid-template-rows: auto auto` on the cell area. */
+  grid-template-columns: 9rem auto;
+  grid-template-rows: auto auto;
+  gap: 0.5rem;
   margin-top: 0.4rem;
+  /* Shrink the whole table to its content width so the panel
+     gutter on the right collapses when an aux filter removes
+     a column of quadrants. Without this the table div is
+     block-level and fills its parent (= the panel's content
+     width), leaving empty space at the right of the cell area. */
+  width: max-content;
+  max-width: 100%;
+}
+.wisden-splits-corner-empty {
+  grid-column: 1;
+  grid-row: 1;
+  /* Right + bottom rules of the corner draw the outer T-cross —
+     the vertical separator between row-headers column and cell
+     area continues down, and the horizontal separator between
+     col-headers row and cell area continues right. */
+  border-right: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.wisden-splits-col-headers {
+  border-bottom: 1px solid var(--rule-soft);
+  padding-bottom: 0.4rem;
+}
+.wisden-splits-row-headers {
+  border-right: 1px solid var(--rule-soft);
+  padding-right: 0.4rem;
+}
+.wisden-splits-col-headers {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  gap: 0.5rem;
+}
+.wisden-splits-col-headers > * {
+  flex: 1 1 0;
+  /* Cells in this column extend from the center-cross outward —
+     they cluster near the center, not the quadrant midpoint. So
+     the column-header text sits NEAR the center: Won toss right-
+     aligned, Lost toss left-aligned. */
+}
+.wisden-splits-col-headers > *:first-child {
+  text-align: right;
+  padding-right: 0.6rem;
+  /* Light divider between Won toss / Lost toss labels, aligned
+     with the inner vertical gridline at the cell-area center. */
+  border-right: 1px solid var(--rule-soft);
+}
+.wisden-splits-col-headers > *:last-child {
+  text-align: left;
+  padding-left: 0.6rem;
+}
+.wisden-splits-row-headers {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.wisden-splits-row-headers > * {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Same anchoring logic as columns — rows extend from center
+   cross outward, so labels sit NEAR the center: Batted first
+   bottom-aligned, Batted second top-aligned. */
+.wisden-splits-row-headers > *:first-child {
+  justify-content: flex-end;
+  padding-bottom: 0.6rem;
+  /* Light divider between Batted first / Batted second labels,
+     aligned with the inner horizontal gridline at the cell-area
+     center. */
+  border-bottom: 1px solid var(--rule-soft);
+}
+.wisden-splits-row-headers > *:last-child {
+  justify-content: flex-start;
+  padding-top: 0.6rem;
+}
+/* Cell area: position: relative for absolute-positioned cells
+   inside. Aspect-ratio set per viewport — wide on desktop, tall
+   on mobile — so cells distort accordingly. Width takes the full
+   grid column (1fr) so the mosaic stretches across available
+   page space. */
+.wisden-splits-cell-area {
+  grid-column: 2;
+  grid-row: 2;
+  /* 2×2 grid of quadrants with FIXED widths (via the
+     --mosaic-unit-x / -y CSS vars below). `auto auto` tracks
+     mean empty rows/cols collapse to 0 — so when an aux filter
+     removes 2 of the 4 quadrants, the cell area visibly shrinks
+     to half size, while the visible quadrants (and the cells
+     inside them) keep their original physical dimensions. */
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  gap: 4px;
+  justify-content: start;
+  /* Quadrant size — clamp on viewport so the mosaic scales
+     between desktop and mobile while preserving relative cell
+     proportions. The full 4-rect mosaic occupies ~2*unit-x wide
+     and 2*unit-y tall. */
+  --mosaic-unit-x: min(42vw, 480px);
+  --mosaic-unit-y: min(17vw, 200px);
+}
+@media (max-width: 720px) {
+  .wisden-splits-cell-area {
+    /* Portrait: smaller quadrants (so the table fits 360-wide
+       viewport) and taller-than-wide aspect so labels can stack
+       vertically inside narrow cells. */
+    --mosaic-unit-x: 30vw;
+    --mosaic-unit-y: 38vw;
+  }
+  .wisden-splits-subrect-label {
+    white-space: normal;
+    text-align: center;
+    font-size: 0.7rem;
+    line-height: 1.1;
+  }
+}
+.wisden-splits-quadrant {
+  position: relative;
+  width: var(--mosaic-unit-x);
+  height: var(--mosaic-unit-y);
 }
 .wisden-splits-corner {
   display: flex;
@@ -2251,7 +2388,7 @@ a { color: inherit; }
 }
 .wisden-splits-row-header:hover .wisden-splits-row-primary {
   color: var(--accent);
-  border-bottom-color: var(--accent);
+  text-decoration-color: var(--accent);
 }
 /* Marginal-link row above the matrix — outcome links (color-coded
    text) + All-toss / Both-innings clear-filter chips. All links use
@@ -2363,13 +2500,15 @@ a { color: inherit; }
   font-weight: 600;
   font-size: 0.9rem;
   color: var(--ink);
-  /* Underline cue that the label is a clickable filter, matching the
-     wisden-seg pattern used by InningToggle. Active state is N/A here
-     because clicking removes the dimension from the chart. */
-  border-bottom: 1px solid transparent;
-  display: inline-block;
-  align-self: flex-end;
-  transition: border-color 120ms, color 120ms;
+  /* Click-cue underline drawn via text-decoration so it tracks the
+     glyph width (not the parent box). Keeping the row as a regular
+     block lets primary/secondary/stats lines share the same right
+     edge AND left edge — earlier `display: inline-block` made the
+     primary shrink to text width and left-edges diverged. */
+  display: block;
+  text-decoration: underline transparent 1px;
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 120ms, color 120ms;
 }
 .wisden-splits-row-label:hover .wisden-splits-row-primary {
   color: var(--accent);
@@ -2543,36 +2682,41 @@ a { color: inherit; }
   margin-right: 0.35em;
   vertical-align: middle;
 }
+/* 1D bar — labels in a wrapping flex row ABOVE the bar (mirrors
+   the 4-rect outcome-marginal row pattern), bar below is just
+   colored proportional segments. Avoids the "label clipped inside
+   a narrow segment" problem that the old inside-the-bar layout
+   produced for Tied (~5%) on the 1D view. */
 .wisden-splits-1d {
   display: flex;
-  height: 2.6rem;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.wisden-splits-1d-labels {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  align-items: baseline;
+}
+.wisden-splits-1d-bar {
+  display: flex;
+  height: 1.4rem;
   border: 1px solid var(--rule-soft);
   border-radius: 3px;
   overflow: hidden;
-  margin-top: 0.5rem;
 }
 .wisden-splits-1d-segment {
   border: none;
   cursor: pointer;
-  position: relative;
   transition: filter 100ms;
   padding: 0;
+  min-width: 0;
 }
 .wisden-splits-1d-segment:hover {
   filter: brightness(1.08);
-}
-.wisden-splits-1d-label {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--sans);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--cream);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  padding: 0 0.5rem;
 }
 .wisden-splits-thin-sample {
   margin-top: 0.5rem;

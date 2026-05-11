@@ -1,5 +1,5 @@
 import type React from 'react'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
 import { useFilterDeps } from '../hooks/useFilterDeps'
@@ -26,7 +26,7 @@ import TeamSearch from '../components/TeamSearch'
 import FlagBadge from '../components/FlagBadge'
 import ScopedPageHeader from '../components/ScopedPageHeader'
 import PlayerLink from '../components/PlayerLink'
-import { ScopeContext } from '../components/scopeLinks'
+import { ScopeContext, FILTER_KEYS } from '../components/scopeLinks'
 import TeamCompareGrid from '../components/teams/TeamCompareGrid'
 import SplitsMosaic from '../components/SplitsMosaic'
 import TeamBattingDistributionPanel from '../components/teams-distribution/TeamBattingDistributionPanel'
@@ -253,6 +253,29 @@ export default function Teams() {
   )
   const summary = summaryFetch.data
 
+  // Aux-stripped summary fetch — drives the SplitsMosaic's scaling
+  // unit (matchesEnvelope). /summary normally narrows by aux filters
+  // too (so matches.value = bat-first count when inning=0), but the
+  // mosaic needs a STABLE total — the FilterBar scope total —
+  // regardless of which aux narrowing is applied. Otherwise the unit
+  // shifts under filter and cell sizes rescale, which the user
+  // explicitly rejected. This is a separate fetch from the main
+  // summaryFetch above, with aux params stripped so refetches only
+  // trigger on FilterBar changes.
+  const filtersWithoutAux = useMemo(() => {
+    const out = { ...filters }
+    delete out.inning
+    delete out.toss_outcome
+    delete out.result
+    return out
+  }, [filters])
+  const unauxFilterDeps = [selected, ...FILTER_KEYS.map(k => (filters as Record<string, string | undefined>)[k])]
+  const unauxSummaryFetch = useFetch<TeamSummary | null>(
+    () => selected ? getTeamSummary(selected, filtersWithoutAux) : Promise.resolve(null),
+    unauxFilterDeps,
+  )
+  const unauxMatchesEnvelope = unauxSummaryFetch.data?.matches ?? null
+
   // Splits Mosaic — joint (toss × inning × result) distribution. Same
   // fetch on landing (selected=null → ?team= absent → league side) and
   // team-detail (?team= set → dual envelope with deltas). Spec:
@@ -277,6 +300,25 @@ export default function Teams() {
   const splitsFetch = useFetch<import('../types').TeamSplits | null>(
     () => getTeamSplits({ ...splitsFilters, team: selected || undefined }),
     [...filterDeps, activeTab],
+  )
+
+  // Aux-stripped /splits fetch — drives the SplitsMosaic's marginal
+  // rows (column headers, row headers, All-toss / Both-innings
+  // chips). The main splitsFetch above is aux-narrowed (so cells
+  // reflect the filter), but the marginals strip should keep
+  // showing 4-rect values when the user clicks into a filter, so
+  // they can see how the filtered slice compares against the
+  // full-scope reference. Same pattern as the aux-stripped /summary
+  // call that drives matchesEnvelope.
+  const unauxSplitsFetch = useFetch<import('../types').TeamSplits | null>(
+    () => {
+      const stripped = { ...splitsFilters }
+      delete stripped.inning
+      delete stripped.toss_outcome
+      delete stripped.result
+      return getTeamSplits({ ...stripped, team: selected || undefined })
+    },
+    [...unauxFilterDeps, activeTab],
   )
 
   // Plumb the team's last appearance into DormancyContext so the
@@ -351,8 +393,9 @@ export default function Teams() {
             loading={splitsFetch.loading}
             filters={filters}
             activeTab={activeTab}
-            matchesEnvelope={summary?.matches ?? null}
+            matchesEnvelope={unauxMatchesEnvelope}
             uniqueTeamsInScope={summary?.unique_teams_in_scope ?? null}
+            unauxData={unauxSplitsFetch.data}
           />
           <TeamsLandingBoard filters={filters} filterDeps={filterDeps} onPick={selectTeam} />
         </>
@@ -448,8 +491,9 @@ export default function Teams() {
             loading={splitsFetch.loading}
             filters={filters}
             activeTab={activeTab}
-            matchesEnvelope={summary?.matches ?? null}
+            matchesEnvelope={unauxMatchesEnvelope}
             uniqueTeamsInScope={summary?.unique_teams_in_scope ?? null}
+            unauxData={unauxSplitsFetch.data}
           />
 
           <div className="wisden-tabs">

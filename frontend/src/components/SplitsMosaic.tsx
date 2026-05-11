@@ -24,7 +24,7 @@
  *
  * Spec: internal_docs/spec-splits-mosaic.md §3.
  */
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { useSetUrlParams } from '../hooks/useUrlState'
 import { WISDEN, WISDEN_WL, WISDEN_WL_TINTS } from './charts/palette'
 import MetricDelta from './MetricDelta'
@@ -58,6 +58,14 @@ interface Props {
    *  compute the per-team league-avg matches as the comparison anchor
    *  for All-toss / Both-innings deltas. */
   uniqueTeamsInScope?: number | null
+  /** Aux-stripped /splits response (same FilterBar scope, but
+   *  inning / toss_outcome / result filters NOT applied). Drives
+   *  the marginal-row chips (outcome marginals, column-header
+   *  toss values, row-header inning values, All-toss / Both-
+   *  innings counts) so they keep showing 4-rect baseline values
+   *  even when the user has clicked into a filter. The cells
+   *  themselves still use the aux-filtered `data`. */
+  unauxData?: TeamSplits | null
 }
 
 type Outcome = 'won' | 'lost' | 'tied'
@@ -198,10 +206,14 @@ function mkEnv(
   }
 }
 
-function dirForOutcome(rv: Outcome): 'higher_better' | 'lower_better' | null {
+function dirForOutcome(rv: Outcome): 'higher_better' | 'lower_better' {
   if (rv === 'won') return 'higher_better'
   if (rv === 'lost') return 'lower_better'
-  return null  // tied — no direction
+  // tied — no inherent value direction, but user wants the chip
+  // colored by sign anyway ("the chip just says above/below avg,
+  // not a value judgement"). 'higher_better' makes positive
+  // delta→green, negative→red without implying tied-more-is-good.
+  return 'higher_better'
 }
 
 // ─── Wilson CI tooltip text ─────────────────────────────────────────
@@ -232,8 +244,19 @@ function cellTooltip(cell: SplitsCell, total: number, hasSubject: boolean, bowli
 }
 
 // ─── Component ──────────────────────────────────────────────────────
-export default function SplitsMosaic({ data, loading, filters, activeTab, matchesEnvelope: _me, uniqueTeamsInScope }: Props) {
+export default function SplitsMosaic({ data, loading, filters, activeTab, matchesEnvelope, uniqueTeamsInScope: _uniqueTeamsInScope, unauxData }: Props) {
   const setUrlParams = useSetUrlParams()
+
+  // Scroll preservation: handled at the document level by the
+  // global `body { padding-bottom: 50vh }` rule (see index.css).
+  // That gives every page enough scroll headroom that when an aux
+  // filter shrinks the mosaic, the document doesn't shrink past
+  // the user's current scrollY — so the browser doesn't auto-
+  // scroll up, and the mosaic stays put. The mosaic panel itself
+  // sizes naturally to its content, the tabs below reflow up
+  // immediately, and there's no empty space inside the bordered
+  // panel.
+  const mosaicRootRef = useRef<HTMLDivElement | null>(null)
 
   // Bowling-side tabs flip the inning semantic — see Props.activeTab
   // doc + spec-inning-split.md §3.4.
@@ -275,14 +298,14 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
 
   if (loading) {
     return (
-      <div className="wisden-splits-mosaic" style={{ padding: '0.75rem 1rem', minHeight: 60 }}>
+      <div ref={mosaicRootRef} className="wisden-splits-mosaic" style={{ padding: '0.75rem 1rem', minHeight: 60 }}>
         <span style={{ fontStyle: 'italic', color: WISDEN.faint }}>Loading splits…</span>
       </div>
     )
   }
   if (!data || total === 0) {
     return (
-      <div className="wisden-splits-mosaic" style={{ padding: '0.75rem 1rem' }}>
+      <div ref={mosaicRootRef} className="wisden-splits-mosaic" style={{ padding: '0.75rem 1rem' }}>
         <span style={{ fontStyle: 'italic', color: WISDEN.faint }}>
           No matches in scope for splits.
         </span>
@@ -295,7 +318,7 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
   // ─── 0-free case — status strip only ─────────────────────────────
   if (r && t && i !== null) {
     return (
-      <div className="wisden-splits-mosaic">
+      <div ref={mosaicRootRef} className="wisden-splits-mosaic">
         <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} setAux={setAux} bowlingCtx={bowlingCtx} />
       </div>
     )
@@ -304,7 +327,7 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
   // ─── 1-free case — 1D bar ────────────────────────────────────────
   if ([r, t, i].filter(x => x !== null).length === 2) {
     return (
-      <div className="wisden-splits-mosaic">
+      <div ref={mosaicRootRef} className="wisden-splits-mosaic">
         <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} setAux={setAux} bowlingCtx={bowlingCtx} />
         <OneDimBar
           marginals={data.marginals}
@@ -332,46 +355,100 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
     : [userInningToTeamInning(parseInt(i) as 0 | 1, bowlingCtx)]
   const resultValues: Outcome[] = r === null ? ['won', 'tied', 'lost'] : [r as Outcome]
 
-  // Column widths proportional to toss-outcome marginal.
-  const tossN = (tv: 'won' | 'lost') => data.marginals.toss_outcome[tv]?.n ?? 0
-  const tossTotal = tossValues.reduce((s, v) => s + tossN(v), 0) || 1
-  const colWidths = tossValues.map(tv => tossN(tv) / tossTotal)
+  // ─── Mosaic — 4 cells in a 2×2 outer grid + a scalable cell area
+  //
+  // The outer container is a CSS grid with clean alignment:
+  //   ┌─────────────┬──────────────────────┐
+  //   │  (corner)   │  column headers row  │
+  //   ├─────────────┼──────────────────────┤
+  //   │ row headers │     CELL AREA        │
+  //   │  column     │   (the 4 squares)    │
+  //   └─────────────┴──────────────────────┘
+  // Headers sit in fixed strips that span the full grid track;
+  // they don't chase the cells' extents. Inside the cell area
+  // (bottom-right grid cell) the 4 mosaic cells are absolutely
+  // positioned, anchored at the GEOMETRIC CENTER (50%, 50%) of
+  // the cell area. Each mosaic cell's width is `(count/unit) ×
+  // SCALE_FRAC` percent of the cell-area width, and its height the
+  // same percent of the cell-area HEIGHT — so a cell distorts
+  // along with the cell-area's aspect ratio (wide on desktop, tall
+  // on mobile, both set by media query). Relative sizes between
+  // cells stay correct in both because they all use the same x/y
+  // percentage axes.
+  //
+  // Filter-bar scope total — STABLE under aux filters. Comes from
+  // /summary's matches envelope (FilterBar respects gender/tier/
+  // tournament/season/team but not toss_outcome/inning/result).
+  // Falls back to scope_total_n if envelope absent.
+  const baseTotal = (matchesEnvelope?.value ?? total) || 1
+  const unitHalf = baseTotal / 2  // = average marginal in filter scope
 
-  // Build CSS-grid template columns: row-header width + proportional toss columns.
-  const gridCols = `9rem ${colWidths.map(w => `${w}fr`).join(' ')}`
+  // Joint count for cell (tv, iv).
+  const cellJointN = (tv: 'won' | 'lost', iv: 0 | 1) =>
+    resultValues.reduce(
+      (s, rv) => s + (cellMap.get(`${tv}|${iv}|${rv}`)?.n ?? 0),
+      0,
+    )
+  const showCell = (tv: 'won' | 'lost', iv: 0 | 1) =>
+    tossValues.includes(tv) && inningValues.includes(iv)
 
-  // All-toss / Both-innings totals reflect the current filtered slice
-  // (= scope_total_n). When the toss / inning filter IS set, this is
-  // the narrowed count; clicking clears the narrowing and the
-  // displayed total expands.
-  const allTossN = total
-  const allInningsN = total
+  // Side fraction of the QUADRANT — area-proportional sizing via
+  // sqrt so cell area encodes count linearly. With SCALE_FRAC = 1
+  // a cell with count = unitHalf (= total/2) would fill its
+  // quadrant exactly; smaller cells take less. Joint counts can
+  // theoretically reach 2×unitHalf (= total) so we clamp at 1.0
+  // to keep cells inside their quadrant.
+  const SCALE_FRAC = 1.0
+  const sideFrac = (tv: 'won' | 'lost', iv: 0 | 1) => {
+    if (!showCell(tv, iv)) return 0
+    const ratio = cellJointN(tv, iv) / unitHalf
+    if (ratio <= 0) return 0
+    return Math.min(1.0, Math.sqrt(ratio) * SCALE_FRAC)
+  }
 
-  // Per-team league avg matches for the comparison anchor on the
-  // All-toss / Both-innings deltas. league_total_n is the unpivot
-  // total (= 2 × match_count), so league_total_n / 2 = match_count.
-  // Divide by N_teams to get per-team avg. unique_teams_in_scope
-  // comes from /teams/{team}/summary.
-  const leaguePerTeamMatches = (
-    data.league_total_n && uniqueTeamsInScope && uniqueTeamsInScope > 0
-  )
-    ? (data.league_total_n / 2) / uniqueTeamsInScope
-    : null
-  const matchesDeltaPct = leaguePerTeamMatches
-    ? Math.round((total - leaguePerTeamMatches) / leaguePerTeamMatches * 100 * 10) / 10
+  // Cream "+" gutter at the center cross is drawn by the
+  // grid-gap between quadrants (set in CSS) — no inline gutter
+  // calculation needed here.
+
+  // All-toss / Both-innings totals show the FilterBar-scope total
+  // (= matchesEnvelope.value, FROZEN under aux filters), not the
+  // aux-narrowed `scope_total_n`. The label "All toss · 276" is
+  // meant to clear the toss filter and show all matches, so it
+  // should display the unfiltered total at all times.
+  const baseTotalForRow = matchesEnvelope?.value ?? total
+  const allTossN = baseTotalForRow
+  const allInningsN = baseTotalForRow
+
+  // Per-team league avg matches — comes straight from the
+  // matchesEnvelope's scope_avg, which the /summary endpoint
+  // already computes correctly (= league_total_n / unique_teams).
+  // Earlier code derived it as `league_total_n / 2 / unique_teams`
+  // which double-divided and produced wrong deltas (e.g. +240% for
+  // teams that actually only sat ~70% above league avg).
+  const leaguePerTeamMatches = matchesEnvelope?.scope_avg ?? null
+  const matchesDeltaPct = (leaguePerTeamMatches != null && leaguePerTeamMatches > 0)
+    ? Math.round((baseTotalForRow - leaguePerTeamMatches) / leaguePerTeamMatches * 100 * 10) / 10
     : null
   const matchesDeltaEnv: MetricEnvelope | null = (hasSubject && leaguePerTeamMatches != null && matchesDeltaPct != null)
     ? {
-        value: total,
+        value: baseTotalForRow,
         scope_avg: Math.round(leaguePerTeamMatches * 10) / 10,
         delta_pct: matchesDeltaPct,
-        direction: null,  // count — informational, neutral coloring
-        sample_size: total,
+        direction: 'higher_better',
+        sample_size: baseTotalForRow,
       }
     : null
 
+  // Marginals come from unauxData when available — that's the
+  // /splits response with aux filters stripped, so the chips
+  // (outcome row + col-header toss + row-header inning) keep
+  // showing 4-rect baseline values regardless of aux filtering.
+  // Falls back to the aux-filtered data.marginals if unauxData
+  // isn't loaded yet (initial render before sibling fetch settles).
+  const marginalsForDisplay = unauxData?.marginals ?? data.marginals
+
   return (
-    <div className="wisden-splits-mosaic">
+    <div ref={mosaicRootRef} className="wisden-splits-mosaic">
       <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} setAux={setAux} bowlingCtx={bowlingCtx} />
 
       {/* Marginal links above the matrix.
@@ -382,7 +459,7 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
                   from the StatCard's matchesEnvelope). */}
       <div className="wisden-splits-marginal-row">
         {(['won', 'tied', 'lost'] as Outcome[]).map(rv => {
-          const m = data.marginals.result[rv]
+          const m = marginalsForDisplay.result[rv]
           const tint = WISDEN_WL_TINTS[rv]
           const isActive = r === rv
           return (
@@ -426,162 +503,246 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
         </button>
       </div>
 
-      {/* Confusion-matrix style table. */}
-      <div className="wisden-splits-table" style={{ gridTemplateColumns: gridCols }}>
-        {/* Empty corner — All-toss / Both-innings moved to the marginal row above. */}
+      {/* Mosaic — outer 2×2 grid (corner + col-headers row + row-
+          headers col + cell area). Headers sit in fixed strips,
+          aligned along the outer grid. Inside the cell area, 4
+          cells are absolutely positioned, anchored at geometric
+          center (50%, 50%), and sized by their joint count via
+          percentage. Cell area aspect-ratio is media-queried (wide
+          on desktop, tall on mobile) so cells get more horizontal
+          space on landscape viewports. */}
+      <div className="wisden-splits-table">
+        {/* Empty corner */}
         <div className="wisden-splits-corner-empty" />
 
-        {/* COLUMN HEADERS — Won toss / Lost toss */}
-        {tossValues.map(tv => {
-          const m = data.marginals.toss_outcome[tv]
-          return (
-            <button
-              key={tv}
-              type="button"
-              onClick={() => setOne('toss_outcome', tv)}
-              className="wisden-splits-marginal wisden-splits-col-header"
-              title={`Filter to ${TOSS_LABEL[tv]}`}
-            >
-              <strong>{TOSS_LABEL[tv]}</strong>
-              <span style={{ color: WISDEN.faint, marginLeft: '0.4em', fontWeight: 400 }}>
-                · {m?.n ?? 0}{m?.share != null && ` (${(m.share * 100).toFixed(0)}%)`}
-              </span>
-              {hasSubject && (
-                <MetricDelta env={mkEnv(m?.share, m?.league_share, m?.delta_pct, null)} />
-              )}
-            </button>
-          )
-        })}
-
-        {/* ROWS — each row contributes [row-header, cell, cell, ...] grid items. */}
-        {inningValues.flatMap(iv => {
-          const userIv = teamInningToUserInning(iv, bowlingCtx)
-          const userIvStr = String(userIv) as '0' | '1'
-          const m = data.marginals.inning[String(iv) as '0' | '1']
-          const primaryLabel = inningLabels[userIvStr]
-          const otherLabels = bowlingCtx ? INNING_LABEL_BAT : INNING_LABEL_BOWL
-          const secondaryLabel = otherLabels[String(1 - userIv) as '0' | '1']
-          return [
-            <button
-              key={`row-${iv}`}
-              type="button"
-              onClick={() => setOne('inning', userIvStr)}
-              className="wisden-splits-marginal wisden-splits-row-header"
-              title={`Filter to ${primaryLabel} (${secondaryLabel})`}
-            >
-              <div className="wisden-splits-row-primary">{primaryLabel}</div>
-              <div className="wisden-splits-row-secondary">({secondaryLabel})</div>
-              <div className="wisden-splits-row-stats">
-                {m?.n ?? 0}
-                {m?.share != null && ` (${(m.share * 100).toFixed(0)}%)`}
+        {/* Column-headers row — Won toss / Lost toss, even split */}
+        <div className="wisden-splits-col-headers">
+          {tossValues.map(tv => {
+            const m = marginalsForDisplay.toss_outcome[tv]
+            return (
+              <button
+                key={tv}
+                type="button"
+                onClick={() => setOne('toss_outcome', tv)}
+                className="wisden-splits-marginal wisden-splits-col-header"
+                title={`Filter to ${TOSS_LABEL[tv]}`}
+              >
+                <strong>{TOSS_LABEL[tv]}</strong>
+                <span style={{ color: WISDEN.faint, marginLeft: '0.4em', fontWeight: 400 }}>
+                  · {m?.n ?? 0}{m?.share != null && ` (${(m.share * 100).toFixed(0)}%)`}
+                </span>
                 {hasSubject && (
-                  <MetricDelta env={mkEnv(m?.share, m?.league_share, m?.delta_pct, null)} />
+                  <MetricDelta env={mkEnv(m?.share, m?.league_share, m?.delta_pct, 'higher_better')} />
                 )}
-              </div>
-            </button>,
-            ...tossValues.map(tv => {
-              const summedN = resultValues.reduce(
-                (s, rv) => s + (cellMap.get(`${tv}|${iv}|${rv}`)?.n ?? 0), 0,
-              )
-              const colTotal = tossN(tv)
-              const cellShare = colTotal ? summedN / colTotal : null
-              const cellOpacity = opacityForN(summedN)
-              // Dominant outcome of the cell — for tinting the cell label.
-              const dominantOutcome: Outcome | null = (() => {
-                if (r !== null) return r as Outcome  // result is filtered → that's the only outcome
-                let max = -1
-                let dom: Outcome | null = null
-                for (const rv of resultValues) {
-                  const cn = cellMap.get(`${tv}|${iv}|${rv}`)?.n ?? 0
-                  if (cn > max) { max = cn; dom = rv }
-                }
-                return dom
-              })()
-              // dominantOutcome is now only used to pick MetricDelta's
-              // direction (won-dominant cell ⇒ higher_better, etc.) —
-              // the cell-label color chip was removed when labels moved
-              // INSIDE the bars in white-on-color.
-              const cellDelta = (() => {
-                if (!hasSubject || resultValues.length !== 1) return null
-                const cell = cellMap.get(`${tv}|${iv}|${resultValues[0]}`)
-                return cell?.delta_pct ?? null
-              })()
-              return (
-                <div
-                  key={`cell-${iv}-${tv}`}
-                  className="wisden-splits-cell"
-                  style={{ opacity: cellOpacity }}
-                >
-                  <div
-                    className="wisden-splits-cell-fills"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      setUrlParams({
-                        toss_outcome: tv,
-                        inning: String(teamInningToUserInning(iv, bowlingCtx)),
-                        result: filters.result || '',
-                      })
-                    }}
-                    title={`Filter to ${TOSS_LABEL[tv]} · ${inningLabels[String(teamInningToUserInning(iv, bowlingCtx)) as '0' | '1']}`}
-                  >
-                    {resultValues.map(rv => {
-                      const cell = cellMap.get(`${tv}|${iv}|${rv}`)
-                      const cellN = cell?.n ?? 0
-                      const sliceShare = summedN ? cellN / summedN : 0
-                      // Always use the outcome's WL color — when result is
-                      // filtered, the cell becomes a single-color bar in that
-                      // outcome's color (not neutral gray). User feedback
-                      // 2026-05-11: "When I click on Won the colors go away.
-                      // It should be one bar with color."
-                      const fill = OUTCOME_COLOR[rv]
-                      const pct = (sliceShare * 100).toFixed(0)
-                      // Per-sub-rect label INSIDE the bar in white text.
-                      // Wins/losses: number + percentage. Ties: number
-                      // only (the yellow segment is usually narrow; OK
-                      // to bleed out for readability). User 2026-05-11.
-                      const labelText = cellN === 0
-                        ? ''
-                        : rv === 'tied'
-                          ? `${cellN}`
-                          : `${cellN} (${pct}%)`
-                      return (
-                        <div
-                          key={rv}
-                          className={`wisden-splits-subrect wisden-splits-subrect-${rv}`}
-                          style={{ flexBasis: `${sliceShare * 100}%`, background: fill }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setUrlParams({
-                              toss_outcome: tv,
-                              inning: String(teamInningToUserInning(iv, bowlingCtx)),
-                              result: rv,
-                            })
-                          }}
-                          title={cell ? cellTooltip(cell, total, hasSubject, bowlingCtx) : `${RESULT_LEGEND[rv]} — 0 matches`}
-                        >
-                          {labelText && (
-                            <span className="wisden-splits-subrect-label">
-                              {labelText}
-                            </span>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                  {hasSubject && cellDelta != null && (
-                    <div className="wisden-splits-cell-delta">
-                      <MetricDelta
-                        env={mkEnv(cellShare, null, cellDelta,
-                          dominantOutcome ? dirForOutcome(dominantOutcome) : null)}
-                      />
-                    </div>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Row-headers column — Batted first / Batted second */}
+        <div className="wisden-splits-row-headers">
+          {inningValues.map(iv => {
+            const userIv = teamInningToUserInning(iv, bowlingCtx)
+            const userIvStr = String(userIv) as '0' | '1'
+            const m = marginalsForDisplay.inning[String(iv) as '0' | '1']
+            const primaryLabel = inningLabels[userIvStr]
+            const otherLabels = bowlingCtx ? INNING_LABEL_BAT : INNING_LABEL_BOWL
+            const secondaryLabel = otherLabels[String(1 - userIv) as '0' | '1']
+            return (
+              <button
+                key={`row-${iv}`}
+                type="button"
+                onClick={() => setOne('inning', userIvStr)}
+                className="wisden-splits-marginal wisden-splits-row-header"
+                title={`Filter to ${primaryLabel} (${secondaryLabel})`}
+              >
+                <div className="wisden-splits-row-primary">{primaryLabel}</div>
+                <div className="wisden-splits-row-secondary">({secondaryLabel})</div>
+                <div className="wisden-splits-row-stats">
+                  {m?.n ?? 0}
+                  {m?.share != null && ` (${(m.share * 100).toFixed(0)}%)`}
+                  {hasSubject && (
+                    <MetricDelta env={mkEnv(m?.share, m?.league_share, m?.delta_pct, 'higher_better')} />
                   )}
                 </div>
-              )
-            }),
-          ]
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Cell area — CSS Grid of 4 quadrants. Each quadrant has
+            a fixed aspect-ratio (media-queried). The cell inside
+            each quadrant is anchored to the corner adjacent to the
+            center cross and sized by sqrt(count/unitHalf). When a
+            row or column is filtered out, those quadrants aren't
+            rendered and CSS Grid naturally collapses those tracks
+            — remaining cells stay the same physical size. */}
+        <div className="wisden-splits-cell-area">
+        {([
+          ['won',  0],
+          ['lost', 0],
+          ['won',  1],
+          ['lost', 1],
+        ] as Array<['won' | 'lost', 0 | 1]>).map(([tv, iv]) => {
+          if (!showCell(tv, iv)) return null
+          const s = sideFrac(tv, iv)
+          if (s <= 0) return null
+          const sPct = s * 100
+          const isLeft = tv === 'won'
+          const isTop = iv === 0
+          // Cell position within its quadrant: anchored to the
+          // quadrant corner that touches the center cross.
+          const cellLeft = isLeft ? `${(1 - s) * 100}%` : '0%'
+          const cellTop  = isTop  ? `${(1 - s) * 100}%` : '0%'
+          const summedN = cellJointN(tv, iv)
+          const cellOpacity = opacityForN(summedN)
+          const dominantOutcome: Outcome | null = (() => {
+            if (r !== null) return r as Outcome
+            let max = -1
+            let dom: Outcome | null = null
+            for (const rv of resultValues) {
+              const cn = cellMap.get(`${tv}|${iv}|${rv}`)?.n ?? 0
+              if (cn > max) { max = cn; dom = rv }
+            }
+            return dom
+          })()
+          const cellDelta = (() => {
+            if (!hasSubject || resultValues.length !== 1) return null
+            const cell = cellMap.get(`${tv}|${iv}|${resultValues[0]}`)
+            return cell?.delta_pct ?? null
+          })()
+          const cellShare = baseTotal ? summedN / baseTotal : null
+
+          // Quadrant-summed counts for the per-cell summary label.
+          const leagueSummedShare = resultValues.reduce(
+            (sum, rv) => sum + (cellMap.get(`${tv}|${iv}|${rv}`)?.league_share ?? 0),
+            0,
+          )
+          const teamJointShare = cellShare
+          const quadrantDelta = (hasSubject && teamJointShare != null && leagueSummedShare > 0)
+            ? ((teamJointShare - leagueSummedShare) / leagueSummedShare) * 100
+            : null
+          const quadrantEnv: MetricEnvelope | null = (hasSubject && quadrantDelta != null)
+            ? {
+                value: summedN,
+                scope_avg: Math.round(leagueSummedShare * baseTotal),
+                delta_pct: quadrantDelta,
+                direction: 'higher_better',
+                sample_size: summedN,
+              }
+            : null
+
+          // Summary label position within the quadrant. Top
+          // quadrants: just ABOVE the cell. Bottom quadrants: just
+          // BELOW the cell. Spans the cell's horizontal extent.
+          const summaryStyle: React.CSSProperties = {
+            position: 'absolute',
+            left: cellLeft,
+            width: `${sPct}%`,
+            height: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.3rem',
+            fontSize: '0.78rem',
+            color: WISDEN.faint,
+            fontFamily: 'var(--sans)',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+          }
+          if (isTop) {
+            summaryStyle.bottom = `${sPct}%`  // just above cell
+          } else {
+            summaryStyle.top = `${sPct}%`      // just below cell
+          }
+
+          return (
+            <div
+              key={`quadrant-${iv}-${tv}`}
+              className="wisden-splits-quadrant"
+              style={{
+                gridColumn: isLeft ? 1 : 2,
+                gridRow: isTop ? 1 : 2,
+              }}
+            >
+              <div style={summaryStyle}>
+                <span className="num" style={{ color: WISDEN.ink, fontWeight: 600 }}>
+                  {summedN}
+                </span>
+                {quadrantEnv && <MetricDelta env={quadrantEnv} />}
+              </div>
+              <div
+                className="wisden-splits-cell"
+                style={{
+                  position: 'absolute',
+                  left: cellLeft,
+                  top: cellTop,
+                  width: `${sPct}%`,
+                  height: `${sPct}%`,
+                  opacity: cellOpacity,
+                }}
+              >
+              <div
+                className="wisden-splits-cell-fills"
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setUrlParams({
+                    toss_outcome: tv,
+                    inning: String(teamInningToUserInning(iv, bowlingCtx)),
+                    result: filters.result || '',
+                  })
+                }}
+                title={`Filter to ${TOSS_LABEL[tv]} · ${inningLabels[String(teamInningToUserInning(iv, bowlingCtx)) as '0' | '1']}`}
+              >
+                {resultValues.map(rv => {
+                  const cell = cellMap.get(`${tv}|${iv}|${rv}`)
+                  const cellN = cell?.n ?? 0
+                  const sliceShare = summedN ? cellN / summedN : 0
+                  const fill = OUTCOME_COLOR[rv]
+                  const pct = (sliceShare * 100).toFixed(0)
+                  const labelText = cellN === 0
+                    ? ''
+                    : rv === 'tied'
+                      ? `${cellN}`
+                      : `${cellN} (${pct}%)`
+                  return (
+                    <div
+                      key={rv}
+                      className={`wisden-splits-subrect wisden-splits-subrect-${rv}`}
+                      style={{ flexBasis: `${sliceShare * 100}%`, background: fill }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setUrlParams({
+                          toss_outcome: tv,
+                          inning: String(teamInningToUserInning(iv, bowlingCtx)),
+                          result: rv,
+                        })
+                      }}
+                      title={cell ? cellTooltip(cell, total, hasSubject, bowlingCtx) : `${RESULT_LEGEND[rv]} — 0 matches`}
+                    >
+                      {labelText && (
+                        <span className="wisden-splits-subrect-label">
+                          {labelText}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              {hasSubject && cellDelta != null && (
+                <div className="wisden-splits-cell-delta">
+                  <MetricDelta
+                    env={mkEnv(cellShare, null, cellDelta,
+                      dominantOutcome ? dirForOutcome(dominantOutcome) : null)}
+                  />
+                </div>
+              )}
+            </div>
+            </div>
+          )
         })}
+        </div>
       </div>
 
       {thinSample && (
@@ -671,27 +832,52 @@ function OneDimBar({
   const total = entries.reduce((s, e) => s + (e.m?.n ?? 0), 0) || 1
   return (
     <div className="wisden-splits-1d">
-      {entries.map(e => {
-        const n = e.m?.n ?? 0
-        const w = n / total
-        return (
-          <button
-            key={e.key}
-            type="button"
-            onClick={() => setOne(freeAxis, e.key)}
-            className="wisden-splits-1d-segment"
-            style={{ flexBasis: `${w * 100}%`, background: e.color }}
-            title={`Filter to ${e.label}`}
-          >
-            <span className="wisden-splits-1d-label">
-              {e.label} {n} ({(w * 100).toFixed(0)}%)
+      {/* Labels row above the bar — mirrors the 4-rect outcome
+          marginal row (color swatch + label + count + delta).
+          Labels DON'T have to align with the bar segments; small
+          segments (like a 5% Tied) used to get their label clipped
+          inside the bar, which read as broken. Putting labels in a
+          flex row above the bar fixes the readability. */}
+      <div className="wisden-splits-1d-labels">
+        {entries.map(e => {
+          const n = e.m?.n ?? 0
+          const w = n / total
+          return (
+            <button
+              key={`label-${e.key}`}
+              type="button"
+              onClick={() => setOne(freeAxis, e.key)}
+              className="wisden-splits-outcome-link"
+              title={`Filter to ${e.label}`}
+            >
+              <span className="wisden-splits-outcome-swatch" style={{ background: e.color }} aria-hidden="true" />
+              <strong>{e.label}</strong>{' '}
+              {n}
+              {` (${(w * 100).toFixed(0)}%)`}
               {hasSubject && (
                 <MetricDelta env={mkEnv(e.m?.share, e.m?.league_share, e.m?.delta_pct, e.direction)} />
               )}
-            </span>
-          </button>
-        )
-      })}
+            </button>
+          )
+        })}
+      </div>
+      <div className="wisden-splits-1d-bar">
+        {entries.map(e => {
+          const n = e.m?.n ?? 0
+          const w = n / total
+          return (
+            <button
+              key={`seg-${e.key}`}
+              type="button"
+              onClick={() => setOne(freeAxis, e.key)}
+              className="wisden-splits-1d-segment"
+              style={{ flexBasis: `${w * 100}%`, background: e.color }}
+              title={`Filter to ${e.label} — ${n} (${(w * 100).toFixed(0)}%)`}
+              aria-label={`${e.label} — ${n} matches`}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 }
