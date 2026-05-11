@@ -30,6 +30,10 @@ export function useFilters(): FilterParams {
     // FilterParams → query string.
     const inning = params.get('inning')
     if (inning) out.inning = inning
+    const result = params.get('result')
+    if (result) out.result = result
+    const toss_outcome = params.get('toss_outcome')
+    if (toss_outcome) out.toss_outcome = toss_outcome
     return out as FilterParams
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qs])

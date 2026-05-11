@@ -53,6 +53,18 @@ export interface FilterParams {
    *  of api/filters.py::AuxParams.inning. Spec:
    *  internal_docs/spec-inning-split.md. */
   inning?: string
+  /** Match-outcome filter from path team's POV — 'won' / 'lost' /
+   *  'tied' (last collapses true ties + no-results). AuxParam, set
+   *  by the Splits Mosaic's marginals + cells + sub-rect clicks
+   *  (`?result=won`). Only meaningful when subject team is bound.
+   *  Mirror of api/filters.py::AuxParams.result. Spec:
+   *  internal_docs/spec-splits-mosaic.md §1.1. */
+  result?: string
+  /** Toss-outcome filter from path team's POV — 'won' / 'lost'.
+   *  AuxParam, set by the Splits Mosaic. Mirror of
+   *  api/filters.py::AuxParams.toss_outcome. Spec:
+   *  internal_docs/spec-splits-mosaic.md §1.1. */
+  toss_outcome?: string
 }
 
 export interface Tournament {

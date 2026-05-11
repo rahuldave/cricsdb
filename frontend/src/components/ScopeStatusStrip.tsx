@@ -126,9 +126,26 @@ function buildSegments(
   // a FilterBar key, but surfaces here so the user sees that the page
   // is partitioned. Spec: spec-inning-split.md §6.6.
   if (filters.inning === '0') {
-    segs.push({ label: 'Innings', value: '1st innings' })
+    segs.push({ label: 'Innings', value: 'batted first' })
   } else if (filters.inning === '1') {
-    segs.push({ label: 'Innings', value: '2nd innings' })
+    segs.push({ label: 'Innings', value: 'batted second' })
+  }
+
+  // Splits Mosaic aux — toss_outcome + result narrowings from the
+  // path team's POV. Same AuxParam treatment as inning. Spec:
+  // internal_docs/spec-splits-mosaic.md §2.1.
+  if (filters.toss_outcome === 'won') {
+    segs.push({ label: 'Toss', value: 'won toss' })
+  } else if (filters.toss_outcome === 'lost') {
+    segs.push({ label: 'Toss', value: 'lost toss' })
+  }
+
+  if (filters.result === 'won') {
+    segs.push({ label: 'Result', value: 'won the game' })
+  } else if (filters.result === 'lost') {
+    segs.push({ label: 'Result', value: 'lost the game' })
+  } else if (filters.result === 'tied') {
+    segs.push({ label: 'Result', value: 'tied' })
   }
 
   // Active tab + pagination — URL-driven, so both deep-link into the

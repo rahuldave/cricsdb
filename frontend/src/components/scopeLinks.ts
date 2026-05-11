@@ -216,8 +216,18 @@ export function abbreviateScope(scope: Partial<FilterParams>): string {
   // genuine scope narrowing the user sees, so it belongs in the
   // abbreviation alongside the FilterBar axes. Mirrors the
   // ScopeStatusStrip rendering convention.
-  if (scope.inning === '0') parts.push('1st innings')
-  else if (scope.inning === '1') parts.push('2nd innings')
+  if (scope.inning === '0') parts.push('batted first')
+  else if (scope.inning === '1') parts.push('batted second')
+
+  // Splits Mosaic aux — match-outcome (result) and toss-outcome
+  // narrowings from the path team's POV. Same AuxParam treatment
+  // as inning. Spec: internal_docs/spec-splits-mosaic.md §2.1.
+  if (scope.toss_outcome === 'won') parts.push('won toss')
+  else if (scope.toss_outcome === 'lost') parts.push('lost toss')
+
+  if (scope.result === 'won') parts.push('won the game')
+  else if (scope.result === 'lost') parts.push('lost the game')
+  else if (scope.result === 'tied') parts.push('tied')
 
   return parts.join(' · ')
 }
