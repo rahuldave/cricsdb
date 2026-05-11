@@ -46,7 +46,7 @@ in dedicated docs — go there before making assumptions.
 **Active work**
 - Next-session agenda + NO-DEPLOYS gate: `internal_docs/next-session-ideas.md`
 - A–Q lettered roadmap, dated session logs, deferred queue: `internal_docs/enhancements-roadmap.md`
-- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md` (§8 backend + §9 frontend IMPLEMENTED 2026-05-05; v2 extension 2026-05-06 added 6mo+1y form windows, conditional milestones, "Scope" rename, sparkline 20-run reference line; rest of doc framing remains DRAFT)
+- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md` (§8 backend + §9 frontend IMPLEMENTED 2026-05-05; v2 extension 2026-05-06 added 6mo+1y form windows, conditional milestones, "Scope" rename, sparkline 20-run reference line; rest of doc framing remains DRAFT), `internal_docs/spec-splits-mosaic.md` (Teams-only joint toss × inning × result distribution + dimensionality-adaptive widget — IMPLEMENTED 2026-05-11; player + H2H + compare-slot are deferred follow-ups per §5)
 - Club-tier classification (read before classifying a new club league): `internal_docs/club-tier-classification.md`. Anchor numbers: `internal_docs/club-tier-anchor-numbers.md`.
 
 ## Running Locally
@@ -492,6 +492,89 @@ the user-clearing path on every filter that participates also
 cascade-clears the inferred narrowings — otherwise the auto-
 correct loop fights the user. Test coverage:
 `tests/integration/filterbar_cascade_clear.sh`.
+
+## Traffic-light WISDEN_WL palette is reserved for Splits Mosaic
+
+The Splits Mosaic introduces a third palette block in
+`frontend/src/components/charts/palette.ts`:
+
+```ts
+export const WISDEN_WL = {
+  won:   '#4B7A3B',  // muted green
+  tied:  '#C9A636',  // muted amber
+  lost:  '#B85450',  // brick red
+}
+```
+
+**Reserved for outcome encoding in the Splits Mosaic ONLY.**
+Other places in the codebase use:
+- `WISDEN_RUN_TIERS` / `WISDEN_WICKET_TIERS` / `WISDEN_SR_TIERS` /
+  `WISDEN_LOWER_TIERS` — indigo/sage/ochre 3-tier palette for
+  metric magnitude (low/typical/high).
+- `WISDEN.oxblood` — 1.2px stroke for the rolling-mean overlay.
+- `WISDEN.forest` — 1.5px stroke for the league-avg reference
+  line on team distribution sparklines.
+
+The W/L palette is intentionally chosen to AVOID those:
+- Green here (`#4B7A3B`) is brighter than the forest reference
+  line (`#3F7A4D`) so it reads as a fill at cell scale.
+- Red here (`#B85450`) is distinct from oxblood (`#7A1F1F`) so
+  a W/L cell and a rolling-mean overlay never visually collide.
+
+**Tells you might be about to break this:**
+- You're adding red as a fill anywhere else — STOP. Reds are
+  reserved for oxblood (overlay strokes) and the WISDEN_WL.lost
+  fill (mosaic only).
+- You're adding a new mosaic conditioning axis encoded by color
+  instead of spatially — STOP. Color is OUTCOME's permanent
+  slot; new axes must be spatial. The Splits Mosaic's fixed axis
+  ordering (toss → inning → result) encodes this guarantee.
+- You're tinting metric tiers with green/red — STOP. Tier
+  coloring stays indigo/sage/ochre. The codebase deliberately
+  has TWO color vocabularies (magnitude vs outcome); blurring
+  them breaks the reader's eye.
+
+Spec: `internal_docs/spec-splits-mosaic.md` §2.2, §3.5.
+
+## Splits Mosaic — dimensionality is URL-derived; aux outcome filters need ?team=
+
+The Splits Mosaic is a filter widget that LOOKS like a stat
+chart. Three aux URL params drive its visual density:
+
+| URL params set | Layout |
+|---|---|
+| 0 | 2×2 (toss × inning) cells with W/T/L sub-rects per cell |
+| 1 | 2×2 of the two free axes |
+| 2 | 1D horizontal stacked bar of the one free axis |
+| 3 | verbose colloquial status strip only — "Won toss · Batted first · Won the game — 3 matches" |
+
+No internal state for expanded/collapsed. The URL IS the state.
+A share-link to a 0-free case reproduces the verbose strip;
+a share-link to a 3-free landing reproduces the full mosaic.
+
+**`result` and `toss_outcome` aux filters require a subject
+team.** Without `?team=`, the league-side query unpivots every
+match into 2 team-views — and "won" within that unpivot is
+tautologically 50% (every win has a loss). The `/teams/splits`
+endpoint returns HTTP 400 when either aux is set without
+`?team=`, making the asymmetry observable instead of silently
+degenerate. `aux.inning` works fine without `?team=` (each
+team-view independently batted first or second).
+
+Tells you might be about to break this:
+- You're tempted to add `result` / `toss_outcome` to FILTER_KEYS
+  so they appear in the FilterBar UI. → DON'T. They're
+  AuxParams (per `feedback_no_filterbar_explosion` discipline)
+  and they don't have meaning on Series / Venues / Search
+  pages where there's no canonical team subject.
+- You're tempted to compute "share" using the unfiltered total
+  even after an aux narrowing is applied. → DON'T. Shares + the
+  scope_total_n header should reflect the FILTERED slice so
+  proportions sum to 1.0 within the narrowing. (Bug landed +
+  fixed in commit 5f91ce2 — captured here so the next iteration
+  doesn't re-introduce it.)
+
+Spec: `internal_docs/spec-splits-mosaic.md` §1.4, §3.
 
 ## Sparkline / per-item chart bar count must match SQL
 

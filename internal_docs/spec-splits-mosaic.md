@@ -1,6 +1,6 @@
 # Spec — Splits Mosaic (toss × inning × outcome conditioning, Teams)
 
-**Status:** DRAFT — 2026-05-11.
+**Status:** IMPLEMENTED — 2026-05-11. Backend §1-§1.5 + frontend §2-§3 + tests §6 + docs §8 all shipped. Player + compare-slot + H2H deferred per §5 follow-up specs.
 
 **Scope of THIS spec:** Teams tab only (landing + team-detail). Player
 splits and H2H splits are explicitly out of scope; future specs build

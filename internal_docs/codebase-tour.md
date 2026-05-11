@@ -239,6 +239,17 @@ frontend/src/
                                     pages above the headline stats (commit 4); team
                                     Batting/Bowling/Fielding tabs in commit 5. AuxParams aux
                                     field — NOT a FilterBar key. Spec: spec-inning-split.md §6.1.
+  components/SplitsMosaic.tsx  — Joint (toss × inning × result) distribution widget mounted
+                                    at the top of /teams (landing + team-detail). URL-state-as-
+                                    shape: the chart's dimensionality is derived from how many
+                                    of {?toss_outcome, ?inning, ?result} are set — no internal
+                                    expanded/collapsed state. Marginal labels, outer cells, and
+                                    outcome sub-rects all write URL params on click. Outcome
+                                    encoded with WISDEN_WL traffic-light palette (won=#4B7A3B,
+                                    tied=#C9A636, lost=#B85450) reserved for this widget. Team-
+                                    detail mode renders per-cell deltas vs the league baseline
+                                    at the same filter scope (envelope from the dual-query
+                                    /splits backend). Spec: spec-splits-mosaic.md.
   components/                  — Layout (now hosts a Players ▾ group with desktop hover-dropdown
                                    + persistent mobile sub-row while any /players, /batting,
                                    /bowling, /fielding route is active; mounts FilterBar +
