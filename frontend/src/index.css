@@ -34,6 +34,17 @@ html, body {
   font-family: var(--sans);
   font-feature-settings: "ss01", "cv11";
 }
+/* Scroll headroom — when an interactive widget below the fold
+   shrinks (e.g. the SplitsMosaic when a filter narrows it), the
+   document would normally get shorter and the browser would auto-
+   scroll up to fit the viewport, which the user reads as a jarring
+   jump. Padding-bottom of 50vh guarantees the document is always
+   tall enough that any reasonable scroll position remains valid
+   after a shrink, so no auto-scroll happens and the clicked
+   element stays put in the viewport. */
+body {
+  padding-bottom: 50vh;
+}
 
 /* Tabular numerals on anything that wants to align numerically.
    Add the .num class, or rely on auto-tabular for table cells. */
