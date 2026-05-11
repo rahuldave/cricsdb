@@ -711,5 +711,16 @@ These are tracked as separate, tighter specs once Teams ships:
    slot mini-mosaic in compare-slot cards.
 3. **`spec-splits-mosaic-h2h.md`** — H2H POV (team1 vs team2);
    default subject = team1 with per-cell-flip toggle.
+4. **Venues-grain Mosaic** + **Series-grain Mosaic** — same
+   visual component on Venues and Series pages, where the page
+   subject IS the venue / series and the baseline is the
+   broader scope (all venues / all series at FilterBar grain).
+   This is where the "is Wankhede better for chasing" question
+   naturally lives — Venues page is the cleanest home. See
+   `internal_docs/splits-mosaic-cross-page.md` for the cross-page
+   design discussion (subject / baseline matrix per page; where
+   to put the "broader-scope baseline" delta option for the
+   Teams-landing-with-narrowing-filter case; component reuse
+   plan).
 
 Each builds on Teams stage; this spec is the foundation.

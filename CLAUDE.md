@@ -46,7 +46,7 @@ in dedicated docs — go there before making assumptions.
 **Active work**
 - Next-session agenda + NO-DEPLOYS gate: `internal_docs/next-session-ideas.md`
 - A–Q lettered roadmap, dated session logs, deferred queue: `internal_docs/enhancements-roadmap.md`
-- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md` (§8 backend + §9 frontend IMPLEMENTED 2026-05-05; v2 extension 2026-05-06 added 6mo+1y form windows, conditional milestones, "Scope" rename, sparkline 20-run reference line; rest of doc framing remains DRAFT), `internal_docs/spec-splits-mosaic.md` (Teams-only joint toss × inning × result distribution + dimensionality-adaptive widget — IMPLEMENTED 2026-05-11; player + H2H + compare-slot are deferred follow-ups per §5)
+- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md` (§8 backend + §9 frontend IMPLEMENTED 2026-05-05; v2 extension 2026-05-06 added 6mo+1y form windows, conditional milestones, "Scope" rename, sparkline 20-run reference line; rest of doc framing remains DRAFT), `internal_docs/spec-splits-mosaic.md` (Teams-only joint toss × inning × result distribution + dimensionality-adaptive widget — IMPLEMENTED 2026-05-11; player + H2H + compare-slot are deferred follow-ups per §5), `internal_docs/splits-mosaic-cross-page.md` (DESIGN — cross-page reuse: Venues / Series / Players Mosaic; broader-scope baseline question for subject-less landing views; the "is Wankhede better for chasing" use case naturally belongs on Venues page)
 - Club-tier classification (read before classifying a new club league): `internal_docs/club-tier-classification.md`. Anchor numbers: `internal_docs/club-tier-anchor-numbers.md`.
 
 ## Running Locally
@@ -69,6 +69,26 @@ single-season), hover interactive elements (tooltips, heatmap cells),
 and click every link to confirm it navigates. `tsc --noEmit` and
 `npm run build` only verify code correctness, not feature correctness.
 Do not claim UI work is complete without a browser-agent run.
+
+**Filter-combination testing is part of UI verification.** When a
+change touches anything that depends on FilterBar / AuxParam state
+(deltas, league-avg chips, marginals, baselines), you MUST exercise
+the following combinations and confirm comparisons / chips / labels
+all still render consistently:
+
+- No team selected (landing view) + a narrowing filter
+  (`filter_venue=...`, opponent, single season).
+- Team selected + same narrowing filters (venue, opponent, season).
+- Team selected + aux filter (`toss_outcome`, `inning`, `result`)
+  AND a narrowing filter together (e.g. `team=MI&filter_venue=Wankhede&toss_outcome=won`).
+- Bowling tab + inning filter (the inning POV flip).
+- Multiple filters chained (`&season_from=2018&season_to=2020&filter_venue=...`).
+
+The app's premise is consistent comparisons across all filter
+combinations. A delta that works at `team=X` but disappears at
+`team=X&filter_venue=Y` is a bug. User feedback 2026-05-11: "things
+need to be consistent on filtration" — flagged after Wankhede +
+toss filter lost its league-baseline chips.
 
 **Mobile viewport check is part of UI verification, not optional.**
 For any new component / layout / panel / stat-row, check at a phone
