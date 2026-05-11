@@ -277,6 +277,28 @@ async def assert_aux_filter(c, scope_label, scope, team, aux_kwargs, failures):
     aux = make_aux(**aux_kwargs)
     resp = await team_splits(team=team, filters=f, aux=aux)
 
+    # scope_total_n must reflect the FILTERED slice — sum(cells.n)
+    # post-filter. The bug pinned here was scope_total_n returning
+    # the UNFILTERED total when aux was set, breaking the
+    # "Of N toss wins:" denominator in the UI. Locking it:
+    cell_sum = sum(cell["n"] for cell in resp["cells"])
+    if cell_sum != resp["scope_total_n"]:
+        failures.append(Failure(
+            f"{scope_label}/{team}/aux={aux_kwargs}",
+            f"scope_total_n {resp['scope_total_n']} ≠ sum(cells.n) {cell_sum} — "
+            f"denominator must reflect the filtered slice",
+        ))
+
+    # Shares must sum to 1.0 within the filtered slice (modulo float
+    # rounding — Wilson rounds to 4dp, so the sum is exact at the
+    # precision we serialize).
+    share_sum = sum((cell["share"] or 0) for cell in resp["cells"])
+    if resp["scope_total_n"] > 0 and abs(share_sum - 1.0) > 0.001:
+        failures.append(Failure(
+            f"{scope_label}/{team}/aux={aux_kwargs}",
+            f"shares sum to {share_sum:.4f}, not 1.0 — denominator drift",
+        ))
+
     # Every returned cell matches the aux filter.
     for cell in resp["cells"]:
         if "result" in aux_kwargs and cell["result"] != aux_kwargs["result"]:
