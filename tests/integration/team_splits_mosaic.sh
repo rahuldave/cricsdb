@@ -283,25 +283,15 @@ assert_contains "Fielding tab also flips to 'Bowled first'" "Bowled first" "$row
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
-echo "Test 11c · Stale-data-on-error: click-to-400 must clear the mosaic"
+echo "Test 11c · Landing + toss_outcome=won returns league-conditional data"
 
-# Bug pattern: load a valid landing URL → mosaic renders (success).
-# Click a marginal that flips URL into a 400-gated state
-# (toss_outcome / result without ?team=). API returns 400.
-# useFetch (pre-fix) keeps the previous successful `data` populated
-# so the mosaic re-renders against STALE numbers from the prior fetch.
-# Visible bug: strip says "Of 2432 toss wins:" — 2432 came from the
-# UNFILTERED scope's scope_total_n; the toss filter never landed.
+# Subject-POV gate was lifted 2026-05-11. Clicking "Won toss" at
+# landing (no ?team=) now narrows the league mosaic to the toss-
+# winners-only slice — exactly the league conditional baseline users
+# read for "P(win | won toss)" at league level.
 #
-# Post-fix: useFetch clears `data` on error → mosaic falls through
-# to the "No matches in scope for splits." empty state.
-#
-# This is the only ACTIVE site where stale-data-on-error is
-# reachable via routine interaction (per the audit). Other 4xx
-# paths in the backend (/matches/scorecard, /venues/{x},
-# /head_to_head batter_id) all require invalid path params which
-# the UI never produces via clicks — so this one click-to-400
-# transition covers the bug for the whole codebase.
+# Pre-lift the click triggered a 400 and the mosaic emptied; this
+# test guards against the gate being re-introduced.
 
 ab open "$BASE/teams?$SCOPE_URL"
 settle 4
@@ -309,20 +299,68 @@ settle 4
 has_table_before=$(ab_eval "!!document.querySelector('.wisden-splits-table')")
 assert_eq "Mosaic present on valid landing (pre-click)" "true" "$has_table_before"
 
-# Click the "Won toss" column header — flips URL into 400-gated shape.
+# Click the "Won toss" column header.
 ab_eval "Array.from(document.querySelectorAll('.wisden-splits-col-header')).find(el => el.innerText.startsWith('Won toss'))?.click()" >/dev/null
 settle 3
 
 url_after=$(agent-browser get url 2>/dev/null)
 assert_contains "URL gained toss_outcome=won after click" "toss_outcome=won" "$url_after"
 
-# The 400-rejection must clear the previous render — NO stale table.
+# Post-click the mosaic stays present (no 400, real data).
 has_table_after=$(ab_eval "!!document.querySelector('.wisden-splits-table')")
-assert_eq "Mosaic cleared after click-into-400 (no stale data)" "false" "$has_table_after"
+assert_eq "Mosaic stays present after toss_outcome click (gate lifted)" "true" "$has_table_after"
 
-# Mosaic should fall through to the empty/error state.
-has_empty=$(ab_eval "!!Array.from(document.querySelectorAll('.wisden-splits-mosaic')).find(el => el.innerText.includes('No matches in scope'))")
-assert_eq "Mosaic shows empty-state message" "true" "$has_empty"
+# Strip reads the FILTERED total — count of team-views that won the
+# toss in this scope (one per match in the unpivot).
+sql_won_toss=$(sql "
+SELECT COUNT(*) FROM match m
+WHERE m.toss_winner IS NOT NULL
+  AND m.gender = 'male'
+  AND m.team_type = 'club'
+  AND m.event_name = 'Indian Premier League'
+  AND m.season >= '2024'
+  AND m.season <= '2024'
+")
+strip_text=$(ab_eval "document.querySelector('$MOSAIC_SEL .wisden-splits-strip')?.innerText || ''")
+assert_contains "Strip reads filtered won-toss total" "Of $sql_won_toss toss wins" "$strip_text"
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
+echo "Test 11d · useFetch contract: data cleared on error (not stale)"
+
+# Regression guard for the useFetch primitive's contract: when a
+# refetch errors, the previous successful response must NOT stay
+# mounted (the bug that surfaced via the now-lifted /splits 400 gate).
+# Triggered here via the /venues/{x}/summary 404 path — the one
+# remaining backend 4xx still reachable from a URL (path param).
+#
+# Pattern:
+#   1. Load /venues?venue=Eden Gardens → dossier loads (200, data).
+#   2. Change URL to /venues?venue=NotARealVenue → 404.
+#   3. Assert the dossier rendered in step 1 is NOT still on screen
+#      (stale-data would have it sticking around).
+
+ab open "$BASE/venues?venue=Eden+Gardens"
+settle 5
+
+# Sanity: dossier loaded with valid venue (some kind of header text
+# anchored to "Eden Gardens" should be present).
+dossier_loaded=$(ab_eval "document.body.innerText.includes('Eden Gardens')")
+assert_eq "Eden Gardens dossier loaded (pre-error)" "true" "$dossier_loaded"
+
+# Navigate to a bad venue → backend 404.
+ab open "$BASE/venues?venue=NotARealVenue"
+settle 5
+
+# Stale-data check: the previous "Eden Gardens" content should NOT
+# linger in the DOM. (The URL bar's venue= query param is allowed to
+# contain "Eden", so check inside main page content only — exclude
+# inputs and search placeholders.)
+stale_eden=$(ab_eval "
+  Array.from(document.querySelectorAll('main, [class*=\"dossier\"], h1, h2'))
+    .some(el => el.innerText.includes('Eden Gardens'))
+")
+assert_eq "No stale Eden Gardens dossier after navigating to bad venue" "false" "$stale_eden"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""

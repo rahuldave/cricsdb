@@ -447,18 +447,15 @@ async def team_splits(
 
     Spec: internal_docs/spec-splits-mosaic.md §1.3.
     """
-    # ── Subject-POV gate ─────────────────────────────────────────────
-    if not team:
-        if aux.result is not None:
-            raise HTTPException(
-                status_code=400,
-                detail="?result= requires ?team= (subject POV needed).",
-            )
-        if aux.toss_outcome is not None:
-            raise HTTPException(
-                status_code=400,
-                detail="?toss_outcome= requires ?team= (subject POV needed).",
-            )
+    # Previously this endpoint 400'd ?result= / ?toss_outcome= without
+    # ?team= on the "tautological 50% by construction" argument. That
+    # missed the useful angle: while the MARGINAL of the filtered axis
+    # is forced (one team-view per match on the toss-winner side, =
+    # half the unpivot), the INNER joint distribution
+    # (inning × outcome | toss=won) is the league-level conditional
+    # baseline — exactly what users read off as the comparison anchor
+    # for team-detail conditional win rates. Gate lifted 2026-05-11.
+    # Spec §1.4 amended.
 
     # ── Build base WHERE (filter scope, no team binding) ─────────────
     # We null out filters.team / filters.opponent so the same WHERE

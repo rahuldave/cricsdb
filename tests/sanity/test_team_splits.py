@@ -11,8 +11,10 @@ For closed-window scopes × subjects, asserts:
      delta_pct is the relative % thereof
   6. Cell-level aux filter (`?result=` / `?toss_outcome=` / `?inning=`)
      correctly post-filters the returned cells (count matches SQL)
-  7. Subject-POV gate: `?result=` / `?toss_outcome=` without `?team=`
-     raises HTTPException with status 400
+  7. Landing-with-aux: `?result=` / `?toss_outcome=` without `?team=`
+     returns data (the league-level conditional slice — inner joint
+     distribution within the filtered axis). Earlier 400 gate lifted
+     2026-05-11; sanity asserts the response shape + filter fidelity.
   8. DLS inclusion: super-over matches and DLS-truncated chases all
      appear in the joint distribution (no special filtering)
 
@@ -318,22 +320,40 @@ async def assert_aux_filter(c, scope_label, scope, team, aux_kwargs, failures):
             ))
 
 
-async def assert_subject_pov_gate(scope, failures):
-    """`?result=` or `?toss_outcome=` without `?team=` must 400."""
+async def assert_landing_aux_returns_data(scope, failures):
+    """`?result=` and `?toss_outcome=` without `?team=` MUST return
+    data (the league-level conditional slice). Earlier design 400'd
+    this combination on a "tautological 50%" argument; the gate was
+    lifted 2026-05-11 because the inner joint distribution within
+    the filtered slice IS the league conditional baseline users
+    compare team-detail conditional win rates against. Spec §1.4."""
     f = make_filters(**scope)
     for aux_kwargs in [{"result": "won"}, {"toss_outcome": "won"}]:
         aux = make_aux(**aux_kwargs)
         try:
-            await team_splits(team=None, filters=f, aux=aux)
-            failures.append(Failure(
-                "subject_pov_gate",
-                f"aux={aux_kwargs} without team should 400, but did not",
-            ))
+            resp = await team_splits(team=None, filters=f, aux=aux)
         except HTTPException as e:
-            if e.status_code != 400:
+            failures.append(Failure(
+                "landing_aux_returns_data",
+                f"aux={aux_kwargs} unexpectedly raised {e.status_code}",
+            ))
+            continue
+        if resp["scope_total_n"] <= 0:
+            failures.append(Failure(
+                "landing_aux_returns_data",
+                f"aux={aux_kwargs} returned empty (expected non-trivial slice)",
+            ))
+        # Cells must all match the aux filter.
+        for c in resp["cells"]:
+            if "toss_outcome" in aux_kwargs and c["toss_outcome"] != aux_kwargs["toss_outcome"]:
                 failures.append(Failure(
-                    "subject_pov_gate",
-                    f"aux={aux_kwargs} raised {e.status_code}, expected 400",
+                    "landing_aux_returns_data",
+                    f"aux={aux_kwargs} returned a cell with mismatched toss",
+                ))
+            if "result" in aux_kwargs and c["result"] != aux_kwargs["result"]:
+                failures.append(Failure(
+                    "landing_aux_returns_data",
+                    f"aux={aux_kwargs} returned a cell with mismatched result",
                 ))
 
 
@@ -383,9 +403,9 @@ async def main():
         print(f"  {scope_label} / {team}: 6 aux variants checked")
 
     print()
-    print("─── Subject-POV gate (400 expected) ───")
-    await assert_subject_pov_gate(IPL_2024, failures)
-    print("  IPL 2024: gate checked")
+    print("─── Landing + aux (returns data; gate lifted 2026-05-11) ───")
+    await assert_landing_aux_returns_data(IPL_2024, failures)
+    print("  IPL 2024: landing aux checked")
 
     print()
     if failures:
