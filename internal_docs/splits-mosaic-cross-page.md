@@ -186,15 +186,123 @@ A secondary answer is **Teams landing with filter_venue applied**
 The Teams page implementation is unchanged; user goes to Venues
 for that question.
 
-## 4. Next steps (not committed)
+## 4. Inventory — every page that currently has `InningToggle`
+       is a candidate Mosaic mount site
 
-1. Write `spec-splits-mosaic-venues.md` — Venues-grain Mosaic.
-2. Write `spec-splits-mosaic-series.md` — Series-grain Mosaic.
-3. Refactor `SplitsMosaic.tsx` to be data-shape-driven (small —
+The Mosaic widget IS, at heart, an inning-axis filter with
+toss-outcome and result added. So everywhere we currently show
+the `InningToggle` (1st innings / 2nd innings / All innings) is
+a natural place to consider the Mosaic.
+
+Current `InningToggle` mount sites (per `grep -rn`):
+
+| Page | File | Subject | Current InningToggle context |
+|---|---|---|---|
+| Teams | `pages/Teams.tsx` | team | landing leaderboards + team-detail tabs (Mosaic SHIPPED) |
+| Batting | `pages/Batting.tsx` | batter | landing leaderboards + player Batting tab |
+| Bowling | `pages/Bowling.tsx` | bowler | landing leaderboards + player Bowling tab |
+| Fielding | `pages/Fielding.tsx` | fielder | landing leaderboards + player Fielding tab |
+| Players | `pages/Players.tsx` | player | player dossier (composite Batting/Bowling/Fielding) |
+| Venues | `components/venues/VenueDossier.tsx` | venue | venue dossier |
+| Tournaments | `components/tournaments/TournamentDossier.tsx` | series | series/tournament dossier |
+
+Each could carry a Mosaic. The visual widget is largely subject-
+agnostic — what differs per page is **what "won/lost" means**
+and **what the baseline scope is**.
+
+## 5. Win/Loss semantics per page — DESIGN CARE NEEDED
+
+User direction 2026-05-11: "win and loss means … for a player it
+may range over teams in which case we want one more filter in a
+player-specific aux. but criteria such as this are different for
+different tabs."
+
+The Mosaic's `result` axis means "did the SUBJECT win" — but
+the subject is defined differently per page:
+
+### Teams (shipped)
+- Subject = a specific team.
+- Win = the team won the match.
+- Direct: `matchplayer.team = ? AND match.winner = team`.
+- Already unambiguous.
+
+### Venues (Venues page)
+- Subject = the venue.
+- "Won/Lost" doesn't apply to a venue — a venue doesn't have a
+  team identity. Result axis loses meaning.
+- Likely replacement: **bat-first-won vs bat-second-won** (i.e.,
+  "did the chasing team win"). This is a venue-meaningful
+  outcome. Or just keep toss × inning and drop result.
+- Worth a design call before implementing.
+
+### Series / Tournaments (Tournaments dossier)
+- Subject = a tournament + season.
+- Same problem as Venues — no subject team. Same likely fix:
+  bat-first-won vs bat-second-won as the result axis.
+
+### Players (Players dossier; Batting/Bowling/Fielding tabs)
+- Subject = a player.
+- A player has played for **multiple teams** over their career.
+- "Won" depends on which team they were on for that match.
+- The `matchplayer` table records team-of-player-per-match — so
+  "did this player win this match" is computable as
+  `matchplayer.team = match.winner`.
+- BUT — the user may want to ask "did the player win when
+  playing for team X" — requires an **aux filter for player's
+  team**. New aux: `player_team` (= one of the teams the
+  player has played for). This is a player-specific aux that
+  doesn't apply on Teams / Venues / Series pages.
+
+  Implementation sketch:
+  - On player pages, an aux dropdown `player_team` populated
+    from the player's distinct teams in scope.
+  - When set, mosaic cells join on
+    `matchplayer.team = ?player_team`.
+  - When unset, mosaic includes all the player's matches
+    regardless of team.
+- This aux is also useful OUTSIDE the Mosaic: players have
+  different stat profiles per team (e.g. AB de Villiers RCB vs
+  South Africa). Generalizable.
+
+### Bowling / Batting / Fielding landing pages (no player picked)
+- Subject = null (leaderboard view).
+- Win/Lost doesn't apply per-row (each row is a different
+  player's aggregate). Mosaic might not belong here, OR shows
+  league-level toss×inning×outcome.
+- Likely **don't ship Mosaic on these landing views**; let it
+  go on the player dossier instead.
+
+## 6. Required scoping calls per page (open questions)
+
+| Page | Subject | Win means | Baseline | New auxes needed |
+|---|---|---|---|---|
+| Teams | team | team won | league at scope | none (shipped) |
+| Venues | venue | n/a → use bat-first/bat-second-won? | all venues at scope | maybe drop result axis |
+| Series | series | n/a → similar to venues | all series at scope | maybe drop result axis |
+| Players (dossier) | player | player's team won | per-team-of-player / overall T20 | `player_team` aux |
+| Player disciplines (per-tab) | player | same as above | per-tab baselines | `player_team` aux |
+| Compare slots | per-slot | per-slot subject | side-by-side | TBD |
+| H2H | team-pair | team1 perspective | all of team1's matches | `flip_subject` toggle |
+
+## 7. Next steps (not committed)
+
+1. **Decide result-axis semantics for Venues / Series.** Drop it
+   (toss × inning only) vs. redefine as bat-first-won / -lost?
+2. **Spec the `player_team` aux** — populate, propagate,
+   validate. Maybe a separate spec.
+3. Write `spec-splits-mosaic-venues.md`, `spec-splits-mosaic-
+   series.md`, `spec-splits-mosaic-players.md` once results are
+   resolved.
+4. Refactor `SplitsMosaic.tsx` to be data-shape-driven (small —
    the props interface already takes generic-ish shapes).
-4. Add the broader-scope baseline (option 2a) to Teams landing
-   as an interim until Venues / Series pages exist.
+5. Audit the conditional-baselines on the existing Teams Mosaic
+   (open from 2026-05-11): make sure deltas use the right
+   conditional baseline (e.g. won-toss-bat-first cell delta is
+   vs `league(won-toss-bat-first)`, not vs `league(all)`).
 
-User direction 2026-05-11: "make a mention of it there [Series],
-and maybe we'll support it here as an all teams thing. I want
-users to be able to get at such information from anywhere."
+User direction 2026-05-11: "make a mention of it [Series], and
+maybe we'll support it here as an all teams thing. I want users
+to be able to get at such information from anywhere. Doing it
+in the general control means multiple pages can benefit. We
+already have some thoughts about the player tab." — and "be
+careful what win and loss means."
