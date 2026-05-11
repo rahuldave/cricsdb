@@ -111,6 +111,65 @@ def _inning_match_filter(
     )
 
 
+def _result_match_filter(
+    team_value: str | None,
+    aux: AuxParams | None,
+) -> tuple[str, dict]:
+    """Match-level WHERE fragment for aux.result. Empty when aux.result
+    is unset or no team is bound (the filter is path-team-relative and
+    has no meaning without a subject).
+
+    Semantics:
+      'won'  → m.outcome_winner = :team
+      'lost' → m.outcome_winner IS NOT NULL AND m.outcome_winner != :team
+      'tied' → m.outcome_winner IS NULL (collapses tied + no-result; T20
+               ties are decided by super-over so a NULL outcome_winner
+               is almost exclusively rain-abandoned)
+
+    Spec: internal_docs/spec-splits-mosaic.md §1.1.
+    """
+    if aux is None or aux.result is None or not team_value:
+        return "", {}
+    params = {"rmf_team": team_value}
+    if aux.result == "won":
+        return "m.outcome_winner = :rmf_team", params
+    if aux.result == "lost":
+        return (
+            "(m.outcome_winner IS NOT NULL AND m.outcome_winner != :rmf_team)",
+            params,
+        )
+    if aux.result == "tied":
+        return "m.outcome_winner IS NULL", {}
+    return "", {}
+
+
+def _toss_outcome_match_filter(
+    team_value: str | None,
+    aux: AuxParams | None,
+) -> tuple[str, dict]:
+    """Match-level WHERE fragment for aux.toss_outcome. Empty when unset
+    or no team is bound. Requires m.toss_winner IS NOT NULL so matches
+    with un-recorded toss (rare) are excluded from both 'won' and 'lost'
+    slices.
+
+    Spec: internal_docs/spec-splits-mosaic.md §1.1.
+    """
+    if aux is None or aux.toss_outcome is None or not team_value:
+        return "", {}
+    params = {"tmf_team": team_value}
+    if aux.toss_outcome == "won":
+        return (
+            "(m.toss_winner IS NOT NULL AND m.toss_winner = :tmf_team)",
+            params,
+        )
+    if aux.toss_outcome == "lost":
+        return (
+            "(m.toss_winner IS NOT NULL AND m.toss_winner != :tmf_team)",
+            params,
+        )
+    return "", {}
+
+
 def _team_filter_clause(
     filters: FilterParams,
     team_param: str = ":team",
@@ -130,10 +189,19 @@ def _team_filter_clause(
     parts = [f"(m.team1 = {team_param} OR m.team2 = {team_param})"]
     if where:
         parts.append(where)
-    inn_clause, inn_params = _inning_match_filter(team_value or filters.team, aux)
+    tv = team_value or filters.team
+    inn_clause, inn_params = _inning_match_filter(tv, aux)
     if inn_clause:
         parts.append(inn_clause)
         params.update(inn_params)
+    res_clause, res_params = _result_match_filter(tv, aux)
+    if res_clause:
+        parts.append(res_clause)
+        params.update(res_params)
+    toss_clause, toss_params = _toss_outcome_match_filter(tv, aux)
+    if toss_clause:
+        parts.append(toss_clause)
+        params.update(toss_params)
     return " AND ".join(parts), params
 
 
@@ -1408,6 +1476,20 @@ def _team_innings_clause(
             parts.extend(["i.team != :team", "(m.team1 = :team OR m.team2 = :team)"])
     if where:
         parts.append(where)
+    # Match-level aux filters (result / toss_outcome) need a path team
+    # to evaluate. They only apply on team-detail (team is not None);
+    # on the scope-averages path (team is None) they're silently
+    # ignored — the league baseline can't meaningfully filter on
+    # outcome-vs-self when there's no self.
+    if team is not None:
+        res_clause, res_params = _result_match_filter(team, aux)
+        if res_clause:
+            parts.append(res_clause)
+            params.update(res_params)
+        toss_clause, toss_params = _toss_outcome_match_filter(team, aux)
+        if toss_clause:
+            parts.append(toss_clause)
+            params.update(toss_params)
     # Auto-scope: only meaningful for the scope-averages path (team is None).
     if team is None:
         st_clause, st_params = _scope_to_team_clause(aux, filters)

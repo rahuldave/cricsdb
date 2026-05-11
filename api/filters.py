@@ -9,10 +9,13 @@ Two-class model:
   through scope-link URLs.
 
 - `AuxParams` — internal-plumbing narrowings that don't originate from
-  the FilterBar. Currently `scope_to_team` (Compare-tab avg-slot
-  auto-narrow) and `chip_team_class` (chip-baseline alignment hint).
-  Future page-local filters (result_filter, close_match, super_over,
-  toss_decision) land here without bleeding into the UI contract.
+  the FilterBar. Includes `scope_to_team` (Compare-tab avg-slot
+  auto-narrow), `chip_team_class` (chip-baseline alignment hint),
+  `inning` (1st/2nd innings page-local toggle), `result` (game-outcome
+  match filter from the path team's POV), and `toss_outcome` (toss-
+  outcome match filter from the path team's POV). Future page-local
+  filters (close_match, super_over, toss_decision) land here without
+  bleeding into the UI contract.
 
 Endpoints that care only about FilterBar use `FilterBarParams = Depends()`.
 Endpoints that also want aux take both dependencies and pass aux to
@@ -147,6 +150,34 @@ class AuxParams:
                 " internal_docs/spec-inning-split.md §3.1a."
             ),
         ),
+        result: Optional[str] = Query(
+            None,
+            description=(
+                "Match-outcome filter from the path team's POV: 'won'"
+                " | 'lost' | 'tied'. 'won' selects matches where the"
+                " path team is outcome_winner; 'lost' selects matches"
+                " where another team won; 'tied' collapses tied and"
+                " no-result (outcome_winner IS NULL — T20 ties go to"
+                " super-over and that winner becomes outcome_winner, so"
+                " NULL is almost exclusively rain-shortened). Only"
+                " meaningful when a path :team is bound — non-team"
+                " endpoints silently ignore. Honoured in teams router"
+                " via `_result_match_filter` (match level) and folded"
+                " into both `_team_filter_clause` and"
+                " `_team_innings_clause`. Spec:"
+                " internal_docs/spec-splits-mosaic.md §1.1."
+            ),
+        ),
+        toss_outcome: Optional[str] = Query(
+            None,
+            description=(
+                "Toss-outcome filter from the path team's POV: 'won'"
+                " | 'lost'. Restricts to matches where the team did"
+                " (or did not) win the toss. Only meaningful when a"
+                " path :team is bound. Spec:"
+                " internal_docs/spec-splits-mosaic.md §1.1."
+            ),
+        ),
     ):
         # When AuxParams is instantiated outside FastAPI's dependency
         # injection (e.g. by sanity tests), the Query() defaults aren't
@@ -160,6 +191,8 @@ class AuxParams:
         self.chip_team_class = _norm(chip_team_class)
         self.chip_baseline_scope_json = _norm(chip_baseline_scope_json)
         self.inning = _norm(inning)
+        self.result = _norm(result)
+        self.toss_outcome = _norm(toss_outcome)
 
 
 class FilterBarParams:

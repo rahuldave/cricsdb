@@ -51,6 +51,12 @@ def is_precomputed_scope(filters: FilterParams, aux: Optional[AuxParams]) -> boo
     # Spec: internal_docs/spec-inning-split.md §5.4.
     if aux is not None and aux.inning is not None:
         return False
+    # Result / toss_outcome aux filters are match-level slices that the
+    # pre-aggregated bucket tables don't carry. Force the live path so
+    # the filter actually fires. Spec:
+    # internal_docs/spec-splits-mosaic.md §1.2.
+    if aux is not None and (aux.result is not None or aux.toss_outcome is not None):
+        return False
     return True
 
 
