@@ -54,6 +54,18 @@ export const WISDEN_WL = {
   lost:  '#B85450',
 } as const
 
+/** Tint pairs (bg + fg) matching the WISDEN_WL traffic-light palette,
+ *  for percentage chips / colored text labels in the Splits Mosaic.
+ *  Same pattern as `WISDEN_TIER_TINTS` but for outcome encoding. */
+export const WISDEN_WL_TINTS: Record<
+  'won' | 'tied' | 'lost',
+  { bg: string; fg: string }
+> = {
+  won:  { bg: 'rgba(75, 122, 59, 0.16)',  fg: '#2C4A22' },
+  tied: { bg: 'rgba(201, 166, 54, 0.18)', fg: '#6B5410' },
+  lost: { bg: 'rgba(184, 84, 80, 0.16)',  fg: '#6E2520' },
+}
+
 /**
  * Three-tier coloring SHARED across distribution histograms,
  * sparklines, AND probability chips. Spec:

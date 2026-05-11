@@ -257,9 +257,26 @@ export default function Teams() {
   // fetch on landing (selected=null → ?team= absent → league side) and
   // team-detail (?team= set → dual envelope with deltas). Spec:
   // internal_docs/spec-splits-mosaic.md §2.9.
+  //
+  // Inning POV translation: the URL's `?inning=` follows the active
+  // tab's convention (bowling-POV on Bowling/Fielding tabs per
+  // spec-inning-split.md §3.4). The /splits API always interprets
+  // `?inning=` in batting POV (team_inning in the CASE WHEN). On
+  // bowling tabs, flip the value before sending so the API returns
+  // the cells the user expects (clicking "1st innings" on Bowling
+  // tab → user wants bowled-first matches → API needs inning=1 to
+  // return team_inning=1 = bowled-first cells).
+  const splitsFilters = (() => {
+    const out = { ...filters }
+    const SPLITS_BOWLING_TABS = new Set(['Bowling', 'Fielding'])
+    if (SPLITS_BOWLING_TABS.has(activeTab) && (out.inning === '0' || out.inning === '1')) {
+      out.inning = out.inning === '0' ? '1' : '0'
+    }
+    return out
+  })()
   const splitsFetch = useFetch<import('../types').TeamSplits | null>(
-    () => getTeamSplits({ ...filters, team: selected || undefined }),
-    filterDeps,
+    () => getTeamSplits({ ...splitsFilters, team: selected || undefined }),
+    [...filterDeps, activeTab],
   )
 
   // Plumb the team's last appearance into DormancyContext so the
@@ -329,7 +346,14 @@ export default function Teams() {
 
       {!selected && (
         <>
-          <SplitsMosaic data={splitsFetch.data} loading={splitsFetch.loading} filters={filters} />
+          <SplitsMosaic
+            data={splitsFetch.data}
+            loading={splitsFetch.loading}
+            filters={filters}
+            activeTab={activeTab}
+            matchesEnvelope={summary?.matches ?? null}
+            uniqueTeamsInScope={summary?.unique_teams_in_scope ?? null}
+          />
           <TeamsLandingBoard filters={filters} filterDeps={filterDeps} onPick={selectTeam} />
         </>
       )}
@@ -419,7 +443,14 @@ export default function Teams() {
           {/* Splits Mosaic — between StatCards and tabs per spec §2.9.
               Team-detail mode (team set) carries per-cell deltas vs the
               league baseline. */}
-          <SplitsMosaic data={splitsFetch.data} loading={splitsFetch.loading} filters={filters} />
+          <SplitsMosaic
+            data={splitsFetch.data}
+            loading={splitsFetch.loading}
+            filters={filters}
+            activeTab={activeTab}
+            matchesEnvelope={summary?.matches ?? null}
+            uniqueTeamsInScope={summary?.unique_teams_in_scope ?? null}
+          />
 
           <div className="wisden-tabs">
             {tabs.map(tab => (

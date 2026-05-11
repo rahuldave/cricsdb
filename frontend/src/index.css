@@ -2162,34 +2162,219 @@ a { color: inherit; }
   border-color: var(--ink);
   color: var(--ink);
 }
-.wisden-splits-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
+/* Confusion-matrix layout: CSS grid with explicit corner cell.
+   gridTemplateColumns is set inline (9rem corner + proportional toss
+   columns from the marginal data). */
+.wisden-splits-table {
+  display: grid;
+  gap: 0.25rem;
   margin-top: 0.4rem;
 }
-.wisden-splits-col-headers {
+.wisden-splits-corner {
   display: flex;
-  margin-left: 7rem;
-  gap: 0.2rem;
+  flex-direction: column;
+  justify-content: center;
+  padding-right: 0.6rem;
+  text-align: right;
+  border-right: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+  gap: 0.1rem;
 }
-.wisden-splits-row {
-  display: flex;
-  align-items: stretch;
-  gap: 0.2rem;
-  min-height: 4rem;
+.wisden-splits-corner-link {
+  background: none;
+  border: none;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  font-style: italic;
+  font-weight: 500;
+  text-align: right;
+  padding: 0;
+  cursor: default;
+  display: inline-block;
+  align-self: flex-end;
 }
-.wisden-splits-cells-row {
+.wisden-splits-corner-link[disabled] { cursor: default; }
+.wisden-splits-corner-link.is-clickable {
+  cursor: pointer;
+  color: var(--ink);
+  font-style: normal;
+  border-bottom: 1px solid transparent;
+}
+.wisden-splits-corner-link.is-clickable:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.wisden-splits-corner-total {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  margin-top: 0.15rem;
+}
+.wisden-splits-col-header {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 0.3rem 0.4rem;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: color 120ms;
+}
+.wisden-splits-col-header:hover { color: var(--accent); }
+.wisden-splits-row-header {
+  background: none;
+  border: none;
+  border-right: 1px solid var(--rule-soft);
+  padding: 0.3rem 0.6rem 0.3rem 0.4rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: right;
   display: flex;
-  flex: 1 1 auto;
-  gap: 0.2rem;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1rem;
+}
+.wisden-splits-row-header:hover .wisden-splits-row-primary {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+/* Marginal-link row above the matrix — outcome links (color-coded
+   text) + All-toss / Both-innings clear-filter chips. All links use
+   the wisden-seg underline-on-hover pattern; outcome links carry
+   their WL tint color baseline, switching to oxblood (accent) on
+   hover/active. */
+.wisden-splits-marginal-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+  flex-wrap: wrap;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+}
+.wisden-splits-marginal-sep {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+.wisden-splits-clear-chip {
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  padding: 0.1rem 0;
+  font: inherit;
+  color: var(--ink-faint);
+  font-style: italic;
+  cursor: default;
+  transition: color 120ms, border-color 120ms;
+}
+.wisden-splits-clear-chip[disabled] { cursor: default; }
+.wisden-splits-clear-chip.is-clickable {
+  cursor: pointer;
+  color: var(--ink);
+  font-style: normal;
+}
+.wisden-splits-clear-chip.is-clickable:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+/* Clear-link (replaces clear-chip) — always link-styled, always
+   clickable. Sits in the secondary marginal row beneath the W/T/L
+   line, with the team's matches delta vs per-team league average. */
+.wisden-splits-clear-link {
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  padding: 0.1rem 0;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+}
+.wisden-splits-clear-link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.wisden-splits-marginal-row-secondary {
+  margin-top: -0.2rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.wisden-splits-outcome-link {
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  padding: 0.1rem 0;
+  font: inherit;
+  /* Color is set inline per outcome (WISDEN_WL_TINTS.fg). */
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  transition: color 120ms, border-color 120ms;
+}
+.wisden-splits-outcome-link:hover {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent);
+}
+.wisden-splits-outcome-link.is-active {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent);
+}
+.wisden-splits-outcome-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+.wisden-splits-corner-empty {
+  /* Just occupy grid cell — no content. */
 }
 .wisden-splits-row-label {
-  flex: 0 0 7rem;
+  flex: 0 0 9rem;
   text-align: right;
-  padding-right: 0.5rem;
+  padding-right: 0.6rem;
   border-right: 1px solid var(--rule-soft);
   align-self: stretch;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1rem;
+}
+.wisden-splits-row-primary {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--ink);
+  /* Underline cue that the label is a clickable filter, matching the
+     wisden-seg pattern used by InningToggle. Active state is N/A here
+     because clicking removes the dimension from the chart. */
+  border-bottom: 1px solid transparent;
+  display: inline-block;
+  align-self: flex-end;
+  transition: border-color 120ms, color 120ms;
+}
+.wisden-splits-row-label:hover .wisden-splits-row-primary {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.wisden-splits-row-secondary {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+.wisden-splits-row-stats {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  font-weight: 400;
+  margin-top: 0.15rem;
 }
 .wisden-splits-marginal {
   background: none;
@@ -2202,40 +2387,120 @@ a { color: inherit; }
   cursor: pointer;
   text-align: left;
   border-radius: 3px;
+  /* Marginals + legend swatches are all filter-links — borrow the
+     wisden-seg underline-on-hover pattern from InningToggle so the
+     viewer immediately reads them as clickable filters, not just
+     decorative text. */
 }
-.wisden-splits-marginal:hover {
-  background: rgba(0, 0, 0, 0.04);
+.wisden-splits-col-headers .wisden-splits-marginal,
+.wisden-splits-legend-item {
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  padding-bottom: 0.1rem;
+  transition: color 120ms, border-color 120ms;
+}
+.wisden-splits-col-headers .wisden-splits-marginal:hover,
+.wisden-splits-legend-item:hover {
+  background: none;
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+/* All-toss / All-innings: gutter labels sized to match the row-label
+   width so they sit in the corner. Inert (faint) by default — the
+   axis isn't filtered. When the axis IS filtered, clickable to clear
+   (is-clickable). */
+.wisden-splits-all-link {
+  flex: 0 0 9rem;
+  text-align: right;
+  padding-right: 0.6rem;
+  border-right: 1px solid var(--rule-soft);
+  color: var(--ink-faint);
+  font-style: italic;
+  font-weight: 500;
+  cursor: default;
+}
+.wisden-splits-all-link[disabled] {
+  background: none;
+  cursor: default;
+}
+.wisden-splits-all-link.is-clickable {
+  cursor: pointer;
+  color: var(--ink);
+  font-style: normal;
+}
+.wisden-splits-all-link.is-clickable:hover {
+  background: none;
+  color: var(--accent);
+}
+.wisden-splits-all-row {
+  min-height: 0 !important;
+  align-items: center !important;
+}
+.wisden-splits-all-row-spacer {
+  flex: 1 1 auto;
+  border-bottom: 1px dashed var(--rule-soft);
+  height: 1px;
+  align-self: center;
 }
 .wisden-splits-cell {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--rule-soft);
   border-radius: 3px;
-  overflow: hidden;
-  min-height: 3.5rem;
+  overflow: visible;  /* allow tied labels to bleed out a bit */
+  min-height: 2.2rem;
   background: rgba(0, 0, 0, 0.02);
 }
 .wisden-splits-cell-fills {
   display: flex;
   flex: 1 1 auto;
-  min-height: 1.4rem;
+  min-height: 2.2rem;
   cursor: pointer;
+  border-radius: 2px;
+  overflow: visible;
+  position: relative;
 }
 .wisden-splits-subrect {
   cursor: pointer;
   transition: filter 100ms;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: visible;
 }
 .wisden-splits-subrect:hover {
   filter: brightness(1.08);
 }
-.wisden-splits-cell-label {
-  padding: 0.3rem 0.5rem;
-  font-size: 0.95rem;
-  background: rgba(255, 255, 255, 0.55);
-  border-top: 1px solid var(--rule-soft);
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
+.wisden-splits-subrect-label {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #FFFFFF;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  pointer-events: none;
+  padding: 0 0.3em;
+}
+.wisden-splits-subrect-tied .wisden-splits-subrect-label {
+  /* Yellow segment is usually narrow; allow the count to overflow
+     horizontally so the small number stays readable. Higher z-index
+     so the overflow isn't masked by the neighbor's background. */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  /* Darker text on the amber background reads better than white. */
+  color: #2A2010;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.45);
+}
+.wisden-splits-cell-delta {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.78rem;
+  text-align: right;
+  background: rgba(255, 255, 255, 0.45);
 }
 .wisden-splits-legend {
   display: flex;

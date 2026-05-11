@@ -20,17 +20,27 @@ export default function MetricDelta({
   /** Decimal places when rendering scope_avg in the subtitle. */
   fmt?: number
 }) {
-  if (!env || env.delta_pct == null || env.direction == null) return null
+  if (!env || env.delta_pct == null) return null
   const d = env.delta_pct
-  const aligned =
+  const aligned = env.direction != null && (
     (env.direction === 'higher_better' && d > 0) ||
     (env.direction === 'lower_better' && d < 0)
-  const color = d === 0
-    ? 'rgb(120,120,120)'
-    : aligned ? 'rgb(36,128,68)' : 'rgb(170,52,52)'
+  )
+  // Non-directional metric (toss/inning marginals on the Splits Mosaic,
+  // where "60% won toss vs league 50%" isn't good or bad — just
+  // informational): render the delta in neutral gray. Per
+  // CLAUDE.md / spec-splits-mosaic.md "percentages and deltas are
+  // different — show percentages always; deltas use this component
+  // with direction-aware coloring where applicable, neutral otherwise."
+  const color =
+    env.direction == null || d === 0
+      ? 'rgb(120,120,120)'
+      : aligned ? 'rgb(36,128,68)' : 'rgb(170,52,52)'
   const arrow = d > 0 ? '↑' : d < 0 ? '↓' : '·'
   const sign = d > 0 ? '+' : ''
-  const tip = `${env.value} vs scope avg ${env.scope_avg} — ${sign}${d.toFixed(1)}% ${aligned ? '(better)' : '(worse)'}`
+  const tip = env.direction == null
+    ? `${env.value} vs scope avg ${env.scope_avg} — ${sign}${d.toFixed(1)}%`
+    : `${env.value} vs scope avg ${env.scope_avg} — ${sign}${d.toFixed(1)}% ${aligned ? '(better)' : '(worse)'}`
   const scopeAvgText = env.scope_avg != null
     ? typeof env.scope_avg === 'number'
       ? env.scope_avg.toFixed(fmt)

@@ -236,6 +236,53 @@ assert_eq "URL has no aux params after reset" "0" "$url_clean"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 11b · Bowling tab inning=0 flips to 'bowled first' POV"
+
+# On Bowling tab with ?inning=0, the URL means "team bowled in match
+# innings 0 = bowled first" — opposite of Batting tab's interpretation.
+# Mosaic must flip its label AND its data to match.
+ab open "$BASE/teams?team=$TEAM_URL&$SCOPE_URL&tab=Bowling&inning=0"
+settle 4
+
+# Row label says "Bowled first" (not "Batted first")
+row_text=$(ab_eval "document.querySelector('$MOSAIC_SEL .wisden-splits-row-primary')?.innerText || ''")
+assert_contains "Bowling tab row label shows 'Bowled first'" "Bowled first" "$row_text"
+
+# Secondary label shows the batting-POV equivalent
+secondary_text=$(ab_eval "document.querySelector('$MOSAIC_SEL .wisden-splits-row-secondary')?.innerText || ''")
+assert_contains "secondary shows '(Batted second)'" "Batted second" "$secondary_text"
+
+# Strip says "bowling first" — the data reflects team-bowled-first matches.
+# RCB bowled first in IPL 2024 = RCB batted second in IPL 2024 = 8 matches.
+sql_bowl_first=$(sql "
+SELECT COUNT(*) FROM match m
+WHERE $RCB_WHERE
+  AND NOT ((m.toss_decision = 'bat' AND m.toss_winner = '$TEAM')
+        OR (m.toss_decision = 'field' AND m.toss_winner != '$TEAM'))
+")
+strip_text=$(ab_eval "document.querySelector('$MOSAIC_SEL .wisden-splits-strip')?.innerText || ''")
+assert_contains "Bowling-tab strip shows 'Of <N> matches bowling first'" "Of $sql_bowl_first matches bowling first" "$strip_text"
+
+# Compare to Batting tab where same URL inning=0 means batted first
+ab open "$BASE/teams?team=$TEAM_URL&$SCOPE_URL&tab=Batting&inning=0"
+settle 4
+sql_bat_first=$(sql "
+SELECT COUNT(*) FROM match m
+WHERE $RCB_WHERE
+  AND ((m.toss_decision = 'bat' AND m.toss_winner = '$TEAM')
+       OR (m.toss_decision = 'field' AND m.toss_winner != '$TEAM'))
+")
+strip_text_bat=$(ab_eval "document.querySelector('$MOSAIC_SEL .wisden-splits-strip')?.innerText || ''")
+assert_contains "Batting-tab strip shows 'Of <N> matches batting first'" "Of $sql_bat_first matches batting first" "$strip_text_bat"
+
+# Fielding tab acts like Bowling
+ab open "$BASE/teams?team=$TEAM_URL&$SCOPE_URL&tab=Fielding&inning=0"
+settle 4
+row_text_field=$(ab_eval "document.querySelector('$MOSAIC_SEL .wisden-splits-row-primary')?.innerText || ''")
+assert_contains "Fielding tab also flips to 'Bowled first'" "Bowled first" "$row_text_field"
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "Test 11 · Mobile viewport (390x844) renders without overflow"
 
 agent-browser set viewport 390 844 >/dev/null 2>&1

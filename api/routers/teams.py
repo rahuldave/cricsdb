@@ -736,6 +736,17 @@ async def team_summary(
     ]
     if k_filt:
         k_parts.append(k_filt)
+    # filters.build emits the inning clause but not result/toss_outcome
+    # (those need :team binding). Add them explicitly per the same
+    # pattern as _team_filter_clause. Spec: spec-splits-mosaic.md §1.2.
+    res_clause, res_params = _result_match_filter(team, aux)
+    if res_clause:
+        k_parts.append(res_clause)
+        k_params.update(res_params)
+    toss_clause, toss_params = _toss_outcome_match_filter(team, aux)
+    if toss_clause:
+        k_parts.append(toss_clause)
+        k_params.update(toss_params)
     k_clause = " AND ".join(k_parts)
 
     keepers_rows = await db.q(
@@ -891,16 +902,18 @@ async def team_vs_opponent(
     aux: AuxParams = Depends(),
 ):
     db = get_db()
-    base_where, params = filters.build(has_innings_join=False, aux=aux)
-    params["team"] = team
+    # Use _team_filter_clause so aux narrowings (inning / result /
+    # toss_outcome) flow through — previous direct `filters.build`
+    # call skipped the result + toss_outcome match-level filters and
+    # the vs-opponent counts ignored those aux params. Spec:
+    # internal_docs/spec-splits-mosaic.md §1.2.
+    team_filt, params = _team_filter_clause(filters, aux=aux, team_value=team)
     params["opponent"] = opponent
+    params["team"] = team
 
     match_clause = (
-        "(m.team1 = :team OR m.team2 = :team) AND "
-        "(m.team1 = :opponent OR m.team2 = :opponent)"
+        f"{team_filt} AND (m.team1 = :opponent OR m.team2 = :opponent)"
     )
-    if base_where:
-        match_clause += f" AND {base_where}"
 
     # Overall record
     overall_rows = await db.q(
@@ -5197,6 +5210,18 @@ def _partnership_filter(
             parts.extend(["i.team != :team", "(m.team1 = :team OR m.team2 = :team)"])
     if where:
         parts.append(where)
+    # Match-level aux filters (result / toss_outcome) need a path team
+    # to evaluate; only apply on team-detail (mirror of
+    # _team_innings_clause). Spec: spec-splits-mosaic.md §1.2.
+    if team is not None:
+        res_clause, res_params = _result_match_filter(team, aux)
+        if res_clause:
+            parts.append(res_clause)
+            params.update(res_params)
+        toss_clause, toss_params = _toss_outcome_match_filter(team, aux)
+        if toss_clause:
+            parts.append(toss_clause)
+            params.update(toss_params)
     if team is None:
         st_clause, st_params = _scope_to_team_clause(aux, filters)
         if st_clause:

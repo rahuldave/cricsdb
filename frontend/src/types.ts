@@ -129,6 +129,9 @@ export interface TeamSummary {
    *  dormancy badge on the Teams page header via DormancyContext.
    *  Null when the team has no matches in scope. */
   last_match_date: string | null
+  /** Number of distinct teams playing in the active scope. Used by
+   *  SplitsMosaic to compute per-team league-avg comparison anchors. */
+  unique_teams_in_scope?: number
 }
 
 /** Keeper info attached to each innings on the scorecard endpoint. */
