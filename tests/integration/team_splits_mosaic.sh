@@ -283,6 +283,49 @@ assert_contains "Fielding tab also flips to 'Bowled first'" "Bowled first" "$row
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 11c · Stale-data-on-error: click-to-400 must clear the mosaic"
+
+# Bug pattern: load a valid landing URL → mosaic renders (success).
+# Click a marginal that flips URL into a 400-gated state
+# (toss_outcome / result without ?team=). API returns 400.
+# useFetch (pre-fix) keeps the previous successful `data` populated
+# so the mosaic re-renders against STALE numbers from the prior fetch.
+# Visible bug: strip says "Of 2432 toss wins:" — 2432 came from the
+# UNFILTERED scope's scope_total_n; the toss filter never landed.
+#
+# Post-fix: useFetch clears `data` on error → mosaic falls through
+# to the "No matches in scope for splits." empty state.
+#
+# This is the only ACTIVE site where stale-data-on-error is
+# reachable via routine interaction (per the audit). Other 4xx
+# paths in the backend (/matches/scorecard, /venues/{x},
+# /head_to_head batter_id) all require invalid path params which
+# the UI never produces via clicks — so this one click-to-400
+# transition covers the bug for the whole codebase.
+
+ab open "$BASE/teams?$SCOPE_URL"
+settle 4
+
+has_table_before=$(ab_eval "!!document.querySelector('.wisden-splits-table')")
+assert_eq "Mosaic present on valid landing (pre-click)" "true" "$has_table_before"
+
+# Click the "Won toss" column header — flips URL into 400-gated shape.
+ab_eval "Array.from(document.querySelectorAll('.wisden-splits-col-header')).find(el => el.innerText.startsWith('Won toss'))?.click()" >/dev/null
+settle 3
+
+url_after=$(agent-browser get url 2>/dev/null)
+assert_contains "URL gained toss_outcome=won after click" "toss_outcome=won" "$url_after"
+
+# The 400-rejection must clear the previous render — NO stale table.
+has_table_after=$(ab_eval "!!document.querySelector('.wisden-splits-table')")
+assert_eq "Mosaic cleared after click-into-400 (no stale data)" "false" "$has_table_after"
+
+# Mosaic should fall through to the empty/error state.
+has_empty=$(ab_eval "!!Array.from(document.querySelectorAll('.wisden-splits-mosaic')).find(el => el.innerText.includes('No matches in scope'))")
+assert_eq "Mosaic shows empty-state message" "true" "$has_empty"
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "Test 11 · Mobile viewport (390x844) renders without overflow"
 
 agent-browser set viewport 390 844 >/dev/null 2>&1

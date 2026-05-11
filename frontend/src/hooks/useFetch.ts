@@ -43,6 +43,14 @@ export function useFetch<T>(
         if (myId !== callIdRef.current) return
         const message = err instanceof Error ? err.message : String(err)
         setError(message || 'Request failed')
+        // Clear stale data — otherwise the previous successful
+        // response stays mounted and the UI silently shows numbers
+        // from the prior fetch while the URL has moved on.
+        // Reachable in production via the Splits Mosaic landing
+        // marginals (which 400 on toss_outcome/result without
+        // ?team=); latent in every other useFetch caller until a
+        // backend error occurs. Spec: spec-splits-mosaic.md §1.4.
+        setData(null)
         setLoading(false)
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
