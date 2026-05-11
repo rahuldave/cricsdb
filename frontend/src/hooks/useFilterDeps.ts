@@ -12,11 +12,19 @@ import { FILTER_KEYS, type FilterKey } from '../components/scopeLinks'
  * auto-wires every page's deps (was the documented "filterDeps
  * landmine" — see internal_docs/design-decisions.md).
  *
- * Also tracks `filters.inning` — the page-local InningToggle's URL param
- * is an AuxParam (not in FILTER_KEYS so it doesn't ride into subscript
- * link URLs), but every fetch the toggle modifies must refetch when it
- * flips. Adding it here keeps the "one source of truth for fetch deps"
- * promise even though FILTER_KEYS itself stays narrow.
+ * Also tracks every AuxParam that changes the displayed data:
+ *   - `filters.inning` (1st/2nd innings toggle)
+ *   - `filters.toss_outcome` (Splits Mosaic toss filter)
+ *   - `filters.result` (Splits Mosaic outcome filter)
+ *
+ * These are page-local AuxParams (not in FILTER_KEYS so they don't
+ * ride into subscript link URLs), but every fetch they modify must
+ * refetch when they flip — otherwise clicking a marginal in the
+ * Splits Mosaic to flip toss_outcome leaves the StatCards and other
+ * panels showing the pre-filter numbers (stale). Adding them here
+ * keeps the "one source of truth for fetch deps" promise even though
+ * FILTER_KEYS itself stays narrow. Spec:
+ * internal_docs/spec-splits-mosaic.md §1.1.
  *
  * Callers can append additional non-filter deps (e.g. active tab, a
  * row id) with `[...useFilterDeps(), tab]`.
@@ -27,7 +35,12 @@ export function useFilterDeps(): (string | undefined)[] {
   // reference identity changes only when values change. One more memo
   // here for the mapped array's stability.
   return useMemo(
-    () => [...FILTER_KEYS.map(k => filters[k as FilterKey]), filters.inning],
+    () => [
+      ...FILTER_KEYS.map(k => filters[k as FilterKey]),
+      filters.inning,
+      filters.toss_outcome,
+      filters.result,
+    ],
     [filters],
   )
 }
