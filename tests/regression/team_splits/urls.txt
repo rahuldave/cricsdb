@@ -1,0 +1,47 @@
+# Splits Mosaic backend — endpoint inventory for /api/v1/teams/splits.
+#
+# Exercises the new joint-distribution endpoint across:
+#   - Landing mode (no ?team=) at varying filter scopes
+#   - Team-detail mode (?team=X) with deltas
+#   - Aux-narrowed slices (result / toss_outcome / inning)
+#   - Cross-cutting: the new aux params on existing /summary endpoints
+#
+# Subjects: Royal Challengers Bengaluru (men's club, IPL), Mumbai Indians
+# (men's club, IPL), India (men's international).
+#
+# Initial state: NEW for the splits endpoint itself (new shape — first
+# release sets the baseline). REG for the cross-cutting /summary URLs
+# whose response shape didn't change; only the params are new and
+# default to unset, so the response is byte-identical to pre-spec.
+#
+# Spec: internal_docs/spec-splits-mosaic.md §6.3.
+
+# ── /teams/splits — Landing mode (no ?team=) ────────────────────
+NEW splits_landing_ipl_2024                 /api/v1/teams/splits?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW splits_landing_intl_2024_25             /api/v1/teams/splits?gender=male&team_type=international&season_from=2024&season_to=2025
+NEW splits_landing_ipl_2024_inning_0        /api/v1/teams/splits?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&inning=0
+NEW splits_landing_ipl_2024_inning_1        /api/v1/teams/splits?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&inning=1
+
+# ── /teams/splits — Team-detail mode (?team=X) ───────────────────
+NEW splits_rcb_ipl_2024                     /api/v1/teams/splits?team=Royal%20Challengers%20Bengaluru&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW splits_mi_ipl_2024                      /api/v1/teams/splits?team=Mumbai%20Indians&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
+NEW splits_india_intl_2024_25               /api/v1/teams/splits?team=India&gender=male&team_type=international&season_from=2024&season_to=2025
+
+# ── /teams/splits — Aux-narrowed team-detail ────────────────────
+NEW splits_rcb_ipl_2024_result_won          /api/v1/teams/splits?team=Royal%20Challengers%20Bengaluru&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&result=won
+NEW splits_rcb_ipl_2024_result_lost         /api/v1/teams/splits?team=Royal%20Challengers%20Bengaluru&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&result=lost
+NEW splits_rcb_ipl_2024_toss_won            /api/v1/teams/splits?team=Royal%20Challengers%20Bengaluru&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&toss_outcome=won
+NEW splits_rcb_ipl_2024_won_bat_first       /api/v1/teams/splits?team=Royal%20Challengers%20Bengaluru&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&result=won&inning=0
+NEW splits_rcb_ipl_2024_full_filter         /api/v1/teams/splits?team=Royal%20Challengers%20Bengaluru&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&result=won&inning=0&toss_outcome=won
+
+# ── Cross-cutting — aux filters on existing /summary endpoints ──
+# Same /summary URLs as tests/regression/teams/urls.txt but with the
+# new aux params attached. These ARE new shapes since the endpoints
+# now narrow under result / toss_outcome. NEW until first commit
+# lands, then flip to REG.
+NEW team_summary_rcb_ipl_won                /api/v1/teams/Royal%20Challengers%20Bengaluru/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&result=won
+NEW team_summary_rcb_ipl_lost               /api/v1/teams/Royal%20Challengers%20Bengaluru/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&result=lost
+NEW team_summary_rcb_ipl_toss_won           /api/v1/teams/Royal%20Challengers%20Bengaluru/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&toss_outcome=won
+NEW team_batting_summary_rcb_ipl_won        /api/v1/teams/Royal%20Challengers%20Bengaluru/batting/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&result=won
+NEW team_bowling_summary_rcb_ipl_won        /api/v1/teams/Royal%20Challengers%20Bengaluru/bowling/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&result=won
+NEW team_fielding_summary_rcb_ipl_won       /api/v1/teams/Royal%20Challengers%20Bengaluru/fielding/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&result=won
