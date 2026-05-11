@@ -10,6 +10,7 @@ import { useDormancy } from '../components/DormancyContext'
 import {
   getTeamSummary, getTeamByseason, getTeamVs, getTeamResults,
   getTeamOpponentsMatrix, getTeamPlayersBySeason, getTeamsLanding,
+  getTeamSplits,
   getTeamBattingSummary, getTeamBattingBySeason, getTeamBattingByPhase, getTeamBattingByInning, getTeamTopBatters,
   getTeamBattingPhaseSeasonHeatmap, getTeamBattingDistribution,
   getTeamBowlingSummary, getTeamBowlingBySeason, getTeamBowlingByPhase, getTeamBowlingByInning, getTeamTopBowlers,
@@ -27,6 +28,7 @@ import ScopedPageHeader from '../components/ScopedPageHeader'
 import PlayerLink from '../components/PlayerLink'
 import { ScopeContext } from '../components/scopeLinks'
 import TeamCompareGrid from '../components/teams/TeamCompareGrid'
+import SplitsMosaic from '../components/SplitsMosaic'
 import TeamBattingDistributionPanel from '../components/teams-distribution/TeamBattingDistributionPanel'
 import TeamBowlingDistributionPanel from '../components/teams-distribution/TeamBowlingDistributionPanel'
 import TeamFieldingDistributionPanel from '../components/teams-distribution/TeamFieldingDistributionPanel'
@@ -251,6 +253,15 @@ export default function Teams() {
   )
   const summary = summaryFetch.data
 
+  // Splits Mosaic — joint (toss × inning × result) distribution. Same
+  // fetch on landing (selected=null → ?team= absent → league side) and
+  // team-detail (?team= set → dual envelope with deltas). Spec:
+  // internal_docs/spec-splits-mosaic.md §2.9.
+  const splitsFetch = useFetch<import('../types').TeamSplits | null>(
+    () => getTeamSplits({ ...filters, team: selected || undefined }),
+    filterDeps,
+  )
+
   // Plumb the team's last appearance into DormancyContext so the
   // ScopedPageHeader badge renders. Independent of which discipline
   // tab is active — dormancy is a team-level fact. Cleared when the
@@ -317,7 +328,10 @@ export default function Teams() {
       </div>
 
       {!selected && (
-        <TeamsLandingBoard filters={filters} filterDeps={filterDeps} onPick={selectTeam} />
+        <>
+          <SplitsMosaic data={splitsFetch.data} loading={splitsFetch.loading} filters={filters} />
+          <TeamsLandingBoard filters={filters} filterDeps={filterDeps} onPick={selectTeam} />
+        </>
       )}
 
       {/* Only fully-block when we have NO summary yet (initial load). On
@@ -401,6 +415,11 @@ export default function Teams() {
               )}
             </p>
           )}
+
+          {/* Splits Mosaic — between StatCards and tabs per spec §2.9.
+              Team-detail mode (team set) carries per-cell deltas vs the
+              league baseline. */}
+          <SplitsMosaic data={splitsFetch.data} loading={splitsFetch.loading} filters={filters} />
 
           <div className="wisden-tabs">
             {tabs.map(tab => (

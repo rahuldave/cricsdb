@@ -214,6 +214,49 @@ export interface TeamsLanding {
   }
 }
 
+/** Splits Mosaic backing response. Spec: spec-splits-mosaic.md §1.3.
+ *  Two modes: landing (subject null) and team-detail (subject.team set,
+ *  cells + marginals carry per-axis deltas vs the league baseline). */
+export interface SplitsCell {
+  toss_outcome: 'won' | 'lost'
+  inning: 0 | 1
+  result: 'won' | 'lost' | 'tied'
+  n: number
+  share: number | null
+  wilson_lo: number | null
+  wilson_hi: number | null
+  /** Team-detail mode only — share of the same cell in the league
+   *  (unpivoted across all team-views in scope). */
+  league_share?: number | null
+  /** share - league_share (absolute proportion delta). */
+  delta?: number | null
+  /** Relative %: (share - league_share) / league_share × 100. */
+  delta_pct?: number | null
+}
+
+export interface SplitsMarginalEntry {
+  n: number
+  share: number | null
+  wilson_lo: number | null
+  wilson_hi: number | null
+  league_share?: number | null
+  delta?: number | null
+  delta_pct?: number | null
+}
+
+export interface TeamSplits {
+  subject: { team: string } | null
+  scope_total_n: number
+  /** Team-detail mode only. */
+  league_total_n: number | null
+  cells: SplitsCell[]
+  marginals: {
+    toss_outcome: Record<'won' | 'lost', SplitsMarginalEntry>
+    inning: Record<'0' | '1', SplitsMarginalEntry>
+    result: Record<'won' | 'lost' | 'tied', SplitsMarginalEntry>
+  }
+}
+
 export interface BattingLeaderEntry {
   person_id: string
   name: string

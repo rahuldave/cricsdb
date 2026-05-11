@@ -2128,3 +2128,203 @@ a { color: inherit; }
 .wisden-collapse-body {
   padding: 0.5rem 0 0.75rem 1rem;
 }
+
+/* ─── Splits Mosaic (spec internal_docs/spec-splits-mosaic.md §3) ──── */
+
+.wisden-splits-mosaic {
+  background: var(--cream);
+  border: 1px solid var(--rule-soft);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0 1rem 0;
+  font-family: var(--sans);
+}
+.wisden-splits-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6em;
+  font-size: 0.92rem;
+  color: var(--ink);
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+.wisden-splits-reset {
+  background: none;
+  border: 1px solid var(--rule-soft);
+  border-radius: 3px;
+  color: var(--ink-faint);
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  padding: 0.1rem 0.5rem;
+  cursor: pointer;
+}
+.wisden-splits-reset:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.wisden-splits-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+.wisden-splits-col-headers {
+  display: flex;
+  margin-left: 7rem;
+  gap: 0.2rem;
+}
+.wisden-splits-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.2rem;
+  min-height: 4rem;
+}
+.wisden-splits-cells-row {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 0.2rem;
+}
+.wisden-splits-row-label {
+  flex: 0 0 7rem;
+  text-align: right;
+  padding-right: 0.5rem;
+  border-right: 1px solid var(--rule-soft);
+  align-self: stretch;
+}
+.wisden-splits-marginal {
+  background: none;
+  border: none;
+  padding: 0.2rem 0.4rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  border-radius: 3px;
+}
+.wisden-splits-marginal:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.wisden-splits-cell {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--rule-soft);
+  border-radius: 3px;
+  overflow: hidden;
+  min-height: 3.5rem;
+  background: rgba(0, 0, 0, 0.02);
+}
+.wisden-splits-cell-fills {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 1.4rem;
+  cursor: pointer;
+}
+.wisden-splits-subrect {
+  cursor: pointer;
+  transition: filter 100ms;
+}
+.wisden-splits-subrect:hover {
+  filter: brightness(1.08);
+}
+.wisden-splits-cell-label {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.55);
+  border-top: 1px solid var(--rule-soft);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.wisden-splits-legend {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
+}
+.wisden-splits-legend-item {
+  background: none;
+  border: none;
+  padding: 0.2rem 0.4rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 3px;
+}
+.wisden-splits-legend-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.wisden-splits-legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  margin-right: 0.35em;
+  vertical-align: middle;
+}
+.wisden-splits-1d {
+  display: flex;
+  height: 2.6rem;
+  border: 1px solid var(--rule-soft);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+.wisden-splits-1d-segment {
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: filter 100ms;
+  padding: 0;
+}
+.wisden-splits-1d-segment:hover {
+  filter: brightness(1.08);
+}
+.wisden-splits-1d-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cream);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  padding: 0 0.5rem;
+}
+.wisden-splits-thin-sample {
+  margin-top: 0.5rem;
+  color: var(--ink-faint);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* Mobile (spec §3.13) — stack the row label above the cells row;
+   col-headers stack to a vertical group. Cells row stays horizontal
+   so 2 toss columns remain comparable. */
+@media (max-width: 720px) {
+  .wisden-splits-col-headers {
+    margin-left: 0;
+  }
+  .wisden-splits-row {
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .wisden-splits-row-label {
+    flex: 0 0 auto;
+    text-align: left;
+    border-right: none;
+    border-bottom: 1px solid var(--rule-soft);
+    padding-right: 0;
+    padding-bottom: 0.3rem;
+  }
+  .wisden-splits-cells-row {
+    width: 100%;
+  }
+}

@@ -476,22 +476,18 @@ async def team_splits(
     base_where = base_where or "1=1"
 
     # ── League side ──────────────────────────────────────────────────
-    league_cells_all, league_total = await _splits_cells(
+    league_cells_all, _league_unfiltered = await _splits_cells(
         base_where, dict(base_params), team_filter=None,
     )
-    league_marginals = _marginals(league_cells_all, league_total)
 
     # ── Team side (only when team is set) ───────────────────────────
     team_cells_all: list[dict] = []
-    team_total = 0
-    team_marginals: dict = {}
     if team:
         team_params = dict(base_params)
         team_params["_sp_team"] = team
-        team_cells_all, team_total = await _splits_cells(
+        team_cells_all, _ = await _splits_cells(
             base_where, team_params, team_filter=":_sp_team",
         )
-        team_marginals = _marginals(team_cells_all, team_total)
 
     # ── Cell-level aux filter (post-GROUP BY) ────────────────────────
     league_cells = [
@@ -502,6 +498,17 @@ async def team_splits(
         c for c in team_cells_all
         if _cell_label_for_aux(c["toss_outcome"], c["inning"], c["result"], aux)
     ]
+
+    # Denominators for shares + scope_total_n use the FILTERED slice so
+    # the response is self-consistent with what the user asked to see:
+    # "of the matches I've filtered to, here's the breakdown".
+    league_filtered_total = sum(c["n"] for c in league_cells)
+    team_filtered_total = sum(c["n"] for c in team_cells)
+
+    # Marginals computed over the FILTERED cell set, using the
+    # filtered total as denominator so all shares sum to 1.0.
+    league_marginals = _marginals(league_cells, league_filtered_total)
+    team_marginals = _marginals(team_cells, team_filtered_total) if team else {}
 
     # ── Compute per-cell shares + Wilson CIs ─────────────────────────
     from ..wilson import wilson_ci
@@ -515,15 +522,15 @@ async def team_splits(
         for c in team_cells:
             key = (c["toss_outcome"], c["inning"], c["result"])
             league_n_for_cell = league_n_by_key.get(key, 0)
-            share = round(c["n"] / team_total, 4) if team_total else None
-            league_share = round(league_n_for_cell / league_total, 4) if league_total else None
+            share = round(c["n"] / team_filtered_total, 4) if team_filtered_total else None
+            league_share = round(league_n_for_cell / league_filtered_total, 4) if league_filtered_total else None
             delta = (share - league_share) if (share is not None and league_share is not None) else None
             delta_pct = (
                 round((share - league_share) / league_share * 100, 1)
                 if (share is not None and league_share not in (None, 0))
                 else None
             )
-            lo, hi = wilson_ci(c["n"], team_total)
+            lo, hi = wilson_ci(c["n"], team_filtered_total)
             out_cells.append({
                 "toss_outcome": c["toss_outcome"],
                 "inning": c["inning"],
@@ -538,13 +545,13 @@ async def team_splits(
             })
     else:
         for c in league_cells:
-            lo, hi = wilson_ci(c["n"], league_total)
+            lo, hi = wilson_ci(c["n"], league_filtered_total)
             out_cells.append({
                 "toss_outcome": c["toss_outcome"],
                 "inning": c["inning"],
                 "result": c["result"],
                 "n": c["n"],
-                "share": round(c["n"] / league_total, 4) if league_total else None,
+                "share": round(c["n"] / league_filtered_total, 4) if league_filtered_total else None,
                 "wilson_lo": round(lo, 4) if lo is not None else None,
                 "wilson_hi": round(hi, 4) if hi is not None else None,
             })
@@ -575,8 +582,8 @@ async def team_splits(
 
     return {
         "subject": {"team": team} if team else None,
-        "scope_total_n": team_total if team else league_total,
-        "league_total_n": league_total if team else None,
+        "scope_total_n": team_filtered_total if team else league_filtered_total,
+        "league_total_n": league_filtered_total if team else None,
         "cells": out_cells,
         "marginals": marginals_out,
     }
