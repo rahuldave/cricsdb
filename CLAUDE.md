@@ -1,58 +1,70 @@
 # CricsDB — T20 Cricket Analytics Platform
 
-## Project Status
+Live: https://t20.rahuldave.com · Repo: https://github.com/rahuldave/cricsdb · deebase PR: https://github.com/rahulcredcore/deebase/pull/8
 
-Live at: https://t20.rahuldave.com
-Repo: https://github.com/rahuldave/cricsdb
-deebase PR: https://github.com/rahulcredcore/deebase/pull/8 (adds params to db.q())
+CLAUDE.md is the **inviolable-rules file**. Everything describing what the codebase IS (files, endpoints, payloads, formulas, design history) lives in dedicated docs — go there before assuming.
+
+## Contents
+
+1. [Pointers (doc index)](#pointers)
+2. [Running locally + deploying](#running-locally--deploying)
+3. [Documentation discipline](#documentation-discipline)
+4. [Methodology rules](#methodology-rules)
+5. [Code patterns](#code-patterns)
+6. [Testing discipline](#testing-discipline)
+7. [Cricket invariants](#cricket-invariants)
+8. [Page conventions](#page-conventions)
+9. [Palette](#palette)
+10. [Splits Mosaic](#splits-mosaic)
+
+---
 
 ## Pointers
 
-CLAUDE.md is the inviolable-rules file. Everything describing what the
-codebase IS (files, endpoints, payloads, formulas, design decisions) lives
-in dedicated docs — go there before making assumptions.
-
 **Orientation**
-- Codebase tour (file-by-file): `internal_docs/codebase-tour.md`
-- React + Vite primer (this codebase, not generic): `internal_docs/react-primer.md`
+- Codebase tour: `internal_docs/codebase-tour.md`
+- React + Vite primer (this codebase): `internal_docs/react-primer.md`
 - Frontend build pipeline: `internal_docs/frontend-build-pipeline.md`
 - Visual identity / Wisden styles: `internal_docs/visual-identity.md`
+- Color discipline (palettes, reference lines, swatch alignment): `internal_docs/colors.md`
 - Local dev prerequisites + REPL: `internal_docs/local-development.md`
 
 **Domain + UX**
 - Landing pages on every search-bar tab + Compare slots + Series/H2H/Venues structure: `internal_docs/landing-pages.md`
-- API reference (every endpoint, curl, response): `docs/api.md` — also `/api/docs` (Swagger) and `/api/redoc` on local + prod
-- Stat formulas (run rate, economy, win %, per-innings/per-team transforms): `internal_docs/how-stats-calculated.md`
-- Server-vs-client calc inventory + cross-endpoint divergence audit (Phase 1): `internal_docs/server-vs-client-calcs.md` — read before changing any predicate or shipping a new derived metric
-- Design decisions (over-numbering, db.q params, legal balls, URL state, scope-link architecture, FilterBarParams/AuxParams, etc.): `internal_docs/design-decisions.md`
+- API reference (every endpoint, curl, response): `docs/api.md` — also `/api/docs` (Swagger) and `/api/redoc`
+- Stat formulas: `internal_docs/how-stats-calculated.md`
+- Server-vs-client calc inventory + cross-endpoint divergence audit: `internal_docs/server-vs-client-calcs.md` — read before changing any predicate or shipping a new derived metric
+- Design decisions: `internal_docs/design-decisions.md`
 - URL state discipline: `internal_docs/url-state.md`
 - Link components (TeamLink / PlayerLink / SeriesLink contract — read before writing ANY navigation): `internal_docs/links.md`
 
 **Data + ops**
-- Data pipeline (download, import, update_recent): `internal_docs/data-pipeline.md`
+- Data pipeline: `internal_docs/data-pipeline.md`
 - Smoke-test update_recent against /tmp DB: `internal_docs/testing-update-recent.md`
 - Deploying: `internal_docs/deploying.md`
 
 **Performance**
-- Leaderboard landings (composite indexes, pure-match-clause pattern): `internal_docs/perf-leaderboards.md`
+- Leaderboard landings: `internal_docs/perf-leaderboards.md`
 - deebase pool / async SQLite: `internal_docs/perf-async-deebase.md`
-- Compare-tab page-load (bucketbaseline): `internal_docs/perf-bucket-baselines.md`
+- Compare-tab page-load: `internal_docs/perf-bucket-baselines.md`
 - Systems / perf catch-all: `internal_docs/systems-followups.md`
 
 **Testing**
-- Test catalogue (sanity / regression / integration — what each tests + when to run): `internal_docs/tests.md`
-- Regression harness (HEAD-vs-patched md5-diff for shared-helper refactors): `internal_docs/regression-testing-api.md` + `tests/regression/`
+- Test catalogue: `internal_docs/tests.md`
+- Regression harness: `internal_docs/regression-testing-api.md` + `tests/regression/`
 
 **Active work**
 - Next-session agenda + NO-DEPLOYS gate: `internal_docs/next-session-ideas.md`
 - A–Q lettered roadmap, dated session logs, deferred queue: `internal_docs/enhancements-roadmap.md`
-- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md` (§8 backend + §9 frontend IMPLEMENTED 2026-05-05; v2 extension 2026-05-06 added 6mo+1y form windows, conditional milestones, "Scope" rename, sparkline 20-run reference line; rest of doc framing remains DRAFT), `internal_docs/spec-splits-mosaic.md` (Teams-only joint toss × inning × result distribution + dimensionality-adaptive widget — IMPLEMENTED 2026-05-11; player + H2H + compare-slot are deferred follow-ups per §5), `internal_docs/splits-mosaic-cross-page.md` (DESIGN — cross-page reuse: Venues / Series / Players Mosaic; broader-scope baseline question for subject-less landing views; the "is Wankhede better for chasing" use case naturally belongs on Venues page)
-- Club-tier classification (read before classifying a new club league): `internal_docs/club-tier-classification.md`. Anchor numbers: `internal_docs/club-tier-anchor-numbers.md`.
+- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md`, `internal_docs/spec-splits-mosaic.md`, `internal_docs/splits-mosaic-cross-page.md`
+- Club-tier classification: `internal_docs/club-tier-classification.md` + anchor numbers `internal_docs/club-tier-anchor-numbers.md`
 
-## Running Locally
+---
+
+## Running locally + deploying
 
 ```bash
-# Terminal 1 — backend
+# Terminal 1 — backend (ALWAYS --reload; bare uvicorn serves stale code)
 uv run uvicorn api.app:app --reload --port 8000
 
 # Terminal 2 — frontend
@@ -61,197 +73,178 @@ cd frontend && npm run dev
 
 Open http://localhost:5173. Vite proxies `/api/*` → port 8000.
 
-**UI verification (any frontend work must go through this):** After any
-change to files under `frontend/src/`, you MUST use the `agent-browser`
-skill to load the affected page(s) in a real browser, exercise every
-new tab/component, apply the relevant FilterBar combinations (incl.
-single-season), hover interactive elements (tooltips, heatmap cells),
-and click every link to confirm it navigates. `tsc --noEmit` and
-`npm run build` only verify code correctness, not feature correctness.
-Do not claim UI work is complete without a browser-agent run.
+```bash
+bash deploy.sh           # code-only (DB persists on plash)
+bash deploy.sh --first   # uploads cricket.db (~435 MB)
+```
 
-**Filter-combination testing is part of UI verification.** When a
-change touches anything that depends on FilterBar / AuxParam state
-(deltas, league-avg chips, marginals, baselines), you MUST exercise
-the following combinations and confirm comparisons / chips / labels
-all still render consistently:
+Type-check with `tsc -b` or `npm run build` — `tsc --noEmit` is a no-op here (root tsconfig has `files: []`).
 
-- No team selected (landing view) + a narrowing filter
-  (`filter_venue=...`, opponent, single season).
+Prereqs, REPL, troubleshooting: `internal_docs/local-development.md`. Deploy details: `internal_docs/deploying.md`.
+
+---
+
+## Documentation discipline
+
+**READ `internal_docs/docs-sync.md` before claiming any feature done.** It is the update-map (API route → `docs/api.md`, design decision → `design-decisions.md`, palette → `colors.md`, etc.) and the regression REG→NEW flip-order workflow.
+
+**Update the affected sections IN that doc** at the end of every feature. CLAUDE.md is rules, not history; new history goes in the right named doc.
+
+---
+
+## Methodology rules
+
+### Commit cadence — one feature, one commit, immediately
+
+**Commit as soon as a feature looks complete — don't batch.** One logical change per commit, committed at the moment it reaches a runnable state (type-check passing, feature working in the browser, tests still green). If you just finished X and X works, commit X before starting Y. Even if Y is the obvious next step — the atomicity is the point.
+
+Why: sessions that accumulate 30 files of uncommitted work across five unrelated features make `git bisect` useless. Lost-bisect debugging is expensive; small commits are free.
+
+User has flagged this repeatedly, including the session that prompted this rewrite. Tells you're about to violate it:
+- You've made 3+ working changes and haven't committed.
+- You're tempted to "finish the whole arc" before committing.
+- You're using `git add -A` because the diff sprawls. → Use `git add -p` to split.
+
+### Filter-combination testing — the matrix is mandatory
+
+The app's premise is **consistent comparisons across all filter combinations**. A delta that works at `team=X` but disappears at `team=X&filter_venue=Y` is a bug. User feedback 2026-05-11: "things need to be consistent on filtration" — flagged after Wankhede + toss filter lost its league-baseline chips.
+
+When a change touches anything that depends on FilterBar / AuxParam state (deltas, league-avg chips, marginals, baselines), exercise this matrix:
+
+- No team selected (landing view) + a narrowing filter (`filter_venue=...`, opponent, single season).
 - Team selected + same narrowing filters (venue, opponent, season).
-- Team selected + aux filter (`toss_outcome`, `inning`, `result`)
-  AND a narrowing filter together (e.g. `team=MI&filter_venue=Wankhede&toss_outcome=won`).
+- Team selected + aux filter (`toss_outcome`, `inning`, `result`) AND a narrowing together (e.g. `team=MI&filter_venue=Wankhede&toss_outcome=won`).
 - Bowling tab + inning filter (the inning POV flip).
 - Multiple filters chained (`&season_from=2018&season_to=2020&filter_venue=...`).
 
-The app's premise is consistent comparisons across all filter
-combinations. A delta that works at `team=X` but disappears at
-`team=X&filter_venue=Y` is a bug. User feedback 2026-05-11: "things
-need to be consistent on filtration" — flagged after Wankhede +
-toss filter lost its league-baseline chips.
+Regression + tsc + curl are NOT substitutes. **Load the actual page in agent-browser, click the actual controls, verify the rendered DOM at each combination.**
 
-**Mobile viewport check is part of UI verification, not optional.**
-For any new component / layout / panel / stat-row, check at a phone
-viewport (`agent-browser set viewport 390 844` then `reload`)
-BEFORE committing. Common failure modes:
-- A grid with `minmax(0, 1fr) minmax(220px, …)` squeezes the first
-  column to ~98px on a 342-wide panel — the histogram or chart
-  becomes invisible at that width. Use a CSS class with a
-  `@media (max-width: 720px) { grid-template-columns: 1fr }`
-  fallback (inline `style={{}}` can't do media queries — extract
-  to a `wisden-*` class in `index.css`).
-- Inline widgets that work fine on desktop (toggles, milestone
-  chip rows, form-delta lines) need `flex-wrap: wrap` to drop to
-  the next line on mobile, or they overflow the panel.
-- `grid-template-columns: repeat(N, 1fr)` with N > 3 typically
-  needs to drop to fewer columns on mobile via a media-query
-  override.
+### UI verification — browser-agent + mobile, every time
 
-**A frontend change is not "done" until both desktop and mobile
-viewports look right.** Reproduce the user's exact URL at both
-widths; the panel that reads great on a 1280-wide laptop can be
-broken (literally invisible content) on a 390-wide phone.
-The user flagged this 2026-05-06: a width-`1fr | minmax(220, 320)`
-grid silently zero'd the histogram column on mobile while sailing
-through desktop verification.
+After any change to `frontend/src/`:
+1. Use the `agent-browser` skill to load affected pages in a real browser, exercise every new tab/component, hover interactive elements, click every link to confirm navigation.
+2. **Mobile viewport check is not optional.** `agent-browser set viewport 390 844` then `reload` BEFORE committing. Reproduce the user's exact URL at both 1280 and 390 widths.
 
-**DO NOT SPECULATE — verify before proposing a fix or explanation.**
-When the user reports a bug or asks why something looks/behaves a
-certain way, do NOT reason from code-reading or prior assumptions and
-guess what's wrong. First REPRODUCE: load the URL with agent-browser
-and observe what's actually rendered, click the actual control,
-query the DB, run the actual test. Then propose. Phrases like
-"this might be because…", "probably the X is Y…", "I bet the issue
-is…" are tells that you're about to ship a speculative fix — STOP
-and verify first. The user has flagged this twice (2026-04-29):
-speculation that turns out wrong wastes a round-trip; speculation
-that "matches what they're seeing" by accident sets the wrong fix
-in motion. Reproduction is cheap (one agent-browser call); guessing
-costs the user trust.
+Common mobile failure modes:
+- Inline `style={{gridTemplateColumns: 'minmax(0, 1fr) minmax(220px, …)'}}` silently zeros the first column on a 342-wide panel — histogram/chart becomes invisible. Inline styles can't do media queries; extract to a `wisden-*` class in `index.css` with `@media (max-width: 720px) { grid-template-columns: 1fr }`.
+- Inline rows (toggles, milestone chips, form-delta lines) overflow without `flex-wrap: wrap`.
+- `grid-template-columns: repeat(N, 1fr)` with N > 3 needs to drop on mobile.
 
-**DO NOT defer parts of an assigned task without asking.** When the
-user gives you a task — "add per-page Twitter cards", "wire up X for
-the whole app" — finish it. Don't ship the easy half and pitch the
-rest as a follow-up ("I deferred the player/match routes since they
-need DB lookups"). If a part is genuinely out-of-scope or needs a
-different design call, ASK before cutting it; don't decide
-unilaterally. The "shipped + deferred" pattern reads as scope-
-shaving and forces the user to re-prompt for the work they already
-asked for. User flagged 2026-04-29 after a per-page social-meta
-task shipped 4-of-6 route patterns and deferred the two that
-needed an `await db.q(...)` lookup. The fix isn't more deferral
-discipline — it's finishing the job.
+A frontend change is not "done" until both desktop AND mobile look right. `tsc -b` and `npm run build` verify code correctness, not feature correctness.
 
-**On bug reports — understand the bug first, propose, then wait.**
-When the user reports a bug ("X doesn't work", "Y looks broken",
-"why does Z behave like this"), the response sequence is:
-1. **Reproduce.** Load the URL with agent-browser, query the DB,
-   run the test. Confirm what's actually wrong before forming a
-   hypothesis. (See "DO NOT SPECULATE" above.)
-2. **Identify the root cause.** Code path, data state, design
-   choice — name the actual mechanism, not a plausible-sounding
-   guess.
-3. **Explain to the user what you found AND propose 1-3 possible
-   fixes with trade-offs.** Two-three sentences each, not a wall
-   of code.
-4. **WAIT for the user's call.** Do NOT ship the fix in the same
-   turn unless explicitly told to ("just fix it"). The user
-   knows their codebase and may pick a different fix than what
-   you'd propose, OR may decide the behavior is correct and the
-   bug report was a misunderstanding.
+### Bug reports — reproduce, propose, WAIT
 
-This rule is stricter than "discuss design before coding"
-because bug reports often LOOK like routine fixes but turn out
-to be design questions in disguise. User flagged 2026-05-08
-after a session where a bug report ("status bar broken") got
-fixed (clicking all-time button now sets explicit range) but
-the actual user intent was different (auto-apply on landing).
-Mid-session ship landed the wrong fix; round-trip wasted.
+When the user reports a bug or asks why something looks/behaves a certain way:
 
-Tells you're about to skip this rule:
-- You jump to a code edit without first reading what's there.
-- You announce "Going to ship this now" / "Implementing the
-  fix" before the user has confirmed the diagnosis.
-- Auto mode is on and you treat it as a license to ship without
-  pause — auto mode is for routine work, NOT for bug-fix
-  decisions. Bug reports always pause for explicit
-  confirmation.
+1. **Reproduce.** Load the URL with agent-browser, query the DB, run the test. Confirm what's actually wrong before forming a hypothesis. Phrases like "this might be because…", "probably the X is Y…", "I bet the issue is…" are tells that you're about to ship a speculative fix — STOP and verify first.
+2. **Identify the root cause.** Name the actual mechanism — code path, data state, design choice — not a plausible-sounding guess.
+3. **Explain what you found AND propose 1–3 fixes with trade-offs.** Two-three sentences each, not a wall of code.
+4. **WAIT.** Do NOT ship the fix in the same turn unless explicitly told to ("just fix it"). The user knows their codebase; they may pick a different fix, OR decide the behavior is correct.
 
-**Audit prompt discipline:** when asking agent-browser to verify, ask
-for RAW OUTPUT, not verdicts. "List every section header with the first
-row label per column" is checkable. "Verify all sections render" is a
-summary that drops information — when the agent reports PASS but
-walked the wrong cells, the bug ships. The 2026-04-27
-"empty-section bug on the avg column" landed because a Commit-5
-audit prompt asked for value sanity-checks instead of cell-by-cell
-text. From there on, audits should:
-- Request the literal text content of each cell/section the assertion
-  cares about, not a yes/no.
-- For each assertion you'd put in an integration test, write the test
-  AT THE SAME TIME, not after a bug surfaces. One-shot browser audits
-  are exploratory. Checked-in `tests/integration/<feature>.sh`
-  assertions are durable.
+Bug reports often LOOK like routine fixes but turn out to be design questions in disguise. Auto mode is NOT a license to skip this — auto mode is for routine work, not bug-fix decisions.
 
-**Page header convention — `ScopedPageHeader` for every scoped page.**
-Every page that takes FilterBar narrowings (Batting / Bowling /
-Fielding / Players / Teams / Series / Venues / HeadToHead) renders
-its title via `frontend/src/components/ScopedPageHeader.tsx`:
-title content + flag on the left, "SCOPE <abbreviated narrowings>"
-small italic on the right, flex-wrap to a second row on mobile.
-The component reads `abbreviateScope(filters)` from
-`scopeLinks.ts`. Pass `omit={['tournament']}` etc. on dossier pages
-where the page subject IS one of the scope axes (Series omits
-`tournament`, Venues omits `filter_venue`) to avoid duplicating
-the title in the abbreviation. The status-strip "SCOPE" pseudo-
-segment between path-identity and FilterBar narrowings establishes
-the same vocabulary at the top of the page. New scoped page →
-use `ScopedPageHeader`, do NOT re-roll the H2 + flag JSX inline.
+Tells you're about to skip the rule:
+- You jump to an Edit before reading the surrounding code.
+- You announce "Going to ship this now" / "Implementing the fix" before the user has confirmed the diagnosis.
 
-**`abbreviateScope` is the source of truth for "what's in scope".**
-When you add a new FilterBar field or AuxParam that affects what
-data the user is looking at, ALSO add it to `abbreviateScope` in
-`scopeLinks.ts`. The 2026-05-06 inning-missing bug surfaced because
-inning is an AuxParam, not in `FILTER_KEYS`, and the abbreviation
-silently dropped it. The audit pattern: for every axis in
-`FilterParams`, ask "does setting this change what data is shown?"
-If yes, it's in scope and belongs in the abbreviation. The
-`ScopeStatusStrip` is the parallel reference list — both should
-emit the same axes.
+### Do NOT defer parts of an assigned task
 
-**URL state for "what view am I looking at".** Anything that
-selects between pre-fetched dossiers / view modes / windows /
-toggles MUST encode in the URL via `useUrlParam` so share-link
-reproducibility holds. The default value is encoded by ABSENCE
-of the param (saves URL noise on the canonical default).
-Per-panel keys use a panel-specific prefix (`dist_window` for the
-Distribution panel; `compareN_inning` for Compare slot inning
-override) so they don't collide. `feedback_state_location.md` —
-share-link reproducibility wins; if you send someone a link to
-"Kohli's last-10 form", the receiver should land on the same view.
+When the user gives you a task — "add per-page Twitter cards", "wire up X for the whole app" — finish it. Don't ship the easy half and pitch the rest as a follow-up. If a part is genuinely out-of-scope or needs a different design call, ASK before cutting it. The "shipped + deferred" pattern reads as scope-shaving and forces the user to re-prompt.
 
-**Single-payload + window-toggle pattern.** When an endpoint can
-return multiple related views in one response (e.g. lifetime +
-last_10 + last_60d + last_6mo + last_1yr in
-`/api/v1/batters/{id}/distribution`), prefer a single roundtrip
-over per-view fetches. The frontend toggle then redraws from the
-in-memory payload — no refetch, instant switching. Cost: payload
-size grows linearly with N views. Acceptable when each view is
-the same shape and N is small (≤6). Spec:
-`internal_docs/spec-distribution-stats.md §8.6` + §9.2.1.
+### Audit prompt discipline — raw output, not verdicts
 
-**API-frontend type contract:** when a backend change drops a field
-from a response, drop it from the matching TypeScript interface in
-`frontend/src/types.ts` IN THE SAME COMMIT. Type-API divergence is
-what turns "field missing at runtime" into a silent fall-through
-through `?. ?? 0` — TypeScript believes the type, the gate evaluates
-to `0 > 0`, the UI hides itself. Tightening types alongside the
-backend change makes `tsc -b` catch the next consumer.
+When asking agent-browser to verify, ask for RAW OUTPUT, not summaries. "List every section header with the first row label per column" is checkable. "Verify all sections render" is a verdict that drops information — when the agent reports PASS but walked the wrong cells, the bug ships.
 
-**Integration tests must self-anchor against SQL.** Numeric
-expected values in `tests/integration/<feature>.sh` (Matches counts,
-Runs, RR values, leaderboard sizes, baseline-avg numerator/denominator)
-must be **derived from `cricket.db` at test runtime**, not hardcoded
-literals. Pattern:
+For each assertion you'd put in an integration test, **write the test AT THE SAME TIME**, not after a bug surfaces. One-shot browser audits are exploratory; checked-in `tests/integration/<feature>.sh` assertions are durable.
+
+### Red-then-green test discipline
+
+Every fix gets a test that demonstrates the bug (red against HEAD), THEN the fix (green). Report both phases in the commit message. A green-only test ships a fix that may or may not address the actual bug.
+
+---
+
+## Code patterns
+
+### Extend existing abstractions — do NOT fork parallel helpers
+
+Before writing a new helper or component, find the existing API that already solves this class of problem, and extend it with a narrow option.
+
+| Surface | API |
+|---|---|
+| Scope-link URLs | `frontend/src/components/scopeLinks.ts` (`FILTER_KEYS`, `SubscriptSource`, `resolveBucket`, `resolveScopePhrases`, `ScopeContext`) |
+| Team / player / series rendering | `TeamLink.tsx` / `PlayerLink.tsx` / `SeriesLink.tsx` — **READ `internal_docs/links.md` before writing ANY navigation** |
+| Filter state | `useFilters()`, `FILTER_KEYS` |
+| Tabular rendering | `DataTable.tsx` |
+| Score rendering | `Score.tsx` |
+| Innings-score aggregation in SQL | scalar-subquery pattern from `api/routers/matches.py::inn_rows` / `wkt_rows` |
+| Delta rendering | `MetricDelta` (inline colored text, not pills — pills are reserved for `ProbChip`) |
+
+When a new surface's needs don't fit an existing API's shape, **add a narrow prop / render-prop / override to that API**. If you find yourself typing `teamXHref(...)`, `EdTag`, `scoreCell` alongside existing `TeamLink` / `Score`, stop and ask: "why can't the existing API do this with one more prop?" Reading 100 lines of the existing module is cheaper than maintaining two pipelines that have to stay in lockstep.
+
+This rule overrides the "just make it work" instinct.
+
+### Page header — `ScopedPageHeader` for every scoped page
+
+Every page that takes FilterBar narrowings (Batting / Bowling / Fielding / Players / Teams / Series / Venues / HeadToHead) renders its title via `frontend/src/components/ScopedPageHeader.tsx`. The component reads `abbreviateScope(filters)` from `scopeLinks.ts`. Pass `omit={['tournament']}` etc. on dossier pages where the page subject IS one of the scope axes (Series omits `tournament`, Venues omits `filter_venue`). New scoped page → use `ScopedPageHeader`, do NOT re-roll the H2 + flag JSX inline.
+
+### `abbreviateScope` is the source of truth for "what's in scope"
+
+When you add a new FilterBar field or AuxParam that affects what data the user is looking at, ALSO add it to `abbreviateScope` in `scopeLinks.ts`. The 2026-05-06 inning-missing bug surfaced because inning is an AuxParam (not in `FILTER_KEYS`) and the abbreviation silently dropped it. Audit pattern: for every axis in `FilterParams`, ask "does setting this change what data is shown?" If yes, it belongs in the abbreviation AND in `ScopeStatusStrip` — both should emit the same axes.
+
+### URL state — share-link reproducibility
+
+Anything that selects between pre-fetched dossiers / view modes / windows / toggles MUST encode in the URL via `useUrlParam`. The default value is encoded by ABSENCE of the param (saves URL noise on the canonical default). Per-panel keys use a panel-specific prefix (`dist_window`, `compareN_inning`) so they don't collide.
+
+**URL-clean rule: compute for display, never auto-mutate.** If you find yourself adding a `setUrlParams` call in a `useEffect` to "make the URL explicit" — STOP. Compute the value in the rendering layer and mark it visually distinct (e.g. the status bar's italic faint `(all-time)` suffix). The URL is a faithful record of user choice; silent URL mutation breaks share-link round-trip. User flagged 2026-05-08 (and earlier 2026-04-20 — commit `700d11b`).
+
+### Single-payload + window-toggle
+
+When an endpoint can return multiple related views in one response (lifetime + last_10 + last_60d + last_6mo + last_1yr in `/api/v1/batters/{id}/distribution`), prefer a single roundtrip over per-view fetches. The frontend toggle then redraws from the in-memory payload — no refetch. Acceptable when each view is the same shape and N is small (≤6). Spec: `spec-distribution-stats.md §8.6` + §9.2.1.
+
+### API ↔ frontend type contract
+
+When a backend change drops a field from a response, drop it from the matching TypeScript interface in `frontend/src/types.ts` IN THE SAME COMMIT. Type-API divergence turns "field missing at runtime" into a silent fall-through through `?. ?? 0` — TypeScript believes the type, the gate evaluates to `0 > 0`, the UI hides itself.
+
+### No CSS-pixel shortcuts when a structural fix exists
+
+When a layout problem has a clean structural solution (CSS Grid / subgrid for cross-column row alignment, semantic flex for inline content), use the structural fix even if a `min-height: 4.6rem` / `padding-top: 12px` hack would land in 30 minutes. Pixel hacks are tuned to one viewport width, one chip density, one font-stack; the next content change shifts the magic number and the layout breaks.
+
+Tells you're about to shortcut:
+- `min-height` because "the team col wraps to 2 lines but the avg col fits on 1." → Subgrid.
+- `padding-top` to push one element down to match another. → Same row of a grid.
+- `position: absolute` to dodge a sibling's height. → Separate grid track.
+- Computing pixel values from observed measurements ("agent measured 73px, so I'll use 4.6rem"). → Subgrid sizes to 73px without you needing the number.
+
+Genuinely-correct shortcut cases: sub-pixel rounding (`transform: translateY(-1px)` for a 0.5px gap), aspect-ratio reservation for known-dimension images, cosmetic padding that's not load-bearing for alignment.
+
+### No hacks where a structural fix exists
+
+When a clean idiomatic solution and a hack both look like they'd "work", ship the clean one. The hack lands as a liability that compounds at the next refactor. Tells:
+- Reading `window.location.*` synchronously inside a React effect to dodge a desync between live URL and React state. → The codebase's idiom is `useRef` once-per-mount gates (see `pages/Teams.tsx`, `TournamentDossier.tsx`'s `prevFilterKey` ref). Match it.
+- Reaching for `setTimeout` / extra `sleep` to "let things settle" in production code. → React state isn't a race; derive one update from the other.
+- Adding a feature flag / `if (process.env.NODE_ENV)` to bypass StrictMode dev-replay. → StrictMode replay IS the test surface; if your effect can't survive it, the effect is wrong.
+
+Default: read the surrounding 100 lines first; if there's an established pattern for this class of problem, match it.
+
+### FilterBar cascade-clear rule (auto-correct loops)
+
+When the user clears a coupled filter (gender / team_type), also clear any dependent narrowing (tournament). The FilterBar runs auto-correct deep-link effects that fill missing fields from a tournament's metadata; if the user clears team_type back to "All" but tournament stays, the auto-correct re-asserts team_type=club. "Spring-back" UX bug.
+
+Pattern:
+```ts
+if (t && (!v || t.team_type !== v)) updates.tournament = ''
+```
+NOT `if (t && v && t.team_type !== v)` — the `&& v &&` short-circuits on the user's "clear" click.
+
+When adding a NEW auto-correct deep-link effect: make sure the user-clearing path on every participating filter also cascade-clears the inferred narrowings. Test: `tests/integration/filterbar_cascade_clear.sh`.
+
+---
+
+## Testing discipline
+
+### Integration tests must self-anchor against SQL
+
+Numeric expected values in `tests/integration/<feature>.sh` (Matches counts, Runs, RR, leaderboard sizes, baseline-avg numerator/denominator) must be **derived from `cricket.db` at test runtime**, not hardcoded.
 
 ```bash
 expected=$(sqlite3 "$DB" "SELECT COUNT(*) FROM match WHERE …")
@@ -260,668 +253,38 @@ assert_eq "label" "$expected" "$actual"
 ```
 
 Three-layer chain:
-- **Sanity** (`tests/sanity/test_*.py`) asserts SQL ↔ API.
-- **Integration** (`tests/integration/*.sh`) asserts DOM ↔ SQL via
-  the running app (transitively SQL ↔ API ↔ DOM).
-- **Regression** (`tests/regression/<feature>/urls.txt`) asserts
-  no-drift across refactors at the API layer.
+- **Sanity** (`tests/sanity/test_*.py`): SQL ↔ API.
+- **Integration** (`tests/integration/*.sh`): DOM ↔ SQL via the running app (transitively SQL ↔ API ↔ DOM).
+- **Regression** (`tests/regression/<feature>/urls.txt`): no-drift across refactors at the API layer.
 
-If you hardcode `assert_eq "label" "548" "$actual"`, a bug that
-drifts the API to 548-by-coincidence (or that drifts both API and
-DOM together) silently passes. The DB is the source of truth — if
-the test computes its expected value from SQL each run, the test
-self-corrects against DB updates AND surfaces drift the moment
-either API or DOM departs from SQL. The team_class club-tier work
-shipped a `filterDeps`-missing bug on 7 of 8 entry pages because
-the original integration tests asserted hardcoded counts on Teams
-only; flipping to SQL-derived anchors lets the test walk every
-page and surface mismatches at the page that's actually broken.
+Hardcoding `assert_eq "label" "548" "$actual"` means a bug that drifts the API to 548-by-coincidence silently passes. The DB is source of truth; SQL-derived expecteds self-correct against DB updates AND surface drift the moment either API or DOM departs.
 
-`tests/integration/team_class_club_per_page_refetch.sh` is the
-reference implementation. New shell tests follow that shape:
-`sql()` helper wraps `sqlite3 $DB`, every `assert_eq` reads its
-expected from `$(sql ...)`. Keep IN-list constants (FM frozenset,
-PRIMARY/SECONDARY club leagues, ICC events) inline at the top of
-the script, mirroring the Python source-of-truth — divergence
-between the two surfaces immediately because both sanity and
-integration run against the same DB but different SQL strings.
+Reference implementation: `tests/integration/team_class_club_per_page_refetch.sh`. `sql()` helper wraps `sqlite3 $DB`; every `assert_eq` reads its expected from `$(sql ...)`. IN-list constants (FM frozenset, PRIMARY/SECONDARY club leagues, ICC events) stay inline at the top of the script, mirroring the Python source — divergence surfaces immediately.
 
-**No hacks where a structural fix exists.** When a clean, idiomatic
-solution and a hack both look like they'd "work," ship the clean
-one even if the hack is faster to write. The hack lands as a
-liability that compounds at the next refactor. Tells you're about
-to ship a hack:
-- Reading `window.location.*` synchronously inside a React effect
-  to dodge a desync between live URL and React state. → The
-  codebase's idiom is `useRef` once-per-mount gates (see the
-  legacy-compare migration in `pages/Teams.tsx`, and
-  `TournamentDossier.tsx`'s `prevFilterKey` ref). Match it.
-- Computing pixel values from observed agent-browser measurements
-  ("agent measured 73px, so I'll use 4.6rem"). → That's a CSS
-  Grid / subgrid problem (already documented under "No CSS-pixel
-  shortcuts" below).
-- Reaching for `setTimeout` / extra `sleep` to "let things
-  settle" inside production code (test settle is fine). → React
-  state isn't a race; if you need to sequence two updates,
-  derive one from the other.
-- Adding a feature flag / `if (process.env.NODE_ENV)` to bypass
-  StrictMode dev-replay. → StrictMode replay is the test surface;
-  if your effect can't survive it, the effect is wrong.
+### Tests must cover EVERY call site of a shared abstraction
 
-User flagged 2026-05-01 after a fix used live `window.location.search`
-in an effect to disambiguate "tab missing" from "tab=non-Compare,"
-where the established pattern (used twice in the codebase already)
-was a `useRef` once-per-mount gate. Both worked; the hack was
-inconsistent with the codebase and would degrade future
-maintainability. Default: read the surrounding 100 lines first; if
-you see an established pattern for this class of problem, match it.
+When you fix a bug in a shared helper (`useFilterDeps`, `FilterParams`, a SQL generator), the integration test must exercise every page that consumes it — not just the page where the bug surfaced. A test hitting 1 of 10 call sites passes through the next refactor that re-breaks 9 of them.
 
-**Tests must cover EVERY call site of a shared abstraction.** When
-you fix a bug in a shared helper (`useFilterDeps`, `FilterParams`,
-a SQL generator), the integration test must exercise every page
-that consumes it — not just the page where the bug surfaced. A
-test that hits 1 of 10 call sites passes through the next
-refactor that re-breaks 9 of them. Pattern: enumerate the call
-sites with `grep -rn 'helperName' src/` and write one assertion
-per site. User flagged 2026-05-01 after commit `be4d755`
-(useFilterDeps migration) shipped with 83 integration passes
-while silently breaking the inning toggle on every InningToggle
-mount site — the green tests covered only `team_class` clicks,
-the migration's marquee feature. The reference test for this
-shape is `tests/integration/inning_per_page_refetch.sh`: 10 mount
-sites × click-after-mount × 4 toggle states × SQL-anchored DOM
-assertions.
+Pattern: `grep -rn 'helperName' src/` enumerates the sites; write one assertion per site. Reference: `tests/integration/inning_per_page_refetch.sh` — 10 mount sites × click-after-mount × 4 toggle states × SQL-anchored DOM assertions. User flagged 2026-05-01 after commit `be4d755` shipped with 83 integration passes while silently breaking the inning toggle on every InningToggle mount site.
 
-See `internal_docs/local-development.md` for prerequisites, the project-layout cheat sheet, type-check / build commands, troubleshooting, and how to query the DB from a Python REPL.
+### Sparkline / per-item chart bar count must match SQL
 
-## Deploying
+Any chart rendering one bar per (innings / spell / match / event) MUST have an integration assertion that the rendered bar count equals the SQL-anchored item count. The "missing matches" bug on 2026-05-06 was 15 wicketless spells rendering at `height=0` — invisible AND unclickable; SQL said 45, the user counted ~30.
 
-```bash
-bash deploy.sh           # code-only (DB persists on plash)
-bash deploy.sh --first   # uploads cricket.db (~435 MB)
-```
-
-See `internal_docs/deploying.md` for what does/doesn't ship, the deebase vendoring quirk, the `.plash` identity file, and troubleshooting.
-
-## Keeping docs in sync
-
-**Every feature or substantive change must end with a docs pass.** Before calling a change done (and certainly before committing), scan the doc set and update whatever the change affects. Specifically:
-
-- **Added / changed / removed an API route?** Update **`docs/api.md`** — add or amend the endpoint section (path, one-liner, curl, abbreviated JSON response). Hit the endpoint via `curl` to capture a real response rather than inventing one.
-- **Changed a URL scheme, filter param, or response shape on an existing endpoint?** Same — update the affected `docs/api.md` section. Re-curl the example if the shape changed.
-- **Added a new router file, a new page, or a new hook?** Update **`internal_docs/codebase-tour.md`** (both the router summary line and the frontend hooks block).
-- **Shipped a feature that belongs in the A-O narrative?** Add or amend the entry in **`internal_docs/enhancements-roadmap.md`**; done items stay there as historical markers.
-- **Made a non-obvious design decision** (a convention future contributors would otherwise try to change)? Add a bullet to **`internal_docs/design-decisions.md`**.
-- **Added or changed a metric formula** (run rate, economy, win %, a transform, an exclusion rule)? Update the matching section in **`internal_docs/how-stats-calculated.md`** with the new formula + WHY. The doc grows with the codebase; never let a formula go undocumented.
-- **Changed pipeline behaviour, introduced a new invariant the DB must carry, or added a testing workflow?** Touch **`internal_docs/data-pipeline.md`** (and/or `internal_docs/testing-update-recent.md`).
-- **Refactored a shared query helper (`FilterParams`, router filter fns, SQL generators) with many callers?** Run `./tests/regression/run.sh <feature>` against a URL inventory at `tests/regression/<feature>/urls.txt`. Workflow + inventory conventions in **`internal_docs/regression-testing-api.md`** + **`tests/regression/README.md`**. Report the pass count before claiming done.
-- **Intentionally changed the response shape of an endpoint that has REG entries in `urls.txt`?** Flip those lines from `REG` to `NEW` in a **separate, earlier commit** before the shape change itself. The runner keys on the HEAD-side `kind` column (`kind, hh = head[k]` in `run.sh`), so an uncommitted flip has no effect — it has to be in HEAD when the runner stashes. Workflow: (1) commit the `REG→NEW` flip on affected URLs, (2) commit the backend change, (3) run `./tests/regression/run.sh <feature>` — expected output is `0 REG drifted, N NEW changed, 0 NEW unchanged`.
-- **Added a user-visible feature the browser-agent can exercise?** Write or extend the matching **`tests/integration/<feature>.sh`** script. See **`tests/integration/README.md`** for the helper set and when-to-run rules.
-- **Introduced a new perf pattern worth reusing?** Add it to **`internal_docs/perf-leaderboards.md`** (or create a sibling `perf-*.md` if scope is different).
-- **Changed the page structure, tabs, or search-bar landing?** Update **`internal_docs/landing-pages.md`**.
-- **Changed anything user-visible about the home page, filter bar, or global conventions?** Update the relevant narrative doc.
-
-If the change is genuinely trivial (typo, whitespace, one-line comment), skip. Otherwise default to updating — undocumented features decay fastest.
-
-## Commit cadence
-
-**Commit as soon as a feature looks complete — don't batch.** One
-logical change per commit, committed at the moment it reaches a
-runnable state (type-check passing, feature working in the browser,
-tests still green). Sessions that accumulate 30 files of uncommitted
-work across five unrelated features make `git bisect` useless — if a
-later change breaks something that worked two features ago, the
-bisect lands on a mega-commit and the signal is gone. Small commits
-are cheap; lost-bisect debugging is not.
-
-Concretely: if you just finished "X" and "X works", commit X before
-starting "Y". Even if Y is obviously the next step, the atomicity is
-the point. Don't wait for the whole arc to finish.
-
-## Extend existing abstractions — do NOT fork parallel helpers
-
-**Before writing a new helper or component, find the existing API that
-already solves this class of problem, and extend it with a narrow
-option.** The codebase has deliberate, maintained APIs for recurring
-patterns:
-
-- Scope-link URLs → `frontend/src/components/scopeLinks.ts` (`FILTER_KEYS`, `SubscriptSource`, `resolveBucket`, `resolveScopePhrases`, `ScopeContext`)
-- **Team / player / series rendering → `TeamLink.tsx` / `PlayerLink.tsx` / `SeriesLink.tsx`. Before writing ANY navigation to `/teams?…`, `/batting|bowling|fielding|players?…`, or `/series?…` — including raw `<Link>` tags, local URL helpers (`teamUrl`, `teamLinkHref`), or inline render helpers (`renderBatter`, `renderVsTeams`) — READ `internal_docs/links.md`. It documents the name-vs-phrase invariant, `subscriptSource`, `phraseLabel`, the decision tree, common patterns, and the anti-patterns. Nearly every cell you think needs a raw `<Link>` is one or two props on the existing component.**
-- Filter state → `useFilters()`, `FILTER_KEYS`
-- Tabular rendering → `DataTable.tsx`
-- Score rendering → `Score.tsx`
-- Innings-score aggregation in SQL → scalar-subquery pattern from `api/routers/matches.py::inn_rows` / `wkt_rows`
-
-When a new surface's needs don't fit an existing API's shape (label
-text, URL shape, render variant), **add a narrow prop / render-prop /
-override to that API**, don't write a sibling helper that duplicates
-its logic. Duplicated mechanisms drift: one path gets a bug fix, the
-other silently keeps the bug; one path learns a new filter key, the
-other silently ignores it.
-
-If you find yourself typing `teamXHref(...)`, `EdTag`, `scoreCell`,
-`playerYTag` alongside existing `TeamLink` / `Score` / `PlayerLink`,
-stop and ask: **"why can't the existing API do this with one more
-prop?"** The answer is almost always "it can — I just didn't read it
-first." Reading 100 lines of the existing module is cheaper than
-maintaining two pipelines that are supposed to stay in lockstep.
-
-This rule overrides the "just make it work" instinct. A parallel
-helper that works in the current call-site is a liability at every
-call-site that follows.
-
-## No CSS-pixel shortcuts when a structural fix exists
-
-**When a layout problem has a clean structural solution — CSS Grid /
-subgrid for cross-column row alignment, semantic flex for inline
-content, baseline grids for typography — use the structural fix even
-if a `min-height: 4.6rem` / `padding-top: 12px` hack would land in 30
-minutes.** Pixel hacks are tuned to one viewport width, one chip
-density, one font-stack. The next content change (a new metric, a
-longer chip, a different season span) shifts the magic number and
-the layout breaks.
-
-**Tells that you're about to take a shortcut:**
-
-- You're typing `min-height` because "the team col wraps to 2 lines but the avg col fits on 1." → That's a subgrid problem. Make both cells the same grid track and let it size to max content.
-- You're adding `padding-top` to push one element down to match another. → They should be in the same row of a grid.
-- You're using `position: absolute` to overlay something to dodge a sibling's height. → The sibling should be in a separate grid track (or a different DOM ancestor).
-- You're computing pixel values from observed measurements ("agent measured 73px, so I'll use 4.6rem"). → Subgrid would size to 73px without you needing to know the number.
-
-**When the shortcut is genuinely correct:** sub-pixel rounding (e.g.
-`transform: translateY(-1px)` to fix a 0.5px gap), aspect-ratio
-reservation for an image whose dimensions are known at build time,
-padding for visual polish that's not load-bearing for alignment.
-These are *cosmetic* uses; they don't carry alignment correctness on
-their backs.
-
-User feedback that drove this rule (2026-04-27): "shouldn't a grid
-not have this problem?" — yes. If the answer to that question is
-"in principle yes but I took a shortcut," refactor.
-
-## Distribution-panel color discipline (3-tier palette)
-
-**One semantic 3-tier palette is shared across histograms,
-sparklines, AND probability chips on every distribution panel.**
-Never let chip colors drift from the histogram tier color of the
-same threshold — that "the chip is green but the bar at this
-value is gray" inconsistency is what the user flagged twice on
-2026-05-06 ("the colors of the pills did not change in response
-to our color changes" / "Why is the color co-ordination off?").
-
-The three semantic tiers (`frontend/src/components/charts/palette.ts`):
-- **INDIGO** `#7090A8` — poor outcome for the player
-- **SAGE**   `#7A8E6A` — typical
-- **OCHRE**  `WISDEN.ochre` — really good ("hot")
-
-**Polarity convention** — color is tied to OUTCOME for the player,
-not bin index:
-- Higher-is-better metrics (runs, wickets, SR): low→indigo,
-  mid→sage, high→ochre.
-- Lower-is-better metrics (economy, runs conceded): low→ochre,
-  mid→sage, high→indigo (polarity flipped — low econ is good).
-
-**Chip-tint helper:** `WISDEN_TIER_TINTS` exports `{indigo, sage,
-ochre}` → `{bg: rgba, fg: hex}` pairs. The `ProbChip` component
-takes a `tint` prop directly (not a `polarity`); each chip caller
-picks the tier its threshold falls in. So `<ProbChip
-tint={T_OCHRE} ...>` for `P(≥3)` on the wickets tab matches the
-strike-tier histogram bar at value 3.
-
-**Reds are reserved for the rolling-mean overlay (oxbow)** —
-NEVER used in tier coloring. The "failure"/"wicketless" tier was
-flipped from muted red to muted indigo on 2026-05-06 so red
-exclusively signals the rolling overlay.
-
-**Sparkline visual contract** (codified
-`frontend/src/components/distribution/DistributionSparkline.tsx`):
-- Bar opacity 0.8 (blue/indigo tier overrides to 1.0 — washes
-  out worst at 0.8); per-bar `opacity` field on `SparklinePoint`.
-- Reference lines: black scope-baseline (2px) + gray gender-global
-  (1.5px) + red rolling-10 mean (1.2px) on the Scope window only.
-- Below-baseline 4px stub zone — every bar (including value=0)
-  has a clickable footprint; the user-flagged "missing matches"
-  bug was zero-height bars vanishing.
-- Mobile (< 720px): bar `<a>`s get `pointer-events: none` —
-  sparkline is impressionistic only; navigation via the season-
-  tick axis context + the page's existing By Innings tab.
-
-Spec: `internal_docs/spec-distribution-stats.md` §10.3 +
-§12.2.6.
-
-## FilterBar cascade-clear rule (auto-correct loops)
-
-**When the user clears a coupled filter (gender / team_type),
-also clear any dependent narrowing (tournament).** The FilterBar
-runs auto-correct deep-link effects that fill missing fields from
-a tournament's metadata (e.g. tournament=IPL → team_type=club).
-If the user then clears team_type back to "All" but tournament
-stays, the auto-correct re-asserts team_type=club from the
-tournament. "Spring-back" UX bug — flagged 2026-05-06.
-
-The fix in `setGender` / `setTeamType`: cascade-clear the
-dependent tournament when v is empty OR mismatched. Pattern:
-```ts
-if (t && (!v || t.team_type !== v)) updates.tournament = ''
-```
-NOT `if (t && v && t.team_type !== v)` — the `&& v &&`
-short-circuits on the user's "clear" click.
-
-**When adding a NEW auto-correct deep-link effect:** make sure
-the user-clearing path on every filter that participates also
-cascade-clears the inferred narrowings — otherwise the auto-
-correct loop fights the user. Test coverage:
-`tests/integration/filterbar_cascade_clear.sh`.
-
-## Traffic-light WISDEN_WL palette is reserved for Splits Mosaic
-
-The Splits Mosaic introduces a third palette block in
-`frontend/src/components/charts/palette.ts`:
-
-```ts
-export const WISDEN_WL = {
-  won:   '#4B7A3B',  // muted green
-  tied:  '#C9A636',  // muted amber
-  lost:  '#B85450',  // brick red
-}
-```
-
-**Reserved for outcome encoding in the Splits Mosaic ONLY.**
-Other places in the codebase use:
-- `WISDEN_RUN_TIERS` / `WISDEN_WICKET_TIERS` / `WISDEN_SR_TIERS` /
-  `WISDEN_LOWER_TIERS` — indigo/sage/ochre 3-tier palette for
-  metric magnitude (low/typical/high).
-- `WISDEN.oxblood` — 1.2px stroke for the rolling-mean overlay.
-- `WISDEN.forest` — 1.5px stroke for the league-avg reference
-  line on team distribution sparklines.
-
-The W/L palette is intentionally chosen to AVOID those:
-- Green here (`#4B7A3B`) is brighter than the forest reference
-  line (`#3F7A4D`) so it reads as a fill at cell scale.
-- Red here (`#B85450`) is distinct from oxblood (`#7A1F1F`) so
-  a W/L cell and a rolling-mean overlay never visually collide.
-
-**Tells you might be about to break this:**
-- You're adding red as a fill anywhere else — STOP. Reds are
-  reserved for oxblood (overlay strokes) and the WISDEN_WL.lost
-  fill (mosaic only).
-- You're adding a new mosaic conditioning axis encoded by color
-  instead of spatially — STOP. Color is OUTCOME's permanent
-  slot; new axes must be spatial. The Splits Mosaic's fixed axis
-  ordering (toss → inning → result) encodes this guarantee.
-- You're tinting metric tiers with green/red — STOP. Tier
-  coloring stays indigo/sage/ochre. The codebase deliberately
-  has TWO color vocabularies (magnitude vs outcome); blurring
-  them breaks the reader's eye.
-
-Spec: `internal_docs/spec-splits-mosaic.md` §2.2, §3.5.
-
-## Splits Mosaic — dimensionality is URL-derived; aux outcome filters need ?team=
-
-The Splits Mosaic is a filter widget that LOOKS like a stat
-chart. Three aux URL params drive its visual density:
-
-| URL params set | Layout |
-|---|---|
-| 0 | 2×2 (toss × inning) cells with W/T/L sub-rects per cell |
-| 1 | 2×2 of the two free axes |
-| 2 | 1D horizontal stacked bar of the one free axis |
-| 3 | verbose colloquial status strip only — "Won toss · Batted first · Won the game — 3 matches" |
-
-No internal state for expanded/collapsed. The URL IS the state.
-A share-link to a 0-free case reproduces the verbose strip;
-a share-link to a 3-free landing reproduces the full mosaic.
-
-**`result` and `toss_outcome` aux filters require a subject
-team.** Without `?team=`, the league-side query unpivots every
-match into 2 team-views — and "won" within that unpivot is
-tautologically 50% (every win has a loss). The `/teams/splits`
-endpoint returns HTTP 400 when either aux is set without
-`?team=`, making the asymmetry observable instead of silently
-degenerate. `aux.inning` works fine without `?team=` (each
-team-view independently batted first or second).
-
-Tells you might be about to break this:
-- You're tempted to add `result` / `toss_outcome` to FILTER_KEYS
-  so they appear in the FilterBar UI. → DON'T. They're
-  AuxParams (per `feedback_no_filterbar_explosion` discipline)
-  and they don't have meaning on Series / Venues / Search
-  pages where there's no canonical team subject.
-- You're tempted to compute "share" using the unfiltered total
-  even after an aux narrowing is applied. → DON'T. Shares + the
-  scope_total_n header should reflect the FILTERED slice so
-  proportions sum to 1.0 within the narrowing. (Bug landed +
-  fixed in commit 5f91ce2 — captured here so the next iteration
-  doesn't re-introduce it.)
-
-Spec: `internal_docs/spec-splits-mosaic.md` §1.4, §3.
-
-## Sparkline / per-item chart bar count must match SQL
-
-**Any chart rendering one bar per (innings / spell / match /
-event) MUST have an integration assertion that the rendered bar
-count equals the SQL-anchored item count.** The user-flagged
-"missing matches" bug on 2026-05-06 was 15 wicketless spells
-rendering with `height=0` → invisible AND unclickable; SQL said
-45 spells, the user counted ~30 visible bars.
-
-Pattern (see `tests/integration/bowler_distribution.sh` Test 1
-+ `batter_distribution.sh` Test 8):
 ```bash
 sql_n=$(sql "$INNS_SQL")
 dom_n=$(ab_eval "document.querySelectorAll('.wisden-dist-sparkline rect[opacity]').length")
 assert_eq "Bar count == SQL n_innings" "$sql_n" "$dom_n"
 
 zero_h=$(ab_eval "Array.from(...).filter(r => parseFloat(r.getAttribute('height')) <= 0).length")
-assert_eq "No height=0 bars (would be invisible)" "0" "$zero_h"
+assert_eq "No height=0 bars" "0" "$zero_h"
 ```
 
-The class of bug this catches: any per-item chart where some
-items render at zero size (height/width/area) and silently vanish
-from the DOM-visible count even though they exist in the data.
+Reference: `tests/integration/bowler_distribution.sh` Test 1, `batter_distribution.sh` Test 8.
 
-## Scope-anchored form-window cutoffs
+### Integration tests anchor against `/summary`'s scope_avg, not re-derived SQL
 
-Distribution-panel calendar form windows (`last_60d` / `last_6mo`
-/ `last_1yr`) compute cutoffs against `anchor = min(today,
-max_obs_date)`, NOT today directly. For active subjects in
-unconstrained scopes the anchor IS today; for retired subjects
-(Gayle, ABdV) and tightly-scoped subjects the anchor follows
-the data — the windows mean "the last N calendar days OF
-SCOPE." Today-direct cutoffs produced empty windows for
-retired players and for filter-pinned scopes (e.g. Kohli@IPL
-2016 with `dist_window=last_1yr`); user-flagged 2026-05-08.
-
-Single helper at `api/form_windows.py::scope_anchor`. All
-three distribution slices import it. New endpoints (e.g. team
-distribution, future v2 follow-ups) MUST use it; do NOT
-re-introduce raw `today - timedelta(days=N)` cutoffs.
-
-Spec: `internal_docs/spec-distribution-stats.md §8.6` +
-`internal_docs/design-decisions.md` "Form-window cutoffs are
-scope-anchored, not today-anchored".
-
-## Player/team-aware seasons + scope-anchored quick-select buttons
-
-`/api/v1/seasons` accepts `?person_id=` and `?team=` so the
-seasons array reflects the subject's actual career-in-scope.
-Frontend `getSeasons()` forwards the URL `?player=` as
-`?person_id=` (preserves both naming conventions).
-
-The FilterBar quick-select buttons (`first-3` / `all-time` /
-`prev-3` / `last-3` / `latest`) all read from this array →
-all are subject-aware automatically. Concretely:
-- `last-3` on AB de Villiers' page sets the range to
-  2019/20-2021 (his actual final seasons), NOT 2024-2026 (the
-  dataset's latest).
-- `first-3` on Kohli sets 2007/08-2009/10 (his earliest 3),
-  NOT the dataset's earliest.
-
-Adding a new FilterBar season button or extending the
-seasons-narrowing logic? The seasons fetch is already
-subject-aware; just slice the array. Don't re-fetch with
-different args. New /seasons-consuming endpoints elsewhere?
-Honour the `person_id` / `team` query params symmetrically
-unless there's a specific reason not to.
-
-Spec: `internal_docs/design-decisions.md` "FilterBar
-season-window quick-select buttons — scope-aware AND
-player-aware".
-
-## Status bar derives "all-time" range; URL stays clean
-
-When a subject is in URL (`?player=X` or `?team=X`) and the
-user hasn't picked a season range, `ScopeStatusStrip` derives
-`Season: 2005/06–2021 (all-time)` from the seasons fetch and
-displays it with an italic faint `(all-time)` suffix to signal
-"computed, not picked." **The URL is NOT auto-mutated.**
-
-Why URL-clean: an earlier auto-default
-(`useDefaultSeasonWindow`) silently wrote `season_from`/`to`
-on landings. User flagged: "I changed my mind — landings now
-open all-time by default rather than silently pinning"
-(commit `700d11b`, 2026-04-20). The keyword was *silently*.
-
-Rule: the URL is a faithful record of user choice. Computed
-values display in the status bar with a visual cue, never as
-URL params written without user action. If you find yourself
-adding a `setUrlParams` call in a `useEffect` to "make the URL
-explicit" — STOP. Compute it for display instead.
-
-Spec: `internal_docs/design-decisions.md` "Status bar
-computes the all-time season range".
-
-## Dormancy badge — page-header only, hybrid duration/calendar text
-
-When a subject's last match in scope is more than 60 days
-before today, a small italic badge renders next to the subject
-name in `ScopedPageHeader`:
-
-| Gap | Badge |
-|---|---|
-| ≤ 60 days | (hidden — active in scope) |
-| 61-364 days | `5 months since last match` |
-| ≥ 365 days | `last match: Oct 2021` |
-
-Page header ONLY (NOT in the status strip — strip describes
-URL state, dormancy is derived player state; same axis-
-separation principle as the status-bar derive-without-mutate
-rule).
-
-Anchoring on a date (calendar form) for year-plus gaps avoids
-the artificial ceiling of an earlier `(0 in 1y+)` form, which
-silently understated multi-year dormancies (ABdV's 4.5y
-dormancy showed as "1y+" — under-stated by 3.5 years).
-
-Wired via `last_match_date` field on the distribution
-endpoints' lifetime block; pages populate `DormancyContext`
-after the dossier fetch. Adding a new subject-page Distribution
-panel? Plumb `last_match_date` into the context the same way.
-Adding a new endpoint that needs the dormancy signal? Surface
-`last_match_date` on the lifetime block, not on a sibling
-summary endpoint (avoids 200-URL regression rotations across
-unrelated suites).
-
-Spec: `internal_docs/design-decisions.md` "Dormancy badge".
-
-## Catches counts include caught-and-bowled (Convention 3)
-
-When writing or auditing any endpoint that surfaces a `catches`
-headline at fielder OR team grain, the predicate MUST be
-`fc.kind IN ('caught', 'caught_and_bowled')` AND
-`COALESCE(fc.is_substitute, 0) = 0`. C&B is a catch — both in
-cricket terms and in this codebase's "Convention 3" (codified
-2026-04-26 across all `/summary` endpoints; the contract is
-"`catches` is the inclusive total, `caught_and_bowled` is a
-sub-count broken out separately so consumers summing both would
-double-count").
-
-The two distribution endpoints shipped 2026-05-07/08 inadvertently
-counted `kind = 'caught'` only, silently dropping ~6% of MI's IPL
-catches and 27% of Bumrah's career catches before being fixed
-2026-05-08. The spec text and the integration test SQL both
-shared the bug — SQL-anchoring tests against the buggy API
-predicate is internally consistent but semantically wrong.
-
-**Substitute_catches is the explicit exception** — predicate
-stays `kind = 'caught'` only because substitutes can't bowl by
-Law (zero C&B-by-substitute exists in the data) AND it's a
-reconciliation scalar surfaced separately for verification
-against /summary, not part of the catches block.
-
-**Tells you might be about to repeat the bug:**
-- Typing `kind = 'caught'` for a catches headline → inclusive
-  predicate per Convention 3.
-- Reading spec §13/§16 from memory and trusting the text — the
-  spec was wrong before the 2026-05-08 fix.
-- Integration test passes with `kind = 'caught'` → verify
-  against `/summary`'s catches count (which uses the inclusive
-  predicate) as a cross-check before trusting.
-
-Spec: `internal_docs/design-decisions.md` "Convention 3 applies
-to distribution endpoints, not just /summary".
-
-## Substitute fielders — INCLUDED in /leaders, EXCLUDED in /distribution (by design)
-
-The two endpoints apply different `is_substitute` predicates **intentionally**:
-
-- `/fielders/leaders.catches` — NO `is_substitute` filter. Volume
-  leaderboard ranks "who took the most catches in scope, period."
-- `/fielders/{id}/distribution` per-match `catches` —
-  `is_substitute = 0` filter. The master sample is `matchplayer`-
-  based (matches the player was in the squad); substitute
-  appearances aren't in that sample, so counting substitute
-  catches against the matchplayer denominator would miscalibrate
-  per-match averages.
-- `/fielders/{id}/distribution.lifetime.substitute_catches` —
-  sibling reconciliation scalar (`is_substitute = 1`).
-- `/fielders/{id}/summary.catches` — NO filter (volume framing,
-  matches /leaders).
-
-The asymmetry is **structural** (sample-denominator consistency),
-NOT a normative judgment that subs don't deserve credit. A sub
-who took a catch took a catch — leaderboards reflect that;
-per-match-rate panels can't fold them in without breaking the
-denominator.
-
-**Tells you might be about to break this:**
-- Adding `AND is_substitute = 0` to `/fielders/leaders.catches`
-  to "fix consistency" — DON'T. The asymmetry is intentional.
-- Adding a sub-only match to /distribution's master sample to
-  "include sub catches" — would change /distribution's semantic
-  axis from "matches you played in the squad" to something
-  fuzzier; not the right fix.
-- A new endpoint surfacing a `catches` headline that joins
-  `matchplayer` for the master sample — apply `is_substitute = 0`
-  on the catches predicate to match /distribution. New endpoint
-  that's pure volume aggregation (no matchplayer join) — leave
-  subs in to match /leaders.
-
-**Tested by:** `tests/sanity/test_catches_convention3.py::assert_leaders_substitute_leak`
-locks the algebraic identity
-`leaders.catches - distribution.catches.total == distribution.substitute_catches`.
-
-Spec: `internal_docs/how-stats-calculated.md` §Fielding
-"Substitute fielders — INCLUDED in /leaders, EXCLUDED in
-/distribution (intentional asymmetry)".
-
-## DLS-truncated innings — INCLUDED everywhere (no filter)
-
-DLS-shortened chases (`innings.target_overs < 20`) are NOT
-filtered or branched on anywhere in `api/routers/`. ~5.9% of
-2nd innings in `cricket.db` are DLS-shortened (724 of 12,248).
-The handling is intentional and codified — when adding any new
-metric or endpoint, do NOT introduce a `target_overs` filter
-without re-reading the resolution.
-
-**Two-class rule:**
-
-- **Overs/balls-denominator stats** (run rate, economy, SR,
-  boundary %, dot %, phase rates) — DLS-safe by construction.
-  Every overs-denominator stat divides by actual legal-ball
-  counts from the `delivery` table; never by an assumed-20-overs
-  number. Verified: zero hardcoded `20` or `20.0` denominators
-  in `api/routers/`. A 12-over DLS chase contributes its real
-  ~60-72 legal balls and the math works correctly.
-
-- **Innings-denominator stats** (Avg innings total, mean_per_innings,
-  wickets_lost / innings_batted, dismissals_per_match) — DLS
-  innings count as 1 innings each. The cricket logic: a 90-run
-  DLS chase that ended in over 12 is structurally identical to
-  a 90-run fast chase that ended in over 12 of a normal 20-over
-  game. Both played one innings, both scored runs, both ended
-  early. Filtering DLS without also filtering fast-chase /
-  all-out-early innings would be inconsistent.
-
-**Tells you might be about to break this:**
-- You're tempted to add `WHERE i.target_overs IS NULL OR i.target_overs = 20`
-  to a per-innings denominator. → Don't. The mixed treatment
-  with fast-chase innings is the bug.
-- You're hardcoding `20` as a divisor anywhere — even inside a
-  comment-stripped formula. → Use the actual ball count from the
-  delivery table.
-- A new endpoint surfaces a "per-innings X" — verify it uses
-  `count(distinct innings.id)` consistently and doesn't accidentally
-  filter DLS via a JOIN that requires `target_overs = 20`.
-
-**Concrete impact** (Mumbai Indians IPL): 0.36 runs/innings swing
-on Avg innings total from including DLS — small at scale, larger
-on narrow scopes; accepted as the correct cricket story.
-
-**Tested by:** `tests/sanity/test_predicate_invariants.py` —
-prints variant-axis inventory + asserts `declared`/`forfeited`
-stay at zero (non-zero ⇒ schema/data changed and policy needs
-re-decision).
-
-Spec: `internal_docs/how-stats-calculated.md` "DLS-truncated
-innings (target_overs < 20) — INCLUDED everywhere" +
-`internal_docs/server-vs-client-calcs.md` §3.5.
-
-## Legend swatch alignment in distribution panels
-
-When rendering a `<swatch> + <label>` pair inside a row that uses
-`align-items: baseline` (every distribution panel's sparkline
-caption row), do NOT wrap the pair in `<span style="display:
-inline-flex; align-items: center">`. The inline-flex baseline
-resolves to bottom-of-swatch (the inline-block child), which sits
-ABOVE the surrounding text baselines and pushes the label
-visibly lower than the leading caption ("oldest ← bars … → most
-recent") on the same row.
-
-Pattern (from commit b770918, applied to all 5 distribution
-panels 2026-05-08):
-
-```jsx
-<span>
-  <span aria-hidden="true" style={{
-    display: 'inline-block', width: 14, height: 1.5,
-    background: COLOR,
-    verticalAlign: 'middle',
-    marginRight: '0.3rem',
-    position: 'relative', top: '-0.1em',  // optical-centre nudge
-  }} />
-  label text
-</span>
-```
-
-The `top: -0.1em` nudge sits the swatch at the optical centre of
-the text x-height (which differs from the geometric centre when
-the font has descenders).
-
-## Distribution-panel reference lines — three semantic anchors
-
-The team distribution sparklines render up to four reference
-lines, three of which carry distinct semantic meanings (the
-fourth is the rolling-mean overlay). Naming + color discipline:
-
-| Line | Color | Reads | Source |
-|---|---|---|---|
-| **Scope average** | black `#1A1714` 2px | THIS team's mean over its actual innings in the active scope (1st + 2nd combined unless `?inning=` filter is active) | `lifetime.X.mean_per_innings` from the distribution endpoint |
-| **League avg** | forest `#3F7A4D` 1.5px | EVERY team's mean over its innings in the active scope (the same-scope league baseline) | `summary.X.scope_avg` from the existing `/summary` endpoint envelope — already fetched by the parent tab; no new HTTP roundtrip |
-| **Gender-global** | gray `#8A7D70` 1.5px | EVERY team's mean across ALL T20 cricket at gender grain (whole-number anchor; ignores other filters) | hard-coded constants in `globalBaselines.ts` (refresh yearly) |
-| **Rolling-10 mean** | oxblood `#7A1F1F` 1.2px | 10-innings rolling-mean overlay on the Scope window only when n_innings ≥ 10 | derived from `observations[]` |
-
-**Wiring discipline:** when adding a new metric tab to a team
-panel, plumb the per-metric `scope_avg` from the parent's
-summary fetch into the panel's `leagueAvg` prop. Don't add a
-backend field for it on the distribution endpoint — the
-duplication forces a regression-suite churn AND mismatches the
-existing `MetricDelta withScopeAvg` plumbing pattern that all
-the StatCard subtitles use.
-
-## Integration tests anchor against /summary's scope_avg, not re-derived SQL
-
-When testing a UI element that displays a value the API computes
-via the dual-query envelope pattern (the `team=None` league-side
-fetch combined with the team-side fetch — used for every
-`MetricEnvelope.scope_avg` field), pull the expected value from
-the `/summary` endpoint via `curl` rather than re-deriving it in
-SQL. Same self-anchoring discipline as the SQL-vs-DOM tests, but
-the source of truth is the API instead of the database — because
-the API is the actual computation under test.
-
-Pattern (see `tests/integration/team_batting_distribution.sh`
-Test 11 / 12):
+When testing a UI element that displays a value the API computes via the dual-query envelope (the `team=None` league-side fetch combined with team-side — every `MetricEnvelope.scope_avg`), pull the expected value from `/summary` via `curl` rather than re-deriving it in SQL. Re-deriving league-avg in SQL inside the integration test is brittle (200+ lines of denominator logic) AND tests the wrong layer; `/summary`'s sanity tests cover SQL↔API, the integration test covers API↔DOM plumbing.
 
 ```bash
 api_summary=$(curl -s "$API_BASE/api/v1/teams/$TEAM_URL/batting/summary?$SCOPE_URL")
@@ -932,9 +295,141 @@ dom_legend=$(ab_eval "...legend element innerText...")
 assert_contains "legend matches API scope_avg" "league avg $expected_scope_avg" "$dom_legend"
 ```
 
-Re-deriving league-avg in SQL inside the integration test is
-brittle (the league-avg computation has 200+ lines of denominator
-logic — `_apply_fielding_per_innings`, super-over exclusion,
-inning-aux halving, etc.) AND tests the wrong layer. The /summary
-endpoint's own sanity tests cover the SQL-vs-API correctness; the
-integration test covers the API-vs-DOM plumbing.
+Reference: `tests/integration/team_batting_distribution.sh` Test 11 / 12.
+
+---
+
+## Cricket invariants
+
+### Catches counts include caught-and-bowled (Convention 3)
+
+When writing or auditing any endpoint that surfaces a `catches` headline at fielder OR team grain, the predicate MUST be `fc.kind IN ('caught', 'caught_and_bowled')` AND `COALESCE(fc.is_substitute, 0) = 0`. C&B is a catch — both in cricket terms and in this codebase's "Convention 3" (codified 2026-04-26 across all `/summary` endpoints; the contract is "`catches` is the inclusive total, `caught_and_bowled` is a sub-count broken out separately so consumers summing both would double-count").
+
+The two distribution endpoints shipped 2026-05-07/08 inadvertently counted `kind = 'caught'` only, silently dropping ~6% of MI's IPL catches and 27% of Bumrah's career catches before being fixed 2026-05-08. The spec text and the integration test SQL both shared the bug — SQL-anchoring tests against the buggy API predicate is internally consistent but semantically wrong.
+
+**Substitute_catches is the explicit exception** — predicate stays `kind = 'caught'` only because substitutes can't bowl by Law (zero C&B-by-substitute exists in the data) AND it's a reconciliation scalar surfaced separately for verification against /summary, not part of the catches block.
+
+**Tells you might be about to repeat the bug:**
+- Typing `kind = 'caught'` for a catches headline → inclusive predicate per Convention 3.
+- Reading spec §13/§16 from memory and trusting the text — the spec was wrong before the 2026-05-08 fix.
+- Integration test passes with `kind = 'caught'` → verify against `/summary`'s catches count (inclusive predicate) as a cross-check before trusting.
+
+Spec: `design-decisions.md` "Convention 3 applies to distribution endpoints, not just /summary".
+
+### Substitute fielders — INCLUDED in /leaders, EXCLUDED in /distribution (by design)
+
+The two endpoints apply different `is_substitute` predicates **intentionally**:
+
+- `/fielders/leaders.catches` — NO `is_substitute` filter. Volume leaderboard ranks "who took the most catches in scope, period."
+- `/fielders/{id}/distribution` per-match `catches` — `is_substitute = 0` filter. The master sample is `matchplayer`-based (matches the player was in the squad); substitute appearances aren't in that sample, so counting substitute catches against the matchplayer denominator would miscalibrate per-match averages.
+- `/fielders/{id}/distribution.lifetime.substitute_catches` — sibling reconciliation scalar (`is_substitute = 1`).
+- `/fielders/{id}/summary.catches` — NO filter (volume framing, matches /leaders).
+
+The asymmetry is **structural** (sample-denominator consistency), NOT a normative judgment that subs don't deserve credit. A sub who took a catch took a catch — leaderboards reflect that; per-match-rate panels can't fold them in without breaking the denominator.
+
+**Tells you might be about to break this:**
+- Adding `AND is_substitute = 0` to `/fielders/leaders.catches` to "fix consistency" — DON'T.
+- Adding a sub-only match to /distribution's master sample to "include sub catches" — would change /distribution's semantic axis from "matches you played in the squad" to something fuzzier; not the right fix.
+- A new endpoint surfacing a `catches` headline that joins `matchplayer` for the master sample — apply `is_substitute = 0` to match /distribution. A new endpoint that's pure volume aggregation (no matchplayer join) — leave subs in to match /leaders.
+
+**Tested by:** `tests/sanity/test_catches_convention3.py::assert_leaders_substitute_leak` locks the algebraic identity `leaders.catches - distribution.catches.total == distribution.substitute_catches`.
+
+Spec: `how-stats-calculated.md` §Fielding "Substitute fielders — INCLUDED in /leaders, EXCLUDED in /distribution (intentional asymmetry)".
+
+### DLS-truncated innings — INCLUDED everywhere (no filter)
+
+DLS-shortened chases (`innings.target_overs < 20`) are NOT filtered or branched on anywhere in `api/routers/`. ~5.9% of 2nd innings in `cricket.db` are DLS-shortened (724 of 12,248). The handling is intentional and codified — do NOT introduce a `target_overs` filter without re-reading this section.
+
+**Two-class rule:**
+
+- **Overs/balls-denominator stats** (run rate, economy, SR, boundary %, dot %, phase rates) — DLS-safe by construction. Every overs-denominator stat divides by actual legal-ball counts from `delivery`; never by an assumed-20-overs number. Verified: zero hardcoded `20` or `20.0` denominators in `api/routers/`. A 12-over DLS chase contributes its real ~60-72 legal balls and the math works.
+
+- **Innings-denominator stats** (Avg innings total, mean_per_innings, wickets_lost / innings_batted, dismissals_per_match) — DLS innings count as 1 innings each. The cricket logic: a 90-run DLS chase that ended in over 12 is structurally identical to a 90-run fast chase that ended in over 12 of a normal 20-over game. Both played one innings, both scored runs, both ended early. Filtering DLS without also filtering fast-chase / all-out-early innings would be inconsistent.
+
+**Tells you might be about to break this:**
+- Tempted to add `WHERE i.target_overs IS NULL OR i.target_overs = 20` to a per-innings denominator. → Don't. The mixed treatment with fast-chase innings is the bug.
+- Hardcoding `20` as a divisor anywhere. → Use the actual ball count from delivery.
+- New endpoint surfaces a "per-innings X" — verify it uses `count(distinct innings.id)` consistently and doesn't accidentally filter DLS via a JOIN that requires `target_overs = 20`.
+
+**Concrete impact** (Mumbai Indians IPL): 0.36 runs/innings swing on Avg innings total from including DLS — small at scale, larger on narrow scopes; accepted as the correct cricket story.
+
+**Tested by:** `tests/sanity/test_predicate_invariants.py` — prints variant-axis inventory + asserts `declared`/`forfeited` stay at zero (non-zero ⇒ schema/data changed, policy needs re-decision).
+
+Spec: `how-stats-calculated.md` "DLS-truncated innings (target_overs < 20) — INCLUDED everywhere" + `server-vs-client-calcs.md` §3.5.
+
+### Scope-anchored form-window cutoffs
+
+Distribution-panel calendar form windows (`last_60d` / `last_6mo` / `last_1yr`) compute cutoffs against `anchor = min(today, max_obs_date)`, NOT today directly. For active subjects in unconstrained scopes the anchor IS today; for retired subjects (Gayle, ABdV) and tightly-scoped subjects the anchor follows the data — the windows mean "the last N calendar days OF SCOPE." Today-direct cutoffs produced empty windows for retired players and for filter-pinned scopes (e.g. Kohli@IPL 2016 with `dist_window=last_1yr`).
+
+Single helper at `api/form_windows.py::scope_anchor`. All three distribution slices import it. New endpoints MUST use it; do NOT re-introduce raw `today - timedelta(days=N)` cutoffs.
+
+Spec: `spec-distribution-stats.md §8.6` + `design-decisions.md` "Form-window cutoffs are scope-anchored, not today-anchored".
+
+### Player/team-aware seasons + scope-anchored quick-select buttons
+
+`/api/v1/seasons` accepts `?person_id=` and `?team=` so the seasons array reflects the subject's actual career-in-scope. Frontend `getSeasons()` forwards URL `?player=` as `?person_id=`.
+
+The FilterBar quick-select buttons (`first-3` / `all-time` / `prev-3` / `last-3` / `latest`) all read from this array → all are subject-aware automatically. Concretely: `last-3` on ABdV sets 2019/20-2021 (his actual final seasons), NOT 2024-2026; `first-3` on Kohli sets 2007/08-2009/10.
+
+Adding a new FilterBar season button? Slice the array; don't re-fetch with different args. New /seasons-consuming endpoints elsewhere? Honour `person_id` / `team` query params symmetrically.
+
+Spec: `design-decisions.md` "FilterBar season-window quick-select buttons — scope-aware AND player-aware".
+
+---
+
+## Page conventions
+
+### Status bar derives "all-time" range; URL stays clean
+
+When a subject is in URL (`?player=X` or `?team=X`) and the user hasn't picked a season range, `ScopeStatusStrip` derives `Season: 2005/06–2021 (all-time)` from the seasons fetch and displays it with an italic faint `(all-time)` suffix to signal "computed, not picked." **The URL is NOT auto-mutated.**
+
+Rule: the URL is a faithful record of user choice. Computed values display in the status bar with a visual cue, never as URL params written without user action. See the URL-clean rule under [Code patterns](#code-patterns).
+
+Spec: `design-decisions.md` "Status bar computes the all-time season range".
+
+### Dormancy badge — page-header only
+
+When a subject's last match in scope is more than 60 days before today, a small italic badge renders next to the subject name in `ScopedPageHeader`:
+
+| Gap | Badge |
+|---|---|
+| ≤ 60 days | (hidden — active in scope) |
+| 61–364 days | `5 months since last match` |
+| ≥ 365 days | `last match: Oct 2021` |
+
+Page header ONLY (NOT in the status strip — strip describes URL state, dormancy is derived player state; same axis-separation principle as the URL-clean rule).
+
+Wired via `last_match_date` on the distribution endpoints' lifetime block; pages populate `DormancyContext` after the dossier fetch. Adding a new subject-page Distribution panel? Plumb `last_match_date` into the context the same way. New endpoint that needs the dormancy signal? Surface `last_match_date` on the lifetime block (avoids 200-URL regression rotations).
+
+Spec: `design-decisions.md` "Dormancy badge".
+
+---
+
+## Palette
+
+Three palette systems, never blurred:
+
+- **Magnitude tiers** (indigo / sage / ochre) — histograms, sparklines, ProbChips on Distribution panels. Polarity tied to OUTCOME for the player (high SR = ochre; high econ = indigo).
+- **Outcome traffic light** (`WISDEN_WL` green/amber/red) — **Splits Mosaic only**.
+- **Accent strokes** — oxblood `#7A1F1F` for rolling-mean overlay, forest `#3F7A4D` for league-avg reference line.
+
+Reds are reserved across the whole codebase: oxblood (strokes) and `WISDEN_WL.lost` (Mosaic cells). Nowhere else.
+
+Full rules — polarity convention, `WISDEN_TIER_TINTS` chip helper, sparkline visual contract, reference-line table, legend-swatch alignment pattern — in **`internal_docs/colors.md`**.
+
+---
+
+## Splits Mosaic
+
+The Mosaic is a filter widget that LOOKS like a stat chart. URL params drive the visual density (no internal state for expanded/collapsed):
+
+| Aux URL params set | Layout |
+|---|---|
+| 0 | 2×2 (toss × inning) cells with W/T/L sub-rects per cell |
+| 1 | 2×2 of the two free axes |
+| 2 | 1D horizontal stacked bar of the one free axis |
+| 3 | verbose colloquial status strip — "Won toss · Batted first · Won the game — 3 matches" |
+
+`result` and `toss_outcome` aux filters **require `?team=`** (without a subject team, the unpivoted league-side view makes "won" tautologically 50%). `/teams/splits` returns HTTP 400 when either aux is set without `?team=`.
+
+Full rules — aux semantics, palette reservation, share-denominator-follows-filter, tells — in **`internal_docs/splits-mosaic-discipline.md`**. Design specs: `spec-splits-mosaic.md` (Teams-only — implemented 2026-05-11), `splits-mosaic-cross-page.md` (cross-page reuse DESIGN).
