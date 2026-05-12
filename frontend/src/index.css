@@ -2435,19 +2435,17 @@ a { color: inherit; }
 .wisden-splits-clear-link {
   background: none;
   border: none;
-  border-bottom: 1px solid transparent;
   padding: 0.1rem 0;
   font: inherit;
   color: var(--ink);
   cursor: pointer;
-  transition: color 120ms, border-color 120ms;
+  transition: color 120ms;
   display: inline-flex;
   align-items: baseline;
   gap: 0.4em;
 }
 .wisden-splits-clear-link:hover {
   color: var(--accent);
-  border-bottom-color: var(--accent);
 }
 .wisden-splits-marginal-row-secondary {
   margin-top: -0.2rem;
@@ -2457,7 +2455,6 @@ a { color: inherit; }
 .wisden-splits-outcome-link {
   background: none;
   border: none;
-  border-bottom: 1px solid transparent;
   padding: 0.1rem 0;
   font: inherit;
   /* Color is set inline per outcome (WISDEN_WL_TINTS.fg). */
@@ -2465,15 +2462,13 @@ a { color: inherit; }
   display: inline-flex;
   align-items: center;
   gap: 0.3em;
-  transition: color 120ms, border-color 120ms;
+  transition: color 120ms;
 }
 .wisden-splits-outcome-link:hover {
   color: var(--accent) !important;
-  border-bottom-color: var(--accent);
 }
 .wisden-splits-outcome-link.is-active {
   color: var(--accent) !important;
-  border-bottom-color: var(--accent);
 }
 .wisden-splits-outcome-swatch {
   display: inline-block;
@@ -2481,6 +2476,29 @@ a { color: inherit; }
   height: 12px;
   border-radius: 2px;
   vertical-align: middle;
+}
+/* In-cell .comp-link override — the count inside a colored sub-rect
+   (white on green/red, dark on amber) needs the underline to ride on
+   currentColor so it stays legible at rest; the default
+   var(--rule-soft) faint cream would vanish on the colored fill.
+   Hover keeps comp-link's standard oxblood swap (color +
+   border-bottom-color → var(--accent)) for the link affordance —
+   without the explicit :hover rule below, the rest-rule's higher
+   specificity would override .comp-link:hover and the link would
+   look static. */
+.wisden-splits-subrect .comp-link {
+  color: inherit;
+  border-bottom-color: currentColor;
+  /* The parent `.wisden-splits-subrect-label` sets pointer-events:
+     none so clicks pass through to the rect's onClick. Re-enable on
+     the link so :hover fires — the click still bubbles up to the
+     rect's handler (e.stopPropagation is inside the rect, not above
+     it), so filter behavior is unchanged. */
+  pointer-events: auto;
+}
+.wisden-splits-subrect .comp-link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 .wisden-splits-corner-empty {
   /* Just occupy grid cell — no content. */
@@ -2544,16 +2562,14 @@ a { color: inherit; }
 }
 .wisden-splits-col-headers .wisden-splits-marginal,
 .wisden-splits-legend-item {
-  border-bottom: 1px solid transparent;
   border-radius: 0;
   padding-bottom: 0.1rem;
-  transition: color 120ms, border-color 120ms;
+  transition: color 120ms;
 }
 .wisden-splits-col-headers .wisden-splits-marginal:hover,
 .wisden-splits-legend-item:hover {
   background: none;
   color: var(--accent);
-  border-bottom-color: var(--accent);
 }
 /* All-toss / All-innings: gutter labels sized to match the row-label
    width so they sit in the corner. Inert (faint) by default — the

@@ -110,6 +110,20 @@ const OUTCOME_COLOR: Record<Outcome, string> = {
 // reserved for outcome encoding"; the cells should reinforce the
 // outcome the user picked, not go gray).
 
+// ─── Sub-rect ordering inside a cell ─────────────────────────────────
+//
+// Default order is [won, tied, lost] (cricket convention: good → bad,
+// reading left → right). `reverse=true` flips to [lost, tied, won],
+// applied to the LEFT column of the 2×2 (tv === 'won') so the green
+// won-sub-rects sit ADJACENT to the right column's green sub-rects —
+// greens cluster at the center cross, making area-wise win comparisons
+// across the four cells easier. The rule depends only on column
+// position (`tv`), not on filter state, so it sustains through
+// filtering: filtering hides cells but never changes orientation.
+function orderedResultsForCell(resultValues: Outcome[], reverse: boolean = false): Outcome[] {
+  return reverse ? [...resultValues].reverse() : resultValues
+}
+
 // ─── Status strip text (spec §3.10) ─────────────────────────────────
 function strip(
   filters: FilterParams,
@@ -472,7 +486,7 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
               title={isActive ? `Clear ${RESULT_LABEL[rv]}` : `Filter to ${RESULT_LABEL[rv]}`}
             >
               <span className="wisden-splits-outcome-swatch" style={{ background: OUTCOME_COLOR[rv] }} aria-hidden="true" />
-              <strong>{RESULT_LEGEND[rv]}</strong>{' '}
+              <strong className="comp-link">{RESULT_LEGEND[rv]}</strong>{' '}
               {m?.n ?? 0}
               {m?.share != null && ` (${(m.share * 100).toFixed(0)}%)`}
               {hasSubject && (
@@ -489,7 +503,7 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
           className="wisden-splits-clear-link"
           title={filters.toss_outcome ? 'Clear toss filter — show both Won toss and Lost toss' : 'Currently showing both Won toss and Lost toss'}
         >
-          All toss · {allTossN}
+          <span className="comp-link">All toss</span> · {allTossN}
           {matchesDeltaEnv && <MetricDelta env={matchesDeltaEnv} />}
         </button>
         <button
@@ -498,7 +512,7 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
           className="wisden-splits-clear-link"
           title={i !== null ? 'Clear inning filter — show both innings' : 'Currently showing both innings'}
         >
-          Both innings · {allInningsN}
+          <span className="comp-link">Both innings</span> · {allInningsN}
           {matchesDeltaEnv && <MetricDelta env={matchesDeltaEnv} />}
         </button>
       </div>
@@ -527,7 +541,7 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
                 className="wisden-splits-marginal wisden-splits-col-header"
                 title={`Filter to ${TOSS_LABEL[tv]}`}
               >
-                <strong>{TOSS_LABEL[tv]}</strong>
+                <strong className="comp-link">{TOSS_LABEL[tv]}</strong>
                 <span style={{ color: WISDEN.faint, marginLeft: '0.4em', fontWeight: 400 }}>
                   · {m?.n ?? 0}{m?.share != null && ` (${(m.share * 100).toFixed(0)}%)`}
                 </span>
@@ -556,7 +570,7 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
                 className="wisden-splits-marginal wisden-splits-row-header"
                 title={`Filter to ${primaryLabel} (${secondaryLabel})`}
               >
-                <div className="wisden-splits-row-primary">{primaryLabel}</div>
+                <div className="wisden-splits-row-primary"><span className="comp-link">{primaryLabel}</span></div>
                 <div className="wisden-splits-row-secondary">({secondaryLabel})</div>
                 <div className="wisden-splits-row-stats">
                   {m?.n ?? 0}
@@ -695,17 +709,12 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
                 }}
                 title={`Filter to ${TOSS_LABEL[tv]} · ${inningLabels[String(teamInningToUserInning(iv, bowlingCtx)) as '0' | '1']}`}
               >
-                {resultValues.map(rv => {
+                {orderedResultsForCell(resultValues, /* reverse */ tv === 'won').map(rv => {
                   const cell = cellMap.get(`${tv}|${iv}|${rv}`)
                   const cellN = cell?.n ?? 0
                   const sliceShare = summedN ? cellN / summedN : 0
                   const fill = OUTCOME_COLOR[rv]
                   const pct = (sliceShare * 100).toFixed(0)
-                  const labelText = cellN === 0
-                    ? ''
-                    : rv === 'tied'
-                      ? `${cellN}`
-                      : `${cellN} (${pct}%)`
                   return (
                     <div
                       key={rv}
@@ -721,9 +730,10 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
                       }}
                       title={cell ? cellTooltip(cell, total, hasSubject, bowlingCtx) : `${RESULT_LEGEND[rv]} — 0 matches`}
                     >
-                      {labelText && (
+                      {cellN > 0 && (
                         <span className="wisden-splits-subrect-label">
-                          {labelText}
+                          <span className="comp-link">{cellN}</span>
+                          {rv !== 'tied' && ` (${pct}%)`}
                         </span>
                       )}
                     </div>
@@ -851,7 +861,7 @@ function OneDimBar({
               title={`Filter to ${e.label}`}
             >
               <span className="wisden-splits-outcome-swatch" style={{ background: e.color }} aria-hidden="true" />
-              <strong>{e.label}</strong>{' '}
+              <strong className="comp-link">{e.label}</strong>{' '}
               {n}
               {` (${(w * 100).toFixed(0)}%)`}
               {hasSubject && (
