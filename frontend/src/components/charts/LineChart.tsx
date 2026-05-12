@@ -1,4 +1,5 @@
 import { LineChart as SemioticLineChart } from 'semiotic'
+import ChartHeader from '../ChartHeader'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
 import { WISDEN_PALETTE } from './palette'
 
@@ -11,6 +12,9 @@ interface LineChartProps<T extends Record<string, any>> {
   colorBy?: string
   colorScheme?: string[]
   title?: string
+  /** Faint italic line under the title, typically the filter-state
+   *  abbreviation. Empty string is treated as no subtitle. */
+  subtitle?: string
   /** When omitted, the chart fills its container via ResizeObserver. */
   width?: number
   height?: number
@@ -29,7 +33,7 @@ interface LineChartProps<T extends Record<string, any>> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function LineChart<T extends Record<string, any>>({
   data, xAccessor = 'x', yAccessor = 'y', lineBy, colorBy,
-  colorScheme = WISDEN_PALETTE, title,
+  colorScheme = WISDEN_PALETTE, title, subtitle,
   width, height = 400, xLabel, yLabel, showPoints, curve,
   annotations, tooltip,
 }: LineChartProps<T>) {
@@ -38,6 +42,7 @@ export default function LineChart<T extends Record<string, any>>({
 
   return (
     <div ref={ref} className="w-full">
+      <ChartHeader title={title} subtitle={subtitle} />
       {effectiveWidth > 0 && (
         <SemioticLineChart
           data={data}
@@ -46,7 +51,6 @@ export default function LineChart<T extends Record<string, any>>({
           lineBy={lineBy}
           colorBy={colorBy}
           colorScheme={colorScheme}
-          title={title}
           width={effectiveWidth}
           height={height}
           xLabel={xLabel}

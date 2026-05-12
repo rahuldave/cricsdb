@@ -1,4 +1,5 @@
 import { BarChart as SemioticBarChart } from 'semiotic'
+import ChartHeader from '../ChartHeader'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
 import { WISDEN_PALETTE } from './palette'
 
@@ -8,6 +9,9 @@ interface BarChartProps<T extends Record<string, any>> {
   categoryAccessor: string | ((d: T) => string)
   valueAccessor: string | ((d: T) => number)
   title?: string
+  /** Faint italic line under the title, typically the filter-state
+   *  abbreviation. Empty string is treated as no subtitle. */
+  subtitle?: string
   /** When omitted, the chart fills its container via ResizeObserver. */
   width?: number
   height?: number
@@ -34,7 +38,7 @@ interface BarChartProps<T extends Record<string, any>> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function BarChart<T extends Record<string, any>>({
-  data, categoryAccessor, valueAccessor, title, width, height = 400,
+  data, categoryAccessor, valueAccessor, title, subtitle, width, height = 400,
   colorScheme = WISDEN_PALETTE, colorBy, categoryLabel, valueLabel, orientation,
   rotateCategoryLabels = 'auto',
   topLabelFormat,
@@ -119,6 +123,7 @@ export default function BarChart<T extends Record<string, any>>({
 
   return (
     <div ref={ref} className="w-full" style={{ position: 'relative' }}>
+      <ChartHeader title={title} subtitle={subtitle} />
       {effectiveWidth > 0 && (
         <SemioticBarChart
           data={data}
@@ -128,7 +133,6 @@ export default function BarChart<T extends Record<string, any>>({
           // MetricEnvelope-typed fields too (otherwise its internal
           // d[key] lookup sees the envelope object and renders 0).
           valueAccessor={getValue}
-          title={title}
           width={effectiveWidth}
           height={finalHeight}
           colorScheme={colorScheme}
