@@ -1017,6 +1017,41 @@ function OverviewTab({
         </div>
       )}
 
+      {/* ── Participating teams (only meaningful for tournaments) ──
+          Moved up to sit right after Best moments — wanted in the
+          dossier's headline strip, not at the bottom past the
+          knockouts table. The section title embeds the tournament +
+          season scope once, so per-chip text can stay tight. Each
+          chip splits into two links: the country NAME is a TeamLink
+          (all-time — preserves the "team-name-as-link always means
+          all-time" convention), and the match COUNT links to the
+          scoped view (team at this tournament + season window). */}
+      {tournament && summary.teams.length > 0 && (() => {
+        const season = seasonTag(filters.season_from, filters.season_to)
+        const scopeLabel = season
+          ? `at ${tournament}, ${season}`
+          : `at ${tournament}`
+        return (
+          <div className="mt-8">
+            <SectionHeader title={<>Teams {scopeLabel} ({summary.teams.length})</>} />
+            <div className="flex flex-wrap gap-2">
+              {summary.teams.map(t => (
+                <span key={t.name} className="wisden-chip">
+                  <TeamLink
+                    teamName={t.name}
+                    gender={gender}
+                    team_type={teamType}
+                    subscriptSource={{ tournament }}
+                    maxTiers={1}
+                    phraseLabel={`(${t.matches})`}
+                  />
+                </span>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {trend.length > 1 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           <LineChart
@@ -1268,39 +1303,6 @@ function OverviewTab({
           />
         </div>
       )}
-
-      {/* ── Participating teams (only meaningful for tournaments) ──
-          The section title embeds the tournament + season scope once, so
-          per-chip text can stay tight. Each chip splits into two links:
-          the country NAME is a TeamLink (all-time — preserves the "team-
-          name-as-link always means all-time" convention), and the match
-          COUNT links to the scoped view (team at this tournament +
-          season window). */}
-      {tournament && summary.teams.length > 0 && (() => {
-        const season = seasonTag(filters.season_from, filters.season_to)
-        const scopeLabel = season
-          ? `at ${tournament}, ${season}`
-          : `at ${tournament}`
-        return (
-          <div className="mt-8">
-            <SectionHeader title={<>Teams {scopeLabel} ({summary.teams.length})</>} />
-            <div className="flex flex-wrap gap-2">
-              {summary.teams.map(t => (
-                <span key={t.name} className="wisden-chip">
-                  <TeamLink
-                    teamName={t.name}
-                    gender={gender}
-                    team_type={teamType}
-                    subscriptSource={{ tournament }}
-                    maxTiers={1}
-                    phraseLabel={`(${t.matches})`}
-                  />
-                </span>
-              ))}
-            </div>
-          </div>
-        )
-      })()}
 
       {tournament && summary.champions_by_season.length > 0 && (
         <div className="mt-8">
