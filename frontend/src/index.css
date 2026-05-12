@@ -2053,6 +2053,19 @@ a { color: inherit; }
 
 /* Tournaments-landing tiles */
 .wisden-landing-section { margin-bottom: 1.75rem; }
+
+/* Recent-editions strip on /series landing — vertical stack of links
+   to the 5 most-recent (tournament, season) editions, latest first. */
+.wisden-recent-editions {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 0;
+}
+.wisden-recent-editions li {
+  padding: 0.15rem 0;
+  font-size: 0.96rem;
+  line-height: 1.45;
+}
 .wisden-tile-grid {
   display: grid;
   grid-template-columns: 1fr;

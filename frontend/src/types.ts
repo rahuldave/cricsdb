@@ -2196,7 +2196,17 @@ export interface ClubRivalryEntry {
   no_result: number
 }
 
+export interface RecentEditionEntry {
+  tournament: string
+  season: string
+  last_match_date: string
+  gender: string | null
+  team_type: string | null
+  champion: string | null
+}
+
 export interface TournamentsLanding {
+  recent_editions: RecentEditionEntry[]
   international: {
     icc_events: TournamentLandingEntry[]
     bilateral_rivalries: {

@@ -10,6 +10,7 @@ import { SectionHeader } from '../ChartHeader'
 import type {
   TournamentsLanding as TLandingData,
   TournamentLandingEntry,
+  RecentEditionEntry,
   RivalryEntry,
 } from '../../types'
 
@@ -211,6 +212,59 @@ function RivalryTile({
   )
 }
 
+/** Top-of-landing strip — the 5 most recently played editions across
+ *  every tournament, latest-first. Includes in-progress editions
+ *  (champion is null until a Final is played). Vertical stack of
+ *  links so the user can jump straight to the edition dossier.
+ */
+function RecentEditionsStrip({
+  editions, ambient,
+}: { editions: RecentEditionEntry[]; ambient: AmbientScope }) {
+  if (!editions.length) return null
+  return (
+    <div className="wisden-landing-section mt-4">
+      <SectionHeader title="Recently played editions" />
+      <ul className="wisden-recent-editions">
+        {editions.map(e => {
+          const rowGender = e.gender || ambient.gender
+          const rowTeamType = e.team_type || ambient.team_type
+          return (
+            <li key={`${e.tournament}|${e.season}`}>
+              <SeriesLink
+                tournament={e.tournament}
+                season={e.season}
+                gender={rowGender}
+                team_type={rowTeamType}
+                title={`${e.tournament}, ${e.season}`}
+              >
+                {e.tournament} {e.season}
+              </SeriesLink>
+              {e.champion && (
+                <>
+                  {' — winner '}
+                  <TeamLink
+                    teamName={e.champion}
+                    compact
+                    gender={rowGender ?? null}
+                    team_type={rowTeamType ?? null}
+                    subscriptSource={{
+                      tournament: e.tournament,
+                      season: e.season,
+                    }}
+                    maxTiers={1}
+                    phraseLabel="ed"
+                    phraseClassName="scope-phrase-ed"
+                  />
+                </>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
 function Section({
   title, tiles, emptyLabel, ambient,
 }: {
@@ -315,6 +369,8 @@ export default function TournamentsLanding() {
       <div className="wisden-page-subtitle">
         Tournaments and bilateral rivalries — filter to narrow the scope.
       </div>
+
+      <RecentEditionsStrip editions={data.recent_editions} ambient={ambient} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
         {/* ── Left column — International ── */}

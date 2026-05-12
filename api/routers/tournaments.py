@@ -340,7 +340,56 @@ async def tournaments_landing(filters: FilterParams = Depends()):
     if show_club_women:
         club_rivalries_women = await _top_club_rivalries(db, filters, gender="female", limit=12)
 
+    # ── Recent editions across all tournaments — top 5 by latest match
+    # date. Includes in-progress editions (an active IPL counts). The
+    # cross-tournament view that `latest_edition` per tile doesn't
+    # surface; reuses canon_finals for champion lookup (null for
+    # in-progress editions with no Final yet).
+    recent_rows = await db.q(
+        f"""
+        SELECT m.event_name AS ev, m.season AS season,
+               MAX(md.date) AS last_date,
+               m.gender AS gender, m.team_type AS team_type
+        FROM match m
+        JOIN matchdate md ON md.match_id = m.id
+        WHERE {tournament_where}
+        GROUP BY m.event_name, m.season, m.gender, m.team_type
+        """,
+        params,
+    )
+    recent_by_key: dict[tuple[str, str], dict] = {}
+    for r in recent_rows:
+        canon = canonicalize(r["ev"])
+        key = (canon, r["season"])
+        cell = recent_by_key.get(key)
+        if cell is None:
+            recent_by_key[key] = {
+                "tournament": canon,
+                "season": r["season"],
+                "last_match_date": r["last_date"],
+                "gender": r["gender"],
+                "team_type": r["team_type"],
+            }
+        elif r["last_date"] and r["last_date"] > (cell["last_match_date"] or ""):
+            cell["last_match_date"] = r["last_date"]
+
+    def _champion_for(canon: str, season: str) -> Optional[str]:
+        for s, w in canon_finals.get(canon, []):
+            if s == season:
+                return w
+        return None
+
+    for cell in recent_by_key.values():
+        cell["champion"] = _champion_for(cell["tournament"], cell["season"])
+
+    recent_editions = sorted(
+        recent_by_key.values(),
+        key=lambda c: c["last_match_date"] or "",
+        reverse=True,
+    )[:5]
+
     return {
+        "recent_editions": recent_editions,
         "international": {
             "icc_events": icc_events,
             "bilateral_rivalries": {
