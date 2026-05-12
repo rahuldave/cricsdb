@@ -9,6 +9,7 @@ import {
 } from './CuratedLists'
 import { carryFilters } from './roleUtils'
 import type { FilterParams } from '../../types'
+import { SectionHeader } from '../ChartHeader'
 
 interface Props {
   filters: FilterParams
@@ -59,7 +60,7 @@ export default function PlayersLanding({ filters }: Props) {
         players side-by-side. All filters above narrow every view.
       </div>
 
-      <h3 className="wisden-section-title" style={{ marginTop: '2rem' }}>Popular profiles</h3>
+      <SectionHeader title="Popular profiles" style={{ marginTop: '2rem' }} />
       {showMen && (
         <>
           <div className="wisden-players-subhead">Men</div>
@@ -77,7 +78,7 @@ export default function PlayersLanding({ filters }: Props) {
         </>
       )}
 
-      <h3 className="wisden-section-title" style={{ marginTop: '2.5rem' }}>Popular comparisons</h3>
+      <SectionHeader title="Popular comparisons" style={{ marginTop: '2.5rem' }} />
       {showMen && (
         <>
           <div className="wisden-players-subhead">Men</div>

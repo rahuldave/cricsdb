@@ -60,6 +60,7 @@ import type {
   FilterParams,
 } from '../types'
 import InningBandsRow from '../components/teams/InningBandsRow'
+import { SectionHeader } from '../components/ChartHeader'
 
 // Tab order: discipline tabs come BEFORE the bare match list so the
 // "list of games" sits at the end — same convention as the player
@@ -536,7 +537,7 @@ export default function Teams() {
                 )}
                 {!seasonsFetch.loading && !seasonsFetch.error && seasons.length > 0 && (
                   <>
-                    <h3 className="wisden-section-title">Wins by Season</h3>
+                    <SectionHeader title="Wins by Season" />
                     <BarChart data={seasons} categoryAccessor="season" valueAccessor="wins"
                       categoryLabel="Season" valueLabel="Wins"
                       height={350}
@@ -795,7 +796,7 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
       {phaseSeason.data && phaseSeason.data.seasons.length >= 2 && phaseSeason.data.cells.length > 0 && (
         <>
           <div>
-            <h3 className="wisden-section-title">Run rate — phase × season</h3>
+            <SectionHeader title="Run rate — phase × season" />
             <HeatmapChart
               cells={phaseSeason.data.cells.map(c => ({
                 x: c.season, y: c.phase, value: c.run_rate, n: c.balls,
@@ -809,7 +810,7 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
             />
           </div>
           <div>
-            <h3 className="wisden-section-title">Wickets lost per innings — phase × season</h3>
+            <SectionHeader title="Wickets lost per innings — phase × season" />
             <HeatmapChart
               cells={phaseSeason.data.cells.map(c => ({
                 x: c.season, y: c.phase, value: c.wickets_per_innings, n: c.innings,
@@ -831,7 +832,7 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
 
       {topBatters.data && topBatters.data.top_batters.length > 0 && (
         <div>
-          <h3 className="wisden-section-title">Top 5 Batters</h3>
+          <SectionHeader title="Top 5 Batters" />
           <DataTable columns={batterColumns} data={topBatters.data.top_batters}
             rowKey={r => r.person_id}
           />
@@ -998,7 +999,7 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
       {phaseSeason.data && phaseSeason.data.seasons.length >= 2 && phaseSeason.data.cells.length > 0 && (
         <>
           <div>
-            <h3 className="wisden-section-title">Economy — phase × season (low = good)</h3>
+            <SectionHeader title="Economy — phase × season (low = good)" />
             <HeatmapChart
               cells={phaseSeason.data.cells.map(c => ({
                 x: c.season, y: c.phase, value: c.economy, n: c.balls,
@@ -1013,7 +1014,7 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
             />
           </div>
           <div>
-            <h3 className="wisden-section-title">Wickets taken per innings — phase × season</h3>
+            <SectionHeader title="Wickets taken per innings — phase × season" />
             <HeatmapChart
               cells={phaseSeason.data.cells.map(c => ({
                 x: c.season, y: c.phase, value: c.wickets_per_innings, n: c.innings,
@@ -1035,7 +1036,7 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
 
       {topBowlers.data && topBowlers.data.top_bowlers.length > 0 && (
         <div>
-          <h3 className="wisden-section-title">Top 5 Bowlers</h3>
+          <SectionHeader title="Top 5 Bowlers" />
           <DataTable columns={bowlerColumns} data={topBowlers.data.top_bowlers}
             rowKey={r => r.person_id}
           />
@@ -1156,7 +1157,7 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
 
       {topFielders.data && topFielders.data.top_fielders.length > 0 && (
         <div>
-          <h3 className="wisden-section-title">Top 5 Fielders</h3>
+          <SectionHeader title="Top 5 Fielders" />
           <DataTable columns={fielderColumns} data={topFielders.data.top_fielders}
             rowKey={r => r.person_id}
           />
@@ -1165,7 +1166,7 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
 
       {keepers && keepers.length > 0 && (
         <div>
-          <h3 className="wisden-section-title">Wicketkeepers</h3>
+          <SectionHeader title="Wicketkeepers" />
           <p className="wisden-tab-help">
             Innings kept per player (Tier 2 attribution — see
             <Link to="/fielding" className="comp-link" style={{ marginLeft: 4 }}>Fielding page</Link>
@@ -1220,7 +1221,7 @@ function VsOpponentTab({
 
       {matrix.data && matrix.data.opponents.length > 0 && (
         <div>
-          <h3 className="wisden-section-title">Record vs each opponent</h3>
+          <SectionHeader title="Record vs each opponent" />
           <OpponentStackedBars
             data={matrix.data.opponents}
             selected={opponent}
@@ -1239,8 +1240,7 @@ function VsOpponentTab({
           another chart. The volume-vs-time view goes at the bottom. */}
       {opponent && (
         <div className="wisden-drilldown">
-          <h3 className="wisden-section-title">
-            vs {opponent}
+          <SectionHeader title={<>vs {opponent}
             {' '}
             <button
               onClick={() => setOpponent('')}
@@ -1257,8 +1257,7 @@ function VsOpponentTab({
               style={{ fontSize: '0.8rem', fontStyle: 'italic' }}
             >
               See full rivalry →
-            </Link>
-          </h3>
+            </Link></>} />
           {vsFetch.loading && <Spinner label={`Loading ${opponent} detail…`} />}
           {vsFetch.error && (
             <ErrorBanner message={`Head-to-head: ${vsFetch.error}`} onRetry={vsFetch.refetch} />
@@ -1273,7 +1272,7 @@ function VsOpponentTab({
               </div>
               {vsData.by_season.length >= 2 && (
                 <>
-                  <h3 className="wisden-section-title">Wins vs {opponent} by Season</h3>
+                  <SectionHeader title={<>Wins vs {opponent} by Season</>} />
                   <BarChart
                     data={vsData.by_season.map(s => ({
                       ...s,
@@ -1319,7 +1318,7 @@ function VsOpponentTab({
       {!singleSeason && matrix.data && matrix.data.cells.length > 0
         && matrix.data.seasons.length >= 2 && (
         <div>
-          <h3 className="wisden-section-title">Matches × outcome — opponent × season</h3>
+          <SectionHeader title="Matches × outcome — opponent × season" />
           <BubbleMatrix
             cells={matrix.data.cells.map(c => ({
               x: c.season,
@@ -1566,9 +1565,7 @@ function PartnershipsTab({ team, filters, filterDeps }: TabProps) {
 
       {byWicket.data && byWicket.data.by_wicket.length > 0 && (
         <div>
-          <h3 className="wisden-section-title">
-            {safeSide === 'batting' ? 'By wicket — our partnerships' : 'By wicket — runs conceded'}
-          </h3>
+          <SectionHeader title={safeSide === 'batting' ? 'By wicket — our partnerships' : 'By wicket — runs conceded'} />
           <DataTable columns={wicketColumns} data={byWicket.data.by_wicket}
             rowKey={r => String(r.wicket_number)} />
         </div>
@@ -1576,11 +1573,9 @@ function PartnershipsTab({ team, filters, filterDeps }: TabProps) {
 
       {bestPairs.data && flatPairs.length > 0 && (
         <div>
-          <h3 className="wisden-section-title">
-            {safeSide === 'batting'
+          <SectionHeader title={safeSide === 'batting'
               ? 'Most prolific pairs — by wicket (top 3 by total runs together)'
-              : 'Most prolific opposition pairs — by wicket (top 3 by total runs against us)'}
-          </h3>
+              : 'Most prolific opposition pairs — by wicket (top 3 by total runs against us)'} />
           <p className="wisden-tab-help" style={{ marginTop: '-0.5rem' }}>
             Top {bestPairs.data.top_n} pairs per wicket, ranked by{' '}
             <strong>total runs scored together</strong> (= n × average per
@@ -1596,7 +1591,7 @@ function PartnershipsTab({ team, filters, filterDeps }: TabProps) {
 
       {!singleSeason && heatmap.data && heatmap.data.cells.length > 0 && (
         <div>
-          <h3 className="wisden-section-title">Season × Wicket (avg runs)</h3>
+          <SectionHeader title="Season × Wicket (avg runs)" />
           <HeatmapChart
             cells={heatmap.data.cells.map(c => ({
               x: c.season, y: c.wicket_number, value: c.avg_runs, n: c.n,
@@ -1612,9 +1607,7 @@ function PartnershipsTab({ team, filters, filterDeps }: TabProps) {
 
       {top.data && top.data.partnerships.length > 0 && (
         <div>
-          <h3 className="wisden-section-title">
-            Top 10 {safeSide === 'batting' ? 'partnerships' : 'partnerships conceded'}
-          </h3>
+          <SectionHeader title={<>Top 10 {safeSide === 'batting' ? 'partnerships' : 'partnerships conceded'}</>} />
           <DataTable
             columns={[
               {
@@ -1728,8 +1721,7 @@ function PlayersTab({ team, filters, filterDeps }: TabProps) {
       </div>
       {seasons.map(bucket => (
         <div key={bucket.season} style={{ marginBottom: '2rem' }}>
-          <h3 className="wisden-section-title">
-            {bucket.season}{' '}
+          <SectionHeader title={<>{bucket.season}{' '}
             <span style={{ color: 'var(--ink-faint)', fontSize: '0.85em', fontWeight: 'normal' }}>
               ({bucket.players.length})
             </span>
@@ -1737,8 +1729,7 @@ function PlayersTab({ team, filters, filterDeps }: TabProps) {
               <span style={{ color: 'var(--ink-faint)', fontSize: '0.75em', fontWeight: 'normal', marginLeft: '0.75rem' }}>
                 vs {bucket.turnover.prev_season} · +{bucket.turnover.new_count} new · −{bucket.turnover.left_count} left
               </span>
-            )}
-          </h3>
+            )}</>} />
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -1892,7 +1883,7 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {showLeft && (
           <div>
-            {showIntl && <h3 className="wisden-section-title">International</h3>}
+            {showIntl && <SectionHeader title="International" />}
             {showMen && (
               <>
                 <div className="coverage-head" style={{ marginTop: '0.5rem', marginBottom: '0.25rem' }}>
@@ -1942,12 +1933,10 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
                 dominating the page. */}
             {hasDomestic && (
               <>
-                <h3
-                  className="wisden-section-title"
+                <SectionHeader
+                  title="Domestic / national championships"
                   style={{ marginTop: showIntl ? '2rem' : undefined }}
-                >
-                  Domestic / national championships
-                </h3>
+                />
                 {domesticSplit.men.length > 0 && (
                   <>
                     <div className="coverage-head" style={{ marginTop: '0.5rem', marginBottom: '0.25rem' }}>
@@ -1992,7 +1981,7 @@ function TeamsLandingBoard({ filters, filterDeps, onPick }: TeamsLandingBoardPro
         )}
         {showRight && (
           <div>
-            <h3 className="wisden-section-title">Clubs</h3>
+            <SectionHeader title="Clubs" />
             {clubFranchise.length > 0 && (
               <>
                 <div className="coverage-head" style={{ marginTop: '0.5rem', marginBottom: '0.25rem' }}>

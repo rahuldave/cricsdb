@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import type { VenueSummary, VenueTGSRow } from '../../types'
 import StatCard from '../StatCard'
 import DataTable from '../DataTable'
+import { SectionHeader } from '../ChartHeader'
 
 const fmt = (v: number | null | undefined, d = 1, suffix = '') =>
   v == null ? '-' : `${v.toFixed(d)}${suffix}`
@@ -48,7 +49,7 @@ export default function VenueOverviewPanel({ summary }: { summary: VenueSummary 
 
       {/* Toss panel */}
       <div className="mt-6">
-        <h3 className="wisden-section-title">Toss</h3>
+        <SectionHeader title="Toss" />
         <div className="wisden-statrow cols-4 mt-2">
           <StatCard
             label="Chose to bat"
@@ -79,7 +80,7 @@ export default function VenueOverviewPanel({ summary }: { summary: VenueSummary 
 
       {/* Phase table */}
       <div className="mt-6">
-        <h3 className="wisden-section-title">By phase (boundary % / dot %)</h3>
+        <SectionHeader title="By phase (boundary % / dot %)" />
         <DataTable
           columns={[
             { key: 'phase', label: 'Phase' },
@@ -111,7 +112,7 @@ export default function VenueOverviewPanel({ summary }: { summary: VenueSummary 
       {/* Highest / lowest totals */}
       {(summary.highest_total || summary.lowest_all_out) && (
         <div className="mt-6">
-          <h3 className="wisden-section-title">Ground-record totals</h3>
+          <SectionHeader title="Ground-record totals" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {summary.highest_total && (
               <div className="wisden-tile">
@@ -146,9 +147,7 @@ export default function VenueOverviewPanel({ summary }: { summary: VenueSummary 
       {/* Matches hosted by tournament × gender × season */}
       {summary.by_tournament_gender_season.length > 0 && (
         <div className="mt-8">
-          <h3 className="wisden-section-title">
-            Matches hosted ({summary.by_tournament_gender_season.length} rows)
-          </h3>
+          <SectionHeader title={<>Matches hosted ({summary.by_tournament_gender_season.length} rows)</>} />
           <DataTable
             columns={[
               { key: 'season', label: 'Season', sortable: true },

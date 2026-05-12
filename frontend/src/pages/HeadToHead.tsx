@@ -20,6 +20,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import TournamentDossier from '../components/tournaments/TournamentDossier'
 import { ScopeContext } from '../components/scopeLinks'
 import { getHeadToHead, getTournamentsLanding } from '../api'
+import { SectionHeader } from '../components/ChartHeader'
 import type {
   PlayerSearchResult, HeadToHeadResponse, HeadToHeadMatch,
   TournamentsLanding, RivalryEntry, ClubRivalryEntry,
@@ -213,7 +214,7 @@ function PlayerVsPlayer() {
         <>
           <div className="wisden-empty">Select both a batter and bowler — or pick a popular matchup below</div>
           <div className="mt-8">
-            <h3 className="wisden-section-title">Popular matchups</h3>
+            <SectionHeader title="Popular matchups" />
             <div className="wisden-tab-help mb-2">Men's</div>
             <div className="wisden-tile-grid">
               {POPULAR_MATCHUPS_MEN.map(m => (
@@ -443,7 +444,7 @@ function TeamVsTeamPicker({
 
           {showSuggestions && (
             <div className="mt-8">
-              <h3 className="wisden-section-title">Or browse a common matchup</h3>
+              <SectionHeader title="Or browse a common matchup" />
               {suggestionsFetch.loading && <Spinner label="Loading suggestions…" />}
               {suggestionsFetch.data && (
                 <>

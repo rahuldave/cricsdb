@@ -32,6 +32,7 @@ import DataTable, { type Column } from '../DataTable'
 import LineChart from '../charts/LineChart'
 import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
+import { SectionHeader } from '../ChartHeader'
 import type {
   TournamentSummary, TournamentSeason, TournamentPointsTableResponse,
   PointsTableRow, TournamentRecords,
@@ -894,7 +895,7 @@ function OverviewTab({
         || summary.largest_partnership || summary.best_fielding
         || summary.highest_team_total) && (
         <div className="mt-8">
-          <h3 className="wisden-section-title">Best moments</h3>
+          <SectionHeader title="Best moments" />
           <div className="wisden-tile-line mt-2">
             {summary.highest_individual && (
               <div>
@@ -1044,7 +1045,7 @@ function OverviewTab({
       {/* ── Per-team breakdown when in rivalry scope ── */}
       {isRivalry && summary.by_team && (
         <div className="mt-8">
-          <h3 className="wisden-section-title">By team</h3>
+          <SectionHeader title="By team" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {teamNames.map(team => {
               const t = summary.by_team![team]
@@ -1144,7 +1145,7 @@ function OverviewTab({
           single because editions === 1. */}
       {tournament && summary.editions === 1 && summary.groups.length > 0 && (
         <div className="mt-8">
-          <h3 className="wisden-section-title">Groups</h3>
+          <SectionHeader title="Groups" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {summary.groups.map(g => (
               <div key={`${g.season}-${g.group}`} className="wisden-tile" style={{ cursor: 'default' }}>
@@ -1172,7 +1173,7 @@ function OverviewTab({
       {/* ── Knockouts (finals, semis, qualifiers) ── */}
       {summary.knockouts.length > 0 && (
         <div className="mt-8">
-          <h3 className="wisden-section-title">Knockouts</h3>
+          <SectionHeader title="Knockouts" />
           <EdHelp />
           <DataTable
             columns={[
@@ -1282,9 +1283,7 @@ function OverviewTab({
           : `at ${tournament}`
         return (
           <div className="mt-8">
-            <h3 className="wisden-section-title">
-              Teams {scopeLabel} ({summary.teams.length})
-            </h3>
+            <SectionHeader title={<>Teams {scopeLabel} ({summary.teams.length})</>} />
             <div className="flex flex-wrap gap-2">
               {summary.teams.map(t => (
                 <span key={t.name} className="wisden-chip">
@@ -1305,7 +1304,7 @@ function OverviewTab({
 
       {tournament && summary.champions_by_season.length > 0 && (
         <div className="mt-8">
-          <h3 className="wisden-section-title">Champions by season</h3>
+          <SectionHeader title="Champions by season" />
           <EdHelp />
           <DataTable
             columns={[
@@ -1441,7 +1440,7 @@ function PartnershipsTab({
 
       {/* ── By-wicket averages ── */}
       <div className="mt-4">
-        <h3 className="wisden-section-title">By wicket — averages</h3>
+        <SectionHeader title="By wicket — averages" />
         <div className="wisden-tab-help">
           N is the sample count — how many partnerships of that wicket
           number were aggregated in scope. Best stand disambiguates the
@@ -1512,9 +1511,7 @@ function PartnershipsTab({
 
       {/* ── Top partnerships ── */}
       <div className="mt-8">
-        <h3 className="wisden-section-title">
-          Top partnerships{filterTeam ? ` (${filterTeam})` : ''}
-        </h3>
+        <SectionHeader title={<>Top partnerships{filterTeam ? ` (${filterTeam})` : ''}</>} />
         <EdHelp />
         {topLoading ? (
           <Spinner label="Loading top…" />
@@ -1558,7 +1555,7 @@ function PartnershipsTab({
 
       {/* ── Top partnerships per wicket (one table per wicket 1–10) ── */}
       <div className="mt-8">
-        <h3 className="wisden-section-title">Top partnerships by wicket</h3>
+        <SectionHeader title="Top partnerships by wicket" />
         {topByWicketLoading ? (
           <Spinner label="Loading per-wicket partnerships…" />
         ) : !topByWicket?.by_wicket?.length ? (
@@ -1883,7 +1880,7 @@ function PointsTab({
       {data.tables.map((t, i) => (
         <div key={i} className="mb-8">
           {t.group !== null && (
-            <h3 className="wisden-section-title">Group {t.group}</h3>
+            <SectionHeader title={<>Group {t.group}</>} />
           )}
           <DataTable columns={columns} data={t.rows} rowKey={(r) => r.team} />
         </div>
@@ -1971,7 +1968,7 @@ function BattersTab({
         )}
       </PickerSlot>
       <div>
-        <h3 className="wisden-section-title">By runs scored</h3>
+        <SectionHeader title="By runs scored" />
         <DataTable
           columns={[
             { key: 'name', label: 'Batter', format: (_v, r) => batterCell(r) },
@@ -1984,7 +1981,7 @@ function BattersTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">By average (runs / dismissals)</h3>
+        <SectionHeader title="By average (runs / dismissals)" />
         <DataTable
           columns={[
             { key: 'name', label: 'Batter', format: (_v, r) => batterCell(r) },
@@ -1998,7 +1995,7 @@ function BattersTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">By strike rate</h3>
+        <SectionHeader title="By strike rate" />
         <DataTable
           columns={[
             { key: 'name', label: 'Batter', format: (_v, r) => batterCell(r) },
@@ -2034,7 +2031,7 @@ function PickerSlot({
 }) {
   return (
     <div>
-      <h3 className="wisden-section-title">{title}</h3>
+      <SectionHeader title={title} />
       <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <div style={{ flex: 1 }}>
           <PlayerSearch
@@ -2125,7 +2122,7 @@ function BowlersTab({
         )}
       </PickerSlot>
       <div>
-        <h3 className="wisden-section-title">By wickets taken</h3>
+        <SectionHeader title="By wickets taken" />
         <DataTable
           columns={[
             { key: 'name', label: 'Bowler', format: (_v, r) => bowlerCell(r) },
@@ -2138,7 +2135,7 @@ function BowlersTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">By strike rate</h3>
+        <SectionHeader title="By strike rate" />
         <DataTable
           columns={[
             { key: 'name', label: 'Bowler', format: (_v, r) => bowlerCell(r) },
@@ -2151,7 +2148,7 @@ function BowlersTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">By economy</h3>
+        <SectionHeader title="By economy" />
         <DataTable
           columns={[
             { key: 'name', label: 'Bowler', format: (_v, r) => bowlerCell(r) },
@@ -2228,7 +2225,7 @@ function FieldersTab({
         )}
       </PickerSlot>
       <div>
-        <h3 className="wisden-section-title">By dismissals (all)</h3>
+        <SectionHeader title="By dismissals (all)" />
         <DataTable
           columns={[
             { key: 'name', label: 'Fielder', format: (_v, r) => fielderCell(r) },
@@ -2242,7 +2239,7 @@ function FieldersTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">By keeper dismissals</h3>
+        <SectionHeader title="By keeper dismissals" />
         <DataTable
           columns={[
             { key: 'name', label: 'Keeper', format: (_v, r) => fielderCell(r) },
@@ -2255,7 +2252,7 @@ function FieldersTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">By run-outs</h3>
+        <SectionHeader title="By run-outs" />
         <DataTable
           columns={[
             { key: 'name', label: 'Fielder', format: (_v, r) => fielderCell(r) },
@@ -2315,7 +2312,7 @@ function RecordsTab({
       <EdHelp className="mt-4" />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div>
-        <h3 className="wisden-section-title">Highest team totals</h3>
+        <SectionHeader title="Highest team totals" />
         <DataTable
           columns={[
             { key: 'runs', label: 'Runs', sortable: true },
@@ -2339,7 +2336,7 @@ function RecordsTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">Lowest all-out totals</h3>
+        <SectionHeader title="Lowest all-out totals" />
         <DataTable
           columns={[
             { key: 'runs', label: 'Runs', sortable: true },
@@ -2363,7 +2360,7 @@ function RecordsTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">Biggest wins by runs</h3>
+        <SectionHeader title="Biggest wins by runs" />
         <DataTable
           columns={[
             { key: 'margin', label: 'Runs', sortable: true },
@@ -2387,7 +2384,7 @@ function RecordsTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">Biggest wins by wickets</h3>
+        <SectionHeader title="Biggest wins by wickets" />
         <DataTable
           columns={[
             { key: 'margin', label: 'Wkts', sortable: true },
@@ -2411,7 +2408,7 @@ function RecordsTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">Largest partnerships</h3>
+        <SectionHeader title="Largest partnerships" />
         <DataTable
           columns={[
             { key: 'runs', label: 'Runs', sortable: true },
@@ -2465,7 +2462,7 @@ function RecordsTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">Best individual batting</h3>
+        <SectionHeader title="Best individual batting" />
         <DataTable
           columns={[
             {
@@ -2497,7 +2494,7 @@ function RecordsTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">Best bowling figures</h3>
+        <SectionHeader title="Best bowling figures" />
         <DataTable
           columns={[
             { key: 'figures', label: 'Figures', sortable: true },
@@ -2526,7 +2523,7 @@ function RecordsTab({
         />
       </div>
       <div className="lg:col-span-2">
-        <h3 className="wisden-section-title">Most sixes in a match</h3>
+        <SectionHeader title="Most sixes in a match" />
         <DataTable
           columns={[
             { key: 'sixes', label: 'Sixes', sortable: true },

@@ -33,6 +33,7 @@ import type {
   BowlerDistribution,
 } from '../types'
 import BowlerDistributionPanel from '../components/bowling/BowlerDistributionPanel'
+import { SectionHeader } from '../components/ChartHeader'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   if (fetch.loading) return <Spinner label="Loading…" />
@@ -503,7 +504,7 @@ function BowlingLandingBoard({ filters, filterDeps }: BowlingLandingBoardProps) 
 
   const renderTable = (title: string, metric: 'strike_rate' | 'economy', rows: BowlingLeaderEntry[]) => (
     <div>
-      <h3 className="wisden-section-title">{title}</h3>
+      <SectionHeader title={title} />
       {rows.length === 0 ? (
         <div className="wisden-tab-help" style={{ fontStyle: 'italic' }}>
           No bowlers meet the threshold.

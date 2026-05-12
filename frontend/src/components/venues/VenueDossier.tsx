@@ -27,6 +27,7 @@ import TeamLink from '../TeamLink'
 import Score from '../Score'
 import EdHelp from '../EdHelp'
 import VenueOverviewPanel from './VenueOverviewPanel'
+import { SectionHeader } from '../ChartHeader'
 
 const TABS = ['Overview', 'Batters', 'Bowlers', 'Fielders', 'Matches', 'Records'] as const
 type TabName = typeof TABS[number]
@@ -269,7 +270,7 @@ function BattersTab({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
       <div>
-        <h3 className="wisden-section-title">By average</h3>
+        <SectionHeader title="By average" />
         <DataTable
           columns={[
             {
@@ -290,7 +291,7 @@ function BattersTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">By strike rate</h3>
+        <SectionHeader title="By strike rate" />
         <DataTable
           columns={[
             {
@@ -327,7 +328,7 @@ function BowlersTab({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
       <div>
-        <h3 className="wisden-section-title">By strike rate</h3>
+        <SectionHeader title="By strike rate" />
         <DataTable
           columns={[
             {
@@ -347,7 +348,7 @@ function BowlersTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">By economy</h3>
+        <SectionHeader title="By economy" />
         <DataTable
           columns={[
             {
@@ -384,7 +385,7 @@ function FieldersTab({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
       <div>
-        <h3 className="wisden-section-title">By dismissals (all)</h3>
+        <SectionHeader title="By dismissals (all)" />
         <DataTable
           columns={[
             {
@@ -405,7 +406,7 @@ function FieldersTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">By keeper dismissals</h3>
+        <SectionHeader title="By keeper dismissals" />
         <DataTable
           columns={[
             {
@@ -526,7 +527,7 @@ function RecordsTab({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
       <div>
-        <h3 className="wisden-section-title">Highest team totals</h3>
+        <SectionHeader title="Highest team totals" />
         <DataTable
           columns={[
             { key: 'runs', label: 'Runs', sortable: true },
@@ -543,7 +544,7 @@ function RecordsTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">Lowest all-out totals</h3>
+        <SectionHeader title="Lowest all-out totals" />
         <DataTable
           columns={[
             { key: 'runs', label: 'Runs', sortable: true },
@@ -560,7 +561,7 @@ function RecordsTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">Biggest wins by runs</h3>
+        <SectionHeader title="Biggest wins by runs" />
         <DataTable
           columns={[
             { key: 'margin', label: 'Runs', sortable: true },
@@ -577,7 +578,7 @@ function RecordsTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">Biggest wins by wickets</h3>
+        <SectionHeader title="Biggest wins by wickets" />
         <DataTable
           columns={[
             { key: 'margin', label: 'Wkts', sortable: true },
@@ -594,7 +595,7 @@ function RecordsTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">Largest partnerships</h3>
+        <SectionHeader title="Largest partnerships" />
         <DataTable
           columns={[
             { key: 'runs', label: 'Runs', sortable: true },
@@ -619,7 +620,7 @@ function RecordsTab({
         />
       </div>
       <div>
-        <h3 className="wisden-section-title">Best bowling figures</h3>
+        <SectionHeader title="Best bowling figures" />
         <DataTable
           columns={[
             { key: 'figures', label: 'Figures', sortable: true },
@@ -640,7 +641,7 @@ function RecordsTab({
         />
       </div>
       <div className="lg:col-span-2">
-        <h3 className="wisden-section-title">Most sixes in a match</h3>
+        <SectionHeader title="Most sixes in a match" />
         <DataTable
           columns={[
             { key: 'sixes', label: 'Sixes', sortable: true },

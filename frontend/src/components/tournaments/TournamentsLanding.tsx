@@ -6,6 +6,7 @@ import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
 import SeriesLink from '../SeriesLink'
 import TeamLink from '../TeamLink'
+import { SectionHeader } from '../ChartHeader'
 import type {
   TournamentsLanding as TLandingData,
   TournamentLandingEntry,
@@ -222,14 +223,14 @@ function Section({
     if (!emptyLabel) return null
     return (
       <div className="wisden-landing-section">
-        <h3 className="wisden-section-title">{title}</h3>
+        <SectionHeader title={title} />
         <div className="wisden-tab-help">{emptyLabel}</div>
       </div>
     )
   }
   return (
     <div className="wisden-landing-section">
-      <h3 className="wisden-section-title">{title}</h3>
+      <SectionHeader title={title} />
       <div className="wisden-tile-grid">
         {tiles.map(e => (
           <TournamentTile key={e.canonical} entry={e} ambient={ambient} />
@@ -250,7 +251,7 @@ function RivalryGrid({
   if (!top.length) return null
   return (
     <div className="wisden-landing-section">
-      <h3 className="wisden-section-title">{title}</h3>
+      <SectionHeader title={title} />
       <div className="wisden-tile-grid">
         {top.map(e => (
           <RivalryTile

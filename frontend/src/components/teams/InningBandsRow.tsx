@@ -26,6 +26,7 @@ import type {
   MetricEnvelope,
 } from '../../types'
 import MetricDelta from '../MetricDelta'
+import { SectionHeader } from '../ChartHeader'
 
 type Discipline = 'batting' | 'bowling' | 'fielding' | 'partnerships'
 
@@ -201,7 +202,7 @@ export default function InningBandsRow(props: Props) {
   if (props.bands.length === 0) return null
   return (
     <div className="wisden-inning-bands">
-      <h3 className="wisden-section-title">{TITLE_FOR[props.discipline]}</h3>
+      <SectionHeader title={TITLE_FOR[props.discipline]} />
       <table className="wisden-table">
         <thead>
           <tr>

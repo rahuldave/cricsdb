@@ -33,6 +33,7 @@ import type {
   BattingLeaders, BattingLeaderEntry, FilterParams, BatterDistribution,
 } from '../types'
 import BatterDistributionPanel from '../components/batting/BatterDistributionPanel'
+import { SectionHeader } from '../components/ChartHeader'
 
 // Small helper for the consistent loading/error pattern in each tab.
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
@@ -522,7 +523,7 @@ function BattingLandingBoard({ filters, filterDeps }: BattingLandingBoardProps) 
 
   const renderTable = (title: string, metric: 'average' | 'strike_rate', rows: BattingLeaderEntry[]) => (
     <div>
-      <h3 className="wisden-section-title">{title}</h3>
+      <SectionHeader title={title} />
       {rows.length === 0 ? (
         <div className="wisden-tab-help" style={{ fontStyle: 'italic' }}>
           No batters meet the threshold.

@@ -33,6 +33,7 @@ import type {
   FieldingLeaders, FielderDistribution, FilterParams,
 } from '../types'
 import FielderDistributionPanel from '../components/fielding/FielderDistributionPanel'
+import { SectionHeader } from '../components/ChartHeader'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   if (fetch.loading) return <Spinner label="Loading…" />
@@ -499,7 +500,7 @@ function FieldingLandingBoard({ filters, filterDeps }: FieldingLandingBoardProps
 
   const fielderTable = (
     <div>
-      <h3 className="wisden-section-title">Top by dismissals</h3>
+      <SectionHeader title="Top by dismissals" />
       {data.by_dismissals.length === 0 ? (
         <div className="wisden-tab-help" style={{ fontStyle: 'italic' }}>No fielders.</div>
       ) : (
@@ -534,7 +535,7 @@ function FieldingLandingBoard({ filters, filterDeps }: FieldingLandingBoardProps
 
   const keeperTable = (
     <div>
-      <h3 className="wisden-section-title">Top keepers</h3>
+      <SectionHeader title="Top keepers" />
       {data.by_keeper_dismissals.length === 0 ? (
         <div className="wisden-tab-help" style={{ fontStyle: 'italic' }}>
           No designated-keeper dismissals in scope.
