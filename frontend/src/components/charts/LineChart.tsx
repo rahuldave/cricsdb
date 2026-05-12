@@ -1,6 +1,8 @@
 import { LineChart as SemioticLineChart } from 'semiotic'
 import ChartHeader from '../ChartHeader'
+import { abbreviateScope } from '../scopeLinks'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
+import { useFilters } from '../../hooks/useFilters'
 import { WISDEN_PALETTE } from './palette'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,10 +41,13 @@ export default function LineChart<T extends Record<string, any>>({
 }: LineChartProps<T>) {
   const [ref, measuredWidth] = useContainerWidth()
   const effectiveWidth = width ?? measuredWidth
+  // Auto-subtitle from filter state — see BarChart for rationale.
+  const filters = useFilters()
+  const effectiveSubtitle = subtitle ?? (title ? abbreviateScope(filters) : '')
 
   return (
     <div ref={ref} className="w-full">
-      <ChartHeader title={title} subtitle={subtitle} />
+      <ChartHeader title={title} subtitle={effectiveSubtitle} />
       {effectiveWidth > 0 && (
         <SemioticLineChart
           data={data}

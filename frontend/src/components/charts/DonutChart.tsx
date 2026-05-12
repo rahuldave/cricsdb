@@ -1,5 +1,7 @@
 import { DonutChart as SemioticDonutChart } from 'semiotic'
 import ChartHeader from '../ChartHeader'
+import { abbreviateScope } from '../scopeLinks'
+import { useFilters } from '../../hooks/useFilters'
 import { WISDEN_PALETTE } from './palette'
 
 interface DonutChartProps<T extends Record<string, any>> {
@@ -20,9 +22,12 @@ export default function DonutChart<T extends Record<string, any>>({
   data, categoryAccessor = 'label', valueAccessor = 'value', title, subtitle,
   width = 300, height = 300, colorScheme = WISDEN_PALETTE, centerContent,
 }: DonutChartProps<T>) {
+  // Auto-subtitle from filter state — see BarChart for rationale.
+  const filters = useFilters()
+  const effectiveSubtitle = subtitle ?? (title ? abbreviateScope(filters) : '')
   return (
     <div>
-      <ChartHeader title={title} subtitle={subtitle} />
+      <ChartHeader title={title} subtitle={effectiveSubtitle} />
       <SemioticDonutChart
         data={data}
         categoryAccessor={categoryAccessor}

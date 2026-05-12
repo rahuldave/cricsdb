@@ -1,6 +1,8 @@
 import { BarChart as SemioticBarChart } from 'semiotic'
 import ChartHeader from '../ChartHeader'
+import { abbreviateScope } from '../scopeLinks'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
+import { useFilters } from '../../hooks/useFilters'
 import { WISDEN_PALETTE } from './palette'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,6 +47,15 @@ export default function BarChart<T extends Record<string, any>>({
 }: BarChartProps<T>) {
   const [ref, measuredWidth] = useContainerWidth()
   const effectiveWidth = width ?? measuredWidth
+  // Auto-subtitle: filter-state abbreviation as a faint reminder line
+  // under the title. Only auto-compute when the chart has a title —
+  // a titleless chart should stay titleless, not grow an orphan
+  // subtitle floating above the SVG. Caller can override the
+  // auto-computed value by passing `subtitle` explicitly (including ""
+  // to suppress). Empty filter state collapses the line
+  // (abbreviateScope returns "").
+  const filters = useFilters()
+  const effectiveSubtitle = subtitle ?? (title ? abbreviateScope(filters) : '')
 
   // Rotate the x-axis tick labels to vertical when bars get too dense
   // for horizontal text.
@@ -123,7 +134,7 @@ export default function BarChart<T extends Record<string, any>>({
 
   return (
     <div ref={ref} className="w-full" style={{ position: 'relative' }}>
-      <ChartHeader title={title} subtitle={subtitle} />
+      <ChartHeader title={title} subtitle={effectiveSubtitle} />
       {effectiveWidth > 0 && (
         <SemioticBarChart
           data={data}
