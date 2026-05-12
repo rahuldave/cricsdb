@@ -1,4 +1,5 @@
 import type { InningsGridInnings, InningsGridDelivery } from '../../types'
+import ChartHeader from '../ChartHeader'
 import { DELIVERY, deliveryRunColor } from './palette'
 
 interface Props {
@@ -297,13 +298,12 @@ export default function InningsGridChart({ innings }: Props) {
 
   return (
     <div>
-      <div className="section-head">
-        <span className="section-label">{innings.team} — innings grid</span>
-        <span className="wisden-chart-sub num">
-          {innings.total_runs}/{innings.total_wickets} · {innings.total_balls} balls
-        </span>
-      </div>
-      <div className="rule" />
+      <ChartHeader
+        variant="section"
+        title={`${innings.team} — innings grid`}
+        subtitle={`${innings.total_runs}/${innings.total_wickets} · ${innings.total_balls} balls`}
+        subtitleClassName="num"
+      />
 
       {/* Color legend */}
       <div className="flex flex-wrap gap-3 text-[10px] mb-3" style={{ color: 'var(--ink-faint)', fontFamily: 'var(--sans)' }}>

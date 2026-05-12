@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import ChartHeader from '../ChartHeader'
 import type { InningsGridInnings, InningsGridDelivery } from '../../types'
 
 interface Props {
@@ -104,11 +105,11 @@ export default function MatchupGridChart({ innings, linkParams = '', highlightBa
 
   return (
     <div>
-      <div className="section-head">
-        <span className="section-label">{innings.team} — matchup grid</span>
-        <span className="wisden-chart-sub">batters × bowlers · click any cell for the head-to-head</span>
-      </div>
-      <div className="rule" />
+      <ChartHeader
+        variant="section"
+        title={`${innings.team} — matchup grid`}
+        subtitle="batters × bowlers · click any cell for the head-to-head"
+      />
       <div className="wisden-scroll-hint">← swipe to scroll →</div>
 
       <div className="overflow-x-auto">
