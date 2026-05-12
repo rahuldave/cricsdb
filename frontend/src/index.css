@@ -1128,6 +1128,20 @@ a { color: inherit; }
   color: var(--ink);
 }
 
+/* Subtitle line rendered below wisden-section-title by <SectionHeader>.
+   Centered to match the title; meant for filter-state reminders. Sits on
+   its own line; collapses entirely when the subtitle string is empty
+   (handled by the component, not the class). */
+.wisden-section-sub {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  text-align: center;
+  margin: -0.35rem 0 0.75rem;
+  font-weight: 400;
+}
+
 .wisden-tab-help {
   font-family: var(--serif);
   font-style: italic;
