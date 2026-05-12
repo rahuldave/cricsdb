@@ -1378,6 +1378,19 @@ a { color: inherit; }
   margin-left: 0.3rem;
 }
 
+/* Subtitle line rendered below wisden-chart-title by <ChartHeader>.
+   Block-level (sits on its own line) — distinct from wisden-chart-sub
+   which is an inline parenthetical inside the title text. Meant for
+   filter-state reminders that may grow long; a short faint italic line. */
+.wisden-chart-subtitle {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  font-weight: 400;
+  margin: -0.25rem 0 0.5rem;
+}
+
 .wisden-wickets-footer {
   margin-top: 0.5rem;
   font-family: var(--serif);
