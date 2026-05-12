@@ -352,7 +352,10 @@ settle 4
 mount_inns=$(ab_eval "document.querySelector('$PANEL_SEL').innerText.match(/(\d+)\s+qualifying/)?.[1] || ''")
 assert_eq "Mount n_innings == lifetime SQL anchor (sanity)" "$sql_inns" "$mount_inns"
 
-ab_eval "[...document.querySelectorAll('.wisden-seg')].find(b => b.innerText.trim() === '1st innings')?.click()" >/dev/null
+# Position-based selector — pill text is POV-aware as of 2026-05-12
+# (/bowling → "Bowling first", not "1st innings"). Innings group has
+# 3 stable segs: [All, innings_number=0, innings_number=1].
+ab_eval "(() => { const g = Array.from(document.querySelectorAll('.wisden-filter-group')).find(g => g.querySelector('.wisden-filter-label')?.textContent === 'Innings'); g?.querySelectorAll('.wisden-seg')[1]?.click(); })()" >/dev/null
 settle 3
 url_with_inning=$(ab_eval "window.location.href" | tr -d '"')
 assert_contains "InningToggle click writes ?inning=0" "inning=0" "\"$url_with_inning\""

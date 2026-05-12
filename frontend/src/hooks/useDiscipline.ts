@@ -33,9 +33,12 @@ export function useDiscipline(): Discipline {
 
   // Tab identifies discipline on the dossier pages. Both singular
   // ('Batting' on /teams) and plural ('Batters' on /venues, /series)
-  // variants map to the same axis.
+  // variants map to the same axis. Partnerships → 'batting' because a
+  // partnership is intrinsically a batting concept (both batters belong
+  // to the batting team; the wicket that ends it is the batting team's
+  // loss); the POV-aware inning label is "batting first/second".
   const tab = params.get('tab')
-  if (tab === 'Batting' || tab === 'Batters') return 'batting'
+  if (tab === 'Batting' || tab === 'Batters' || tab === 'Partnerships') return 'batting'
   if (tab === 'Bowling' || tab === 'Bowlers') return 'bowling'
   if (tab === 'Fielding' || tab === 'Fielders') return 'fielding'
 

@@ -80,13 +80,17 @@ assert_lacks() {
 sql() { sqlite3 "$DB" "$1" 2>&1; }
 
 # Click the All / 1st / 2nd innings pill (page-local InningToggle).
+# Position-based selector because pill TEXT is POV-aware as of
+# 2026-05-12 — Batting pages render "Batting first" not "1st innings".
+# The "Innings"-labelled wisden-filter-group is stable; its 3 segs
+# are always [All, innings_number=0, innings_number=1] in that order.
 click_inning() {
   case "$1" in
-    All) lab="All innings";;
-    0)   lab="1st innings";;
-    1)   lab="2nd innings";;
+    All) idx=0;;
+    0)   idx=1;;
+    1)   idx=2;;
   esac
-  ab_eval "Array.from(document.querySelectorAll('.wisden-seg')).find(b => b.textContent.trim() === '$lab')?.click()" >/dev/null
+  ab_eval "(() => { const g = Array.from(document.querySelectorAll('.wisden-filter-group')).find(g => g.querySelector('.wisden-filter-label')?.textContent === 'Innings'); g?.querySelectorAll('.wisden-seg')[$idx]?.click(); })()" >/dev/null
 }
 
 # DOM extractors. Match label-then-value — same shape as cross_

@@ -217,9 +217,11 @@ settle 4
 mount_inns=$(ab_eval "document.querySelector('section[aria-label=\"Per-innings runs distribution\"]').innerText.match(/(\d+)\s+inns/)?.[1] || ''")
 assert_eq "Lifetime n_innings on mount (sanity)" "$sql_inns" "$mount_inns"
 
-# Click the InningToggle "1st innings" pill (NOT a panel pill — the
-# top-of-page toggle that sets ?inning=0)
-ab_eval "[...document.querySelectorAll('.wisden-seg')].find(b => b.innerText.trim() === '1st innings')?.click()" >/dev/null
+# Click the InningToggle "1st innings" pill — position-based selector
+# because pill text is POV-aware as of 2026-05-12 (this is /batting →
+# "Batting first", not "1st innings"). The "Innings"-labelled group's
+# 3 segs are stably [All, innings_number=0, innings_number=1].
+ab_eval "(() => { const g = Array.from(document.querySelectorAll('.wisden-filter-group')).find(g => g.querySelector('.wisden-filter-label')?.textContent === 'Innings'); g?.querySelectorAll('.wisden-seg')[1]?.click(); })()" >/dev/null
 settle 3
 url_with_inning=$(ab_eval "window.location.href" | tr -d '"')
 assert_contains "InningToggle click writes ?inning=0" "inning=0" "\"$url_with_inning\""
@@ -234,7 +236,8 @@ WHERE $KOHLI_IPL_2024_WHERE AND i.innings_number = 0
 dom_inn0=$(ab_eval "document.querySelector('section[aria-label=\"Per-innings runs distribution\"]').innerText.match(/(\d+)\s+inns/)?.[1] || ''")
 assert_eq "Panel n_innings refetches under inning=0" "$sql_inn0" "$dom_inn0"
 # And inning=0 + inning=1 should partition lifetime (sanity)
-ab_eval "[...document.querySelectorAll('.wisden-seg')].find(b => b.innerText.trim() === '2nd innings')?.click()" >/dev/null
+# Position-based (POV-aware labels — see comment above).
+ab_eval "(() => { const g = Array.from(document.querySelectorAll('.wisden-filter-group')).find(g => g.querySelector('.wisden-filter-label')?.textContent === 'Innings'); g?.querySelectorAll('.wisden-seg')[2]?.click(); })()" >/dev/null
 settle 3
 sql_inn1=$(sql "
 SELECT COUNT(DISTINCT i.id)

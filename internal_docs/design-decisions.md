@@ -2260,3 +2260,45 @@ match count. Per-cell deltas compare team-share to league-
 share at the same filter scope.
 
 Spec: `internal_docs/spec-splits-mosaic.md` §1.4.
+
+## Inning-toggle labels are POV-aware via `useDiscipline()` (2026-05-12)
+
+`?inning=0/1` ALWAYS means the match's `innings.innings_number=0/1`
+— URL semantics are constant across pages. The visible pill text
+on `InningToggle` is POV-aware:
+
+| Page POV | `useDiscipline()` | Pill |
+|---|---|---|
+| Batting · Partnerships | `'batting'` | `Batting first` / `Batting second` |
+| Bowling · Fielding | `'bowling'` / `'fielding'` | `Bowling first` / `Bowling second` |
+| Ambiguous (Records, single-player profile) | `null` | `1st innings` / `2nd innings` |
+
+Before 2026-05-12 every site rendered "1st innings" / "2nd innings"
+to dodge the bowler-perspective gloss (spec-inning-split.md §7.1
+original). Audit on 13 mount sites showed cricket idiom resolves
+cleanly: "Bumrah bowled first" = his team was the fielding side in
+innings_number=0, which IS what the user expects when picking the
+1st-innings pill on /bowling. Fielding pages adopt **bowling**
+terminology because the fielding side IS the bowling side in any
+innings — never "Fielded first".
+
+Ambiguous pages (Records, single-player profile) stay neutral
+because a single `?inning=0` simultaneously means three different
+POVs on one page: batting section reflects batted-first, bowling
+section bowled-first, fielding section fielded-first. The
+neutral wording forces the reader to interpret per-section. The
+polysemy is locked by `tests/integration/inning_toggle_pov_labels.sh`
+Part B (SQL-anchored: one URL, three discipline-specific predicates).
+
+Partnerships → batting POV (`useDiscipline()` maps `tab=Partnerships`
+→ `'batting'`) because a partnership is intrinsically a batting
+concept — both batters belong to the batting team; the wicket that
+ends it is the batting team's loss.
+
+`useDiscipline()` is the single source of truth — `abbreviateScope`,
+`ScopeStatusStrip`, and chart subtitles all flow through it; new
+mount sites or new aux labels needing POV awareness should extend
+the hook, not roll their own resolution.
+
+Spec: `spec-inning-split.md` §7.1 (post-2026-05-12 rewrite) +
+`CLAUDE.md` "Inning-toggle labels" under Page conventions.

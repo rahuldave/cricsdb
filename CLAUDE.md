@@ -403,6 +403,34 @@ Wired via `last_match_date` on the distribution endpoints' lifetime block; pages
 
 Spec: `design-decisions.md` "Dormancy badge".
 
+### Inning-toggle labels — POV-aware via `useDiscipline()`
+
+`?inning=0/1` always means `innings.innings_number = 0/1` (the match's 1st / 2nd innings half) — the URL semantics are **constant** across pages. The **rendered pill label** is POV-aware, derived from `useDiscipline()`:
+
+| Page POV | `useDiscipline()` | Pills (after "All innings") |
+|---|---|---|
+| Batting · Partnerships | `'batting'` | `Batting first` / `Batting second` |
+| Bowling · Fielding | `'bowling'` / `'fielding'` | `Bowling first` / `Bowling second` |
+| Ambiguous (Records, single-player profile) | `null` | `1st innings` / `2nd innings` (neutral) |
+
+**Ambiguous pages stay neutral because the same `?inning=0` token simultaneously means three different POVs on one page.** On Players/Records the batting section reflects batted-first, the bowling section reflects bowled-first, the fielding section reflects fielded-first — all under one toggle. No single POV label can be accurate; the neutral wording forces the reader to interpret per-section.
+
+**Fielding inherits Bowling terminology** — pills say "Bowling first" on `/fielding`, never "Fielded first". The fielding side IS the bowling side in any given innings; "Bowling first" is the standard cricket idiom.
+
+**Partnerships → batting POV** (not null). A partnership is intrinsically a batting concept — both batters belong to the batting team, the wicket that ends it is the batting team's loss. `useDiscipline()` maps `tab=Partnerships` → `'batting'`.
+
+13 mount sites total: 4 batting-POV (Batting + Venue/Batters + Tournament/Batters + Tournament/Partnerships), 6 bowling-POV (Bowling + Fielding + Venue/Bowlers + Venue/Fielders + Tournament/Bowlers + Tournament/Fielders), 3 ambiguous (Players + Venue/Records + Tournament/Records).
+
+**Tells you might be about to break this:**
+- New mount site for `InningToggle` on a multi-discipline page → confirm `useDiscipline()` returns `null` there; if it forces a POV that doesn't match the page content, propagate it to ambiguous rather than picking one POV.
+- New dossier-style page with `?tab=<axis>` → extend `useDiscipline()` to map the tab, not the rendering layer.
+- Tempted to add an explicit `pov` prop to `InningToggle` → don't; `useDiscipline()` is the single source of truth. Extend that hook, not the toggle.
+- New aux narrowing (toss, result, batting-position, etc.) that needs a similar POV label → mirror this pattern via `useDiscipline()`, don't roll your own POV resolution.
+
+Tested by `tests/integration/inning_toggle_pov_labels.sh` — Part A asserts pill text per site; Part B locks the ambiguous-page polysemy (one `?inning=0` URL == three POVs simultaneously, SQL-anchored).
+
+Spec: `spec-inning-split.md` §7.1 + `design-decisions.md`.
+
 ---
 
 ## Palette

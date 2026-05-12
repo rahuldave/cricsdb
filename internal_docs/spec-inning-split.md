@@ -758,32 +758,40 @@ column on Compare tab — bumps from 12 to 16).
 
 ## 7. Reading conventions — labels + slot semantics
 
-### 7.1 Bowler-perspective labelling
+### 7.1 POV-aware inning labels (updated 2026-05-12)
 
-A bowler "in the 1st innings" was bowling against the team batting
-first. Conventional cricket parlance "X bowled first" typically
-means "X's team was on the field FIRST" — i.e. opposition batted
-first — i.e. innings_number=0.
+**Original policy (deprecated 2026-05-12):** the toggle showed "1st
+innings" / "2nd innings" everywhere, on the theory that "bowled
+first" / "fielded first" risk confusing a casual reader.
 
-But that's exactly the opposite of what some readers might assume.
-And for fielders the same confusion compounds — "Pakistan fielded
-first" means Pakistan's fielders were active during innings 1 (when
-Pakistan's opposition batted first).
+**Revised policy:** `?inning=0/1` always means the match's
+`innings.innings_number=0/1`; the URL semantics are constant. The
+**rendered pill label** is POV-aware via `useDiscipline()`:
 
-**Convention to write into `internal_docs/design-decisions.md`
-before shipping:**
+| Page POV | `useDiscipline()` returns | Pill label |
+|---|---|---|
+| Batting · Partnerships | `'batting'` | `Batting first` / `Batting second` |
+| Bowling · Fielding | `'bowling'` / `'fielding'` | `Bowling first` / `Bowling second` |
+| Ambiguous (Records, single-player profile) | `null` | `1st innings` / `2nd innings` |
 
-> Inning labels are framed by the MATCH'S innings_number even on
-> bowling and fielding pages: "1st innings" = innings_number=0
-> regardless of which side of the ball the page focuses on. So
-> "Bumrah, 1st innings" = Bumrah's deliveries when the opposition
-> was batting first. "Pakistan fielding, 2nd innings" = Pakistan's
-> fielding credits during innings_number=1. NEVER use "bowling
-> first" / "fielded first" as labels — those phrases mean the
-> OPPOSITE of what a casual reader assumes.
+Cricket idiom resolves the bowler/fielder confusion: "Bumrah bowled
+first" = his team was the fielding side in innings_number=0 = he
+was bowling while the OPPOSITION batted first. This matches the
+conventional reading. Fielding pages adopt **bowling** terminology
+("Bowling first") because the fielding side IS the bowling side
+in any given innings — never "Fielded first".
 
-The frontend toggle pill says "1st innings" / "2nd innings" on
-every page. No "bowling first" anywhere in the UI.
+**Ambiguous pages stay neutral** because a single `?inning=0`
+simultaneously means three different POVs on one page: the batting
+section reflects batted-first, the bowling section bowled-first,
+the fielding section fielded-first. No single POV label can be
+accurate for all three on the same page. Polysemy is locked by
+`tests/integration/inning_toggle_pov_labels.sh` Part B.
+
+13 mount sites: 4 batting-POV, 6 bowling/fielding-POV, 3 ambiguous.
+Source-of-truth rule lives in `CLAUDE.md` "Inning-toggle labels"
+under Page conventions; cross-codebase consistency comes from
+the single hook (no per-component POV resolution).
 
 ### 7.2 Slot-level inning=0 is dual-meaning (Compare tab)
 
@@ -804,19 +812,21 @@ unsure.
 `InningToggle` on single-column pages (Team Batting, Player
 Batting, etc.) doesn't have this issue — page is one discipline.
 
-### 7.3 Single-discipline pages (single-column reading)
+### 7.3 Single-discipline pages (single-column reading) — updated 2026-05-12
 
-Player Batting page with inning=0: "Babar in 1st innings" =
+Player Batting page with inning=0: pill reads "Batting first" —
 his batting in matches where his team batted first. Direct.
 
-Player Bowling page with inning=0: "Bumrah in 1st innings" = his
-bowling when opposition batted first. The bowler-perspective gloss
-in §7.1 takes care of the conceptual flip; the label "1st innings"
-stays.
+Player Bowling page with inning=0: pill reads "Bowling first" —
+his bowling when his team was the fielding side in the 1st innings
+(i.e. opposition batted first). Cricket idiom resolves: "Bumrah
+bowled first" reads naturally.
 
-Player Fielding page with inning=0: "Jadeja's catches in 1st
-innings" = catches taken when opposition was batting first. Same
-logic.
+Player Fielding page with inning=0: pill reads "Bowling first" —
+fielding inherits bowling terminology because the fielding side
+IS the bowling side in any innings (Convention 3 of cricket
+parlance, mirrored in `useDiscipline()` returning `'fielding'` →
+same Bowling-first label as `'bowling'`).
 
 ---
 
