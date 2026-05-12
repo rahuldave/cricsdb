@@ -103,7 +103,17 @@ export default function BarChart<T extends Record<string, any>>({
     const v = typeof valueAccessor === 'function'
       ? valueAccessor(d)
       : (d as Record<string, unknown>)[valueAccessor as string]
-    return typeof v === 'number' ? v : 0
+    if (typeof v === 'number') return v
+    // Auto-unwrap MetricEnvelope so string accessors like
+    // valueAccessor="run_rate" keep working after fields get wrapped
+    // by the league-delta envelope migration (commit 2d9e335). Without
+    // this, the chart silently degenerates to maxValue=0 because
+    // TypeScript's `Record<string, unknown>` lookup erases the field
+    // shape — see CLAUDE.md "API ↔ frontend type contract".
+    if (v && typeof v === 'object' && typeof (v as { value?: unknown }).value === 'number') {
+      return (v as { value: number }).value
+    }
+    return 0
   }
   const maxValue = data.reduce((m, d) => Math.max(m, getValue(d) || 0), 0)
 
@@ -113,7 +123,11 @@ export default function BarChart<T extends Record<string, any>>({
         <SemioticBarChart
           data={data}
           categoryAccessor={categoryAccessor}
-          valueAccessor={valueAccessor}
+          // Pass the envelope-unwrapping `getValue` rather than the raw
+          // `valueAccessor` so Semiotic reads the unwrapped number for
+          // MetricEnvelope-typed fields too (otherwise its internal
+          // d[key] lookup sees the envelope object and renders 0).
+          valueAccessor={getValue}
           title={title}
           width={effectiveWidth}
           height={finalHeight}
