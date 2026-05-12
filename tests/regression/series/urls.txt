@@ -11,13 +11,14 @@
 # All REG.
 
 # ── landing ──────────────────────────────────────────────────────
-# 2026-05-12 — flipped REG→NEW for the recent_editions field addition.
-# Three-commit dance per regression-testing-api.md "Three-commit
-# shape-change workflow"; this commit lands the flip, next commit
-# adds the field, third flips back to REG.
-NEW series_landing_plain              /api/v1/series/landing
-NEW series_landing_men                /api/v1/series/landing?gender=male
-NEW series_landing_women              /api/v1/series/landing?gender=female
+# 2026-05-12 — flipped NEW→REG after the recent_editions shape change
+# landed in commit 355a87e. Three-commit dance per
+# regression-testing-api.md "Three-commit shape-change workflow"
+# — these now baseline the post-shape state so the next future
+# shape change starts clean.
+REG series_landing_plain              /api/v1/series/landing
+REG series_landing_men                /api/v1/series/landing?gender=male
+REG series_landing_women              /api/v1/series/landing?gender=female
 
 # ── tournament dossier: IPL all-time ─────────────────────────────
 NEW series_summary_ipl                /api/v1/series/summary?tournament=Indian%20Premier%20League
