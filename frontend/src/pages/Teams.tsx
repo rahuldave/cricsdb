@@ -20,7 +20,6 @@ import {
   getTeamPartnershipsByWicket, getTeamPartnershipsBestPairs, getTeamPartnershipsHeatmap, getTeamPartnershipsTop, getTeamPartnershipsByInning, getTeamPartnershipsSummary,
 } from '../api'
 import StatCard from '../components/StatCard'
-import InningToggle from '../components/InningToggle'
 import MetricDelta from '../components/MetricDelta'
 import TeamSearch from '../components/TeamSearch'
 import FlagBadge from '../components/FlagBadge'
@@ -518,14 +517,14 @@ export default function Teams() {
           </div>
 
           <div>
-            {/* Page-local 1st/2nd-innings toggle. Mounts only on tabs
-                that have innings-level metrics. Compare uses per-slot
-                override (SlotScopeEditor "Innings" row) instead.
-                Match List + Players don't have inning-relevant stats.
-                Spec: spec-inning-split.md §6.1 + §3.3. */}
-            {(['By Season', 'vs Opponent', 'Batting', 'Bowling', 'Fielding', 'Partnerships'] as const).includes(activeTab as never) && (
-              <InningToggle />
-            )}
+            {/* 1st/2nd-innings narrowing is driven by the SplitsMosaic
+                cells on this page — InningToggle removed 2026-05-12 to
+                avoid redundancy. The Mosaic writes ?inning= directly on
+                cell-click, and the page's inning-POV translation
+                (splitsFilters above) bridges to the API. Compare slots
+                still use SlotScopeEditor's "Innings" row for per-slot
+                override. Spec: spec-inning-split.md §6.1 + §3.3
+                (toggle deprecation deferred there). */}
             {activeTab === 'By Season' && (
               <>
                 {seasonsFetch.loading && <Spinner label="Loading season records…" />}
