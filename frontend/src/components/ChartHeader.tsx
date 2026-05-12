@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { abbreviateScope } from './scopeLinks'
 import { useFilters } from '../hooks/useFilters'
+import { useDiscipline } from '../hooks/useDiscipline'
 
 export interface ChartHeaderProps {
   title?: ReactNode
@@ -74,7 +75,8 @@ export interface SectionHeaderProps {
  */
 export function SectionHeader({ title, subtitle, style }: SectionHeaderProps) {
   const filters = useFilters()
-  const effectiveSubtitle = subtitle ?? abbreviateScope(filters)
+  const discipline = useDiscipline()
+  const effectiveSubtitle = subtitle ?? abbreviateScope(filters, { discipline })
   return (
     <>
       <h3 className="wisden-section-title" style={style}>{title}</h3>
@@ -102,7 +104,8 @@ export interface KickerHeaderProps {
  */
 export function KickerHeader({ title, subtitle }: KickerHeaderProps) {
   const filters = useFilters()
-  const effectiveSubtitle = subtitle ?? abbreviateScope(filters)
+  const discipline = useDiscipline()
+  const effectiveSubtitle = subtitle ?? abbreviateScope(filters, { discipline })
   return (
     <div>
       <div className="wisden-kicker">{title}</div>

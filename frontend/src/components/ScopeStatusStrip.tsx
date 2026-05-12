@@ -21,6 +21,7 @@
 import { useState } from 'react'
 import { useSearchParams, useLocation } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
+import { useDiscipline, type Discipline } from '../hooks/useDiscipline'
 import { useFetch } from '../hooks/useFetch'
 import { getSeasons } from '../api'
 import { seasonTag } from './scopeLinks'
@@ -43,6 +44,7 @@ function buildSegments(
   tab: string | null,
   page: string | null,
   derivedSeasonRange: string | null,
+  discipline: Discipline,
 ): Segment[] {
   const segs: Segment[] = []
 
@@ -125,10 +127,13 @@ function buildSegments(
   // Page-local 1st/2nd-innings narrowing — AuxParams aux field, NOT
   // a FilterBar key, but surfaces here so the user sees that the page
   // is partitioned. Spec: spec-inning-split.md §6.6.
+  // POV-aware: bowling/fielding discipline flips to "bowled first/second".
+  // See project_inning_pov_conventions for the decision history.
+  const bowlPov = discipline === 'bowling' || discipline === 'fielding'
   if (filters.inning === '0') {
-    segs.push({ label: 'Innings', value: 'batted first' })
+    segs.push({ label: 'Innings', value: bowlPov ? 'bowled first' : 'batted first' })
   } else if (filters.inning === '1') {
-    segs.push({ label: 'Innings', value: 'batted second' })
+    segs.push({ label: 'Innings', value: bowlPov ? 'bowled second' : 'batted second' })
   }
 
   // Splits Mosaic aux — toss_outcome + result narrowings from the
@@ -224,9 +229,10 @@ export default function ScopeStatusStrip() {
     return first === last ? first : `${first}–${last}`
   })()
 
+  const discipline = useDiscipline()
   const segments = buildSegments(
     filters, pathTeam, pathVenue, pathPlayer, pathCompare, tab, page,
-    derivedSeasonRange,
+    derivedSeasonRange, discipline,
   )
 
   const handleCopy = async () => {

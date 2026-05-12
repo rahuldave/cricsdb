@@ -2,6 +2,7 @@ import { BarChart as SemioticBarChart } from 'semiotic'
 import ChartHeader from '../ChartHeader'
 import { abbreviateScope } from '../scopeLinks'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
+import { useDiscipline } from '../../hooks/useDiscipline'
 import { useFilters } from '../../hooks/useFilters'
 import { WISDEN_PALETTE } from './palette'
 
@@ -55,7 +56,8 @@ export default function BarChart<T extends Record<string, any>>({
   // to suppress). Empty filter state collapses the line
   // (abbreviateScope returns "").
   const filters = useFilters()
-  const effectiveSubtitle = subtitle ?? (title ? abbreviateScope(filters) : '')
+  const discipline = useDiscipline()
+  const effectiveSubtitle = subtitle ?? (title ? abbreviateScope(filters, { discipline }) : '')
 
   // Rotate the x-axis tick labels to vertical when bars get too dense
   // for horizontal text.

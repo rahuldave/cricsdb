@@ -2,6 +2,7 @@ import { Scatterplot } from 'semiotic'
 import ChartHeader from '../ChartHeader'
 import { abbreviateScope } from '../scopeLinks'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
+import { useDiscipline } from '../../hooks/useDiscipline'
 import { useFilters } from '../../hooks/useFilters'
 import { WISDEN_PALETTE, WISDEN } from './palette'
 const DEFAULT_POINT = WISDEN.indigo
@@ -48,7 +49,8 @@ export default function ScatterChart<T extends Record<string, any>>({
   const effectiveWidth = width ?? measuredWidth
   // Auto-subtitle from filter state — see BarChart for rationale.
   const filters = useFilters()
-  const effectiveSubtitle = subtitle ?? (title ? abbreviateScope(filters) : '')
+  const discipline = useDiscipline()
+  const effectiveSubtitle = subtitle ?? (title ? abbreviateScope(filters, { discipline }) : '')
 
   return (
     <div ref={ref} className="w-full">

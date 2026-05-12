@@ -161,6 +161,10 @@ export function seasonTag(
   return ''
 }
 
+/** Stat discipline used for POV-aware inning phrasing. Null = no
+ *  clear discipline; abbreviation falls back to batting-POV defaults. */
+export type Discipline = 'batting' | 'bowling' | 'fielding' | null
+
 /**
  * Compact one-line summary of the active scope, suitable for inline
  * display next to a page title. Used to give the user an at-a-glance
@@ -173,8 +177,16 @@ export function seasonTag(
  * Mirrors the segment ordering of ScopeStatusStrip but in shorter form
  * (no labels, just values, " · " separator). The status strip is the
  * authoritative read; this is the glance read.
+ *
+ * `opts.discipline` flips the inning POV: 'bowling' or 'fielding'
+ * renders `?inning=0/1` as "bowled first/second"; anything else
+ * (batting / null / undefined) renders "batted first/second".
+ * Source-of-truth for callers is the `useDiscipline()` hook.
  */
-export function abbreviateScope(scope: Partial<FilterParams>): string {
+export function abbreviateScope(
+  scope: Partial<FilterParams>,
+  opts?: { discipline?: Discipline },
+): string {
   const parts: string[] = []
 
   if (scope.gender === 'male') parts.push("men's")
@@ -214,10 +226,13 @@ export function abbreviateScope(scope: Partial<FilterParams>): string {
   // Inning aux — page-local 1st/2nd-innings filter. NOT in
   // FILTER_KEYS (it's an AuxParam, not a FilterBar key) but it's a
   // genuine scope narrowing the user sees, so it belongs in the
-  // abbreviation alongside the FilterBar axes. Mirrors the
-  // ScopeStatusStrip rendering convention.
-  if (scope.inning === '0') parts.push('batted first')
-  else if (scope.inning === '1') parts.push('batted second')
+  // abbreviation alongside the FilterBar axes. POV-aware: bowling /
+  // fielding discipline flips the verb to "bowled first/second" so the
+  // subtitle matches the side of the ball the user is reading. See
+  // project_inning_pov_conventions for the decision history.
+  const bowlPov = opts?.discipline === 'bowling' || opts?.discipline === 'fielding'
+  if (scope.inning === '0') parts.push(bowlPov ? 'bowled first' : 'batted first')
+  else if (scope.inning === '1') parts.push(bowlPov ? 'bowled second' : 'batted second')
 
   // Splits Mosaic aux — match-outcome (result) and toss-outcome
   // narrowings from the path team's POV. Same AuxParam treatment
