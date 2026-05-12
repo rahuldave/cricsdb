@@ -36,6 +36,7 @@ import { WISDEN_WICKET_TIERS, WISDEN_LOWER_TIERS } from '../charts/palette'
 import { wicketBin, wicketTier, economyTier, runsConcededTier } from './distributionBins'
 import type { BowlerDistribution, BowlerDossier, BowlerInningsObservation } from '../../types'
 
+import { KickerHeader } from '../ChartHeader'
 type DistWindow = 'scope' | 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
 type DistMetric = 'wickets' | 'economy' | 'runs'
 
@@ -223,16 +224,7 @@ export default function BowlerDistributionPanel({
         <div style={{
           display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '0.6rem',
         }}>
-          <div style={{
-            fontFamily: 'var(--serif)',
-            fontStyle: 'italic',
-            fontSize: '0.78rem',
-            color: 'var(--ink-faint)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-          }}>
-            Per-innings bowling distribution
-          </div>
+          <KickerHeader title="Per-innings bowling distribution" />
           <div style={{
             fontFamily: 'var(--serif)',
             fontStyle: 'italic',

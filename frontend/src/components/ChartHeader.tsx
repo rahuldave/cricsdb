@@ -84,3 +84,31 @@ export function SectionHeader({ title, subtitle, style }: SectionHeaderProps) {
     </>
   )
 }
+
+export interface KickerHeaderProps {
+  title: ReactNode
+  /** Same opt-out semantics as the other headers — undefined auto-fills
+   *  from abbreviateScope(useFilters()), "" suppresses, anything else
+   *  is used verbatim. */
+  subtitle?: ReactNode
+}
+
+/**
+ * Quiet uppercase italic eyebrow label used by the distribution panels
+ * (Batter / Bowler / Fielder / TeamBatting / TeamBowling / TeamFielding).
+ * Sits in the flex `<header>` row alongside the window-toggle. Emits a
+ * single <div> so the parent flex can baseline-align the toggle to the
+ * kicker title (the subtitle, if present, hangs below the baseline).
+ */
+export function KickerHeader({ title, subtitle }: KickerHeaderProps) {
+  const filters = useFilters()
+  const effectiveSubtitle = subtitle ?? abbreviateScope(filters)
+  return (
+    <div>
+      <div className="wisden-kicker">{title}</div>
+      {effectiveSubtitle && (
+        <div className="wisden-kicker-sub">{effectiveSubtitle}</div>
+      )}
+    </div>
+  )
+}

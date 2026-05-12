@@ -33,6 +33,7 @@ import FormDeltaLine from './FormDeltaLine'
 import SuggestedSplitsRow from './SuggestedSplitsRow'
 import type { BatterDistribution, DistributionDossier, InningsObservation } from '../../types'
 
+import { KickerHeader } from '../ChartHeader'
 type DistWindow = 'scope' | 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
 type DistMetric = 'runs' | 'sr'
 
@@ -262,18 +263,7 @@ export default function BatterDistributionPanel({
         gap: '0.5rem',
         marginBottom: '0.5rem',
       }}>
-        <div>
-          <div style={{
-            fontFamily: 'var(--serif)',
-            fontStyle: 'italic',
-            fontSize: '0.78rem',
-            color: 'var(--ink-faint)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-          }}>
-            Per-innings runs distribution
-          </div>
-        </div>
+        <KickerHeader title="Per-innings runs distribution" />
         <div className="wisden-filter-group">
           {WINDOW_OPTIONS.map(opt => (
             <button

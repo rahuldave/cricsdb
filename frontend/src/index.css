@@ -1142,6 +1142,28 @@ a { color: inherit; }
   font-weight: 400;
 }
 
+/* Kicker eyebrow + sub used by the distribution-panel headers via
+   <KickerHeader>. Italic uppercase small-caps treatment is the quiet
+   "this is what this panel is" label; the sub is the faint filter-state
+   reminder on the line below. The flex `<header>` (kicker-left +
+   window-toggle-right) wraps these; KickerHeader emits a single <div>
+   so the flex baseline aligns the toggle to the kicker, not the sub. */
+.wisden-kicker {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.wisden-kicker-sub {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  margin-top: 0.15rem;
+}
+
 .wisden-tab-help {
   font-family: var(--serif);
   font-style: italic;

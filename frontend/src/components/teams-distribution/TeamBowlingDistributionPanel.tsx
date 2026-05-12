@@ -37,6 +37,7 @@ import {
 } from './TeamBowlingStatStrips'
 import TeamBowlingFormDeltaLine from './TeamBowlingFormDeltaLine'
 import TeamBowlingSuggestedSplitsRow from './TeamBowlingSuggestedSplitsRow'
+import { KickerHeader } from '../ChartHeader'
 import type {
   TeamBowlingDistribution,
   TeamBowlingDossier,
@@ -266,16 +267,7 @@ export default function TeamBowlingDistributionPanel({
         gap: '0.5rem',
         marginBottom: '0.5rem',
       }}>
-        <div style={{
-          fontFamily: 'var(--serif)',
-          fontStyle: 'italic',
-          fontSize: '0.78rem',
-          color: 'var(--ink-faint)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-        }}>
-          Per-innings team bowling distribution
-        </div>
+        <KickerHeader title="Per-innings team bowling distribution" />
         <div className="wisden-filter-group">
           {WINDOW_OPTIONS.map(opt => (
             <button
