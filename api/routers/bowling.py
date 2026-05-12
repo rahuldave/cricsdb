@@ -42,8 +42,10 @@ async def bowling_leaders(
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
     limit: int = Query(10, ge=1, le=50),
-    min_balls: int = Query(60, ge=1),
-    min_wickets: int = Query(3, ge=0),
+    # Thresholds relaxed to 1/0 (effectively no eligibility gate).
+    # Follow-up: opportunity-symmetric thresholds — see batting_leaders.
+    min_balls: int = Query(1, ge=1),
+    min_wickets: int = Query(0, ge=0),
 ):
     """Top bowlers in the current filter scope.
 

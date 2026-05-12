@@ -43,8 +43,12 @@ async def batting_leaders(
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
     limit: int = Query(10, ge=1, le=50),
-    min_balls: int = Query(100, ge=1),
-    min_dismissals: int = Query(3, ge=0),
+    # Thresholds relaxed to 1/0 (effectively no eligibility gate).
+    # Follow-up: opportunity-symmetric thresholds — scale to per-match
+    # batting opportunity vs bowling opportunity. See enhancements
+    # roadmap "leaderboard threshold redesign".
+    min_balls: int = Query(1, ge=1),
+    min_dismissals: int = Query(0, ge=0),
 ):
     """Top batters in the current filter scope.
 

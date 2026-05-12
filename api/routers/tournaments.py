@@ -1997,8 +1997,10 @@ async def tournament_batters_leaders(
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
     limit: int = Query(10, ge=1, le=50),
-    min_balls: int = Query(100, ge=1),
-    min_dismissals: int = Query(3, ge=0),
+    # Thresholds relaxed to 1/0 — see batting_leaders. Follow-up:
+    # opportunity-symmetric thresholds.
+    min_balls: int = Query(1, ge=1),
+    min_dismissals: int = Query(0, ge=0),
 ):
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
@@ -2219,8 +2221,10 @@ async def tournament_bowlers_leaders(
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
     limit: int = Query(10, ge=1, le=50),
-    min_balls: int = Query(60, ge=1),
-    min_wickets: int = Query(3, ge=0),
+    # Thresholds relaxed to 1/0 — see bowling_leaders. Follow-up:
+    # opportunity-symmetric thresholds.
+    min_balls: int = Query(1, ge=1),
+    min_wickets: int = Query(0, ge=0),
 ):
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
