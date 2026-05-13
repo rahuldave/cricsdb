@@ -1135,30 +1135,48 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
           stumpings: s.stumpings?.scope_avg ?? null,
         }}
       />
-      <div className="wisden-statrow">
-        <StatCard label="Matches" value={s.matches.value ?? 0} />
-        <StatCard label="Catches" value={(s.catches.value ?? 0).toLocaleString()} />
-        <StatCard label="Stumpings" value={s.stumpings.value ?? 0} />
-        <StatCard label="Run-outs" value={s.run_outs.value ?? 0} />
-      </div>
-      <div className="wisden-statrow">
-        <StatCard
-          label="Catches/match"
-          value={s.catches_per_match.value != null ? s.catches_per_match.value.toFixed(2) : '-'}
-          subtitle={<MetricDelta env={s.catches_per_match} withScopeAvg fmt={2} />}
-        />
-        <StatCard
-          label="Stumpings/match"
-          value={s.stumpings_per_match.value != null ? s.stumpings_per_match.value.toFixed(2) : '-'}
-          subtitle={<MetricDelta env={s.stumpings_per_match} withScopeAvg fmt={2} />}
-        />
-        <StatCard
-          label="Run-outs/match"
-          value={s.run_outs_per_match.value != null ? s.run_outs_per_match.value.toFixed(2) : '-'}
-          subtitle={<MetricDelta env={s.run_outs_per_match} withScopeAvg fmt={2} />}
-        />
-        <StatCard label="C&B" value={s.caught_and_bowled.value ?? 0} />
-      </div>
+      {(() => {
+        // σ-across-in-scope-seasons per spec-series-trend-charts.md §D4.
+        const seasons = bySeason.data?.seasons ?? null
+        const sdCatchesPerMatch = seasonStdDev(seasons, r => r.catches_per_match)
+        const sdStumpingsPerMatch = seasonStdDev(seasons, r => r.stumpings_per_match)
+        const sdRunOutsPerMatch = seasonStdDev(seasons, r => r.run_outs_per_match)
+        return (
+          <>
+            <div className="wisden-statrow">
+              <StatCard label="Matches" value={s.matches.value ?? 0} />
+              <StatCard label="Catches" value={(s.catches.value ?? 0).toLocaleString()} />
+              <StatCard label="Stumpings" value={s.stumpings.value ?? 0} />
+              <StatCard label="Run-outs" value={s.run_outs.value ?? 0} />
+            </div>
+            <div className="wisden-statrow cols-5">
+              <StatCard
+                label="Catches/match"
+                value={s.catches_per_match.value != null ? s.catches_per_match.value.toFixed(2) : '-'}
+                stdDev={sdCatchesPerMatch != null ? sdCatchesPerMatch.toFixed(2) : null}
+                subtitle={<MetricDelta env={s.catches_per_match} withScopeAvg fmt={2} />}
+              />
+              <StatCard
+                label="Stumpings/match"
+                value={s.stumpings_per_match.value != null ? s.stumpings_per_match.value.toFixed(2) : '-'}
+                stdDev={sdStumpingsPerMatch != null ? sdStumpingsPerMatch.toFixed(2) : null}
+                subtitle={<MetricDelta env={s.stumpings_per_match} withScopeAvg fmt={2} />}
+              />
+              <StatCard
+                label="Run-outs/match"
+                value={s.run_outs_per_match.value != null ? s.run_outs_per_match.value.toFixed(2) : '-'}
+                stdDev={sdRunOutsPerMatch != null ? sdRunOutsPerMatch.toFixed(2) : null}
+                subtitle={<MetricDelta env={s.run_outs_per_match} withScopeAvg fmt={2} />}
+              />
+              <StatCard label="C&B" value={s.caught_and_bowled.value ?? 0} />
+              <StatCard
+                label="Total dismissals"
+                value={(s.total_dismissals_contributed.value ?? 0).toLocaleString()}
+              />
+            </div>
+          </>
+        )
+      })()}
 
       {bySeason.data && bySeason.data.seasons.length >= 2 && (
         <>
