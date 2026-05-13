@@ -32,14 +32,18 @@ interface LineChartProps<T extends Record<string, any>> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tooltip?: any
   /** Optional second series rendered alongside the primary `data` —
-   *  e.g. a tournament-wide pool-weighted baseline against which a
-   *  team's line should be read (spec-series-trend-charts.md step 11).
-   *  Must share the same x and y accessors as the primary data. Forest
-   *  green stroke (`internal_docs/colors.md`'s league-avg reference
-   *  color); the primary keeps WISDEN_PALETTE's first color. Ignored
-   *  when `lineBy` is already set (multi-series mode wins). */
+   *  e.g. a pool-weighted league baseline against which a team's line
+   *  should be read (spec-series-trend-charts.md step 11). Must share
+   *  the same x and y accessors as the primary data. Forest green
+   *  stroke (`internal_docs/colors.md`'s league-avg reference color);
+   *  the primary keeps WISDEN_PALETTE's first color. Ignored when
+   *  `lineBy` is already set (multi-series mode wins). */
   referenceData?: T[]
-  /** Legend label for the reference series — default "Tournament avg". */
+  /** Legend label for the reference series. When omitted, auto-
+   *  derived from `abbreviateScope(filters, { discipline })` + " avg"
+   *  so the legend always tells the reader exactly which pool the
+   *  baseline aggregates over (e.g. "men's · Indian Premier League
+   *  avg" / "men's · club · 2024 avg"). */
   referenceLabel?: string
   /** Legend label for the primary `data` series — default "Team". Only
    *  meaningful when `referenceData` is provided. */
@@ -52,14 +56,23 @@ export default function LineChart<T extends Record<string, any>>({
   colorScheme = WISDEN_PALETTE, title, subtitle,
   width, height = 400, xLabel, yLabel, showPoints, curve,
   annotations, tooltip,
-  referenceData, referenceLabel = 'Tournament avg', primaryLabel = 'Team',
+  referenceData, referenceLabel, primaryLabel = 'Team',
 }: LineChartProps<T>) {
   const [ref, measuredWidth] = useContainerWidth()
   const effectiveWidth = width ?? measuredWidth
   // Auto-subtitle from filter state — see BarChart for rationale.
   const filters = useFilters()
   const discipline = useDiscipline()
-  const effectiveSubtitle = subtitle ?? (title ? abbreviateScope(filters, { discipline }) : '')
+  const scopePhrase = abbreviateScope(filters, { discipline })
+  const effectiveSubtitle = subtitle ?? (title ? scopePhrase : '')
+
+  // Auto-derive the reference-line legend label from the same scope
+  // phrase that drives the subtitle — the chip deltas on the tile row
+  // above already compare against this exact pool (scope_avg on
+  // /summary), so the chart legend names the same baseline explicitly.
+  // Fallback "League avg" covers the empty-scope case.
+  const effectiveReferenceLabel = referenceLabel
+    ?? (scopePhrase ? `${scopePhrase} avg` : 'League avg')
 
   // Reference-overlay mode: combine data + referenceData into a single
   // tagged array and tell Semiotic to draw two lines, distinguished
@@ -69,7 +82,7 @@ export default function LineChart<T extends Record<string, any>>({
   const effectiveData: Record<string, unknown>[] = hasReference
     ? [
         ...data.map(d => ({ ...d, _series: primaryLabel })),
-        ...(referenceData ?? []).map(d => ({ ...d, _series: referenceLabel })),
+        ...(referenceData ?? []).map(d => ({ ...d, _series: effectiveReferenceLabel })),
       ]
     : data
   const effectiveLineBy = hasReference ? '_series' : lineBy

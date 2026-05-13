@@ -160,11 +160,13 @@ Mirrors `pages/Teams.tsx:1111-1151`. The `Total dismissals` tile is new on **bot
 ### Teams → Batting/Bowling/Fielding (two changes)
 
 1. **Tile-row enrichment** — same tile rows as today **plus** the inline std-dev on rate/average tiles (D4) **plus** the two new tiles (`Boundaries conceded` on Bowling, `Total dismissals` on Fielding). Std is hidden on N=1; visible as `value ± σ` on N≥2.
-2. **Tournament-baseline overlay on charts** — when `filters.tournament` is set, each existing LineChart / BarChart in `BattingTab` / `BowlingTab` / `FieldingTab` gains a second series: the tournament's pool-weighted by-season baseline rendered as a forest-green reference overlay (`internal_docs/colors.md` reserves forest for league-avg reference lines).
+2. **Scope-baseline overlay on rate LineCharts** — every rate-rate chart in `BattingTab` / `BowlingTab` / `FieldingTab` gains a second series at **every scope**: the pool-weighted by-season baseline (the same `scope_avg` source the chip-deltas above the chart already use), rendered as a forest-green reference overlay (`internal_docs/colors.md` reserves forest for league-avg reference lines). With `tournament=IPL` the legend reads "men's · Indian Premier League avg"; without it, "men's · club avg" — `abbreviateScope` derives the label so the legend always identifies the exact pool.
 
-Implementation note for the overlay: existing `LineChart` should support a second `data` series via a `referenceData`-style prop. Verify in `frontend/src/components/charts/LineChart.tsx`; if absent, **extend the existing component with a narrow prop** rather than forking a `LineChartWithRef` variant (CLAUDE.md "Extend existing abstractions"). BarCharts are trickier — proposal: render the baseline as a small horizontal reference line at each season-x position, not a second bar. Decide concretely during the overlay commit.
+Implementation: extend `LineChart` with three narrow props — `referenceData`, `referenceLabel` (optional; auto-derived from `abbreviateScope(filters, { discipline }) + " avg"` when omitted), and `primaryLabel` for the team-side legend entry. When both `data` and `referenceData` are passed and `lineBy` isn't set, the component combines them into a `_series`-tagged array. `lineBy` callers (SeasonTrajectoryStrip, WormChart) keep their existing multi-series behavior.
 
-Overlay is hidden when `filters.tournament === ''` or when team has 0/1 seasons in scope (no chart shown anyway).
+BarCharts are trickier — proposal: render the baseline as a small horizontal reference line at each season-x position, not a second bar. Decide concretely during the overlay commit. (Deferred in the current commit.)
+
+Why always-on (not tournament-gated): the chip deltas on the tile row above already compare against the same pool-weighted `scope_avg` at every scope — gating the chart visualisation differently from the chip would create an asymmetry where the number tells you the delta but the chart doesn't show what's being subtracted. Overlay hides only when the team has 0/1 seasons in scope (no chart drawn anyway).
 
 ## Tile composition (std-dev rules per D4)
 

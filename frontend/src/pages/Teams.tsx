@@ -641,15 +641,16 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
     () => getTeamBattingBySeason(team, filters),
     filterDeps,
   )
-  // Tournament-baseline overlay (spec-series-trend-charts.md step 11) —
-  // when `filters.tournament` is set, fetch the pool-weighted per-
-  // season aggregate so each chart can render a forest-green
-  // reference line alongside the team's line. Same FilterParams so
-  // `gender`, `team_type`, `season_from/to` etc. carry through.
-  const tournamentBaseline = useFetch<{ by_season: ScopeBattingSeason[] } | null>(
-    () => filters.tournament
-      ? getScopeBattingBySeason(filters)
-      : Promise.resolve(null),
+  // Scope-baseline overlay (spec-series-trend-charts.md step 11) —
+  // pool-weighted per-season aggregate against which the team's line
+  // reads as +/- league. Fetched unconditionally because the baseline
+  // is meaningful at every scope: with `tournament=IPL` it's the IPL
+  // pool; without, it's whatever FilterBar describes (men's club /
+  // women's intl / etc.). LineChart auto-labels the reference line
+  // via abbreviateScope so the legend tells the reader exactly which
+  // pool the green line aggregates over.
+  const scopeBaseline = useFetch<{ by_season: ScopeBattingSeason[] } | null>(
+    () => getScopeBattingBySeason(filters),
     filterDeps,
   )
   const byPhase = useFetch<{ phases: TeamBattingPhase[] } | null>(
@@ -796,8 +797,7 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <LineChart data={bySeason.data.seasons} xAccessor="season" yAccessor="run_rate"
-              referenceData={tournamentBaseline.data?.by_season}
-              referenceLabel={filters.tournament ? `${filters.tournament} avg` : undefined}
+              referenceData={scopeBaseline.data?.by_season}
               primaryLabel={team}
               title="Run rate by season" xLabel="Season" yLabel="RR" height={280} />
             <LineChart data={bySeason.data.seasons} xAccessor="season" yAccessor="avg_innings_total"
@@ -811,13 +811,11 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <LineChart data={bySeason.data.seasons} xAccessor="season" yAccessor="boundary_pct"
-              referenceData={tournamentBaseline.data?.by_season}
-              referenceLabel={filters.tournament ? `${filters.tournament} avg` : undefined}
+              referenceData={scopeBaseline.data?.by_season}
               primaryLabel={team}
               title="Boundary % by season" xLabel="Season" yLabel="%" height={280} />
             <LineChart data={bySeason.data.seasons} xAccessor="season" yAccessor="dot_pct"
-              referenceData={tournamentBaseline.data?.by_season}
-              referenceLabel={filters.tournament ? `${filters.tournament} avg` : undefined}
+              referenceData={scopeBaseline.data?.by_season}
               primaryLabel={team}
               title="Dot % by season" xLabel="Season" yLabel="%" height={280} />
           </div>
@@ -903,11 +901,9 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
     () => getTeamBowlingBySeason(team, filters),
     filterDeps,
   )
-  // Tournament-baseline overlay — spec-series-trend-charts.md step 11.
-  const tournamentBaseline = useFetch<{ by_season: ScopeBowlingSeason[] } | null>(
-    () => filters.tournament
-      ? getScopeBowlingBySeason(filters)
-      : Promise.resolve(null),
+  // Scope-baseline overlay — spec-series-trend-charts.md step 11.
+  const scopeBaseline = useFetch<{ by_season: ScopeBowlingSeason[] } | null>(
+    () => getScopeBowlingBySeason(filters),
     filterDeps,
   )
   const byPhase = useFetch<{ phases: TeamBowlingPhase[] } | null>(
@@ -1041,8 +1037,7 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <LineChart data={bySeason.data.seasons} xAccessor="season" yAccessor="economy"
-              referenceData={tournamentBaseline.data?.by_season}
-              referenceLabel={filters.tournament ? `${filters.tournament} avg` : undefined}
+              referenceData={scopeBaseline.data?.by_season}
               primaryLabel={team}
               title="Economy by season" xLabel="Season" yLabel="Econ" height={280} />
             <LineChart data={bySeason.data.seasons} xAccessor="season" yAccessor="avg_opposition_total"
@@ -1056,8 +1051,7 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <LineChart data={bySeason.data.seasons} xAccessor="season" yAccessor="dot_pct"
-              referenceData={tournamentBaseline.data?.by_season}
-              referenceLabel={filters.tournament ? `${filters.tournament} avg` : undefined}
+              referenceData={scopeBaseline.data?.by_season}
               primaryLabel={team}
               title="Dot % by season" xLabel="Season" yLabel="%" height={280} />
             <BarChart data={bySeason.data.seasons} categoryAccessor="season" valueAccessor="boundaries_conceded"
@@ -1150,11 +1144,9 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
     () => getTeamFieldingBySeason(team, filters),
     filterDeps,
   )
-  // Tournament-baseline overlay — spec-series-trend-charts.md step 11.
-  const tournamentBaseline = useFetch<{ by_season: ScopeFieldingSeason[] } | null>(
-    () => filters.tournament
-      ? getScopeFieldingBySeason(filters)
-      : Promise.resolve(null),
+  // Scope-baseline overlay — spec-series-trend-charts.md step 11.
+  const scopeBaseline = useFetch<{ by_season: ScopeFieldingSeason[] } | null>(
+    () => getScopeFieldingBySeason(filters),
     filterDeps,
   )
   const byInning = useFetch<{ innings: TeamFieldingInning[] } | null>(
@@ -1250,8 +1242,7 @@ function FieldingTab({ team, filters, filterDeps, keepers }: FieldingTabProps) {
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <LineChart data={bySeason.data.seasons} xAccessor="season" yAccessor="catches_per_match"
-              referenceData={tournamentBaseline.data?.by_season}
-              referenceLabel={filters.tournament ? `${filters.tournament} avg` : undefined}
+              referenceData={scopeBaseline.data?.by_season}
               primaryLabel={team}
               title="Catches per match by season" xLabel="Season" yLabel="per match" height={280} />
             <LineChart data={bySeason.data.seasons} xAccessor="season" yAccessor="total_dismissals_contributed"

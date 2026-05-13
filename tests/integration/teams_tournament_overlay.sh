@@ -1,13 +1,15 @@
 #!/bin/bash
-# Teams chart tournament-baseline overlay from spec-series-trend-charts.md step 11.
+# Teams chart scope-baseline overlay from spec-series-trend-charts.md step 11.
 #
 # Asserts:
-#  1. When filters.tournament is set, rate-rate LineCharts on Teams →
-#     Batting/Bowling/Fielding render a forest-green reference line
-#     alongside the team's line — visible via the in-chart legend
-#     ("<Team>" + "<Tournament> avg").
-#  2. When filters.tournament is unset, the reference line + legend
-#     are absent.
+#  1. Rate-rate LineCharts on Teams → Batting/Bowling/Fielding render
+#     a forest-green pool-weighted league reference line at EVERY
+#     scope — visible via the in-chart legend ("<Team>" + auto-derived
+#     `abbreviateScope(filters) + " avg"`).
+#  2. With `tournament=IPL`, legend reads "<Team>" / "men's · Indian
+#     Premier League avg".
+#  3. Without tournament, legend reads "<Team>" / "men's · club avg"
+#     (or whatever abbreviateScope renders for the broader scope).
 set -u
 
 BASE="${BASE:-http://localhost:5173}"
@@ -65,16 +67,17 @@ else
   bad "Fielding · Catches per match by season — legend missing overlay entries (got '$leg')"
 fi
 
-echo "Test 4 · MI without tournament filter — no overlay legend entries"
+echo "Test 4 · MI WITHOUT tournament filter — overlay still visible, scope-derived label"
 ab open "$BASE/teams?team=Mumbai%20Indians&gender=male&team_type=club&tab=Batting"
 sleep 5
 leg=$(unq "$(chart_legend "Run rate by season")")
-# Axis ticks remain in the SVG; the test is that neither the team name
-# nor any "avg" series label appears as a legend entry.
-if [[ "$leg" != *"Mumbai Indians"* && "$leg" != *"avg"* ]]; then
-  ok "Batting · Run rate by season — no overlay legend entries (correct)"
+# Legend should now ALWAYS show both lines. Without tournament, the
+# baseline label comes from abbreviateScope(filters) — for men's club
+# scope, that's "men's · club avg".
+if [[ "$leg" == *"Mumbai Indians"* && "$leg" == *"men's · club avg"* ]]; then
+  ok "Batting · Run rate by season — overlay visible, label '$leg'"
 else
-  bad "Batting · Run rate by season — unexpected legend entries without tournament filter (got '$leg')"
+  bad "Batting · Run rate by season — expected overlay + 'men's · club avg' label, got '$leg'"
 fi
 
 echo ""
