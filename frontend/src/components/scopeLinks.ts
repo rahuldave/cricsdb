@@ -247,6 +247,72 @@ export function abbreviateScope(
   return parts.join(' · ')
 }
 
+/**
+ * Prose-y version of `abbreviateScope` — full English sentences, not
+ * dot-separated abbreviations. Used as the H2 title on League pages
+ * (above-tournament scope dossiers) where the page subject IS the
+ * FilterBar scope and the reader needs an at-a-glance explanation of
+ * what's in the dossier ("Men's primary-tier club cricket" reads
+ * better than the dot-separated "men's · club · primary clubs").
+ *
+ * Composition: <gender> [<class>] <team_type> <discipline-noun> [, <suffixes>]
+ * Examples:
+ *   ∅                                              → "All Twenty20 cricket"
+ *   gender=male                                    → "Men's Twenty20 cricket"
+ *   gender=male&team_type=club                     → "Men's club Twenty20 cricket"
+ *   gender=male&team_type=club&team_class=primary  → "Men's primary-tier club cricket"
+ *   gender=male&team_type=international&series=icc → "Men's ICC tournaments"
+ *   gender=female&team_type=international          → "Women's international Twenty20 cricket"
+ *   + season_from=2024&season_to=2025              → "…, 2024–2025"
+ *   + filter_venue=Wankhede Stadium                → "…, at Wankhede Stadium"
+ */
+export function scopeToProse(scope: Partial<FilterParams>): string {
+  const gender = scope.gender
+  const tt = scope.team_type
+  const tc = scope.team_class
+  const st = scope.series_type
+
+  // Subject word — gender + tier + team_type form a noun phrase.
+  // "Men's primary-tier club cricket" rather than "Men's club primary-tier cricket"
+  // (tier qualifier reads better directly before "club"/"international").
+  const possessive =
+    gender === 'male' ? "Men's" : gender === 'female' ? "Women's" : ''
+
+  let coreNoun: string
+  if (st === 'icc' || st === 'tournament_only') {
+    // Series-type ICC overrides team_type — the page is "ICC tournaments,"
+    // not "international cricket filtered to ICC."
+    coreNoun = 'ICC tournaments'
+  } else if (st === 'bilateral' || st === 'bilateral_only') {
+    coreNoun = 'bilateral series'
+  } else if (st === 'club') {
+    coreNoun = 'club tournaments'
+  } else if (tt === 'club') {
+    if (tc === 'primary_club') coreNoun = 'primary-tier club cricket'
+    else if (tc === 'secondary_club') coreNoun = 'secondary-tier club cricket'
+    else coreNoun = 'club Twenty20 cricket'
+  } else if (tt === 'international') {
+    if (tc === 'full_member') coreNoun = 'full-member international cricket'
+    else coreNoun = 'international Twenty20 cricket'
+  } else {
+    coreNoun = possessive ? 'Twenty20 cricket' : 'All Twenty20 cricket'
+  }
+
+  const subject = possessive
+    ? `${possessive} ${coreNoun}`
+    : coreNoun.charAt(0).toUpperCase() + coreNoun.slice(1)
+
+  const suffixes: string[] = []
+  const season = seasonTag(scope.season_from, scope.season_to)
+  if (season) suffixes.push(season)
+  if (scope.filter_venue) suffixes.push(`at ${scope.filter_venue}`)
+  if (scope.filter_team && scope.filter_opponent) {
+    suffixes.push(`${scope.filter_team} vs ${scope.filter_opponent}`)
+  }
+
+  return suffixes.length > 0 ? `${subject}, ${suffixes.join(', ')}` : subject
+}
+
 export interface PhraseTier {
   /** Phrase text, e.g. "at T20 World Cup" or "vs Australia" or "at IPL, 2024 vs CSK". */
   label: string
