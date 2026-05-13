@@ -2666,10 +2666,12 @@ export interface LeagueOverview {
   teams_count: number
   tournaments_count: number
   min_games_threshold: number
-  top_teams: LeagueTopTeamRow[]
-  /** All teams in scope NOT in top_teams (either below the games
-   *  threshold or ranked outside the top-10). Sorted by matches DESC. */
-  other_teams: LeagueTopTeamRow[]
+  /** Top 5 international teams in scope (≥min_games). Empty when the
+   *  FilterBar narrows team_type to club. */
+  top_teams_international: LeagueTopTeamRow[]
+  /** Top 5 club teams in scope (≥min_games). Empty when the FilterBar
+   *  narrows team_type to international. */
+  top_teams_club: LeagueTopTeamRow[]
   best_moments: {
     highest_total: LeagueBestMomentTeamTotal | null
     lowest_all_out: LeagueBestMomentTeamTotal | null

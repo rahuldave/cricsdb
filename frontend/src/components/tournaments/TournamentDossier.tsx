@@ -57,7 +57,7 @@ import type {
   TournamentLandingEntry, RivalryEntry,
 } from '../../types'
 import { scopeToProse } from '../scopeLinks'
-import { RecentEditionsStrip, RivalryTile } from './TournamentsLanding'
+import TournamentsLanding, { RecentEditionsStrip, RivalryTile } from './TournamentsLanding'
 import TournamentTile, { tileAmbientFromFilters } from './TournamentTile'
 
 const fmt = (v: number | null | undefined, d = 2) =>
@@ -658,8 +658,8 @@ export default function TournamentDossier({
           gender={filters.gender}
           teamType={filters.team_type}
           tierExtras={isTierMode ? {
-            topTeams: tierOverviewFetch.data?.top_teams ?? null,
-            otherTeams: tierOverviewFetch.data?.other_teams ?? null,
+            topTeamsInternational: tierOverviewFetch.data?.top_teams_international ?? null,
+            topTeamsClub: tierOverviewFetch.data?.top_teams_club ?? null,
             minGamesThreshold: tierOverviewFetch.data?.min_games_threshold ?? 100,
             champions: tierChampionsFetch.data?.rows ?? null,
             landing: tierLandingFetch.data,
@@ -816,8 +816,8 @@ function OverviewTab({
    *  Champions / Other teams sections. When null, the tab renders
    *  exactly as it has for tournament / rivalry pages. */
   tierExtras?: {
-    topTeams: LeagueTopTeamRow[] | null
-    otherTeams: LeagueTopTeamRow[] | null
+    topTeamsInternational: LeagueTopTeamRow[] | null
+    topTeamsClub: LeagueTopTeamRow[] | null
     minGamesThreshold: number
     champions: LeagueChampionRow[] | null
     landing: TournamentsLandingData | null
@@ -2936,13 +2936,13 @@ function TierExtrasSections({
   gender: string | null | undefined
   teamType: string | null | undefined
 }) {
-  const { topTeams, otherTeams, minGamesThreshold, champions, landing, counts } = tierExtras
+  const { topTeamsInternational, topTeamsClub, minGamesThreshold, champions, landing, counts } = tierExtras
   const filters = useFilters()
   const ambient = tileAmbientFromFilters(filters)
 
   // ── Top events — curate marquee tournaments + rivalries from
-  //    /series/landing. Sectioned grouped tile grids so a reader can
-  //    tell international rivalries from franchise leagues at a glance.
+  //    /series/landing. Sub-sections hide when empty (gender=female
+  //    drops men's franchise + men's rivalries automatically).
   const topFranchise = (landing?.club.franchise_leagues ?? []).slice(0, 4)
   const topWomensFranchise = (landing?.club.women_franchise ?? []).slice(0, 4)
   const topIcc = (landing?.international.icc_events ?? []).slice(0, 4)
@@ -2950,6 +2950,10 @@ function TierExtrasSections({
   const topWomensRivalries = (landing?.international.bilateral_rivalries.women.top ?? []).slice(0, 4)
   const hasTopEvents = topFranchise.length + topWomensFranchise.length + topIcc.length
     + topMensRivalries.length + topWomensRivalries.length > 0
+
+  const hasIntl = (topTeamsInternational?.length ?? 0) > 0
+  const hasClub = (topTeamsClub?.length ?? 0) > 0
+  const hasAnyTopTeams = hasIntl || hasClub
 
   return (
     <>
@@ -2974,13 +2978,26 @@ function TierExtrasSections({
         />
       )}
 
-      {topTeams && topTeams.length > 0 && (
+      {hasAnyTopTeams && (
         <div className="mt-8">
           <SectionHeader
             title="Top teams by win %"
             subtitle={`min ${minGamesThreshold} games — keeps small-sample teams off the leaderboard`}
           />
-          <TierTopTeamsTable rows={topTeams} gender={gender} teamType={teamType} />
+          <div className="mt-2 flex flex-wrap gap-8">
+            {hasIntl && (
+              <div style={{ flex: '1 1 320px', minWidth: '300px' }}>
+                <SectionHeader title="International" />
+                <TierTopTeamsTable rows={topTeamsInternational!} gender={gender} teamType={teamType} />
+              </div>
+            )}
+            {hasClub && (
+              <div style={{ flex: '1 1 320px', minWidth: '300px' }}>
+                <SectionHeader title="Club" />
+                <TierTopTeamsTable rows={topTeamsClub!} gender={gender} teamType={teamType} />
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -2991,12 +3008,20 @@ function TierExtrasSections({
         </div>
       )}
 
-      {otherTeams && otherTeams.length > 0 && (
-        <div className="mt-8">
-          <SectionHeader title="Other teams in scope" />
-          <OtherTeamsTileGrid rows={otherTeams} gender={gender} teamType={teamType} />
+      {/* Other tournaments + rivalries — reuse the existing
+          TournamentsLanding directory. Its primary sections
+          (Franchise / Domestic / Women's franchise / International
+          events) overlap visually with Top events above by design
+          (Top events is a curated quick-glance; the directory is the
+          full browse). The lazy-load buttons it carries — "Show 155
+          other men's rivalries", "Other international tournaments
+          (667)" — are what mirror prod's /series page. */}
+      <div className="mt-10">
+        <SectionHeader title="Other tournaments and rivalries in scope" />
+        <div className="mt-3">
+          <TournamentsLanding embedded />
         </div>
-      )}
+      </div>
     </>
   )
 }
@@ -3102,82 +3127,6 @@ function TierTopTeamsTable({
       data={rows}
       rowKey={(r) => r.team}
     />
-  )
-}
-
-
-/** Long-tail teams — every team in scope NOT in the top-10. Rendered as
- *  a tile grid so the reader can scan compact per-team summaries. Capped
- *  at 24 with a show-more toggle to keep the page compact. */
-function OtherTeamsTileGrid({
-  rows, gender, teamType,
-}: {
-  rows: LeagueTopTeamRow[]
-  gender: string | null | undefined
-  teamType: string | null | undefined
-}) {
-  const [showAll, setShowAll] = useState(false)
-  const DEFAULT_LIMIT = 24
-  const visible = showAll ? rows : rows.slice(0, DEFAULT_LIMIT)
-  const hidden = rows.length - visible.length
-
-  return (
-    <>
-      <div className="wisden-tile-grid mt-2">
-        {visible.map(t => (
-          <div key={t.team} className="wisden-tile tile-wrapper">
-            <span className="tile-stretched">
-              <TeamLink
-                teamName={t.team}
-                gender={gender ?? null}
-                team_type={teamType ?? null}
-              />
-            </span>
-            <div className="wisden-tile-title">
-              <TeamLink
-                teamName={t.team}
-                compact
-                gender={gender ?? null}
-                team_type={teamType ?? null}
-              />
-            </div>
-            <div className="wisden-tile-sub">
-              {t.played} {t.played === 1 ? 'match' : 'matches'}
-            </div>
-            <div className="wisden-tile-line">
-              {t.wins}W — {t.losses}L
-              {t.win_pct != null && (
-                <span className="wisden-tile-faint">
-                  {' · '}{t.win_pct.toFixed(1)}%
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-      {hidden > 0 && !showAll && (
-        <div className="mt-3">
-          <button
-            type="button"
-            className="wisden-clear"
-            onClick={() => setShowAll(true)}
-          >
-            ▸ Show {hidden} more team{hidden === 1 ? '' : 's'}
-          </button>
-        </div>
-      )}
-      {showAll && rows.length > DEFAULT_LIMIT && (
-        <div className="mt-3">
-          <button
-            type="button"
-            className="wisden-clear"
-            onClick={() => setShowAll(false)}
-          >
-            ▾ Show fewer
-          </button>
-        </div>
-      )}
-    </>
   )
 }
 

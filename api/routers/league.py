@@ -95,54 +95,56 @@ async def league_overview(
     )
     teams_count = (teams_rows[0]["n"] if teams_rows else 0) or 0
 
-    # ── All teams in scope, with split for leaderboard vs long-tail ──
+    # ── Top teams by win % — split by team_type so broad-scope scopes
+    #    (no team_type filter) get a mix of international + club at
+    #    the top instead of one type dominating. min_games threshold
+    #    keeps small-sample teams (e.g. 5-game team at 80%) off the
+    #    leaderboard.
     #
-    # Two-step: first fetch every team's aggregate counts, then split
-    # client-side into top_teams (qualified: played >= min_games, top 10
-    # by win%) and other_teams (everyone else, sorted by matches DESC).
-    # Default min_games=100 keeps small-sample teams (5-game team at
-    # 80%) out of the leaderboard — they'd rank above 500-game teams at
-    # 60% otherwise.
-    all_teams_rows = await db.q(
-        f"""
-        WITH sides AS (
-          SELECT m.team1 AS team, m.id AS match_id,
-                 m.outcome_winner, m.outcome_result
-          FROM match m WHERE {where}
-          UNION ALL
-          SELECT m.team2, m.id, m.outcome_winner, m.outcome_result
-          FROM match m WHERE {where}
+    # When the FilterBar has team_type set (e.g. team_type='club'),
+    # the matching side returns the top 5 of that type and the other
+    # side returns an empty list. When both are unset, both sides
+    # populate and the frontend renders them side-by-side.
+    async def _top_teams_by_type(team_type_value: str) -> list[dict]:
+        rows = await db.q(
+            f"""
+            WITH sides AS (
+              SELECT m.team1 AS team, m.id AS match_id,
+                     m.outcome_winner, m.outcome_result
+              FROM match m WHERE {where} AND m.team_type = :tt
+              UNION ALL
+              SELECT m.team2, m.id, m.outcome_winner, m.outcome_result
+              FROM match m WHERE {where} AND m.team_type = :tt
+            )
+            SELECT team,
+                   COUNT(*) AS played,
+                   SUM(CASE WHEN outcome_winner = team THEN 1 ELSE 0 END) AS wins,
+                   SUM(CASE WHEN outcome_winner IS NOT NULL
+                              AND outcome_winner != team THEN 1 ELSE 0 END) AS losses,
+                   SUM(CASE WHEN outcome_winner IS NOT NULL THEN 1 ELSE 0 END) AS decided
+            FROM sides
+            GROUP BY team
+            HAVING played >= :min_games
+            ORDER BY (CAST(SUM(CASE WHEN outcome_winner = team THEN 1 ELSE 0 END) AS REAL)
+                      / NULLIF(SUM(CASE WHEN outcome_winner IS NOT NULL THEN 1 ELSE 0 END), 0)) DESC,
+                     played DESC
+            LIMIT 5
+            """,
+            {**params, "tt": team_type_value, "min_games": min_games},
         )
-        SELECT team,
-               COUNT(*) AS played,
-               SUM(CASE WHEN outcome_winner = team THEN 1 ELSE 0 END) AS wins,
-               SUM(CASE WHEN outcome_winner IS NOT NULL
-                          AND outcome_winner != team THEN 1 ELSE 0 END) AS losses,
-               SUM(CASE WHEN outcome_winner IS NOT NULL THEN 1 ELSE 0 END) AS decided
-        FROM sides
-        GROUP BY team
-        ORDER BY played DESC
-        """,
-        params,
-    )
-    all_teams = [
-        {
-            "team": r["team"],
-            "played": r["played"] or 0,
-            "wins": r["wins"] or 0,
-            "losses": r["losses"] or 0,
-            "win_pct": _safe_div(r["wins"] or 0, r["decided"] or 0, 100, 1),
-        }
-        for r in all_teams_rows
-    ]
-    qualified = [t for t in all_teams if (t["played"] or 0) >= min_games]
-    top_teams = sorted(
-        qualified,
-        key=lambda t: (t["win_pct"] or -1, t["played"]),
-        reverse=True,
-    )[:10]
-    top_team_names = {t["team"] for t in top_teams}
-    other_teams = [t for t in all_teams if t["team"] not in top_team_names]
+        return [
+            {
+                "team": r["team"],
+                "played": r["played"] or 0,
+                "wins": r["wins"] or 0,
+                "losses": r["losses"] or 0,
+                "win_pct": _safe_div(r["wins"] or 0, r["decided"] or 0, 100, 1),
+            }
+            for r in rows
+        ]
+
+    top_teams_international = await _top_teams_by_type("international")
+    top_teams_club = await _top_teams_by_type("club")
 
     # ── Best moments — singleton from each record axis ──
     # Highest team total (innings-level)
@@ -292,8 +294,8 @@ async def league_overview(
         "teams_count": teams_count,
         "tournaments_count": meta["tournaments"] or 0,
         "min_games_threshold": min_games,
-        "top_teams": top_teams,
-        "other_teams": other_teams,
+        "top_teams_international": top_teams_international,
+        "top_teams_club": top_teams_club,
         "best_moments": {
             "highest_total": highest_total,
             "lowest_all_out": lowest_all_out,
