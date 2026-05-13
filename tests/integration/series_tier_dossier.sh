@@ -48,7 +48,7 @@ SCOPE_SQL="WHERE m.gender='male' AND m.team_type='club' AND m.season>='2024' AND
 echo "Test 1 · /series at broad scope — tier dossier loads with SQL-anchored counts"
 
 ab open "$BASE/series?$SCOPE"
-settle 6
+settle 10
 
 sql_matches=$(sql "SELECT COUNT(DISTINCT m.id) FROM match m $SCOPE_SQL")
 api_matches=$(curl -sS "$API/api/v1/league/overview?$SCOPE" | python3 -c "import json,sys; print(json.load(sys.stdin)['matches'])")
@@ -56,16 +56,20 @@ dom_matches=$(ab_eval "(() => { const stat = Array.from(document.querySelectorAl
 assert_eq "matches: SQL == API" "$sql_matches" "$api_matches"
 assert_eq "matches: DOM == SQL" "$sql_matches" "$dom_matches"
 
+# Tournaments count surfaces in the italic "X tournaments · Y teams · Z innings" line,
+# not as a stat-tile (which is now the heavy /series/summary path's tiles).
 sql_tournaments=$(sql "SELECT COUNT(DISTINCT m.event_name) FROM match m $SCOPE_SQL")
-dom_tournaments=$(ab_eval "(() => { const stat = Array.from(document.querySelectorAll('.wisden-statrow .wisden-stat')).find(s => s.querySelector('.wisden-stat-label')?.textContent === 'Tournaments'); return stat?.querySelector('.wisden-stat-value')?.textContent; })()")
-assert_eq "tournaments DOM == SQL" "$sql_tournaments" "$dom_tournaments"
+dom_count_line=$(ab_eval "document.body.innerText.match(/(\\d+) tournaments/)?.[1]")
+assert_eq "tournaments DOM count-line == SQL" "$sql_tournaments" "$dom_count_line"
 
-# ─── Test 2 — Champions DataTable row count ───────────────────────────
+# ─── Test 2 — Champions across scope DataTable row count ──────────────
 echo ""
-echo "Test 2 · Champions DataTable row count"
+echo "Test 2 · Champions DataTable row count (capped at 20 + show-more button)"
 
+# Find the section by its H3 — wrapped in <div class="mt-8"> not <section>.
 sql_champions=$(sql "SELECT COUNT(*) FROM match m $SCOPE_SQL AND m.event_stage='Final' AND m.outcome_winner IS NOT NULL AND m.event_name IS NOT NULL")
-dom_champions=$(ab_eval "(() => { const all = Array.from(document.querySelectorAll('section')); const sec = all.find(s => s.querySelector('h3')?.textContent === 'Champions in scope'); return sec ? sec.querySelectorAll('table tbody tr').length : 0; })()")
+dom_champions=$(ab_eval "(() => { const h = Array.from(document.querySelectorAll('h3')).find(el => el.textContent === 'Champions across scope'); return h ? h.parentElement.querySelectorAll('table tbody tr').length : 0; })()")
+# 2024-2025 has 20 finals (≤ DEFAULT_LIMIT) — should not be capped.
 assert_eq "champion rows: DOM == SQL" "$sql_champions" "$dom_champions"
 
 # ─── Test 3 — Prose H2 + 7 tabs ───────────────────────────────────────
@@ -86,7 +90,7 @@ echo ""
 echo "Test 4 · Batting subtab"
 
 ab open "$BASE/series?$SCOPE&tab=Batting"
-settle 4
+settle 8
 
 first_label=$(ab_eval "document.querySelector('.wisden-statrow .wisden-stat-label')?.textContent")
 assert_eq "First batting tile label" "Avg innings total" "$first_label"
@@ -98,9 +102,24 @@ else
   bad "Batting leaderboards row count too low ($leaderboard_rows)"
 fi
 
-api_top_runs=$(curl -sS "$API/api/v1/league/leaders/batting?$SCOPE&limit=5" | python3 -c "import json,sys; d=json.load(sys.stdin)['by_runs'][0]; print(d['runs'])")
-dom_top_runs=$(ab_eval "(() => { const all = Array.from(document.querySelectorAll('h3')); const h = all.find(el => el.textContent === 'Top batters by runs'); if (!h) return null; const tbody = h.parentElement.querySelector('table tbody'); const cells = tbody?.querySelector('tr')?.querySelectorAll('td'); return cells?.[1]?.textContent; })()")
-assert_eq "Top batter by runs (API == DOM)" "$api_top_runs" "$dom_top_runs"
+# TournamentDossier's BattersTab uses "By runs scored" (the existing
+# Series-tab section title). Tier-dossier merged into TournamentDossier
+# 2026-05-13.
+sql_top_runs=$(sql "
+  SELECT SUM(d.runs_batter) AS r
+  FROM delivery d
+  JOIN innings i ON i.id = d.innings_id
+  JOIN match m ON m.id = i.match_id
+  WHERE d.batter_id IS NOT NULL
+    AND d.extras_wides = 0 AND d.extras_noballs = 0
+    AND i.super_over = 0
+    AND m.gender='male' AND m.team_type='club'
+    AND m.season >= '2024' AND m.season <= '2025'
+    AND m.match_type IN ('T20','IT20')
+  GROUP BY d.batter_id ORDER BY r DESC LIMIT 1
+")
+dom_top_runs=$(ab_eval "(() => { const all = Array.from(document.querySelectorAll('h3')); const h = all.find(el => el.textContent === 'By runs scored'); if (!h) return null; const tbody = h.parentElement.querySelector('table tbody'); const cells = tbody?.querySelector('tr')?.querySelectorAll('td'); return cells?.[1]?.textContent; })()")
+assert_eq "Top batter by runs (DOM == SQL)" "$sql_top_runs" "$dom_top_runs"
 
 # ─── Test 5 — /league legacy URL redirects to /series ─────────────────
 echo ""
