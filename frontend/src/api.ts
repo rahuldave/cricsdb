@@ -456,3 +456,15 @@ export const getLeagueOverview = (filters?: F) =>
 export const getLeagueChampions = (filters?: F) =>
   fetchApi<{ rows: import('./types').LeagueChampionRow[] }>(
     '/api/v1/league/champions', filters as Record<string, string>)
+export const getLeagueBattersLeaders = (
+  filters?: F & { limit?: number; offset?: number },
+) => fetchApi<import('./types').BattingLeaders>(
+  '/api/v1/league/leaders/batting', filters as Record<string, string>)
+export const getLeagueBowlersLeaders = (
+  filters?: F & { limit?: number; offset?: number },
+) => fetchApi<import('./types').BowlingLeaders>(
+  '/api/v1/league/leaders/bowling', filters as Record<string, string>)
+export const getLeagueFieldersLeaders = (
+  filters?: F & { limit?: number; offset?: number },
+) => fetchApi<import('./types').FieldingLeaders>(
+  '/api/v1/league/leaders/fielding', filters as Record<string, string>)
