@@ -40,6 +40,7 @@ import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
 import LineChart from '../components/charts/LineChart'
 import HeatmapChart from '../components/charts/HeatmapChart'
+import { seasonStdDev } from '../components/charts/seasonStats'
 import BubbleMatrix from '../components/charts/BubbleMatrix'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
@@ -910,50 +911,76 @@ function BowlingTab({ team, filters, filterDeps }: TabProps) {
           economy: s.economy?.scope_avg ?? null,
         }}
       />
-      <div className="wisden-statrow">
-        <StatCard label="Innings" value={s.innings_bowled.value ?? 0} />
-        <StatCard label="Overs" value={(s.overs.value ?? 0).toFixed(1)} />
-        <StatCard label="Wickets" value={(s.wickets.value ?? 0).toLocaleString()} />
-        <StatCard label="Runs conceded" value={(s.runs_conceded.value ?? 0).toLocaleString()} />
-      </div>
-      <div className="wisden-statrow">
-        <StatCard
-          label="Economy"
-          value={s.economy.value != null ? s.economy.value.toFixed(2) : '-'}
-          subtitle={<MetricDelta env={s.economy} withScopeAvg fmt={2} />}
-        />
-        <StatCard
-          label="Average"
-          value={s.average.value != null ? s.average.value.toFixed(2) : '-'}
-          subtitle={<MetricDelta env={s.average} withScopeAvg fmt={2} />}
-        />
-        <StatCard
-          label="Strike rate"
-          value={s.strike_rate.value != null ? s.strike_rate.value.toFixed(2) : '-'}
-          subtitle={<MetricDelta env={s.strike_rate} withScopeAvg fmt={2} />}
-        />
-        <StatCard
-          label="Dot %"
-          value={s.dot_pct.value != null ? `${s.dot_pct.value}%` : '-'}
-          subtitle={<MetricDelta env={s.dot_pct} withScopeAvg />}
-        />
-      </div>
-      <div className="wisden-statrow">
-        <StatCard
-          label="Avg opp total"
-          value={s.avg_opposition_total.value != null ? s.avg_opposition_total.value.toFixed(1) : '-'}
-          subtitle={<MetricDelta env={s.avg_opposition_total} withScopeAvg />}
-        />
-        <StatCard label="Worst conceded"
-          value={s.worst_conceded ? String(s.worst_conceded.runs) : '-'} />
-        <StatCard label="Best defence"
-          value={s.best_defence ? String(s.best_defence.runs) : '-'} />
-        <StatCard
-          label="Wides/match"
-          value={s.wides_per_match.value != null ? s.wides_per_match.value.toFixed(1) : '-'}
-          subtitle={<MetricDelta env={s.wides_per_match} withScopeAvg />}
-        />
-      </div>
+      {(() => {
+        // σ-across-in-scope-seasons per spec-series-trend-charts.md §D4.
+        // null when bySeason has <2 seasons (single-season scope) → hides
+        // `± σ` on the StatCard. Derived rates (Average, Strike rate)
+        // recompute per-season from runs_conceded / legal_balls / wickets
+        // since bySeason doesn't carry the rate columns directly.
+        const seasons = bySeason.data?.seasons ?? null
+        const sdEconomy = seasonStdDev(seasons, r => r.economy)
+        const sdAverage = seasonStdDev(seasons, r => r.wickets > 0 ? r.runs_conceded / r.wickets : null)
+        const sdStrikeRate = seasonStdDev(seasons, r => r.wickets > 0 ? r.legal_balls / r.wickets : null)
+        const sdDotPct = seasonStdDev(seasons, r => r.dot_pct)
+        const sdAvgOpp = seasonStdDev(seasons, r => r.avg_opposition_total)
+        return (
+          <>
+            <div className="wisden-statrow">
+              <StatCard label="Innings" value={s.innings_bowled.value ?? 0} />
+              <StatCard label="Overs" value={(s.overs.value ?? 0).toFixed(1)} />
+              <StatCard label="Wickets" value={(s.wickets.value ?? 0).toLocaleString()} />
+              <StatCard label="Runs conceded" value={(s.runs_conceded.value ?? 0).toLocaleString()} />
+            </div>
+            <div className="wisden-statrow">
+              <StatCard
+                label="Economy"
+                value={s.economy.value != null ? s.economy.value.toFixed(2) : '-'}
+                stdDev={sdEconomy != null ? sdEconomy.toFixed(2) : null}
+                subtitle={<MetricDelta env={s.economy} withScopeAvg fmt={2} />}
+              />
+              <StatCard
+                label="Average"
+                value={s.average.value != null ? s.average.value.toFixed(2) : '-'}
+                stdDev={sdAverage != null ? sdAverage.toFixed(2) : null}
+                subtitle={<MetricDelta env={s.average} withScopeAvg fmt={2} />}
+              />
+              <StatCard
+                label="Strike rate"
+                value={s.strike_rate.value != null ? s.strike_rate.value.toFixed(2) : '-'}
+                stdDev={sdStrikeRate != null ? sdStrikeRate.toFixed(2) : null}
+                subtitle={<MetricDelta env={s.strike_rate} withScopeAvg fmt={2} />}
+              />
+              <StatCard
+                label="Dot %"
+                value={s.dot_pct.value != null ? `${s.dot_pct.value}%` : '-'}
+                stdDev={sdDotPct != null ? sdDotPct.toFixed(1) : null}
+                subtitle={<MetricDelta env={s.dot_pct} withScopeAvg />}
+              />
+            </div>
+            <div className="wisden-statrow cols-5">
+              <StatCard
+                label="Avg opp total"
+                value={s.avg_opposition_total.value != null ? s.avg_opposition_total.value.toFixed(1) : '-'}
+                stdDev={sdAvgOpp != null ? sdAvgOpp.toFixed(1) : null}
+                subtitle={<MetricDelta env={s.avg_opposition_total} withScopeAvg />}
+              />
+              <StatCard label="Worst conceded"
+                value={s.worst_conceded ? String(s.worst_conceded.runs) : '-'} />
+              <StatCard label="Best defence"
+                value={s.best_defence ? String(s.best_defence.runs) : '-'} />
+              <StatCard
+                label="Wides/match"
+                value={s.wides_per_match.value != null ? s.wides_per_match.value.toFixed(1) : '-'}
+                subtitle={<MetricDelta env={s.wides_per_match} withScopeAvg />}
+              />
+              <StatCard
+                label="Boundaries conceded"
+                value={(s.boundaries_conceded.value ?? 0).toLocaleString()}
+              />
+            </div>
+          </>
+        )
+      })()}
 
       {bySeason.data && bySeason.data.seasons.length >= 2 && (
         <>
