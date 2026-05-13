@@ -1,17 +1,20 @@
 #!/bin/bash
-# League page integration tests.
+# /series at broad scope (tier dossier) integration tests.
 #
-# Spec: internal_docs/spec-league-pages.md §Testing — Integration.
+# Spec: internal_docs/spec-league-pages.md §Testing — Integration
+# (originally /league, merged into /series 2026-05-13).
 #
-# Covers:
-#   1. /league?gender=male&team_type=club&season_from=2024&season_to=2025
-#      — Overview tab loads with SQL-anchored stat counts, tournament
-#      tiles count matches /series/landing, Champions DataTable row
-#      count matches SQL.
-#   2. Tab nav: Batting tile row + at least one chart + leaderboard
-#      rows present.
-#   3. /league?tournament=IPL redirects to /series?tournament=IPL.
-#   4. /league (no params) redirects to /league?gender=male&team_type=club.
+# Covers /series at a scope BROADER than a single tournament:
+#   1. /series?gender=male&team_type=club&... renders the tier dossier
+#      (TierDossier component) with SQL-anchored stat counts.
+#   2. Champions DataTable row count matches SQL.
+#   3. Prose H2 reads "Men's club Twenty20 cricket, 2024–2025"; all 7
+#      tabs (Overview / Batting / Bowling / Fielding / Partnerships /
+#      Records / Matches) render.
+#   4. Batting subtab: tile row, leaderboards, top batter DOM == API.
+#   5. /league redirects to /series.
+#   6. /series?tournament=IPL still renders the per-tournament dossier
+#      (TournamentDossier; 8 tabs).
 #
 # Per CLAUDE.md "Integration tests must self-anchor against SQL" —
 # every numeric expected derives from sqlite3 + curl at test runtime.
@@ -41,11 +44,11 @@ assert_eq() {
 SCOPE="gender=male&team_type=club&season_from=2024&season_to=2025"
 SCOPE_SQL="WHERE m.gender='male' AND m.team_type='club' AND m.season>='2024' AND m.season<='2025' AND m.match_type IN ('T20','IT20')"
 
-# ─── Test 1 — Overview tab loads with SQL-anchored counts ─────────────
-echo "Test 1 · Overview tab loads with SQL-anchored counts"
+# ─── Test 1 — /series at broad scope renders tier dossier ─────────────
+echo "Test 1 · /series at broad scope — tier dossier loads with SQL-anchored counts"
 
-ab open "$BASE/league?$SCOPE"
-settle 3
+ab open "$BASE/series?$SCOPE"
+settle 6
 
 sql_matches=$(sql "SELECT COUNT(DISTINCT m.id) FROM match m $SCOPE_SQL")
 api_matches=$(curl -sS "$API/api/v1/league/overview?$SCOPE" | python3 -c "import json,sys; print(json.load(sys.stdin)['matches'])")
@@ -62,32 +65,32 @@ echo ""
 echo "Test 2 · Champions DataTable row count"
 
 sql_champions=$(sql "SELECT COUNT(*) FROM match m $SCOPE_SQL AND m.event_stage='Final' AND m.outcome_winner IS NOT NULL AND m.event_name IS NOT NULL")
-# Find the Champions section table and count rows
 dom_champions=$(ab_eval "(() => { const all = Array.from(document.querySelectorAll('section')); const sec = all.find(s => s.querySelector('h3')?.textContent === 'Champions in scope'); return sec ? sec.querySelectorAll('table tbody tr').length : 0; })()")
 assert_eq "champion rows: DOM == SQL" "$sql_champions" "$dom_champions"
 
-# ─── Test 3 — Prose H2 + tabs render ──────────────────────────────────
+# ─── Test 3 — Prose H2 + 7 tabs ───────────────────────────────────────
 echo ""
-echo "Test 3 · Prose H2 + tab bar"
+echo "Test 3 · Prose H2 + 7-tab bar (Overview/Batting/Bowling/Fielding/Partnerships/Records/Matches)"
 
 dom_h2=$(ab_eval "document.querySelector('.wisden-page-title')?.textContent")
 assert_eq "H2 reads prose scope" "Men's club Twenty20 cricket, 2024–2025" "$dom_h2"
 
-tab_count=$(ab_eval "document.querySelectorAll('.wisden-tab').length")
-assert_eq "4 tabs render" "4" "$tab_count"
+tab_count=$(ab_eval "document.querySelectorAll('.wisden-tabs .wisden-tab').length")
+assert_eq "7 tabs render" "7" "$tab_count"
+
+tab_list=$(ab_eval "Array.from(document.querySelectorAll('.wisden-tabs .wisden-tab')).map(t => t.textContent).join(',')")
+assert_eq "tab list" "Overview,Batting,Bowling,Fielding,Partnerships,Records,Matches" "$tab_list"
 
 # ─── Test 4 — Batting subtab loads tile row + leaderboards ────────────
 echo ""
 echo "Test 4 · Batting subtab"
 
-ab open "$BASE/league?$SCOPE&tab=Batting"
-settle 3
+ab open "$BASE/series?$SCOPE&tab=Batting"
+settle 4
 
-# Tile row should show "Avg innings total" label as first tile.
 first_label=$(ab_eval "document.querySelector('.wisden-statrow .wisden-stat-label')?.textContent")
 assert_eq "First batting tile label" "Avg innings total" "$first_label"
 
-# 3 leaderboards × 50 rows = 150 rows minimum
 leaderboard_rows=$(ab_eval "document.querySelectorAll('table tbody tr').length")
 if [ "$(unq "$leaderboard_rows")" -ge 30 ]; then
   ok "Batting leaderboards have rows ($leaderboard_rows)"
@@ -95,48 +98,34 @@ else
   bad "Batting leaderboards row count too low ($leaderboard_rows)"
 fi
 
-# Top batter by runs DOM matches API
 api_top_runs=$(curl -sS "$API/api/v1/league/leaders/batting?$SCOPE&limit=5" | python3 -c "import json,sys; d=json.load(sys.stdin)['by_runs'][0]; print(d['runs'])")
-# DOM: find "Top batters by runs" section, get the first row's runs cell.
 dom_top_runs=$(ab_eval "(() => { const all = Array.from(document.querySelectorAll('h3')); const h = all.find(el => el.textContent === 'Top batters by runs'); if (!h) return null; const tbody = h.parentElement.querySelector('table tbody'); const cells = tbody?.querySelector('tr')?.querySelectorAll('td'); return cells?.[1]?.textContent; })()")
 assert_eq "Top batter by runs (API == DOM)" "$api_top_runs" "$dom_top_runs"
 
-# ─── Test 5 — single-tournament redirect (/league?tournament=X → /series) ─
+# ─── Test 5 — /league legacy URL redirects to /series ─────────────────
 echo ""
-echo "Test 5 · Single-tournament redirect"
+echo "Test 5 · /league legacy redirect → /series"
 
-ab open "$BASE/league?tournament=Indian+Premier+League"
+ab open "$BASE/league?gender=male&team_type=club"
 settle 3
 url=$(ab_eval "location.pathname + location.search")
 case "$(unq "$url")" in
-  "/series?tournament=Indian+Premier+League"*) ok "Redirected to /series" ;;
+  "/series?gender=male&team_type=club"*) ok "Redirected /league → /series (params preserved)" ;;
   *) bad "Did NOT redirect — got: $(unq "$url")" ;;
 esac
 
-# ─── Test 6 — empty-scope redirect (/league → ?gender=male&team_type=club) ─
+# ─── Test 6 — /series?tournament=X still renders TournamentDossier ────
 echo ""
-echo "Test 6 · Empty-scope redirect"
+echo "Test 6 · /series?tournament=BBL still renders per-tournament dossier (regression check)"
 
-ab open "$BASE/league"
-settle 3
-url=$(ab_eval "location.search")
-case "$(unq "$url")" in
-  *"gender=male"*"team_type=club"*|*"team_type=club"*"gender=male"*) ok "Redirected to men's club" ;;
-  *) bad "Did NOT redirect — got: $(unq "$url")" ;;
-esac
+ab open "$BASE/series?tournament=Big+Bash+League&gender=male&team_type=club"
+settle 4
 
-# ─── Test 7 — By-tier cards on /series → link to /league ──────────────
-echo ""
-echo "Test 7 · By-tier entry cards on /series"
+dom_h2_t=$(ab_eval "document.querySelector('.wisden-page-title')?.textContent")
+assert_eq "H2 reads tournament name" "Big Bash League" "$dom_h2_t"
 
-ab open "$BASE/series"
-settle 5
-tier_card_count=$(ab_eval "(() => { const all = Array.from(document.querySelectorAll('.wisden-landing-section')); const tier = all.find(s => s.querySelector('.wisden-section-title')?.textContent === 'By tier'); return tier ? tier.querySelectorAll('.wisden-tile').length : 0; })()")
-if [ "$(unq "$tier_card_count")" -ge 4 ]; then
-  ok "By-tier section has $tier_card_count cards"
-else
-  bad "By-tier section card count: $(unq "$tier_card_count")"
-fi
+tab_count_t=$(ab_eval "document.querySelectorAll('.wisden-tabs .wisden-tab').length")
+assert_eq "8 tabs (incl. Editions)" "8" "$tab_count_t"
 
 # ─── Report ───────────────────────────────────────────────────────────
 echo ""
