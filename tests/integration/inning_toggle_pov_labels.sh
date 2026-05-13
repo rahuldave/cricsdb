@@ -91,9 +91,9 @@ probe_site "5.  Venue/Batters"             "$BASE/venues?venue=Wankhede%20Stadiu
 probe_site "6.  Venue/Bowlers"             "$BASE/venues?venue=Wankhede%20Stadium&tab=Bowlers"                           "$BOWLING_PILLS"
 probe_site "7.  Venue/Fielders"            "$BASE/venues?venue=Wankhede%20Stadium&tab=Fielders"                          "$BOWLING_PILLS"
 probe_site "8.  Venue/Records (ambig)"     "$BASE/venues?venue=Wankhede%20Stadium&tab=Records"                           "$NEUTRAL_PILLS"
-probe_site "9.  Series/Batters"            "$BASE/series?tournament=Indian%20Premier%20League&tab=Batters"               "$BATTING_PILLS"
-probe_site "10. Series/Bowlers"            "$BASE/series?tournament=Indian%20Premier%20League&tab=Bowlers"               "$BOWLING_PILLS"
-probe_site "11. Series/Fielders"           "$BASE/series?tournament=Indian%20Premier%20League&tab=Fielders"              "$BOWLING_PILLS"
+probe_site "9.  Series/Batting"            "$BASE/series?tournament=Indian%20Premier%20League&tab=Batting"               "$BATTING_PILLS"
+probe_site "10. Series/Bowling"            "$BASE/series?tournament=Indian%20Premier%20League&tab=Bowling"               "$BOWLING_PILLS"
+probe_site "11. Series/Fielding"           "$BASE/series?tournament=Indian%20Premier%20League&tab=Fielding"              "$BOWLING_PILLS"
 probe_site "12. Series/Partnerships"       "$BASE/series?tournament=Indian%20Premier%20League&tab=Partnerships"          "$BATTING_PILLS"
 probe_site "13. Series/Records (ambig)"    "$BASE/series?tournament=Indian%20Premier%20League&tab=Records"               "$NEUTRAL_PILLS"
 

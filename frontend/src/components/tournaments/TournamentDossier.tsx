@@ -108,7 +108,17 @@ function TeamWithEd({ team, row, gender, team_type }: {
 
 // Tab list — Points only included when single-season is in scope; rendered
 // conditionally so it doesn't flash on/off during filter changes.
-const BASE_TABS = ['Overview', 'Editions', 'Batters', 'Bowlers', 'Fielders', 'Partnerships', 'Records', 'Matches'] as const
+const BASE_TABS = ['Overview', 'Editions', 'Batting', 'Bowling', 'Fielding', 'Partnerships', 'Records', 'Matches'] as const
+// Deep-link aliases: tabs were renamed from Batters/Bowlers/Fielders
+// to Batting/Bowling/Fielding (spec-series-trend-charts.md §D2). The
+// new names match Teams-tab terminology because the subtabs now carry
+// discipline-level trends in addition to player leaderboards. Keep
+// the old slugs landing on the new tabs so external links survive.
+const TAB_ALIAS: Record<string, string> = {
+  Batters: 'Batting',
+  Bowlers: 'Bowling',
+  Fielders: 'Fielding',
+}
 type TabName = typeof BASE_TABS[number] | 'Points'
 
 export default function TournamentDossier({
@@ -162,12 +172,24 @@ export default function TournamentDossier({
     const base: TabName[] = ['Overview']
     if (isSingleTournament) base.push('Editions')
     if (isSingleTournament && singleSeason) base.push('Points')
-    base.push('Batters', 'Bowlers', 'Fielders', 'Partnerships', 'Records', 'Matches')
+    base.push('Batting', 'Bowling', 'Fielding', 'Partnerships', 'Records', 'Matches')
     return base
   })()
 
   const [activeTab, setActiveTab] = useUrlParam('tab', 'Overview')
-  const currentTab = tabs.includes(activeTab as TabName) ? (activeTab as TabName) : 'Overview'
+  const resolvedTab = TAB_ALIAS[activeTab] ?? activeTab
+  const currentTab = tabs.includes(resolvedTab as TabName) ? (resolvedTab as TabName) : 'Overview'
+  // Normalise the URL once if the user landed on a renamed-old slug
+  // (?tab=Batters etc.) — replace-mode so we don't push a history
+  // entry over the deep-link. URL-clean rule: this is the ONE
+  // exception that's allowed because the URL was already non-canonical
+  // (the slug is a closed enum, not a user value).
+  useEffect(() => {
+    if (TAB_ALIAS[activeTab]) {
+      setActiveTab(TAB_ALIAS[activeTab], { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
 
   const filterDeps = [
     tournament, filterTeam, filterOpponent, seriesType,
@@ -194,10 +216,10 @@ export default function TournamentDossier({
   )
 
   const battingFetch = useFetch<BattingLeaders | null>(
-    () => currentTab === 'Batters'
+    () => currentTab === 'Batting'
       ? getTournamentBattersLeaders(tournament, { ...apiFilters, limit: 20 })
       : Promise.resolve(null),
-    [...filterDeps, currentTab === 'Batters'],
+    [...filterDeps, currentTab === 'Batting'],
   )
 
   // Picker URL state — the picked player's scoped stats are rendered
@@ -209,30 +231,30 @@ export default function TournamentDossier({
   const batterScopeFetch = useFetch<
     { entry: BattingLeaderEntry | null } | null
   >(
-    () => currentTab === 'Batters' && seriesBatter
+    () => currentTab === 'Batting' && seriesBatter
       ? getTournamentBatterScopeStats(tournament, seriesBatter, apiFilters)
       : Promise.resolve(null),
-    [...filterDeps, currentTab === 'Batters', seriesBatter],
+    [...filterDeps, currentTab === 'Batting', seriesBatter],
   )
 
   const [seriesBowler, setSeriesBowler] = useUrlParam('series_bowler', '')
   const bowlerScopeFetch = useFetch<
     { entry: BowlingLeaderEntry | null } | null
   >(
-    () => currentTab === 'Bowlers' && seriesBowler
+    () => currentTab === 'Bowling' && seriesBowler
       ? getTournamentBowlerScopeStats(tournament, seriesBowler, apiFilters)
       : Promise.resolve(null),
-    [...filterDeps, currentTab === 'Bowlers', seriesBowler],
+    [...filterDeps, currentTab === 'Bowling', seriesBowler],
   )
 
   const [seriesFielder, setSeriesFielder] = useUrlParam('series_fielder', '')
   const fielderScopeFetch = useFetch<
     { entry: FieldingLeaderEntry | null } | null
   >(
-    () => currentTab === 'Fielders' && seriesFielder
+    () => currentTab === 'Fielding' && seriesFielder
       ? getTournamentFielderScopeStats(tournament, seriesFielder, apiFilters)
       : Promise.resolve(null),
-    [...filterDeps, currentTab === 'Fielders', seriesFielder],
+    [...filterDeps, currentTab === 'Fielding', seriesFielder],
   )
 
   // Active-URL / dormant-session picker model — URL carries ONLY the
@@ -248,15 +270,15 @@ export default function TournamentDossier({
   //      non-current-tab picks from URL (stashing to session) and
   //      restore current-tab's pick from session if the URL dropped
   //      it on a prior switch. Auto-correction, replace mode.
-  const SESSION_KEYS: Record<'Batters' | 'Bowlers' | 'Fielders', string> = {
-    Batters: 'cricsdb:series_batter',
-    Bowlers: 'cricsdb:series_bowler',
-    Fielders: 'cricsdb:series_fielder',
+  const SESSION_KEYS: Record<'Batting' | 'Bowling' | 'Fielding', string> = {
+    Batting: 'cricsdb:series_batter',
+    Bowling: 'cricsdb:series_bowler',
+    Fielding: 'cricsdb:series_fielder',
   }
-  const URL_KEYS: Record<'Batters' | 'Bowlers' | 'Fielders', string> = {
-    Batters: 'series_batter',
-    Bowlers: 'series_bowler',
-    Fielders: 'series_fielder',
+  const URL_KEYS: Record<'Batting' | 'Bowling' | 'Fielding', string> = {
+    Batting: 'series_batter',
+    Bowling: 'series_bowler',
+    Fielding: 'series_fielder',
   }
   const writeSession = (key: string, val: string) => {
     if (val) sessionStorage.setItem(key, val)
@@ -264,15 +286,15 @@ export default function TournamentDossier({
   }
   const pickBatter = (id: string) => {
     setSeriesBatter(id)
-    writeSession(SESSION_KEYS.Batters, id)
+    writeSession(SESSION_KEYS.Batting, id)
   }
   const pickBowler = (id: string) => {
     setSeriesBowler(id)
-    writeSession(SESSION_KEYS.Bowlers, id)
+    writeSession(SESSION_KEYS.Bowling, id)
   }
   const pickFielder = (id: string) => {
     setSeriesFielder(id)
-    writeSession(SESSION_KEYS.Fielders, id)
+    writeSession(SESSION_KEYS.Fielding, id)
   }
 
   useEffect(() => {
@@ -280,7 +302,7 @@ export default function TournamentDossier({
     // first mount — which also handles the deep-link-with-wrong-params
     // self-correcting case). Replace mode: this is cleanup finishing
     // the tab-switch, not a new history entry.
-    const tabName = currentTab as 'Batters' | 'Bowlers' | 'Fielders'
+    const tabName = currentTab as 'Batting' | 'Bowling' | 'Fielding'
     const activeUrlKey = URL_KEYS[tabName]  // may be undefined for non-picker tabs
     const params = new URLSearchParams(window.location.search)
     const updates: Record<string, string> = {}
@@ -288,7 +310,7 @@ export default function TournamentDossier({
 
     // 1. Strip any picker param that doesn't belong to the current tab,
     //    stashing to session first so the pick isn't lost.
-    for (const tab of ['Batters', 'Bowlers', 'Fielders'] as const) {
+    for (const tab of ['Batting', 'Bowling', 'Fielding'] as const) {
       if (tab === tabName) continue
       const urlKey = URL_KEYS[tab]
       const val = params.get(urlKey)
@@ -317,16 +339,16 @@ export default function TournamentDossier({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTab])
   const bowlingFetch = useFetch<BowlingLeaders | null>(
-    () => currentTab === 'Bowlers'
+    () => currentTab === 'Bowling'
       ? getTournamentBowlersLeaders(tournament, { ...apiFilters, limit: 20 })
       : Promise.resolve(null),
-    [...filterDeps, currentTab === 'Bowlers'],
+    [...filterDeps, currentTab === 'Bowling'],
   )
   const fieldingFetch = useFetch<FieldingLeaders | null>(
-    () => currentTab === 'Fielders'
+    () => currentTab === 'Fielding'
       ? getTournamentFieldersLeaders(tournament, { ...apiFilters, limit: 20 })
       : Promise.resolve(null),
-    [...filterDeps, currentTab === 'Fielders'],
+    [...filterDeps, currentTab === 'Fielding'],
   )
 
   const recordsFetch = useFetch<TournamentRecords | null>(
@@ -531,7 +553,7 @@ export default function TournamentDossier({
           a different level (full-match identity, calendar) where
           inning narrowing isn't meaningful, so the toggle hides.
           Spec: spec-inning-split.md §6.1 + §3.3. */}
-      {(['Batters', 'Bowlers', 'Fielders', 'Partnerships', 'Records'] as const).includes(currentTab as never) && (
+      {(['Batting', 'Bowling', 'Fielding', 'Partnerships', 'Records'] as const).includes(currentTab as never) && (
         <InningToggle />
       )}
 
@@ -571,7 +593,7 @@ export default function TournamentDossier({
           season={filters.season_from}
         />
       )}
-      {currentTab === 'Batters' && (
+      {currentTab === 'Batting' && (
         <BattersTab
           loading={battingFetch.loading}
           error={battingFetch.error}
@@ -588,7 +610,7 @@ export default function TournamentDossier({
           pickedLoading={batterScopeFetch.loading}
         />
       )}
-      {currentTab === 'Bowlers' && (
+      {currentTab === 'Bowling' && (
         <BowlersTab
           loading={bowlingFetch.loading}
           error={bowlingFetch.error}
@@ -605,7 +627,7 @@ export default function TournamentDossier({
           pickedLoading={bowlerScopeFetch.loading}
         />
       )}
-      {currentTab === 'Fielders' && (
+      {currentTab === 'Fielding' && (
         <FieldersTab
           loading={fieldingFetch.loading}
           error={fieldingFetch.error}
