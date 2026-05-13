@@ -15,6 +15,7 @@ import {
   getTournamentPartnershipsTopByWicket,
   getMatches,
   getScopeBattingSummary, getScopeBattingBySeason,
+  getScopeBowlingSummary, getScopeBowlingBySeason,
 } from '../../api'
 import StatCard from '../StatCard'
 import InningToggle from '../InningToggle'
@@ -47,6 +48,7 @@ import type {
   TournamentPartnershipsByWicket, TournamentPartnershipsTop,
   TournamentPartnershipsTopByWicket, TournamentPartnershipTopEntry,
   ScopeBattingSummary, ScopeBattingSeason,
+  ScopeBowlingSummary, ScopeBowlingSeason,
 } from '../../types'
 
 const fmt = (v: number | null | undefined, d = 2) =>
@@ -242,6 +244,18 @@ export default function TournamentDossier({
       ? getScopeBattingBySeason(apiFilters)
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Batting'],
+  )
+  const scopeBowlingSummaryFetch = useFetch<ScopeBowlingSummary | null>(
+    () => currentTab === 'Bowling'
+      ? getScopeBowlingSummary(apiFilters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Bowling'],
+  )
+  const scopeBowlingBySeasonFetch = useFetch<{ by_season: ScopeBowlingSeason[] } | null>(
+    () => currentTab === 'Bowling'
+      ? getScopeBowlingBySeason(apiFilters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Bowling'],
   )
 
   // Picker URL state — the picked player's scoped stats are rendered
@@ -649,6 +663,8 @@ export default function TournamentDossier({
           onPick={pickBowler}
           pickedEntry={bowlerScopeFetch.data?.entry ?? null}
           pickedLoading={bowlerScopeFetch.loading}
+          scopeSummary={scopeBowlingSummaryFetch.data}
+          scopeSeasons={scopeBowlingBySeasonFetch.data?.by_season ?? null}
         />
       )}
       {currentTab === 'Fielding' && (
@@ -2177,6 +2193,7 @@ function PickerSlot({
 function BowlersTab({
   loading, error, data, refetch, filterTeam, filterOpponent, gender,
   scope, pickedId, onPick, pickedEntry, pickedLoading,
+  scopeSummary, scopeSeasons,
 }: {
   loading: boolean; error: string | null
   data: BowlingLeaders | null; refetch: () => void
@@ -2189,6 +2206,8 @@ function BowlersTab({
   onPick: (id: string) => void
   pickedEntry: BowlingLeaderEntry | null
   pickedLoading: boolean
+  scopeSummary: ScopeBowlingSummary | null
+  scopeSeasons: ScopeBowlingSeason[] | null
 }) {
   if (loading) return <Spinner label="Loading bowlers…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
@@ -2205,7 +2224,10 @@ function BowlersTab({
   ) as unknown as string
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+    <div className="space-y-6 mt-4">
+      <SeriesBowlingTileRow summary={scopeSummary} seasons={scopeSeasons} />
+      <SeriesBowlingChartStrip seasons={scopeSeasons} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <PickerSlot
         title="Picked bowler"
         role="bowler"
@@ -2269,7 +2291,85 @@ function BowlersTab({
           rowKey={(r) => r.person_id}
         />
       </div>
+      </div>
     </div>
+  )
+}
+
+/** Series-Bowling tile row — pool-weighted per-innings averages. */
+function SeriesBowlingTileRow({
+  summary, seasons,
+}: {
+  summary: ScopeBowlingSummary | null
+  seasons: ScopeBowlingSeason[] | null
+}) {
+  if (!summary) return null
+  const sdEconomy = seasonStdDev(seasons, r => r.economy)
+  const sdDot = seasonStdDev(seasons, r => r.dot_pct)
+  // SR + Average aren't on the scope/averages by-season payload directly,
+  // but we can derive them as `legal_balls / wickets` and `runs_conceded
+  // / wickets`. Each season gets a wickets divisor; skip when 0.
+  const sdStrikeRate = seasonStdDev(seasons, r =>
+    r.wickets > 0 ? r.legal_balls / r.wickets : null)
+  const sdAverage = seasonStdDev(seasons, r =>
+    r.wickets > 0 ? r.runs_conceded / r.wickets : null)
+  return (
+    <div className="wisden-statrow cols-5">
+      <StatCard
+        label="Economy"
+        value={summary.economy != null ? summary.economy.toFixed(2) : '-'}
+        stdDev={sdEconomy != null ? sdEconomy.toFixed(2) : null}
+      />
+      <StatCard
+        label="Average"
+        value={summary.average != null ? summary.average.toFixed(2) : '-'}
+        stdDev={sdAverage != null ? sdAverage.toFixed(2) : null}
+      />
+      <StatCard
+        label="Strike rate"
+        value={summary.strike_rate != null ? summary.strike_rate.toFixed(2) : '-'}
+        stdDev={sdStrikeRate != null ? sdStrikeRate.toFixed(2) : null}
+      />
+      <StatCard
+        label="Dot %"
+        value={summary.dot_pct != null ? `${summary.dot_pct}%` : '-'}
+        stdDev={sdDot != null ? sdDot.toFixed(1) : null}
+      />
+      <StatCard
+        label="Boundaries conceded"
+        value={summary.boundaries_conceded != null ? summary.boundaries_conceded.toFixed(1) : '-'}
+      />
+    </div>
+  )
+}
+
+/** Series-Bowling per-season trend strip. */
+function SeriesBowlingChartStrip({
+  seasons,
+}: {
+  seasons: ScopeBowlingSeason[] | null
+}) {
+  if (!seasons || seasons.length < 2) return null
+  return (
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LineChart data={seasons} xAccessor="season" yAccessor="economy"
+          title="Economy by season" xLabel="Season" yLabel="Econ" height={280} />
+        <LineChart data={seasons} xAccessor="season" yAccessor="dot_pct"
+          title="Dot % by season" xLabel="Season" yLabel="%" height={280} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BarChart data={seasons} categoryAccessor="season" valueAccessor="wickets"
+          title="Wickets per innings by season" categoryLabel="Season" valueLabel="Wkts/inn" height={280} />
+        <BarChart data={seasons} categoryAccessor="season" valueAccessor="runs_conceded"
+          title="Runs conceded per innings by season" categoryLabel="Season" valueLabel="Runs/inn" height={280} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BarChart data={seasons} categoryAccessor="season" valueAccessor="boundaries_conceded"
+          title="Boundaries conceded per innings by season" categoryLabel="Season" valueLabel="Bdys/inn" height={280} />
+        <div />
+      </div>
+    </>
   )
 }
 
