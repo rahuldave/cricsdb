@@ -610,7 +610,6 @@ export default function TournamentDossier({
       {currentTab === 'Overview' && (
         <OverviewTab
           summary={summary}
-          seasons={bySeasonFetch.data?.seasons ?? []}
           tournament={tournament}
           gender={filters.gender}
           teamType={filters.team_type}
@@ -746,29 +745,14 @@ export default function TournamentDossier({
 
 // ─── Tabs ─────────────────────────────────────────────────────────────
 
-// Convert cricsheet season strings to a numeric x-axis value.
-// "2024" → 2024. "2022/23" → 2022.5. Keeps chronological ordering
-// while staying numeric so Semiotic's linear scale treats each edition
-// as a separate point.
-const seasonNum = (s: string): number => {
-  const [y] = s.split('/')
-  const base = parseInt(y, 10)
-  return s.includes('/') ? base + 0.5 : base
-}
-
 function OverviewTab({
-  summary, seasons, tournament, gender, teamType,
+  summary, tournament, gender, teamType,
 }: {
   summary: TournamentSummary
-  seasons: TournamentSeason[]
   tournament: string | null
   gender: string | null | undefined
   teamType: string | null | undefined
 }) {
-  // Seasons come newest-first from backend — flip for chart reading left-to-right.
-  const trend = [...seasons].reverse()
-    .filter(s => s.run_rate != null)
-    .map(s => ({ ...s, _x: seasonNum(s.season) }))
   const isRivalry = !!summary.by_team
   const teamNames = isRivalry && summary.by_team ? Object.keys(summary.by_team) : []
 
@@ -1130,30 +1114,10 @@ function OverviewTab({
         )
       })()}
 
-      {trend.length > 1 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <LineChart
-            data={trend}
-            xAccessor="_x"
-            yAccessor="run_rate"
-            title="Run rate by season"
-            xLabel="season"
-            yLabel="runs/over"
-            showPoints
-            curve="monotoneX"
-          />
-          <LineChart
-            data={trend.filter(s => s.boundary_pct != null)}
-            xAccessor="_x"
-            yAccessor="boundary_pct"
-            title="Boundary % by season"
-            xLabel="season"
-            yLabel="% of balls"
-            showPoints
-            curve="monotoneX"
-          />
-        </div>
-      )}
+      {/* Run rate + Boundary % by season moved to Series → Batting tab
+          (spec-series-trend-charts.md step 10). The Batting subtab
+          carries the full discipline-level chart strip; Overview now
+          focuses on identity / champions / per-edition narrative. */}
 
       {/* ── Per-team breakdown when in rivalry scope ── */}
       {isRivalry && summary.by_team && (

@@ -1,16 +1,15 @@
 #!/bin/bash
 # Series > Overview — section-order invariant. 2026-05-12 we hoisted
 # the "Teams at <X>" chips out of the bottom of the dossier and into
-# the headline strip, just after Best moments. This test locks that
-# order so a future Overview refactor can't silently undo it:
+# the headline strip, just after Best moments. Spec-series-trend-charts
+# step 10 (2026-05-13) then moved "Run rate by season" and
+# "Boundary % by season" OFF Overview to the Series → Batting subtab
+# (which carries the full discipline-level chart strip now).
 #
-#   Best moments  →  Teams at IPL  →  Run rate by season  →
-#   Boundary % by season  →  Knockouts (moved away — must NOT
-#   appear on Overview)  →  Champions by season
+#   Best moments  →  Teams at IPL  →  Champions by season
 #
-# Knockouts removed from Overview on the same date — that section
-# now lives per-edition on the Editions tab. This test asserts BOTH
-# the new order AND the absence of "Knockouts" as an Overview header.
+# Run rate / Boundary % charts AND Knockouts must NOT appear on
+# Overview — first two moved to Batting, last to Editions.
 #
 # Anchor: IPL (all editions, men's, club) — the marquee dossier with
 # Best moments + Teams + trend charts + Champions table all present.
@@ -83,15 +82,16 @@ def absent(label, key):
 # All required sections present.
 present("Best moments",        "best_moments")
 present("Teams at",            "teams_at")
-present("Run rate by season",  "run_rate")
-present("Boundary % by season", "boundary_pct")
 present("Champions by season", "champions_by_season")
 
-# Section order: Best moments → Teams at → Run rate → Boundary % → Champions.
+# Section order: Best moments → Teams at → Champions by season.
 before("Best moments",        "best_moments",        "Teams at",            "teams_at")
-before("Teams at",            "teams_at",            "Run rate by season",  "run_rate")
-before("Run rate by season",  "run_rate",            "Boundary % by season", "boundary_pct")
-before("Boundary % by season","boundary_pct",        "Champions by season", "champions_by_season")
+before("Teams at",            "teams_at",            "Champions by season", "champions_by_season")
+
+# Run rate + Boundary % charts moved to Series → Batting subtab — must
+# NOT appear on Overview.
+absent("Run rate by season",   "run_rate")
+absent("Boundary % by season", "boundary_pct")
 
 # Knockouts moved to Editions tab — must NOT appear on Overview.
 absent("Knockouts", "knockouts")
