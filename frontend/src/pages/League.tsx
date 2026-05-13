@@ -27,8 +27,9 @@ import { useFetch } from '../hooks/useFetch'
 import { useFilterDeps } from '../hooks/useFilterDeps'
 import {
   getLeagueOverview, getLeagueChampions, getTournamentsLanding,
-  getLeagueBattersLeaders,
+  getLeagueBattersLeaders, getLeagueBowlersLeaders,
   getScopeBattingSummary, getScopeBattingBySeason,
+  getScopeBowlingSummary, getScopeBowlingBySeason,
 } from '../api'
 import { scopeToProse } from '../components/scopeLinks'
 import InningToggle from '../components/InningToggle'
@@ -44,6 +45,7 @@ import TournamentTile, {
 } from '../components/tournaments/TournamentTile'
 import {
   SeriesBattingTileRow, SeriesBattingChartStrip,
+  SeriesBowlingTileRow, SeriesBowlingChartStrip,
 } from '../components/tournaments/TournamentDossier'
 import PlayerLink from '../components/PlayerLink'
 import type {
@@ -51,6 +53,8 @@ import type {
   TournamentsLanding, TournamentLandingEntry,
   ScopeBattingSummary, ScopeBattingSeason,
   BattingLeaders, BattingLeaderEntry,
+  ScopeBowlingSummary, ScopeBowlingSeason,
+  BowlingLeaders, BowlingLeaderEntry,
 } from '../types'
 
 type TabName = 'Overview' | 'Batting' | 'Bowling' | 'Fielding'
@@ -129,6 +133,26 @@ export default function League() {
     [...filterDeps, currentTab === 'Batting'],
   )
 
+  // ── Bowling subtab data ───────────────────────────────────────
+  const bowlingSummaryFetch = useFetch<ScopeBowlingSummary | null>(
+    () => currentTab === 'Bowling'
+      ? getScopeBowlingSummary(filters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Bowling'],
+  )
+  const bowlingBySeasonFetch = useFetch<{ by_season: ScopeBowlingSeason[] } | null>(
+    () => currentTab === 'Bowling'
+      ? getScopeBowlingBySeason(filters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Bowling'],
+  )
+  const bowlingLeadersFetch = useFetch<BowlingLeaders | null>(
+    () => currentTab === 'Bowling'
+      ? getLeagueBowlersLeaders({ ...filters, limit: 50 })
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Bowling'],
+  )
+
   return (
     <div>
       <h2 className="wisden-page-title" style={{ margin: 0 }}>
@@ -185,7 +209,26 @@ export default function League() {
         />
       )}
       {currentTab === 'Bowling' && (
-        <div className="wisden-tab-help mt-4">Bowling content lands in step 8.</div>
+        <BowlingSubtab
+          summary={bowlingSummaryFetch.data}
+          seasons={bowlingBySeasonFetch.data?.by_season ?? null}
+          leaders={bowlingLeadersFetch.data}
+          loading={
+            bowlingSummaryFetch.loading
+            || bowlingBySeasonFetch.loading
+            || bowlingLeadersFetch.loading
+          }
+          error={
+            bowlingSummaryFetch.error
+            || bowlingBySeasonFetch.error
+            || bowlingLeadersFetch.error
+          }
+          refetch={() => {
+            bowlingSummaryFetch.refetch()
+            bowlingBySeasonFetch.refetch()
+            bowlingLeadersFetch.refetch()
+          }}
+        />
       )}
       {currentTab === 'Fielding' && (
         <div className="wisden-tab-help mt-4">Fielding content lands in step 9.</div>
@@ -586,6 +629,94 @@ function BattingSubtab({
                 { key: 'runs', label: 'Runs' },
                 { key: 'balls', label: 'Balls' },
               ] as Column<BattingLeaderEntry>[]}
+              data={leaders.by_strike_rate}
+              rowKey={(r) => `bsr-${r.person_id}`}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+// ─── Bowling subtab ───────────────────────────────────────────────────
+
+function BowlingSubtab({
+  summary, seasons, leaders, loading, error, refetch,
+}: {
+  summary: ScopeBowlingSummary | null
+  seasons: ScopeBowlingSeason[] | null
+  leaders: BowlingLeaders | null
+  loading: boolean
+  error: string | null
+  refetch: () => void
+}) {
+  const filters = useFilters()
+  const gender = filters.gender ?? null
+
+  if (loading && !summary) return <Spinner label="Loading bowlers…" />
+  if (error) return <ErrorBanner message={error} onRetry={refetch} />
+
+  const fmt = (v: number | null | undefined, d = 2) =>
+    v == null ? '-' : v.toFixed(d)
+
+  const bowlerCell = (r: BowlingLeaderEntry) => (
+    <PlayerLink
+      personId={r.person_id}
+      name={r.name}
+      role="bowler"
+      gender={gender}
+    />
+  ) as unknown as string
+
+  return (
+    <div className="mt-4 space-y-6">
+      <SeriesBowlingTileRow summary={summary} seasons={seasons} />
+      <SeriesBowlingChartStrip seasons={seasons} />
+      {leaders && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div>
+            <SectionHeader title="Top bowlers by wickets" />
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Bowler',
+                  format: (_v, r: BowlingLeaderEntry) => bowlerCell(r) },
+                { key: 'wickets', label: 'W', sortable: true },
+                { key: 'balls', label: 'Balls' },
+                { key: 'economy', label: 'Econ',
+                  format: (v: number | null) => fmt(v) },
+              ] as Column<BowlingLeaderEntry>[]}
+              data={leaders.by_wickets}
+              rowKey={(r) => `bwkts-${r.person_id}`}
+            />
+          </div>
+          <div>
+            <SectionHeader title="Top bowlers by economy" />
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Bowler',
+                  format: (_v, r: BowlingLeaderEntry) => bowlerCell(r) },
+                { key: 'economy', label: 'Econ', sortable: true,
+                  format: (v: number | null) => fmt(v) },
+                { key: 'wickets', label: 'W' },
+                { key: 'balls', label: 'Balls' },
+              ] as Column<BowlingLeaderEntry>[]}
+              data={leaders.by_economy}
+              rowKey={(r) => `becon-${r.person_id}`}
+            />
+          </div>
+          <div>
+            <SectionHeader title="Top bowlers by strike rate" />
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Bowler',
+                  format: (_v, r: BowlingLeaderEntry) => bowlerCell(r) },
+                { key: 'strike_rate', label: 'SR', sortable: true,
+                  format: (v: number | null) => fmt(v) },
+                { key: 'wickets', label: 'W' },
+                { key: 'balls', label: 'Balls' },
+              ] as Column<BowlingLeaderEntry>[]}
               data={leaders.by_strike_rate}
               rowKey={(r) => `bsr-${r.person_id}`}
             />
