@@ -203,6 +203,7 @@ SUMMARY_FIELD_MAP = {
     "average":               "average",
     "fours_conceded":        "fours_conceded",
     "sixes_conceded":        "sixes_conceded",
+    "boundaries_conceded":   "boundaries_conceded",
     "wides":                 "wides",
     "noballs":               "noballs",
     "wides_per_match":       "wides_per_match",

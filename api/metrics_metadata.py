@@ -71,6 +71,7 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     "bowl_dot_pct":     "higher_better",
     "fours_conceded":   None,
     "sixes_conceded":   None,
+    "boundaries_conceded": None,
     "wides":            None,
     "noballs":          None,
     "wides_per_match":  "lower_better",

@@ -1352,7 +1352,7 @@ BATTING_COUNT_KEYS = (
 )
 BOWLING_COUNT_KEYS = (
     "runs_conceded", "legal_balls", "wickets",
-    "fours_conceded", "sixes_conceded", "wides", "noballs",
+    "fours_conceded", "sixes_conceded", "boundaries_conceded", "wides", "noballs",
 )
 BOWLING_HALF_KEYS = ("wides_per_match", "noballs_per_match")
 FIELDING_COUNT_KEYS = (
@@ -3151,6 +3151,7 @@ async def _bowling_aggregates_baseline(team, filters, aux):
         "bowl_dot_pct": _safe_div(r.get("dots") or 0, legal_balls, 100, 1),
         "fours_conceded": r.get("fours_conceded") or 0,
         "sixes_conceded": r.get("sixes_conceded") or 0,
+        "boundaries_conceded": (r.get("fours_conceded") or 0) + (r.get("sixes_conceded") or 0),
         "wides": r.get("wides") or 0,
         "noballs": r.get("noballs") or 0,
         "wides_per_match": _safe_div(r.get("wides") or 0, matches, 1, 2),
@@ -3293,6 +3294,7 @@ async def _bowling_aggregates_live(
         "bowl_dot_pct": _safe_div(dots, legal_balls, 100, 1),
         "fours_conceded": fours,
         "sixes_conceded": sixes,
+        "boundaries_conceded": fours + sixes,
         "wides": c.get("wides") or 0,
         "noballs": c.get("noballs") or 0,
         "wides_per_match": _safe_div(c.get("wides") or 0, matches, 1, 2),
@@ -3332,6 +3334,7 @@ async def _compute_bowling_summary(
         "dot_pct": wrap_metric(t["bowl_dot_pct"], s["bowl_dot_pct"], "bowl_dot_pct", sample_size=legal),
         "fours_conceded": wrap_metric(t["fours_conceded"], s["fours_conceded"], "fours_conceded", sample_size=legal),
         "sixes_conceded": wrap_metric(t["sixes_conceded"], s["sixes_conceded"], "sixes_conceded", sample_size=legal),
+        "boundaries_conceded": wrap_metric(t["boundaries_conceded"], s["boundaries_conceded"], "boundaries_conceded", sample_size=legal),
         "wides": wrap_metric(t["wides"], s["wides"], "wides", sample_size=matches),
         "noballs": wrap_metric(t["noballs"], s["noballs"], "noballs", sample_size=matches),
         # Per-match league rates: `s` is already halved at source by

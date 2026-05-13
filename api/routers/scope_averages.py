@@ -695,6 +695,8 @@ def _format_bowling_summary(
     matches = matches or 0
     wickets = wickets or 0
     inn = innings_bowled or 0
+    fours = fours_conceded or 0
+    sixes = sixes_conceded or 0
     out = {
         "innings_bowled": inn,
         "matches": matches,
@@ -706,8 +708,9 @@ def _format_bowling_summary(
         "strike_rate": _safe_div(balls, wickets) if wickets else None,
         "average": _safe_div(runs, wickets) if wickets else None,
         "dot_pct": _safe_div(dots, balls, 100, 1),
-        "fours_conceded": fours_conceded or 0,
-        "sixes_conceded": sixes_conceded or 0,
+        "fours_conceded": fours,
+        "sixes_conceded": sixes,
+        "boundaries_conceded": fours + sixes,
         "wides": wides or 0,
         "noballs": noballs or 0,
         "wides_per_match": _safe_div(wides or 0, matches, 1, 2),

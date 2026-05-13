@@ -1645,6 +1645,7 @@ export interface TeamBowlingSummary {
   dot_pct: MetricEnvelope
   fours_conceded: MetricEnvelope
   sixes_conceded: MetricEnvelope
+  boundaries_conceded: MetricEnvelope
   wides: MetricEnvelope
   noballs: MetricEnvelope
   wides_per_match: MetricEnvelope

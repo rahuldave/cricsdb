@@ -106,6 +106,7 @@ SUMMARY_FIELD_MAP = {
     "wickets": "wickets",
     "economy": "economy", "strike_rate": "strike_rate", "average": "average",
     "fours_conceded": "fours_conceded", "sixes_conceded": "sixes_conceded",
+    "boundaries_conceded": None,
     "wides": "wides", "noballs": "noballs",
     "wides_per_match": "wides_per_match", "noballs_per_match": "noballs_per_match",
     "avg_opposition_total": None,
