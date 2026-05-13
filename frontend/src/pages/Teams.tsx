@@ -698,58 +698,77 @@ function BattingTab({ team, filters, filterDeps }: TabProps) {
           and Dot % doesn't orphan. Same pattern as the player Batting
           page (Batting.tsx). Combined 50s/100s + Highest/Lowest cards
           let us pack 15 stats into 3 evenly-wide rows. */}
-      <div className="wisden-statrow cols-5">
-        <StatCard label="Innings" value={s.innings_batted.value ?? 0} />
-        <StatCard label="Runs" value={(s.total_runs.value ?? 0).toLocaleString()} />
-        <StatCard
-          label="Run rate"
-          value={s.run_rate.value != null ? s.run_rate.value.toFixed(2) : '-'}
-          subtitle={<MetricDelta env={s.run_rate} withScopeAvg fmt={2} />}
-        />
-        <StatCard
-          label="Boundary %"
-          value={s.boundary_pct.value != null ? `${s.boundary_pct.value}%` : '-'}
-          subtitle={<MetricDelta env={s.boundary_pct} withScopeAvg />}
-        />
-        <StatCard
-          label="Dot %"
-          value={s.dot_pct.value != null ? `${s.dot_pct.value}%` : '-'}
-          subtitle={<MetricDelta env={s.dot_pct} withScopeAvg />}
-        />
-      </div>
-      <div className="wisden-statrow cols-5">
-        <StatCard label="4s" value={(s.fours.value ?? 0).toLocaleString()} />
-        <StatCard label="6s" value={(s.sixes.value ?? 0).toLocaleString()} />
-        <StatCard label="50s" value={s.fifties.value ?? 0} />
-        <StatCard label="100s" value={s.hundreds.value ?? 0} />
-        <StatCard label="50s / 100s per inn"
-          value={(s.innings_batted.value ?? 0) > 0
-            ? `${(((s.fifties.value ?? 0) + (s.hundreds.value ?? 0)) / (s.innings_batted.value ?? 1)).toFixed(2)}`
-            : '-'} />
-      </div>
-      <div className="wisden-statrow cols-5">
-        <StatCard
-          label="Avg 1st-inn total"
-          value={s.avg_1st_innings_total.value != null ? s.avg_1st_innings_total.value.toFixed(1) : '-'}
-          subtitle={<MetricDelta env={s.avg_1st_innings_total} withScopeAvg />}
-        />
-        <StatCard
-          label="Avg 2nd-inn total"
-          value={s.avg_2nd_innings_total.value != null ? s.avg_2nd_innings_total.value.toFixed(1) : '-'}
-          subtitle={<MetricDelta env={s.avg_2nd_innings_total} withScopeAvg />}
-        />
-        <StatCard label="Highest total"
-          value={s.highest_total ? String(s.highest_total.runs) : '-'} />
-        <StatCard label="Lowest all-out"
-          value={s.lowest_all_out_total ? String(s.lowest_all_out_total.runs) : '-'} />
-        <StatCard label="Avg innings total"
-          value={s.avg_innings_total.value != null
-            ? s.avg_innings_total.value.toFixed(1)
-            : '-'}
-          subtitle={s.avg_innings_total.value != null
-            ? <MetricDelta env={s.avg_innings_total} withScopeAvg fmt={1} />
-            : null} />
-      </div>
+      {(() => {
+        // σ-across-in-scope-seasons per spec-series-trend-charts.md §D4.
+        // Avg 1st/2nd-inn totals + 50s/100s per inn aren't on the
+        // by-season payload today, so σ stays null for those tiles —
+        // future endpoint widening can unlock them.
+        const seasons = bySeason.data?.seasons ?? null
+        const sdRunRate = seasonStdDev(seasons, r => r.run_rate)
+        const sdBoundaryPct = seasonStdDev(seasons, r => r.boundary_pct)
+        const sdDotPct = seasonStdDev(seasons, r => r.dot_pct)
+        const sdAvgInnings = seasonStdDev(seasons, r => r.avg_innings_total)
+        return (
+          <>
+            <div className="wisden-statrow cols-5">
+              <StatCard label="Innings" value={s.innings_batted.value ?? 0} />
+              <StatCard label="Runs" value={(s.total_runs.value ?? 0).toLocaleString()} />
+              <StatCard
+                label="Run rate"
+                value={s.run_rate.value != null ? s.run_rate.value.toFixed(2) : '-'}
+                stdDev={sdRunRate != null ? sdRunRate.toFixed(2) : null}
+                subtitle={<MetricDelta env={s.run_rate} withScopeAvg fmt={2} />}
+              />
+              <StatCard
+                label="Boundary %"
+                value={s.boundary_pct.value != null ? `${s.boundary_pct.value}%` : '-'}
+                stdDev={sdBoundaryPct != null ? sdBoundaryPct.toFixed(1) : null}
+                subtitle={<MetricDelta env={s.boundary_pct} withScopeAvg />}
+              />
+              <StatCard
+                label="Dot %"
+                value={s.dot_pct.value != null ? `${s.dot_pct.value}%` : '-'}
+                stdDev={sdDotPct != null ? sdDotPct.toFixed(1) : null}
+                subtitle={<MetricDelta env={s.dot_pct} withScopeAvg />}
+              />
+            </div>
+            <div className="wisden-statrow cols-5">
+              <StatCard label="4s" value={(s.fours.value ?? 0).toLocaleString()} />
+              <StatCard label="6s" value={(s.sixes.value ?? 0).toLocaleString()} />
+              <StatCard label="50s" value={s.fifties.value ?? 0} />
+              <StatCard label="100s" value={s.hundreds.value ?? 0} />
+              <StatCard label="50s / 100s per inn"
+                value={(s.innings_batted.value ?? 0) > 0
+                  ? `${(((s.fifties.value ?? 0) + (s.hundreds.value ?? 0)) / (s.innings_batted.value ?? 1)).toFixed(2)}`
+                  : '-'} />
+            </div>
+            <div className="wisden-statrow cols-5">
+              <StatCard
+                label="Avg 1st-inn total"
+                value={s.avg_1st_innings_total.value != null ? s.avg_1st_innings_total.value.toFixed(1) : '-'}
+                subtitle={<MetricDelta env={s.avg_1st_innings_total} withScopeAvg />}
+              />
+              <StatCard
+                label="Avg 2nd-inn total"
+                value={s.avg_2nd_innings_total.value != null ? s.avg_2nd_innings_total.value.toFixed(1) : '-'}
+                subtitle={<MetricDelta env={s.avg_2nd_innings_total} withScopeAvg />}
+              />
+              <StatCard label="Highest total"
+                value={s.highest_total ? String(s.highest_total.runs) : '-'} />
+              <StatCard label="Lowest all-out"
+                value={s.lowest_all_out_total ? String(s.lowest_all_out_total.runs) : '-'} />
+              <StatCard label="Avg innings total"
+                value={s.avg_innings_total.value != null
+                  ? s.avg_innings_total.value.toFixed(1)
+                  : '-'}
+                stdDev={sdAvgInnings != null ? sdAvgInnings.toFixed(1) : null}
+                subtitle={s.avg_innings_total.value != null
+                  ? <MetricDelta env={s.avg_innings_total} withScopeAvg fmt={1} />
+                  : null} />
+            </div>
+          </>
+        )
+      })()}
 
       {/* Line charts only when there are 2+ seasons — one data point
           renders an empty chart. Filter collapsed → no charts. */}
