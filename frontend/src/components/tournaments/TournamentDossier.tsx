@@ -16,6 +16,7 @@ import {
   getMatches,
   getScopeBattingSummary, getScopeBattingBySeason,
   getScopeBowlingSummary, getScopeBowlingBySeason,
+  getScopeFieldingSummary, getScopeFieldingBySeason,
 } from '../../api'
 import StatCard from '../StatCard'
 import InningToggle from '../InningToggle'
@@ -49,6 +50,7 @@ import type {
   TournamentPartnershipsTopByWicket, TournamentPartnershipTopEntry,
   ScopeBattingSummary, ScopeBattingSeason,
   ScopeBowlingSummary, ScopeBowlingSeason,
+  ScopeFieldingSummary, ScopeFieldingSeason,
 } from '../../types'
 
 const fmt = (v: number | null | undefined, d = 2) =>
@@ -256,6 +258,18 @@ export default function TournamentDossier({
       ? getScopeBowlingBySeason(apiFilters)
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Bowling'],
+  )
+  const scopeFieldingSummaryFetch = useFetch<ScopeFieldingSummary | null>(
+    () => currentTab === 'Fielding'
+      ? getScopeFieldingSummary(apiFilters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Fielding'],
+  )
+  const scopeFieldingBySeasonFetch = useFetch<{ by_season: ScopeFieldingSeason[] } | null>(
+    () => currentTab === 'Fielding'
+      ? getScopeFieldingBySeason(apiFilters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Fielding'],
   )
 
   // Picker URL state — the picked player's scoped stats are rendered
@@ -682,6 +696,8 @@ export default function TournamentDossier({
           onPick={pickFielder}
           pickedEntry={fielderScopeFetch.data?.entry ?? null}
           pickedLoading={fielderScopeFetch.loading}
+          scopeSummary={scopeFieldingSummaryFetch.data}
+          scopeSeasons={scopeFieldingBySeasonFetch.data?.by_season ?? null}
         />
       )}
       {currentTab === 'Records' && (
@@ -2376,6 +2392,7 @@ function SeriesBowlingChartStrip({
 function FieldersTab({
   loading, error, data, refetch, filterTeam, filterOpponent, gender,
   scope, pickedId, onPick, pickedEntry, pickedLoading,
+  scopeSummary, scopeSeasons,
 }: {
   loading: boolean; error: string | null
   data: FieldingLeaders | null; refetch: () => void
@@ -2388,6 +2405,8 @@ function FieldersTab({
   onPick: (id: string) => void
   pickedEntry: FieldingLeaderEntry | null
   pickedLoading: boolean
+  scopeSummary: ScopeFieldingSummary | null
+  scopeSeasons: ScopeFieldingSeason[] | null
 }) {
   if (loading) return <Spinner label="Loading fielders…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
@@ -2407,7 +2426,10 @@ function FieldersTab({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+    <div className="space-y-6 mt-4">
+      <SeriesFieldingTileRow summary={scopeSummary} seasons={scopeSeasons} />
+      <SeriesFieldingChartStrip seasons={scopeSeasons} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <PickerSlot
         title="Picked fielder"
         role="fielder"
@@ -2474,7 +2496,70 @@ function FieldersTab({
           rowKey={(r) => r.person_id}
         />
       </div>
+      </div>
     </div>
+  )
+}
+
+/** Series-Fielding tile row — pool-weighted per-match averages. */
+function SeriesFieldingTileRow({
+  summary, seasons,
+}: {
+  summary: ScopeFieldingSummary | null
+  seasons: ScopeFieldingSeason[] | null
+}) {
+  if (!summary) return null
+  const sdCpm = seasonStdDev(seasons, r => r.catches_per_match)
+  const sdSpm = seasonStdDev(seasons, r => r.stumpings_per_match)
+  const sdRpm = seasonStdDev(seasons, r => r.run_outs_per_match)
+  return (
+    <div className="wisden-statrow cols-5">
+      <StatCard
+        label="Catches/match"
+        value={summary.catches_per_match != null ? summary.catches_per_match.toFixed(2) : '-'}
+        stdDev={sdCpm != null ? sdCpm.toFixed(2) : null}
+      />
+      <StatCard
+        label="Stumpings/match"
+        value={summary.stumpings_per_match != null ? summary.stumpings_per_match.toFixed(2) : '-'}
+        stdDev={sdSpm != null ? sdSpm.toFixed(2) : null}
+      />
+      <StatCard
+        label="Run-outs/match"
+        value={summary.run_outs_per_match != null ? summary.run_outs_per_match.toFixed(2) : '-'}
+        stdDev={sdRpm != null ? sdRpm.toFixed(2) : null}
+      />
+      <StatCard label="C&B" value={summary.caught_and_bowled.toLocaleString()} />
+      <StatCard
+        label="Total dismissals"
+        value={summary.total_dismissals_contributed.toLocaleString()}
+      />
+    </div>
+  )
+}
+
+/** Series-Fielding per-season trend strip. */
+function SeriesFieldingChartStrip({
+  seasons,
+}: {
+  seasons: ScopeFieldingSeason[] | null
+}) {
+  if (!seasons || seasons.length < 2) return null
+  return (
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LineChart data={seasons} xAccessor="season" yAccessor="catches_per_match"
+          title="Catches per match by season" xLabel="Season" yLabel="per match" height={280} />
+        <LineChart data={seasons} xAccessor="season" yAccessor="run_outs_per_match"
+          title="Run-outs per match by season" xLabel="Season" yLabel="per match" height={280} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BarChart data={seasons} categoryAccessor="season" valueAccessor="catches"
+          title="Catches by season" categoryLabel="Season" valueLabel="Catches" height={280} />
+        <BarChart data={seasons} categoryAccessor="season" valueAccessor="total_dismissals_contributed"
+          title="Total dismissals by season" categoryLabel="Season" valueLabel="Total" height={280} />
+      </div>
+    </>
   )
 }
 
