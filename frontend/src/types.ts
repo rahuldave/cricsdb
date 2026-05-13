@@ -2619,3 +2619,58 @@ export interface VenueSummary {
   highest_total: VenueTotalEntry | null
   lowest_all_out: VenueTotalEntry | null
 }
+
+// ─── League (above-tournament scope dossier) ─────────────────────────
+
+export interface LeagueTopTeamRow {
+  team: string
+  played: number
+  wins: number
+  losses: number
+  win_pct: number | null
+}
+
+export interface LeagueBestMomentTeamTotal {
+  team: string
+  runs: number
+  match_id: number
+  season: string | null
+  tournament: string | null
+  opponent: string
+  date: string | null
+}
+
+export interface LeagueBestMomentWinMargin {
+  winner: string
+  loser: string
+  margin: number
+  match_id: number
+  season: string | null
+  tournament: string | null
+  date: string | null
+}
+
+export interface LeagueBestMomentMatchSixes {
+  match_id: number
+  season: string | null
+  tournament: string | null
+  team1: string
+  team2: string
+  sixes: number
+  date: string | null
+}
+
+export interface LeagueOverview {
+  matches: number
+  innings: number
+  teams_count: number
+  tournaments_count: number
+  top_teams: LeagueTopTeamRow[]
+  best_moments: {
+    highest_total: LeagueBestMomentTeamTotal | null
+    lowest_all_out: LeagueBestMomentTeamTotal | null
+    biggest_win_runs: LeagueBestMomentWinMargin | null
+    biggest_win_wickets: LeagueBestMomentWinMargin | null
+    most_sixes_match: LeagueBestMomentMatchSixes | null
+  }
+}

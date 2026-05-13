@@ -447,3 +447,9 @@ export const getTournamentPartnershipsHeatmap = (
   tournament: string | null, filters?: TF & { side?: 'batting' | 'bowling' },
 ) => fetchApi<import('./types').TournamentPartnershipsHeatmap>(
   '/api/v1/series/partnerships/heatmap', tparams(tournament, filters))
+
+// ─── League (above-tournament scope dossier) ─────────────────────────
+
+export const getLeagueOverview = (filters?: F) =>
+  fetchApi<import('./types').LeagueOverview>(
+    '/api/v1/league/overview', filters as Record<string, string>)

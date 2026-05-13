@@ -12,6 +12,7 @@ from .keeping import router as keeping_router
 from .head_to_head import router as head_to_head_router
 from .matches import router as matches_router
 from .tournaments import router as tournaments_router
+from .league import router as league_router
 from .venues import router as venues_router
 
 
@@ -27,4 +28,5 @@ def register_routers(app: FastAPI):
     app.include_router(head_to_head_router)
     app.include_router(matches_router)
     app.include_router(tournaments_router)
+    app.include_router(league_router)
     app.include_router(venues_router)
