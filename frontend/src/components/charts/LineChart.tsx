@@ -31,6 +31,19 @@ interface LineChartProps<T extends Record<string, any>> {
   /** Pass-through to Semiotic — title accessor + fields config. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tooltip?: any
+  /** Optional second series rendered alongside the primary `data` —
+   *  e.g. a tournament-wide pool-weighted baseline against which a
+   *  team's line should be read (spec-series-trend-charts.md step 11).
+   *  Must share the same x and y accessors as the primary data. Forest
+   *  green stroke (`internal_docs/colors.md`'s league-avg reference
+   *  color); the primary keeps WISDEN_PALETTE's first color. Ignored
+   *  when `lineBy` is already set (multi-series mode wins). */
+  referenceData?: T[]
+  /** Legend label for the reference series — default "Tournament avg". */
+  referenceLabel?: string
+  /** Legend label for the primary `data` series — default "Team". Only
+   *  meaningful when `referenceData` is provided. */
+  primaryLabel?: string
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,6 +52,7 @@ export default function LineChart<T extends Record<string, any>>({
   colorScheme = WISDEN_PALETTE, title, subtitle,
   width, height = 400, xLabel, yLabel, showPoints, curve,
   annotations, tooltip,
+  referenceData, referenceLabel = 'Tournament avg', primaryLabel = 'Team',
 }: LineChartProps<T>) {
   const [ref, measuredWidth] = useContainerWidth()
   const effectiveWidth = width ?? measuredWidth
@@ -47,17 +61,34 @@ export default function LineChart<T extends Record<string, any>>({
   const discipline = useDiscipline()
   const effectiveSubtitle = subtitle ?? (title ? abbreviateScope(filters, { discipline }) : '')
 
+  // Reference-overlay mode: combine data + referenceData into a single
+  // tagged array and tell Semiotic to draw two lines, distinguished
+  // by `_series`. When `lineBy` is already set the multi-series caller
+  // owns the data; skip the overlay merge.
+  const hasReference = !lineBy && referenceData != null && referenceData.length > 0
+  const effectiveData: Record<string, unknown>[] = hasReference
+    ? [
+        ...data.map(d => ({ ...d, _series: primaryLabel })),
+        ...(referenceData ?? []).map(d => ({ ...d, _series: referenceLabel })),
+      ]
+    : data
+  const effectiveLineBy = hasReference ? '_series' : lineBy
+  const effectiveColorBy = hasReference ? '_series' : colorBy
+  const effectiveColorScheme = hasReference
+    ? [colorScheme[0] ?? WISDEN_PALETTE[0], '#3F7A4D']
+    : colorScheme
+
   return (
     <div ref={ref} className="w-full">
       <ChartHeader title={title} subtitle={effectiveSubtitle} />
       {effectiveWidth > 0 && (
         <SemioticLineChart
-          data={data}
+          data={effectiveData}
           xAccessor={xAccessor}
           yAccessor={yAccessor}
-          lineBy={lineBy}
-          colorBy={colorBy}
-          colorScheme={colorScheme}
+          lineBy={effectiveLineBy}
+          colorBy={effectiveColorBy}
+          colorScheme={effectiveColorScheme}
           width={effectiveWidth}
           height={height}
           xLabel={xLabel}
