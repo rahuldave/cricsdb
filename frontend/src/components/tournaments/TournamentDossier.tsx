@@ -14,6 +14,7 @@ import {
   getTournamentPartnershipsByWicket, getTournamentPartnershipsTop,
   getTournamentPartnershipsTopByWicket,
   getMatches,
+  getScopeBattingSummary, getScopeBattingBySeason,
 } from '../../api'
 import StatCard from '../StatCard'
 import InningToggle from '../InningToggle'
@@ -29,6 +30,8 @@ import {
 } from '../scopeLinks'
 import DataTable, { type Column } from '../DataTable'
 import LineChart from '../charts/LineChart'
+import BarChart from '../charts/BarChart'
+import { seasonStdDev } from '../charts/seasonStats'
 import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
 import { SectionHeader } from '../ChartHeader'
@@ -43,6 +46,7 @@ import type {
   MatchListItem,
   TournamentPartnershipsByWicket, TournamentPartnershipsTop,
   TournamentPartnershipsTopByWicket, TournamentPartnershipTopEntry,
+  ScopeBattingSummary, ScopeBattingSeason,
 } from '../../types'
 
 const fmt = (v: number | null | undefined, d = 2) =>
@@ -218,6 +222,24 @@ export default function TournamentDossier({
   const battingFetch = useFetch<BattingLeaders | null>(
     () => currentTab === 'Batting'
       ? getTournamentBattersLeaders(tournament, { ...apiFilters, limit: 20 })
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Batting'],
+  )
+
+  // Series-Batting tile row + chart strip (spec-series-trend-charts.md
+  // step 7). Pool-weighted /scope/averages/batting/summary + by-season,
+  // gated by currentTab. Per-innings averages on the values — matches
+  // the discipline-level "what's an average IPL innings look like"
+  // framing. Bowling + Fielding equivalents land in steps 8/9.
+  const scopeBattingSummaryFetch = useFetch<ScopeBattingSummary | null>(
+    () => currentTab === 'Batting'
+      ? getScopeBattingSummary(apiFilters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Batting'],
+  )
+  const scopeBattingBySeasonFetch = useFetch<{ by_season: ScopeBattingSeason[] } | null>(
+    () => currentTab === 'Batting'
+      ? getScopeBattingBySeason(apiFilters)
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Batting'],
   )
@@ -608,6 +630,8 @@ export default function TournamentDossier({
           onPick={pickBatter}
           pickedEntry={batterScopeFetch.data?.entry ?? null}
           pickedLoading={batterScopeFetch.loading}
+          scopeSummary={scopeBattingSummaryFetch.data}
+          scopeSeasons={scopeBattingBySeasonFetch.data?.by_season ?? null}
         />
       )}
       {currentTab === 'Bowling' && (
@@ -1904,6 +1928,7 @@ function rowSubscriptSource(opts: {
 function BattersTab({
   loading, error, data, refetch, filterTeam, filterOpponent, gender,
   scope, pickedId, onPick, pickedEntry, pickedLoading,
+  scopeSummary, scopeSeasons,
 }: {
   loading: boolean; error: string | null
   data: BattingLeaders | null; refetch: () => void
@@ -1916,6 +1941,8 @@ function BattersTab({
   onPick: (id: string) => void
   pickedEntry: BattingLeaderEntry | null
   pickedLoading: boolean
+  scopeSummary: ScopeBattingSummary | null
+  scopeSeasons: ScopeBattingSeason[] | null
 }) {
   if (loading) return <Spinner label="Loading batters…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
@@ -1935,7 +1962,10 @@ function BattersTab({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+    <div className="space-y-6 mt-4">
+      <SeriesBattingTileRow summary={scopeSummary} seasons={scopeSeasons} />
+      <SeriesBattingChartStrip seasons={scopeSeasons} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <PickerSlot
         title="Picked batter"
         role="batter"
@@ -2001,7 +2031,92 @@ function BattersTab({
           rowKey={(r) => r.person_id}
         />
       </div>
+      </div>
     </div>
+  )
+}
+
+/** Series-Batting tile row — pool-weighted per-innings averages with
+ *  inline std-dev across in-scope seasons. Values are per-innings (the
+ *  /scope/averages/* contract), so a single row of 4 rate-style tiles
+ *  is the honest framing — Teams' team-cumulative volume tiles
+ *  (Innings, Runs, 4s, 6s) don't translate here. Spec §UX. */
+function SeriesBattingTileRow({
+  summary, seasons,
+}: {
+  summary: ScopeBattingSummary | null
+  seasons: ScopeBattingSeason[] | null
+}) {
+  if (!summary) return null
+  const sdRunRate = seasonStdDev(seasons, r => r.run_rate)
+  const sdBoundary = seasonStdDev(seasons, r => r.boundary_pct)
+  const sdDot = seasonStdDev(seasons, r => r.dot_pct)
+  // `total_runs` on the scope/averages payload is already per-innings
+  // (drop_divisor=True path in _apply_batting_per_innings) — same as
+  // avg-innings-total.
+  const sdAvgInnings = seasonStdDev(seasons, r => r.total_runs)
+  return (
+    <div className="wisden-statrow cols-5">
+      <StatCard
+        label="Avg innings total"
+        value={summary.total_runs != null ? summary.total_runs.toFixed(1) : '-'}
+        stdDev={sdAvgInnings != null ? sdAvgInnings.toFixed(1) : null}
+      />
+      <StatCard
+        label="Run rate"
+        value={summary.run_rate != null ? summary.run_rate.toFixed(2) : '-'}
+        stdDev={sdRunRate != null ? sdRunRate.toFixed(2) : null}
+      />
+      <StatCard
+        label="Boundary %"
+        value={summary.boundary_pct != null ? `${summary.boundary_pct}%` : '-'}
+        stdDev={sdBoundary != null ? sdBoundary.toFixed(1) : null}
+      />
+      <StatCard
+        label="Dot %"
+        value={summary.dot_pct != null ? `${summary.dot_pct}%` : '-'}
+        stdDev={sdDot != null ? sdDot.toFixed(1) : null}
+      />
+      <StatCard
+        label="Highest total"
+        value={summary.highest_total ? summary.highest_total.runs : '-'}
+        subtitle={summary.highest_total?.team ?? null}
+      />
+    </div>
+  )
+}
+
+/** Series-Batting per-season trend strip. Mirrors Teams → Batting's
+ *  chart strip in layout, but plots tournament-level pool-weighted
+ *  per-innings averages instead of team totals. Hides on N<2 — single-
+ *  season scope has no trend to draw. */
+function SeriesBattingChartStrip({
+  seasons,
+}: {
+  seasons: ScopeBattingSeason[] | null
+}) {
+  if (!seasons || seasons.length < 2) return null
+  return (
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LineChart data={seasons} xAccessor="season" yAccessor="run_rate"
+          title="Run rate by season" xLabel="Season" yLabel="RR" height={280} />
+        <LineChart data={seasons} xAccessor="season" yAccessor="total_runs"
+          title="Avg innings total by season" xLabel="Season" yLabel="Runs/innings" height={280} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BarChart data={seasons} categoryAccessor="season" valueAccessor="fours"
+          title="Fours per innings by season" categoryLabel="Season" valueLabel="4s/inn" height={280} />
+        <BarChart data={seasons} categoryAccessor="season" valueAccessor="sixes"
+          title="Sixes per innings by season" categoryLabel="Season" valueLabel="6s/inn" height={280} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LineChart data={seasons} xAccessor="season" yAccessor="boundary_pct"
+          title="Boundary % by season" xLabel="Season" yLabel="%" height={280} />
+        <LineChart data={seasons} xAccessor="season" yAccessor="dot_pct"
+          title="Dot % by season" xLabel="Season" yLabel="%" height={280} />
+      </div>
+    </>
   )
 }
 

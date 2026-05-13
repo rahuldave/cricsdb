@@ -1881,6 +1881,7 @@ export interface ScopeBowlingSummary {
   dot_pct: number | null
   fours_conceded: number
   sixes_conceded: number
+  boundaries_conceded: number
   wides: number
   noballs: number
   wides_per_match: number | null
