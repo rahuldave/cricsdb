@@ -453,3 +453,6 @@ export const getTournamentPartnershipsHeatmap = (
 export const getLeagueOverview = (filters?: F) =>
   fetchApi<import('./types').LeagueOverview>(
     '/api/v1/league/overview', filters as Record<string, string>)
+export const getLeagueChampions = (filters?: F) =>
+  fetchApi<{ rows: import('./types').LeagueChampionRow[] }>(
+    '/api/v1/league/champions', filters as Record<string, string>)

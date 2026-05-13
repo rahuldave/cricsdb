@@ -2674,3 +2674,16 @@ export interface LeagueOverview {
     most_sixes_match: LeagueBestMomentMatchSixes | null
   }
 }
+
+export interface LeagueChampionRow {
+  season: string
+  tournament: string
+  champion: string
+  runner_up: string
+  final_match_id: number
+  final_team1: string
+  final_team2: string
+  final_team1_score: string | null
+  final_team2_score: string | null
+  date: string | null
+}

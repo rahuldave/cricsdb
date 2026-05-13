@@ -289,3 +289,79 @@ async def league_overview(
             "most_sixes_match": most_sixes_match,
         },
     }
+
+
+# ─── /league/champions ─────────────────────────────────────────────────
+
+@router.get("/champions")
+async def league_champions(
+    filters: FilterParams = Depends(),
+):
+    """Cross-tournament Champions table.
+
+    Returns one row per (season, tournament) Final played in scope —
+    the unioned version of `/series/by-season`'s `finals_rows` slice
+    that drives a single tournament's per-edition champion column.
+
+    Sort: season DESC, then tournament. Frontend DataTable can re-sort
+    by column. Bilateral series (event_name IS NULL) and unfinaled
+    seasons (no event_stage='Final' yet) are omitted.
+    """
+    db = get_db()
+    where, params = _tournament_scope_where(filters, tournament=None)
+
+    # Match the same scalar-subquery pattern as /series/by-season →
+    # `finals_rows` for the score breakdown; the only structural
+    # difference is the unrestricted tournament so we keep
+    # m.event_name in SELECT for the response.
+    rows = await db.q(
+        f"""
+        SELECT m.season, m.event_name AS tournament, m.id AS match_id,
+               m.outcome_winner AS winner,
+               m.team1, m.team2,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date,
+               (SELECT COALESCE(SUM(d.runs_total), 0)
+                  FROM innings i JOIN delivery d ON d.innings_id = i.id
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_runs,
+               (SELECT COUNT(*) FROM wicket w
+                  JOIN delivery d ON d.id = w.delivery_id
+                  JOIN innings i ON i.id = d.innings_id
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_wkts,
+               (SELECT COALESCE(SUM(d.runs_total), 0)
+                  FROM innings i JOIN delivery d ON d.innings_id = i.id
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_runs,
+               (SELECT COUNT(*) FROM wicket w
+                  JOIN delivery d ON d.id = w.delivery_id
+                  JOIN innings i ON i.id = d.innings_id
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_wkts,
+               (SELECT COUNT(*) FROM innings i
+                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_has,
+               (SELECT COUNT(*) FROM innings i
+                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_has
+        FROM match m
+        WHERE {where}
+          AND m.event_stage = 'Final'
+          AND m.outcome_winner IS NOT NULL
+          AND m.event_name IS NOT NULL
+        ORDER BY m.season DESC, m.event_name
+        """,
+        params,
+    )
+    out = []
+    for r in rows:
+        runner_up = r["team1"] if r["winner"] == r["team2"] else r["team2"]
+        t1_score = f"{r['t1_runs']}/{r['t1_wkts']}" if r["t1_has"] else None
+        t2_score = f"{r['t2_runs']}/{r['t2_wkts']}" if r["t2_has"] else None
+        out.append({
+            "season": r["season"],
+            "tournament": r["tournament"],
+            "champion": r["winner"],
+            "runner_up": runner_up,
+            "final_match_id": r["match_id"],
+            "final_team1": r["team1"],
+            "final_team2": r["team2"],
+            "final_team1_score": t1_score,
+            "final_team2_score": t2_score,
+            "date": r["date"],
+        })
+    return {"rows": out}
