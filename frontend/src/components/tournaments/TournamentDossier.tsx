@@ -1645,14 +1645,30 @@ function EditionsTab({
   // minus the Season/Edition column (each mini-table is already scoped
   // to one season by the surrounding header).
   const koColumns: Column<KnockoutRow>[] = [
+    {
+      key: 'date', label: 'Date',
+      format: (v: string | null, r) => v
+        ? (
+            <Link to={`/matches/${r.match_id}`} className="comp-link">{v}</Link>
+          ) as unknown as string
+        : '-',
+    },
     { key: 'stage', label: 'Stage' },
     {
+      // Match column now carries the per-team scores inline so they
+      // sit next to the team that posted them, instead of being
+      // stranded in a far-right combined column. Scores are faint plain
+      // text — splitting them across two team cells removes the
+      // single-link affordance, but the leftmost Date column still
+      // links to the scorecard.
       key: 'team1', label: 'Match',
       format: (_v, r) => (
         <>
           <TeamWithEd team={r.team1} row={r} gender={gender} team_type={teamType} />
+          {r.team1_score && <span className="wisden-tile-faint">{` ${r.team1_score}`}</span>}
           {' v '}
           <TeamWithEd team={r.team2} row={r} gender={gender} team_type={teamType} />
+          {r.team2_score && <span className="wisden-tile-faint">{` ${r.team2_score}`}</span>}
         </>
       ) as unknown as string,
     },
@@ -1674,30 +1690,6 @@ function EditionsTab({
             <Link to={`/venues?venue=${encodeURIComponent(v)}`} className="comp-link">{v}</Link>
           ) as unknown as string
         : '-',
-    },
-    {
-      key: 'date', label: 'Date and Score',
-      format: (v: string | null, r) => {
-        const hasScore = r.team1_score != null || r.team2_score != null
-        if (!v && !hasScore) return '-'
-        const scoreTitle = r.team1 && r.team2
-          ? `${r.team1} ${r.team1_score ?? '—'} vs ${r.team2} ${r.team2_score ?? '—'} — scorecard`
-          : undefined
-        return (
-          <>
-            {v && (<Link to={`/matches/${r.match_id}`} className="comp-link">{v}</Link>)}
-            {v && hasScore && <span className="wisden-tile-faint">{' · '}</span>}
-            {hasScore && (
-              <Score
-                team1Score={r.team1_score}
-                team2Score={r.team2_score}
-                matchId={r.match_id}
-                title={scoreTitle}
-              />
-            )}
-          </>
-        ) as unknown as string
-      },
     },
   ]
 
