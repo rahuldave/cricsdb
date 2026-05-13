@@ -17,7 +17,7 @@ import {
   getScopeBattingSummary, getScopeBattingBySeason,
   getScopeBowlingSummary, getScopeBowlingBySeason,
   getScopeFieldingSummary, getScopeFieldingBySeason,
-  getLeagueOverview, getLeagueChampions,
+  getLeagueOverview, getLeagueChampions, getTournamentsLanding,
 } from '../../api'
 import StatCard from '../StatCard'
 import InningToggle from '../InningToggle'
@@ -53,9 +53,12 @@ import type {
   ScopeBowlingSummary, ScopeBowlingSeason,
   ScopeFieldingSummary, ScopeFieldingSeason,
   LeagueOverview, LeagueChampionRow, LeagueTopTeamRow,
+  TournamentsLanding as TournamentsLandingData,
+  TournamentLandingEntry, RivalryEntry,
 } from '../../types'
 import { scopeToProse } from '../scopeLinks'
-import TournamentsLanding from './TournamentsLanding'
+import { RecentEditionsStrip, RivalryTile } from './TournamentsLanding'
+import TournamentTile, { tileAmbientFromFilters } from './TournamentTile'
 
 const fmt = (v: number | null | undefined, d = 2) =>
   v == null ? '-' : typeof v === 'number' ? v.toFixed(d) : v
@@ -230,6 +233,16 @@ export default function TournamentDossier({
   const tierChampionsFetch = useFetch<{ rows: LeagueChampionRow[] } | null>(
     () => showTierExtras
       ? getLeagueChampions(apiFilters)
+      : Promise.resolve(null),
+    [...filterDeps, showTierExtras],
+  )
+  // Source of truth for: Recently played editions strip + Top events
+  // tile grid + RivalryTile content. /series/landing is already
+  // FilterParams-aware so narrowing flows through without per-tile
+  // logic here.
+  const tierLandingFetch = useFetch<TournamentsLandingData | null>(
+    () => showTierExtras
+      ? getTournamentsLanding(apiFilters)
       : Promise.resolve(null),
     [...filterDeps, showTierExtras],
   )
@@ -646,7 +659,10 @@ export default function TournamentDossier({
           teamType={filters.team_type}
           tierExtras={isTierMode ? {
             topTeams: tierOverviewFetch.data?.top_teams ?? null,
+            otherTeams: tierOverviewFetch.data?.other_teams ?? null,
+            minGamesThreshold: tierOverviewFetch.data?.min_games_threshold ?? 100,
             champions: tierChampionsFetch.data?.rows ?? null,
+            landing: tierLandingFetch.data,
             counts: tierOverviewFetch.data
               ? {
                   innings: tierOverviewFetch.data.innings,
@@ -795,13 +811,16 @@ function OverviewTab({
   gender: string | null | undefined
   teamType: string | null | undefined
   /** Only set when rendering at broad scope (no tournament, no rivalry).
-   *  When set, the tab appends Top-teams + Champions + an embedded
-   *  TournamentsLanding below the existing Best-moments section.
-   *  When null, the tab renders exactly as it has for tournament /
-   *  rivalry pages — no parallel pipeline. */
+   *  When set, the tab puts Recently played editions next to Best
+   *  moments (flex-wrap), then appends Top events / Top teams /
+   *  Champions / Other teams sections. When null, the tab renders
+   *  exactly as it has for tournament / rivalry pages. */
   tierExtras?: {
     topTeams: LeagueTopTeamRow[] | null
+    otherTeams: LeagueTopTeamRow[] | null
+    minGamesThreshold: number
     champions: LeagueChampionRow[] | null
+    landing: TournamentsLandingData | null
     counts: { innings: number; teams: number; tournaments: number } | null
   } | null
 }) {
@@ -999,16 +1018,20 @@ function OverviewTab({
         )}
       </div>
 
-      {/* Best moments — single-match highlights across the scope.
-          Prose lines rather than tiles: too many big cards made the
-          Overview read as a wall. Same markup as the rivalry by-team
-          tile body. PlayerLink's `trailingContent` holds the stat; the
-          scope-phrase tiers flow after it via the component's native
-          phrase rendering. */}
+      {/* Best moments + Recently played editions (tier mode only).
+          Flex-wrap so they sit side-by-side on desktop and stack on
+          narrow screens. Recently played is meaningful only at broad
+          scope (cross-tournament view) — single-tournament dossiers
+          have the Editions tab for the same role. */}
       {(summary.highest_individual || summary.best_bowling
         || summary.largest_partnership || summary.best_fielding
-        || summary.highest_team_total) && (
-        <div className="mt-8">
+        || summary.highest_team_total
+        || (tierExtras?.landing?.recent_editions?.length ?? 0) > 0) && (
+        <div className="mt-8 flex flex-wrap gap-8">
+        {(summary.highest_individual || summary.best_bowling
+          || summary.largest_partnership || summary.best_fielding
+          || summary.highest_team_total) && (
+        <div style={{ flex: '1 1 320px', minWidth: '300px' }}>
           <SectionHeader title="Best moments" />
           <div className="wisden-tile-line mt-2">
             {summary.highest_individual && (
@@ -1129,16 +1152,24 @@ function OverviewTab({
             )}
           </div>
         </div>
+        )}
+        {tierExtras?.landing?.recent_editions && tierExtras.landing.recent_editions.length > 0 && (
+          <div style={{ flex: '1 1 320px', minWidth: '300px' }}>
+            <RecentEditionsStrip
+              editions={tierExtras.landing.recent_editions}
+              ambient={tileAmbientFromFilters(filters)}
+            />
+          </div>
+        )}
+        </div>
       )}
 
       {/* ── Tier-mode extras (no tournament, no rivalry) ──
-          Rendered AFTER Best moments so the headline order matches
-          the tournament view: stat strip → leaders → Best moments →
-          per-scope sections. The TournamentsLanding embed below is
-          the same directory component /series previously rendered —
-          reusing it preserves ICC events / franchise / domestic /
-          "show more" sectioning instead of duplicating with a flat
-          696-tile grid. */}
+          Order matches user feedback 2026-05-13: Top events tile bar
+          → Top teams (≥ N games) → Champions across scope → Other
+          teams tile bar. Each sources from a FilterParams-aware
+          endpoint so narrowing the FilterBar narrows the section
+          content. */}
       {tierExtras && (
         <TierExtrasSections
           tierExtras={tierExtras}
@@ -2880,7 +2911,23 @@ export function RecordsTab({
 }
 
 
-// ─── Tier-extras (broad-scope only) — Top teams + Champions + browse ──
+// ─── Tier-extras (broad-scope only) ─────────────────────────────────────
+//
+// Order, per user feedback 2026-05-13:
+//   1. Top events tile bar — curated marquee from /series/landing
+//      (top franchise + women's franchise + ICC events + bilateral
+//      rivalries men + women). Each tile re-uses TournamentTile or
+//      RivalryTile from TournamentsLanding so the visual matches.
+//   2. Top teams by win % — min N games (default 100) to keep
+//      5-game wonders off the leaderboard. Threshold mentioned in
+//      the section subtitle.
+//   3. Champions across scope — same DataTable as before.
+//   4. Other teams tile grid — every team not in the top-10 leader
+//      board. Sorted by matches DESC, capped at 24 with show-more.
+//
+// Both tile bars filter as the FilterBar narrows — all data comes
+// from FilterParams-aware endpoints (/series/landing and
+// /league/overview).
 
 function TierExtrasSections({
   tierExtras, gender, teamType,
@@ -2889,7 +2936,20 @@ function TierExtrasSections({
   gender: string | null | undefined
   teamType: string | null | undefined
 }) {
-  const { topTeams, champions, counts } = tierExtras
+  const { topTeams, otherTeams, minGamesThreshold, champions, landing, counts } = tierExtras
+  const filters = useFilters()
+  const ambient = tileAmbientFromFilters(filters)
+
+  // ── Top events — curate marquee tournaments + rivalries from
+  //    /series/landing. Sectioned grouped tile grids so a reader can
+  //    tell international rivalries from franchise leagues at a glance.
+  const topFranchise = (landing?.club.franchise_leagues ?? []).slice(0, 4)
+  const topWomensFranchise = (landing?.club.women_franchise ?? []).slice(0, 4)
+  const topIcc = (landing?.international.icc_events ?? []).slice(0, 4)
+  const topMensRivalries = (landing?.international.bilateral_rivalries.men.top ?? []).slice(0, 4)
+  const topWomensRivalries = (landing?.international.bilateral_rivalries.women.top ?? []).slice(0, 4)
+  const hasTopEvents = topFranchise.length + topWomensFranchise.length + topIcc.length
+    + topMensRivalries.length + topWomensRivalries.length > 0
 
   return (
     <>
@@ -2903,9 +2963,23 @@ function TierExtrasSections({
         </div>
       )}
 
+      {hasTopEvents && (
+        <TopEventsSection
+          franchise={topFranchise}
+          womensFranchise={topWomensFranchise}
+          icc={topIcc}
+          mensRivalries={topMensRivalries}
+          womensRivalries={topWomensRivalries}
+          ambient={ambient}
+        />
+      )}
+
       {topTeams && topTeams.length > 0 && (
         <div className="mt-8">
-          <SectionHeader title="Top teams by win %" />
+          <SectionHeader
+            title="Top teams by win %"
+            subtitle={`min ${minGamesThreshold} games — keeps small-sample teams off the leaderboard`}
+          />
           <TierTopTeamsTable rows={topTeams} gender={gender} teamType={teamType} />
         </div>
       )}
@@ -2917,17 +2991,83 @@ function TierExtrasSections({
         </div>
       )}
 
-      {/* Browse tournaments — embed the existing TournamentsLanding so
-          its smart sectioning (ICC events / franchise / domestic /
-          rivalries with "show more" lazy-load) is reused, not
-          rebuilt. */}
-      <div className="mt-10">
-        <SectionHeader title="Browse tournaments in scope" />
-        <div className="mt-3">
-          <TournamentsLanding embedded />
+      {otherTeams && otherTeams.length > 0 && (
+        <div className="mt-8">
+          <SectionHeader title="Other teams in scope" />
+          <OtherTeamsTileGrid rows={otherTeams} gender={gender} teamType={teamType} />
         </div>
-      </div>
+      )}
     </>
+  )
+}
+
+
+/** Top events — sub-sectioned tile grids combining marquee tournaments
+ *  (TournamentTile) and bilateral rivalries (RivalryTile). Each
+ *  sub-grid is gated on having at least one entry, so narrowing the
+ *  FilterBar (e.g. gender=female) drops the corresponding sections
+ *  automatically. */
+function TopEventsSection({
+  franchise, womensFranchise, icc, mensRivalries, womensRivalries, ambient,
+}: {
+  franchise: TournamentLandingEntry[]
+  womensFranchise: TournamentLandingEntry[]
+  icc: TournamentLandingEntry[]
+  mensRivalries: RivalryEntry[]
+  womensRivalries: RivalryEntry[]
+  ambient: ReturnType<typeof tileAmbientFromFilters>
+}) {
+  return (
+    <div className="mt-8">
+      <SectionHeader title="Top events" />
+      <div className="mt-2 space-y-4">
+        {franchise.length > 0 && (
+          <div className="wisden-tile-grid">
+            {franchise.map(e => (
+              <TournamentTile key={`f-${e.canonical}`} entry={e} ambient={ambient} />
+            ))}
+          </div>
+        )}
+        {womensFranchise.length > 0 && (
+          <div className="wisden-tile-grid">
+            {womensFranchise.map(e => (
+              <TournamentTile key={`wf-${e.canonical}`} entry={e} ambient={ambient} />
+            ))}
+          </div>
+        )}
+        {icc.length > 0 && (
+          <div className="wisden-tile-grid">
+            {icc.map(e => (
+              <TournamentTile key={`icc-${e.canonical}`} entry={e} ambient={ambient} />
+            ))}
+          </div>
+        )}
+        {mensRivalries.length > 0 && (
+          <div className="wisden-tile-grid">
+            {mensRivalries.map(e => (
+              <RivalryTile
+                key={`mr-${e.team1}|${e.team2}`}
+                entry={e}
+                ambient={ambient}
+                gender="male"
+              />
+            ))}
+          </div>
+        )}
+        {womensRivalries.length > 0 && (
+          <div className="wisden-tile-grid">
+            {womensRivalries.map(e => (
+              <RivalryTile
+                key={`wr-${e.team1}|${e.team2}`}
+                entry={e}
+                ambient={ambient}
+                gender="female"
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -2962,6 +3102,82 @@ function TierTopTeamsTable({
       data={rows}
       rowKey={(r) => r.team}
     />
+  )
+}
+
+
+/** Long-tail teams — every team in scope NOT in the top-10. Rendered as
+ *  a tile grid so the reader can scan compact per-team summaries. Capped
+ *  at 24 with a show-more toggle to keep the page compact. */
+function OtherTeamsTileGrid({
+  rows, gender, teamType,
+}: {
+  rows: LeagueTopTeamRow[]
+  gender: string | null | undefined
+  teamType: string | null | undefined
+}) {
+  const [showAll, setShowAll] = useState(false)
+  const DEFAULT_LIMIT = 24
+  const visible = showAll ? rows : rows.slice(0, DEFAULT_LIMIT)
+  const hidden = rows.length - visible.length
+
+  return (
+    <>
+      <div className="wisden-tile-grid mt-2">
+        {visible.map(t => (
+          <div key={t.team} className="wisden-tile tile-wrapper">
+            <span className="tile-stretched">
+              <TeamLink
+                teamName={t.team}
+                gender={gender ?? null}
+                team_type={teamType ?? null}
+              />
+            </span>
+            <div className="wisden-tile-title">
+              <TeamLink
+                teamName={t.team}
+                compact
+                gender={gender ?? null}
+                team_type={teamType ?? null}
+              />
+            </div>
+            <div className="wisden-tile-sub">
+              {t.played} {t.played === 1 ? 'match' : 'matches'}
+            </div>
+            <div className="wisden-tile-line">
+              {t.wins}W — {t.losses}L
+              {t.win_pct != null && (
+                <span className="wisden-tile-faint">
+                  {' · '}{t.win_pct.toFixed(1)}%
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {hidden > 0 && !showAll && (
+        <div className="mt-3">
+          <button
+            type="button"
+            className="wisden-clear"
+            onClick={() => setShowAll(true)}
+          >
+            ▸ Show {hidden} more team{hidden === 1 ? '' : 's'}
+          </button>
+        </div>
+      )}
+      {showAll && rows.length > DEFAULT_LIMIT && (
+        <div className="mt-3">
+          <button
+            type="button"
+            className="wisden-clear"
+            onClick={() => setShowAll(false)}
+          >
+            ▾ Show fewer
+          </button>
+        </div>
+      )}
+    </>
   )
 }
 

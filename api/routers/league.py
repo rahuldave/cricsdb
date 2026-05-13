@@ -40,13 +40,16 @@ router = APIRouter(prefix="/api/v1/league", tags=["League"])
 async def league_overview(
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
+    min_games: int = Query(
+        100, ge=1,
+        description="Minimum matches for a team to qualify for the top-10. "
+                    "Default 100 keeps small-sample teams (e.g. an 80%-win "
+                    "5-game team) out of the leaderboard. Returned in the "
+                    "response so the UI can display the threshold.",
+    ),
 ):
-    """Composite Overview payload — counts strip, top teams, best moments.
-
-    The Tournaments-in-scope tile grid uses the existing
-    `/api/v1/series/landing` payload; the Champions table uses
-    `/league/champions`. This endpoint covers the remaining four
-    Overview blocks in a single roundtrip.
+    """Composite Overview payload — counts strip, top teams (qualified),
+    other teams (below threshold or beyond top-10), best moments.
 
     Honours every FilterParams field (no tournament restriction —
     tournament-narrowed callers should be redirected to /series).
@@ -92,11 +95,15 @@ async def league_overview(
     )
     teams_count = (teams_rows[0]["n"] if teams_rows else 0) or 0
 
-    # ── Top teams by win % (decided matches only) ──
-    # `decided` = matches with an outcome_winner (excludes ties/NR).
-    # win_pct ranks teams; secondary sort by `played` so a 100%-win 2-
-    # game team doesn't outrank a 60%-win 500-game team.
-    top_teams_rows = await db.q(
+    # ── All teams in scope, with split for leaderboard vs long-tail ──
+    #
+    # Two-step: first fetch every team's aggregate counts, then split
+    # client-side into top_teams (qualified: played >= min_games, top 10
+    # by win%) and other_teams (everyone else, sorted by matches DESC).
+    # Default min_games=100 keeps small-sample teams (5-game team at
+    # 80%) out of the leaderboard — they'd rank above 500-game teams at
+    # 60% otherwise.
+    all_teams_rows = await db.q(
         f"""
         WITH sides AS (
           SELECT m.team1 AS team, m.id AS match_id,
@@ -114,15 +121,11 @@ async def league_overview(
                SUM(CASE WHEN outcome_winner IS NOT NULL THEN 1 ELSE 0 END) AS decided
         FROM sides
         GROUP BY team
-        HAVING played >= 5
-        ORDER BY (CAST(SUM(CASE WHEN outcome_winner = team THEN 1 ELSE 0 END) AS REAL)
-                  / NULLIF(SUM(CASE WHEN outcome_winner IS NOT NULL THEN 1 ELSE 0 END), 0)) DESC,
-                 played DESC
-        LIMIT 10
+        ORDER BY played DESC
         """,
         params,
     )
-    top_teams = [
+    all_teams = [
         {
             "team": r["team"],
             "played": r["played"] or 0,
@@ -130,8 +133,16 @@ async def league_overview(
             "losses": r["losses"] or 0,
             "win_pct": _safe_div(r["wins"] or 0, r["decided"] or 0, 100, 1),
         }
-        for r in top_teams_rows
+        for r in all_teams_rows
     ]
+    qualified = [t for t in all_teams if (t["played"] or 0) >= min_games]
+    top_teams = sorted(
+        qualified,
+        key=lambda t: (t["win_pct"] or -1, t["played"]),
+        reverse=True,
+    )[:10]
+    top_team_names = {t["team"] for t in top_teams}
+    other_teams = [t for t in all_teams if t["team"] not in top_team_names]
 
     # ── Best moments — singleton from each record axis ──
     # Highest team total (innings-level)
@@ -280,7 +291,9 @@ async def league_overview(
         "innings": innings,
         "teams_count": teams_count,
         "tournaments_count": meta["tournaments"] or 0,
+        "min_games_threshold": min_games,
         "top_teams": top_teams,
+        "other_teams": other_teams,
         "best_moments": {
             "highest_total": highest_total,
             "lowest_all_out": lowest_all_out,

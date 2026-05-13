@@ -18,7 +18,7 @@ import type {
   RivalryEntry,
 } from '../../types'
 
-function RivalryTile({
+export function RivalryTile({
   entry, ambient, gender,
 }: { entry: RivalryEntry; ambient: AmbientScope; gender: 'male' | 'female' }) {
   // Rivalry tiles show an all-time bilateral pair; tile click opens the
@@ -112,8 +112,11 @@ function RivalryTile({
  *  every tournament, latest-first. Includes in-progress editions
  *  (champion is null until a Final is played). Vertical stack of
  *  links so the user can jump straight to the edition dossier.
- */
-function RecentEditionsStrip({
+ *
+ *  Exported so TournamentDossier can render this strip side-by-side
+ *  with Best moments at broad scope (tier mode) without duplicating
+ *  the markup. */
+export function RecentEditionsStrip({
   editions, ambient,
 }: { editions: RecentEditionEntry[]; ambient: AmbientScope }) {
   if (!editions.length) return null

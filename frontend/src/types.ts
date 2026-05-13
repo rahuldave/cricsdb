@@ -2665,7 +2665,11 @@ export interface LeagueOverview {
   innings: number
   teams_count: number
   tournaments_count: number
+  min_games_threshold: number
   top_teams: LeagueTopTeamRow[]
+  /** All teams in scope NOT in top_teams (either below the games
+   *  threshold or ranked outside the top-10). Sorted by matches DESC. */
+  other_teams: LeagueTopTeamRow[]
   best_moments: {
     highest_total: LeagueBestMomentTeamTotal | null
     lowest_all_out: LeagueBestMomentTeamTotal | null
