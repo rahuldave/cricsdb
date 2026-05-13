@@ -1,0 +1,11 @@
+innings_id,match_id,date,tournament,season,fielding_team,innings_number,ambiguous_reason,candidate_ids,candidate_names,resolved_keeper_id,resolved_source,notes
+26240,13118,2026-05-07,Indian Premier League,2026,Lucknow Super Giants,1,multi_career,"3241e3fd,919a3be2","N Pooran,RR Pant",,,
+26254,13125,2026-05-10,Indian Premier League,2026,Lucknow Super Giants,1,multi_career,"3241e3fd,919a3be2,989889ff","N Pooran,RR Pant,JP Inglis",,,
+26273,13134,2026-05-08,ICC Men's T20 World Cup East Asia-Pacific Qualifier,2026,Cook Islands,0,multi_team_ever,"00863408,1ac8edcf","MTMMJ Ave,J Pickering",,,
+26285,13140,2026-05-10,ICC Men's T20 World Cup East Asia-Pacific Qualifier,2026,Cook Islands,0,multi_team_ever,"00863408,1ac8edcf","MTMMJ Ave,J Pickering",,,
+26294,13144,2026-05-08,Finland tour of Cyprus,2026,Cyprus,1,no_candidate,,,,,
+26296,13145,2026-05-08,Finland tour of Cyprus,2026,Cyprus,1,no_candidate,,,,,
+26297,13146,2026-05-09,Finland tour of Cyprus,2026,Cyprus,0,no_candidate,,,,,
+26315,13154,2026-05-10,Hong Kong Women's T20I Tri-Series,2026,Malaysia,0,no_candidate,,,,,
+26317,13155,2026-05-10,Hong Kong Women's T20I Tri-Series,2026,China,0,no_candidate,,,,,
+26328,13160,2026-05-10,Bulgaria tour of Romania,2026,Romania,1,no_candidate,,,,,

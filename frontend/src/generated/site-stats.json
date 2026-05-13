@@ -1,19 +1,19 @@
 {
   "totals": {
-    "matches": 13115,
-    "deliveries": 2993767,
-    "wickets": 162610
+    "matches": 13162,
+    "deliveries": 3004800,
+    "wickets": 163216
   },
   "featured_teams": [
     {
       "name": "Royal Challengers Bengaluru",
       "blurb": "IPL & WPL",
-      "matches": 314
+      "matches": 316
     },
     {
       "name": "Chennai Super Kings",
       "blurb": "IPL",
-      "matches": 261
+      "matches": 263
     },
     {
       "name": "India",
