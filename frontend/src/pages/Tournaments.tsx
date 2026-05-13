@@ -1,20 +1,19 @@
 import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
-import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import TournamentDossier from '../components/tournaments/TournamentDossier'
-import TierDossier from '../components/tournaments/TierDossier'
 
-/** /series — single URL for every match-set scope.
+/** /series — match-set dossier at every scope.
  *
- *  Three render shapes:
- *    - ?tournament=X (and/or filter_team+opp) → TournamentDossier
- *      (single-tournament or rivalry, existing /series/summary path).
- *    - ?filter_team=A&filter_opponent=B       → TournamentDossier (rivalry).
- *    - neither set                             → TierDossier — above-
- *      tournament "men's club cricket" / "women's international" etc.
- *      dossier driven purely by FilterBar narrowings, using the lean
- *      /league/* composite endpoints.
+ *  TournamentDossier is the single entry point. It handles three subjects:
+ *    - tournament-set                          → single-tournament dossier
+ *    - rivalry pair set                        → rivalry dossier
+ *    - neither (broad scope, e.g. men's club)  → above-tournament "tier"
+ *      dossier driven purely by FilterBar narrowings
+ *
+ *  Editions is the only tab gated on isSingleTournament; every other tab
+ *  works at any scope. The Overview tab adds Champions / Top teams /
+ *  TournamentsLanding-as-section when tournament=null.
  *
  *  Legacy `?rivalry=A,B` URLs redirect to filter_team+filter_opponent.
  */
@@ -40,17 +39,11 @@ export default function Tournaments() {
     setUrlParams(updates, { replace: true })
   }, [rivalry])
 
-  const isTournamentMode = !!(tournament || (filterTeam && filterOpp))
-  useDocumentTitle(isTournamentMode ? null : 'Series')
-
-  if (isTournamentMode) {
-    return (
-      <TournamentDossier
-        tournament={tournament || null}
-        filterTeam={filterTeam || null}
-        filterOpponent={filterOpp || null}
-      />
-    )
-  }
-  return <TierDossier />
+  return (
+    <TournamentDossier
+      tournament={tournament || null}
+      filterTeam={filterTeam || null}
+      filterOpponent={filterOpp || null}
+    />
+  )
 }

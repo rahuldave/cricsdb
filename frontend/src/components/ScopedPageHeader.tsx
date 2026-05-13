@@ -27,14 +27,19 @@ interface Props {
    *  Series dossier omits 'tournament' (its H2 IS the tournament
    *  name, so showing it again in the scope is redundant). */
   omit?: (keyof FilterParams)[]
+  /** Suppress the right-side italic abbreviation entirely. Set when
+   *  the H2 already contains the full scope (e.g. /series at broad
+   *  scope renders "Men's club Twenty20 cricket, 2024–2025" — the
+   *  abbreviation would just repeat the title). */
+  hideAbbrev?: boolean
   children: ReactNode
 }
 
-export default function ScopedPageHeader({ filters, omit, children }: Props) {
+export default function ScopedPageHeader({ filters, omit, hideAbbrev, children }: Props) {
   const scoped: FilterParams = omit && omit.length > 0
     ? { ...filters, ...Object.fromEntries(omit.map(k => [k, undefined])) }
     : filters
-  const abbrev = abbreviateScope(scoped)
+  const abbrev = hideAbbrev ? '' : abbreviateScope(scoped)
   return (
     <div style={{
       display: 'flex',

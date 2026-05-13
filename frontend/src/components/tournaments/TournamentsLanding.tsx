@@ -216,7 +216,14 @@ function RivalryGrid({
   )
 }
 
-export default function TournamentsLanding() {
+/** Renders the tournaments-and-rivalries directory.
+ *
+ *  `embedded` — when rendered as a section inside another page (e.g.
+ *  TournamentDossier's Overview tab at broad scope), the H2 + subtitle
+ *  are suppressed so the host page's heading hierarchy stays clean.
+ *  Standalone callers (currently none — /series renders the dossier)
+ *  leave the heading visible. */
+export default function TournamentsLanding({ embedded = false }: { embedded?: boolean } = {}) {
   const filters = useFilters()
   const ambient = ambientFromFilters(filters)
 
@@ -261,10 +268,14 @@ export default function TournamentsLanding() {
 
   return (
     <div>
-      <h2 className="wisden-page-title">Series</h2>
-      <div className="wisden-page-subtitle">
-        Tournaments and bilateral rivalries — filter to narrow the scope.
-      </div>
+      {!embedded && (
+        <>
+          <h2 className="wisden-page-title">Series</h2>
+          <div className="wisden-page-subtitle">
+            Tournaments and bilateral rivalries — filter to narrow the scope.
+          </div>
+        </>
+      )}
 
       <RecentEditionsStrip editions={data.recent_editions} ambient={ambient} />
 

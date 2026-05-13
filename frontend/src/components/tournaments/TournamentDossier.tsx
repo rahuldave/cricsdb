@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
 import { useFilterDeps } from '../../hooks/useFilterDeps'
@@ -17,6 +17,7 @@ import {
   getScopeBattingSummary, getScopeBattingBySeason,
   getScopeBowlingSummary, getScopeBowlingBySeason,
   getScopeFieldingSummary, getScopeFieldingBySeason,
+  getLeagueOverview, getLeagueChampions,
 } from '../../api'
 import StatCard from '../StatCard'
 import InningToggle from '../InningToggle'
@@ -51,7 +52,10 @@ import type {
   ScopeBattingSummary, ScopeBattingSeason,
   ScopeBowlingSummary, ScopeBowlingSeason,
   ScopeFieldingSummary, ScopeFieldingSeason,
+  LeagueOverview, LeagueChampionRow, LeagueTopTeamRow,
 } from '../../types'
+import { scopeToProse } from '../scopeLinks'
+import TournamentsLanding from './TournamentsLanding'
 
 const fmt = (v: number | null | undefined, d = 2) =>
   v == null ? '-' : typeof v === 'number' ? v.toFixed(d) : v
@@ -207,6 +211,27 @@ export default function TournamentDossier({
   const summaryFetch = useFetch<TournamentSummary>(
     () => getTournamentSummary(tournament, apiFilters),
     filterDeps,
+  )
+
+  // ── Tier-mode extras: Champions across scope + top-teams by win % ──
+  // Only fetched when we're rendering at broad scope (no tournament,
+  // no rivalry) on the Overview tab. /league/* endpoints are the lean
+  // composites — /series/summary is the heavy single-tournament path.
+  const isSingleTournamentLocal = !!tournament
+  const isRivalryLocal = !!(filterTeam && filterOpponent)
+  const showTierExtras = !isSingleTournamentLocal && !isRivalryLocal
+
+  const tierOverviewFetch = useFetch<LeagueOverview | null>(
+    () => showTierExtras
+      ? getLeagueOverview(apiFilters)
+      : Promise.resolve(null),
+    [...filterDeps, showTierExtras],
+  )
+  const tierChampionsFetch = useFetch<{ rows: LeagueChampionRow[] } | null>(
+    () => showTierExtras
+      ? getLeagueChampions(apiFilters)
+      : Promise.resolve(null),
+    [...filterDeps, showTierExtras],
   )
 
   const bySeasonFetch = useFetch<{ tournament: string; seasons: TournamentSeason[] } | null>(
@@ -506,11 +531,17 @@ export default function TournamentDossier({
           )}
         </>
       )
-    : (tournament || summary.canonical || 'Match-set')
+    : (tournament || summary.canonical || scopeToProse(filters))
+
+  const isTierMode = !isSingleTournament && !isRivalryMode
 
   return (
     <div>
-      <ScopedPageHeader filters={filters} omit={['tournament']}>{headlineTitle}</ScopedPageHeader>
+      <ScopedPageHeader
+        filters={filters}
+        omit={['tournament']}
+        hideAbbrev={isTierMode}
+      >{headlineTitle}</ScopedPageHeader>
       <div className="wisden-page-subtitle">
         {isSingleTournament && summary.editions > 0 && (
           <>
@@ -613,6 +644,17 @@ export default function TournamentDossier({
           tournament={tournament}
           gender={filters.gender}
           teamType={filters.team_type}
+          tierExtras={isTierMode ? {
+            topTeams: tierOverviewFetch.data?.top_teams ?? null,
+            champions: tierChampionsFetch.data?.rows ?? null,
+            counts: tierOverviewFetch.data
+              ? {
+                  innings: tierOverviewFetch.data.innings,
+                  teams: tierOverviewFetch.data.teams_count,
+                  tournaments: tierOverviewFetch.data.tournaments_count,
+                }
+              : null,
+          } : null}
         />
       )}
       {currentTab === 'Editions' && (
@@ -746,12 +788,22 @@ export default function TournamentDossier({
 // ─── Tabs ─────────────────────────────────────────────────────────────
 
 function OverviewTab({
-  summary, tournament, gender, teamType,
+  summary, tournament, gender, teamType, tierExtras,
 }: {
   summary: TournamentSummary
   tournament: string | null
   gender: string | null | undefined
   teamType: string | null | undefined
+  /** Only set when rendering at broad scope (no tournament, no rivalry).
+   *  When set, the tab appends Top-teams + Champions + an embedded
+   *  TournamentsLanding below the existing Best-moments section.
+   *  When null, the tab renders exactly as it has for tournament /
+   *  rivalry pages — no parallel pipeline. */
+  tierExtras?: {
+    topTeams: LeagueTopTeamRow[] | null
+    champions: LeagueChampionRow[] | null
+    counts: { innings: number; teams: number; tournaments: number } | null
+  } | null
 }) {
   const isRivalry = !!summary.by_team
   const teamNames = isRivalry && summary.by_team ? Object.keys(summary.by_team) : []
@@ -1077,6 +1129,22 @@ function OverviewTab({
             )}
           </div>
         </div>
+      )}
+
+      {/* ── Tier-mode extras (no tournament, no rivalry) ──
+          Rendered AFTER Best moments so the headline order matches
+          the tournament view: stat strip → leaders → Best moments →
+          per-scope sections. The TournamentsLanding embed below is
+          the same directory component /series previously rendered —
+          reusing it preserves ICC events / franchise / domestic /
+          "show more" sectioning instead of duplicating with a flat
+          696-tile grid. */}
+      {tierExtras && (
+        <TierExtrasSections
+          tierExtras={tierExtras}
+          gender={gender}
+          teamType={teamType}
+        />
       )}
 
       {/* ── Participating teams (only meaningful for tournaments) ──
@@ -2807,6 +2875,176 @@ export function RecordsTab({
         />
       </div>
     </div>
+    </>
+  )
+}
+
+
+// ─── Tier-extras (broad-scope only) — Top teams + Champions + browse ──
+
+function TierExtrasSections({
+  tierExtras, gender, teamType,
+}: {
+  tierExtras: NonNullable<Parameters<typeof OverviewTab>[0]['tierExtras']>
+  gender: string | null | undefined
+  teamType: string | null | undefined
+}) {
+  const { topTeams, champions, counts } = tierExtras
+
+  return (
+    <>
+      {counts && (
+        <div className="mt-6 wisden-tab-help" style={{ fontStyle: 'italic' }}>
+          {counts.tournaments.toLocaleString()} tournaments
+          {' · '}
+          {counts.teams.toLocaleString()} teams
+          {' · '}
+          {counts.innings.toLocaleString()} innings in scope
+        </div>
+      )}
+
+      {topTeams && topTeams.length > 0 && (
+        <div className="mt-8">
+          <SectionHeader title="Top teams by win %" />
+          <TierTopTeamsTable rows={topTeams} gender={gender} teamType={teamType} />
+        </div>
+      )}
+
+      {champions && champions.length > 0 && (
+        <div className="mt-8">
+          <SectionHeader title="Champions across scope" />
+          <TierChampionsTable rows={champions} gender={gender} teamType={teamType} />
+        </div>
+      )}
+
+      {/* Browse tournaments — embed the existing TournamentsLanding so
+          its smart sectioning (ICC events / franchise / domestic /
+          rivalries with "show more" lazy-load) is reused, not
+          rebuilt. */}
+      <div className="mt-10">
+        <SectionHeader title="Browse tournaments in scope" />
+        <div className="mt-3">
+          <TournamentsLanding embedded />
+        </div>
+      </div>
+    </>
+  )
+}
+
+
+function TierTopTeamsTable({
+  rows, gender, teamType,
+}: {
+  rows: LeagueTopTeamRow[]
+  gender: string | null | undefined
+  teamType: string | null | undefined
+}) {
+  const teamCell = (team: string) => (
+    <TeamLink
+      teamName={team}
+      compact
+      gender={gender ?? null}
+      team_type={teamType ?? null}
+    />
+  ) as unknown as string
+
+  return (
+    <DataTable
+      columns={[
+        { key: 'team', label: 'Team',
+          format: (v: string) => teamCell(v) },
+        { key: 'played', label: 'P', sortable: true },
+        { key: 'wins', label: 'W' },
+        { key: 'losses', label: 'L' },
+        { key: 'win_pct', label: 'Win %', sortable: true,
+          format: (v: number | null) => v != null ? `${v.toFixed(1)}%` : '-' },
+      ] as Column<LeagueTopTeamRow>[]}
+      data={rows}
+      rowKey={(r) => r.team}
+    />
+  )
+}
+
+
+function TierChampionsTable({
+  rows, gender, teamType,
+}: {
+  rows: LeagueChampionRow[]
+  gender: string | null | undefined
+  teamType: string | null | undefined
+}) {
+  // Show top 20 by default, with "show all" toggle — broad-scope
+  // champion lists can run hundreds of rows. Keeps the page compact
+  // unless the user wants the full history.
+  const [showAll, setShowAll] = useState(false)
+  const DEFAULT_LIMIT = 20
+  const visible = showAll ? rows : rows.slice(0, DEFAULT_LIMIT)
+  const hidden = rows.length - visible.length
+
+  const teamCell = (team: string, row: LeagueChampionRow) => (
+    <TeamLink
+      teamName={team}
+      gender={gender ?? null}
+      team_type={teamType ?? null}
+      subscriptSource={{
+        tournament: row.tournament,
+        season: row.season,
+        team1: null,
+        team2: null,
+      }}
+      maxTiers={1}
+      phraseLabel="ed"
+      phraseClassName="scope-phrase-ed"
+    />
+  ) as unknown as string
+
+  const finalCell = (row: LeagueChampionRow) => (
+    <Score
+      team1Score={row.final_team1_score}
+      team2Score={row.final_team2_score}
+      matchId={row.final_match_id}
+      title={`Final scorecard — ${row.final_team1} v ${row.final_team2}`}
+    />
+  ) as unknown as string
+
+  return (
+    <>
+      <DataTable
+        columns={[
+          { key: 'season', label: 'Season', sortable: true },
+          { key: 'tournament', label: 'Tournament', sortable: true },
+          { key: 'champion', label: 'Champion',
+            format: (v: string, r: LeagueChampionRow) => teamCell(v, r) },
+          { key: 'runner_up', label: 'Runner-up',
+            format: (v: string, r: LeagueChampionRow) => teamCell(v, r) },
+          { key: 'final_match_id', label: 'Final',
+            format: (_v, r: LeagueChampionRow) => finalCell(r) },
+        ] as Column<LeagueChampionRow>[]}
+        data={visible}
+        rowKey={(r) => `${r.season}-${r.tournament}`}
+      />
+      {hidden > 0 && (
+        <div className="mt-2">
+          <button
+            type="button"
+            className="wisden-clear"
+            onClick={() => setShowAll(true)}
+          >
+            ▸ Show {hidden} more champion{hidden === 1 ? '' : 's'}
+          </button>
+        </div>
+      )}
+      {showAll && rows.length > DEFAULT_LIMIT && (
+        <div className="mt-2">
+          <button
+            type="button"
+            className="wisden-clear"
+            onClick={() => setShowAll(false)}
+          >
+            ▾ Show fewer
+          </button>
+        </div>
+      )}
     </>
   )
 }
