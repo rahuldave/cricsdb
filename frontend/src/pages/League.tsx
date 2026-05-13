@@ -27,6 +27,8 @@ import { useFetch } from '../hooks/useFetch'
 import { useFilterDeps } from '../hooks/useFilterDeps'
 import {
   getLeagueOverview, getLeagueChampions, getTournamentsLanding,
+  getLeagueBattersLeaders,
+  getScopeBattingSummary, getScopeBattingBySeason,
 } from '../api'
 import { scopeToProse } from '../components/scopeLinks'
 import InningToggle from '../components/InningToggle'
@@ -40,9 +42,15 @@ import Score from '../components/Score'
 import TournamentTile, {
   tileAmbientFromFilters,
 } from '../components/tournaments/TournamentTile'
+import {
+  SeriesBattingTileRow, SeriesBattingChartStrip,
+} from '../components/tournaments/TournamentDossier'
+import PlayerLink from '../components/PlayerLink'
 import type {
   LeagueOverview, LeagueChampionRow, LeagueTopTeamRow,
   TournamentsLanding, TournamentLandingEntry,
+  ScopeBattingSummary, ScopeBattingSeason,
+  BattingLeaders, BattingLeaderEntry,
 } from '../types'
 
 type TabName = 'Overview' | 'Batting' | 'Bowling' | 'Fielding'
@@ -101,6 +109,26 @@ export default function League() {
     [...filterDeps, currentTab === 'Overview'],
   )
 
+  // ── Batting subtab data ───────────────────────────────────────
+  const battingSummaryFetch = useFetch<ScopeBattingSummary | null>(
+    () => currentTab === 'Batting'
+      ? getScopeBattingSummary(filters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Batting'],
+  )
+  const battingBySeasonFetch = useFetch<{ by_season: ScopeBattingSeason[] } | null>(
+    () => currentTab === 'Batting'
+      ? getScopeBattingBySeason(filters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Batting'],
+  )
+  const battingLeadersFetch = useFetch<BattingLeaders | null>(
+    () => currentTab === 'Batting'
+      ? getLeagueBattersLeaders({ ...filters, limit: 50 })
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Batting'],
+  )
+
   return (
     <div>
       <h2 className="wisden-page-title" style={{ margin: 0 }}>
@@ -135,7 +163,26 @@ export default function League() {
         />
       )}
       {currentTab === 'Batting' && (
-        <div className="wisden-tab-help mt-4">Batting content lands in step 7.</div>
+        <BattingSubtab
+          summary={battingSummaryFetch.data}
+          seasons={battingBySeasonFetch.data?.by_season ?? null}
+          leaders={battingLeadersFetch.data}
+          loading={
+            battingSummaryFetch.loading
+            || battingBySeasonFetch.loading
+            || battingLeadersFetch.loading
+          }
+          error={
+            battingSummaryFetch.error
+            || battingBySeasonFetch.error
+            || battingLeadersFetch.error
+          }
+          refetch={() => {
+            battingSummaryFetch.refetch()
+            battingBySeasonFetch.refetch()
+            battingLeadersFetch.refetch()
+          }}
+        />
       )}
       {currentTab === 'Bowling' && (
         <div className="wisden-tab-help mt-4">Bowling content lands in step 8.</div>
@@ -455,6 +502,94 @@ function BestMomentsCards({
             )}
             {tournamentSeason(moments.most_sixes_match.tournament, moments.most_sixes_match.season)}
           </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+// ─── Batting subtab ───────────────────────────────────────────────────
+
+function BattingSubtab({
+  summary, seasons, leaders, loading, error, refetch,
+}: {
+  summary: ScopeBattingSummary | null
+  seasons: ScopeBattingSeason[] | null
+  leaders: BattingLeaders | null
+  loading: boolean
+  error: string | null
+  refetch: () => void
+}) {
+  const filters = useFilters()
+  const gender = filters.gender ?? null
+
+  if (loading && !summary) return <Spinner label="Loading batters…" />
+  if (error) return <ErrorBanner message={error} onRetry={refetch} />
+
+  const fmt = (v: number | null | undefined, d = 2) =>
+    v == null ? '-' : v.toFixed(d)
+
+  const batterCell = (r: BattingLeaderEntry) => (
+    <PlayerLink
+      personId={r.person_id}
+      name={r.name}
+      role="batter"
+      gender={gender}
+    />
+  ) as unknown as string
+
+  return (
+    <div className="mt-4 space-y-6">
+      <SeriesBattingTileRow summary={summary} seasons={seasons} />
+      <SeriesBattingChartStrip seasons={seasons} />
+      {leaders && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div>
+            <SectionHeader title="Top batters by runs" />
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Batter',
+                  format: (_v, r: BattingLeaderEntry) => batterCell(r) },
+                { key: 'runs', label: 'Runs', sortable: true },
+                { key: 'balls', label: 'Balls' },
+                { key: 'strike_rate', label: 'SR',
+                  format: (v: number | null) => fmt(v) },
+              ] as Column<BattingLeaderEntry>[]}
+              data={leaders.by_runs}
+              rowKey={(r) => `bruns-${r.person_id}`}
+            />
+          </div>
+          <div>
+            <SectionHeader title="Top batters by average" />
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Batter',
+                  format: (_v, r: BattingLeaderEntry) => batterCell(r) },
+                { key: 'average', label: 'Avg', sortable: true,
+                  format: (v: number | null) => fmt(v) },
+                { key: 'runs', label: 'Runs' },
+                { key: 'dismissals', label: 'Out' },
+              ] as Column<BattingLeaderEntry>[]}
+              data={leaders.by_average}
+              rowKey={(r) => `bavg-${r.person_id}`}
+            />
+          </div>
+          <div>
+            <SectionHeader title="Top batters by strike rate" />
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Batter',
+                  format: (_v, r: BattingLeaderEntry) => batterCell(r) },
+                { key: 'strike_rate', label: 'SR', sortable: true,
+                  format: (v: number | null) => fmt(v) },
+                { key: 'runs', label: 'Runs' },
+                { key: 'balls', label: 'Balls' },
+              ] as Column<BattingLeaderEntry>[]}
+              data={leaders.by_strike_rate}
+              rowKey={(r) => `bsr-${r.person_id}`}
+            />
+          </div>
         </div>
       )}
     </div>

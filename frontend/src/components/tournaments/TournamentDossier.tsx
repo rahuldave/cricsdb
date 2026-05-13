@@ -2037,7 +2037,7 @@ function BattersTab({
  *  /scope/averages/* contract), so a single row of 4 rate-style tiles
  *  is the honest framing — Teams' team-cumulative volume tiles
  *  (Innings, Runs, 4s, 6s) don't translate here. Spec §UX. */
-function SeriesBattingTileRow({
+export function SeriesBattingTileRow({
   summary, seasons,
 }: {
   summary: ScopeBattingSummary | null
@@ -2086,7 +2086,7 @@ function SeriesBattingTileRow({
  *  chart strip in layout, but plots tournament-level pool-weighted
  *  per-innings averages instead of team totals. Hides on N<2 — single-
  *  season scope has no trend to draw. */
-function SeriesBattingChartStrip({
+export function SeriesBattingChartStrip({
   seasons,
 }: {
   seasons: ScopeBattingSeason[] | null
@@ -2277,7 +2277,7 @@ function BowlersTab({
 }
 
 /** Series-Bowling tile row — pool-weighted per-innings averages. */
-function SeriesBowlingTileRow({
+export function SeriesBowlingTileRow({
   summary, seasons,
 }: {
   summary: ScopeBowlingSummary | null
@@ -2324,7 +2324,7 @@ function SeriesBowlingTileRow({
 }
 
 /** Series-Bowling per-season trend strip. */
-function SeriesBowlingChartStrip({
+export function SeriesBowlingChartStrip({
   seasons,
 }: {
   seasons: ScopeBowlingSeason[] | null
@@ -2466,7 +2466,7 @@ function FieldersTab({
 }
 
 /** Series-Fielding tile row — pool-weighted per-match averages. */
-function SeriesFieldingTileRow({
+export function SeriesFieldingTileRow({
   summary, seasons,
 }: {
   summary: ScopeFieldingSummary | null
@@ -2503,7 +2503,7 @@ function SeriesFieldingTileRow({
 }
 
 /** Series-Fielding per-season trend strip. */
-function SeriesFieldingChartStrip({
+export function SeriesFieldingChartStrip({
   seasons,
 }: {
   seasons: ScopeFieldingSeason[] | null
