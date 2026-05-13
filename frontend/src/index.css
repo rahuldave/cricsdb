@@ -453,6 +453,36 @@ a { color: inherit; }
 .wisden-table tbody tr.is-clickable { cursor: pointer; }
 .wisden-table tbody tr.is-highlighted { background: var(--highlight); }
 .wisden-table tbody tr.is-highlighted:hover { background: var(--highlight-hover); }
+/* Final-stage row in per-edition mini knockouts tables. Subtle
+   left-rule + bolder leading cell to lift the Final without
+   stealing focus from the row's data. */
+.wisden-table tbody tr.is-final { background: var(--bg-soft); }
+.wisden-table tbody tr.is-final td:first-child {
+  border-left: 3px solid var(--accent);
+  font-weight: 600;
+}
+.wisden-table tbody tr.is-final:hover { background: var(--highlight); }
+
+/* Per-edition mini-section on the Editions tab: header block stacked
+   above a flex champion/runner-up line above a knockouts mini-table. */
+.wisden-edition-block { margin-top: 1.75rem; }
+.wisden-edition-block:first-child { margin-top: 0.75rem; }
+.wisden-edition-header { display: flex; align-items: baseline; gap: 0.5rem; }
+.wisden-edition-season {
+  font-family: var(--font-display, inherit);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.wisden-edition-stats { margin-top: 0.25rem; line-height: 1.5; }
+.wisden-edition-stats > div { font-size: 0.96rem; }
+.wisden-edition-champs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  margin: 0.4rem 0 0.6rem;
+  font-size: 0.96rem;
+}
 .wisden-table td {
   padding: 0.55rem 0.75rem;
   color: var(--ink-soft);

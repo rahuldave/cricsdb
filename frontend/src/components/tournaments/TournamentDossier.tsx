@@ -21,7 +21,6 @@ import ScopedPageHeader from '../ScopedPageHeader'
 import PlayerLink from '../PlayerLink'
 import PlayerSearch from '../PlayerSearch'
 import TeamLink from '../TeamLink'
-import SeriesLink from '../SeriesLink'
 import Score from '../Score'
 import EdHelp from '../EdHelp'
 import {
@@ -550,6 +549,7 @@ export default function TournamentDossier({
           loading={bySeasonFetch.loading}
           error={bySeasonFetch.error}
           seasons={bySeasonFetch.data?.seasons ?? []}
+          knockouts={summary.knockouts}
           tournament={tournament}
           gender={filters.gender ?? null}
           teamType={filters.team_type ?? null}
@@ -1205,104 +1205,11 @@ function OverviewTab({
         </div>
       )}
 
-      {/* ── Knockouts (finals, semis, qualifiers) ── */}
-      {summary.knockouts.length > 0 && (
-        <div className="mt-8">
-          <SectionHeader title="Knockouts" />
-          <EdHelp />
-          <DataTable
-            columns={[
-              {
-                // Edition column. Single-tournament dossier: just the
-                // season (plain text, tournament implied by page scope).
-                // Multi-tournament scope (rivalry, ICC Trophies, etc.):
-                // "<Tournament> <Season>" as a link to that edition's
-                // dossier, since the season alone is ambiguous.
-                key: 'season',
-                label: tournament ? 'Season' : 'Edition',
-                format: (v: string, r) => {
-                  if (tournament || !r.tournament) return v
-                  return (
-                    <SeriesLink
-                      tournament={r.tournament}
-                      season={r.season}
-                      gender={gender}
-                      team_type={teamType}
-                    >
-                      {r.tournament} {r.season}
-                    </SeriesLink>
-                  ) as unknown as string
-                },
-              },
-              { key: 'stage', label: 'Stage' },
-              {
-                key: 'team1', label: 'Match',
-                format: (_v, r) => (
-                  <>
-                    <TeamWithEd team={r.team1} row={r} gender={gender} team_type={teamType} />
-                    {' v '}
-                    <TeamWithEd team={r.team2} row={r} gender={gender} team_type={teamType} />
-                  </>
-                ) as unknown as string,
-              },
-              {
-                key: 'winner', label: 'Winner',
-                format: (v: string | null, r) => v
-                  ? (
-                      <>
-                        <TeamLink
-                          teamName={v}
-                          gender={gender ?? null}
-                          team_type={teamType ?? null}
-                          compact
-                        />
-                        {` (${r.margin})`}
-                      </>
-                    ) as unknown as string
-                  : (r.margin || '—'),
-              },
-              {
-                key: 'venue', label: 'Venue',
-                format: (v: string) => v
-                  ? (
-                      <Link to={`/venues?venue=${encodeURIComponent(v)}`} className="comp-link">{v}</Link>
-                    ) as unknown as string
-                  : '-',
-              },
-              {
-                key: 'date', label: 'Date and Score',
-                format: (v: string | null, r) => {
-                  const hasScore = r.team1_score != null || r.team2_score != null
-                  if (!v && !hasScore) return '-'
-                  const scoreTitle = r.team1 && r.team2
-                    ? `${r.team1} ${r.team1_score ?? '—'} vs ${r.team2} ${r.team2_score ?? '—'} — scorecard`
-                    : undefined
-                  return (
-                    <>
-                      {v && (
-                        <Link to={`/matches/${r.match_id}`} className="comp-link">{v}</Link>
-                      )}
-                      {v && hasScore && (
-                        <span className="wisden-tile-faint">{' · '}</span>
-                      )}
-                      {hasScore && (
-                        <Score
-                          team1Score={r.team1_score}
-                          team2Score={r.team2_score}
-                          matchId={r.match_id}
-                          title={scoreTitle}
-                        />
-                      )}
-                    </>
-                  ) as unknown as string
-                },
-              },
-            ]}
-            data={summary.knockouts}
-            rowKey={(r) => `ko-${r.match_id}`}
-          />
-        </div>
-      )}
+      {/* Knockouts moved to the Editions tab — each edition now has its
+          own mini knockouts table (Final highlighted) directly beneath
+          its season header. Champions by season below stays on Overview
+          as a compact cross-edition summary. */}
+
 
       {tournament && summary.champions_by_season.length > 0 && (
         <div className="mt-8">
@@ -1711,10 +1618,20 @@ function MatchesTab({
   )
 }
 
+type KnockoutRow = TournamentSummary['knockouts'][number]
+
+/** Per-edition mini-section: season header + champion/runner-up flex
+ *  line + per-edition knockouts mini-table with the Final highlighted.
+ *
+ *  Replaces the previous flat DataTable so the knockouts (previously on
+ *  Overview) sit beneath each edition's headline info, making the
+ *  Editions tab the single home for per-season detail. The Champions-
+ *  by-season cross-edition summary stays on Overview. */
 function EditionsTab({
-  loading, error, seasons, tournament, gender, teamType, onPickSeason, refetch,
+  loading, error, seasons, knockouts, tournament, gender, teamType, onPickSeason, refetch,
 }: {
   loading: boolean; error: string | null; seasons: TournamentSeason[]
+  knockouts: KnockoutRow[]
   tournament: string | null
   gender: string | null
   teamType: string | null
@@ -1724,105 +1641,166 @@ function EditionsTab({
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!seasons.length) return <div className="wisden-empty">No editions in scope.</div>
 
-  const columns: Column<TournamentSeason>[] = [
+  // Knockout columns mirror what the old Overview Knockouts table used,
+  // minus the Season/Edition column (each mini-table is already scoped
+  // to one season by the surrounding header).
+  const koColumns: Column<KnockoutRow>[] = [
+    { key: 'stage', label: 'Stage' },
     {
-      key: 'season', label: 'Season', sortable: true,
-      format: (v: string) => (
-        <button
-          type="button"
-          className="comp-link"
-          onClick={() => onPickSeason(v)}
-        >{v}</button>
+      key: 'team1', label: 'Match',
+      format: (_v, r) => (
+        <>
+          <TeamWithEd team={r.team1} row={r} gender={gender} team_type={teamType} />
+          {' v '}
+          <TeamWithEd team={r.team2} row={r} gender={gender} team_type={teamType} />
+        </>
       ) as unknown as string,
     },
-    { key: 'matches', label: 'Matches', sortable: true },
     {
-      key: 'champion', label: 'Champion', sortable: true,
-      format: (v: string | null, r) => v ? (
-        r.champion_record ? (
-          <TeamLink
-            teamName={v}
-            gender={gender} team_type={teamType}
-            subscriptSource={{ tournament, season: r.season }}
-            maxTiers={1}
-            phraseLabel={`(${r.champion_record.won}/${r.champion_record.played})`}
-          />
-        ) : (
-          <TeamLink teamName={v} compact gender={gender} team_type={teamType} />
-        )
-      ) as unknown as string : '-',
+      key: 'winner', label: 'Winner',
+      format: (v: string | null, r) => v
+        ? (
+            <>
+              <TeamLink teamName={v} gender={gender ?? null} team_type={teamType ?? null} compact />
+              {` (${r.margin})`}
+            </>
+          ) as unknown as string
+        : (r.margin || '—'),
     },
     {
-      key: 'runner_up', label: 'Runner-up',
-      format: (v: string | null, r) => v ? (
-        r.runner_up_record ? (
-          <TeamLink
-            teamName={v}
-            gender={gender} team_type={teamType}
-            subscriptSource={{ tournament, season: r.season }}
-            maxTiers={1}
-            phraseLabel={`(${r.runner_up_record.won}/${r.runner_up_record.played})`}
-          />
-        ) : (
-          <TeamLink teamName={v} compact gender={gender} team_type={teamType} />
-        )
-      ) as unknown as string : '-',
+      key: 'venue', label: 'Venue',
+      format: (v: string) => v
+        ? (
+            <Link to={`/venues?venue=${encodeURIComponent(v)}`} className="comp-link">{v}</Link>
+          ) as unknown as string
+        : '-',
     },
     {
-      key: 'top_scorer', label: 'Top scorer',
-      format: (_v, r) => r.top_scorer ? (
-        <PlayerLink
-          personId={r.top_scorer.person_id}
-          name={r.top_scorer.name}
-          role="batter"
-          gender={gender}
-          subscriptSource={{ tournament, season: r.season }}
-          maxTiers={1}
-          phraseLabel={`(${r.top_scorer.runs})`}
-        />
-      ) as unknown as string : '-',
-    },
-    {
-      key: 'top_wicket_taker', label: 'Top wicket-taker',
-      format: (_v, r) => r.top_wicket_taker ? (
-        <PlayerLink
-          personId={r.top_wicket_taker.person_id}
-          name={r.top_wicket_taker.name}
-          role="bowler"
-          gender={gender}
-          subscriptSource={{ tournament, season: r.season }}
-          maxTiers={1}
-          phraseLabel={`(${r.top_wicket_taker.wickets})`}
-        />
-      ) as unknown as string : '-',
-    },
-    {
-      key: 'final_match_id', label: 'Final',
-      format: (v: number | null, r) => {
-        if (!v) return '-'
-        const hasScore = r.final_team1_score != null || r.final_team2_score != null
-        if (!hasScore) return matchLink(v, 'scorecard →') as unknown as string
-        const title = r.final_team1 && r.final_team2
-          ? `${r.final_team1} ${r.final_team1_score ?? '—'} vs ${r.final_team2} ${r.final_team2_score ?? '—'} — scorecard`
+      key: 'date', label: 'Date and Score',
+      format: (v: string | null, r) => {
+        const hasScore = r.team1_score != null || r.team2_score != null
+        if (!v && !hasScore) return '-'
+        const scoreTitle = r.team1 && r.team2
+          ? `${r.team1} ${r.team1_score ?? '—'} vs ${r.team2} ${r.team2_score ?? '—'} — scorecard`
           : undefined
         return (
-          <Score
-            team1Score={r.final_team1_score}
-            team2Score={r.final_team2_score}
-            matchId={v}
-            title={title}
-          />
+          <>
+            {v && (<Link to={`/matches/${r.match_id}`} className="comp-link">{v}</Link>)}
+            {v && hasScore && <span className="wisden-tile-faint">{' · '}</span>}
+            {hasScore && (
+              <Score
+                team1Score={r.team1_score}
+                team2Score={r.team2_score}
+                matchId={r.match_id}
+                title={scoreTitle}
+              />
+            )}
+          </>
         ) as unknown as string
       },
     },
   ]
 
+  // Group knockouts by season for O(1) per-edition lookup.
+  const koBySeason: Record<string, KnockoutRow[]> = {}
+  for (const k of knockouts) {
+    (koBySeason[k.season] = koBySeason[k.season] || []).push(k)
+  }
+
   return (
     <div className="mt-4">
       <div className="wisden-tab-help">
-        Click a season to narrow the whole page to that edition.
+        Click a season to narrow the whole page to that edition. Final-stage
+        rows in each mini-table are highlighted.
       </div>
-      <DataTable columns={columns} data={seasons} />
+      <EdHelp />
+      {seasons.map(s => {
+        const seasonKnockouts = koBySeason[s.season] || []
+        return (
+          <div key={s.season} className="wisden-edition-block">
+            <div className="wisden-edition-header">
+              <button
+                type="button"
+                className="wisden-edition-season comp-link"
+                onClick={() => onPickSeason(s.season)}
+              >{s.season}</button>
+              <span className="wisden-tile-faint">· {s.matches} matches</span>
+            </div>
+            <div className="wisden-edition-stats">
+              {s.top_scorer && (
+                <div>
+                  <span className="wisden-tile-faint">Top scorer: </span>
+                  <PlayerLink
+                    personId={s.top_scorer.person_id}
+                    name={s.top_scorer.name}
+                    role="batter"
+                    gender={gender}
+                    subscriptSource={{ tournament, season: s.season }}
+                    maxTiers={1}
+                    phraseLabel={`(${s.top_scorer.runs})`}
+                  />
+                </div>
+              )}
+              {s.top_wicket_taker && (
+                <div>
+                  <span className="wisden-tile-faint">Top wicket-taker: </span>
+                  <PlayerLink
+                    personId={s.top_wicket_taker.person_id}
+                    name={s.top_wicket_taker.name}
+                    role="bowler"
+                    gender={gender}
+                    subscriptSource={{ tournament, season: s.season }}
+                    maxTiers={1}
+                    phraseLabel={`(${s.top_wicket_taker.wickets})`}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="wisden-edition-champs">
+              {s.champion && (
+                <span>
+                  <span className="wisden-tile-faint">Champion: </span>
+                  {s.champion_record ? (
+                    <TeamLink
+                      teamName={s.champion}
+                      gender={gender} team_type={teamType}
+                      subscriptSource={{ tournament, season: s.season }}
+                      maxTiers={1}
+                      phraseLabel={`(${s.champion_record.won}/${s.champion_record.played})`}
+                    />
+                  ) : (
+                    <TeamLink teamName={s.champion} compact gender={gender} team_type={teamType} />
+                  )}
+                </span>
+              )}
+              {s.runner_up && (
+                <span>
+                  <span className="wisden-tile-faint">Runner-up: </span>
+                  {s.runner_up_record ? (
+                    <TeamLink
+                      teamName={s.runner_up}
+                      gender={gender} team_type={teamType}
+                      subscriptSource={{ tournament, season: s.season }}
+                      maxTiers={1}
+                      phraseLabel={`(${s.runner_up_record.won}/${s.runner_up_record.played})`}
+                    />
+                  ) : (
+                    <TeamLink teamName={s.runner_up} compact gender={gender} team_type={teamType} />
+                  )}
+                </span>
+              )}
+            </div>
+            {seasonKnockouts.length > 0 && (
+              <DataTable
+                columns={koColumns}
+                data={seasonKnockouts}
+                rowKey={(r) => `ko-${r.match_id}`}
+                rowClass={(r) => r.stage === 'Final' ? 'is-final' : undefined}
+              />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

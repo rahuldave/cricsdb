@@ -20,11 +20,15 @@ interface DataTableProps<T = any> {
   highlightKey?: string | null
   /** Called when a row is clicked. Rows become hover-able when this is set. */
   onRowClick?: (row: T) => void
+  /** Optional per-row class — for static row-state styling (e.g. mark Final rows
+   *  in a knockouts mini-table). Receives the row, returns the class string or
+   *  undefined to add nothing. Joined alongside is-highlighted / is-clickable. */
+  rowClass?: (row: T) => string | undefined
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function DataTable<T extends Record<string, any> = Record<string, any>>({
-  columns, data, pagination, rowKey, highlightKey, onRowClick,
+  columns, data, pagination, rowKey, highlightKey, onRowClick, rowClass,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortAsc, setSortAsc] = useState(true)
@@ -73,6 +77,7 @@ export default function DataTable<T extends Record<string, any> = Record<string,
             const cls = [
               isHighlighted ? 'is-highlighted' : '',
               onRowClick ? 'is-clickable' : '',
+              rowClass ? (rowClass(row) || '') : '',
             ].filter(Boolean).join(' ')
             return (
               <tr
