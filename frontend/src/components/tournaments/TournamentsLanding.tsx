@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
 import { useFetch } from '../../hooks/useFetch'
 import { getTournamentsLanding, getTournamentOtherRivalries } from '../../api'
@@ -269,11 +268,6 @@ export default function TournamentsLanding() {
 
       <RecentEditionsStrip editions={data.recent_editions} ambient={ambient} />
 
-      <ByTierSection
-        showInternational={showInternational}
-        showClub={showClub}
-      />
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
         {/* ── Left column — International ── */}
         {showInternational && (
@@ -443,78 +437,3 @@ export default function TournamentsLanding() {
 }
 
 
-// ─── By-tier cards — entry points to the /league page ─────────────────
-//
-// 4-6 cards positioned above the per-tournament list. Each card → a
-// /league URL with the matching FilterParams. Cards are filtered by
-// the active FilterBar gender / team_type so users browsing women's
-// only see women's tiers, etc. — same gating as showInternational /
-// showClub on the per-tournament sections below.
-//
-// Spec: internal_docs/spec-league-pages.md §D5 step 10.
-
-interface TierCardSpec {
-  label: string
-  sublabel: string
-  gender: 'male' | 'female'
-  team_type: 'club' | 'international'
-  team_class?: 'primary_club' | 'secondary_club' | 'full_member'
-}
-
-const TIER_CARDS: TierCardSpec[] = [
-  { label: "Men's club cricket", sublabel: 'All franchises and domestic leagues',
-    gender: 'male', team_type: 'club' },
-  { label: "Men's primary-tier clubs", sublabel: 'IPL · BBL · PSL · CPL · SA20 · ILT20 · LPL · MLC · The Hundred',
-    gender: 'male', team_type: 'club', team_class: 'primary_club' },
-  { label: "Men's secondary-tier clubs", sublabel: 'Other franchise + domestic competitions',
-    gender: 'male', team_type: 'club', team_class: 'secondary_club' },
-  { label: "Men's international cricket", sublabel: 'ICC events + bilaterals',
-    gender: 'male', team_type: 'international' },
-  { label: "Women's club cricket", sublabel: "WBBL · Women's Hundred · WPL and more",
-    gender: 'female', team_type: 'club' },
-  { label: "Women's international cricket", sublabel: 'ICC events + bilaterals',
-    gender: 'female', team_type: 'international' },
-]
-
-function ByTierSection({
-  showInternational, showClub,
-}: { showInternational: boolean; showClub: boolean }) {
-  // Mirror the per-section gating — when filters narrow to one
-  // team_type, hide the other half's tier cards too.
-  const visible = TIER_CARDS.filter(c =>
-    (c.team_type === 'club' && showClub)
-    || (c.team_type === 'international' && showInternational))
-
-  if (visible.length === 0) return null
-
-  return (
-    <div className="wisden-landing-section mt-6">
-      <SectionHeader title="By tier" />
-      <div className="wisden-tile-help mt-1">
-        Above-tournament dossiers — what does cricket look like at this scope?
-      </div>
-      <div className="wisden-tile-grid mt-2">
-        {visible.map(c => {
-          const params = new URLSearchParams({
-            gender: c.gender,
-            team_type: c.team_type,
-          })
-          if (c.team_class) params.set('team_class', c.team_class)
-          return (
-            <div key={c.label} className="wisden-tile tile-wrapper">
-              <Link
-                to={`/league?${params.toString()}`}
-                className="tile-stretched"
-                title={c.label}
-              >
-                {c.label}
-              </Link>
-              <div className="wisden-tile-title">{c.label}</div>
-              <div className="wisden-tile-sub">{c.sublabel}</div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}

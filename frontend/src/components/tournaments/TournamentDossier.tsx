@@ -1322,7 +1322,7 @@ function OverviewTab({
   )
 }
 
-function PartnershipsTab({
+export function PartnershipsTab({
   byWicket, byWicketLoading, top, topLoading,
   topByWicket, topByWicketLoading,
   filterTeam, tournament, gender, teamType,
@@ -1558,7 +1558,7 @@ function PartnershipsTab({
   )
 }
 
-function MatchesTab({
+export function MatchesTab({
   loading, error, matches, total, refetch, tournament, gender, team_type,
   pageSize, offset, onPageChange,
 }: {
@@ -2527,7 +2527,7 @@ export function SeriesFieldingChartStrip({
   )
 }
 
-function RecordsTab({
+export function RecordsTab({
   loading, error, data, refetch, tournament, gender, team_type,
 }: {
   loading: boolean; error: string | null

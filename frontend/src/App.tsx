@@ -10,7 +10,6 @@ import HeadToHead from './pages/HeadToHead'
 import Matches from './pages/Matches'
 import MatchScorecard from './pages/MatchScorecard'
 import Tournaments from './pages/Tournaments'
-import League from './pages/League'
 import Players from './pages/Players'
 import Venues from './pages/Venues'
 import Help from './pages/Help'
@@ -19,6 +18,15 @@ import HelpUsage from './pages/HelpUsage'
 /** Old /tournaments URLs redirect to /series, preserving query params.
  *  Keeps shared links + bookmarks alive across the rename. */
 function LegacyTournamentsRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={`/series${search}`} replace />
+}
+
+/** /league was a brief intermediate route for above-tournament scope
+ *  dossiers (2026-05-13 morning). Merged into /series the same day —
+ *  /series renders the dossier at every scope. Redirect keeps any
+ *  links from the brief /league window working. */
+function LeagueRedirect() {
   const { search } = useLocation()
   return <Navigate to={`/series${search}`} replace />
 }
@@ -37,7 +45,7 @@ export default function App() {
           <Route path="/fielding" element={<Fielding />} />
           <Route path="/series" element={<Tournaments />} />
           <Route path="/tournaments" element={<LegacyTournamentsRedirect />} />
-          <Route path="/league" element={<League />} />
+          <Route path="/league" element={<LeagueRedirect />} />
           <Route path="/venues" element={<Venues />} />
           <Route path="/head-to-head" element={<HeadToHead />} />
           <Route path="/matches" element={<Matches />} />

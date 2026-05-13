@@ -1,55 +1,64 @@
 /**
- * League page — above-tournament scope dossier.
+ * TierDossier — above-tournament match-set dossier.
  *
- * The destination for FilterBar configurations broader than a single
- * tournament: "men's club cricket," "men's primary-tier clubs,"
- * "women's international ICC tournaments," etc. Mirrors the
- * Tournament dossier shape (Overview / Batting / Bowling / Fielding
- * tabs) but the subject IS the scope itself.
+ * Renders on /series when the FilterBar narrows to a scope broader
+ * than any single tournament — "men's club," "women's international,"
+ * "men's primary-tier clubs," etc. Mirrors TournamentDossier's tab
+ * layout so every narrowing reads "identically to a series":
  *
- * The H2 title renders the scope in prose English (Men's club
- * Twenty20 cricket) via `scopeToProse` rather than the dot-separated
- * abbreviation used elsewhere — there's no separate page subject to
- * pair the abbreviation with, so the abbreviation becomes the title.
- * Spec: internal_docs/spec-league-pages.md §D8 + user 2026-05-13.
+ *   Overview / Batting / Bowling / Fielding / Partnerships / Records / Matches
  *
- * URL normalisation (Spec §D6 + UX §Empty/sparse):
- *  - Zero scope params → redirect to ?gender=male&team_type=club.
- *  - tournament=X set  → redirect to /series?tournament=X (the more
- *    specific destination; /league shouldn't duplicate Series).
+ * (Editions / Points are tournament-specific and hidden here.)
+ *
+ * Uses the lean /league/* composite endpoints for the Overview tab
+ * (the heavy /series/summary endpoint scans the whole pool — 20s at
+ * broad scope; /league/overview is ~3s by skipping the deep
+ * sub-queries). Records / Partnerships / Matches tabs reuse the same
+ * /series/{records,partnerships/*,matches} endpoints TournamentDossier
+ * uses — every one of those already accepts tournament=null.
+ *
+ * The H2 title comes from `scopeToProse(filters)` rather than the
+ * dot-separated abbreviation used on subject-pages — the scope IS
+ * the page subject, so the abbreviation becomes the title and the
+ * right-side italic abbreviation would be redundant.
+ *
+ * Spec: internal_docs/spec-league-pages.md (originally /league;
+ * merged into /series per user feedback 2026-05-13).
  */
-import { useEffect, useMemo } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { useFilters } from '../hooks/useFilters'
-import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
-import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { useFetch } from '../hooks/useFetch'
-import { useFilterDeps } from '../hooks/useFilterDeps'
+import { useEffect, useMemo, useRef } from 'react'
+import { Link } from 'react-router-dom'
+import { useFilters } from '../../hooks/useFilters'
+import { useUrlParam } from '../../hooks/useUrlState'
+import { useDocumentTitle } from '../../hooks/useDocumentTitle'
+import { useFetch } from '../../hooks/useFetch'
+import { useFilterDeps } from '../../hooks/useFilterDeps'
 import {
   getLeagueOverview, getLeagueChampions, getTournamentsLanding,
   getLeagueBattersLeaders, getLeagueBowlersLeaders, getLeagueFieldersLeaders,
   getScopeBattingSummary, getScopeBattingBySeason,
   getScopeBowlingSummary, getScopeBowlingBySeason,
   getScopeFieldingSummary, getScopeFieldingBySeason,
-} from '../api'
-import { scopeToProse } from '../components/scopeLinks'
-import InningToggle from '../components/InningToggle'
-import StatCard from '../components/StatCard'
-import Spinner from '../components/Spinner'
-import ErrorBanner from '../components/ErrorBanner'
-import { SectionHeader } from '../components/ChartHeader'
-import DataTable, { type Column } from '../components/DataTable'
-import TeamLink from '../components/TeamLink'
-import Score from '../components/Score'
-import TournamentTile, {
-  tileAmbientFromFilters,
-} from '../components/tournaments/TournamentTile'
+  getTournamentRecords, getMatches,
+  getTournamentPartnershipsByWicket, getTournamentPartnershipsTop,
+  getTournamentPartnershipsTopByWicket,
+} from '../../api'
+import { scopeToProse } from '../scopeLinks'
+import InningToggle from '../InningToggle'
+import StatCard from '../StatCard'
+import Spinner from '../Spinner'
+import ErrorBanner from '../ErrorBanner'
+import { SectionHeader } from '../ChartHeader'
+import DataTable, { type Column } from '../DataTable'
+import TeamLink from '../TeamLink'
+import Score from '../Score'
+import PlayerLink from '../PlayerLink'
+import TournamentTile, { tileAmbientFromFilters } from './TournamentTile'
 import {
   SeriesBattingTileRow, SeriesBattingChartStrip,
   SeriesBowlingTileRow, SeriesBowlingChartStrip,
   SeriesFieldingTileRow, SeriesFieldingChartStrip,
-} from '../components/tournaments/TournamentDossier'
-import PlayerLink from '../components/PlayerLink'
+  RecordsTab, PartnershipsTab, MatchesTab,
+} from './TournamentDossier'
 import type {
   LeagueOverview, LeagueChampionRow, LeagueTopTeamRow,
   TournamentsLanding, TournamentLandingEntry,
@@ -59,45 +68,33 @@ import type {
   BowlingLeaders, BowlingLeaderEntry,
   ScopeFieldingSummary, ScopeFieldingSeason,
   FieldingLeaders, FieldingLeaderEntry,
-} from '../types'
+  TournamentRecords, MatchListItem,
+  TournamentPartnershipsByWicket, TournamentPartnershipsTop,
+  TournamentPartnershipsTopByWicket,
+} from '../../types'
 
-type TabName = 'Overview' | 'Batting' | 'Bowling' | 'Fielding'
-const TABS: TabName[] = ['Overview', 'Batting', 'Bowling', 'Fielding']
+type TabName =
+  | 'Overview' | 'Batting' | 'Bowling' | 'Fielding'
+  | 'Partnerships' | 'Records' | 'Matches'
+const TABS: TabName[] = [
+  'Overview', 'Batting', 'Bowling', 'Fielding',
+  'Partnerships', 'Records', 'Matches',
+]
 
-export default function League() {
+export default function TierDossier() {
   const filters = useFilters()
-  const setUrlParams = useSetUrlParams()
-  const navigate = useNavigate()
-  const location = useLocation()
   const [activeTab, setActiveTab] = useUrlParam('tab', 'Overview')
   const currentTab: TabName = TABS.includes(activeTab as TabName)
     ? (activeTab as TabName)
     : 'Overview'
 
-  // D6: deep-link /league with no scope params lands on the broadest
-  // tier (men's club). URL-clean rule exception: /league with no
-  // params is non-canonical by construction; the replace lands a
-  // canonical URL the user can share.
-  useEffect(() => {
-    if (!filters.gender && !filters.team_type && !filters.tournament) {
-      setUrlParams({ gender: 'male', team_type: 'club' }, { replace: true })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Single-tournament redirect: /league?tournament=IPL → /series?tournament=IPL.
-  useEffect(() => {
-    if (filters.tournament) {
-      navigate(`/series${location.search}`, { replace: true })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.tournament])
-
   const docTitle = scopeToProse(filters)
   useDocumentTitle(docTitle)
 
   const filterDeps = useFilterDeps()
+  const apiFilters = filters
 
+  // ── Overview tab data (lean /league/overview composite) ───────
   const overviewFetch = useFetch<LeagueOverview | null>(
     () => currentTab === 'Overview'
       ? getLeagueOverview(filters)
@@ -117,7 +114,7 @@ export default function League() {
     [...filterDeps, currentTab === 'Overview'],
   )
 
-  // ── Batting subtab data ───────────────────────────────────────
+  // ── Batting / Bowling / Fielding tab data ─────────────────────
   const battingSummaryFetch = useFetch<ScopeBattingSummary | null>(
     () => currentTab === 'Batting'
       ? getScopeBattingSummary(filters)
@@ -137,7 +134,6 @@ export default function League() {
     [...filterDeps, currentTab === 'Batting'],
   )
 
-  // ── Bowling subtab data ───────────────────────────────────────
   const bowlingSummaryFetch = useFetch<ScopeBowlingSummary | null>(
     () => currentTab === 'Bowling'
       ? getScopeBowlingSummary(filters)
@@ -157,7 +153,6 @@ export default function League() {
     [...filterDeps, currentTab === 'Bowling'],
   )
 
-  // ── Fielding subtab data ──────────────────────────────────────
   const fieldingSummaryFetch = useFetch<ScopeFieldingSummary | null>(
     () => currentTab === 'Fielding'
       ? getScopeFieldingSummary(filters)
@@ -175,6 +170,61 @@ export default function League() {
       ? getLeagueFieldersLeaders({ ...filters, limit: 50 })
       : Promise.resolve(null),
     [...filterDeps, currentTab === 'Fielding'],
+  )
+
+  // ── Records / Partnerships / Matches tab data — reuse existing
+  //    /series/* endpoints (already accept tournament=null). ─────
+  const recordsFetch = useFetch<TournamentRecords | null>(
+    () => currentTab === 'Records'
+      ? getTournamentRecords(null, { ...apiFilters, limit: 10 })
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Records'],
+  )
+
+  const partnershipsByWicketFetch = useFetch<TournamentPartnershipsByWicket | null>(
+    () => currentTab === 'Partnerships'
+      ? getTournamentPartnershipsByWicket(null, { ...apiFilters, side: 'batting' })
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Partnerships'],
+  )
+  const partnershipsTopFetch = useFetch<TournamentPartnershipsTop | null>(
+    () => currentTab === 'Partnerships'
+      ? getTournamentPartnershipsTop(null, { ...apiFilters, side: 'batting', limit: 20 })
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Partnerships'],
+  )
+  const partnershipsTopByWicketFetch = useFetch<TournamentPartnershipsTopByWicket | null>(
+    () => currentTab === 'Partnerships'
+      ? getTournamentPartnershipsTopByWicket(null, { ...apiFilters, side: 'batting', per_wicket: 10 })
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Partnerships'],
+  )
+
+  const MATCHES_PAGE_SIZE = 50
+  const [pageParam, setPageParam] = useUrlParam('page', '1')
+  const matchesPage = Math.max(1, parseInt(pageParam, 10) || 1)
+  const matchesOffset = (matchesPage - 1) * MATCHES_PAGE_SIZE
+  // Reset pagination when filter scope changes; preserve deep-linked
+  // ?tab=Matches&page=3. Mirror the prevFilterKey ref pattern from
+  // TournamentDossier.
+  const prevFilterKey = useRef<string | null>(null)
+  useEffect(() => {
+    const key = filterDeps.map(v => String(v ?? '')).join('|')
+    if (prevFilterKey.current === null) { prevFilterKey.current = key; return }
+    if (prevFilterKey.current !== key) {
+      prevFilterKey.current = key
+      if (pageParam && pageParam !== '1') setPageParam('', { replace: true })
+    }
+  }, filterDeps)
+
+  const matchesFetch = useFetch<{ matches: MatchListItem[]; total: number } | null>(
+    () => currentTab === 'Matches'
+      ? getMatches({
+          ...filters,
+          limit: MATCHES_PAGE_SIZE, offset: matchesOffset,
+        })
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Matches', matchesOffset],
   )
 
   return (
@@ -196,7 +246,9 @@ export default function League() {
         ))}
       </div>
 
-      {currentTab !== 'Overview' && <InningToggle />}
+      {(currentTab === 'Batting' || currentTab === 'Bowling'
+        || currentTab === 'Fielding' || currentTab === 'Partnerships'
+        || currentTab === 'Records') && <InningToggle />}
 
       {currentTab === 'Overview' && (
         <OverviewTab
@@ -276,6 +328,46 @@ export default function League() {
           }}
         />
       )}
+      {currentTab === 'Partnerships' && (
+        <PartnershipsTab
+          byWicket={partnershipsByWicketFetch.data}
+          byWicketLoading={partnershipsByWicketFetch.loading}
+          top={partnershipsTopFetch.data}
+          topLoading={partnershipsTopFetch.loading}
+          topByWicket={partnershipsTopByWicketFetch.data}
+          topByWicketLoading={partnershipsTopByWicketFetch.loading}
+          filterTeam={filters.team}
+          tournament={null}
+          gender={filters.gender}
+          teamType={filters.team_type}
+        />
+      )}
+      {currentTab === 'Records' && (
+        <RecordsTab
+          loading={recordsFetch.loading}
+          error={recordsFetch.error}
+          data={recordsFetch.data}
+          refetch={recordsFetch.refetch}
+          tournament={null}
+          gender={filters.gender}
+          team_type={filters.team_type}
+        />
+      )}
+      {currentTab === 'Matches' && (
+        <MatchesTab
+          loading={matchesFetch.loading}
+          error={matchesFetch.error}
+          matches={matchesFetch.data?.matches ?? []}
+          total={matchesFetch.data?.total ?? 0}
+          refetch={matchesFetch.refetch}
+          tournament={null}
+          gender={filters.gender}
+          team_type={filters.team_type}
+          pageSize={MATCHES_PAGE_SIZE}
+          offset={matchesOffset}
+          onPageChange={(p) => setPageParam(p > 1 ? String(p) : '')}
+        />
+      )}
     </div>
   )
 }
@@ -300,9 +392,6 @@ function OverviewTab({
   const filters = useFilters()
   const ambient = tileAmbientFromFilters(filters)
 
-  // Flatten the sectioned landing payload into a single tile list,
-  // sorted by match count (the natural "biggest leagues first" order
-  // a reader expects on a league-scope page).
   const tournamentTiles = useMemo<TournamentLandingEntry[]>(() => {
     if (!landing) return []
     const all = [
@@ -317,18 +406,17 @@ function OverviewTab({
   }, [landing])
 
   if (overviewLoading && !overview) {
-    return <Spinner label="Loading league…" size="lg" />
+    return <Spinner label="Loading scope…" size="lg" />
   }
   if (overviewError) {
     return <ErrorBanner
-      message={`Could not load league overview: ${overviewError}`}
+      message={`Could not load: ${overviewError}`}
       onRetry={overviewRefetch} />
   }
   if (!overview) return null
 
   return (
     <div className="mt-4 space-y-8">
-      {/* Headline strip — match-set identity counts, no σ/Δ.*/}
       <div className="wisden-statrow cols-4">
         <StatCard label="Matches" value={overview.matches.toLocaleString()} />
         <StatCard label="Innings" value={overview.innings.toLocaleString()} />
@@ -336,9 +424,6 @@ function OverviewTab({
         <StatCard label="Tournaments" value={overview.tournaments_count.toLocaleString()} />
       </div>
 
-      {/* Tournaments tile grid — full reuse of TournamentTile from
-          TournamentsLanding. Each card links to the all-editions
-          dossier for that tournament. */}
       {(landingLoading || tournamentTiles.length > 0) && (
         <section>
           <SectionHeader title={
@@ -360,7 +445,6 @@ function OverviewTab({
         </section>
       )}
 
-      {/* Champions DataTable — cross-tournament finals in scope. */}
       {champions !== null && champions.length > 0 && (
         <section>
           <SectionHeader title="Champions in scope" />
@@ -371,7 +455,6 @@ function OverviewTab({
         <Spinner label="Loading champions…" />
       )}
 
-      {/* Top teams by win % */}
       {overview.top_teams.length > 0 && (
         <section>
           <SectionHeader title="Top teams by win %" />
@@ -379,7 +462,6 @@ function OverviewTab({
         </section>
       )}
 
-      {/* Best moments */}
       {hasAnyBestMoment(overview.best_moments) && (
         <section>
           <SectionHeader title="Best moments" />
@@ -403,9 +485,6 @@ function ChampionsTable({ rows }: { rows: LeagueChampionRow[] }) {
   const gender = filters.gender ?? null
   const team_type = filters.team_type ?? null
 
-  // teamCell wires per-row TeamLink with (ed) phrase pinning to the
-  // row's (tournament, season). Same pattern as the Records/Matches
-  // tabs on TournamentDossier.
   const teamCell = (team: string, row: LeagueChampionRow) => (
     <TeamLink
       teamName={team}

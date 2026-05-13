@@ -2,15 +2,20 @@ import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import TournamentsLanding from '../components/tournaments/TournamentsLanding'
 import TournamentDossier from '../components/tournaments/TournamentDossier'
+import TierDossier from '../components/tournaments/TierDossier'
 
-/** Render mode for the /series route.
+/** /series — single URL for every match-set scope.
  *
- *  Three URL shapes drive the mode:
- *    - no params                              → landing
- *    - ?tournament=X (and/or filter_team+opp) → match-set dossier
- *    - ?filter_team=A&filter_opponent=B       → match-set dossier (rivalry)
+ *  Three render shapes:
+ *    - ?tournament=X (and/or filter_team+opp) → TournamentDossier
+ *      (single-tournament or rivalry, existing /series/summary path).
+ *    - ?filter_team=A&filter_opponent=B       → TournamentDossier (rivalry).
+ *    - neither set                             → TierDossier — above-
+ *      tournament "men's club cricket" / "women's international" etc.
+ *      dossier driven purely by FilterBar narrowings, using the lean
+ *      /league/* composite endpoints.
+ *
  *  Legacy `?rivalry=A,B` URLs redirect to filter_team+filter_opponent.
  */
 export default function Tournaments() {
@@ -32,15 +37,13 @@ export default function Tournaments() {
       filter_opponent: b,
     }
     if (!searchParams.get('series_type')) updates.series_type = 'all'
-    // URL-shape migration → replace so the back button returns to
-    // wherever the user came from, not to the old `?rivalry=…` URL.
     setUrlParams(updates, { replace: true })
   }, [rivalry])
 
-  const isDossier = !!(tournament || (filterTeam && filterOpp))
-  useDocumentTitle(isDossier ? null : 'Series')
+  const isTournamentMode = !!(tournament || (filterTeam && filterOpp))
+  useDocumentTitle(isTournamentMode ? null : 'Series')
 
-  if (isDossier) {
+  if (isTournamentMode) {
     return (
       <TournamentDossier
         tournament={tournament || null}
@@ -49,6 +52,5 @@ export default function Tournaments() {
       />
     )
   }
-
-  return <TournamentsLanding />
+  return <TierDossier />
 }
