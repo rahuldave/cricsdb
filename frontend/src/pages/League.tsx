@@ -27,9 +27,10 @@ import { useFetch } from '../hooks/useFetch'
 import { useFilterDeps } from '../hooks/useFilterDeps'
 import {
   getLeagueOverview, getLeagueChampions, getTournamentsLanding,
-  getLeagueBattersLeaders, getLeagueBowlersLeaders,
+  getLeagueBattersLeaders, getLeagueBowlersLeaders, getLeagueFieldersLeaders,
   getScopeBattingSummary, getScopeBattingBySeason,
   getScopeBowlingSummary, getScopeBowlingBySeason,
+  getScopeFieldingSummary, getScopeFieldingBySeason,
 } from '../api'
 import { scopeToProse } from '../components/scopeLinks'
 import InningToggle from '../components/InningToggle'
@@ -46,6 +47,7 @@ import TournamentTile, {
 import {
   SeriesBattingTileRow, SeriesBattingChartStrip,
   SeriesBowlingTileRow, SeriesBowlingChartStrip,
+  SeriesFieldingTileRow, SeriesFieldingChartStrip,
 } from '../components/tournaments/TournamentDossier'
 import PlayerLink from '../components/PlayerLink'
 import type {
@@ -55,6 +57,8 @@ import type {
   BattingLeaders, BattingLeaderEntry,
   ScopeBowlingSummary, ScopeBowlingSeason,
   BowlingLeaders, BowlingLeaderEntry,
+  ScopeFieldingSummary, ScopeFieldingSeason,
+  FieldingLeaders, FieldingLeaderEntry,
 } from '../types'
 
 type TabName = 'Overview' | 'Batting' | 'Bowling' | 'Fielding'
@@ -153,6 +157,26 @@ export default function League() {
     [...filterDeps, currentTab === 'Bowling'],
   )
 
+  // ── Fielding subtab data ──────────────────────────────────────
+  const fieldingSummaryFetch = useFetch<ScopeFieldingSummary | null>(
+    () => currentTab === 'Fielding'
+      ? getScopeFieldingSummary(filters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Fielding'],
+  )
+  const fieldingBySeasonFetch = useFetch<{ by_season: ScopeFieldingSeason[] } | null>(
+    () => currentTab === 'Fielding'
+      ? getScopeFieldingBySeason(filters)
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Fielding'],
+  )
+  const fieldingLeadersFetch = useFetch<FieldingLeaders | null>(
+    () => currentTab === 'Fielding'
+      ? getLeagueFieldersLeaders({ ...filters, limit: 50 })
+      : Promise.resolve(null),
+    [...filterDeps, currentTab === 'Fielding'],
+  )
+
   return (
     <div>
       <h2 className="wisden-page-title" style={{ margin: 0 }}>
@@ -231,7 +255,26 @@ export default function League() {
         />
       )}
       {currentTab === 'Fielding' && (
-        <div className="wisden-tab-help mt-4">Fielding content lands in step 9.</div>
+        <FieldingSubtab
+          summary={fieldingSummaryFetch.data}
+          seasons={fieldingBySeasonFetch.data?.by_season ?? null}
+          leaders={fieldingLeadersFetch.data}
+          loading={
+            fieldingSummaryFetch.loading
+            || fieldingBySeasonFetch.loading
+            || fieldingLeadersFetch.loading
+          }
+          error={
+            fieldingSummaryFetch.error
+            || fieldingBySeasonFetch.error
+            || fieldingLeadersFetch.error
+          }
+          refetch={() => {
+            fieldingSummaryFetch.refetch()
+            fieldingBySeasonFetch.refetch()
+            fieldingLeadersFetch.refetch()
+          }}
+        />
       )}
     </div>
   )
@@ -719,6 +762,89 @@ function BowlingSubtab({
               ] as Column<BowlingLeaderEntry>[]}
               data={leaders.by_strike_rate}
               rowKey={(r) => `bsr-${r.person_id}`}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+// ─── Fielding subtab ──────────────────────────────────────────────────
+
+function FieldingSubtab({
+  summary, seasons, leaders, loading, error, refetch,
+}: {
+  summary: ScopeFieldingSummary | null
+  seasons: ScopeFieldingSeason[] | null
+  leaders: FieldingLeaders | null
+  loading: boolean
+  error: string | null
+  refetch: () => void
+}) {
+  const filters = useFilters()
+  const gender = filters.gender ?? null
+
+  if (loading && !summary) return <Spinner label="Loading fielders…" />
+  if (error) return <ErrorBanner message={error} onRetry={refetch} />
+
+  const fielderCell = (r: FieldingLeaderEntry) => (
+    <PlayerLink
+      personId={r.person_id}
+      name={r.name}
+      role="fielder"
+      gender={gender}
+    />
+  ) as unknown as string
+
+  return (
+    <div className="mt-4 space-y-6">
+      <SeriesFieldingTileRow summary={summary} seasons={seasons} />
+      <SeriesFieldingChartStrip seasons={seasons} />
+      {leaders && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div>
+            <SectionHeader title="Top fielders by dismissals" />
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Fielder',
+                  format: (_v, r: FieldingLeaderEntry) => fielderCell(r) },
+                { key: 'total', label: 'Total', sortable: true },
+                { key: 'catches', label: 'C' },
+                { key: 'stumpings', label: 'St' },
+                { key: 'run_outs', label: 'RO' },
+              ] as Column<FieldingLeaderEntry>[]}
+              data={leaders.by_dismissals}
+              rowKey={(r) => `fall-${r.person_id}`}
+            />
+          </div>
+          <div>
+            <SectionHeader title="Top keepers" />
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Keeper',
+                  format: (_v, r: FieldingLeaderEntry) => fielderCell(r) },
+                { key: 'total', label: 'Total', sortable: true },
+                { key: 'catches', label: 'C' },
+                { key: 'stumpings', label: 'St' },
+              ] as Column<FieldingLeaderEntry>[]}
+              data={leaders.by_keeper_dismissals}
+              rowKey={(r) => `fkep-${r.person_id}`}
+            />
+          </div>
+          <div>
+            <SectionHeader title="Top fielders by run-outs" />
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Fielder',
+                  format: (_v, r: FieldingLeaderEntry) => fielderCell(r) },
+                { key: 'run_outs', label: 'RO', sortable: true },
+                { key: 'total', label: 'Total' },
+                { key: 'catches', label: 'C' },
+              ] as Column<FieldingLeaderEntry>[]}
+              data={leaders.by_run_outs ?? []}
+              rowKey={(r) => `fro-${r.person_id}`}
             />
           </div>
         </div>
