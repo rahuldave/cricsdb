@@ -1,11 +1,13 @@
 #!/bin/bash
 # Series > Overview "Champions by season" table — intl-only anchor.
 # (NOT a separate "Champions" tab — the section lives within the
-# Overview tab, alongside "Knockouts" and "Best moments".)
+# Overview tab, alongside "Best moments".)
 #
 # Anchor: ICC Men's T20 World Cup, ALL editions in DB (no season
-# filter). Champions table = DataTable at index 1 on the page (idx
-# 0 is the Knockouts table). 4 rows DESC by season:
+# filter). Champions table is the SOLE DataTable on Overview as of
+# 2026-05-12 (Knockouts moved to Editions tab → per-edition mini-
+# tables; see series_knockouts_intl.sh for the new home). 4 rows
+# DESC by season:
 #
 #   2025/26   India v New Zealand    → India
 #   2024      India v South Africa   → India
@@ -30,8 +32,8 @@ navigate "$BASE/series?tournament=ICC+Men%27s+T20+World+Cup&gender=male&team_typ
   "Anchor — Series Overview Champions table (all editions)"
 sleep 4
 
-# Champions by season — table at idx 1 (idx 0 is Knockouts).
-JSON=$(extract_data_table 1 2>/dev/null)
+# Champions by season — sole DataTable on Overview (idx 0).
+JSON=$(extract_data_table 0 2>/dev/null)
 
 EXPECTED=$(cat <<'PYEXPECT'
 {

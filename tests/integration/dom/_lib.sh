@@ -228,6 +228,43 @@ extract_landing_tiles() {
 EVALEOF
 }
 
+# ─────────────────────────── EXTRACTOR: edition blocks ───────────────────────────
+# For /series?...&tab=Editions (TournamentDossier EditionsTab).
+# Replaced the old flat DataTable on 2026-05-12 — each edition now
+# renders as a `.wisden-edition-block` with a header (season +
+# matches), stats (top scorer / top wicket-taker), champs (champion +
+# runner-up), and a per-edition knockouts mini-table whose Final row
+# carries the `is-final` class.
+#
+# Returns: [{ season, matches_text, header, stats, champs,
+#             ko_rows: [[cell,...]], ko_final_row: [cell,...] | null }]
+extract_edition_blocks() {
+  agent-browser eval --stdin <<'EVALEOF'
+(() => {
+  const blocks = Array.from(document.querySelectorAll('.wisden-edition-block'));
+  return blocks.map(b => {
+    const seasonBtn = b.querySelector('.wisden-edition-season');
+    const season = seasonBtn?.innerText?.trim() || '';
+    const headerEl = b.querySelector('.wisden-edition-header');
+    const header = headerEl?.innerText?.replace(/\s+/g, ' ').trim() || '';
+    // "· 74 matches" — strip the leading bullet so the value reads cleanly.
+    const matchesMatch = header.match(/(\d[\d,]*)\s+matches?/);
+    const matches_text = matchesMatch ? matchesMatch[1] : '';
+    const stats = b.querySelector('.wisden-edition-stats')?.innerText?.trim() || '';
+    const champs = b.querySelector('.wisden-edition-champs')?.innerText?.trim() || '';
+    const ko_rows = Array.from(b.querySelectorAll('tbody tr')).map(tr =>
+      Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim())
+    );
+    const finalTr = b.querySelector('tbody tr.is-final');
+    const ko_final_row = finalTr
+      ? Array.from(finalTr.querySelectorAll('td')).map(td => td.innerText.trim())
+      : null;
+    return { season, matches_text, header, stats, champs, ko_rows, ko_final_row };
+  });
+})()
+EVALEOF
+}
+
 # ─────────────────────────── EXTRACTOR: team overview ───────────────────────────
 # For /teams?team=X (default tab "By Season" — the always-on summary
 # band rendered above every tab). DOM:

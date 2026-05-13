@@ -75,7 +75,10 @@ NEUTRAL_PILLS='InningsAll innings1st innings2nd innings'
 
 probe_site() {
   local site="$1" url="$2" expected="$3"
-  ab open "$url"; sleep 4
+  ab open "$url"; sleep 6   # 6s soak — dossier subtabs (esp. Records,
+                            # which fires an extra /series/records fetch)
+                            # need this for the InningToggle group to
+                            # mount before the assertion runs.
   assert_eq "$site" "$expected" "$(inning_group_text)"
 }
 
