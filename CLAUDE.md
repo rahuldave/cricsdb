@@ -205,6 +205,16 @@ When an endpoint can return multiple related views in one response (lifetime + l
 
 When a backend change drops a field from a response, drop it from the matching TypeScript interface in `frontend/src/types.ts` IN THE SAME COMMIT. Type-API divergence turns "field missing at runtime" into a silent fall-through through `?. ?? 0` — TypeScript believes the type, the gate evaluates to `0 > 0`, the UI hides itself.
 
+### Chip ↔ chart baseline symmetry
+
+When a tile renders a `MetricDelta` chip against `scope_avg` (the league-side dual-query result on `/summary` endpoints) AND the page also renders a by-season chart of the same metric, the chart MUST render the same `scope_avg` source as a reference overlay at the same scope. Don't gate the chart visualisation differently from the chip — they're the same comparison.
+
+`MetricEnvelope.scope_avg` is computed at every FilterBar scope (the dual-query is `team=None` with the same FilterParams). If the chip's delta is meaningful at every scope, the green-line baseline is too. Shipping the chip-without-overlay (or worse, the chip-at-every-scope + overlay-gated-on-one-axis) leaves the reader with a delta number whose comparison target isn't drawn — they can read the +14.9% but can't see what 14.9% larger than is.
+
+Use `LineChart`'s `referenceData` prop (auto-derives the legend label from `abbreviateScope(filters, { discipline }) + " avg"`) and fetch the baseline unconditionally — `/scope/averages/{discipline}/by-season` accepts the same FilterParams the chip's summary endpoint does, so the baseline tracks whatever the FilterBar describes.
+
+User flagged 2026-05-13: CSK win % showed +14.9% at `tournament=IPL` and +16.0% without — the chip surfaced the scope_avg movement at every scope but the chart only drew the green line at one. Naming: avoid `tournamentBaseline` for a variable that fetches at every scope; `scopeBaseline` reads correctly.
+
 ### No CSS-pixel shortcuts when a structural fix exists
 
 When a layout problem has a clean structural solution (CSS Grid / subgrid for cross-column row alignment, semantic flex for inline content), use the structural fix even if a `min-height: 4.6rem` / `padding-top: 12px` hack would land in 30 minutes. Pixel hacks are tuned to one viewport width, one chip density, one font-stack; the next content change shifts the magic number and the layout breaks.
