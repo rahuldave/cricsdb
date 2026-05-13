@@ -25,7 +25,7 @@ A natural framing: Series pages are about "what happened at this tournament acro
 - New route `/league`. Page component `LeagueDossier` mirrors `TournamentDossier` structurally — tab bar, FilterBar gating, `ScopedPageHeader`.
 - Tab set: **Overview / Batting / Bowling / Fielding**. No Editions tab (no single tournament to slice by), no Partnerships tab (deferred — adds a `partnerships/by-season` page complexity that's not load-bearing for v1), no Matches tab (the existing `/matches` filtered view already covers it), no Records tab in v1 (the Overview's "biggest wins / highest totals" carries the records story for now).
 - Batting/Bowling/Fielding subtabs: **direct reuse** of `SeriesBattingTileRow` + `SeriesBattingChartStrip` (and bowling/fielding equivalents) shipped today in `spec-series-trend-charts.md`. The data is already pool-weighted; the only difference is that these subtabs don't carry a player-leaderboard grid below the tiles. Player leaderboards across the pool become a sortable, paginated DataTable at the bottom of each subtab (consuming a new `/league/leaders/*` endpoint).
-- New **Overview tab** content (§UX) — five blocks: tournaments-in-scope chip strip, Champions-across-(tournament, season) table, top teams by win %, scope extrema, top scorers/wicket-takers headline.
+- New **Overview tab** content (§UX) — five blocks: headline counts strip, **Tournaments-in-scope tile grid (full reuse of `TournamentTile` from `TournamentsLanding`)**, Champions-across-(tournament, season) sortable DataTable, top teams by win %, best moments (highest totals / lowest all-outs / biggest wins / most sixes in a match).
 - Three new backend endpoints (§API): `/league/champions`, `/league/leaders/{batting,bowling,fielding}`, `/league/extrema`. All accept the full `FilterParams` envelope.
 - Entry points: TournamentsLanding gets a new "By tier" section with link cards for the major scope buckets above the per-tournament list. Compare tab's "Add avg slot" picker grows a link to the matching League page.
 
@@ -123,8 +123,18 @@ Five blocks, top-to-bottom:
 │  (4 StatCards — counts only, no σ, no Δ)                    │
 ├──────────────────────────────────────────────────────────────┤
 │  Tournaments in <scope> (N)                                  │
-│  [IPL (1234)] [BBL (567)] [PSL (456)] ...                   │
-│  Each chip → TournamentLink at that tournament              │
+│  ┌────────────────────┐ ┌────────────────────┐ ┌──────────┐ │
+│  │ Indian Premier     │ │ Pakistan Super     │ │ Big Bash │ │
+│  │ League             │ │ League             │ │ League   │ │
+│  │ 18 ed · 1234 mat   │ │ 9 ed · 567 mat     │ │ ...      │ │
+│  │ Most titles: MI(5) │ │ Most titles: ISL(2)│ │ ...      │ │
+│  │ Latest: 2025       │ │ Latest: 2024–25    │ │ ...      │ │
+│  │ Winner: RCB        │ │ Winner: Islamabad  │ │ ...      │ │
+│  └────────────────────┘ └────────────────────┘ └──────────┘ │
+│  Grid of `wisden-tile` cards — full reuse of TournamentTile  │
+│  from TournamentsLanding (canonical name + editions + matches│
+│  + most titles team + latest edition + latest winner). Each  │
+│  card is a SeriesLink to the tournament's all-editions page. │
 ├──────────────────────────────────────────────────────────────┤
 │  Champions across <scope>                                    │
 │  ┌────────┬──────────────┬───────────┬───────────┬────────┐ │
@@ -200,13 +210,14 @@ Tile rows: existing `wisden-statrow.cols-5` already drops to 3+2 on narrow scree
 | `/api/v1/scope/averages/batting/by-season` | Per-season same metrics. | League → Batting chart strip. |
 | `/api/v1/scope/averages/bowling/summary` + `by-season` | Same pattern for bowling. | League → Bowling subtab. |
 | `/api/v1/scope/averages/fielding/summary` + `by-season` | Same for fielding. | League → Fielding subtab. |
+| `/api/v1/series/landing` | `TournamentLandingEntry[]` — canonical name + editions + matches + most-titles team + latest edition + latest winner per tournament. | **League → Overview "Tournaments in <scope>" tile grid** (full reuse of `TournamentTile` from `TournamentsLanding`). Accepts FilterParams already. |
 | `/api/v1/matches` | FilterParams-aware match list. | Linked from Overview's "Best moments" cards. |
 
 ### New (this spec — three endpoints)
 
 | Endpoint | Returns | Notes |
 |---|---|---|
-| `/api/v1/league/overview` | `{matches, innings, teams_count, tournaments: [{name, matches}], top_teams: [{team, played, wins, losses, win_pct}], best_moments: {highest_total, lowest_all_out, biggest_win_runs, biggest_win_wickets, most_sixes_match}}` | Single composite call powers all of Overview's non-Champions content. Tournament chip strip + top teams + best moments in one roundtrip — keeps the page-load count low (single-payload + window-toggle principle, CLAUDE.md). Accepts full FilterParams. |
+| `/api/v1/league/overview` | `{matches, innings, teams_count, top_teams: [{team, played, wins, losses, win_pct}], best_moments: {highest_total, lowest_all_out, biggest_win_runs, biggest_win_wickets, most_sixes_match}}` | Composite call for the 3 non-tournaments, non-Champions Overview blocks (headline counts + top teams + best moments). The Tournaments tile grid uses the existing `/series/landing`; the Champions table uses its own endpoint below. Accepts full FilterParams. |
 | `/api/v1/league/champions` | `{rows: [{season, tournament, champion, runner_up, final_match_id, final_score}]}` | Cross-tournament unionized version of `/series/by-season`'s champion-per-season data. Sortable on the frontend. Accepts FilterParams. |
 | `/api/v1/league/leaders/{batting,bowling,fielding}` | Mirror of `/series/{discipline}-leaders` shape (`{by_runs, by_average, by_strike_rate}` etc.) but with NO tournament restriction. | Accepts the full FilterParams. Pagination support (`limit` + `offset`) since the leader pool is much larger than per-tournament. |
 
@@ -224,7 +235,7 @@ Each new endpoint mirrors an existing tournament-grain sibling — implementatio
 3. **`/api/v1/league/champions` endpoint** — cross-tournament champions table.
 4. **`/api/v1/league/leaders/{batting,bowling,fielding}` endpoints** — three sibling endpoints + frontend types.
 5. **`LeagueDossier` page shell + routing** — `/league` route added to `App.tsx`. Page renders header + tab bar + empty-tab placeholders. URL-normalise-to-default effect (D6). Single-tournament redirect (UX §Empty/sparse).
-6. **Overview tab content** — assemble the 5 blocks. Champions DataTable + Tournaments chip strip + Best moments cards + Top teams table + Headline strip.
+6. **Overview tab content** — assemble the 5 blocks. Headline strip + Tournaments tile grid (reuse `TournamentTile` from `TournamentsLanding.tsx`, fetch from existing `/api/v1/series/landing`) + Champions DataTable + Top teams table + Best moments cards. The TournamentTile reuse may need a small extraction so the component is importable outside `TournamentsLanding` (currently a module-local function); narrow refactor — move to `components/tournaments/TournamentTile.tsx` and re-export.
 7. **Batting subtab** — mount existing `SeriesBattingTileRow` + `SeriesBattingChartStrip` with `suppressDelta`; add Top batters leaderboard (3 by-axis tables, paginated).
 8. **Bowling subtab** — same shape for bowling.
 9. **Fielding subtab** — same shape for fielding.
@@ -243,7 +254,7 @@ Each step its own commit per CLAUDE.md commit-cadence. Steps 1-4 ship backend va
 
 ### Integration (SQL-anchored DOM)
 
-- `tests/integration/league_overview.sh` — at `/league?gender=male&team_type=club`: tournaments chip strip count matches SQL, top-teams row count matches SQL, biggest-win-runs match SQL.
+- `tests/integration/league_overview.sh` — at `/league?gender=male&team_type=club`: tournaments tile grid count matches the `/series/landing` payload's row count at scope, each tile shows canonical name + editions + matches + latest winner, top-teams row count matches SQL, biggest-win-runs match SQL.
 - `tests/integration/league_champions.sh` — Champions DataTable row count matches the API's `/league/champions`; default sort is season desc; click-to-sort by Tournament re-orders.
 - `tests/integration/league_batting_subtab.sh` — at `/league?...&tab=Batting`: tile values match `/scope/averages/batting/summary`; chart count ≥ 6; leaderboard top-row by_runs matches `/league/leaders/batting`.
 - `tests/integration/league_single_tournament_redirect.sh` — deep-link `/league?tournament=Indian+Premier+League` redirects to `/series?tournament=Indian+Premier+League`.
