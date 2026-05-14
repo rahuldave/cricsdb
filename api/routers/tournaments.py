@@ -3328,7 +3328,7 @@ async def tournament_partnerships_top_by_wicket(
     db = get_db()
 
     from .bucket_baseline_dispatch import is_precomputed_scope, baseline_where
-    from scripts.populate_bucket_baseline import PARTNERSHIP_TOP_K
+    from models.tables import PARTNERSHIP_TOP_K
     is_tier = tournament is None and not (filters.team and filters.opponent)
     is_baseline = (
         is_tier

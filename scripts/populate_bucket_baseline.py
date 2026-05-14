@@ -50,6 +50,7 @@ from models import (
     BucketBaselineFielding, BucketBaselinePhase, BucketBaselinePartnership,
     BucketBaselineMoments, BucketBaselinePartnershipTop,
 )
+from models.tables import PARTNERSHIP_TOP_K
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(PROJECT_ROOT, "cricket.db")
@@ -67,8 +68,8 @@ BUCKET_TABLES = [
     BucketBaselineFielding, BucketBaselinePhase, BucketBaselinePartnership,
     BucketBaselineMoments, BucketBaselinePartnershipTop,
 ]
-
-PARTNERSHIP_TOP_K = 10
+# PARTNERSHIP_TOP_K lives in models/tables.py (re-imported above) so
+# the API router can use it without depending on scripts/.
 
 
 def _missing_cols(have: set[str], want: dict[str, str]) -> dict[str, str]:

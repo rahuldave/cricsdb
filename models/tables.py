@@ -488,12 +488,21 @@ class BucketBaselineMoments:
     bf_date: Optional[str] = None
 
 
+# How many partnership ranks are stored per (cell, wicket_number) in
+# bucketbaselinepartnershiptop. Exported here (rather than in
+# scripts/populate_bucket_baseline.py where it was first defined) so
+# the API router can import it without taking a runtime dependency on
+# scripts/ — deploy.sh ships api/ + models/ but NOT scripts/.
+PARTNERSHIP_TOP_K = 10
+
+
 class BucketBaselinePartnershipTop:
     """Per-(cell, wicket_number) top-K partnerships — drives
     /series/partnerships/top-by-wicket without scanning the partnership
     table at request time.
 
-    K = 10 ranks stored (matches the endpoint's default per_wicket=10).
+    K = PARTNERSHIP_TOP_K (10) ranks stored — matches the endpoint's
+    default per_wicket=10.
     League-only — no team column. The endpoint's dispatch rejects
     filter_team via is_precomputed_scope, so per-team rows are unused.
 
