@@ -2262,6 +2262,11 @@ export interface TournamentSummary {
   most_titles: { team: string; titles: number } | null
   champions_by_season: {
     season: string
+    /** Cricsheet event_name (NOT canonical). Present at tier mode so
+     *  the Champions table can render a Tournament column across rows.
+     *  In tournament-mode, every row's tournament equals the dossier's
+     *  tournament so the field is redundant. */
+    tournament: string | null
     champion: string
     match_id: number
     team1: string
@@ -2272,6 +2277,25 @@ export interface TournamentSummary {
   }[]
   top_scorer_alltime: (PersonRef & { team: string | null; runs: number }) | null
   top_wicket_taker_alltime: (PersonRef & { team: string | null; wickets: number }) | null
+  /** Top 5 international teams by win % (min 100 games) at tier mode.
+   *  Empty list when in tournament/rivalry mode (teams[] is shown
+   *  instead). Sourced from precomputed bucketbaselinematch rows. */
+  top_teams_international: {
+    team: string
+    played: number
+    wins: number
+    losses: number
+    win_pct: number | null
+  }[]
+  /** Top 5 club teams by win % at tier mode. Same shape as
+   *  top_teams_international. Empty in tournament/rivalry mode. */
+  top_teams_club: {
+    team: string
+    played: number
+    wins: number
+    losses: number
+    win_pct: number | null
+  }[]
   highest_individual: (PersonRef & {
     team: string | null; runs: number
     match_id: number; date: string | null

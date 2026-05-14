@@ -381,7 +381,7 @@ const tparams = (t: string | null | undefined, f?: TF) => {
 
 export const getTournamentsLanding = (filters?: F) =>
   fetchApi<import('./types').TournamentsLanding>('/api/v1/series/landing', filters as Record<string, string>)
-export const getTournamentSummary = (tournament: string | null, filters?: TF & { lite?: boolean }) =>
+export const getTournamentSummary = (tournament: string | null, filters?: TF) =>
   fetchApi<import('./types').TournamentSummary>('/api/v1/series/summary', tparams(tournament, filters))
 export const getTournamentBySeason = (tournament: string | null, filters?: TF) =>
   fetchApi<{ tournament: string; seasons: import('./types').TournamentSeason[] }>(
@@ -450,21 +450,8 @@ export const getTournamentPartnershipsHeatmap = (
 
 // ─── League (above-tournament scope dossier) ─────────────────────────
 
-export const getLeagueOverview = (filters?: F) =>
-  fetchApi<import('./types').LeagueOverview>(
-    '/api/v1/league/overview', filters as Record<string, string>)
-export const getLeagueChampions = (filters?: F) =>
-  fetchApi<{ rows: import('./types').LeagueChampionRow[] }>(
-    '/api/v1/league/champions', filters as Record<string, string>)
-export const getLeagueBattersLeaders = (
-  filters?: F & { limit?: number; offset?: number },
-) => fetchApi<import('./types').BattingLeaders>(
-  '/api/v1/league/leaders/batting', filters as Record<string, string>)
-export const getLeagueBowlersLeaders = (
-  filters?: F & { limit?: number; offset?: number },
-) => fetchApi<import('./types').BowlingLeaders>(
-  '/api/v1/league/leaders/bowling', filters as Record<string, string>)
-export const getLeagueFieldersLeaders = (
-  filters?: F & { limit?: number; offset?: number },
-) => fetchApi<import('./types').FieldingLeaders>(
-  '/api/v1/league/leaders/fielding', filters as Record<string, string>)
+// /league/* endpoints removed 2026-05-14 — they were parallel copies
+// of /series/* that just dropped the tournament param. /series/summary
+// at broad scope now returns top_teams_international + top_teams_club
+// + tournament-bearing champions_by_season + all-time leaders, sourced
+// from precomputed bucket-baseline tables for sub-second response.

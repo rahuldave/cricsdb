@@ -705,15 +705,6 @@ async def tournament_summary(
     series_type: str | None = Query(None, description="all / bilateral_only / tournament_only"),
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
-    lite: bool = Query(
-        False,
-        description="Skip the three slow GROUP BY (person, match) aggregates "
-                    "(highest_individual, best_bowling, best_fielding). At "
-                    "all-cricket scope these dominate the response time "
-                    "(20s vs 4s without them). Set true from the /series tier "
-                    "dossier where person-level Best moments are deferred to "
-                    "narrower scope. Returns null for the three skipped fields.",
-    ),
 ):
     """Headline numbers for a match-set scope.
 
@@ -745,44 +736,105 @@ async def tournament_summary(
     #    reads (verified: 3x parallel = 0.35s vs serial 1.0s). At
     #    all-cricket scope this drops the cost of these 7 queries from
     #    ~5s serial to ~1s parallel.
-    meta_rows, bat_rows, wkt_rows, ts_rows, tw_rows, ht_rows, lp_rows = await asyncio.gather(
-        db.q(
-            f"""
-            SELECT COUNT(DISTINCT m.id) AS matches,
-                   COUNT(DISTINCT m.season) AS editions
-            FROM match m WHERE {where}
-            """,
+    # `is_baseline`: precomputed-tables path answers the count/rate
+    # queries when the scope is in the regime (no venue, no rivalry,
+    # no aux narrowing, no team_class narrowing that matches the
+    # team_type). At all-cricket scope this is the difference between
+    # SUM-ing 6k matches in bucketbaselinematch (<100ms) and full
+    # delivery-table aggregation (multi-second). Per-(person, match)
+    # best moments stay live since no precompute table carries that
+    # grain.
+    from .bucket_baseline_dispatch import (
+        is_precomputed_scope, baseline_where, LEAGUE_TEAM_KEY,
+    )
+    is_tier = tournament is None and not (filters.team and filters.opponent)
+    is_baseline = is_tier and is_precomputed_scope(filters, aux)
+
+    if is_baseline:
+        bl_where, bl_params = baseline_where(filters, aux, team=LEAGUE_TEAM_KEY)
+        meta_q = db.q(
+            f"SELECT SUM(matches) AS matches, COUNT(DISTINCT season) AS editions "
+            f"FROM bucketbaselinematch {bl_where}",
+            bl_params,
+        )
+        bat_q = db.q(
+            f"""SELECT SUM(total_runs) AS total_runs,
+                       SUM(legal_balls) AS legal_balls,
+                       SUM(sixes) AS sixes,
+                       SUM(fours) AS fours,
+                       SUM(dots) AS dots
+                FROM bucketbaselinebatting {bl_where}""",
+            bl_params,
+        )
+        wkt_q = db.q(
+            f"SELECT SUM(wickets) AS wickets FROM bucketbaselinebowling {bl_where}",
+            bl_params,
+        )
+    else:
+        meta_q = db.q(
+            f"""SELECT COUNT(DISTINCT m.id) AS matches,
+                       COUNT(DISTINCT m.season) AS editions
+                FROM match m WHERE {where}""",
             params,
-        ),
-        db.q(
-            f"""
-            SELECT SUM(d.runs_total) AS total_runs,
-                   SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
-                   SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
-                   SUM(CASE WHEN d.runs_batter = 4 AND (d.runs_non_boundary IS NULL OR d.runs_non_boundary = 0) THEN 1 ELSE 0 END) AS fours,
-                   SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots
-            FROM delivery d
-            JOIN innings i ON i.id = d.innings_id
-            JOIN match m ON m.id = i.match_id
-            WHERE i.super_over = 0 AND {where}{inn_clause}
-            """,
+        )
+        bat_q = db.q(
+            f"""SELECT SUM(d.runs_total) AS total_runs,
+                       SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
+                       SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
+                       SUM(CASE WHEN d.runs_batter = 4 AND (d.runs_non_boundary IS NULL OR d.runs_non_boundary = 0) THEN 1 ELSE 0 END) AS fours,
+                       SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots
+                FROM delivery d
+                JOIN innings i ON i.id = d.innings_id
+                JOIN match m ON m.id = i.match_id
+                WHERE i.super_over = 0 AND {where}{inn_clause}""",
             {**params, **inn_params},
-        ),
-        db.q(
-            f"""
-            SELECT COUNT(*) AS wickets
-            FROM wicket w
-            JOIN delivery d ON d.id = w.delivery_id
-            JOIN innings i ON i.id = d.innings_id
-            JOIN match m ON m.id = i.match_id
-            WHERE i.super_over = 0 AND {where}{inn_clause}
-            """,
+        )
+        wkt_q = db.q(
+            f"""SELECT COUNT(*) AS wickets
+                FROM wicket w
+                JOIN delivery d ON d.id = w.delivery_id
+                JOIN innings i ON i.id = d.innings_id
+                JOIN match m ON m.id = i.match_id
+                WHERE i.super_over = 0 AND {where}{inn_clause}""",
             {**params, **inn_params},
-        ),
-        db.q(
-            # Top scorer all-time (GROUP BY batter_id over delivery)
-            f"""
-            SELECT d.batter_id AS person_id, p.name, i.team AS team,
+        )
+
+    # Top teams (precomputed): SUM bat_first_wins + field_first_wins
+    # per team across the scope's bucketbaselinematch rows. Only
+    # populated in baseline regime — tournament-mode renders teams[]
+    # chips instead.
+    if is_baseline:
+        # baseline_where with team=None skips the team predicate.
+        bl_where_anyteam, bl_params_anyteam = baseline_where(filters, aux, team=None)
+        # That helper still adds team=NULL; build manually here.
+        top_teams_q = db.q(
+            f"""SELECT team, team_type,
+                       SUM(matches) AS played,
+                       SUM(bat_first_wins) + SUM(field_first_wins) AS wins,
+                       SUM(decided) AS decided
+                FROM bucketbaselinematch
+                WHERE team != '{LEAGUE_TEAM_KEY}'
+                  {("AND gender = :gender" if filters.gender else "")}
+                  {("AND team_type = :team_type" if filters.team_type else "")}
+                  {("AND season >= :season_from" if filters.season_from else "")}
+                  {("AND season <= :season_to" if filters.season_to else "")}
+                GROUP BY team, team_type
+                HAVING played >= 100""",
+            {
+                **({"gender": filters.gender} if filters.gender else {}),
+                **({"team_type": filters.team_type} if filters.team_type else {}),
+                **({"season_from": filters.season_from} if filters.season_from else {}),
+                **({"season_to": filters.season_to} if filters.season_to else {}),
+            },
+        )
+    else:
+        top_teams_q = None
+
+    # ── Standard live queries (ts/tw/ht/lp, finals, hi/bb/bf) — all
+    #    gathered alongside the baseline-or-live count queries above
+    #    so wall time = max-of-queries, not sum-of-queries.
+    ts_q = db.q(
+        f"""SELECT d.batter_id AS person_id, p.name, i.team AS team,
                    SUM(d.runs_batter) AS runs
             FROM delivery d
             JOIN innings i ON i.id = d.innings_id
@@ -792,15 +844,11 @@ async def tournament_summary(
               AND d.batter_id IS NOT NULL
               AND d.extras_wides = 0 AND d.extras_noballs = 0
             GROUP BY d.batter_id
-            ORDER BY runs DESC
-            LIMIT 1
-            """,
-            params,
-        ),
-        db.q(
-            # Top wicket-taker all-time (GROUP BY bowler_id over wicket)
-            f"""
-            SELECT d.bowler_id AS person_id, p.name,
+            ORDER BY runs DESC LIMIT 1""",
+        params,
+    )
+    tw_q = db.q(
+        f"""SELECT d.bowler_id AS person_id, p.name,
                    CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS team,
                    COUNT(*) AS wickets
             FROM wicket w
@@ -812,15 +860,11 @@ async def tournament_summary(
               AND d.bowler_id IS NOT NULL
               AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
             GROUP BY d.bowler_id
-            ORDER BY wickets DESC
-            LIMIT 1
-            """,
-            params,
-        ),
-        db.q(
-            # Highest team total (innings-level)
-            f"""
-            SELECT i.team, tot.total,
+            ORDER BY wickets DESC LIMIT 1""",
+        params,
+    )
+    ht_q = db.q(
+        f"""SELECT i.team, tot.total,
                    m.id AS match_id,
                    CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
                    (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
@@ -832,15 +876,11 @@ async def tournament_summary(
             JOIN innings i ON i.id = tot.innings_id
             JOIN match m ON m.id = i.match_id
             WHERE i.super_over = 0 AND {where}{inn_clause}
-            ORDER BY tot.total DESC
-            LIMIT 1
-            """,
-            params,
-        ),
-        db.q(
-            # Largest partnership
-            f"""
-            SELECT p.partnership_runs AS runs, m.id AS match_id,
+            ORDER BY tot.total DESC LIMIT 1""",
+        params,
+    )
+    lp_q = db.q(
+        f"""SELECT p.partnership_runs AS runs, m.id AS match_id,
                    p.batter1_id, p.batter1_name,
                    p.batter2_id, p.batter2_name,
                    i.team AS team,
@@ -850,12 +890,113 @@ async def tournament_summary(
             JOIN innings i ON i.id = p.innings_id
             JOIN match m ON m.id = i.match_id
             WHERE i.super_over = 0 AND {where}{inn_clause}
-            ORDER BY p.partnership_runs DESC
-            LIMIT 1
-            """,
-            params,
-        ),
+            ORDER BY p.partnership_runs DESC LIMIT 1""",
+        params,
     )
+    # Finals (for champions_by_season + most_titles). Adds
+    # `tournament` (m.event_name) to the SELECT so cross-tournament
+    # tier-mode rows can render the column. event_stage='Final' is
+    # selective so this is fast at any scope.
+    finals_q = db.q(
+        f"""SELECT m.season AS season, m.event_name AS tournament,
+                   m.outcome_winner AS winner, m.id AS match_id,
+                   m.team1, m.team2,
+                   (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date,
+                   (SELECT COALESCE(SUM(d.runs_total), 0) FROM innings i JOIN delivery d ON d.innings_id = i.id WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_runs,
+                   (SELECT COUNT(*) FROM wicket w JOIN delivery d ON d.id = w.delivery_id JOIN innings i ON i.id = d.innings_id WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_wkts,
+                   (SELECT COALESCE(SUM(d.runs_total), 0) FROM innings i JOIN delivery d ON d.innings_id = i.id WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_runs,
+                   (SELECT COUNT(*) FROM wicket w JOIN delivery d ON d.id = w.delivery_id JOIN innings i ON i.id = d.innings_id WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_wkts,
+                   (SELECT COUNT(*) FROM innings i WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_has,
+                   (SELECT COUNT(*) FROM innings i WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_has
+            FROM match m
+            WHERE {where} AND m.event_stage = 'Final' AND m.outcome_winner IS NOT NULL
+            ORDER BY m.season DESC""",
+        params,
+    )
+    # Person-level best moments (highest_individual, best_bowling,
+    # best_fielding) — slow GROUP BY (person, match) but in gather
+    # they parallelize.
+    hi_q = db.q(
+        f"""SELECT d.batter_id AS person_id, p.name, i.team AS team,
+                   m.id AS match_id,
+                   SUM(d.runs_batter) AS runs,
+                   (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            LEFT JOIN person p ON p.id = d.batter_id
+            WHERE i.super_over = 0 AND {where}{inn_clause}
+              AND d.batter_id IS NOT NULL
+              AND d.extras_wides = 0 AND d.extras_noballs = 0
+            GROUP BY d.batter_id, m.id
+            ORDER BY runs DESC LIMIT 1""",
+        params,
+    )
+    bb_q = db.q(
+        f"""WITH per_match_bowler AS (
+              SELECT d.bowler_id, i.match_id,
+                     CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS bowler_team,
+                     SUM(CASE WHEN w.id IS NOT NULL
+                                  AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+                              THEN 1 ELSE 0 END) AS wickets,
+                     SUM(d.runs_total) AS runs_conceded
+              FROM delivery d
+              LEFT JOIN wicket w ON w.delivery_id = d.id
+              JOIN innings i ON i.id = d.innings_id
+              JOIN match m ON m.id = i.match_id
+              WHERE i.super_over = 0 AND {where}{inn_clause}
+                AND d.bowler_id IS NOT NULL
+              GROUP BY d.bowler_id, i.match_id
+            )
+            SELECT pm.bowler_id AS person_id, p.name, pm.bowler_team AS team,
+                   pm.wickets, pm.runs_conceded AS runs, pm.match_id,
+                   (SELECT MIN(date) FROM matchdate WHERE match_id = pm.match_id) AS date
+            FROM per_match_bowler pm
+            LEFT JOIN person p ON p.id = pm.bowler_id
+            ORDER BY pm.wickets DESC, pm.runs_conceded ASC LIMIT 1""",
+        params,
+    )
+    bf_q = db.q(
+        f"""WITH per_match_fielder AS (
+              SELECT fc.fielder_id, i.match_id,
+                     CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS fielder_team,
+                     SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled') THEN 1 ELSE 0 END) AS catches,
+                     SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+                     SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+                     SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS caught_bowled,
+                     COUNT(*) AS total
+              FROM fieldingcredit fc
+              JOIN delivery d ON d.id = fc.delivery_id
+              JOIN innings i ON i.id = d.innings_id
+              JOIN match m ON m.id = i.match_id
+              WHERE i.super_over = 0 AND {where}{inn_clause}
+                AND fc.fielder_id IS NOT NULL
+                AND fc.is_substitute = 0
+              GROUP BY fc.fielder_id, i.match_id
+            )
+            SELECT pf.fielder_id AS person_id, p.name, pf.fielder_team AS team,
+                   pf.catches, pf.stumpings, pf.run_outs, pf.caught_bowled,
+                   pf.total, pf.match_id,
+                   (SELECT MIN(date) FROM matchdate WHERE match_id = pf.match_id) AS date
+            FROM per_match_fielder pf
+            LEFT JOIN person p ON p.id = pf.fielder_id
+            ORDER BY pf.total DESC, pf.stumpings DESC LIMIT 1""",
+        params,
+    )
+
+    # One big gather — every read in /series/summary that doesn't
+    # depend on another's result. deebase supports parallel reads
+    # (verified). Wall time becomes max-of-queries (~1-3s) instead of
+    # sum-of-queries (~15-20s at all-cricket).
+    _queries = [meta_q, bat_q, wkt_q, ts_q, tw_q, ht_q, lp_q,
+                finals_q, hi_q, bb_q, bf_q]
+    if top_teams_q is not None:
+        _queries.append(top_teams_q)
+    _results = await asyncio.gather(*_queries)
+    (meta_rows, bat_rows, wkt_rows, ts_rows, tw_rows, ht_rows, lp_rows,
+     finals_rows, hi_rows, bb_rows, bf_rows) = _results[:11]
+    top_teams_rows = _results[11] if top_teams_q is not None else None
+
     meta = meta_rows[0] if meta_rows else {"matches": 0, "editions": 0}
     b = bat_rows[0] if bat_rows else {}
     total_runs = b.get("total_runs") or 0
@@ -865,44 +1006,13 @@ async def tournament_summary(
     dots = b.get("dots") or 0
     total_wickets = wkt_rows[0]["wickets"] if wkt_rows else 0
 
-    # ── Champions + most-titles ──
-    # Include the final's team1/team2 + per-innings scores so the
-    # frontend Champions-by-season table can render a <Score /> instead
-    # of a bare "scorecard →" link. Scalar subqueries mirror the pattern
-    # in /series/by-season::finals_rows (see design-decisions.md on
-    # avoiding delivery × wicket LEFT JOIN overcount).
-    finals_rows = await db.q(
-        f"""
-        SELECT m.season AS season, m.outcome_winner AS winner, m.id AS match_id,
-               m.team1, m.team2,
-               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date,
-               (SELECT COALESCE(SUM(d.runs_total), 0)
-                  FROM innings i JOIN delivery d ON d.innings_id = i.id
-                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_runs,
-               (SELECT COUNT(*) FROM wicket w
-                  JOIN delivery d ON d.id = w.delivery_id
-                  JOIN innings i ON i.id = d.innings_id
-                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_wkts,
-               (SELECT COALESCE(SUM(d.runs_total), 0)
-                  FROM innings i JOIN delivery d ON d.innings_id = i.id
-                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_runs,
-               (SELECT COUNT(*) FROM wicket w
-                  JOIN delivery d ON d.id = w.delivery_id
-                  JOIN innings i ON i.id = d.innings_id
-                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_wkts,
-               (SELECT COUNT(*) FROM innings i
-                 WHERE i.match_id = m.id AND i.team = m.team1 AND i.super_over = 0) AS t1_has,
-               (SELECT COUNT(*) FROM innings i
-                 WHERE i.match_id = m.id AND i.team = m.team2 AND i.super_over = 0) AS t2_has
-        FROM match m
-        WHERE {where} AND m.event_stage = 'Final' AND m.outcome_winner IS NOT NULL
-        ORDER BY m.season DESC
-        """,
-        params,
-    )
+    # ── Champions + most-titles (finals_rows gathered above) ──
+    # Adds `tournament` column so cross-tournament tier-mode rows
+    # carry their event_name for the Champions table column.
     champions_by_season = [
         {
             "season": r["season"],
+            "tournament": r["tournament"],
             "champion": r["winner"],
             "match_id": r["match_id"],
             "team1": r["team1"],
@@ -945,39 +1055,15 @@ async def tournament_summary(
             "date": r["date"],
         }
 
-    # ── Highest individual innings (best batting single-match) ──
-    # Slow at broad scope: GROUP BY (batter_id, match_id) iterates
-    # ~300k groups across all delivery rows. `lite=True` skips it.
+    # ── Process gathered hi/bb/bf/lp ──
     highest_individual = None
-    if not lite:
-        hi_rows = await db.q(
-            f"""
-            SELECT d.batter_id AS person_id, p.name, i.team AS team,
-                   m.id AS match_id,
-                   SUM(d.runs_batter) AS runs,
-                   (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
-            FROM delivery d
-            JOIN innings i ON i.id = d.innings_id
-            JOIN match m ON m.id = i.match_id
-            LEFT JOIN person p ON p.id = d.batter_id
-            WHERE i.super_over = 0 AND {where}{inn_clause}
-              AND d.batter_id IS NOT NULL
-              AND d.extras_wides = 0 AND d.extras_noballs = 0
-            GROUP BY d.batter_id, m.id
-            ORDER BY runs DESC
-            LIMIT 1
-            """,
-            params,
-        )
-        if hi_rows:
-            r = hi_rows[0]
-            highest_individual = {
-                "person_id": r["person_id"], "name": r["name"],
-                "team": r["team"],
-                "runs": r["runs"], "match_id": r["match_id"], "date": r["date"],
-            }
-
-    # ── Largest partnership (gathered above) ──
+    if hi_rows:
+        r = hi_rows[0]
+        highest_individual = {
+            "person_id": r["person_id"], "name": r["name"],
+            "team": r["team"],
+            "runs": r["runs"], "match_id": r["match_id"], "date": r["date"],
+        }
     largest_partnership = None
     if lp_rows:
         r = lp_rows[0]
@@ -988,101 +1074,29 @@ async def tournament_summary(
             "batter1": {"person_id": r["batter1_id"], "name": r["batter1_name"]},
             "batter2": {"person_id": r["batter2_id"], "name": r["batter2_name"]},
         }
-
-    # ── Best bowling figures (single match) ──
-    # Slow at broad scope: GROUP BY (bowler_id, match_id) CTE.
-    # Bowler's team = opposite of the innings they bowled in.
     best_bowling = None
-    if not lite:
-        bb_rows = await db.q(
-            f"""
-            WITH per_match_bowler AS (
-              SELECT d.bowler_id, i.match_id,
-                     CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS bowler_team,
-                     SUM(CASE WHEN w.id IS NOT NULL
-                                  AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-                              THEN 1 ELSE 0 END) AS wickets,
-                     SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
-                              THEN d.runs_total ELSE d.runs_total END) AS runs_conceded
-              FROM delivery d
-              LEFT JOIN wicket w ON w.delivery_id = d.id
-              JOIN innings i ON i.id = d.innings_id
-              JOIN match m ON m.id = i.match_id
-              WHERE i.super_over = 0 AND {where}{inn_clause}
-                AND d.bowler_id IS NOT NULL
-              GROUP BY d.bowler_id, i.match_id
-            )
-            SELECT pm.bowler_id AS person_id, p.name,
-                   pm.bowler_team AS team,
-                   pm.wickets, pm.runs_conceded AS runs,
-                   pm.match_id,
-                   (SELECT MIN(date) FROM matchdate WHERE match_id = pm.match_id) AS date
-            FROM per_match_bowler pm
-            LEFT JOIN person p ON p.id = pm.bowler_id
-            ORDER BY pm.wickets DESC, pm.runs_conceded ASC
-            LIMIT 1
-            """,
-            params,
-        )
-        if bb_rows:
-            r = bb_rows[0]
-            best_bowling = {
-                "person_id": r["person_id"], "name": r["name"],
-                "team": r["team"],
-                "figures": f"{r['wickets']}/{r['runs']}",
-                "wickets": r["wickets"], "runs": r["runs"],
-                "match_id": r["match_id"], "date": r["date"],
-            }
+    if bb_rows:
+        r = bb_rows[0]
+        best_bowling = {
+            "person_id": r["person_id"], "name": r["name"],
+            "team": r["team"],
+            "figures": f"{r['wickets']}/{r['runs']}",
+            "wickets": r["wickets"], "runs": r["runs"],
+            "match_id": r["match_id"], "date": r["date"],
+        }
 
-    # ── Best fielding (most dismissals in a single match) ──
-    # Slow at broad scope: GROUP BY (fielder_id, match_id) CTE.
-    # Counts catches + stumpings + run-outs + caught-and-bowled. Excludes
-    # substitute fielders. Fielder's team = opposite of innings batting team.
+    # ── Process gathered best_fielding (bf_rows gathered above) ──
     best_fielding = None
-    if not lite:
-        bf_rows = await db.q(
-            f"""
-            WITH per_match_fielder AS (
-              SELECT fc.fielder_id, i.match_id,
-                     CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS fielder_team,
-                     -- Convention 3: catches inclusive of caught_and_bowled.
-                     SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
-                              THEN 1 ELSE 0 END) AS catches,
-                     SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
-                     SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
-                     SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS caught_bowled,
-                     COUNT(*) AS total
-              FROM fieldingcredit fc
-              JOIN delivery d ON d.id = fc.delivery_id
-              JOIN innings i ON i.id = d.innings_id
-              JOIN match m ON m.id = i.match_id
-              WHERE i.super_over = 0 AND {where}{inn_clause}
-                AND fc.fielder_id IS NOT NULL
-                AND fc.is_substitute = 0
-              GROUP BY fc.fielder_id, i.match_id
-            )
-            SELECT pf.fielder_id AS person_id, p.name,
-                   pf.fielder_team AS team,
-                   pf.catches, pf.stumpings, pf.run_outs, pf.caught_bowled,
-                   pf.total, pf.match_id,
-                   (SELECT MIN(date) FROM matchdate WHERE match_id = pf.match_id) AS date
-            FROM per_match_fielder pf
-            LEFT JOIN person p ON p.id = pf.fielder_id
-            ORDER BY pf.total DESC, pf.stumpings DESC
-            LIMIT 1
-            """,
-            params,
-        )
-        if bf_rows:
-            r = bf_rows[0]
-            best_fielding = {
-                "person_id": r["person_id"], "name": r["name"],
-                "team": r["team"],
-                "catches": r["catches"], "stumpings": r["stumpings"],
-                "run_outs": r["run_outs"], "caught_bowled": r["caught_bowled"],
-                "total": r["total"],
-                "match_id": r["match_id"], "date": r["date"],
-            }
+    if bf_rows:
+        r = bf_rows[0]
+        best_fielding = {
+            "person_id": r["person_id"], "name": r["name"],
+            "team": r["team"],
+            "catches": r["catches"], "stumpings": r["stumpings"],
+            "run_outs": r["run_outs"], "caught_bowled": r["caught_bowled"],
+            "total": r["total"],
+            "match_id": r["match_id"], "date": r["date"],
+        }
 
     # ── Participating teams (in scope) ──
     team_rows = await db.q(
@@ -1229,6 +1243,37 @@ async def tournament_summary(
                 "no_result": r["no_result"] or 0,
             }
 
+    # ── Top teams (precomputed, tier-mode only) ──
+    # Split by team_type into international + club leaderboards, each
+    # top 5 by win %. Already gathered as `top_teams_rows`. Empty
+    # lists when not in baseline regime (tournament/rivalry scope
+    # has teams[] chips instead).
+    top_teams_intl: list[dict] = []
+    top_teams_club: list[dict] = []
+    if top_teams_rows:
+        bucketed: dict[str, list[dict]] = {"international": [], "club": []}
+        for r in top_teams_rows:
+            tt = r["team_type"]
+            if tt not in bucketed:
+                continue
+            played = r["played"] or 0
+            wins = r["wins"] or 0
+            decided = r["decided"] or 0
+            bucketed[tt].append({
+                "team": r["team"],
+                "played": played,
+                "wins": wins,
+                "losses": (decided - wins) if decided else 0,
+                "win_pct": _safe_div(wins, decided, 100, 1),
+            })
+        for tt in ("international", "club"):
+            bucketed[tt].sort(
+                key=lambda t: (t["win_pct"] or -1, t["played"]),
+                reverse=True,
+            )
+        top_teams_intl = bucketed["international"][:5]
+        top_teams_club = bucketed["club"][:5]
+
     return {
         "canonical": tournament,
         "variants": vs,
@@ -1245,6 +1290,8 @@ async def tournament_summary(
         "champions_by_season": champions_by_season,
         "top_scorer_alltime": top_scorer,
         "top_wicket_taker_alltime": top_wicket_taker,
+        "top_teams_international": top_teams_intl,
+        "top_teams_club": top_teams_club,
         "highest_individual": highest_individual,
         "highest_team_total": highest_team_total,
         "largest_partnership": largest_partnership,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
 import { useFilterDeps } from '../../hooks/useFilterDeps'
@@ -17,7 +17,7 @@ import {
   getScopeBattingSummary, getScopeBattingBySeason,
   getScopeBowlingSummary, getScopeBowlingBySeason,
   getScopeFieldingSummary, getScopeFieldingBySeason,
-  getLeagueOverview, getLeagueChampions, getTournamentsLanding,
+  getTournamentsLanding,
 } from '../../api'
 import StatCard from '../StatCard'
 import InningToggle from '../InningToggle'
@@ -52,7 +52,6 @@ import type {
   ScopeBattingSummary, ScopeBattingSeason,
   ScopeBowlingSummary, ScopeBowlingSeason,
   ScopeFieldingSummary, ScopeFieldingSeason,
-  LeagueOverview, LeagueChampionRow, LeagueTopTeamRow,
   TournamentsLanding as TournamentsLandingData,
   TournamentLandingEntry, RivalryEntry,
 } from '../../types'
@@ -211,37 +210,21 @@ export default function TournamentDossier({
     ...useFilterDeps(),
   ]
 
-  // `lite=true` at tier mode skips the slow per-person-per-match GROUP BY
-  // aggregates in /series/summary (highest_individual / best_bowling /
-  // best_fielding). At all-cricket scope this drops the response time
-  // from ~20s to ~7s; at men's club from ~10s to ~4s. Person-level Best
-  // moments lines hide automatically when the fields are null.
-  const isTierFetch = !tournament && !(filterTeam && filterOpponent)
   const summaryFetch = useFetch<TournamentSummary>(
-    () => getTournamentSummary(tournament, { ...apiFilters, lite: isTierFetch || undefined }),
-    [...filterDeps, isTierFetch],
+    () => getTournamentSummary(tournament, apiFilters),
+    filterDeps,
   )
 
-  // ── Tier-mode extras: Champions across scope + top-teams by win % ──
-  // Only fetched when we're rendering at broad scope (no tournament,
-  // no rivalry) on the Overview tab. /league/* endpoints are the lean
-  // composites — /series/summary is the heavy single-tournament path.
+  // /series/summary at broad scope (no tournament, no rivalry) now
+  // returns top_teams_international + top_teams_club, and its
+  // champions_by_season carries the per-row tournament — so the
+  // tier-mode Overview reads all of its data straight off `summary`.
+  // The separate /league/* router (5 redundant endpoints) was deleted
+  // 2026-05-14 along with the lite=true band-aid.
   const isSingleTournamentLocal = !!tournament
   const isRivalryLocal = !!(filterTeam && filterOpponent)
   const showTierExtras = !isSingleTournamentLocal && !isRivalryLocal
 
-  const tierOverviewFetch = useFetch<LeagueOverview | null>(
-    () => showTierExtras
-      ? getLeagueOverview(apiFilters)
-      : Promise.resolve(null),
-    [...filterDeps, showTierExtras],
-  )
-  const tierChampionsFetch = useFetch<{ rows: LeagueChampionRow[] } | null>(
-    () => showTierExtras
-      ? getLeagueChampions(apiFilters)
-      : Promise.resolve(null),
-    [...filterDeps, showTierExtras],
-  )
   // Source of truth for: Recently played editions strip + Top events
   // tile grid + RivalryTile content. /series/landing is already
   // FilterParams-aware so narrowing flows through without per-tile
@@ -664,18 +647,10 @@ export default function TournamentDossier({
           gender={filters.gender}
           teamType={filters.team_type}
           tierExtras={isTierMode ? {
-            topTeamsInternational: tierOverviewFetch.data?.top_teams_international ?? null,
-            topTeamsClub: tierOverviewFetch.data?.top_teams_club ?? null,
-            minGamesThreshold: tierOverviewFetch.data?.min_games_threshold ?? 100,
-            champions: tierChampionsFetch.data?.rows ?? null,
+            topTeamsInternational: summary.top_teams_international ?? null,
+            topTeamsClub: summary.top_teams_club ?? null,
+            minGamesThreshold: 100,
             landing: tierLandingFetch.data,
-            counts: tierOverviewFetch.data
-              ? {
-                  innings: tierOverviewFetch.data.innings,
-                  teams: tierOverviewFetch.data.teams_count,
-                  tournaments: tierOverviewFetch.data.tournaments_count,
-                }
-              : null,
           } : null}
         />
       )}
@@ -822,12 +797,10 @@ function OverviewTab({
    *  Champions / Other teams sections. When null, the tab renders
    *  exactly as it has for tournament / rivalry pages. */
   tierExtras?: {
-    topTeamsInternational: LeagueTopTeamRow[] | null
-    topTeamsClub: LeagueTopTeamRow[] | null
+    topTeamsInternational: TournamentSummary['top_teams_international'] | null
+    topTeamsClub: TournamentSummary['top_teams_club'] | null
     minGamesThreshold: number
-    champions: LeagueChampionRow[] | null
     landing: TournamentsLandingData | null
-    counts: { innings: number; teams: number; tournaments: number } | null
   } | null
 }) {
   const isRivalry = !!summary.by_team
@@ -1358,26 +1331,32 @@ function OverviewTab({
           as a compact cross-edition summary. */}
 
 
-      {tournament && summary.champions_by_season.length > 0 && (
+      {summary.champions_by_season.length > 0 && (
         <div className="mt-8">
-          <SectionHeader title="Champions by season" />
+          <SectionHeader title={tournament ? "Champions by season" : "Champions across scope"} />
           <EdHelp />
           <DataTable
             columns={[
               { key: 'season', label: 'Season', sortable: true },
+              // In tier mode (no tournament), surface the tournament
+              // column so each row is identifiable (a season may have
+              // multiple finals across leagues).
+              ...(!tournament ? [{
+                key: 'tournament' as const, label: 'Tournament', sortable: true,
+              }] : []),
               {
                 key: 'team1', label: 'Final',
                 format: (_v, r) => (
                   <>
                     <TeamWithEd
                       team={r.team1}
-                      row={{ tournament, season: r.season }}
+                      row={{ tournament: r.tournament ?? tournament, season: r.season }}
                       gender={gender} team_type={teamType}
                     />
                     {' v '}
                     <TeamWithEd
                       team={r.team2}
-                      row={{ tournament, season: r.season }}
+                      row={{ tournament: r.tournament ?? tournament, season: r.season }}
                       gender={gender} team_type={teamType}
                     />
                   </>
@@ -2942,13 +2921,12 @@ function TierExtrasSections({
   gender: string | null | undefined
   teamType: string | null | undefined
 }) {
-  const { topTeamsInternational, topTeamsClub, minGamesThreshold, champions, landing, counts } = tierExtras
+  const { topTeamsInternational, topTeamsClub, minGamesThreshold, landing } = tierExtras
   const filters = useFilters()
   const ambient = tileAmbientFromFilters(filters)
 
   // ── Top events — curate marquee tournaments + rivalries from
-  //    /series/landing. Sub-sections hide when empty (gender=female
-  //    drops men's franchise + men's rivalries automatically).
+  //    /series/landing. Sub-sections hide when empty.
   const topFranchise = (landing?.club.franchise_leagues ?? []).slice(0, 4)
   const topWomensFranchise = (landing?.club.women_franchise ?? []).slice(0, 4)
   const topIcc = (landing?.international.icc_events ?? []).slice(0, 4)
@@ -2963,16 +2941,6 @@ function TierExtrasSections({
 
   return (
     <>
-      {counts && (
-        <div className="mt-6 wisden-tab-help" style={{ fontStyle: 'italic' }}>
-          {counts.tournaments.toLocaleString()} tournaments
-          {' · '}
-          {counts.teams.toLocaleString()} teams
-          {' · '}
-          {counts.innings.toLocaleString()} innings in scope
-        </div>
-      )}
-
       {hasTopEvents && (
         <TopEventsSection
           franchise={topFranchise}
@@ -3007,19 +2975,11 @@ function TierExtrasSections({
         </div>
       )}
 
-      {champions && champions.length > 0 && (
-        <div className="mt-8">
-          <SectionHeader title="Champions across scope" />
-          <TierChampionsTable rows={champions} gender={gender} teamType={teamType} />
-        </div>
-      )}
-
-      {/* Other tournaments + rivalries — reuse the existing
-          TournamentsLanding directory. presetData shares the landing
-          fetch with Top events above so we don't double-call
-          /series/landing (each call ~3s on SQLite). The lazy-load
-          buttons inside ("Show 155 other men's rivalries", "Other
-          international tournaments (667)") mirror prod's /series. */}
+      {/* Other tournaments + rivalries — reuse TournamentsLanding's
+          directory with its native lazy-load buttons ("Show N other
+          men's rivalries", "Other international tournaments (N)").
+          presetData shares the /series/landing fetch with Top events
+          above so the embedded directory doesn't re-fetch. */}
       <div className="mt-10">
         <SectionHeader title="Other tournaments and rivalries in scope" />
         <div className="mt-3">
@@ -3101,10 +3061,12 @@ function TopEventsSection({
 }
 
 
+type TierTopTeamRow = TournamentSummary['top_teams_international'][number]
+
 function TierTopTeamsTable({
   rows, gender, teamType,
 }: {
-  rows: LeagueTopTeamRow[]
+  rows: TierTopTeamRow[]
   gender: string | null | undefined
   teamType: string | null | undefined
 }) {
@@ -3127,93 +3089,9 @@ function TierTopTeamsTable({
         { key: 'losses', label: 'L' },
         { key: 'win_pct', label: 'Win %', sortable: true,
           format: (v: number | null) => v != null ? `${v.toFixed(1)}%` : '-' },
-      ] as Column<LeagueTopTeamRow>[]}
+      ] as Column<TierTopTeamRow>[]}
       data={rows}
       rowKey={(r) => r.team}
     />
-  )
-}
-
-
-function TierChampionsTable({
-  rows, gender, teamType,
-}: {
-  rows: LeagueChampionRow[]
-  gender: string | null | undefined
-  teamType: string | null | undefined
-}) {
-  // Show top 20 by default, with "show all" toggle — broad-scope
-  // champion lists can run hundreds of rows. Keeps the page compact
-  // unless the user wants the full history.
-  const [showAll, setShowAll] = useState(false)
-  const DEFAULT_LIMIT = 20
-  const visible = showAll ? rows : rows.slice(0, DEFAULT_LIMIT)
-  const hidden = rows.length - visible.length
-
-  const teamCell = (team: string, row: LeagueChampionRow) => (
-    <TeamLink
-      teamName={team}
-      gender={gender ?? null}
-      team_type={teamType ?? null}
-      subscriptSource={{
-        tournament: row.tournament,
-        season: row.season,
-        team1: null,
-        team2: null,
-      }}
-      maxTiers={1}
-      phraseLabel="ed"
-      phraseClassName="scope-phrase-ed"
-    />
-  ) as unknown as string
-
-  const finalCell = (row: LeagueChampionRow) => (
-    <Score
-      team1Score={row.final_team1_score}
-      team2Score={row.final_team2_score}
-      matchId={row.final_match_id}
-      title={`Final scorecard — ${row.final_team1} v ${row.final_team2}`}
-    />
-  ) as unknown as string
-
-  return (
-    <>
-      <DataTable
-        columns={[
-          { key: 'season', label: 'Season', sortable: true },
-          { key: 'tournament', label: 'Tournament', sortable: true },
-          { key: 'champion', label: 'Champion',
-            format: (v: string, r: LeagueChampionRow) => teamCell(v, r) },
-          { key: 'runner_up', label: 'Runner-up',
-            format: (v: string, r: LeagueChampionRow) => teamCell(v, r) },
-          { key: 'final_match_id', label: 'Final',
-            format: (_v, r: LeagueChampionRow) => finalCell(r) },
-        ] as Column<LeagueChampionRow>[]}
-        data={visible}
-        rowKey={(r) => `${r.season}-${r.tournament}`}
-      />
-      {hidden > 0 && (
-        <div className="mt-2">
-          <button
-            type="button"
-            className="wisden-clear"
-            onClick={() => setShowAll(true)}
-          >
-            ▸ Show {hidden} more champion{hidden === 1 ? '' : 's'}
-          </button>
-        </div>
-      )}
-      {showAll && rows.length > DEFAULT_LIMIT && (
-        <div className="mt-2">
-          <button
-            type="button"
-            className="wisden-clear"
-            onClick={() => setShowAll(false)}
-          >
-            ▾ Show fewer
-          </button>
-        </div>
-      )}
-    </>
   )
 }
