@@ -454,3 +454,36 @@ class BucketBaselineMoments:
     bf_total: int = 0
     bf_match_id: Optional[int] = None
     bf_date: Optional[str] = None
+
+
+class BucketBaselinePartnershipTop:
+    """Per-(cell, wicket_number) top-K partnerships — drives
+    /series/partnerships/top-by-wicket without scanning the partnership
+    table at request time.
+
+    K = 10 ranks stored (matches the endpoint's default per_wicket=10).
+    League-only — no team column. The endpoint's dispatch rejects
+    filter_team via is_precomputed_scope, so per-team rows are unused.
+
+    Ranking matches the live endpoint exactly:
+        ORDER BY p.partnership_runs DESC, p.partnership_balls ASC
+    Ties beyond balls are arbitrary (live SQL has no tertiary key);
+    populate adds p.id ASC as the deterministic tie-break.
+
+    Includes retired-hurt-terminated partnerships (matches live —
+    /series/partnerships/top-by-wicket does NOT exclude them, unlike
+    bucketbaselinepartnership which excludes for per-wicket aggregates).
+
+    Read-side merge across N cells: collect K rows per cell, sort by
+    runs DESC + balls ASC + partnership_id ASC, take top-K.
+    """
+    id: int
+    gender: str
+    team_type: str
+    tournament: str
+    season: str
+    wicket_number: int
+    rank: int  # 1..K (K=10)
+    partnership_id: int
+    runs: int
+    balls: int

@@ -501,6 +501,60 @@ async def check_top_scorer_wicket_taker(
     return ok
 
 
+async def check_partnership_top_roundtrip(
+    db, scope_desc: str, live_where: str, bucket_where: str, params: dict,
+) -> bool:
+    """bucketbaselinepartnershiptop-derived top-K per (cell, wicket) —
+    must match live SQL byte-identical at the given scope. Phase C of
+    spec-series-precompute-followup.md.
+
+    The scope here is a SINGLE cell — the precompute stores top-K per
+    cell, so cross-cell merging happens at request time. Roundtrip test
+    locks the per-cell layer.
+    """
+    print(f"=== /series partnerships top-by-wicket: {scope_desc} ===")
+    ok = True
+    for wn in (1, 5, 10):
+        live = await db.q(
+            f"""WITH ranked AS (
+                SELECT p.id AS partnership_id, p.partnership_runs AS runs,
+                       p.partnership_balls AS balls,
+                       ROW_NUMBER() OVER (
+                           ORDER BY p.partnership_runs DESC,
+                                    p.partnership_balls ASC,
+                                    p.id ASC
+                       ) AS rnk
+                FROM partnership p
+                JOIN innings i ON i.id = p.innings_id
+                JOIN match m ON m.id = i.match_id
+                WHERE i.super_over = 0 AND m.match_type IN ('T20','IT20')
+                  AND p.wicket_number IS NOT NULL AND p.wicket_number = :wn
+                  {(' AND ' + live_where) if live_where else ''}
+            )
+            SELECT partnership_id, runs, balls FROM ranked WHERE rnk <= 10
+            ORDER BY rnk""",
+            {**params, "wn": wn},
+        )
+        bucket = await db.q(
+            f"""SELECT partnership_id, runs, balls
+                FROM bucketbaselinepartnershiptop
+                WHERE wicket_number = :wn
+                  {(' AND ' + bucket_where) if bucket_where else ''}
+                ORDER BY rank""",
+            {**params, "wn": wn},
+        )
+        l = [dict(r) for r in live]
+        b = [dict(r) for r in bucket]
+        if l == b:
+            print(f"  {PASS}: wicket={wn} top-{len(l)}")
+        else:
+            print(f"  {FAIL}: wicket={wn}")
+            print(f"    live  ({len(l)} rows): {l[:3]}...")
+            print(f"    bucket({len(b)} rows): {b[:3]}...")
+            ok = False
+    return ok
+
+
 async def check_cross_cell_isolation(db) -> bool:
     """populate_incremental on cell A leaves cell B untouched."""
     print("=== Cross-cell isolation ===")
@@ -615,6 +669,25 @@ async def main():
     # Phase A — top scorer / wicket-taker roundtrip at 5 scopes.
     for scope in ht_scopes:
         all_ok &= await check_top_scorer_wicket_taker(db, *scope)
+
+    # Phase C — top partnerships per wicket roundtrip at 3 single-cell
+    # scopes (precompute is per-cell; multi-cell merging is endpoint-side).
+    pt_scopes = [
+        ("IPL 2024 (male club)",
+         "m.event_name = :t AND m.season = :s AND m.gender = :g AND m.team_type = :tt",
+         "tournament = :t AND season = :s AND gender = :g AND team_type = :tt",
+         {"t": "Indian Premier League", "s": "2024", "g": "male", "tt": "club"}),
+        ("BBL 2023/24 (male club)",
+         "m.event_name = :t AND m.season = :s AND m.gender = :g AND m.team_type = :tt",
+         "tournament = :t AND season = :s AND gender = :g AND team_type = :tt",
+         {"t": "Big Bash League", "s": "2023/24", "g": "male", "tt": "club"}),
+        ("WBBL 2023/24 (female club)",
+         "m.event_name = :t AND m.season = :s AND m.gender = :g AND m.team_type = :tt",
+         "tournament = :t AND season = :s AND gender = :g AND team_type = :tt",
+         {"t": "Women's Big Bash League", "s": "2023/24", "g": "female", "tt": "club"}),
+    ]
+    for scope in pt_scopes:
+        all_ok &= await check_partnership_top_roundtrip(db, *scope)
 
     all_ok &= await check_incremental_roundtrip(db)
     all_ok &= await check_cross_cell_isolation(db)

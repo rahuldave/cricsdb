@@ -48,7 +48,7 @@ from models import (
     FieldingCredit, KeeperAssignment, Partnership, PlayerScopeStats,
     BucketBaselineMatch, BucketBaselineBatting, BucketBaselineBowling,
     BucketBaselineFielding, BucketBaselinePhase, BucketBaselinePartnership,
-    BucketBaselineMoments,
+    BucketBaselineMoments, BucketBaselinePartnershipTop,
 )
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -65,8 +65,10 @@ BOWLER_WICKET_EXCLUDED = (
 BUCKET_TABLES = [
     BucketBaselineMatch, BucketBaselineBatting, BucketBaselineBowling,
     BucketBaselineFielding, BucketBaselinePhase, BucketBaselinePartnership,
-    BucketBaselineMoments,
+    BucketBaselineMoments, BucketBaselinePartnershipTop,
 ]
+
+PARTNERSHIP_TOP_K = 10
 
 
 async def _ensure_tables(db, incremental: bool = False):
@@ -86,13 +88,14 @@ async def _ensure_tables(db, incremental: bool = False):
     await db.create(PlayerScopeStats,
                     pk=["person_id", "scope_key"], if_not_exists=True)
 
-    await db.create(BucketBaselineMatch,        pk="id", if_not_exists=True)
-    await db.create(BucketBaselineBatting,      pk="id", if_not_exists=True)
-    await db.create(BucketBaselineBowling,      pk="id", if_not_exists=True)
-    await db.create(BucketBaselineFielding,     pk="id", if_not_exists=True)
-    await db.create(BucketBaselinePhase,        pk="id", if_not_exists=True)
-    await db.create(BucketBaselinePartnership,  pk="id", if_not_exists=True)
-    await db.create(BucketBaselineMoments,      pk="id", if_not_exists=True)
+    await db.create(BucketBaselineMatch,           pk="id", if_not_exists=True)
+    await db.create(BucketBaselineBatting,         pk="id", if_not_exists=True)
+    await db.create(BucketBaselineBowling,         pk="id", if_not_exists=True)
+    await db.create(BucketBaselineFielding,        pk="id", if_not_exists=True)
+    await db.create(BucketBaselinePhase,           pk="id", if_not_exists=True)
+    await db.create(BucketBaselinePartnership,     pk="id", if_not_exists=True)
+    await db.create(BucketBaselineMoments,         pk="id", if_not_exists=True)
+    await db.create(BucketBaselinePartnershipTop,  pk="id", if_not_exists=True)
 
     # Indexes — covering the common lookup pattern.
     common = "gender, team_type, tournament, season, team"
@@ -110,6 +113,11 @@ async def _ensure_tables(db, incremental: bool = False):
     await db.q(
         "CREATE INDEX IF NOT EXISTS ix_bucketbaselinemoments_lookup "
         "ON bucketbaselinemoments (gender, team_type, tournament, season)"
+    )
+    # bucketbaselinepartnershiptop — keyed by cell + wicket + rank.
+    await db.q(
+        "CREATE INDEX IF NOT EXISTS ix_bucketbaselinepartnershiptop_lookup "
+        "ON bucketbaselinepartnershiptop (gender, team_type, tournament, season, wicket_number, rank)"
     )
 
 
@@ -1070,6 +1078,63 @@ async def _populate_partnership(db, cells=None):
     await db.q("DROP TABLE _bb_pship")
 
 
+async def _populate_partnership_top(db, cells=None):
+    """Per-cell top-K partnerships per wicket_number — drives
+    /series/partnerships/top-by-wicket without scanning partnership at
+    request time.
+
+    K = PARTNERSHIP_TOP_K (=10). Endpoint default per_wicket=10; for
+    per_wicket > K the endpoint falls back to live SQL.
+
+    Ranking matches the live endpoint exactly:
+        ORDER BY p.partnership_runs DESC, p.partnership_balls ASC,
+                 p.id ASC
+    The trailing p.id ASC is the deterministic tie-break — live has
+    only the two leading keys, but SQLite's ROW_NUMBER would otherwise
+    return non-deterministic ordering at full ties.
+
+    Includes retired-hurt-terminated partnerships (matches live —
+    /series/partnerships/top-by-wicket does NOT exclude them).
+    """
+    cf, cfp = _cell_filter_clause(cells, "m")
+    await db.q(
+        f"""
+        INSERT INTO bucketbaselinepartnershiptop (
+            gender, team_type, tournament, season,
+            wicket_number, rank, partnership_id, runs, balls
+        )
+        WITH ranked AS (
+            SELECT m.gender AS gender, m.team_type AS team_type,
+                   COALESCE(m.event_name, '') AS tournament,
+                   m.season AS season,
+                   p.wicket_number AS wicket_number,
+                   p.id AS partnership_id,
+                   p.partnership_runs AS runs,
+                   p.partnership_balls AS balls,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY m.gender, m.team_type,
+                                    COALESCE(m.event_name, ''), m.season,
+                                    p.wicket_number
+                       ORDER BY p.partnership_runs DESC,
+                                p.partnership_balls ASC,
+                                p.id ASC
+                   ) AS rank
+            FROM partnership p
+            JOIN innings i ON i.id = p.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0
+              AND m.match_type IN ('T20', 'IT20')
+              AND p.wicket_number IS NOT NULL
+              {cf}
+        )
+        SELECT gender, team_type, tournament, season,
+               wicket_number, rank, partnership_id, runs, balls
+        FROM ranked WHERE rank <= {PARTNERSHIP_TOP_K}
+        """,
+        cfp,
+    )
+
+
 async def _populate_moments(db, cells=None):
     """Per-cell top moments (highest_individual, best_bowling, best_fielding).
 
@@ -1255,29 +1320,31 @@ async def populate_full(db):
     for table in ("bucketbaselinematch", "bucketbaselinebatting",
                   "bucketbaselinebowling", "bucketbaselinefielding",
                   "bucketbaselinephase", "bucketbaselinepartnership",
-                  "bucketbaselinemoments"):
+                  "bucketbaselinemoments", "bucketbaselinepartnershiptop"):
         await db.q(f"DELETE FROM {table}")
 
     t0 = time.time()
-    print("  match…");        await _populate_match(db);        print(f"    {time.time()-t0:.1f}s")
+    print("  match…");             await _populate_match(db);             print(f"    {time.time()-t0:.1f}s")
     t0 = time.time()
-    print("  batting…");      await _populate_batting(db);      print(f"    {time.time()-t0:.1f}s")
+    print("  batting…");           await _populate_batting(db);           print(f"    {time.time()-t0:.1f}s")
     t0 = time.time()
-    print("  bowling…");      await _populate_bowling(db);      print(f"    {time.time()-t0:.1f}s")
+    print("  bowling…");           await _populate_bowling(db);           print(f"    {time.time()-t0:.1f}s")
     t0 = time.time()
-    print("  fielding…");     await _populate_fielding(db);     print(f"    {time.time()-t0:.1f}s")
+    print("  fielding…");          await _populate_fielding(db);          print(f"    {time.time()-t0:.1f}s")
     t0 = time.time()
-    print("  phase…");        await _populate_phase(db);        print(f"    {time.time()-t0:.1f}s")
+    print("  phase…");             await _populate_phase(db);             print(f"    {time.time()-t0:.1f}s")
     t0 = time.time()
-    print("  partnership…");  await _populate_partnership(db);  print(f"    {time.time()-t0:.1f}s")
+    print("  partnership…");       await _populate_partnership(db);       print(f"    {time.time()-t0:.1f}s")
     t0 = time.time()
-    print("  moments…");      await _populate_moments(db);      print(f"    {time.time()-t0:.1f}s")
+    print("  partnership_top…");   await _populate_partnership_top(db);   print(f"    {time.time()-t0:.1f}s")
+    t0 = time.time()
+    print("  moments…");           await _populate_moments(db);           print(f"    {time.time()-t0:.1f}s")
 
     counts = {}
     for table in ("bucketbaselinematch", "bucketbaselinebatting",
                   "bucketbaselinebowling", "bucketbaselinefielding",
                   "bucketbaselinephase", "bucketbaselinepartnership",
-                  "bucketbaselinemoments"):
+                  "bucketbaselinemoments", "bucketbaselinepartnershiptop"):
         rows = await db.q(f"SELECT COUNT(*) AS c FROM {table}")
         counts[table] = rows[0]["c"]
     print("[bucket_baseline] row counts:", counts)
@@ -1330,7 +1397,7 @@ async def populate_incremental(db, new_match_ids: list[int]):
     for table in ("bucketbaselinematch", "bucketbaselinebatting",
                   "bucketbaselinebowling", "bucketbaselinefielding",
                   "bucketbaselinephase", "bucketbaselinepartnership",
-                  "bucketbaselinemoments"):
+                  "bucketbaselinemoments", "bucketbaselinepartnershiptop"):
         await db.q(f"DELETE FROM {table} WHERE {cf_where}", cf_params)
 
     # Re-INSERT via the same per-table routines, scoped to the cells.
@@ -1340,6 +1407,7 @@ async def populate_incremental(db, new_match_ids: list[int]):
     await _populate_fielding(db, cells)
     await _populate_phase(db, cells)
     await _populate_partnership(db, cells)
+    await _populate_partnership_top(db, cells)
     await _populate_moments(db, cells)
 
 
