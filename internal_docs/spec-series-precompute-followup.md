@@ -1,6 +1,6 @@
 # Spec: /series precompute follow-up (Phases B → A → C → D → E)
 
-**Status: B + A SHIPPED 2026-05-14. C / D / E remaining.**
+**Status: B + A + C + D SHIPPED 2026-05-14. E permanently deferred.**
 
 | Phase | Status | Commits |
 |---|---|---|
@@ -8,9 +8,21 @@
 | A pt 1 (ts_q + tw_q via playerscopestats) | SHIPPED | `f11b323` |
 | A pt 2-3 (batters + bowlers leaders) | SHIPPED | `228e5ba` |
 | A pt 4 (fielders leaders) | SHIPPED | `c10c869` |
-| C (partnerships top per (cell, wicket)) | PENDING — next session | — |
-| D (per-team inning splits) | PENDING — next session | — |
+| C pt 1 (bucketbaselinepartnershiptop schema + populate) | SHIPPED | `d3ce8ef` |
+| C pt 2 (/series/partnerships/top-by-wicket wiring) | SHIPPED | `2ead91c` |
+| D pt 1 (batting + bowling inning split columns + populate) | SHIPPED | `13cf56c` |
+| D pt 2 (/teams/{team}/{batting,bowling}/by-inning wiring) | SHIPPED | `18e1b51` |
 | E (distribution lifetime) | PERMANENTLY DEFERRED 2026-05-14 | — |
+
+Measured 2026-05-14 (HTTP, local DB):
+- `/series/partnerships/top-by-wicket?per_wicket=10` (tier all-cricket): 1.5s → **0.19s** (~8×)
+- `/teams/{team}/batting/by-inning` (men's intl): 865ms → **3-4ms** (~280×)
+- `/teams/{team}/bowling/by-inning` (men's intl): 1.46s → **4-9ms** (~250×)
+
+Combined all-phase impact on /series Overview / Batting / Bowling /
+Partnerships pages at all-cricket: every dominant API call now under
+0.4s. /teams Batting / Bowling tabs drop ~1s of API latency per
+sub-tab load.
 
 End-to-end /series at all-cricket — all four key endpoints under 0.4s
 each (was 3-6s):
