@@ -2073,6 +2073,33 @@ Headline numbers for any match-set scope. Tournament + series_type +
 filter_team/opponent are all optional. Returns `by_team` when team-pair
 in scope.
 
+At broad scope (no tournament, no rivalry, no inning/aux narrowing,
+no team_class narrowing matching team_type) the count + rate
+queries source from precomputed `bucketbaselinematch` /
+`bucketbaselinebatting` / `bucketbaselinebowling` tables, dropping
+sub-second. Per-(person, match) Best moments
+(`highest_individual`, `best_bowling`, `best_fielding`) stay live
+since no precompute table carries that grain — they're gathered
+with everything else via `asyncio.gather`.
+
+Returns `top_teams_international` + `top_teams_club` (top 5 each,
+min 100 games, SUM bat_first_wins + field_first_wins from
+`bucketbaselinematch`) at tier mode; empty in tournament/rivalry
+mode where `teams[]` chips are shown instead.
+
+`champions_by_season` rows carry the per-row `tournament`
+(cricsheet `event_name`) so cross-tournament tier-mode Champions
+tables can render a Tournament column. In tournament-mode every
+row's tournament equals the dossier's — the field is redundant
+there.
+
+> **Historical:** there used to be a `/api/v1/league/*` router with
+> 5 endpoints (`/league/overview`, `/league/champions`,
+> `/league/leaders/{batting,bowling,fielding}`) added 2026-05-13.
+> Deleted 2026-05-14 — they were parallel copies of `/series/*`
+> with `tournament=null`. All functionality lives on `/series/*`
+> now.
+
 ```bash
 curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male"
 ```
@@ -2086,7 +2113,8 @@ curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_oppon
   "total_fours": 934, "total_sixes": 449,
   "most_titles": null,
   "champions_by_season": [
-    { "season": "2024", "champion": "India", "match_id": 1551,
+    { "season": "2024", "tournament": "ICC Men's T20 World Cup",
+      "champion": "India", "match_id": 1551,
       "team1": "India", "team2": "South Africa",
       "team1_score": "176/7", "team2_score": "169/8",
       "date": "2024-06-29" }
@@ -2095,6 +2123,15 @@ curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_oppon
                               "team": "India", "runs": 794 },
   "top_wicket_taker_alltime": { "person_id": "462411b3", "name": "JJ Bumrah",
                               "team": "India", "wickets": 20 },
+  "top_teams_international": [
+    { "team": "Uganda",     "played": 214, "wins": 142, "losses": 71, "win_pct": 66.7 },
+    { "team": "Australia",  "played": 375, "wins": 237, "losses": 121, "win_pct": 66.2 },
+    { "team": "India",      "played": 432, "wins": 270, "losses": 144, "win_pct": 65.2 }
+  ],
+  "top_teams_club": [
+    { "team": "Titans",                  "played": 103, "wins": 65, "losses": 35, "win_pct": 65.0 },
+    { "team": "Trinbago Knight Riders",  "played": 148, "wins": 91, "losses": 52, "win_pct": 63.6 }
+  ],
   "highest_individual":     { "person_id": "55d96c71", "name": "SR Watson",
                               "team": "Australia", "runs": 120,
                               "match_id": 1092, "date": "2016-03-27" },
