@@ -2746,9 +2746,85 @@ async def _batting_by_inning_aggregates(
 ) -> dict[int, dict]:
     """Flat per-inning batting aggregates keyed by innings_number (0/1).
 
-    Mirrors `_batting_by_phase_aggregates_live` but `GROUP BY
-    i.innings_number` instead of by phase CASE. Live only — bucket
-    tables don't carry an innings dimension. Spec:
+    In the precomputed regime, reads first_inn_* / second_inn_*
+    columns from bucketbaselinebatting (Phase D of
+    spec-series-precompute-followup.md). Falls back to live SQL for
+    venue/rivalry/aux narrowing.
+    """
+    from .bucket_baseline_dispatch import is_precomputed_scope
+    if is_precomputed_scope(filters, aux):
+        return await _batting_by_inning_aggregates_baseline(team, filters, aux)
+    return await _batting_by_inning_aggregates_live(team, filters, aux)
+
+
+async def _batting_by_inning_aggregates_baseline(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict[int, dict]:
+    from .bucket_baseline_dispatch import baseline_where, LEAGUE_TEAM_KEY
+    db = get_db()
+    table_team = team if team else LEAGUE_TEAM_KEY
+    where, params = baseline_where(filters, aux, team=table_team)
+    rows = await db.q(
+        f"""
+        SELECT
+            SUM(first_inn_runs_sum)      AS first_runs,
+            SUM(first_inn_count)         AS first_count,
+            SUM(first_inn_legal_balls)   AS first_balls,
+            SUM(first_inn_fours)         AS first_fours,
+            SUM(first_inn_sixes)         AS first_sixes,
+            SUM(first_inn_dots)          AS first_dots,
+            SUM(first_inn_wickets_lost)  AS first_wickets,
+            SUM(second_inn_runs_sum)     AS second_runs,
+            SUM(second_inn_count)        AS second_count,
+            SUM(second_inn_legal_balls)  AS second_balls,
+            SUM(second_inn_fours)        AS second_fours,
+            SUM(second_inn_sixes)        AS second_sixes,
+            SUM(second_inn_dots)         AS second_dots,
+            SUM(second_inn_wickets_lost) AS second_wickets
+        FROM bucketbaselinebatting {where}
+        """,
+        params,
+    )
+    r = dict(rows[0]) if rows else {}
+
+    out: dict[int, dict] = {}
+    for inn_no, prefix in ((0, "first"), (1, "second")):
+        count = r.get(f"{prefix}_count") or 0
+        if count == 0:
+            continue
+        runs = r.get(f"{prefix}_runs") or 0
+        balls = r.get(f"{prefix}_balls") or 0
+        fours = r.get(f"{prefix}_fours") or 0
+        sixes = r.get(f"{prefix}_sixes") or 0
+        out[inn_no] = {
+            "inning": inn_no,
+            "runs": runs,
+            "balls": balls,
+            "run_rate": _safe_div(runs, balls, 6),
+            "wickets_lost": r.get(f"{prefix}_wickets") or 0,
+            "boundary_pct": _safe_div(fours + sixes, balls, 100, 1),
+            "bat_dot_pct": _safe_div(r.get(f"{prefix}_dots") or 0, balls, 100, 1),
+            "fours": fours,
+            "sixes": sixes,
+        }
+    if team is None:
+        counts = {
+            0: r.get("first_count")  or 0,
+            1: r.get("second_count") or 0,
+        }
+        out = _inning_dict_per_innings(out, counts)
+    return out
+
+
+async def _batting_by_inning_aggregates_live(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict[int, dict]:
+    """Live-aggregation fallback. Used when scope isn't covered by
+    bucketbaselinebatting's inning splits (venue / rivalry / aux). Spec:
     spec-inning-split.md §3.2 + §5.5.
     """
     db = get_db()
@@ -4119,8 +4195,85 @@ async def _bowling_by_inning_aggregates(
 ) -> dict[int, dict]:
     """Flat per-inning bowling aggregates keyed by innings_number.
 
-    Mirrors `_bowling_by_phase_aggregates_live` but `GROUP BY
-    i.innings_number`. Live only. Spec: spec-inning-split.md §3.2.
+    In the precomputed regime, reads first_inn_* / second_inn_*
+    columns from bucketbaselinebowling (Phase D of
+    spec-series-precompute-followup.md). Falls back to live SQL for
+    venue/rivalry/aux narrowing.
+    """
+    from .bucket_baseline_dispatch import is_precomputed_scope
+    if is_precomputed_scope(filters, aux):
+        return await _bowling_by_inning_aggregates_baseline(team, filters, aux)
+    return await _bowling_by_inning_aggregates_live(team, filters, aux)
+
+
+async def _bowling_by_inning_aggregates_baseline(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict[int, dict]:
+    from .bucket_baseline_dispatch import baseline_where, LEAGUE_TEAM_KEY
+    db = get_db()
+    table_team = team if team else LEAGUE_TEAM_KEY
+    where, params = baseline_where(filters, aux, team=table_team)
+    rows = await db.q(
+        f"""
+        SELECT
+            SUM(first_inn_count)            AS first_count,
+            SUM(first_inn_balls)            AS first_balls,
+            SUM(first_inn_runs_conceded)    AS first_runs,
+            SUM(first_inn_fours_conceded)   AS first_fours,
+            SUM(first_inn_sixes_conceded)   AS first_sixes,
+            SUM(first_inn_dots)             AS first_dots,
+            SUM(first_inn_wickets)          AS first_wickets,
+            SUM(second_inn_count)           AS second_count,
+            SUM(second_inn_balls)           AS second_balls,
+            SUM(second_inn_runs_conceded)   AS second_runs,
+            SUM(second_inn_fours_conceded)  AS second_fours,
+            SUM(second_inn_sixes_conceded)  AS second_sixes,
+            SUM(second_inn_dots)            AS second_dots,
+            SUM(second_inn_wickets)         AS second_wickets
+        FROM bucketbaselinebowling {where}
+        """,
+        params,
+    )
+    r = dict(rows[0]) if rows else {}
+
+    out: dict[int, dict] = {}
+    for inn_no, prefix in ((0, "first"), (1, "second")):
+        count = r.get(f"{prefix}_count") or 0
+        if count == 0:
+            continue
+        runs = r.get(f"{prefix}_runs") or 0
+        balls = r.get(f"{prefix}_balls") or 0
+        fours = r.get(f"{prefix}_fours") or 0
+        sixes = r.get(f"{prefix}_sixes") or 0
+        out[inn_no] = {
+            "inning": inn_no,
+            "runs_conceded": runs,
+            "balls": balls,
+            "economy": _safe_div(runs, balls, 6),
+            "wickets": r.get(f"{prefix}_wickets") or 0,
+            "boundary_pct": _safe_div(fours + sixes, balls, 100, 1),
+            "bowl_dot_pct": _safe_div(r.get(f"{prefix}_dots") or 0, balls, 100, 1),
+            "fours_conceded": fours,
+            "sixes_conceded": sixes,
+        }
+    if team is None:
+        counts = {
+            0: r.get("first_count")  or 0,
+            1: r.get("second_count") or 0,
+        }
+        out = _inning_dict_per_innings(out, counts)
+    return out
+
+
+async def _bowling_by_inning_aggregates_live(
+    team: str | None,
+    filters: FilterParams,
+    aux: AuxParams,
+) -> dict[int, dict]:
+    """Live-aggregation fallback. Used when scope isn't covered by
+    bucketbaselinebowling's inning splits. Spec: spec-inning-split.md §3.2.
     """
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
