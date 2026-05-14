@@ -863,22 +863,41 @@ async def tournament_summary(
             ORDER BY wickets DESC LIMIT 1""",
         params,
     )
-    ht_q = db.q(
-        f"""SELECT i.team, tot.total,
-                   m.id AS match_id,
-                   CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
-                   (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
-            FROM (
-              SELECT d.innings_id, SUM(d.runs_total) AS total
-              FROM delivery d
-              GROUP BY d.innings_id
-            ) tot
-            JOIN innings i ON i.id = tot.innings_id
-            JOIN match m ON m.id = i.match_id
-            WHERE i.super_over = 0 AND {where}{inn_clause}
-            ORDER BY tot.total DESC LIMIT 1""",
-        params,
-    )
+    # Highest team total — in baseline regime, read from
+    # bucketbaselinebatting's LEAGUE row (one row per cell carries the
+    # cell-wide MAX innings total + identity). ~0.34s → ~1ms.
+    if is_baseline:
+        ht_q = db.q(
+            f"""SELECT highest_inn_team AS team,
+                       highest_inn_runs AS total,
+                       highest_inn_match_id AS match_id,
+                       (SELECT CASE WHEN team1 = highest_inn_team
+                                    THEN team2 ELSE team1 END
+                          FROM match WHERE id = highest_inn_match_id) AS opponent,
+                       (SELECT MIN(date) FROM matchdate
+                          WHERE match_id = highest_inn_match_id) AS date
+                FROM bucketbaselinebatting {bl_where}
+                  AND highest_inn_match_id IS NOT NULL
+                ORDER BY highest_inn_runs DESC, highest_inn_match_id ASC LIMIT 1""",
+            bl_params,
+        )
+    else:
+        ht_q = db.q(
+            f"""SELECT i.team, tot.total,
+                       m.id AS match_id,
+                       CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
+                       (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+                FROM (
+                  SELECT d.innings_id, SUM(d.runs_total) AS total
+                  FROM delivery d
+                  GROUP BY d.innings_id
+                ) tot
+                JOIN innings i ON i.id = tot.innings_id
+                JOIN match m ON m.id = i.match_id
+                WHERE i.super_over = 0 AND {where}{inn_clause}
+                ORDER BY tot.total DESC LIMIT 1""",
+            params,
+        )
     lp_q = db.q(
         f"""SELECT p.partnership_runs AS runs, m.id AS match_id,
                    p.batter1_id, p.batter1_name,

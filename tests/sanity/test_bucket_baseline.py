@@ -388,6 +388,50 @@ async def check_incremental_roundtrip(db) -> bool:
     return ok
 
 
+async def check_highest_team_total(
+    db, scope_desc: str, live_where: str, bucket_where: str, params: dict,
+) -> bool:
+    """Bucket-derived (team, total, match_id, opponent) — must match
+    live SQL byte-identical at the given scope. `live_where` uses
+    `m.*` prefixes (event_name, season, gender, team_type); `bucket_where`
+    uses the bucket table's unprefixed scope columns (tournament,
+    season, gender, team_type)."""
+    print(f"=== /series highest_team_total: {scope_desc} ===")
+    live = await db.q(
+        f"""SELECT i.team, tot.total, m.id AS match_id,
+                   CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent
+            FROM (SELECT d.innings_id, SUM(d.runs_total) AS total
+                  FROM delivery d GROUP BY d.innings_id) tot
+            JOIN innings i ON i.id = tot.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0 AND m.match_type IN ('T20','IT20')
+              {(' AND ' + live_where) if live_where else ''}
+            ORDER BY tot.total DESC, m.id ASC LIMIT 1""",
+        params,
+    )
+    bucket = await db.q(
+        f"""SELECT highest_inn_team AS team,
+                   highest_inn_runs AS total,
+                   highest_inn_match_id AS match_id,
+                   (SELECT CASE WHEN team1 = highest_inn_team
+                                THEN team2 ELSE team1 END
+                      FROM match WHERE id = highest_inn_match_id) AS opponent
+            FROM bucketbaselinebatting
+            WHERE team = '{LEAGUE_TEAM}'
+              AND highest_inn_match_id IS NOT NULL
+              {(' AND ' + bucket_where) if bucket_where else ''}
+            ORDER BY highest_inn_runs DESC, highest_inn_match_id ASC LIMIT 1""",
+        params,
+    )
+    l = dict(live[0]) if live else None
+    b = dict(bucket[0]) if bucket else None
+    if l == b:
+        print(f"  {PASS}: {l}")
+        return True
+    print(f"  {FAIL}: live={l} bucket={b}")
+    return False
+
+
 async def check_cross_cell_isolation(db) -> bool:
     """populate_incremental on cell A leaves cell B untouched."""
     print("=== Cross-cell isolation ===")
@@ -476,6 +520,29 @@ async def main():
         all_ok &= await check_identity_cols(db, *cell)
     for cell in sample_league_cells:
         all_ok &= await check_league_cell(db, *cell)
+    # Phase B — highest_team_total roundtrip at 5 scopes.
+    ht_scopes = [
+        ("all-cricket", "", "", {}),
+        ("men's club, all-time",
+         "m.gender = :g AND m.team_type = :tt",
+         "gender = :g AND team_type = :tt",
+         {"g": "male", "tt": "club"}),
+        ("women's international, all-time",
+         "m.gender = :g AND m.team_type = :tt",
+         "gender = :g AND team_type = :tt",
+         {"g": "female", "tt": "international"}),
+        ("IPL 2023",
+         "m.event_name = :t AND m.season = :s",
+         "tournament = :t AND season = :s",
+         {"t": "Indian Premier League", "s": "2023"}),
+        ("Men's International 2024",
+         "m.gender = :g AND m.team_type = :tt AND m.season = :s",
+         "gender = :g AND team_type = :tt AND season = :s",
+         {"g": "male", "tt": "international", "s": "2024"}),
+    ]
+    for scope in ht_scopes:
+        all_ok &= await check_highest_team_total(db, *scope)
+
     all_ok &= await check_incremental_roundtrip(db)
     all_ok &= await check_cross_cell_isolation(db)
 
