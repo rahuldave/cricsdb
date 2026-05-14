@@ -337,6 +337,8 @@ async def check_incremental_roundtrip(db) -> bool:
             return "ORDER BY team, phase, side"
         if table == "bucketbaselinepartnership":
             return "ORDER BY team, wicket_number"
+        if table == "bucketbaselinepartnershiptop":
+            return "ORDER BY wicket_number, rank"
         if table == "bucketbaselinemoments":
             return "ORDER BY 1"
         return "ORDER BY team"
@@ -345,7 +347,7 @@ async def check_incremental_roundtrip(db) -> bool:
     for table in ("bucketbaselinematch", "bucketbaselinebatting",
                   "bucketbaselinebowling", "bucketbaselinefielding",
                   "bucketbaselinephase", "bucketbaselinepartnership",
-                  "bucketbaselinemoments"):
+                  "bucketbaselinemoments", "bucketbaselinepartnershiptop"):
         rows = await db.q(
             f"SELECT * FROM {table} WHERE gender=:g AND team_type=:tt AND tournament=:t AND season=:s {_order_clause(table)}",
             {"g": g, "tt": tt, "t": t, "s": s},
@@ -498,6 +500,143 @@ async def check_top_scorer_wicket_taker(
         print(f"  FAIL: live={live[0] if live else None} bucket={bucket[0] if bucket else None}")
         ok = False
 
+    return ok
+
+
+async def check_batting_by_inning_roundtrip(
+    db, scope_desc: str, live_where: str, bucket_where: str, params: dict,
+) -> bool:
+    """bucketbaselinebatting first_inn_* / second_inn_* must match live
+    SQL byte-identical at the league row level (team='__league__').
+    Phase D of spec-series-precompute-followup.md."""
+    print(f"=== /teams batting by-inning: {scope_desc} ===")
+    ok = True
+    for inn in (0, 1):
+        prefix = "first_inn" if inn == 0 else "second_inn"
+        live = await db.q(
+            f"""SELECT
+                SUM(CASE WHEN i.innings_number = :inn THEN d.runs_total ELSE 0 END) AS runs,
+                COUNT(DISTINCT CASE WHEN i.innings_number = :inn THEN i.id END) AS count_inn,
+                SUM(CASE WHEN i.innings_number = :inn AND d.extras_wides=0 AND d.extras_noballs=0 THEN 1 ELSE 0 END) AS balls,
+                SUM(CASE WHEN i.innings_number = :inn AND d.runs_batter=4 AND COALESCE(d.runs_non_boundary,0)=0 THEN 1 ELSE 0 END) AS fours,
+                SUM(CASE WHEN i.innings_number = :inn AND d.runs_batter=6 THEN 1 ELSE 0 END) AS sixes,
+                SUM(CASE WHEN i.innings_number = :inn AND d.runs_total=0 AND d.extras_wides=0 AND d.extras_noballs=0 THEN 1 ELSE 0 END) AS dots
+            FROM delivery d
+            JOIN innings i ON i.id=d.innings_id
+            JOIN match m ON m.id=i.match_id
+            WHERE i.super_over=0 AND m.match_type IN ('T20','IT20')
+              {(' AND ' + live_where) if live_where else ''}""",
+            {**params, "inn": inn},
+        )
+        wkts_live = await db.q(
+            f"""SELECT COUNT(*) AS wkts
+            FROM wicket w
+            JOIN delivery d ON d.id=w.delivery_id
+            JOIN innings i ON i.id=d.innings_id
+            JOIN match m ON m.id=i.match_id
+            WHERE i.super_over=0 AND m.match_type IN ('T20','IT20')
+              AND i.innings_number = :inn
+              AND w.kind NOT IN ('retired hurt','retired not out')
+              {(' AND ' + live_where) if live_where else ''}""",
+            {**params, "inn": inn},
+        )
+        bucket = await db.q(
+            f"""SELECT
+                SUM({prefix}_runs_sum)     AS runs,
+                SUM({prefix}_count)        AS count_inn,
+                SUM({prefix}_legal_balls)  AS balls,
+                SUM({prefix}_fours)        AS fours,
+                SUM({prefix}_sixes)        AS sixes,
+                SUM({prefix}_dots)         AS dots,
+                SUM({prefix}_wickets_lost) AS wkts
+            FROM bucketbaselinebatting
+            WHERE team = '{LEAGUE_TEAM}'
+              {(' AND ' + bucket_where) if bucket_where else ''}""",
+            params,
+        )
+        l = dict(live[0]) if live else {}
+        b = dict(bucket[0]) if bucket else {}
+        l_wkts = wkts_live[0]["wkts"] if wkts_live else 0
+        passed = True
+        for k in ("runs", "count_inn", "balls", "fours", "sixes", "dots"):
+            if (l.get(k) or 0) != (b.get(k) or 0):
+                passed = False
+                print(f"  {FAIL}: {prefix}.{k} live={l.get(k)} bucket={b.get(k)}")
+        if l_wkts != (b.get("wkts") or 0):
+            passed = False
+            print(f"  {FAIL}: {prefix}.wickets_lost live={l_wkts} bucket={b.get('wkts')}")
+        if passed:
+            print(f"  {PASS}: {prefix} runs={b['runs']} balls={b['balls']} wkts={b['wkts']}")
+        else:
+            ok = False
+    return ok
+
+
+async def check_bowling_by_inning_roundtrip(
+    db, scope_desc: str, live_where: str, bucket_where: str, params: dict,
+) -> bool:
+    """bucketbaselinebowling first_inn_* / second_inn_* must match live
+    SQL byte-identical at the league row level. Phase D."""
+    print(f"=== /teams bowling by-inning: {scope_desc} ===")
+    ok = True
+    for inn in (0, 1):
+        prefix = "first_inn" if inn == 0 else "second_inn"
+        live = await db.q(
+            f"""SELECT
+                SUM(CASE WHEN i.innings_number = :inn THEN d.runs_total ELSE 0 END) AS runs,
+                COUNT(DISTINCT CASE WHEN i.innings_number = :inn THEN i.id END) AS count_inn,
+                SUM(CASE WHEN i.innings_number = :inn AND d.extras_wides=0 AND d.extras_noballs=0 THEN 1 ELSE 0 END) AS balls,
+                SUM(CASE WHEN i.innings_number = :inn AND d.runs_batter=4 AND COALESCE(d.runs_non_boundary,0)=0 THEN 1 ELSE 0 END) AS fours,
+                SUM(CASE WHEN i.innings_number = :inn AND d.runs_batter=6 THEN 1 ELSE 0 END) AS sixes,
+                SUM(CASE WHEN i.innings_number = :inn AND d.runs_total=0 AND d.extras_wides=0 AND d.extras_noballs=0 THEN 1 ELSE 0 END) AS dots
+            FROM delivery d
+            JOIN innings i ON i.id=d.innings_id
+            JOIN match m ON m.id=i.match_id
+            WHERE i.super_over=0 AND m.match_type IN ('T20','IT20')
+              {(' AND ' + live_where) if live_where else ''}""",
+            {**params, "inn": inn},
+        )
+        wkts_live = await db.q(
+            f"""SELECT COUNT(*) AS wkts
+            FROM wicket w
+            JOIN delivery d ON d.id=w.delivery_id
+            JOIN innings i ON i.id=d.innings_id
+            JOIN match m ON m.id=i.match_id
+            WHERE i.super_over=0 AND m.match_type IN ('T20','IT20')
+              AND i.innings_number = :inn
+              AND w.kind NOT IN ('run out','retired hurt','retired out','obstructing the field','retired not out')
+              {(' AND ' + live_where) if live_where else ''}""",
+            {**params, "inn": inn},
+        )
+        bucket = await db.q(
+            f"""SELECT
+                SUM({prefix}_runs_conceded)   AS runs,
+                SUM({prefix}_count)           AS count_inn,
+                SUM({prefix}_balls)           AS balls,
+                SUM({prefix}_fours_conceded)  AS fours,
+                SUM({prefix}_sixes_conceded)  AS sixes,
+                SUM({prefix}_dots)            AS dots,
+                SUM({prefix}_wickets)         AS wkts
+            FROM bucketbaselinebowling
+            WHERE team = '{LEAGUE_TEAM}'
+              {(' AND ' + bucket_where) if bucket_where else ''}""",
+            params,
+        )
+        l = dict(live[0]) if live else {}
+        b = dict(bucket[0]) if bucket else {}
+        l_wkts = wkts_live[0]["wkts"] if wkts_live else 0
+        passed = True
+        for k in ("runs", "count_inn", "balls", "fours", "sixes", "dots"):
+            if (l.get(k) or 0) != (b.get(k) or 0):
+                passed = False
+                print(f"  {FAIL}: {prefix}.{k} live={l.get(k)} bucket={b.get(k)}")
+        if l_wkts != (b.get("wkts") or 0):
+            passed = False
+            print(f"  {FAIL}: {prefix}.wickets live={l_wkts} bucket={b.get('wkts')}")
+        if passed:
+            print(f"  {PASS}: {prefix} runs={b['runs']} balls={b['balls']} wkts={b['wkts']}")
+        else:
+            ok = False
     return ok
 
 
@@ -669,6 +808,12 @@ async def main():
     # Phase A — top scorer / wicket-taker roundtrip at 5 scopes.
     for scope in ht_scopes:
         all_ok &= await check_top_scorer_wicket_taker(db, *scope)
+
+    # Phase D — per-team inning splits in bucketbaselinebatting +
+    # bucketbaselinebowling. Checked at league row level across 5 scopes.
+    for scope in ht_scopes:
+        all_ok &= await check_batting_by_inning_roundtrip(db, *scope)
+        all_ok &= await check_bowling_by_inning_roundtrip(db, *scope)
 
     # Phase C — top partnerships per wicket roundtrip at 3 single-cell
     # scopes (precompute is per-cell; multi-cell merging is endpoint-side).

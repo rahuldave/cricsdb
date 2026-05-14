@@ -71,6 +71,18 @@ BUCKET_TABLES = [
 PARTNERSHIP_TOP_K = 10
 
 
+async def _add_columns_if_missing(db, table: str, cols: dict[str, str]):
+    """ALTER TABLE ADD COLUMN for each name not already present in
+    PRAGMA table_info. Idempotent — safe to re-run.
+    """
+    rows = await db.q(f"PRAGMA table_info({table})")
+    have = {r["name"] for r in rows}
+    for name, decl in cols.items():
+        if name in have:
+            continue
+        await db.q(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+
+
 async def _ensure_tables(db, incremental: bool = False):
     """Register tables with deebase + create indexes idempotently.
 
@@ -96,6 +108,38 @@ async def _ensure_tables(db, incremental: bool = False):
     await db.create(BucketBaselinePartnership,     pk="id", if_not_exists=True)
     await db.create(BucketBaselineMoments,         pk="id", if_not_exists=True)
     await db.create(BucketBaselinePartnershipTop,  pk="id", if_not_exists=True)
+
+    # Phase D — add inning split columns idempotently. deebase's
+    # if_not_exists guards table creation but not column additions, so
+    # ALTER TABLE ADD COLUMN per missing column. Safe to re-run.
+    await _add_columns_if_missing(db, "bucketbaselinebatting", {
+        "first_inn_legal_balls":   "INTEGER DEFAULT 0",
+        "first_inn_fours":         "INTEGER DEFAULT 0",
+        "first_inn_sixes":         "INTEGER DEFAULT 0",
+        "first_inn_dots":          "INTEGER DEFAULT 0",
+        "first_inn_wickets_lost":  "INTEGER DEFAULT 0",
+        "second_inn_legal_balls":  "INTEGER DEFAULT 0",
+        "second_inn_fours":        "INTEGER DEFAULT 0",
+        "second_inn_sixes":        "INTEGER DEFAULT 0",
+        "second_inn_dots":         "INTEGER DEFAULT 0",
+        "second_inn_wickets_lost": "INTEGER DEFAULT 0",
+    })
+    await _add_columns_if_missing(db, "bucketbaselinebowling", {
+        "first_inn_count":           "INTEGER DEFAULT 0",
+        "first_inn_balls":           "INTEGER DEFAULT 0",
+        "first_inn_runs_conceded":   "INTEGER DEFAULT 0",
+        "first_inn_fours_conceded":  "INTEGER DEFAULT 0",
+        "first_inn_sixes_conceded":  "INTEGER DEFAULT 0",
+        "first_inn_dots":            "INTEGER DEFAULT 0",
+        "first_inn_wickets":         "INTEGER DEFAULT 0",
+        "second_inn_count":          "INTEGER DEFAULT 0",
+        "second_inn_balls":          "INTEGER DEFAULT 0",
+        "second_inn_runs_conceded":  "INTEGER DEFAULT 0",
+        "second_inn_fours_conceded": "INTEGER DEFAULT 0",
+        "second_inn_sixes_conceded": "INTEGER DEFAULT 0",
+        "second_inn_dots":           "INTEGER DEFAULT 0",
+        "second_inn_wickets":        "INTEGER DEFAULT 0",
+    })
 
     # Indexes — covering the common lookup pattern.
     common = "gender, team_type, tournament, season, team"
@@ -277,6 +321,10 @@ async def _populate_batting(db, cells=None):
             innings_batted, total_runs, legal_balls, fours, sixes, dots,
             first_inn_runs_sum, first_inn_count,
             second_inn_runs_sum, second_inn_count,
+            first_inn_legal_balls, first_inn_fours, first_inn_sixes,
+            first_inn_dots, first_inn_wickets_lost,
+            second_inn_legal_balls, second_inn_fours, second_inn_sixes,
+            second_inn_dots, second_inn_wickets_lost,
             highest_inn_runs
         )
         SELECT
@@ -287,10 +335,20 @@ async def _populate_batting(db, cells=None):
             SUM(fours) AS fours,
             SUM(sixes) AS sixes,
             SUM(dots) AS dots,
-            SUM(CASE WHEN innings_number = 0 THEN runs ELSE 0 END) AS first_inn_runs_sum,
-            SUM(CASE WHEN innings_number = 0 THEN 1 ELSE 0 END) AS first_inn_count,
-            SUM(CASE WHEN innings_number = 1 THEN runs ELSE 0 END) AS second_inn_runs_sum,
-            SUM(CASE WHEN innings_number = 1 THEN 1 ELSE 0 END) AS second_inn_count,
+            SUM(CASE WHEN innings_number = 0 THEN runs        ELSE 0 END) AS first_inn_runs_sum,
+            SUM(CASE WHEN innings_number = 0 THEN 1           ELSE 0 END) AS first_inn_count,
+            SUM(CASE WHEN innings_number = 1 THEN runs        ELSE 0 END) AS second_inn_runs_sum,
+            SUM(CASE WHEN innings_number = 1 THEN 1           ELSE 0 END) AS second_inn_count,
+            SUM(CASE WHEN innings_number = 0 THEN legal_balls ELSE 0 END) AS first_inn_legal_balls,
+            SUM(CASE WHEN innings_number = 0 THEN fours       ELSE 0 END) AS first_inn_fours,
+            SUM(CASE WHEN innings_number = 0 THEN sixes       ELSE 0 END) AS first_inn_sixes,
+            SUM(CASE WHEN innings_number = 0 THEN dots        ELSE 0 END) AS first_inn_dots,
+            SUM(CASE WHEN innings_number = 0 THEN wickets_lost ELSE 0 END) AS first_inn_wickets_lost,
+            SUM(CASE WHEN innings_number = 1 THEN legal_balls ELSE 0 END) AS second_inn_legal_balls,
+            SUM(CASE WHEN innings_number = 1 THEN fours       ELSE 0 END) AS second_inn_fours,
+            SUM(CASE WHEN innings_number = 1 THEN sixes       ELSE 0 END) AS second_inn_sixes,
+            SUM(CASE WHEN innings_number = 1 THEN dots        ELSE 0 END) AS second_inn_dots,
+            SUM(CASE WHEN innings_number = 1 THEN wickets_lost ELSE 0 END) AS second_inn_wickets_lost,
             COALESCE(MAX(runs), 0) AS highest_inn_runs
         FROM _bb_batting_inn
         GROUP BY gender, team_type, tournament, season
@@ -305,15 +363,29 @@ async def _populate_batting(db, cells=None):
             innings_batted, total_runs, legal_balls, fours, sixes, dots,
             first_inn_runs_sum, first_inn_count,
             second_inn_runs_sum, second_inn_count,
+            first_inn_legal_balls, first_inn_fours, first_inn_sixes,
+            first_inn_dots, first_inn_wickets_lost,
+            second_inn_legal_balls, second_inn_fours, second_inn_sixes,
+            second_inn_dots, second_inn_wickets_lost,
             highest_inn_runs
         )
         SELECT
             gender, team_type, tournament, season, innings_team,
             COUNT(*), SUM(runs), SUM(legal_balls), SUM(fours), SUM(sixes), SUM(dots),
-            SUM(CASE WHEN innings_number = 0 THEN runs ELSE 0 END),
-            SUM(CASE WHEN innings_number = 0 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN innings_number = 1 THEN runs ELSE 0 END),
-            SUM(CASE WHEN innings_number = 1 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN innings_number = 0 THEN runs        ELSE 0 END),
+            SUM(CASE WHEN innings_number = 0 THEN 1           ELSE 0 END),
+            SUM(CASE WHEN innings_number = 1 THEN runs        ELSE 0 END),
+            SUM(CASE WHEN innings_number = 1 THEN 1           ELSE 0 END),
+            SUM(CASE WHEN innings_number = 0 THEN legal_balls ELSE 0 END),
+            SUM(CASE WHEN innings_number = 0 THEN fours       ELSE 0 END),
+            SUM(CASE WHEN innings_number = 0 THEN sixes       ELSE 0 END),
+            SUM(CASE WHEN innings_number = 0 THEN dots        ELSE 0 END),
+            SUM(CASE WHEN innings_number = 0 THEN wickets_lost ELSE 0 END),
+            SUM(CASE WHEN innings_number = 1 THEN legal_balls ELSE 0 END),
+            SUM(CASE WHEN innings_number = 1 THEN fours       ELSE 0 END),
+            SUM(CASE WHEN innings_number = 1 THEN sixes       ELSE 0 END),
+            SUM(CASE WHEN innings_number = 1 THEN dots        ELSE 0 END),
+            SUM(CASE WHEN innings_number = 1 THEN wickets_lost ELSE 0 END),
             COALESCE(MAX(runs), 0)
         FROM _bb_batting_inn
         GROUP BY gender, team_type, tournament, season, innings_team
@@ -489,12 +561,19 @@ async def _populate_bowling(db, cells=None):
     cf, cfp = _cell_filter_clause(cells, "m")
 
     # League delivery counters — every delivery in scope.
+    # Per-inning aggregates use CASE WHEN i.innings_number = 0/1 over
+    # the same delivery rows; first_inn_count counts DISTINCT innings
+    # in innings_0, second_inn_count counts DISTINCT innings in innings_1.
     await db.q(
         f"""
         INSERT INTO bucketbaselinebowling (
             gender, team_type, tournament, season, team,
             innings_bowled, matches, runs_conceded, legal_balls,
-            wides, noballs, wide_runs, noball_runs, fours_conceded, sixes_conceded, dots, wickets
+            wides, noballs, wide_runs, noball_runs, fours_conceded, sixes_conceded, dots, wickets,
+            first_inn_count, first_inn_balls, first_inn_runs_conceded,
+            first_inn_fours_conceded, first_inn_sixes_conceded, first_inn_dots,
+            second_inn_count, second_inn_balls, second_inn_runs_conceded,
+            second_inn_fours_conceded, second_inn_sixes_conceded, second_inn_dots
         )
         SELECT
             m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, '{LEAGUE_TEAM}',
@@ -509,7 +588,19 @@ async def _populate_bowling(db, cells=None):
             SUM(CASE WHEN d.runs_batter = 4 AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS fours_conceded,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes_conceded,
             SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots,
-            0 AS wickets
+            0 AS wickets,
+            COUNT(DISTINCT CASE WHEN i.innings_number = 0 THEN i.id END) AS first_inn_count,
+            SUM(CASE WHEN i.innings_number = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS first_inn_balls,
+            SUM(CASE WHEN i.innings_number = 0 THEN d.runs_total ELSE 0 END) AS first_inn_runs_conceded,
+            SUM(CASE WHEN i.innings_number = 0 AND d.runs_batter = 4 AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS first_inn_fours_conceded,
+            SUM(CASE WHEN i.innings_number = 0 AND d.runs_batter = 6 THEN 1 ELSE 0 END) AS first_inn_sixes_conceded,
+            SUM(CASE WHEN i.innings_number = 0 AND d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS first_inn_dots,
+            COUNT(DISTINCT CASE WHEN i.innings_number = 1 THEN i.id END) AS second_inn_count,
+            SUM(CASE WHEN i.innings_number = 1 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS second_inn_balls,
+            SUM(CASE WHEN i.innings_number = 1 THEN d.runs_total ELSE 0 END) AS second_inn_runs_conceded,
+            SUM(CASE WHEN i.innings_number = 1 AND d.runs_batter = 4 AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS second_inn_fours_conceded,
+            SUM(CASE WHEN i.innings_number = 1 AND d.runs_batter = 6 THEN 1 ELSE 0 END) AS second_inn_sixes_conceded,
+            SUM(CASE WHEN i.innings_number = 1 AND d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS second_inn_dots
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
@@ -529,7 +620,11 @@ async def _populate_bowling(db, cells=None):
         INSERT INTO bucketbaselinebowling (
             gender, team_type, tournament, season, team,
             innings_bowled, matches, runs_conceded, legal_balls,
-            wides, noballs, wide_runs, noball_runs, fours_conceded, sixes_conceded, dots, wickets
+            wides, noballs, wide_runs, noball_runs, fours_conceded, sixes_conceded, dots, wickets,
+            first_inn_count, first_inn_balls, first_inn_runs_conceded,
+            first_inn_fours_conceded, first_inn_sixes_conceded, first_inn_dots,
+            second_inn_count, second_inn_balls, second_inn_runs_conceded,
+            second_inn_fours_conceded, second_inn_sixes_conceded, second_inn_dots
         )
         SELECT
             m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, mt.team,
@@ -544,7 +639,19 @@ async def _populate_bowling(db, cells=None):
             SUM(CASE WHEN d.runs_batter = 4 AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS fours_conceded,
             SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes_conceded,
             SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots,
-            0 AS wickets
+            0 AS wickets,
+            COUNT(DISTINCT CASE WHEN i.innings_number = 0 THEN i.id END) AS first_inn_count,
+            SUM(CASE WHEN i.innings_number = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS first_inn_balls,
+            SUM(CASE WHEN i.innings_number = 0 THEN d.runs_total ELSE 0 END) AS first_inn_runs_conceded,
+            SUM(CASE WHEN i.innings_number = 0 AND d.runs_batter = 4 AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS first_inn_fours_conceded,
+            SUM(CASE WHEN i.innings_number = 0 AND d.runs_batter = 6 THEN 1 ELSE 0 END) AS first_inn_sixes_conceded,
+            SUM(CASE WHEN i.innings_number = 0 AND d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS first_inn_dots,
+            COUNT(DISTINCT CASE WHEN i.innings_number = 1 THEN i.id END) AS second_inn_count,
+            SUM(CASE WHEN i.innings_number = 1 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS second_inn_balls,
+            SUM(CASE WHEN i.innings_number = 1 THEN d.runs_total ELSE 0 END) AS second_inn_runs_conceded,
+            SUM(CASE WHEN i.innings_number = 1 AND d.runs_batter = 4 AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS second_inn_fours_conceded,
+            SUM(CASE WHEN i.innings_number = 1 AND d.runs_batter = 6 THEN 1 ELSE 0 END) AS second_inn_sixes_conceded,
+            SUM(CASE WHEN i.innings_number = 1 AND d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS second_inn_dots
         FROM match m
         JOIN match_teams mt ON mt.match_id = m.id
         JOIN innings i ON i.match_id = m.id AND i.team != mt.team
@@ -556,11 +663,15 @@ async def _populate_bowling(db, cells=None):
     )
 
     # League wickets — single GROUP BY pass over the wicket table.
+    # Also computes first_inn_wickets / second_inn_wickets per cell.
     await db.q(
         f"""
         WITH wkt AS (
             SELECT m.gender, m.team_type, COALESCE(m.event_name, '') AS tournament,
-                   m.season, COUNT(*) AS wickets
+                   m.season,
+                   COUNT(*) AS wickets,
+                   SUM(CASE WHEN i.innings_number = 0 THEN 1 ELSE 0 END) AS first_inn_wickets,
+                   SUM(CASE WHEN i.innings_number = 1 THEN 1 ELSE 0 END) AS second_inn_wickets
             FROM wicket w
             JOIN delivery d ON d.id = w.delivery_id
             JOIN innings i ON i.id = d.innings_id
@@ -571,11 +682,9 @@ async def _populate_bowling(db, cells=None):
             GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season
         )
         UPDATE bucketbaselinebowling
-        SET wickets = (SELECT wickets FROM wkt
-                       WHERE wkt.gender = bucketbaselinebowling.gender
-                         AND wkt.team_type = bucketbaselinebowling.team_type
-                         AND wkt.tournament = bucketbaselinebowling.tournament
-                         AND wkt.season = bucketbaselinebowling.season)
+        SET wickets             = (SELECT wickets             FROM wkt WHERE wkt.gender = bucketbaselinebowling.gender AND wkt.team_type = bucketbaselinebowling.team_type AND wkt.tournament = bucketbaselinebowling.tournament AND wkt.season = bucketbaselinebowling.season),
+            first_inn_wickets   = (SELECT first_inn_wickets   FROM wkt WHERE wkt.gender = bucketbaselinebowling.gender AND wkt.team_type = bucketbaselinebowling.team_type AND wkt.tournament = bucketbaselinebowling.tournament AND wkt.season = bucketbaselinebowling.season),
+            second_inn_wickets  = (SELECT second_inn_wickets  FROM wkt WHERE wkt.gender = bucketbaselinebowling.gender AND wkt.team_type = bucketbaselinebowling.team_type AND wkt.tournament = bucketbaselinebowling.tournament AND wkt.season = bucketbaselinebowling.season)
         WHERE team = '{LEAGUE_TEAM}'
           AND EXISTS (SELECT 1 FROM wkt
                       WHERE wkt.gender = bucketbaselinebowling.gender
@@ -586,7 +695,8 @@ async def _populate_bowling(db, cells=None):
         cfp,
     )
 
-    # Per-team wickets — group wickets by (cell, bowling_team).
+    # Per-team wickets — group wickets by (cell, bowling_team), also
+    # splitting first_inn / second_inn.
     await db.q(
         f"""
         WITH match_teams AS (
@@ -594,7 +704,10 @@ async def _populate_bowling(db, cells=None):
         ),
         wkt AS (
             SELECT m.gender, m.team_type, COALESCE(m.event_name, '') AS tournament,
-                   m.season, mt.team AS bowling_team, COUNT(*) AS wickets
+                   m.season, mt.team AS bowling_team,
+                   COUNT(*) AS wickets,
+                   SUM(CASE WHEN i.innings_number = 0 THEN 1 ELSE 0 END) AS first_inn_wickets,
+                   SUM(CASE WHEN i.innings_number = 1 THEN 1 ELSE 0 END) AS second_inn_wickets
             FROM wicket w
             JOIN delivery d ON d.id = w.delivery_id
             JOIN innings i ON i.id = d.innings_id
@@ -606,12 +719,9 @@ async def _populate_bowling(db, cells=None):
             GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season, mt.team
         )
         UPDATE bucketbaselinebowling
-        SET wickets = (SELECT wickets FROM wkt
-                       WHERE wkt.gender = bucketbaselinebowling.gender
-                         AND wkt.team_type = bucketbaselinebowling.team_type
-                         AND wkt.tournament = bucketbaselinebowling.tournament
-                         AND wkt.season = bucketbaselinebowling.season
-                         AND wkt.bowling_team = bucketbaselinebowling.team)
+        SET wickets             = (SELECT wickets             FROM wkt WHERE wkt.gender = bucketbaselinebowling.gender AND wkt.team_type = bucketbaselinebowling.team_type AND wkt.tournament = bucketbaselinebowling.tournament AND wkt.season = bucketbaselinebowling.season AND wkt.bowling_team = bucketbaselinebowling.team),
+            first_inn_wickets   = (SELECT first_inn_wickets   FROM wkt WHERE wkt.gender = bucketbaselinebowling.gender AND wkt.team_type = bucketbaselinebowling.team_type AND wkt.tournament = bucketbaselinebowling.tournament AND wkt.season = bucketbaselinebowling.season AND wkt.bowling_team = bucketbaselinebowling.team),
+            second_inn_wickets  = (SELECT second_inn_wickets  FROM wkt WHERE wkt.gender = bucketbaselinebowling.gender AND wkt.team_type = bucketbaselinebowling.team_type AND wkt.tournament = bucketbaselinebowling.tournament AND wkt.season = bucketbaselinebowling.season AND wkt.bowling_team = bucketbaselinebowling.team)
         WHERE team != '{LEAGUE_TEAM}'
           AND EXISTS (SELECT 1 FROM wkt
                       WHERE wkt.gender = bucketbaselinebowling.gender

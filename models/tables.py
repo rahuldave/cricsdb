@@ -325,6 +325,20 @@ class BucketBaselineBatting:
     # Per-batter-innings 50+/100+ counts. SUM cleanly across cells.
     fifties: int = 0
     hundreds: int = 0
+    # Per-inning splits for /teams/{team}/batting/by-inning. SUM across
+    # cells gives team-side totals; SUM / SUM(first_inn_count) gives the
+    # league per-1st-innings averages. Phase D of
+    # spec-series-precompute-followup.md.
+    first_inn_legal_balls: int = 0
+    first_inn_fours: int = 0
+    first_inn_sixes: int = 0
+    first_inn_dots: int = 0
+    first_inn_wickets_lost: int = 0
+    second_inn_legal_balls: int = 0
+    second_inn_fours: int = 0
+    second_inn_sixes: int = 0
+    second_inn_dots: int = 0
+    second_inn_wickets_lost: int = 0
 
 
 class BucketBaselineBowling:
@@ -350,6 +364,24 @@ class BucketBaselineBowling:
     # via MAX(MAX) across cells. Drives /teams/{team}/bowling/by-season
     # `worst_conceded`.
     worst_inn_runs: int = 0
+    # Per-inning splits for /teams/{team}/bowling/by-inning. SUM across
+    # cells gives team-side totals; SUM / SUM(first_inn_count) gives the
+    # league per-1st-innings averages. Phase D of
+    # spec-series-precompute-followup.md.
+    first_inn_count: int = 0
+    first_inn_balls: int = 0
+    first_inn_runs_conceded: int = 0
+    first_inn_fours_conceded: int = 0
+    first_inn_sixes_conceded: int = 0
+    first_inn_dots: int = 0
+    first_inn_wickets: int = 0
+    second_inn_count: int = 0
+    second_inn_balls: int = 0
+    second_inn_runs_conceded: int = 0
+    second_inn_fours_conceded: int = 0
+    second_inn_sixes_conceded: int = 0
+    second_inn_dots: int = 0
+    second_inn_wickets: int = 0
 
 
 class BucketBaselineFielding:
