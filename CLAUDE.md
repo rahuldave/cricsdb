@@ -161,6 +161,27 @@ For each assertion you'd put in an integration test, **write the test AT THE SAM
 
 Every fix gets a test that demonstrates the bug (red against HEAD), THEN the fix (green). Report both phases in the commit message. A green-only test ships a fix that may or may not address the actual bug.
 
+### Perf changes — measure after every single change
+
+When optimizing, make ONE change at a time and measure it in isolation. Do not stack 2–3 changes and measure at the end.
+
+Why: batched measurements can't tell you which change moved the number. If the final result is faster, slower, or flat, you can't decide which change to keep, drop, or extend. You also can't notice when one change cancelled out the gain from another — the way `lite=true` skipping the 3 GROUP BY queries hid the actual cost of restoring them when `lite` was deleted in the next iteration (2026-05-14 /series perf work).
+
+A perf pass should look like:
+1. Baseline timing recorded.
+2. Change A. Measure. Record delta.
+3. Change B. Measure. Record delta.
+4. Change C. Measure. Record delta.
+
+If a commit message claims a perf win, the win should be measurable in isolation — gather one query, time it; gather another, time it; etc.
+
+Tells you're about to violate this:
+- Several refactors stacked without a baseline timing between them.
+- Vague claims like "this should be faster" without a number-vs-number comparison.
+- Switching to a precomputed table AND parallelizing the query AND deleting an endpoint in one commit.
+
+User flagged 2026-05-14. Pair with [Bug reports — reproduce, propose, WAIT] above.
+
 ---
 
 ## Code patterns
