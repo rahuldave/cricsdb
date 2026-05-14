@@ -1,4 +1,5 @@
 import LineChart from './LineChart'
+import ChartContainer from './ChartContainer'
 import ChartHeader from '../ChartHeader'
 import { WISDEN, WISDEN_PAIR } from './palette'
 import type { ScorecardInnings } from '../../types'
@@ -184,10 +185,11 @@ export default function WormChart({ innings, width, height = 480 }: Props) {
   ]
 
   return (
-    <div>
-      <ChartHeader
+    <ChartContainer
+      header={<ChartHeader
         title={<>Worm — cumulative runs <span className="wisden-chart-sub">(oxblood dots = wickets)</span></>}
-      />
+      />}
+    >
       <LineChart
         data={data}
         xAccessor="over"
@@ -267,6 +269,6 @@ export default function WormChart({ innings, width, height = 480 }: Props) {
           )
         ))}
       </div>
-    </div>
+    </ChartContainer>
   )
 }

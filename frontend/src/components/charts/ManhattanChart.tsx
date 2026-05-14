@@ -1,4 +1,5 @@
 import BarChart from './BarChart'
+import ChartContainer from './ChartContainer'
 import ChartHeader from '../ChartHeader'
 import { WISDEN_PAIR } from './palette'
 import type { ScorecardInnings } from '../../types'
@@ -23,8 +24,9 @@ export default function ManhattanChart({ innings, width, height = 260 }: Props) 
   if (main.length === 0) return null
 
   return (
-    <div>
-      <ChartHeader title="Manhattan — runs per over" />
+    <ChartContainer
+      header={<ChartHeader title="Manhattan — runs per over" />}
+    >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {main.map((inn, idx) => (
           <div key={inn.innings_number}>
@@ -46,6 +48,6 @@ export default function ManhattanChart({ innings, width, height = 260 }: Props) 
           </div>
         ))}
       </div>
-    </div>
+    </ChartContainer>
   )
 }

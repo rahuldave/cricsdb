@@ -1,4 +1,5 @@
 import { Scatterplot } from 'semiotic'
+import ChartContainer from './ChartContainer'
 import ChartHeader from '../ChartHeader'
 import { abbreviateScope } from '../scopeLinks'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
@@ -53,8 +54,10 @@ export default function ScatterChart<T extends Record<string, any>>({
   const effectiveSubtitle = subtitle ?? (title ? abbreviateScope(filters, { discipline }) : '')
 
   return (
-    <div ref={ref} className="w-full">
-      <ChartHeader title={title} subtitle={effectiveSubtitle} />
+    <ChartContainer
+      outerRef={ref}
+      header={<ChartHeader title={title} subtitle={effectiveSubtitle} />}
+    >
       {effectiveWidth > 0 && (
         <Scatterplot
           data={data}
@@ -76,6 +79,6 @@ export default function ScatterChart<T extends Record<string, any>>({
           showGrid
         />
       )}
-    </div>
+    </ChartContainer>
   )
 }

@@ -1,4 +1,5 @@
 import { DonutChart as SemioticDonutChart } from 'semiotic'
+import ChartContainer from './ChartContainer'
 import ChartHeader from '../ChartHeader'
 import { abbreviateScope } from '../scopeLinks'
 import { useDiscipline } from '../../hooks/useDiscipline'
@@ -28,8 +29,9 @@ export default function DonutChart<T extends Record<string, any>>({
   const discipline = useDiscipline()
   const effectiveSubtitle = subtitle ?? (title ? abbreviateScope(filters, { discipline }) : '')
   return (
-    <div>
-      <ChartHeader title={title} subtitle={effectiveSubtitle} />
+    <ChartContainer
+      header={<ChartHeader title={title} subtitle={effectiveSubtitle} />}
+    >
       <SemioticDonutChart
         data={data}
         categoryAccessor={categoryAccessor}
@@ -45,6 +47,6 @@ export default function DonutChart<T extends Record<string, any>>({
         // on narrow screens.
         legendPosition="bottom"
       />
-    </div>
+    </ChartContainer>
   )
 }

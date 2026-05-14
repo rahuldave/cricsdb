@@ -1,4 +1,5 @@
 import { LineChart as SemioticLineChart } from 'semiotic'
+import ChartContainer from './ChartContainer'
 import ChartHeader from '../ChartHeader'
 import { abbreviateScope } from '../scopeLinks'
 import { useContainerWidth } from '../../hooks/useContainerWidth'
@@ -92,8 +93,10 @@ export default function LineChart<T extends Record<string, any>>({
     : colorScheme
 
   return (
-    <div ref={ref} className="w-full">
-      <ChartHeader title={title} subtitle={effectiveSubtitle} />
+    <ChartContainer
+      outerRef={ref}
+      header={<ChartHeader title={title} subtitle={effectiveSubtitle} />}
+    >
       {effectiveWidth > 0 && (
         <SemioticLineChart
           data={effectiveData}
@@ -118,6 +121,6 @@ export default function LineChart<T extends Record<string, any>>({
           showGrid
         />
       )}
-    </div>
+    </ChartContainer>
   )
 }
