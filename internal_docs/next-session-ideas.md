@@ -3,7 +3,22 @@
 > **NO DEPLOYS gate is OFF** as of 2026-04-21. Resume normal deploy
 > cadence.
 
-## NEXT SESSION — top of queue (2026-04-28+)
+## NEXT SESSION — top of queue (2026-05-14+)
+
+**`spec-series-precompute-followup.md`** is the top priority. Builds
+on bucketbaselinemoments shipped 2026-05-14 (this session, not yet
+committed — diff in working tree at session end). Five phases B → A
+→ C → D → E to drop /series Overview / Batting / Bowling / Partnerships
+at all-cricket from ~5s to <2s page-load. Phase B is a free win
+(no schema change), Phase A is the big one (wires existing
+`playerscopestats` table to leaderboard endpoints).
+
+**Deploy gate:** bucketbaselinemoments doesn't exist on production —
+next deploy needs `bash deploy.sh --first` to ship the populated DB.
+
+Older queue (DOM-test rollout, series_type FilterBar) follows:
+
+## OLDER QUEUE — DOM-test rollout (2026-04-28+)
 
 `spec-filterbar-team-class-v3.md` shipped 2026-04-28 in 5 commits
 (`a0773e5` … `87ad937`); `spec-avg-col-per-team-transform.md`
