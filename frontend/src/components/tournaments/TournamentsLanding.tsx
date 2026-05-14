@@ -225,16 +225,32 @@ function RivalryGrid({
  *  TournamentDossier's Overview tab at broad scope), the H2 + subtitle
  *  are suppressed so the host page's heading hierarchy stays clean.
  *  Standalone callers (currently none — /series renders the dossier)
- *  leave the heading visible. */
-export default function TournamentsLanding({ embedded = false }: { embedded?: boolean } = {}) {
+ *  leave the heading visible.
+ *
+ *  `presetData` — when the host page has already fetched /series/landing
+ *  (e.g. for Top events), it passes the data here so we don't double-
+ *  fetch. SQLite serializes async reads, so a duplicate landing fetch
+ *  adds ~3s to the wall-clock load. With presetData, the directory
+ *  renders synchronously from the host's cache. */
+export default function TournamentsLanding({
+  embedded = false, presetData,
+}: { embedded?: boolean; presetData?: TLandingData | null } = {}) {
   const filters = useFilters()
   const ambient = ambientFromFilters(filters)
 
-  const { data, loading, error, refetch } = useFetch<TLandingData>(
-    () => getTournamentsLanding(filters),
-    [filters.gender, filters.team_type, filters.tournament,
+  // Always call the hook (rules of hooks), but skip the network when
+  // presetData is provided.
+  const fetched = useFetch<TLandingData | null>(
+    () => presetData
+      ? Promise.resolve(null)
+      : getTournamentsLanding(filters),
+    [presetData != null, filters.gender, filters.team_type, filters.tournament,
      filters.season_from, filters.season_to, filters.filter_venue],
   )
+  const data = presetData ?? fetched.data
+  const loading = !presetData && fetched.loading
+  const error = !presetData ? fetched.error : null
+  const refetch = fetched.refetch
 
   const [showOthersMen, setShowOthersMen] = useState(false)
   const [showOthersWomen, setShowOthersWomen] = useState(false)

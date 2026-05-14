@@ -211,9 +211,15 @@ export default function TournamentDossier({
     ...useFilterDeps(),
   ]
 
+  // `lite=true` at tier mode skips the slow per-person-per-match GROUP BY
+  // aggregates in /series/summary (highest_individual / best_bowling /
+  // best_fielding). At all-cricket scope this drops the response time
+  // from ~20s to ~7s; at men's club from ~10s to ~4s. Person-level Best
+  // moments lines hide automatically when the fields are null.
+  const isTierFetch = !tournament && !(filterTeam && filterOpponent)
   const summaryFetch = useFetch<TournamentSummary>(
-    () => getTournamentSummary(tournament, apiFilters),
-    filterDeps,
+    () => getTournamentSummary(tournament, { ...apiFilters, lite: isTierFetch || undefined }),
+    [...filterDeps, isTierFetch],
   )
 
   // ── Tier-mode extras: Champions across scope + top-teams by win % ──
@@ -3009,17 +3015,15 @@ function TierExtrasSections({
       )}
 
       {/* Other tournaments + rivalries — reuse the existing
-          TournamentsLanding directory. Its primary sections
-          (Franchise / Domestic / Women's franchise / International
-          events) overlap visually with Top events above by design
-          (Top events is a curated quick-glance; the directory is the
-          full browse). The lazy-load buttons it carries — "Show 155
-          other men's rivalries", "Other international tournaments
-          (667)" — are what mirror prod's /series page. */}
+          TournamentsLanding directory. presetData shares the landing
+          fetch with Top events above so we don't double-call
+          /series/landing (each call ~3s on SQLite). The lazy-load
+          buttons inside ("Show 155 other men's rivalries", "Other
+          international tournaments (667)") mirror prod's /series. */}
       <div className="mt-10">
         <SectionHeader title="Other tournaments and rivalries in scope" />
         <div className="mt-3">
-          <TournamentsLanding embedded />
+          <TournamentsLanding embedded presetData={landing} />
         </div>
       </div>
     </>

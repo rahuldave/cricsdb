@@ -381,7 +381,7 @@ const tparams = (t: string | null | undefined, f?: TF) => {
 
 export const getTournamentsLanding = (filters?: F) =>
   fetchApi<import('./types').TournamentsLanding>('/api/v1/series/landing', filters as Record<string, string>)
-export const getTournamentSummary = (tournament: string | null, filters?: TF) =>
+export const getTournamentSummary = (tournament: string | null, filters?: TF & { lite?: boolean }) =>
   fetchApi<import('./types').TournamentSummary>('/api/v1/series/summary', tparams(tournament, filters))
 export const getTournamentBySeason = (tournament: string | null, filters?: TF) =>
   fetchApi<{ tournament: string; seasons: import('./types').TournamentSeason[] }>(

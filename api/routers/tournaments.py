@@ -34,6 +34,8 @@ Canonicalization:
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
@@ -703,6 +705,15 @@ async def tournament_summary(
     series_type: str | None = Query(None, description="all / bilateral_only / tournament_only"),
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
+    lite: bool = Query(
+        False,
+        description="Skip the three slow GROUP BY (person, match) aggregates "
+                    "(highest_individual, best_bowling, best_fielding). At "
+                    "all-cricket scope these dominate the response time "
+                    "(20s vs 4s without them). Set true from the /series tier "
+                    "dossier where person-level Best moments are deferred to "
+                    "narrower scope. Returns null for the three skipped fields.",
+    ),
 ):
     """Headline numbers for a match-set scope.
 
@@ -927,33 +938,36 @@ async def tournament_summary(
         }
 
     # ── Highest individual innings (best batting single-match) ──
-    hi_rows = await db.q(
-        f"""
-        SELECT d.batter_id AS person_id, p.name, i.team AS team,
-               m.id AS match_id,
-               SUM(d.runs_batter) AS runs,
-               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
-        FROM delivery d
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        LEFT JOIN person p ON p.id = d.batter_id
-        WHERE i.super_over = 0 AND {where}{inn_clause}
-          AND d.batter_id IS NOT NULL
-          AND d.extras_wides = 0 AND d.extras_noballs = 0
-        GROUP BY d.batter_id, m.id
-        ORDER BY runs DESC
-        LIMIT 1
-        """,
-        params,
-    )
+    # Slow at broad scope: GROUP BY (batter_id, match_id) iterates
+    # ~300k groups across all delivery rows. `lite=True` skips it.
     highest_individual = None
-    if hi_rows:
-        r = hi_rows[0]
-        highest_individual = {
-            "person_id": r["person_id"], "name": r["name"],
-            "team": r["team"],
-            "runs": r["runs"], "match_id": r["match_id"], "date": r["date"],
-        }
+    if not lite:
+        hi_rows = await db.q(
+            f"""
+            SELECT d.batter_id AS person_id, p.name, i.team AS team,
+                   m.id AS match_id,
+                   SUM(d.runs_batter) AS runs,
+                   (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            LEFT JOIN person p ON p.id = d.batter_id
+            WHERE i.super_over = 0 AND {where}{inn_clause}
+              AND d.batter_id IS NOT NULL
+              AND d.extras_wides = 0 AND d.extras_noballs = 0
+            GROUP BY d.batter_id, m.id
+            ORDER BY runs DESC
+            LIMIT 1
+            """,
+            params,
+        )
+        if hi_rows:
+            r = hi_rows[0]
+            highest_individual = {
+                "person_id": r["person_id"], "name": r["name"],
+                "team": r["team"],
+                "runs": r["runs"], "match_id": r["match_id"], "date": r["date"],
+            }
 
     # ── Largest partnership (enriched — batter IDs, team, date) ──
     lp_rows = await db.q(
@@ -985,95 +999,99 @@ async def tournament_summary(
         }
 
     # ── Best bowling figures (single match) ──
+    # Slow at broad scope: GROUP BY (bowler_id, match_id) CTE.
     # Bowler's team = opposite of the innings they bowled in.
-    bb_rows = await db.q(
-        f"""
-        WITH per_match_bowler AS (
-          SELECT d.bowler_id, i.match_id,
-                 CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS bowler_team,
-                 SUM(CASE WHEN w.id IS NOT NULL
-                              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-                          THEN 1 ELSE 0 END) AS wickets,
-                 SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
-                          THEN d.runs_total ELSE d.runs_total END) AS runs_conceded
-          FROM delivery d
-          LEFT JOIN wicket w ON w.delivery_id = d.id
-          JOIN innings i ON i.id = d.innings_id
-          JOIN match m ON m.id = i.match_id
-          WHERE i.super_over = 0 AND {where}{inn_clause}
-            AND d.bowler_id IS NOT NULL
-          GROUP BY d.bowler_id, i.match_id
-        )
-        SELECT pm.bowler_id AS person_id, p.name,
-               pm.bowler_team AS team,
-               pm.wickets, pm.runs_conceded AS runs,
-               pm.match_id,
-               (SELECT MIN(date) FROM matchdate WHERE match_id = pm.match_id) AS date
-        FROM per_match_bowler pm
-        LEFT JOIN person p ON p.id = pm.bowler_id
-        ORDER BY pm.wickets DESC, pm.runs_conceded ASC
-        LIMIT 1
-        """,
-        params,
-    )
     best_bowling = None
-    if bb_rows:
-        r = bb_rows[0]
-        best_bowling = {
-            "person_id": r["person_id"], "name": r["name"],
-            "team": r["team"],
-            "figures": f"{r['wickets']}/{r['runs']}",
-            "wickets": r["wickets"], "runs": r["runs"],
-            "match_id": r["match_id"], "date": r["date"],
-        }
+    if not lite:
+        bb_rows = await db.q(
+            f"""
+            WITH per_match_bowler AS (
+              SELECT d.bowler_id, i.match_id,
+                     CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS bowler_team,
+                     SUM(CASE WHEN w.id IS NOT NULL
+                                  AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+                              THEN 1 ELSE 0 END) AS wickets,
+                     SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
+                              THEN d.runs_total ELSE d.runs_total END) AS runs_conceded
+              FROM delivery d
+              LEFT JOIN wicket w ON w.delivery_id = d.id
+              JOIN innings i ON i.id = d.innings_id
+              JOIN match m ON m.id = i.match_id
+              WHERE i.super_over = 0 AND {where}{inn_clause}
+                AND d.bowler_id IS NOT NULL
+              GROUP BY d.bowler_id, i.match_id
+            )
+            SELECT pm.bowler_id AS person_id, p.name,
+                   pm.bowler_team AS team,
+                   pm.wickets, pm.runs_conceded AS runs,
+                   pm.match_id,
+                   (SELECT MIN(date) FROM matchdate WHERE match_id = pm.match_id) AS date
+            FROM per_match_bowler pm
+            LEFT JOIN person p ON p.id = pm.bowler_id
+            ORDER BY pm.wickets DESC, pm.runs_conceded ASC
+            LIMIT 1
+            """,
+            params,
+        )
+        if bb_rows:
+            r = bb_rows[0]
+            best_bowling = {
+                "person_id": r["person_id"], "name": r["name"],
+                "team": r["team"],
+                "figures": f"{r['wickets']}/{r['runs']}",
+                "wickets": r["wickets"], "runs": r["runs"],
+                "match_id": r["match_id"], "date": r["date"],
+            }
 
     # ── Best fielding (most dismissals in a single match) ──
+    # Slow at broad scope: GROUP BY (fielder_id, match_id) CTE.
     # Counts catches + stumpings + run-outs + caught-and-bowled. Excludes
     # substitute fielders. Fielder's team = opposite of innings batting team.
-    bf_rows = await db.q(
-        f"""
-        WITH per_match_fielder AS (
-          SELECT fc.fielder_id, i.match_id,
-                 CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS fielder_team,
-                 -- Convention 3: catches inclusive of caught_and_bowled.
-                 SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
-                          THEN 1 ELSE 0 END) AS catches,
-                 SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
-                 SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
-                 SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS caught_bowled,
-                 COUNT(*) AS total
-          FROM fieldingcredit fc
-          JOIN delivery d ON d.id = fc.delivery_id
-          JOIN innings i ON i.id = d.innings_id
-          JOIN match m ON m.id = i.match_id
-          WHERE i.super_over = 0 AND {where}{inn_clause}
-            AND fc.fielder_id IS NOT NULL
-            AND fc.is_substitute = 0
-          GROUP BY fc.fielder_id, i.match_id
-        )
-        SELECT pf.fielder_id AS person_id, p.name,
-               pf.fielder_team AS team,
-               pf.catches, pf.stumpings, pf.run_outs, pf.caught_bowled,
-               pf.total, pf.match_id,
-               (SELECT MIN(date) FROM matchdate WHERE match_id = pf.match_id) AS date
-        FROM per_match_fielder pf
-        LEFT JOIN person p ON p.id = pf.fielder_id
-        ORDER BY pf.total DESC, pf.stumpings DESC
-        LIMIT 1
-        """,
-        params,
-    )
     best_fielding = None
-    if bf_rows:
-        r = bf_rows[0]
-        best_fielding = {
-            "person_id": r["person_id"], "name": r["name"],
-            "team": r["team"],
-            "catches": r["catches"], "stumpings": r["stumpings"],
-            "run_outs": r["run_outs"], "caught_bowled": r["caught_bowled"],
-            "total": r["total"],
-            "match_id": r["match_id"], "date": r["date"],
-        }
+    if not lite:
+        bf_rows = await db.q(
+            f"""
+            WITH per_match_fielder AS (
+              SELECT fc.fielder_id, i.match_id,
+                     CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS fielder_team,
+                     -- Convention 3: catches inclusive of caught_and_bowled.
+                     SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                              THEN 1 ELSE 0 END) AS catches,
+                     SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+                     SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+                     SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS caught_bowled,
+                     COUNT(*) AS total
+              FROM fieldingcredit fc
+              JOIN delivery d ON d.id = fc.delivery_id
+              JOIN innings i ON i.id = d.innings_id
+              JOIN match m ON m.id = i.match_id
+              WHERE i.super_over = 0 AND {where}{inn_clause}
+                AND fc.fielder_id IS NOT NULL
+                AND fc.is_substitute = 0
+              GROUP BY fc.fielder_id, i.match_id
+            )
+            SELECT pf.fielder_id AS person_id, p.name,
+                   pf.fielder_team AS team,
+                   pf.catches, pf.stumpings, pf.run_outs, pf.caught_bowled,
+                   pf.total, pf.match_id,
+                   (SELECT MIN(date) FROM matchdate WHERE match_id = pf.match_id) AS date
+            FROM per_match_fielder pf
+            LEFT JOIN person p ON p.id = pf.fielder_id
+            ORDER BY pf.total DESC, pf.stumpings DESC
+            LIMIT 1
+            """,
+            params,
+        )
+        if bf_rows:
+            r = bf_rows[0]
+            best_fielding = {
+                "person_id": r["person_id"], "name": r["name"],
+                "team": r["team"],
+                "catches": r["catches"], "stumpings": r["stumpings"],
+                "run_outs": r["run_outs"], "caught_bowled": r["caught_bowled"],
+                "total": r["total"],
+                "match_id": r["match_id"], "date": r["date"],
+            }
 
     # ── Participating teams (in scope) ──
     team_rows = await db.q(
