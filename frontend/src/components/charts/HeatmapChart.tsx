@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useContainerWidth } from '../../hooks/useContainerWidth'
+import { useIsMobile } from '../../hooks/useMediaQuery'
 
 export interface HeatmapCell {
   x: string | number
@@ -46,6 +46,21 @@ function interp(t: number, a: number[], b: number[]): string {
   return `rgb(${r},${g},${bl})`
 }
 
+/**
+ * HeatmapChart — value-matrix viewer.
+ *
+ * Layout: pure CSS Grid driven by `--cols`/`--rows` custom properties.
+ * No fixed-pixel margins, no JS `measuredWidth`, no absolute-positioned
+ * cells (only the floating tooltip is absolute — that's idiomatic).
+ *
+ * Mobile pivot (≤ 720px): the conceptual axes flip — y=phase, x=season
+ * becomes y=season, x=phase. Implementation is a data swap: caller
+ * still passes xCategories/yCategories the same way; on mobile we
+ * iterate them transposed so each season gets its own row and the
+ * (small set of) phases become the columns. Spec: cell width on a
+ * 390px viewport jumps from ~18px to ~100px so multi-digit values
+ * like `10.16` render comfortably.
+ */
 export default function HeatmapChart({
   cells,
   xCategories,
@@ -60,8 +75,16 @@ export default function HeatmapChart({
   nLabel = 'n',
   onCellClick,
 }: HeatmapChartProps) {
-  const [ref, measuredWidth] = useContainerWidth()
   const [hover, setHover] = useState<{ x: number; y: number; cell: HeatmapCell } | null>(null)
+  const isMobile = useIsMobile()
+
+  // On mobile, pivot axes: rows ← original xCategories (seasons),
+  // cols ← original yCategories (phases). Cells still keyed by the
+  // ORIGINAL (x, y) so the data layer is untouched.
+  const rowCats = isMobile ? xCategories : yCategories
+  const colCats = isMobile ? yCategories : xCategories
+  const rowFormatter = isMobile ? (v: string | number) => String(v) : formatYTick
+  const colFormatter = isMobile ? formatYTick : (v: string | number) => String(v)
 
   const cellMap = useMemo(() => {
     const m = new Map<string, HeatmapCell>()
@@ -84,146 +107,183 @@ export default function HeatmapChart({
     return interp(t, CREAM, OXBLOOD)
   }
 
-  // Sizing — left margin for y-axis labels, top margin for x-axis labels.
-  const Y_LABEL_W = 80
-  const X_LABEL_H = 28
-  const innerW = Math.max(measuredWidth - Y_LABEL_W, 100)
-  const cellW = xCategories.length > 0 ? innerW / xCategories.length : 0
-  const cellH = 32
+  // Look up a cell by ROW index / COL index, accounting for the pivot.
+  const getCell = (rowI: number, colI: number): HeatmapCell | undefined => {
+    const xVal = isMobile ? rowCats[rowI] : colCats[colI]
+    const yVal = isMobile ? colCats[colI] : rowCats[rowI]
+    return cellMap.get(`${xVal}|${yVal}`)
+  }
 
   return (
-    <div ref={ref} className="w-full" style={{ position: 'relative', userSelect: 'none' }}>
-      {measuredWidth > 0 && (
-        <div style={{ position: 'relative', paddingLeft: Y_LABEL_W, paddingTop: X_LABEL_H }}>
-          {/* X axis labels (column categories — usually seasons, rotated) */}
-          <div style={{
-            position: 'absolute', left: Y_LABEL_W, top: 0,
-            width: innerW, height: X_LABEL_H,
+    <div
+      className="wisden-heatmap"
+      style={{
+        // CSS Grid: first column = y-axis labels (auto-sized to the
+        // widest label), remaining columns share remaining width equally.
+        // First row = x-axis label header (rotated text); remaining rows
+        // size to content.
+        display: 'grid',
+        gridTemplateColumns: `auto repeat(${colCats.length}, minmax(0, 1fr))`,
+        gridAutoRows: 'auto',
+        userSelect: 'none',
+        position: 'relative',  // contains the floating tooltip
+        rowGap: 0,
+        columnGap: 0,
+      }}
+    >
+      {/* Corner cell (above the y-labels, left of the x-labels) — empty. */}
+      <div />
+
+      {/* X-axis label row (rotated). One cell per column. */}
+      {colCats.map((c) => (
+        <div
+          key={`xlabel-${c}`}
+          className="wisden-heatmap-xlabel"
+          style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            minHeight: '1.8rem',
+            padding: '0 0.1rem 0.15rem',
+          }}
+        >
+          <span style={{
+            transform: isMobile ? 'none' : 'rotate(-55deg)',
+            transformOrigin: 'center bottom',
+            whiteSpace: 'nowrap',
+            fontSize: '0.7rem',
+            fontFamily: 'var(--serif)',
+            fontStyle: 'italic',
+            color: 'var(--ink-faint)',
+            lineHeight: 1,
+            display: 'inline-block',
           }}>
-            {xCategories.map((x, i) => (
+            {colFormatter(c)}
+          </span>
+        </div>
+      ))}
+
+      {/* One row per row-category: y-label + N data cells. */}
+      {rowCats.map((rc, rowI) => (
+        <RowFragment key={`row-${rc}`}>
+          <div
+            className="wisden-heatmap-ylabel"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              fontSize: '0.7rem',
+              fontFamily: 'var(--serif)',
+              fontStyle: 'italic',
+              color: 'var(--ink-faint)',
+              whiteSpace: 'nowrap',
+              padding: '0 0.4rem 0 0',
+              minHeight: '2rem',
+            }}
+          >
+            {rowFormatter(rc)}
+          </div>
+          {colCats.map((cc, colI) => {
+            const cell = getCell(rowI, colI)
+            const v = cell?.value ?? null
+            const n = cell?.n
+            const bg = colorFor(v, n)
+            const display = v == null ? '' : formatValue(v)
+            const darkText = v == null || (n != null && n < lowNThreshold) ||
+              ((v - minV) / (maxV - minV || 1)) < (invert ? 0.7 : 0.5)
+            return (
               <div
-                key={String(x)}
+                key={`cell-${rc}-${cc}`}
+                onMouseEnter={() => cell && setHover({ x: colI, y: rowI, cell })}
+                onMouseLeave={() => setHover(null)}
+                onClick={() => cell && onCellClick && onCellClick(cell)}
                 style={{
-                  position: 'absolute',
-                  left: i * cellW + cellW / 2,
-                  top: X_LABEL_H - 4,
-                  transformOrigin: '0 0',
-                  transform: 'rotate(-55deg)',
-                  whiteSpace: 'nowrap',
-                  fontSize: 11,
-                  fontFamily: 'var(--serif)',
-                  fontStyle: 'italic',
-                  color: 'var(--ink-faint)',
-                  lineHeight: 1,
+                  background: bg,
+                  borderRight: '1px solid rgba(255,255,255,0.35)',
+                  borderBottom: '1px solid rgba(255,255,255,0.35)',
+                  minHeight: '2rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.7rem',
+                  fontFamily: 'var(--sans)',
+                  color: darkText ? 'var(--ink)' : '#FAF7F0',
+                  cursor: cell && onCellClick ? 'pointer' : 'default',
+                  padding: '0.15rem 0.1rem',
                 }}
-              >{String(x)}</div>
-            ))}
+              >{display}</div>
+            )
+          })}
+        </RowFragment>
+      ))}
+
+      {/* Axis titles — span the full data area below / left of the grid. */}
+      {xLabel && (
+        <div
+          style={{
+            gridColumn: `2 / span ${colCats.length}`,
+            textAlign: 'center',
+            fontSize: '0.75rem', color: 'var(--ink-faint)',
+            fontStyle: 'italic',
+            marginTop: '0.4rem',
+          }}
+        >{xLabel}</div>
+      )}
+      {yLabel && (
+        <div
+          style={{
+            gridColumn: 1,
+            gridRow: `2 / span ${rowCats.length}`,
+            writingMode: 'vertical-rl',
+            transform: 'rotate(180deg)',
+            fontSize: '0.75rem', color: 'var(--ink-faint)',
+            fontStyle: 'italic',
+            placeSelf: 'center',
+          }}
+        >{yLabel}</div>
+      )}
+
+      {/* Tooltip — absolute is appropriate for floating content;
+          not used for layout. Positioned by the hovered cell's grid
+          coords expressed in percent of the data area. */}
+      {hover && (
+        <div
+          style={{
+            position: 'absolute',
+            // Anchor to viewport corner of the heatmap container.
+            // Picking right side of cell + slight offset is enough for
+            // a tooltip that's allowed to overlap.
+            left: '50%',
+            top: 0,
+            transform: 'translateX(-50%)',
+            background: '#2E2823',
+            color: '#FAF7F0',
+            padding: '6px 10px',
+            fontSize: 12,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            zIndex: 10,
+            borderRadius: 2,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}
+        >
+          <div style={{ color: '#FAF7F0', fontWeight: 600 }}>
+            {formatYTick(hover.cell.y)} · {String(hover.cell.x)}
           </div>
-
-          {/* Grid body */}
-          <div style={{ position: 'relative' }}>
-            {yCategories.map((y, yi) => (
-              <div key={String(y)} style={{ display: 'flex', position: 'relative' }}>
-                {/* Y axis label (wicket number) */}
-                <div style={{
-                  position: 'absolute',
-                  left: -Y_LABEL_W,
-                  top: 0,
-                  width: Y_LABEL_W - 6,
-                  height: cellH,
-                  display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                  fontSize: 11,
-                  fontFamily: 'var(--serif)',
-                  fontStyle: 'italic',
-                  color: 'var(--ink-faint)',
-                }}>
-                  {formatYTick(y)}
-                </div>
-                {xCategories.map((x, xi) => {
-                  const cell = cellMap.get(`${x}|${y}`)
-                  const v = cell?.value ?? null
-                  const n = cell?.n
-                  const bg = colorFor(v, n)
-                  const display = v == null ? '' : formatValue(v)
-                  // Use dark text on light cells, light text on dark cells.
-                  // Heuristic: brightness of bg.
-                  const darkText = v == null || (n != null && n < lowNThreshold) ||
-                    ((v - minV) / (maxV - minV || 1)) < (invert ? 0.7 : 0.5)
-                  return (
-                    <div
-                      key={String(x)}
-                      onMouseEnter={() => cell && setHover({ x: xi, y: yi, cell })}
-                      onMouseLeave={() => setHover(null)}
-                      onClick={() => cell && onCellClick && onCellClick(cell)}
-                      style={{
-                        width: cellW, height: cellH,
-                        background: bg,
-                        borderRight: '1px solid rgba(255,255,255,0.35)',
-                        borderBottom: '1px solid rgba(255,255,255,0.35)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: Math.min(11, cellW * 0.28),
-                        fontFamily: 'var(--sans)',
-                        color: darkText ? 'var(--ink)' : '#FAF7F0',
-                        cursor: cell && onCellClick ? 'pointer' : 'default',
-                      }}
-                    >{display}</div>
-                  )
-                })}
-              </div>
-            ))}
+          <div style={{ color: 'rgba(250,247,240,0.82)', marginTop: 2 }}>
+            avg: {hover.cell.value != null ? formatValue(hover.cell.value) : '—'} {valueSuffix}
+            {hover.cell.n != null && ` · ${nLabel}=${hover.cell.n}`}
           </div>
-
-          {/* Axis titles */}
-          {xLabel && (
-            <div style={{
-              textAlign: 'center',
-              fontSize: 12, color: 'var(--ink-faint)',
-              fontStyle: 'italic',
-              marginTop: 6,
-            }}>{xLabel}</div>
-          )}
-          {yLabel && (
-            <div style={{
-              position: 'absolute',
-              left: -10, top: X_LABEL_H + (yCategories.length * cellH) / 2,
-              transform: 'rotate(-90deg)',
-              transformOrigin: '0 0',
-              fontSize: 12, color: 'var(--ink-faint)',
-              fontStyle: 'italic',
-            }}>{yLabel}</div>
-          )}
-
-          {/* Tooltip — use hardcoded colors, not CSS vars (the project
-              doesn't define --cream; falling back to unset text colour
-              made the tooltip unreadable). */}
-          {hover && (
-            <div
-              style={{
-                position: 'absolute',
-                left: Math.min(hover.x * cellW + cellW + 4, innerW - 160),
-                top: X_LABEL_H + hover.y * cellH - 2,
-                background: '#2E2823',
-                color: '#FAF7F0',
-                padding: '6px 10px',
-                fontSize: 12,
-                pointerEvents: 'none',
-                whiteSpace: 'nowrap',
-                zIndex: 10,
-                borderRadius: 2,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              }}
-            >
-              <div style={{ color: '#FAF7F0', fontWeight: 600 }}>
-                {formatYTick(hover.cell.y)} · {String(hover.cell.x)}
-              </div>
-              <div style={{ color: 'rgba(250,247,240,0.82)', marginTop: 2 }}>
-                avg: {hover.cell.value != null ? formatValue(hover.cell.value) : '—'} {valueSuffix}
-                {hover.cell.n != null && ` · ${nLabel}=${hover.cell.n}`}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
   )
+}
+
+/** Wrap a y-label + its cells without introducing a wrapping <div>
+ *  that would break CSS Grid (the cells need to live as direct grid
+ *  children of the heatmap container). React.Fragment is the natural
+ *  fit. */
+function RowFragment({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
 }

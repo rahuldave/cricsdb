@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useContainerWidth } from '../../hooks/useContainerWidth'
+import { useIsMobile } from '../../hooks/useMediaQuery'
 
 export interface BubbleCell {
   x: string | number
@@ -26,8 +26,6 @@ interface BubbleMatrixProps {
   onCellClick?: (cell: BubbleCell) => void
   /** Render-time tooltip body — receives the hovered cell. */
   tooltipBody?: (cell: BubbleCell) => React.ReactNode
-  /** Cell row height. Default 28. */
-  rowHeight?: number
 }
 
 const DEFAULT_BUCKETS: { upTo: number; color: string; label: string }[] = [
@@ -46,6 +44,47 @@ function bucketFor(value: number | null | undefined, buckets: typeof DEFAULT_BUC
   return buckets[buckets.length - 1]
 }
 
+/**
+ * Compact form of a team name for narrow viewports.
+ *
+ *   "Royal Challengers Bengaluru" → "RCB"
+ *   "Mumbai Indians"              → "MI"
+ *   "Chennai Super Kings"         → "CSK"
+ *   "India"                       → "IND"
+ *   "Sri Lanka"                   → "SL"
+ *
+ * Heuristic: pluck the leading capitalised letter of each whitespace-
+ * separated word. For single-word names (international teams whose
+ * country name is one word), take the first three letters.
+ *
+ * Punctuation-only chars are skipped so "Q de Kock"-style names don't
+ * land here (this helper is for TEAM labels, not player names).
+ */
+function shortTeam(name: string): string {
+  const words = name.split(/\s+/).filter(w => /^[A-Za-z]/.test(w))
+  if (words.length === 0) return name.slice(0, 3).toUpperCase()
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase()
+  return words
+    .filter(w => /^[A-Z]/.test(w))  // skip "of" / "the" in "Bay of Plenty" etc.
+    .map(w => w[0])
+    .join('')
+}
+
+/**
+ * BubbleMatrix — opponent × season grid of bubbles. Bubble area is
+ * proportional to `size` (matches); colour is bucketed by `value`
+ * (win-percent). Cells are clickable.
+ *
+ * Layout: pure CSS Grid driven by `--cols` count. No fixed-pixel
+ * margins, no JS `measuredWidth`, no absolute-positioned cells.
+ *
+ * Mobile (≤ 720px): we DON'T pivot the axes because the y-axis
+ * dimension (opponents) has many entries too — pivoting would just
+ * shift the overlap to a different label. Instead, swap the y-axis
+ * label formatter for a compact short-form ("Royal Challengers
+ * Bengaluru" → "RCB") so the y-column shrinks from ~150px to ~40px,
+ * leaving the data area enough room for 12 column bubbles.
+ */
 export default function BubbleMatrix({
   cells,
   xCategories,
@@ -54,10 +93,9 @@ export default function BubbleMatrix({
   colorBuckets = DEFAULT_BUCKETS,
   onCellClick,
   tooltipBody,
-  rowHeight = 28,
 }: BubbleMatrixProps) {
-  const [ref, measuredWidth] = useContainerWidth()
   const [hover, setHover] = useState<{ xi: number; yi: number; cell: BubbleCell } | null>(null)
+  const isMobile = useIsMobile()
 
   const cellMap = useMemo(() => {
     const m = new Map<string, BubbleCell>()
@@ -70,142 +108,164 @@ export default function BubbleMatrix({
     [cells],
   )
 
-  // Sizing: leave a gutter for the y-axis labels and a header row for x.
-  const Y_LABEL_W = 180
-  const X_LABEL_H = 32
-  const innerW = Math.max(measuredWidth - Y_LABEL_W, 200)
-  const colW = xCategories.length > 0 ? innerW / xCategories.length : 0
-  // Bubble diameter scales with sqrt(size) (so AREA ≈ size, not radius).
-  // Cap at the smaller of column width and row height minus a margin.
-  const maxR = Math.max(2, Math.min(colW, rowHeight) / 2 - 2)
-  const radiusFor = (size: number) =>
-    maxSize > 0 ? Math.max(2, Math.sqrt(size / maxSize) * maxR) : 0
+  // Bubble diameter scales with sqrt(size) (so AREA ≈ size). The
+  // diameter is expressed in % of cell width so it scales with the
+  // CSS-Grid-allocated cell — no measured-width JS needed. We clamp
+  // to a sensible max via CSS aspect-ratio + max-width.
+  const sizePct = (size: number): number =>
+    maxSize > 0 ? Math.sqrt(size / maxSize) * 90 : 0  // up to 90% of cell
+
+  const effectiveFormatY = isMobile
+    ? (y: string | number) => shortTeam(formatYTick(y))
+    : formatYTick
 
   return (
-    <div ref={ref} className="w-full" style={{ position: 'relative', userSelect: 'none' }}>
-      {measuredWidth > 0 && (
-        <div style={{ position: 'relative', paddingLeft: Y_LABEL_W, paddingTop: X_LABEL_H }}>
-          {/* X axis labels — rotated so seasons fit. */}
-          <div style={{
-            position: 'absolute', left: Y_LABEL_W, top: 0,
-            width: innerW, height: X_LABEL_H,
+    <div
+      className="wisden-bubble-matrix"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `auto repeat(${xCategories.length}, minmax(0, 1fr))`,
+        gridAutoRows: 'auto',
+        userSelect: 'none',
+        position: 'relative',
+        rowGap: 0,
+        columnGap: 0,
+      }}
+    >
+      {/* Corner cell — empty. */}
+      <div />
+
+      {/* X-axis labels — rotated season columns. */}
+      {xCategories.map((x) => (
+        <div
+          key={`xlabel-${x}`}
+          style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            minHeight: '1.8rem',
+            padding: '0 0.1rem 0.15rem',
+          }}
+        >
+          <span style={{
+            transform: 'rotate(-55deg)',
+            transformOrigin: 'center bottom',
+            whiteSpace: 'nowrap',
+            fontSize: '0.7rem',
+            fontFamily: 'var(--serif)',
+            fontStyle: 'italic',
+            color: 'var(--ink-faint)',
+            lineHeight: 1,
+            display: 'inline-block',
           }}>
-            {xCategories.map((x, i) => (
+            {String(x)}
+          </span>
+        </div>
+      ))}
+
+      {/* One row per yCategory: label + N bubble cells. */}
+      {yCategories.map((y, yi) => (
+        <RowFragment key={`row-${y}`}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              fontSize: '0.8rem',
+              fontFamily: 'var(--serif)',
+              color: 'var(--ink-soft)',
+              whiteSpace: 'nowrap',
+              padding: '0 0.5rem 0 0',
+              minHeight: '1.8rem',
+            }}
+            title={isMobile ? formatYTick(y) : undefined}
+          >
+            {effectiveFormatY(y)}
+          </div>
+          {xCategories.map((x, xi) => {
+            const cell = cellMap.get(`${x}|${y}`)
+            const diameterPct = cell && cell.size > 0 ? sizePct(cell.size) : 0
+            const color = cell ? bucketFor(cell.value, colorBuckets).color : NEUTRAL
+            const isHovered = hover && hover.xi === xi && hover.yi === yi
+            return (
               <div
-                key={String(x)}
+                key={`cell-${x}-${y}`}
+                onMouseEnter={() => cell && setHover({ xi, yi, cell })}
+                onMouseLeave={() => setHover(null)}
+                onClick={() => cell && onCellClick && onCellClick(cell)}
                 style={{
-                  position: 'absolute',
-                  left: i * colW + colW / 2,
-                  top: X_LABEL_H - 4,
-                  transformOrigin: '0 0',
-                  transform: 'rotate(-55deg)',
-                  whiteSpace: 'nowrap',
-                  fontSize: 11,
-                  fontFamily: 'var(--serif)',
-                  fontStyle: 'italic',
-                  color: 'var(--ink-faint)',
-                  lineHeight: 1,
+                  position: 'relative',
+                  minHeight: '1.8rem',
+                  // Faint baseline so the row remains readable when empty.
+                  background: 'linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--bg-soft) calc(50% - 0.5px), var(--bg-soft) calc(50% + 0.5px), transparent calc(50% + 0.5px))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: cell && onCellClick ? 'pointer' : 'default',
                 }}
-              >{String(x)}</div>
-            ))}
+              >
+                {diameterPct > 0 && (
+                  <div
+                    style={{
+                      width: `${diameterPct}%`,
+                      aspectRatio: '1 / 1',
+                      maxWidth: '1.4rem',
+                      maxHeight: '1.4rem',
+                      borderRadius: '50%',
+                      background: color,
+                      opacity: 0.88,
+                      transition: 'transform 0.08s',
+                      transform: isHovered ? 'scale(1.18)' : 'none',
+                    }}
+                  />
+                )}
+              </div>
+            )
+          })}
+        </RowFragment>
+      ))}
+
+      {/* Tooltip — absolute positioning is appropriate for floating
+          content; not used for layout. */}
+      {hover && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0, left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#2E2823',
+            color: '#FAF7F0',
+            padding: '6px 10px',
+            fontSize: 12,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            zIndex: 10,
+            borderRadius: 2,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+          }}
+        >
+          <div style={{ fontWeight: 600 }}>
+            {formatYTick(hover.cell.y)} · {String(hover.cell.x)}
           </div>
-
-          {/* Body rows — one per yCategory. */}
-          <div style={{ position: 'relative' }}>
-            {yCategories.map((y, yi) => (
-              <div key={String(y)} style={{ position: 'relative', display: 'flex', height: rowHeight }}>
-                {/* y-axis label */}
-                <div style={{
-                  position: 'absolute',
-                  left: -Y_LABEL_W,
-                  top: 0,
-                  width: Y_LABEL_W - 8,
-                  height: rowHeight,
-                  display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                  fontSize: 12,
-                  fontFamily: 'var(--serif)',
-                  color: 'var(--ink-soft)',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}>
-                  {formatYTick(y)}
-                </div>
-
-                {/* Faint baseline so the row is readable even when empty. */}
-                <div style={{
-                  position: 'absolute',
-                  left: 0, right: 0, top: rowHeight / 2 - 0.5,
-                  height: 1, background: 'var(--bg-soft)',
-                }} />
-
-                {xCategories.map((x, xi) => {
-                  const cell = cellMap.get(`${x}|${y}`)
-                  if (!cell || cell.size <= 0) return null
-                  const r = radiusFor(cell.size)
-                  const { color } = bucketFor(cell.value, colorBuckets)
-                  return (
-                    <div
-                      key={String(x)}
-                      onMouseEnter={() => setHover({ xi, yi, cell })}
-                      onMouseLeave={() => setHover(null)}
-                      onClick={() => onCellClick && onCellClick(cell)}
-                      style={{
-                        position: 'absolute',
-                        left: xi * colW + colW / 2 - r,
-                        top: rowHeight / 2 - r,
-                        width: r * 2,
-                        height: r * 2,
-                        borderRadius: '50%',
-                        background: color,
-                        opacity: 0.88,
-                        cursor: onCellClick ? 'pointer' : 'default',
-                        transition: 'transform 0.08s',
-                        ...(hover && hover.xi === xi && hover.yi === yi
-                          ? { transform: 'scale(1.18)' } : {}),
-                      }}
-                    />
-                  )
-                })}
-              </div>
-            ))}
+          <div style={{ color: 'rgba(250,247,240,0.82)', marginTop: 2 }}>
+            {tooltipBody
+              ? tooltipBody(hover.cell)
+              : `${hover.cell.size} matches${
+                  hover.cell.value != null ? ` · ${hover.cell.value}` : ''
+                }`}
           </div>
-
-          {/* Tooltip */}
-          {hover && (
-            <div
-              style={{
-                position: 'absolute',
-                left: Math.min(hover.xi * colW + colW / 2 + 14, innerW - 180),
-                top: X_LABEL_H + hover.yi * rowHeight - 6,
-                background: '#2E2823',
-                color: '#FAF7F0',
-                padding: '6px 10px',
-                fontSize: 12,
-                pointerEvents: 'none',
-                whiteSpace: 'nowrap',
-                zIndex: 10,
-                borderRadius: 2,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-              }}
-            >
-              <div style={{ fontWeight: 600 }}>
-                {formatYTick(hover.cell.y)} · {String(hover.cell.x)}
-              </div>
-              <div style={{ color: 'rgba(250,247,240,0.82)', marginTop: 2 }}>
-                {tooltipBody
-                  ? tooltipBody(hover.cell)
-                  : `${hover.cell.size} matches${
-                      hover.cell.value != null ? ` · ${hover.cell.value}` : ''
-                    }`}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Legend — one chip per colour bucket. */}
-      <div className="wisden-tab-help" style={{ marginTop: 8 }}>
+      {/* Legend — one chip per colour bucket. Spans the data area
+          below the grid via grid-column. */}
+      <div
+        className="wisden-tab-help"
+        style={{
+          gridColumn: `1 / span ${xCategories.length + 1}`,
+          marginTop: '0.5rem',
+        }}
+      >
         {colorBuckets.map(b => (
           <span key={b.label} style={{ marginRight: 14 }}>
             <span style={{
@@ -222,4 +282,8 @@ export default function BubbleMatrix({
       </div>
     </div>
   )
+}
+
+function RowFragment({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
 }
