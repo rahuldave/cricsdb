@@ -2220,52 +2220,90 @@ async def tournament_batters_leaders(
     inn_clause, inn_params = _inning_extras(aux)
     params.update(inn_params)
 
-    agg_rows = await db.q(
-        f"""
-        SELECT d.batter_id AS person_id,
-               SUM(d.runs_batter) AS runs,
-               COUNT(*) AS balls
-        FROM delivery d
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE d.batter_id IS NOT NULL
-          AND d.extras_wides = 0 AND d.extras_noballs = 0
-          AND i.super_over = 0 AND {where}{inn_clause}
-        GROUP BY d.batter_id
-        HAVING COUNT(*) >= :min_balls
-        """,
-        {**params, "min_balls": min_balls},
-    )
-    dism_rows = await db.q(
-        f"""
-        SELECT w.player_out_id AS person_id, COUNT(*) AS dismissals
-        FROM wicket w
-        JOIN delivery d ON d.id = w.delivery_id
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE w.player_out_id IS NOT NULL
-          AND w.kind NOT IN ('retired hurt', 'retired out')
-          AND i.super_over = 0 AND {where}{inn_clause}
-        GROUP BY w.player_out_id
-        """,
-        params,
-    )
-    dism_map = {r["person_id"]: r["dismissals"] or 0 for r in dism_rows}
+    # In tier-mode + precomputed regime, runs / legal_balls / dismissals
+    # come from playerscopestats SUM — one scan over ~67k rows instead
+    # of a full GROUP BY (batter, delivery) over 6M deliveries. Live
+    # SQL fallback for rivalry / venue / aux.inning / tournament-mode.
+    from .bucket_baseline_dispatch import is_precomputed_scope, baseline_where
+    is_tier = tournament is None and not (filters.team and filters.opponent)
+    is_baseline = is_tier and is_precomputed_scope(filters, aux)
 
-    entries: list[dict] = []
-    for r in agg_rows:
-        pid = r["person_id"]
-        runs = r["runs"] or 0
-        balls = r["balls"] or 0
-        dism = dism_map.get(pid, 0)
-        entries.append({
-            "person_id": pid,
-            "runs": runs,
-            "balls": balls,
-            "dismissals": dism,
-            "average": _safe_div(runs, dism) if dism > 0 else None,
-            "strike_rate": _safe_div(runs, balls, 100),
-        })
+    if is_baseline:
+        bl_where, bl_params = baseline_where(filters, aux, team=None)
+        rows = await db.q(
+            f"""
+            SELECT person_id,
+                   SUM(runs) AS runs,
+                   SUM(legal_balls) AS balls,
+                   SUM(dismissals) AS dismissals
+            FROM playerscopestats {bl_where}
+              {("AND" if bl_where else "WHERE")} person_id IS NOT NULL
+            GROUP BY person_id
+            HAVING SUM(legal_balls) >= :min_balls
+            """,
+            {**bl_params, "min_balls": min_balls},
+        )
+        entries: list[dict] = []
+        for r in rows:
+            pid = r["person_id"]
+            runs = r["runs"] or 0
+            balls = r["balls"] or 0
+            dism = r["dismissals"] or 0
+            entries.append({
+                "person_id": pid,
+                "runs": runs,
+                "balls": balls,
+                "dismissals": dism,
+                "average": _safe_div(runs, dism) if dism > 0 else None,
+                "strike_rate": _safe_div(runs, balls, 100),
+            })
+    else:
+        agg_rows = await db.q(
+            f"""
+            SELECT d.batter_id AS person_id,
+                   SUM(d.runs_batter) AS runs,
+                   COUNT(*) AS balls
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE d.batter_id IS NOT NULL
+              AND d.extras_wides = 0 AND d.extras_noballs = 0
+              AND i.super_over = 0 AND {where}{inn_clause}
+            GROUP BY d.batter_id
+            HAVING COUNT(*) >= :min_balls
+            """,
+            {**params, "min_balls": min_balls},
+        )
+        dism_rows = await db.q(
+            f"""
+            SELECT w.player_out_id AS person_id, COUNT(*) AS dismissals
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE w.player_out_id IS NOT NULL
+              AND w.kind NOT IN ('retired hurt', 'retired out')
+              AND i.super_over = 0 AND {where}{inn_clause}
+            GROUP BY w.player_out_id
+            """,
+            params,
+        )
+        dism_map = {r["person_id"]: r["dismissals"] or 0 for r in dism_rows}
+
+        entries = []
+        for r in agg_rows:
+            pid = r["person_id"]
+            runs = r["runs"] or 0
+            balls = r["balls"] or 0
+            dism = dism_map.get(pid, 0)
+            entries.append({
+                "person_id": pid,
+                "runs": runs,
+                "balls": balls,
+                "dismissals": dism,
+                "average": _safe_div(runs, dism) if dism > 0 else None,
+                "strike_rate": _safe_div(runs, balls, 100),
+            })
 
     runs_top = sorted(
         entries,
@@ -2444,51 +2482,89 @@ async def tournament_bowlers_leaders(
     inn_clause, inn_params = _inning_extras(aux)
     params.update(inn_params)
 
-    agg_rows = await db.q(
-        f"""
-        SELECT d.bowler_id AS person_id,
-               SUM(d.runs_total) AS runs,
-               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS balls
-        FROM delivery d
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE d.bowler_id IS NOT NULL
-          AND i.super_over = 0 AND {where}{inn_clause}
-        GROUP BY d.bowler_id
-        HAVING balls >= :min_balls
-        """,
-        {**params, "min_balls": min_balls},
-    )
-    wkt_rows = await db.q(
-        f"""
-        SELECT d.bowler_id AS person_id, COUNT(*) AS wickets
-        FROM wicket w
-        JOIN delivery d ON d.id = w.delivery_id
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE d.bowler_id IS NOT NULL
-          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-          AND i.super_over = 0 AND {where}{inn_clause}
-        GROUP BY d.bowler_id
-        """,
-        params,
-    )
-    wkt_map = {r["person_id"]: r["wickets"] or 0 for r in wkt_rows}
+    # In tier-mode + precomputed regime, wickets / runs_conceded /
+    # legal_balls come from playerscopestats SUM — one scan over ~67k
+    # rows instead of two full delivery+wicket scans. Live SQL fallback
+    # for rivalry / venue / aux.inning / tournament-mode.
+    from .bucket_baseline_dispatch import is_precomputed_scope, baseline_where
+    is_tier = tournament is None and not (filters.team and filters.opponent)
+    is_baseline = is_tier and is_precomputed_scope(filters, aux)
 
-    entries: list[dict] = []
-    for r in agg_rows:
-        pid = r["person_id"]
-        runs = r["runs"] or 0
-        balls = r["balls"] or 0
-        wickets = wkt_map.get(pid, 0)
-        entries.append({
-            "person_id": pid,
-            "runs": runs,
-            "balls": balls,
-            "wickets": wickets,
-            "economy": _safe_div(runs, balls, 6),
-            "strike_rate": _safe_div(balls, wickets) if wickets > 0 else None,
-        })
+    if is_baseline:
+        bl_where, bl_params = baseline_where(filters, aux, team=None)
+        rows = await db.q(
+            f"""
+            SELECT person_id,
+                   SUM(runs_conceded) AS runs,
+                   SUM(balls_bowled) AS balls,
+                   SUM(wickets) AS wickets
+            FROM playerscopestats {bl_where}
+              {("AND" if bl_where else "WHERE")} person_id IS NOT NULL
+            GROUP BY person_id
+            HAVING SUM(balls_bowled) >= :min_balls
+            """,
+            {**bl_params, "min_balls": min_balls},
+        )
+        entries: list[dict] = []
+        for r in rows:
+            pid = r["person_id"]
+            runs = r["runs"] or 0
+            balls = r["balls"] or 0
+            wickets = r["wickets"] or 0
+            entries.append({
+                "person_id": pid,
+                "runs": runs,
+                "balls": balls,
+                "wickets": wickets,
+                "economy": _safe_div(runs, balls, 6),
+                "strike_rate": _safe_div(balls, wickets) if wickets > 0 else None,
+            })
+    else:
+        agg_rows = await db.q(
+            f"""
+            SELECT d.bowler_id AS person_id,
+                   SUM(d.runs_total) AS runs,
+                   SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS balls
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE d.bowler_id IS NOT NULL
+              AND i.super_over = 0 AND {where}{inn_clause}
+            GROUP BY d.bowler_id
+            HAVING balls >= :min_balls
+            """,
+            {**params, "min_balls": min_balls},
+        )
+        wkt_rows = await db.q(
+            f"""
+            SELECT d.bowler_id AS person_id, COUNT(*) AS wickets
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE d.bowler_id IS NOT NULL
+              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+              AND i.super_over = 0 AND {where}{inn_clause}
+            GROUP BY d.bowler_id
+            """,
+            params,
+        )
+        wkt_map = {r["person_id"]: r["wickets"] or 0 for r in wkt_rows}
+
+        entries = []
+        for r in agg_rows:
+            pid = r["person_id"]
+            runs = r["runs"] or 0
+            balls = r["balls"] or 0
+            wickets = wkt_map.get(pid, 0)
+            entries.append({
+                "person_id": pid,
+                "runs": runs,
+                "balls": balls,
+                "wickets": wickets,
+                "economy": _safe_div(runs, balls, 6),
+                "strike_rate": _safe_div(balls, wickets) if wickets > 0 else None,
+            })
 
     wickets_top = sorted(
         entries,
