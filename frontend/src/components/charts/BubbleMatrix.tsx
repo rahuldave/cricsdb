@@ -59,8 +59,18 @@ function bucketFor(value: number | null | undefined, buckets: typeof DEFAULT_BUC
  *
  * Punctuation-only chars are skipped so "Q de Kock"-style names don't
  * land here (this helper is for TEAM labels, not player names).
+ *
+ * SHORTNAME_OVERRIDES handles known collisions where the generic
+ * initials produce the same code for two teams. Defunct teams take
+ * the longer code (active teams stay punchier — "DC" is Delhi
+ * Capitals, not the long-gone Deccan Chargers).
  */
+const SHORTNAME_OVERRIDES: Record<string, string> = {
+  'Deccan Chargers': 'DECC',  // defuncts → keeps "DC" for Delhi Capitals
+}
+
 function shortTeam(name: string): string {
+  if (name in SHORTNAME_OVERRIDES) return SHORTNAME_OVERRIDES[name]
   const words = name.split(/\s+/).filter(w => /^[A-Za-z]/.test(w))
   if (words.length === 0) return name.slice(0, 3).toUpperCase()
   if (words.length === 1) return words[0].slice(0, 3).toUpperCase()
