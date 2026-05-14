@@ -833,36 +833,90 @@ async def tournament_summary(
     # ── Standard live queries (ts/tw/ht/lp, finals, hi/bb/bf) — all
     #    gathered alongside the baseline-or-live count queries above
     #    so wall time = max-of-queries, not sum-of-queries.
-    ts_q = db.q(
-        f"""SELECT d.batter_id AS person_id, p.name, i.team AS team,
-                   SUM(d.runs_batter) AS runs
-            FROM delivery d
-            JOIN innings i ON i.id = d.innings_id
-            JOIN match m ON m.id = i.match_id
-            LEFT JOIN person p ON p.id = d.batter_id
-            WHERE i.super_over = 0 AND {where}{inn_clause}
-              AND d.batter_id IS NOT NULL
-              AND d.extras_wides = 0 AND d.extras_noballs = 0
-            GROUP BY d.batter_id
-            ORDER BY runs DESC LIMIT 1""",
-        params,
-    )
-    tw_q = db.q(
-        f"""SELECT d.bowler_id AS person_id, p.name,
-                   CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS team,
-                   COUNT(*) AS wickets
-            FROM wicket w
-            JOIN delivery d ON d.id = w.delivery_id
-            JOIN innings i ON i.id = d.innings_id
-            JOIN match m ON m.id = i.match_id
-            LEFT JOIN person p ON p.id = d.bowler_id
-            WHERE i.super_over = 0 AND {where}{inn_clause}
-              AND d.bowler_id IS NOT NULL
-              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-            GROUP BY d.bowler_id
-            ORDER BY wickets DESC LIMIT 1""",
-        params,
-    )
+    #
+    # ts_q / tw_q: in baseline regime, SUM-aggregate playerscopestats
+    # (no per-(person, match) join → <100ms instead of 2.8s for ts_q
+    # at all-cricket). The outer CTE picks the top player by runs /
+    # wickets; the name + team subqueries enrich the LIMIT 1 row —
+    # team uses the same arbitrary-first pick SQLite gives the live
+    # GROUP BY (deterministic by query plan, identical visible output
+    # at the sub-scopes we sampled). Out-of-regime (rivalry, venue,
+    # aux.inning, series_type ≠ 'all') keeps the live SQL.
+    if is_baseline:
+        ts_q = db.q(
+            f"""WITH top AS (
+                  SELECT person_id, SUM(runs) AS runs
+                  FROM playerscopestats {bl_where_anyteam}
+                  GROUP BY person_id
+                  ORDER BY runs DESC, person_id ASC LIMIT 1
+                )
+                SELECT t.person_id AS person_id, p.name AS name,
+                       t.runs AS runs,
+                       (SELECT i.team FROM delivery d
+                        JOIN innings i ON i.id = d.innings_id
+                        JOIN match m ON m.id = i.match_id
+                        WHERE d.batter_id = t.person_id
+                          AND d.extras_wides = 0 AND d.extras_noballs = 0
+                          AND i.super_over = 0 AND {where}
+                        LIMIT 1) AS team
+                FROM top t LEFT JOIN person p ON p.id = t.person_id""",
+            {**bl_params_anyteam, **params},
+        )
+        tw_q = db.q(
+            f"""WITH top AS (
+                  SELECT person_id, SUM(wickets) AS wickets
+                  FROM playerscopestats {bl_where_anyteam}
+                  GROUP BY person_id
+                  ORDER BY wickets DESC, person_id ASC LIMIT 1
+                )
+                SELECT t.person_id AS person_id, p.name AS name,
+                       t.wickets AS wickets,
+                       (SELECT CASE WHEN m.team1 = i.team
+                                    THEN m.team2 ELSE m.team1 END
+                        FROM wicket w
+                        JOIN delivery d ON d.id = w.delivery_id
+                        JOIN innings i ON i.id = d.innings_id
+                        JOIN match m ON m.id = i.match_id
+                        WHERE d.bowler_id = t.person_id
+                          AND w.kind NOT IN ('run out', 'retired hurt',
+                                             'retired out',
+                                             'obstructing the field')
+                          AND i.super_over = 0 AND {where}
+                        LIMIT 1) AS team
+                FROM top t LEFT JOIN person p ON p.id = t.person_id""",
+            {**bl_params_anyteam, **params},
+        )
+    else:
+        ts_q = db.q(
+            f"""SELECT d.batter_id AS person_id, p.name, i.team AS team,
+                       SUM(d.runs_batter) AS runs
+                FROM delivery d
+                JOIN innings i ON i.id = d.innings_id
+                JOIN match m ON m.id = i.match_id
+                LEFT JOIN person p ON p.id = d.batter_id
+                WHERE i.super_over = 0 AND {where}{inn_clause}
+                  AND d.batter_id IS NOT NULL
+                  AND d.extras_wides = 0 AND d.extras_noballs = 0
+                GROUP BY d.batter_id
+                ORDER BY runs DESC LIMIT 1""",
+            params,
+        )
+        tw_q = db.q(
+            f"""SELECT d.bowler_id AS person_id, p.name,
+                       CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS team,
+                       COUNT(*) AS wickets
+                FROM wicket w
+                JOIN delivery d ON d.id = w.delivery_id
+                JOIN innings i ON i.id = d.innings_id
+                JOIN match m ON m.id = i.match_id
+                LEFT JOIN person p ON p.id = d.bowler_id
+                WHERE i.super_over = 0 AND {where}{inn_clause}
+                  AND d.bowler_id IS NOT NULL
+                  AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+                GROUP BY d.bowler_id
+                ORDER BY wickets DESC LIMIT 1""",
+            params,
+        )
     # Highest team total — in baseline regime, read from
     # bucketbaselinebatting's LEAGUE row (one row per cell carries the
     # cell-wide MAX innings total + identity). ~0.34s → ~1ms.

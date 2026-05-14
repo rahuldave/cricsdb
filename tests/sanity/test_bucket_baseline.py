@@ -432,6 +432,75 @@ async def check_highest_team_total(
     return False
 
 
+async def check_top_scorer_wicket_taker(
+    db, scope_desc: str, live_where: str, bucket_where: str, params: dict,
+) -> bool:
+    """playerscopestats-driven top scorer / top wicket-taker — must
+    match live SQL byte-identical (person_id + runs / wickets) at the
+    given scope. Phase A of spec-series-precompute-followup.md."""
+    print(f"=== /series top scorer + top wicket-taker: {scope_desc} ===")
+    ok = True
+
+    # Top scorer (live ts_q shape).
+    live = await db.q(
+        f"""SELECT d.batter_id AS person_id, SUM(d.runs_batter) AS runs
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0 AND m.match_type IN ('T20','IT20')
+              AND d.batter_id IS NOT NULL
+              AND d.extras_wides = 0 AND d.extras_noballs = 0
+              {(' AND ' + live_where) if live_where else ''}
+            GROUP BY d.batter_id
+            ORDER BY runs DESC, d.batter_id ASC LIMIT 1""",
+        params,
+    )
+    bucket = await db.q(
+        f"""SELECT person_id, SUM(runs) AS runs
+            FROM playerscopestats
+            {(' WHERE ' + bucket_where) if bucket_where else ''}
+            GROUP BY person_id
+            ORDER BY runs DESC, person_id ASC LIMIT 1""",
+        params,
+    )
+    if live and bucket and live[0]["person_id"] == bucket[0]["person_id"] and live[0]["runs"] == bucket[0]["runs"]:
+        print(f"  PASS: top_scorer person_id={live[0]['person_id']}, runs={live[0]['runs']}")
+    else:
+        print(f"  FAIL: live={live[0] if live else None} bucket={bucket[0] if bucket else None}")
+        ok = False
+
+    # Top wicket-taker (live tw_q shape).
+    live = await db.q(
+        f"""SELECT d.bowler_id AS person_id, COUNT(*) AS wickets
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0 AND m.match_type IN ('T20','IT20')
+              AND d.bowler_id IS NOT NULL
+              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+              {(' AND ' + live_where) if live_where else ''}
+            GROUP BY d.bowler_id
+            ORDER BY wickets DESC, d.bowler_id ASC LIMIT 1""",
+        params,
+    )
+    bucket = await db.q(
+        f"""SELECT person_id, SUM(wickets) AS wickets
+            FROM playerscopestats
+            {(' WHERE ' + bucket_where) if bucket_where else ''}
+            GROUP BY person_id
+            ORDER BY wickets DESC, person_id ASC LIMIT 1""",
+        params,
+    )
+    if live and bucket and live[0]["person_id"] == bucket[0]["person_id"] and live[0]["wickets"] == bucket[0]["wickets"]:
+        print(f"  PASS: top_wicket_taker person_id={live[0]['person_id']}, wickets={live[0]['wickets']}")
+    else:
+        print(f"  FAIL: live={live[0] if live else None} bucket={bucket[0] if bucket else None}")
+        ok = False
+
+    return ok
+
+
 async def check_cross_cell_isolation(db) -> bool:
     """populate_incremental on cell A leaves cell B untouched."""
     print("=== Cross-cell isolation ===")
@@ -542,6 +611,10 @@ async def main():
     ]
     for scope in ht_scopes:
         all_ok &= await check_highest_team_total(db, *scope)
+
+    # Phase A — top scorer / wicket-taker roundtrip at 5 scopes.
+    for scope in ht_scopes:
+        all_ok &= await check_top_scorer_wicket_taker(db, *scope)
 
     all_ok &= await check_incremental_roundtrip(db)
     all_ok &= await check_cross_cell_isolation(db)
