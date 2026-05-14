@@ -65,6 +65,14 @@ const METRIC_OPTIONS: { key: DistMetric; label: string; param: string; tooltip: 
 const VALID_WINDOWS: ReadonlyArray<DistWindow> = ['last_10', 'last_60d', 'last_6mo', 'last_1yr']
 const VALID_METRICS: ReadonlyArray<DistMetric> = ['economy', 'runs']
 
+// Rolling-mean overlay window for the Scope tab. Player-grain
+// bowling = 5: per-spell wickets are very bursty (0/1 modal, 3+
+// rare) so smaller window preserves the visual signature of a
+// hot streak. Window = 10 oversmoothed visible IPL-scope swings
+// (user feedback 2026-05-14). See internal_docs/colors.md
+// "Rolling-mean windows by grain".
+const ROLLING_WINDOW = 5
+
 function pickDossier(dist: BowlerDistribution, window: DistWindow): BowlerDossier {
   if (window === 'last_10') return dist.form.last_10
   if (window === 'last_60d') return dist.form.last_60d
@@ -139,9 +147,9 @@ function sparklineFor(
 }
 
 /** Tiny inline legend explaining the reference lines + rolling mean. */
-function SparklineLegend({ globalLegend, showRolling }: {
+function SparklineLegend({ globalLegend, rollingWindow }: {
   globalLegend: string
-  showRolling: boolean
+  rollingWindow: number | null
 }) {
   // Swatch alignment pattern per commit b770918 — see
   // BatterDistributionPanel comment for rationale.
@@ -163,8 +171,8 @@ function SparklineLegend({ globalLegend, showRolling }: {
     }}>
       <span><Swatch color="#1A1714" h={2} />scope average</span>
       <span><Swatch color="#8A7D70" h={1.5} />gender-global ({globalLegend})</span>
-      {showRolling && (
-        <span><Swatch color="#7A1F1F" h={1.5} />rolling-10 mean</span>
+      {rollingWindow !== null && (
+        <span><Swatch color="#7A1F1F" h={1.5} />rolling-{rollingWindow} mean</span>
       )}
     </span>
   )
@@ -322,14 +330,14 @@ export default function BowlerDistributionPanel({
               // Rolling-mean overlay only on the widest window (Scope)
               // where smoothing reads as form-arc rather than noise;
               // skipped on Last 10 / 60d / 6mo / 1y (samples too short).
-              const showRolling = window === 'scope' && points.length >= 10
+              const showRolling = window === 'scope' && points.length >= ROLLING_WINDOW
               return (
                 <>
                   <DistributionSparkline
                     points={points}
                     playerReferenceValue={cfg.playerReferenceValue}
                     globalReferenceValue={cfg.globalReferenceValue}
-                    rollingWindow={showRolling ? 10 : undefined}
+                    rollingWindow={showRolling ? ROLLING_WINDOW : undefined}
                   />
                   <SeasonTickAxis dates={dossier.wickets.observations.map(o => o.date)} />
                   <div style={{
@@ -340,7 +348,10 @@ export default function BowlerDistributionPanel({
                     fontSize: '0.7rem', color: 'var(--ink-faint)',
                   }}>
                     <span>{cfg.caption}</span>
-                    <SparklineLegend globalLegend={cfg.globalLegend} showRolling={showRolling} />
+                    <SparklineLegend
+                      globalLegend={cfg.globalLegend}
+                      rollingWindow={showRolling ? ROLLING_WINDOW : null}
+                    />
                   </div>
                 </>
               )

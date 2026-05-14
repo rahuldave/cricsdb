@@ -16,8 +16,9 @@
  *     bins — failure/building/fifty/century/rare).
  *   - Dual reference lines: black scope average + gray gender-
  *     global anchor (BATTING_GLOBAL_* in distribution/globalBaselines).
- *   - Rolling-10 mean overlay (oxblood/red) on the Scope window
- *     when n ≥ 10.
+ *   - Rolling-N mean overlay (oxblood/red) on the Scope window
+ *     when n ≥ N. Player-grain N = 5 (smaller window keeps recent
+ *     swings visible; one bad innings is the floor).
  */
 
 import { useUrlParam } from '../../hooks/useUrlState'
@@ -36,6 +37,14 @@ import type { BatterDistribution, DistributionDossier, InningsObservation } from
 import { KickerHeader } from '../ChartHeader'
 type DistWindow = 'scope' | 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
 type DistMetric = 'runs' | 'sr'
+
+// Rolling-mean overlay window for the Scope tab. Player-grain
+// batting = 5: one duck swings the mean by ~runs/5, which the eye
+// can still attribute to one innings rather than smoothing it
+// away. Window = 10 oversmoothed visible IPL-scope swings (user
+// feedback 2026-05-14). See internal_docs/colors.md "Rolling-mean
+// windows by grain" for the per-panel table.
+const ROLLING_WINDOW = 5
 
 const WINDOW_OPTIONS: { key: DistWindow; label: string; param: string; tooltip: string }[] = [
   { key: 'scope',    label: 'Scope',    param: '',
@@ -182,8 +191,8 @@ function SRStatStrip({ dossier }: { dossier: DistributionDossier }) {
   )
 }
 
-function SparklineLegend({ globalLegend, showRolling }: {
-  globalLegend: string; showRolling: boolean
+function SparklineLegend({ globalLegend, rollingWindow }: {
+  globalLegend: string; rollingWindow: number | null
 }) {
   // Swatch alignment pattern per commit b770918: NO inline-flex
   // wrapper; verticalAlign: middle + position: relative top -0.1em
@@ -207,8 +216,8 @@ function SparklineLegend({ globalLegend, showRolling }: {
     }}>
       <span><Swatch color="#1A1714" h={2} />scope average</span>
       <span><Swatch color="#8A7D70" />gender-global ({globalLegend})</span>
-      {showRolling && (
-        <span><Swatch color="#7A1F1F" />rolling-10 mean</span>
+      {rollingWindow !== null && (
+        <span><Swatch color="#7A1F1F" />rolling-{rollingWindow} mean</span>
       )}
     </span>
   )
@@ -337,14 +346,14 @@ export default function BatterDistributionPanel({
               const globals = pickBattingBaseline(distribution.scope)
               const cfg = sparklineFor(metric, distribution.lifetime, globals)
               const points = dossier.runs.observations.map(cfg.point)
-              const showRolling = window === 'scope' && points.length >= 10
+              const showRolling = window === 'scope' && points.length >= ROLLING_WINDOW
               return (
                 <>
                   <DistributionSparkline
                     points={points}
                     playerReferenceValue={cfg.playerReferenceValue}
                     globalReferenceValue={cfg.globalReferenceValue}
-                    rollingWindow={showRolling ? 10 : undefined}
+                    rollingWindow={showRolling ? ROLLING_WINDOW : undefined}
                   />
                   <SeasonTickAxis dates={dossier.runs.observations.map(o => o.date)} />
                   <div style={{
@@ -355,7 +364,10 @@ export default function BatterDistributionPanel({
                     fontSize: '0.7rem', color: 'var(--ink-faint)',
                   }}>
                     <span>{cfg.caption}</span>
-                    <SparklineLegend globalLegend={cfg.globalLegend} showRolling={showRolling} />
+                    <SparklineLegend
+                      globalLegend={cfg.globalLegend}
+                      rollingWindow={showRolling ? ROLLING_WINDOW : null}
+                    />
                   </div>
                 </>
               )

@@ -72,6 +72,13 @@ const METRIC_OPTIONS: { key: DistMetric; label: string; param: string; tooltip: 
 const VALID_WINDOWS: ReadonlyArray<DistWindow> = ['last_10', 'last_60d', 'last_6mo', 'last_1yr']
 const VALID_METRICS: ReadonlyArray<DistMetric> = ['runs_conceded', 'economy']
 
+// Rolling-mean overlay window for the Scope tab. Team-grain
+// bowling = 7: same logic as team batting — spans two-plus
+// bilaterals, draws in WC scopes, smooths a lower-variance series
+// than player-grain. See internal_docs/colors.md "Rolling-mean
+// windows by grain".
+const ROLLING_WINDOW = 7
+
 // 3-tier polarity-aware palette per CLAUDE.md "Distribution-panel
 // color discipline (3-tier palette)". Bin-index ordering is always
 // low→mid→high (left-to-right on the histogram); the tier-to-color
@@ -174,10 +181,10 @@ function sparklineFor(
 
 /** Tiny inline legend explaining the reference lines + rolling mean.
  *  Mirrors TeamBattingDistributionPanel's SparklineLegend. */
-function SparklineLegend({ globalLegend, leagueLegend, showRolling }: {
+function SparklineLegend({ globalLegend, leagueLegend, rollingWindow }: {
   globalLegend: string
   leagueLegend: string | null
-  showRolling: boolean
+  rollingWindow: number | null
 }) {
   // Swatch alignment pattern per commit b770918 — see
   // TeamBattingDistributionPanel comment for rationale.
@@ -202,8 +209,8 @@ function SparklineLegend({ globalLegend, leagueLegend, showRolling }: {
         <span><Swatch color="#3F7A4D" h={1.5} />{leagueLegend}</span>
       )}
       <span><Swatch color="#8A7D70" h={1.5} />gender-global ({globalLegend})</span>
-      {showRolling && (
-        <span><Swatch color="#7A1F1F" h={1.5} />rolling-10 mean</span>
+      {rollingWindow !== null && (
+        <span><Swatch color="#7A1F1F" h={1.5} />rolling-{rollingWindow} mean</span>
       )}
     </span>
   )
@@ -383,7 +390,7 @@ export default function TeamBowlingDistributionPanel({
               // Rolling-mean overlay only on the widest window (Scope)
               // where smoothing reads as form-arc rather than noise;
               // skipped on Last 10 / 60d / 6mo / 1y (samples too short).
-              const showRolling = window === 'scope' && points.length >= 10
+              const showRolling = window === 'scope' && points.length >= ROLLING_WINDOW
               const league = metric === 'runs_conceded'
                 ? leagueAvg?.runsConceded ?? null
                 : metric === 'economy'
@@ -403,7 +410,7 @@ export default function TeamBowlingDistributionPanel({
                     playerReferenceValue={cfg.playerReferenceValue}
                     globalReferenceValue={cfg.globalReferenceValue}
                     leagueReferenceValue={league}
-                    rollingWindow={showRolling ? 10 : undefined}
+                    rollingWindow={showRolling ? ROLLING_WINDOW : undefined}
                   />
                   <SeasonTickAxis dates={dossier.wickets.observations.map(o => o.date)} />
                   <div style={{
@@ -417,7 +424,7 @@ export default function TeamBowlingDistributionPanel({
                     <SparklineLegend
                       globalLegend={cfg.globalLegend}
                       leagueLegend={leagueLegend}
-                      showRolling={showRolling}
+                      rollingWindow={showRolling ? ROLLING_WINDOW : null}
                     />
                   </div>
                 </>

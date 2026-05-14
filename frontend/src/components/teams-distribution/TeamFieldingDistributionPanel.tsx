@@ -71,6 +71,19 @@ const METRIC_OPTIONS: { key: DistMetric; label: string; param: string; tooltip: 
 const VALID_WINDOWS: ReadonlyArray<DistWindow> = ['last_10', 'last_60d', 'last_6mo', 'last_1yr']
 const VALID_METRICS: ReadonlyArray<DistMetric> = ['run_outs', 'stumpings']
 
+// Rolling-mean overlay window per metric. Catches = 7 (matches
+// team batting/bowling — moderately discrete count bounded by
+// wickets/innings). Run-outs + stumpings = 12 (lower-frequency,
+// slower-drifting signals: run-outs reflects team athleticism,
+// stumpings is essentially a keeper-property — both warrant
+// heavier smoothing). See internal_docs/colors.md "Rolling-mean
+// windows by grain".
+const ROLLING_WINDOW_BY_METRIC: Record<DistMetric, number> = {
+  catches: 7,
+  run_outs: 12,
+  stumpings: 12,
+}
+
 // 3-tier polarity-aware palette per CLAUDE.md "Distribution-panel
 // color discipline (3-tier palette)". All three fielding tabs use
 // the OUTCOME-ASCENDING tinting — fielding events are good for the
@@ -165,10 +178,10 @@ function sparklineFor(
 
 /** Tiny inline legend explaining the reference lines + rolling mean.
  *  Mirrors TeamBattingDistributionPanel's SparklineLegend. */
-function SparklineLegend({ globalLegend, leagueLegend, showRolling }: {
+function SparklineLegend({ globalLegend, leagueLegend, rollingWindow }: {
   globalLegend: string
   leagueLegend: string | null
-  showRolling: boolean
+  rollingWindow: number | null
 }) {
   // Swatch alignment pattern per commit b770918 — see
   // TeamBattingDistributionPanel comment for rationale.
@@ -193,8 +206,8 @@ function SparklineLegend({ globalLegend, leagueLegend, showRolling }: {
         <span><Swatch color="#3F7A4D" h={1.5} />{leagueLegend}</span>
       )}
       <span><Swatch color="#8A7D70" h={1.5} />gender-global ({globalLegend})</span>
-      {showRolling && (
-        <span><Swatch color="#7A1F1F" h={1.5} />rolling-10 mean</span>
+      {rollingWindow !== null && (
+        <span><Swatch color="#7A1F1F" h={1.5} />rolling-{rollingWindow} mean</span>
       )}
     </span>
   )
@@ -376,7 +389,8 @@ export default function TeamFieldingDistributionPanel({
               // Rolling-mean overlay only on the widest window (Scope)
               // where smoothing reads as form-arc rather than noise;
               // skipped on Last 10 / 60d / 6mo / 1y (samples too short).
-              const showRolling = window === 'scope' && points.length >= 10
+              const rollingN = ROLLING_WINDOW_BY_METRIC[metric]
+              const showRolling = window === 'scope' && points.length >= rollingN
               const league = metric === 'run_outs'
                 ? leagueAvg?.runOuts ?? null
                 : metric === 'stumpings'
@@ -396,7 +410,7 @@ export default function TeamFieldingDistributionPanel({
                     playerReferenceValue={cfg.playerReferenceValue}
                     globalReferenceValue={cfg.globalReferenceValue}
                     leagueReferenceValue={league}
-                    rollingWindow={showRolling ? 10 : undefined}
+                    rollingWindow={showRolling ? rollingN : undefined}
                   />
                   <SeasonTickAxis dates={dossier.observations.map(o => o.date)} />
                   <div style={{
@@ -410,7 +424,7 @@ export default function TeamFieldingDistributionPanel({
                     <SparklineLegend
                       globalLegend={cfg.globalLegend}
                       leagueLegend={leagueLegend}
-                      showRolling={showRolling}
+                      rollingWindow={showRolling ? rollingN : null}
                     />
                   </div>
                 </>

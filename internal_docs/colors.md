@@ -73,11 +73,39 @@ The team distribution sparklines render up to four reference lines, three carryi
 | **Scope average** | black `#1A1714` 2px | THIS subject's mean over its actual innings in the active scope (1st + 2nd combined unless `?inning=` filter) | `lifetime.X.mean_per_innings` from distribution endpoint |
 | **League avg** | forest `#3F7A4D` 1.5px | EVERY team's mean over its innings in the active scope (same-scope league baseline) | `summary.X.scope_avg` from `/summary` envelope — already fetched by parent tab; no new HTTP roundtrip |
 | **Gender-global** | gray `#8A7D70` 1.5px | EVERY team's mean across ALL T20 cricket at gender grain (whole-number anchor; ignores other filters) | hard-coded constants in `globalBaselines.ts` (refresh yearly) |
-| **Rolling-10 mean** | oxblood `#7A1F1F` 1.2px | 10-innings rolling-mean overlay on the Scope window only when n_innings ≥ 10 | derived from `observations[]` |
+| **Rolling-N mean** | oxblood `#7A1F1F` 1.2px | N-innings rolling-mean overlay on the Scope window only when n_innings ≥ N. **N varies per panel/metric** — see "Rolling-mean windows by grain" below. | derived from `observations[]` |
 
 ### Wiring discipline
 
 When adding a new metric tab to a team panel, plumb the per-metric `scope_avg` from the parent's summary fetch into the panel's `leagueAvg` prop. Don't add a backend field for it on the distribution endpoint — the duplication forces a regression-suite churn AND mismatches the existing `MetricDelta withScopeAvg` plumbing pattern that all the StatCard subtitles use.
+
+---
+
+## Rolling-mean windows by grain
+
+The oxblood overlay's window varies per panel/metric — bigger windows for lower-variance, slower-drifting series. Set via a `ROLLING_WINDOW` const at the top of each panel; team fielding uses a `ROLLING_WINDOW_BY_METRIC` map. The same number drives the `points.length >= N` gate and the legend text (`rolling-N mean`).
+
+| Panel | Metric | Window |
+|---|---|---|
+| Batter (player) | runs, sr | **5** |
+| Bowler (player) | wickets, economy, runs conceded | **5** |
+| Fielder (player) | — | none (per-match catches/run-outs are 0/1 — a rolling line is uninformative) |
+| Team batting | runs, run rate | **7** |
+| Team bowling | wickets, runs conceded, economy | **7** |
+| Team fielding | catches | **7** |
+| Team fielding | run-outs | **12** |
+| Team fielding | stumpings | **12** |
+
+**Why per-grain N differs.** Two independent axes set the right window:
+
+1. **Per-sample variance.** A team's innings total is a sum across ~6-7 batters, so its CV is much lower than any one batter's per-innings score. Lower variance → bigger window smooths reliably without hiding form arcs.
+2. **Sample density per calendar time.** Top T20 teams play every match in scope; a fringe player plays half. 7 team innings span ~2 months; 7 player innings can span 4-5. The user perceives "current form" over a shorter calendar horizon at player grain than team grain.
+
+Both arguments push team-grain N ≥ player-grain N. The original universal `10` came in as a guess pre-data; the per-panel split (player=5, team=7, team-fielding-rare-events=12) is calibrated 2026-05-14 against observed IPL/WC scopes.
+
+**Why per-metric for team fielding.** Catches per match is bounded by wickets taken (≤10) and has moderate variance; runs-conceded-style smoothing applies (window=7). Run-outs and stumpings are much rarer per match (median ~0) and reflect slow-drifting team properties — athleticism in run-outs, designated keeper in stumpings. Both warrant heavier smoothing (window=12) without hitting the World Cup ceiling that would block the overlay from drawing in tournament-only scopes.
+
+**Don't drift these numbers** without re-arguing both axes. If a new panel ships a rolling overlay, decide its N from this table's logic, document the case in this section, and update the integration test `tests/integration/distribution_rolling_window.sh`.
 
 ---
 
