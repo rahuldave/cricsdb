@@ -8,9 +8,9 @@
 | A pt 1 (ts_q + tw_q via playerscopestats) | SHIPPED | `f11b323` |
 | A pt 2-3 (batters + bowlers leaders) | SHIPPED | `228e5ba` |
 | A pt 4 (fielders leaders) | SHIPPED | `c10c869` |
-| C (partnerships top per (cell, wicket)) | PENDING | — |
-| D (per-team inning splits) | PENDING | — |
-| E (distribution lifetime) | DEFERRED | — |
+| C (partnerships top per (cell, wicket)) | PENDING — next session | — |
+| D (per-team inning splits) | PENDING — next session | — |
+| E (distribution lifetime) | PERMANENTLY DEFERRED 2026-05-14 | — |
 
 End-to-end /series at all-cricket — all four key endpoints under 0.4s
 each (was 3-6s):
@@ -427,7 +427,7 @@ bucket-derived per-team inning splits match live SQL.
 
 ---
 
-## Phase E — Per-team distribution lifetime totals (LOW PRIORITY, defer)
+## Phase E — Per-team distribution lifetime totals (PERMANENTLY DEFERRED 2026-05-14)
 
 **Small win.** ~200ms off /teams Distribution panels.
 
@@ -438,9 +438,14 @@ precompute (the anchor moves daily).
 
 Lifetime totals could be precomputed but the per-team bucket tables
 already have lifetime data — just need wiring. Estimated <200ms
-win; defer.
+win.
 
-Decision deferred until A-D are shipped and measured.
+**Permanently deferred** — the lifetime-only half doesn't move the
+needle (200ms) enough to justify the wiring touch, and the
+form-window half is genuinely hard to precompute because the
+calendar anchor moves daily. Revisit only if a future spec adds
+form-window precompute as part of a broader effort, in which case
+the lifetime wiring becomes a natural side-effect.
 
 ---
 

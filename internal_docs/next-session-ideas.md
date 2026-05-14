@@ -5,16 +5,21 @@
 
 ## NEXT SESSION — top of queue (2026-05-14+)
 
-**`spec-series-precompute-followup.md`** is the top priority. Builds
-on bucketbaselinemoments shipped 2026-05-14 (this session, not yet
-committed — diff in working tree at session end). Five phases B → A
-→ C → D → E to drop /series Overview / Batting / Bowling / Partnerships
-at all-cricket from ~5s to <2s page-load. Phase B is a free win
-(no schema change), Phase A is the big one (wires existing
-`playerscopestats` table to leaderboard endpoints).
+**`spec-series-precompute-followup.md` Phases C + D** are the top
+priority. Phases B + A SHIPPED in the 2026-05-14 follow-up session
+(commits `d152ec2`, `f11b323`, `228e5ba`, `c10c869`, `e59e637` —
+plus prior session's `0eb5ec9` for moments). End-to-end /series at
+all-cricket now sub-second across every key endpoint (was 3-6s).
+Phase E permanently deferred 2026-05-14.
 
-**Deploy gate:** bucketbaselinemoments doesn't exist on production —
-next deploy needs `bash deploy.sh --first` to ship the populated DB.
+See `internal_docs/session-handoff-2026-05-14b.md` for the full
+handoff — measured wall-clocks, verification done, what to do next
+session for C + D.
+
+**Deploy gate:** bucketbaselinemoments + (forthcoming C/D tables)
+don't exist on production. User decision 2026-05-14: bundle B + A +
+C + D into a single `bash deploy.sh --first` deploy after C + D
+land, rather than deploying B + A alone first.
 
 Older queue (DOM-test rollout, series_type FilterBar) follows:
 
