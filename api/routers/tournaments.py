@@ -740,54 +740,129 @@ async def tournament_summary(
     params.update(inn_params)
     vs = variants(tournament) if tournament else []
 
-    # ── Basic aggregates ──
-    # Match-level identity — NOT narrowed by inning (matches/editions
-    # are full-match concepts). Spec: spec-inning-split.md §3.1a.
-    meta_rows = await db.q(
-        f"""
-        SELECT COUNT(DISTINCT m.id) AS matches,
-               COUNT(DISTINCT m.season) AS editions
-        FROM match m
-        WHERE {where}
-        """,
-        params,
+    # ── Parallel-gather the 4 baseline aggregates + 3 leader/record
+    #    queries that run unconditionally. deebase supports parallel
+    #    reads (verified: 3x parallel = 0.35s vs serial 1.0s). At
+    #    all-cricket scope this drops the cost of these 7 queries from
+    #    ~5s serial to ~1s parallel.
+    meta_rows, bat_rows, wkt_rows, ts_rows, tw_rows, ht_rows, lp_rows = await asyncio.gather(
+        db.q(
+            f"""
+            SELECT COUNT(DISTINCT m.id) AS matches,
+                   COUNT(DISTINCT m.season) AS editions
+            FROM match m WHERE {where}
+            """,
+            params,
+        ),
+        db.q(
+            f"""
+            SELECT SUM(d.runs_total) AS total_runs,
+                   SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
+                   SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
+                   SUM(CASE WHEN d.runs_batter = 4 AND (d.runs_non_boundary IS NULL OR d.runs_non_boundary = 0) THEN 1 ELSE 0 END) AS fours,
+                   SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0 AND {where}{inn_clause}
+            """,
+            {**params, **inn_params},
+        ),
+        db.q(
+            f"""
+            SELECT COUNT(*) AS wickets
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0 AND {where}{inn_clause}
+            """,
+            {**params, **inn_params},
+        ),
+        db.q(
+            # Top scorer all-time (GROUP BY batter_id over delivery)
+            f"""
+            SELECT d.batter_id AS person_id, p.name, i.team AS team,
+                   SUM(d.runs_batter) AS runs
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            LEFT JOIN person p ON p.id = d.batter_id
+            WHERE i.super_over = 0 AND {where}{inn_clause}
+              AND d.batter_id IS NOT NULL
+              AND d.extras_wides = 0 AND d.extras_noballs = 0
+            GROUP BY d.batter_id
+            ORDER BY runs DESC
+            LIMIT 1
+            """,
+            params,
+        ),
+        db.q(
+            # Top wicket-taker all-time (GROUP BY bowler_id over wicket)
+            f"""
+            SELECT d.bowler_id AS person_id, p.name,
+                   CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS team,
+                   COUNT(*) AS wickets
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            LEFT JOIN person p ON p.id = d.bowler_id
+            WHERE i.super_over = 0 AND {where}{inn_clause}
+              AND d.bowler_id IS NOT NULL
+              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+            GROUP BY d.bowler_id
+            ORDER BY wickets DESC
+            LIMIT 1
+            """,
+            params,
+        ),
+        db.q(
+            # Highest team total (innings-level)
+            f"""
+            SELECT i.team, tot.total,
+                   m.id AS match_id,
+                   CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
+                   (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+            FROM (
+              SELECT d.innings_id, SUM(d.runs_total) AS total
+              FROM delivery d
+              GROUP BY d.innings_id
+            ) tot
+            JOIN innings i ON i.id = tot.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0 AND {where}{inn_clause}
+            ORDER BY tot.total DESC
+            LIMIT 1
+            """,
+            params,
+        ),
+        db.q(
+            # Largest partnership
+            f"""
+            SELECT p.partnership_runs AS runs, m.id AS match_id,
+                   p.batter1_id, p.batter1_name,
+                   p.batter2_id, p.batter2_name,
+                   i.team AS team,
+                   CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
+                   (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+            FROM partnership p
+            JOIN innings i ON i.id = p.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0 AND {where}{inn_clause}
+            ORDER BY p.partnership_runs DESC
+            LIMIT 1
+            """,
+            params,
+        ),
     )
     meta = meta_rows[0] if meta_rows else {"matches": 0, "editions": 0}
-
-    # Delivery-level aggregates (runs, wickets, sixes, rates) — DO
-    # narrow by inning when set.
-    bat_rows = await db.q(
-        f"""
-        SELECT SUM(d.runs_total) AS total_runs,
-               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
-               SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
-               SUM(CASE WHEN d.runs_batter = 4 AND (d.runs_non_boundary IS NULL OR d.runs_non_boundary = 0) THEN 1 ELSE 0 END) AS fours,
-               SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots
-        FROM delivery d
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}{inn_clause}
-        """,
-        {**params, **inn_params},
-    )
     b = bat_rows[0] if bat_rows else {}
     total_runs = b.get("total_runs") or 0
     legal_balls = b.get("legal_balls") or 0
     sixes = b.get("sixes") or 0
     fours = b.get("fours") or 0
     dots = b.get("dots") or 0
-
-    wkt_rows = await db.q(
-        f"""
-        SELECT COUNT(*) AS wickets
-        FROM wicket w
-        JOIN delivery d ON d.id = w.delivery_id
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}{inn_clause}
-        """,
-        {**params, **inn_params},
-    )
     total_wickets = wkt_rows[0]["wickets"] if wkt_rows else 0
 
     # ── Champions + most-titles ──
@@ -846,31 +921,7 @@ async def tournament_summary(
         team, n = max(title_counts.items(), key=lambda kv: (kv[1], kv[0]))
         most_titles = {"team": team, "titles": n}
 
-    # ── Top scorer all-time (in this tournament scope) ──
-    #
-    # `team` is needed so the frontend StatCard can orient the rivalry
-    # phrase correctly on rivalry scope (a batter playing FOR India
-    # should read "vs Australia", not "vs India"). SQLite's bare-column
-    # GROUP BY returns an arbitrary team from the batter's innings in
-    # scope — deterministic for rivalry (one team per batter) and
-    # informational for non-rivalry multi-team scope.
-    ts_rows = await db.q(
-        f"""
-        SELECT d.batter_id AS person_id, p.name, i.team AS team,
-               SUM(d.runs_batter) AS runs
-        FROM delivery d
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        LEFT JOIN person p ON p.id = d.batter_id
-        WHERE i.super_over = 0 AND {where}{inn_clause}
-          AND d.batter_id IS NOT NULL
-          AND d.extras_wides = 0 AND d.extras_noballs = 0
-        GROUP BY d.batter_id
-        ORDER BY runs DESC
-        LIMIT 1
-        """,
-        params,
-    )
+    # ── Process gathered top scorer / wicket-taker / highest_team_total ──
     top_scorer = None
     if ts_rows:
         r = ts_rows[0]
@@ -878,28 +929,6 @@ async def tournament_summary(
             "person_id": r["person_id"], "name": r["name"],
             "team": r["team"], "runs": r["runs"],
         }
-
-    # ── Top wicket-taker all-time ──
-    # Bowler's team = opposite of the innings batting team.
-    tw_rows = await db.q(
-        f"""
-        SELECT d.bowler_id AS person_id, p.name,
-               CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS team,
-               COUNT(*) AS wickets
-        FROM wicket w
-        JOIN delivery d ON d.id = w.delivery_id
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        LEFT JOIN person p ON p.id = d.bowler_id
-        WHERE i.super_over = 0 AND {where}{inn_clause}
-          AND d.bowler_id IS NOT NULL
-          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-        GROUP BY d.bowler_id
-        ORDER BY wickets DESC
-        LIMIT 1
-        """,
-        params,
-    )
     top_wicket_taker = None
     if tw_rows:
         r = tw_rows[0]
@@ -907,27 +936,6 @@ async def tournament_summary(
             "person_id": r["person_id"], "name": r["name"],
             "team": r["team"], "wickets": r["wickets"],
         }
-
-    # ── Highest team total (innings) ──
-    ht_rows = await db.q(
-        f"""
-        SELECT i.team, tot.total,
-               m.id AS match_id,
-               CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
-               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
-        FROM (
-          SELECT d.innings_id, SUM(d.runs_total) AS total
-          FROM delivery d
-          GROUP BY d.innings_id
-        ) tot
-        JOIN innings i ON i.id = tot.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}{inn_clause}
-        ORDER BY tot.total DESC
-        LIMIT 1
-        """,
-        params,
-    )
     highest_team_total = None
     if ht_rows:
         r = ht_rows[0]
@@ -969,24 +977,7 @@ async def tournament_summary(
                 "runs": r["runs"], "match_id": r["match_id"], "date": r["date"],
             }
 
-    # ── Largest partnership (enriched — batter IDs, team, date) ──
-    lp_rows = await db.q(
-        f"""
-        SELECT p.partnership_runs AS runs, m.id AS match_id,
-               p.batter1_id, p.batter1_name,
-               p.batter2_id, p.batter2_name,
-               i.team AS team,
-               CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
-               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
-        FROM partnership p
-        JOIN innings i ON i.id = p.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}{inn_clause}
-        ORDER BY p.partnership_runs DESC
-        LIMIT 1
-        """,
-        params,
-    )
+    # ── Largest partnership (gathered above) ──
     largest_partnership = None
     if lp_rows:
         r = lp_rows[0]
