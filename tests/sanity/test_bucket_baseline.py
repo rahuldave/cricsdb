@@ -640,6 +640,146 @@ async def check_bowling_by_inning_roundtrip(
     return ok
 
 
+async def check_fielders_leaders_roundtrip(
+    db, scope_desc: str, live_where: str, bucket_where: str, params: dict,
+) -> bool:
+    """playerscopestats-driven fielders-leaders aggregates — must match
+    live SQL byte-identical (top by total dismissals + top by run outs
+    + top by keeper dismissals) at the given scope. Phase A part 4 of
+    spec-series-precompute-followup.md.
+
+    Live SQL aggregates over fieldingcredit; bucket aggregates over
+    SUM(catches) + SUM(stumpings) + SUM(runouts) (and SUM(catches_as_keeper)
+    + SUM(stumpings) for keeper). The equivalence relies on
+    populate_player_scope_stats writing those columns from the SAME
+    fieldingcredit rows the live SQL would scan.
+    """
+    print(f"=== /series fielders-leaders: {scope_desc} ===")
+    ok = True
+
+    # by_dismissals — top fielder by total dismissals (catches+stumpings+runouts).
+    # Convention 3: catches includes caught_and_bowled.
+    live = await db.q(
+        f"""SELECT fc.fielder_id AS person_id,
+                   SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled') THEN 1 ELSE 0 END) AS catches,
+                   SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+                   SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+                   COUNT(*) AS total
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE fc.fielder_id IS NOT NULL
+              AND i.super_over = 0 AND m.match_type IN ('T20','IT20')
+              {(' AND ' + live_where) if live_where else ''}
+            GROUP BY fc.fielder_id
+            ORDER BY total DESC, fc.fielder_id ASC LIMIT 1""",
+        params,
+    )
+    bucket = await db.q(
+        f"""SELECT person_id,
+                   SUM(catches) AS catches,
+                   SUM(stumpings) AS stumpings,
+                   SUM(runouts) AS run_outs,
+                   SUM(catches) + SUM(stumpings) + SUM(runouts) AS total
+            FROM playerscopestats
+            {(' WHERE ' + bucket_where) if bucket_where else ''}
+            GROUP BY person_id
+            HAVING total > 0
+            ORDER BY total DESC, person_id ASC LIMIT 1""",
+        params,
+    )
+    if (live and bucket
+            and live[0]["person_id"] == bucket[0]["person_id"]
+            and live[0]["total"] == bucket[0]["total"]
+            and live[0]["catches"] == bucket[0]["catches"]
+            and live[0]["stumpings"] == bucket[0]["stumpings"]
+            and live[0]["run_outs"] == bucket[0]["run_outs"]):
+        print(f"  PASS: by_dismissals person_id={live[0]['person_id']}, "
+              f"total={live[0]['total']} (c={live[0]['catches']}, s={live[0]['stumpings']}, ro={live[0]['run_outs']})")
+    else:
+        print(f"  FAIL by_dismissals: live={live[0] if live else None} bucket={bucket[0] if bucket else None}")
+        ok = False
+
+    # by_run_outs — top fielder by run-outs.
+    live = await db.q(
+        f"""SELECT fc.fielder_id AS person_id,
+                   SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE fc.fielder_id IS NOT NULL
+              AND i.super_over = 0 AND m.match_type IN ('T20','IT20')
+              {(' AND ' + live_where) if live_where else ''}
+            GROUP BY fc.fielder_id
+            HAVING run_outs > 0
+            ORDER BY run_outs DESC, fc.fielder_id ASC LIMIT 1""",
+        params,
+    )
+    bucket = await db.q(
+        f"""SELECT person_id, SUM(runouts) AS run_outs
+            FROM playerscopestats
+            {(' WHERE ' + bucket_where) if bucket_where else ''}
+            GROUP BY person_id
+            HAVING run_outs > 0
+            ORDER BY run_outs DESC, person_id ASC LIMIT 1""",
+        params,
+    )
+    if (live and bucket
+            and live[0]["person_id"] == bucket[0]["person_id"]
+            and live[0]["run_outs"] == bucket[0]["run_outs"]):
+        print(f"  PASS: by_run_outs person_id={live[0]['person_id']}, run_outs={live[0]['run_outs']}")
+    else:
+        print(f"  FAIL by_run_outs: live={live[0] if live else None} bucket={bucket[0] if bucket else None}")
+        ok = False
+
+    # by_keeper_dismissals — keeper catches_as_keeper + stumpings.
+    # Equivalence: live joins fieldingcredit to keeperassignment with
+    # fc.fielder_id = ka.keeper_id; bucket reads catches_as_keeper which
+    # populate writes from the same join. Keepers don't bowl so catches
+    # vs caught+c&b is identical here.
+    live = await db.q(
+        f"""SELECT ka.keeper_id AS person_id,
+                   SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled') THEN 1 ELSE 0 END) AS catches,
+                   SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+                   SUM(CASE WHEN fc.kind IN ('caught','stumped','caught_and_bowled') THEN 1 ELSE 0 END) AS total
+            FROM keeperassignment ka
+            JOIN innings i ON i.id = ka.innings_id
+            JOIN match m ON m.id = i.match_id
+            JOIN delivery d ON d.innings_id = i.id
+            JOIN fieldingcredit fc ON fc.delivery_id = d.id AND fc.fielder_id = ka.keeper_id
+            WHERE ka.keeper_id IS NOT NULL
+              AND i.super_over = 0 AND m.match_type IN ('T20','IT20')
+              {(' AND ' + live_where) if live_where else ''}
+            GROUP BY ka.keeper_id
+            HAVING total > 0
+            ORDER BY total DESC, ka.keeper_id ASC LIMIT 1""",
+        params,
+    )
+    bucket = await db.q(
+        f"""SELECT person_id,
+                   SUM(catches_as_keeper) AS catches,
+                   SUM(stumpings) AS stumpings,
+                   SUM(catches_as_keeper) + SUM(stumpings) AS total
+            FROM playerscopestats
+            {(' WHERE ' + bucket_where) if bucket_where else ''}
+            GROUP BY person_id
+            HAVING total > 0
+            ORDER BY total DESC, person_id ASC LIMIT 1""",
+        params,
+    )
+    if (live and bucket
+            and live[0]["person_id"] == bucket[0]["person_id"]
+            and live[0]["total"] == bucket[0]["total"]):
+        print(f"  PASS: by_keeper person_id={live[0]['person_id']}, total={live[0]['total']}")
+    else:
+        print(f"  FAIL by_keeper: live={live[0] if live else None} bucket={bucket[0] if bucket else None}")
+        ok = False
+
+    return ok
+
+
 async def check_partnership_top_roundtrip(
     db, scope_desc: str, live_where: str, bucket_where: str, params: dict,
 ) -> bool:
@@ -808,6 +948,10 @@ async def main():
     # Phase A — top scorer / wicket-taker roundtrip at 5 scopes.
     for scope in ht_scopes:
         all_ok &= await check_top_scorer_wicket_taker(db, *scope)
+
+    # Phase A pt 4 — fielders-leaders roundtrip at 5 scopes.
+    for scope in ht_scopes:
+        all_ok &= await check_fielders_leaders_roundtrip(db, *scope)
 
     # Phase D — per-team inning splits in bucketbaselinebatting +
     # bucketbaselinebowling. Checked at league row level across 5 scopes.

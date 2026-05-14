@@ -139,6 +139,55 @@ ind_wkts_1st_eden=$(sql "
 actual=$(unq "$(inning_cell '1st innings' 'Wkts')")
 if [ "$actual" = "$ind_wkts_1st_eden" ]; then ok "India batting 1st @ Eden · Wkts (=$ind_wkts_1st_eden, live path)"; else bad "India batting 1st @ Eden · Wkts — expected '$ind_wkts_1st_eden', got '$actual'"; fi
 
+# ── Scope 4 · India bowling + filter_venue (live path) ────────────
+# Mirrors Scope 3 for the bowling-side _live aggregator. The bowling
+# live path runs DISTINCT delivery + wicket scans with i.team != team
+# narrowing — exercising it specifically here so a future refactor
+# that only fixes the batting helper can't silently break bowling.
+echo "Test 4 · /teams/India Bowling · filter_venue=Eden Gardens (live fallback)"
+ab open "$BASE/teams?team=India&gender=male&team_type=international&filter_venue=Eden+Gardens&tab=Bowling"
+sleep 6
+
+ind_bowl_wkts_1st_eden=$(sql "
+  WITH mt AS (SELECT DISTINCT match_id FROM matchplayer WHERE team='India')
+  SELECT COUNT(*)
+  FROM wicket w
+  JOIN delivery d ON d.id=w.delivery_id
+  JOIN innings i ON i.id=d.innings_id
+  JOIN match m ON m.id=i.match_id
+  JOIN mt ON mt.match_id=m.id
+  WHERE i.super_over=0 AND m.match_type IN ('T20','IT20')
+    AND m.gender='male' AND m.team_type='international'
+    AND m.venue='Eden Gardens'
+    AND i.team != 'India' AND i.innings_number=0
+    AND w.kind NOT IN ('run out','retired hurt','retired out','obstructing the field','retired not out');
+")
+actual=$(unq "$(inning_cell '1st innings' 'Wickets')")
+if [ "$actual" = "$ind_bowl_wkts_1st_eden" ]; then
+  ok "India bowling 1st @ Eden · Wickets (=$ind_bowl_wkts_1st_eden, live path)"
+else
+  bad "India bowling 1st @ Eden · Wickets — expected '$ind_bowl_wkts_1st_eden', got '$actual'"
+fi
+
+ind_bowl_4s_2nd_eden=$(sql "
+  WITH mt AS (SELECT DISTINCT match_id FROM matchplayer WHERE team='India')
+  SELECT SUM(CASE WHEN d.runs_batter=4 AND COALESCE(d.runs_non_boundary,0)=0 THEN 1 ELSE 0 END)
+  FROM delivery d
+  JOIN innings i ON i.id=d.innings_id
+  JOIN match m ON m.id=i.match_id
+  JOIN mt ON mt.match_id=m.id
+  WHERE i.super_over=0 AND m.match_type IN ('T20','IT20')
+    AND m.gender='male' AND m.team_type='international'
+    AND m.venue='Eden Gardens'
+    AND i.team != 'India' AND i.innings_number=1;
+")
+actual=$(unq "$(inning_cell '2nd innings' '4s')")
+if [ "$actual" = "$ind_bowl_4s_2nd_eden" ]; then
+  ok "India bowling 2nd @ Eden · 4s (=$ind_bowl_4s_2nd_eden, live path)"
+else
+  bad "India bowling 2nd @ Eden · 4s — expected '$ind_bowl_4s_2nd_eden', got '$actual'"
+fi
+
 echo ""
 if [ "$FAIL" -gt 0 ]; then
   echo "FAIL: $FAIL/$((PASS+FAIL))"

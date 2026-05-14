@@ -20,6 +20,18 @@ REG series_landing_plain              /api/v1/series/landing
 REG series_landing_men                /api/v1/series/landing?gender=male
 REG series_landing_women              /api/v1/series/landing?gender=female
 
+# ── tier-mode /series/summary (bucket path coverage for Phase A+B) ──
+# tournament= unset → is_tier=True → is_baseline=True when scope is
+# precomputed-regime. Locks the bucketbaselinebatting.highest_inn_*
+# wiring (Phase B), playerscopestats ts_q/tw_q (Phase A pt 1), and
+# bucketbaselinemoments (precomputed before this spec).
+NEW series_summary_tier_all           /api/v1/series/summary
+NEW series_summary_tier_men_intl      /api/v1/series/summary?gender=male&team_type=international
+NEW series_summary_tier_men_club_2024 /api/v1/series/summary?gender=male&team_type=club&season_from=2024&season_to=2024
+NEW series_batters_tier_all           /api/v1/series/batters-leaders?limit=5
+NEW series_bowlers_tier_all           /api/v1/series/bowlers-leaders?limit=5
+NEW series_fielders_tier_all          /api/v1/series/fielders-leaders?limit=5
+
 # ── tournament dossier: IPL all-time ─────────────────────────────
 NEW series_summary_ipl                /api/v1/series/summary?tournament=Indian%20Premier%20League
 REG series_by_season_ipl              /api/v1/series/by-season?tournament=Indian%20Premier%20League&gender=male&team_type=club

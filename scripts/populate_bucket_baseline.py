@@ -71,15 +71,22 @@ BUCKET_TABLES = [
 PARTNERSHIP_TOP_K = 10
 
 
+def _missing_cols(have: set[str], want: dict[str, str]) -> dict[str, str]:
+    """Pure: given the set of existing column names and the desired
+    {name: decl} mapping, return only those not yet present. Lifted
+    out of `_add_columns_if_missing` so the column-diff logic is unit-
+    testable without a DB. The DB-touching shell stays thin: query
+    PRAGMA, call this, issue ALTERs."""
+    return {name: decl for name, decl in want.items() if name not in have}
+
+
 async def _add_columns_if_missing(db, table: str, cols: dict[str, str]):
     """ALTER TABLE ADD COLUMN for each name not already present in
     PRAGMA table_info. Idempotent — safe to re-run.
     """
     rows = await db.q(f"PRAGMA table_info({table})")
     have = {r["name"] for r in rows}
-    for name, decl in cols.items():
-        if name in have:
-            continue
+    for name, decl in _missing_cols(have, cols).items():
         await db.q(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
 
 
