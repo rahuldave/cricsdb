@@ -2738,87 +2738,175 @@ async def tournament_fielders_leaders(
     params.update(inn_params)
     params["lim"] = limit
 
-    # By total dismissals (catches + stumpings + run-outs)
-    # Note: catches is INCLUSIVE of c_and_b per Convention 3, so total
-    # is just catches + stumpings + run_outs (no separate +c_and_b).
-    # COUNT(*) in `total` already counts every kind once including C&B.
-    disp_rows = await db.q(
-        f"""
-        SELECT fc.fielder_id AS person_id,
-               COUNT(*) AS total,
-               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
-                        THEN 1 ELSE 0 END) AS catches,
-               SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
-               SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
-               SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS c_and_b
-        FROM fieldingcredit fc
-        JOIN delivery d ON d.id = fc.delivery_id
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE fc.fielder_id IS NOT NULL
-          AND i.super_over = 0 AND {where}{inn_clause}
-        GROUP BY fc.fielder_id
-        ORDER BY total DESC
-        LIMIT :lim
-        """,
-        params,
-    )
+    # In tier-mode + precomputed regime, catches / stumpings / runouts
+    # come from playerscopestats SUM; c_and_b is NOT in
+    # playerscopestats so a small bounded secondary query (top_ids only)
+    # backfills it.  Keeper dismissals lean on
+    # playerscopestats.catches_as_keeper — equivalent to live's
+    # `kind IN ('caught','caught_and_bowled')` where fielder=keeper
+    # because keepers structurally don't bowl (no c&b possible),
+    # matching the existing endpoint's comment.
+    from .bucket_baseline_dispatch import is_precomputed_scope, baseline_where
+    is_tier = tournament is None and not (filters.team and filters.opponent)
+    is_baseline = is_tier and is_precomputed_scope(filters, aux)
 
-    # By run-outs — same aggregate shape as by_dismissals but sorted
-    # by run_outs DESC. HAVING run_outs > 0 so the tail isn't padded
-    # with zeros from everyone who's ever fielded without a run-out.
-    run_out_rows = await db.q(
-        f"""
-        SELECT fc.fielder_id AS person_id,
-               COUNT(*) AS total,
-               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
-                        THEN 1 ELSE 0 END) AS catches,
-               SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
-               SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
-               SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS c_and_b
-        FROM fieldingcredit fc
-        JOIN delivery d ON d.id = fc.delivery_id
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE fc.fielder_id IS NOT NULL
-          AND i.super_over = 0 AND {where}{inn_clause}
-        GROUP BY fc.fielder_id
-        HAVING run_outs > 0
-        ORDER BY run_outs DESC, total DESC
-        LIMIT :lim
-        """,
-        params,
-    )
+    if is_baseline:
+        bl_where, bl_params = baseline_where(filters, aux, team=None)
+        bl_clause = (bl_where + " AND") if bl_where else "WHERE"
 
-    # By keeper dismissals — credit catches/stumpings to the designated
-    # keeper (via keeper_assignment) for the fielding innings. Join
-    # fielding_credit through delivery → innings to match ka.innings_id.
-    keeper_rows = await db.q(
-        f"""
-        SELECT ka.keeper_id AS person_id,
-               SUM(CASE WHEN fc.kind IN ('caught','stumped') THEN 1 ELSE 0 END) AS total,
-               -- Convention 3: catches inclusive of caught_and_bowled.
-               -- Keepers structurally don't bowl so this is identical
-               -- to caught-only in practice; predicate kept consistent
-               -- with /leaders + /summary.
-               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
-                        THEN 1 ELSE 0 END) AS catches,
-               SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings
-        FROM keeperassignment ka
-        JOIN innings i ON i.id = ka.innings_id
-        JOIN match m ON m.id = i.match_id
-        JOIN delivery d ON d.innings_id = i.id
-        JOIN fieldingcredit fc ON fc.delivery_id = d.id
-          AND fc.fielder_id = ka.keeper_id
-        WHERE ka.keeper_id IS NOT NULL
-          AND i.super_over = 0 AND {where}{inn_clause}
-        GROUP BY ka.keeper_id
-        HAVING total > 0
-        ORDER BY total DESC
-        LIMIT :lim
-        """,
-        params,
-    )
+        disp_rows = await db.q(
+            f"""
+            SELECT person_id,
+                   SUM(catches) + SUM(stumpings) + SUM(runouts) AS total,
+                   SUM(catches) AS catches,
+                   SUM(stumpings) AS stumpings,
+                   SUM(runouts) AS run_outs
+            FROM playerscopestats {bl_clause} person_id IS NOT NULL
+            GROUP BY person_id
+            HAVING total > 0
+            ORDER BY total DESC, person_id ASC
+            LIMIT :lim
+            """,
+            {**bl_params, "lim": limit},
+        )
+        run_out_rows = await db.q(
+            f"""
+            SELECT person_id,
+                   SUM(catches) + SUM(stumpings) + SUM(runouts) AS total,
+                   SUM(catches) AS catches,
+                   SUM(stumpings) AS stumpings,
+                   SUM(runouts) AS run_outs
+            FROM playerscopestats {bl_clause} person_id IS NOT NULL
+            GROUP BY person_id
+            HAVING SUM(runouts) > 0
+            ORDER BY SUM(runouts) DESC, total DESC, person_id ASC
+            LIMIT :lim
+            """,
+            {**bl_params, "lim": limit},
+        )
+        keeper_rows = await db.q(
+            f"""
+            SELECT person_id,
+                   SUM(catches_as_keeper) + SUM(stumpings) AS total,
+                   SUM(catches_as_keeper) AS catches,
+                   SUM(stumpings) AS stumpings
+            FROM playerscopestats {bl_clause} person_id IS NOT NULL
+            GROUP BY person_id
+            HAVING total > 0
+            ORDER BY total DESC, person_id ASC
+            LIMIT :lim
+            """,
+            {**bl_params, "lim": limit},
+        )
+
+        # Backfill c_and_b for the top_ids (bounded ~30, fast).
+        cb_ids = {r["person_id"] for r in disp_rows} | {r["person_id"] for r in run_out_rows}
+        cb_map: dict[str, int] = {}
+        if cb_ids:
+            cb_placeholders = ",".join(f":c{i}" for i in range(len(cb_ids)))
+            cb_params = {f"c{i}": pid for i, pid in enumerate(cb_ids)}
+            cb_rows = await db.q(
+                f"""
+                SELECT fc.fielder_id AS pid, COUNT(*) AS c_and_b
+                FROM fieldingcredit fc
+                JOIN delivery d ON d.id = fc.delivery_id
+                JOIN innings i ON i.id = d.innings_id
+                JOIN match m ON m.id = i.match_id
+                WHERE fc.fielder_id IN ({cb_placeholders})
+                  AND fc.kind = 'caught_and_bowled'
+                  AND i.super_over = 0 AND {where}
+                GROUP BY fc.fielder_id
+                """,
+                {**params, **cb_params},
+            )
+            cb_map = {r["pid"]: r["c_and_b"] for r in cb_rows}
+        # Inject c_and_b into the disp / run_out rows; keeper rows
+        # structurally have c_and_b=0 (keepers don't bowl), and the
+        # existing live shape didn't expose c_and_b on keeper rows.
+        disp_rows = [{**dict(r), "c_and_b": cb_map.get(r["person_id"], 0)} for r in disp_rows]
+        run_out_rows = [{**dict(r), "c_and_b": cb_map.get(r["person_id"], 0)} for r in run_out_rows]
+    else:
+        # By total dismissals (catches + stumpings + run-outs)
+        # Note: catches is INCLUSIVE of c_and_b per Convention 3, so total
+        # is just catches + stumpings + run_outs (no separate +c_and_b).
+        # COUNT(*) in `total` already counts every kind once including C&B.
+        disp_rows = await db.q(
+            f"""
+            SELECT fc.fielder_id AS person_id,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                            THEN 1 ELSE 0 END) AS catches,
+                   SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+                   SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+                   SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS c_and_b
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE fc.fielder_id IS NOT NULL
+              AND i.super_over = 0 AND {where}{inn_clause}
+            GROUP BY fc.fielder_id
+            ORDER BY total DESC
+            LIMIT :lim
+            """,
+            params,
+        )
+
+        # By run-outs — same aggregate shape as by_dismissals but sorted
+        # by run_outs DESC. HAVING run_outs > 0 so the tail isn't padded
+        # with zeros from everyone who's ever fielded without a run-out.
+        run_out_rows = await db.q(
+            f"""
+            SELECT fc.fielder_id AS person_id,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                            THEN 1 ELSE 0 END) AS catches,
+                   SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+                   SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+                   SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS c_and_b
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE fc.fielder_id IS NOT NULL
+              AND i.super_over = 0 AND {where}{inn_clause}
+            GROUP BY fc.fielder_id
+            HAVING run_outs > 0
+            ORDER BY run_outs DESC, total DESC
+            LIMIT :lim
+            """,
+            params,
+        )
+
+        # By keeper dismissals — credit catches/stumpings to the designated
+        # keeper (via keeper_assignment) for the fielding innings. Join
+        # fielding_credit through delivery → innings to match ka.innings_id.
+        keeper_rows = await db.q(
+            f"""
+            SELECT ka.keeper_id AS person_id,
+                   SUM(CASE WHEN fc.kind IN ('caught','stumped') THEN 1 ELSE 0 END) AS total,
+                   -- Convention 3: catches inclusive of caught_and_bowled.
+                   -- Keepers structurally don't bowl so this is identical
+                   -- to caught-only in practice; predicate kept consistent
+                   -- with /leaders + /summary.
+                   SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled')
+                            THEN 1 ELSE 0 END) AS catches,
+                   SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings
+            FROM keeperassignment ka
+            JOIN innings i ON i.id = ka.innings_id
+            JOIN match m ON m.id = i.match_id
+            JOIN delivery d ON d.innings_id = i.id
+            JOIN fieldingcredit fc ON fc.delivery_id = d.id
+              AND fc.fielder_id = ka.keeper_id
+            WHERE ka.keeper_id IS NOT NULL
+              AND i.super_over = 0 AND {where}{inn_clause}
+            GROUP BY ka.keeper_id
+            HAVING total > 0
+            ORDER BY total DESC
+            LIMIT :lim
+            """,
+            params,
+        )
 
     top_ids = (
         {r["person_id"] for r in disp_rows}
