@@ -186,6 +186,20 @@ User flagged 2026-05-14. Pair with [Bug reports — reproduce, propose, WAIT] ab
 
 ## Code patterns
 
+### Router imports must come from shipped paths
+
+`deploy.sh` ships only `api/` + `models/` + `frontend/dist/` + `main.py` + vendored `deebase/`. Imports in `api/routers/*.py` from `scripts/`, `tests/`, or any other top-level directory resolve locally (project root is on `sys.path`) but **500 in production** because the source files don't exist in `build_plash/`.
+
+Constants used by routers belong in `models/tables.py` (next to the table they describe) or `api/` (cross-router home). Populate scripts can re-import the constant from `models.tables` so it has one canonical definition. Quick pre-deploy probe: `grep -rn 'from scripts\|from tests' api/` should return zero hits.
+
+User flagged 2026-05-14 after Phase C part 2 (`2ead91c`) shipped `from scripts.populate_bucket_baseline import PARTNERSHIP_TOP_K` inside `/series/partnerships/top-by-wicket`. Local: 200. Prod: 500 on every call. Hot-fixed in `48cef68`.
+
+### Chart wrappers — header lives OUTSIDE the positioning context
+
+Every chart wrapper that combines `<ChartHeader />` with absolute-positioned overlays (rotated axis labels, top-of-bar annotations) must use `<ChartContainer>` from `frontend/src/components/charts/ChartContainer.tsx`. ChartContainer renders the header in normal flow, then wraps the SVG + overlays in a separate `position: relative` block — so the overlay's containing block is the chart area, not "header + chart area".
+
+Why: when `<ChartHeader>` is rendered as the first child of a `position: relative` wrapper that ALSO contains absolute-positioned overlays, the overlay's `top: NN` measures from wrapper-top, not SVG-top. Header height (28-53px depending on whether a subtitle auto-fills) pushes the SVG down inside the wrapper, but the overlay's coordinate math doesn't know — labels drift INTO the plot area. Commit `eb8e69f` shipped this regression on every BarChart in May 2026; `51ed9ae` fixed it structurally via `<ChartContainer>`. Locked by `tests/integration/charts_label_positioning.sh`.
+
 ### Extend existing abstractions — do NOT fork parallel helpers
 
 Before writing a new helper or component, find the existing API that already solves this class of problem, and extend it with a narrow option.

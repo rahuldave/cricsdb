@@ -49,14 +49,26 @@ build_plash/
 ```
 
 **Things in the repo that do NOT ship to plash:**
-- `import_data.py`, `download_data.py`, `update_recent.py` — data
-  pipeline scripts run only on your laptop. plash isn't where you
+- `scripts/` — populate scripts, data pipeline. plash isn't where you
   ingest cricket data; you do that locally and re-deploy with `--first`.
+- `import_data.py`, `download_data.py`, `update_recent.py` — top-level
+  data-pipeline scripts, same reason.
 - `data/*.zip`, `data/*_json/` — the cricsheet source archives.
-- `SPEC.md`, `CLAUDE.md`, `docs/` — documentation.
+- `SPEC.md`, `CLAUDE.md`, `internal_docs/`, `docs/` — documentation.
 - `frontend/src/`, `frontend/node_modules/` — only the built `dist/`
   ships.
-- Tests (none yet) and `.git/`.
+- `tests/` and `.git/`.
+
+> ⚠️ **Trap**: API router code (`api/routers/*.py`) **MUST NOT** import
+> from `scripts/` or `tests/`. Those imports resolve locally (project
+> root is on `sys.path`) but the source files don't exist in
+> `build_plash/`, so requests 500 the first time the affected line
+> executes in production. Cross-module constants used by routers go in
+> `models/tables.py` (next to the table they describe) or `api/`.
+> Pre-deploy probe: `grep -rn 'from scripts\|from tests' api/` should
+> return zero hits. Flagged 2026-05-14; hot-fixed in `48cef68` after
+> `2ead91c` shipped `from scripts.populate_bucket_baseline import
+> PARTNERSHIP_TOP_K` inside `/series/partnerships/top-by-wicket`.
 
 If you find yourself wanting plash to run a script, the answer is
 almost always "run it locally and redeploy" — see the GitHub Actions

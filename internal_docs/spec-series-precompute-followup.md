@@ -1,6 +1,6 @@
 # Spec: /series precompute follow-up (Phases B → A → C → D → E)
 
-**Status: B + A + C + D SHIPPED 2026-05-14. E permanently deferred.**
+**Status: B + A + C + D SHIPPED + DEPLOYED 2026-05-14 to t20.rahuldave.com. E permanently deferred.**
 
 | Phase | Status | Commits |
 |---|---|---|
@@ -12,7 +12,25 @@
 | C pt 2 (/series/partnerships/top-by-wicket wiring) | SHIPPED | `2ead91c` |
 | D pt 1 (batting + bowling inning split columns + populate) | SHIPPED | `13cf56c` |
 | D pt 2 (/teams/{team}/{batting,bowling}/by-inning wiring) | SHIPPED | `18e1b51` |
+| 7 test-coverage gap closures | SHIPPED | `47f0b59` |
+| Hot-fix: PARTNERSHIP_TOP_K import path | SHIPPED | `48cef68` |
 | E (distribution lifetime) | PERMANENTLY DEFERRED 2026-05-14 | — |
+
+**Deploy** — full data deploy via `bash deploy.sh --first` (627MB DB
+upload) for the schema additions, then a code-only follow-up deploy
+for the hot-fix. Confirmed live: `/series/summary`,
+`/series/partnerships/top-by-wicket` (both bucket and live paths),
+`/teams/{team}/bowling/by-inning` all return 200 on production with
+correct payloads.
+
+**Lessons captured for future sessions:**
+- `[[feedback_router_imports_shipped_paths]]` — the prod 500 was a
+  `from scripts.*` import inside a router. `scripts/` isn't shipped.
+  Hot-fix moved the constant to `models/tables.py`. New CLAUDE.md
+  rule under "Code patterns".
+- `[[feedback_screenshot_every_chart_type]]` — the BarChart label
+  regression class would have been caught by visual inspection of
+  every chart type in agent-browser. DOM probes mislead.
 
 Measured 2026-05-14 (HTTP, local DB):
 - `/series/partnerships/top-by-wicket?per_wicket=10` (tier all-cricket): 1.5s → **0.19s** (~8×)
