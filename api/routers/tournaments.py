@@ -914,75 +914,110 @@ async def tournament_summary(
         params,
     )
     # Person-level best moments (highest_individual, best_bowling,
-    # best_fielding) — slow GROUP BY (person, match) but in gather
+    # best_fielding). In `is_baseline` regime, read from precomputed
+    # bucketbaselinemoments (~1ms per query — scans a few hundred
+    # cells). Out of regime (rivalry, venue, aux.inning, etc.) fall
+    # back to live SQL — slow GROUP BY (person, match) but in gather
     # they parallelize.
-    hi_q = db.q(
-        f"""SELECT d.batter_id AS person_id, p.name, i.team AS team,
-                   m.id AS match_id,
-                   SUM(d.runs_batter) AS runs,
-                   (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
-            FROM delivery d
-            JOIN innings i ON i.id = d.innings_id
-            JOIN match m ON m.id = i.match_id
-            LEFT JOIN person p ON p.id = d.batter_id
-            WHERE i.super_over = 0 AND {where}{inn_clause}
-              AND d.batter_id IS NOT NULL
-              AND d.extras_wides = 0 AND d.extras_noballs = 0
-            GROUP BY d.batter_id, m.id
-            ORDER BY runs DESC LIMIT 1""",
-        params,
-    )
-    bb_q = db.q(
-        f"""WITH per_match_bowler AS (
-              SELECT d.bowler_id, i.match_id,
-                     CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS bowler_team,
-                     SUM(CASE WHEN w.id IS NOT NULL
-                                  AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-                              THEN 1 ELSE 0 END) AS wickets,
-                     SUM(d.runs_total) AS runs_conceded
-              FROM delivery d
-              LEFT JOIN wicket w ON w.delivery_id = d.id
-              JOIN innings i ON i.id = d.innings_id
-              JOIN match m ON m.id = i.match_id
-              WHERE i.super_over = 0 AND {where}{inn_clause}
-                AND d.bowler_id IS NOT NULL
-              GROUP BY d.bowler_id, i.match_id
-            )
-            SELECT pm.bowler_id AS person_id, p.name, pm.bowler_team AS team,
-                   pm.wickets, pm.runs_conceded AS runs, pm.match_id,
-                   (SELECT MIN(date) FROM matchdate WHERE match_id = pm.match_id) AS date
-            FROM per_match_bowler pm
-            LEFT JOIN person p ON p.id = pm.bowler_id
-            ORDER BY pm.wickets DESC, pm.runs_conceded ASC LIMIT 1""",
-        params,
-    )
-    bf_q = db.q(
-        f"""WITH per_match_fielder AS (
-              SELECT fc.fielder_id, i.match_id,
-                     CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS fielder_team,
-                     SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled') THEN 1 ELSE 0 END) AS catches,
-                     SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
-                     SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
-                     SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS caught_bowled,
-                     COUNT(*) AS total
-              FROM fieldingcredit fc
-              JOIN delivery d ON d.id = fc.delivery_id
-              JOIN innings i ON i.id = d.innings_id
-              JOIN match m ON m.id = i.match_id
-              WHERE i.super_over = 0 AND {where}{inn_clause}
-                AND fc.fielder_id IS NOT NULL
-                AND fc.is_substitute = 0
-              GROUP BY fc.fielder_id, i.match_id
-            )
-            SELECT pf.fielder_id AS person_id, p.name, pf.fielder_team AS team,
-                   pf.catches, pf.stumpings, pf.run_outs, pf.caught_bowled,
-                   pf.total, pf.match_id,
-                   (SELECT MIN(date) FROM matchdate WHERE match_id = pf.match_id) AS date
-            FROM per_match_fielder pf
-            LEFT JOIN person p ON p.id = pf.fielder_id
-            ORDER BY pf.total DESC, pf.stumpings DESC LIMIT 1""",
-        params,
-    )
+    if is_baseline:
+        mom_where, mom_params = baseline_where(filters, aux, team=None)
+        mom_where_and = (mom_where + " AND ") if mom_where else "WHERE "
+        hi_q = db.q(
+            f"""SELECT hi_person_id AS person_id, hi_name AS name,
+                       hi_team AS team, hi_runs AS runs,
+                       hi_match_id AS match_id, hi_date AS date
+                FROM bucketbaselinemoments {mom_where_and}hi_person_id IS NOT NULL
+                ORDER BY hi_runs DESC, hi_match_id ASC LIMIT 1""",
+            mom_params,
+        )
+        bb_q = db.q(
+            f"""SELECT bb_person_id AS person_id, bb_name AS name,
+                       bb_team AS team, bb_wickets AS wickets,
+                       bb_runs AS runs, bb_match_id AS match_id,
+                       bb_date AS date
+                FROM bucketbaselinemoments {mom_where_and}bb_person_id IS NOT NULL
+                ORDER BY bb_wickets DESC, bb_runs ASC, bb_match_id ASC LIMIT 1""",
+            mom_params,
+        )
+        bf_q = db.q(
+            f"""SELECT bf_person_id AS person_id, bf_name AS name,
+                       bf_team AS team, bf_catches AS catches,
+                       bf_stumpings AS stumpings, bf_run_outs AS run_outs,
+                       bf_caught_bowled AS caught_bowled,
+                       bf_total AS total, bf_match_id AS match_id,
+                       bf_date AS date
+                FROM bucketbaselinemoments {mom_where_and}bf_person_id IS NOT NULL
+                ORDER BY bf_total DESC, bf_stumpings DESC, bf_match_id ASC LIMIT 1""",
+            mom_params,
+        )
+    else:
+        hi_q = db.q(
+            f"""SELECT d.batter_id AS person_id, p.name, i.team AS team,
+                       m.id AS match_id,
+                       SUM(d.runs_batter) AS runs,
+                       (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+                FROM delivery d
+                JOIN innings i ON i.id = d.innings_id
+                JOIN match m ON m.id = i.match_id
+                LEFT JOIN person p ON p.id = d.batter_id
+                WHERE i.super_over = 0 AND {where}{inn_clause}
+                  AND d.batter_id IS NOT NULL
+                  AND d.extras_wides = 0 AND d.extras_noballs = 0
+                GROUP BY d.batter_id, m.id
+                ORDER BY runs DESC LIMIT 1""",
+            params,
+        )
+        bb_q = db.q(
+            f"""WITH per_match_bowler AS (
+                  SELECT d.bowler_id, i.match_id,
+                         CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS bowler_team,
+                         SUM(CASE WHEN w.id IS NOT NULL
+                                      AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+                                  THEN 1 ELSE 0 END) AS wickets,
+                         SUM(d.runs_total) AS runs_conceded
+                  FROM delivery d
+                  LEFT JOIN wicket w ON w.delivery_id = d.id
+                  JOIN innings i ON i.id = d.innings_id
+                  JOIN match m ON m.id = i.match_id
+                  WHERE i.super_over = 0 AND {where}{inn_clause}
+                    AND d.bowler_id IS NOT NULL
+                  GROUP BY d.bowler_id, i.match_id
+                )
+                SELECT pm.bowler_id AS person_id, p.name, pm.bowler_team AS team,
+                       pm.wickets, pm.runs_conceded AS runs, pm.match_id,
+                       (SELECT MIN(date) FROM matchdate WHERE match_id = pm.match_id) AS date
+                FROM per_match_bowler pm
+                LEFT JOIN person p ON p.id = pm.bowler_id
+                ORDER BY pm.wickets DESC, pm.runs_conceded ASC LIMIT 1""",
+            params,
+        )
+        bf_q = db.q(
+            f"""WITH per_match_fielder AS (
+                  SELECT fc.fielder_id, i.match_id,
+                         CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS fielder_team,
+                         SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled') THEN 1 ELSE 0 END) AS catches,
+                         SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+                         SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+                         SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS caught_bowled,
+                         COUNT(*) AS total
+                  FROM fieldingcredit fc
+                  JOIN delivery d ON d.id = fc.delivery_id
+                  JOIN innings i ON i.id = d.innings_id
+                  JOIN match m ON m.id = i.match_id
+                  WHERE i.super_over = 0 AND {where}{inn_clause}
+                    AND fc.fielder_id IS NOT NULL
+                    AND fc.is_substitute = 0
+                  GROUP BY fc.fielder_id, i.match_id
+                )
+                SELECT pf.fielder_id AS person_id, p.name, pf.fielder_team AS team,
+                       pf.catches, pf.stumpings, pf.run_outs, pf.caught_bowled,
+                       pf.total, pf.match_id,
+                       (SELECT MIN(date) FROM matchdate WHERE match_id = pf.match_id) AS date
+                FROM per_match_fielder pf
+                LEFT JOIN person p ON p.id = pf.fielder_id
+                ORDER BY pf.total DESC, pf.stumpings DESC LIMIT 1""",
+            params,
+        )
 
     # One big gather — every read in /series/summary that doesn't
     # depend on another's result. deebase supports parallel reads

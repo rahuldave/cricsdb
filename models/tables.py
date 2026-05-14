@@ -403,3 +403,54 @@ class BucketBaselinePartnership:
     # cell with MAX(best_runs) and joins back to partnership for full
     # identity (batters, date, balls). NULL when n=0.
     best_pair_partnership_id: Optional[int] = None
+
+
+class BucketBaselineMoments:
+    """Per-cell top individual moments — drives /series/summary's
+    highest_individual / best_bowling / best_fielding tiles without
+    running 3 slow GROUP BY (person, match) queries at request time.
+
+    One row per (gender, team_type, tournament, season) cell. No `team`
+    column — these records are per-cell global maxima; rivalry-scoped
+    requests (filter_team + filter_opponent) fall back to live SQL.
+
+    Read-side roll-up: across a scope spanning N cells, pick the row
+    that maximises the relevant metric. SQL becomes a tiny scan over a
+    few hundred bucket rows instead of a GROUP BY over millions of
+    deliveries.
+    """
+    id: int
+    gender: str
+    team_type: str
+    tournament: str
+    season: str
+    # Highest individual batting score in this cell (single innings,
+    # legal balls only — matches hi_q in api/routers/tournaments.py).
+    hi_person_id: Optional[str] = None
+    hi_name: Optional[str] = None
+    hi_team: Optional[str] = None
+    hi_runs: int = 0
+    hi_match_id: Optional[int] = None
+    hi_date: Optional[str] = None
+    # Best bowling figures in this cell (most wickets, ties broken by
+    # fewest runs conceded). Matches bb_q.
+    bb_person_id: Optional[str] = None
+    bb_name: Optional[str] = None
+    bb_team: Optional[str] = None
+    bb_wickets: int = 0
+    bb_runs: int = 0
+    bb_match_id: Optional[int] = None
+    bb_date: Optional[str] = None
+    # Best fielding tally in this cell (most total dismissals, ties
+    # broken by stumpings). Convention 3: catches includes C&B. Matches
+    # bf_q.
+    bf_person_id: Optional[str] = None
+    bf_name: Optional[str] = None
+    bf_team: Optional[str] = None
+    bf_catches: int = 0
+    bf_stumpings: int = 0
+    bf_run_outs: int = 0
+    bf_caught_bowled: int = 0
+    bf_total: int = 0
+    bf_match_id: Optional[int] = None
+    bf_date: Optional[str] = None

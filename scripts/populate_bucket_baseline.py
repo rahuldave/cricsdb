@@ -48,6 +48,7 @@ from models import (
     FieldingCredit, KeeperAssignment, Partnership, PlayerScopeStats,
     BucketBaselineMatch, BucketBaselineBatting, BucketBaselineBowling,
     BucketBaselineFielding, BucketBaselinePhase, BucketBaselinePartnership,
+    BucketBaselineMoments,
 )
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -64,6 +65,7 @@ BOWLER_WICKET_EXCLUDED = (
 BUCKET_TABLES = [
     BucketBaselineMatch, BucketBaselineBatting, BucketBaselineBowling,
     BucketBaselineFielding, BucketBaselinePhase, BucketBaselinePartnership,
+    BucketBaselineMoments,
 ]
 
 
@@ -90,6 +92,7 @@ async def _ensure_tables(db, incremental: bool = False):
     await db.create(BucketBaselineFielding,     pk="id", if_not_exists=True)
     await db.create(BucketBaselinePhase,        pk="id", if_not_exists=True)
     await db.create(BucketBaselinePartnership,  pk="id", if_not_exists=True)
+    await db.create(BucketBaselineMoments,      pk="id", if_not_exists=True)
 
     # Indexes — covering the common lookup pattern.
     common = "gender, team_type, tournament, season, team"
@@ -103,6 +106,11 @@ async def _ensure_tables(db, incremental: bool = False):
     ]:
         idx_name = f"ix_{table}_lookup"
         await db.q(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({common}{extra})")
+    # bucketbaselinemoments has no `team` column — keyed by cell only.
+    await db.q(
+        "CREATE INDEX IF NOT EXISTS ix_bucketbaselinemoments_lookup "
+        "ON bucketbaselinemoments (gender, team_type, tournament, season)"
+    )
 
 
 # ─── Cell-filter helpers ────────────────────────────────────────────────
@@ -1062,6 +1070,181 @@ async def _populate_partnership(db, cells=None):
     await db.q("DROP TABLE _bb_pship")
 
 
+async def _populate_moments(db, cells=None):
+    """Per-cell top moments (highest_individual, best_bowling, best_fielding).
+
+    Unlike the other bucket tables, no per-team rows — these records are
+    per-cell global maxima. Rivalry-scoped requests
+    (filter_team + filter_opponent) fall back to live SQL in the
+    /series/summary endpoint.
+
+    Three steps:
+      1) INSERT one row per cell with hi_* populated (window-function
+         picks the top batter-innings per cell).
+      2) UPDATE bb_* on those rows (top bowler-innings per cell).
+      3) UPDATE bf_* on those rows (top fielder-tally per cell).
+
+    Cells with batting data but no bowling/fielding data (unusual; would
+    require a populated `delivery` table but missing `wicket` /
+    `fieldingcredit`) keep bb_*/bf_* at defaults.
+
+    SQL invariants — KEEP IN SYNC with hi_q / bb_q / bf_q in
+    api/routers/tournaments.py. Specifically:
+      - super_over = 0 in all three.
+      - Bowler wickets exclude BOWLER_WICKET_EXCLUDED kinds.
+      - Catches kind IN ('caught', 'caught_and_bowled') — Convention 3.
+      - Fielding excludes is_substitute = 1.
+    """
+    cf, cfp = _cell_filter_clause(cells, "m")
+
+    # Step 1 — INSERT (cell, hi_*) via window-function pick.
+    await db.q(
+        f"""
+        INSERT INTO bucketbaselinemoments (
+            gender, team_type, tournament, season,
+            hi_person_id, hi_name, hi_team, hi_runs, hi_match_id, hi_date
+        )
+        WITH per_cell_batter_match AS (
+            SELECT m.gender AS gender, m.team_type AS team_type,
+                   COALESCE(m.event_name, '') AS tournament, m.season AS season,
+                   d.batter_id AS person_id, p.name AS name, i.team AS team,
+                   m.id AS match_id, SUM(d.runs_batter) AS runs
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            LEFT JOIN person p ON p.id = d.batter_id
+            WHERE i.super_over = 0 AND m.match_type IN ('T20', 'IT20')
+              AND d.batter_id IS NOT NULL
+              AND d.extras_wides = 0 AND d.extras_noballs = 0
+              {cf}
+            GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season,
+                     d.batter_id, m.id
+        ),
+        ranked AS (
+            SELECT *, ROW_NUMBER() OVER (
+                PARTITION BY gender, team_type, tournament, season
+                ORDER BY runs DESC, match_id ASC
+            ) AS rn
+            FROM per_cell_batter_match
+        )
+        SELECT gender, team_type, tournament, season,
+               person_id, name, team, runs, match_id,
+               (SELECT MIN(date) FROM matchdate md WHERE md.match_id = ranked.match_id) AS date
+        FROM ranked WHERE rn = 1
+        """,
+        cfp,
+    )
+
+    # Step 2 — UPDATE bb_* via UPDATE…FROM.
+    await db.q(
+        f"""
+        WITH per_cell_bowler_match AS (
+            SELECT m.gender AS gender, m.team_type AS team_type,
+                   COALESCE(m.event_name, '') AS tournament, m.season AS season,
+                   d.bowler_id AS person_id,
+                   CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS team,
+                   m.id AS match_id,
+                   SUM(CASE WHEN w.id IS NOT NULL
+                                AND w.kind NOT IN ('run out', 'retired hurt',
+                                                   'retired out',
+                                                   'obstructing the field')
+                            THEN 1 ELSE 0 END) AS wickets,
+                   SUM(d.runs_total) AS runs
+            FROM delivery d
+            LEFT JOIN wicket w ON w.delivery_id = d.id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0 AND m.match_type IN ('T20', 'IT20')
+              AND d.bowler_id IS NOT NULL
+              {cf}
+            GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season,
+                     d.bowler_id, m.id,
+                     CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END
+        ),
+        ranked AS (
+            SELECT pc.*, p.name,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY gender, team_type, tournament, season
+                       ORDER BY wickets DESC, runs ASC, match_id ASC
+                   ) AS rn
+            FROM per_cell_bowler_match pc
+            LEFT JOIN person p ON p.id = pc.person_id
+        )
+        UPDATE bucketbaselinemoments AS b
+        SET bb_person_id = r.person_id,
+            bb_name      = r.name,
+            bb_team      = r.team,
+            bb_wickets   = r.wickets,
+            bb_runs      = r.runs,
+            bb_match_id  = r.match_id,
+            bb_date      = (SELECT MIN(date) FROM matchdate md WHERE md.match_id = r.match_id)
+        FROM ranked r
+        WHERE r.rn = 1
+          AND b.gender = r.gender
+          AND b.team_type = r.team_type
+          AND b.tournament = r.tournament
+          AND b.season = r.season
+        """,
+        cfp,
+    )
+
+    # Step 3 — UPDATE bf_* via UPDATE…FROM.
+    await db.q(
+        f"""
+        WITH per_cell_fielder_match AS (
+            SELECT m.gender AS gender, m.team_type AS team_type,
+                   COALESCE(m.event_name, '') AS tournament, m.season AS season,
+                   fc.fielder_id AS person_id,
+                   CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS team,
+                   m.id AS match_id,
+                   SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled') THEN 1 ELSE 0 END) AS catches,
+                   SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+                   SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+                   SUM(CASE WHEN fc.kind = 'caught_and_bowled' THEN 1 ELSE 0 END) AS caught_bowled,
+                   COUNT(*) AS total
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE i.super_over = 0 AND m.match_type IN ('T20', 'IT20')
+              AND fc.fielder_id IS NOT NULL
+              AND fc.is_substitute = 0
+              {cf}
+            GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season,
+                     fc.fielder_id, m.id,
+                     CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END
+        ),
+        ranked AS (
+            SELECT pc.*, p.name,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY gender, team_type, tournament, season
+                       ORDER BY total DESC, stumpings DESC, match_id ASC
+                   ) AS rn
+            FROM per_cell_fielder_match pc
+            LEFT JOIN person p ON p.id = pc.person_id
+        )
+        UPDATE bucketbaselinemoments AS b
+        SET bf_person_id     = r.person_id,
+            bf_name          = r.name,
+            bf_team          = r.team,
+            bf_catches       = r.catches,
+            bf_stumpings     = r.stumpings,
+            bf_run_outs      = r.run_outs,
+            bf_caught_bowled = r.caught_bowled,
+            bf_total         = r.total,
+            bf_match_id      = r.match_id,
+            bf_date          = (SELECT MIN(date) FROM matchdate md WHERE md.match_id = r.match_id)
+        FROM ranked r
+        WHERE r.rn = 1
+          AND b.gender = r.gender
+          AND b.team_type = r.team_type
+          AND b.tournament = r.tournament
+          AND b.season = r.season
+        """,
+        cfp,
+    )
+
+
 # ─── Public modes ───────────────────────────────────────────────────────
 
 async def populate_full(db):
@@ -1071,7 +1254,8 @@ async def populate_full(db):
 
     for table in ("bucketbaselinematch", "bucketbaselinebatting",
                   "bucketbaselinebowling", "bucketbaselinefielding",
-                  "bucketbaselinephase", "bucketbaselinepartnership"):
+                  "bucketbaselinephase", "bucketbaselinepartnership",
+                  "bucketbaselinemoments"):
         await db.q(f"DELETE FROM {table}")
 
     t0 = time.time()
@@ -1086,11 +1270,14 @@ async def populate_full(db):
     print("  phase…");        await _populate_phase(db);        print(f"    {time.time()-t0:.1f}s")
     t0 = time.time()
     print("  partnership…");  await _populate_partnership(db);  print(f"    {time.time()-t0:.1f}s")
+    t0 = time.time()
+    print("  moments…");      await _populate_moments(db);      print(f"    {time.time()-t0:.1f}s")
 
     counts = {}
     for table in ("bucketbaselinematch", "bucketbaselinebatting",
                   "bucketbaselinebowling", "bucketbaselinefielding",
-                  "bucketbaselinephase", "bucketbaselinepartnership"):
+                  "bucketbaselinephase", "bucketbaselinepartnership",
+                  "bucketbaselinemoments"):
         rows = await db.q(f"SELECT COUNT(*) AS c FROM {table}")
         counts[table] = rows[0]["c"]
     print("[bucket_baseline] row counts:", counts)
@@ -1142,7 +1329,8 @@ async def populate_incremental(db, new_match_ids: list[int]):
 
     for table in ("bucketbaselinematch", "bucketbaselinebatting",
                   "bucketbaselinebowling", "bucketbaselinefielding",
-                  "bucketbaselinephase", "bucketbaselinepartnership"):
+                  "bucketbaselinephase", "bucketbaselinepartnership",
+                  "bucketbaselinemoments"):
         await db.q(f"DELETE FROM {table} WHERE {cf_where}", cf_params)
 
     # Re-INSERT via the same per-table routines, scoped to the cells.
@@ -1152,6 +1340,7 @@ async def populate_incremental(db, new_match_ids: list[int]):
     await _populate_fielding(db, cells)
     await _populate_phase(db, cells)
     await _populate_partnership(db, cells)
+    await _populate_moments(db, cells)
 
 
 # ─── CLI ────────────────────────────────────────────────────────────────

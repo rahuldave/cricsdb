@@ -63,7 +63,7 @@ def is_precomputed_scope(filters: FilterParams, aux: Optional[AuxParams]) -> boo
 def baseline_where(
     filters: FilterParams,
     aux: Optional[AuxParams],
-    team: str = LEAGUE_TEAM_KEY,
+    team: Optional[str] = LEAGUE_TEAM_KEY,
     table_alias: str = "",
 ) -> tuple[str, dict]:
     """Build the WHERE clause for SELECT-from-bucket_baseline_X queries.
@@ -75,8 +75,10 @@ def baseline_where(
             `is_precomputed_scope`).
         aux: AuxParams. `aux.scope_to_team` triggers the team-tournament
             IN-list narrowing when no explicit tournament filter is set.
-        team: Either LEAGUE_TEAM_KEY for the pool-weighted league row
-            or a real team name for a per-team query.
+        team: Either LEAGUE_TEAM_KEY for the pool-weighted league row,
+            a real team name for a per-team query, or None to skip the
+            team clause entirely (used by bucketbaselinemoments, which
+            has no team column).
         table_alias: Optional alias prefix (e.g. "b" → `b.gender = …`).
             Defaults to bare column references.
 
@@ -84,8 +86,11 @@ def baseline_where(
         (where_str, params_dict). where_str includes leading "WHERE".
     """
     a = f"{table_alias}." if table_alias else ""
-    parts: list[str] = [f"{a}team = :_team"]
-    params: dict = {"_team": team}
+    parts: list[str] = []
+    params: dict = {}
+    if team is not None:
+        parts.append(f"{a}team = :_team")
+        params["_team"] = team
 
     if _is_set(filters.gender):
         parts.append(f"{a}gender = :_gender")
@@ -132,4 +137,6 @@ def baseline_where(
         parts.append(f"{a}season <= :_season_to")
         params["_season_to"] = filters.season_to
 
+    if not parts:
+        return "", params
     return "WHERE " + " AND ".join(parts), params

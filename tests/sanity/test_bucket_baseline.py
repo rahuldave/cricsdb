@@ -330,15 +330,24 @@ async def check_incremental_roundtrip(db) -> bool:
     print(f"  cell: {g}/{tt} | {t!r} | {s} ({target[0]['c']} matches)")
 
     # Snapshot baseline rows for this cell.
+    # bucketbaselinemoments has no `team` column — at most 1 row per
+    # cell, ORDER BY 1 keeps the query uniform without an ordering key.
+    def _order_clause(table):
+        if table == "bucketbaselinephase":
+            return "ORDER BY team, phase, side"
+        if table == "bucketbaselinepartnership":
+            return "ORDER BY team, wicket_number"
+        if table == "bucketbaselinemoments":
+            return "ORDER BY 1"
+        return "ORDER BY team"
+
     snapshot = {}
     for table in ("bucketbaselinematch", "bucketbaselinebatting",
                   "bucketbaselinebowling", "bucketbaselinefielding",
-                  "bucketbaselinephase", "bucketbaselinepartnership"):
+                  "bucketbaselinephase", "bucketbaselinepartnership",
+                  "bucketbaselinemoments"):
         rows = await db.q(
-            f"SELECT * FROM {table} WHERE gender=:g AND team_type=:tt AND tournament=:t AND season=:s ORDER BY team, "
-            + ("phase, side" if table == "bucketbaselinephase"
-               else "wicket_number" if table == "bucketbaselinepartnership"
-               else "team"),
+            f"SELECT * FROM {table} WHERE gender=:g AND team_type=:tt AND tournament=:t AND season=:s {_order_clause(table)}",
             {"g": g, "tt": tt, "t": t, "s": s},
         )
         # Strip surrogate id (varies between runs).
@@ -358,10 +367,7 @@ async def check_incremental_roundtrip(db) -> bool:
     after = {}
     for table in snapshot.keys():
         rows = await db.q(
-            f"SELECT * FROM {table} WHERE gender=:g AND team_type=:tt AND tournament=:t AND season=:s ORDER BY team, "
-            + ("phase, side" if table == "bucketbaselinephase"
-               else "wicket_number" if table == "bucketbaselinepartnership"
-               else "team"),
+            f"SELECT * FROM {table} WHERE gender=:g AND team_type=:tt AND tournament=:t AND season=:s {_order_clause(table)}",
             {"g": g, "tt": tt, "t": t, "s": s},
         )
         after[table] = [{k: v for k, v in r.items() if k != "id"} for r in rows]
