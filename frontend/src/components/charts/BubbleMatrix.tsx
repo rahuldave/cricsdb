@@ -118,12 +118,14 @@ export default function BubbleMatrix({
     [cells],
   )
 
-  // Bubble diameter scales with sqrt(size) (so AREA ≈ size). The
-  // diameter is expressed in % of cell width so it scales with the
-  // CSS-Grid-allocated cell — no measured-width JS needed. We clamp
-  // to a sensible max via CSS aspect-ratio + max-width.
-  const sizePct = (size: number): number =>
-    maxSize > 0 ? Math.sqrt(size / maxSize) * 90 : 0  // up to 90% of cell
+  // Bubble diameter scales with sqrt(size) (so AREA ≈ size). Output
+  // in rem so the diameter is independent of cell width — every
+  // bubble across all rows uses the same px-per-unit-of-size scale,
+  // which is what makes the matrix legible as a size-comparison.
+  // Max diameter 1.5rem fits in the 1.8rem row height with margin;
+  // min clamped to 0.3rem so a single-match cell is still visible.
+  const diameterRem = (size: number): number =>
+    maxSize > 0 ? Math.max(0.3, Math.sqrt(size / maxSize) * 1.5) : 0
 
   const effectiveFormatY = isMobile
     ? (y: string | number) => shortTeam(formatYTick(y))
@@ -145,7 +147,13 @@ export default function BubbleMatrix({
       {/* Corner cell — empty. */}
       <div />
 
-      {/* X-axis labels — rotated season columns. */}
+      {/* X-axis labels — rotated season columns. Header row height
+          (min 3rem) is sized to contain the rotated label envelope —
+          a single-line label rotated -55° has a bounding box ~0.82 ×
+          its unrotated width; for a "2009/10" label at 0.7rem font
+          that's ~3rem of vertical room. Without this the labels
+          overflow the header row and visually eat into the chart
+          title above. */}
       {xCategories.map((x) => (
         <div
           key={`xlabel-${x}`}
@@ -153,7 +161,7 @@ export default function BubbleMatrix({
             display: 'flex',
             alignItems: 'flex-end',
             justifyContent: 'center',
-            minHeight: '1.8rem',
+            minHeight: '3rem',
             padding: '0 0.1rem 0.15rem',
           }}
         >
@@ -194,7 +202,7 @@ export default function BubbleMatrix({
           </div>
           {xCategories.map((x, xi) => {
             const cell = cellMap.get(`${x}|${y}`)
-            const diameterPct = cell && cell.size > 0 ? sizePct(cell.size) : 0
+            const dRem = cell && cell.size > 0 ? diameterRem(cell.size) : 0
             const color = cell ? bucketFor(cell.value, colorBuckets).color : NEUTRAL
             const isHovered = hover && hover.xi === xi && hover.yi === yi
             return (
@@ -214,13 +222,11 @@ export default function BubbleMatrix({
                   cursor: cell && onCellClick ? 'pointer' : 'default',
                 }}
               >
-                {diameterPct > 0 && (
+                {dRem > 0 && (
                   <div
                     style={{
-                      width: `${diameterPct}%`,
+                      width: `${dRem}rem`,
                       aspectRatio: '1 / 1',
-                      maxWidth: '1.4rem',
-                      maxHeight: '1.4rem',
                       borderRadius: '50%',
                       background: color,
                       opacity: 0.88,
