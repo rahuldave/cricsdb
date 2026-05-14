@@ -1,9 +1,26 @@
 # Spec: /series precompute follow-up (Phases B → A → C → D → E)
 
-**Status: NOT STARTED. Handoff for next session.**
+**Status: B + A SHIPPED 2026-05-14. C / D / E remaining.**
 
-Builds on the bucketbaselinemoments work shipped this session
-(2026-05-14). That commit dropped `/series/summary` at all-cricket
+| Phase | Status | Commits |
+|---|---|---|
+| B (ht_q via bucketbaselinebatting) | SHIPPED | `d152ec2` |
+| A pt 1 (ts_q + tw_q via playerscopestats) | SHIPPED | `f11b323` |
+| A pt 2-3 (batters + bowlers leaders) | SHIPPED | `228e5ba` |
+| A pt 4 (fielders leaders) | SHIPPED | `c10c869` |
+| C (partnerships top per (cell, wicket)) | PENDING | — |
+| D (per-team inning splits) | PENDING | — |
+| E (distribution lifetime) | DEFERRED | — |
+
+End-to-end /series at all-cricket — all four key endpoints under 0.4s
+each (was 3-6s):
+- `/series/summary`: 6.4s → 0.33s
+- `/series/batters-leaders`: 5.2s → 0.31s
+- `/series/bowlers-leaders`: 3.6s → 0.27s
+- `/series/fielders-leaders`: 3.2s → 0.34s
+
+Builds on the bucketbaselinemoments work shipped earlier
+(`0eb5ec9`). That commit dropped `/series/summary` at all-cricket
 from 6.4s → 4.6s by precomputing `highest_individual`,
 `best_bowling`, `best_fielding` per cell. This spec covers the
 remaining slow paths identified by HAR-measured page loads in the
