@@ -30,6 +30,8 @@ NEW series_fielders_leaders_ipl       /api/v1/series/fielders-leaders?tournament
 REG series_partnerships_by_wkt_ipl    /api/v1/series/partnerships/by-wicket?tournament=Indian%20Premier%20League&gender=male&team_type=club
 REG series_partnerships_top_ipl       /api/v1/series/partnerships/top?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
 REG series_partnerships_top_by_wkt_ipl /api/v1/series/partnerships/top-by-wicket?tournament=Indian%20Premier%20League&gender=male&team_type=club&per_wicket=5
+NEW series_partnerships_top_by_wkt_tier_all      /api/v1/series/partnerships/top-by-wicket?per_wicket=10
+NEW series_partnerships_top_by_wkt_tier_men_intl /api/v1/series/partnerships/top-by-wicket?gender=male&team_type=international&per_wicket=10
 REG series_partnerships_heatmap_ipl   /api/v1/series/partnerships/heatmap?tournament=Indian%20Premier%20League&gender=male&team_type=club
 
 # ── single-season (points table) ─────────────────────────────────

@@ -3318,42 +3318,95 @@ async def tournament_partnerships_top_by_wicket(
 
     Returns ten sub-lists, one per wicket number, each capped at
     `per_wicket`. Ordered by runs DESC, balls ASC.
+
+    In tier-mode + precomputed regime + per_wicket <= 10, reads from
+    bucketbaselinepartnershiptop instead of scanning partnership at
+    request time. Spec: spec-series-precompute-followup.md Phase C.
     """
     if side not in ("batting", "bowling"):
         side = "batting"
     db = get_db()
-    where, params = _partnership_tournament_where(
-        filters, tournament, side, series_type=series_type, aux=aux,
-    )
-    params["pw"] = per_wicket
 
-    rows = await db.q(
-        f"""
-        WITH ranked AS (
-          SELECT p.id AS partnership_id,
-                 p.partnership_runs AS runs,
-                 p.partnership_balls AS balls,
-                 p.wicket_number, p.unbroken, p.ended_by_kind,
-                 p.batter1_id, p.batter1_name, p.batter1_runs, p.batter1_balls,
-                 p.batter2_id, p.batter2_name, p.batter2_runs, p.batter2_balls,
-                 m.id AS match_id, m.season, m.event_name AS event_name_raw,
-                 (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date,
-                 i.team AS batting_team,
-                 CASE WHEN i.team = m.team1 THEN m.team2 ELSE m.team1 END AS opponent,
-                 ROW_NUMBER() OVER (
-                   PARTITION BY p.wicket_number
-                   ORDER BY p.partnership_runs DESC, p.partnership_balls ASC
-                 ) AS rnk
-          FROM partnership p
-          JOIN innings i ON i.id = p.innings_id
-          JOIN match m ON m.id = i.match_id
-          WHERE {where} AND p.wicket_number IS NOT NULL
-        )
-        SELECT * FROM ranked WHERE rnk <= :pw
-        ORDER BY wicket_number ASC, rnk ASC
-        """,
-        params,
+    from .bucket_baseline_dispatch import is_precomputed_scope, baseline_where
+    from scripts.populate_bucket_baseline import PARTNERSHIP_TOP_K
+    is_tier = tournament is None and not (filters.team and filters.opponent)
+    is_baseline = (
+        is_tier
+        and is_precomputed_scope(filters, aux)
+        and per_wicket <= PARTNERSHIP_TOP_K
     )
+
+    if is_baseline:
+        bl_where, bl_params = baseline_where(
+            filters, aux, team=None, table_alias="bpt",
+        )
+        bl_clause = bl_where if bl_where else ""
+        rows = await db.q(
+            f"""
+            WITH cands AS (
+                SELECT bpt.partnership_id,
+                       bpt.runs,
+                       bpt.balls,
+                       bpt.wicket_number,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY bpt.wicket_number
+                           ORDER BY bpt.runs DESC,
+                                    bpt.balls ASC,
+                                    bpt.partnership_id ASC
+                       ) AS rnk
+                FROM bucketbaselinepartnershiptop bpt
+                {bl_clause}
+            )
+            SELECT c.partnership_id, c.runs, c.balls, c.wicket_number, c.rnk,
+                   p.unbroken, p.ended_by_kind,
+                   p.batter1_id, p.batter1_name, p.batter1_runs, p.batter1_balls,
+                   p.batter2_id, p.batter2_name, p.batter2_runs, p.batter2_balls,
+                   m.id AS match_id, m.season, m.event_name AS event_name_raw,
+                   (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date,
+                   i.team AS batting_team,
+                   CASE WHEN i.team = m.team1 THEN m.team2 ELSE m.team1 END AS opponent
+            FROM cands c
+            JOIN partnership p ON p.id = c.partnership_id
+            JOIN innings i ON i.id = p.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE c.rnk <= :pw
+            ORDER BY c.wicket_number ASC, c.rnk ASC
+            """,
+            {**bl_params, "pw": per_wicket},
+        )
+    else:
+        where, params = _partnership_tournament_where(
+            filters, tournament, side, series_type=series_type, aux=aux,
+        )
+        params["pw"] = per_wicket
+
+        rows = await db.q(
+            f"""
+            WITH ranked AS (
+              SELECT p.id AS partnership_id,
+                     p.partnership_runs AS runs,
+                     p.partnership_balls AS balls,
+                     p.wicket_number, p.unbroken, p.ended_by_kind,
+                     p.batter1_id, p.batter1_name, p.batter1_runs, p.batter1_balls,
+                     p.batter2_id, p.batter2_name, p.batter2_runs, p.batter2_balls,
+                     m.id AS match_id, m.season, m.event_name AS event_name_raw,
+                     (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date,
+                     i.team AS batting_team,
+                     CASE WHEN i.team = m.team1 THEN m.team2 ELSE m.team1 END AS opponent,
+                     ROW_NUMBER() OVER (
+                       PARTITION BY p.wicket_number
+                       ORDER BY p.partnership_runs DESC, p.partnership_balls ASC
+                     ) AS rnk
+              FROM partnership p
+              JOIN innings i ON i.id = p.innings_id
+              JOIN match m ON m.id = i.match_id
+              WHERE {where} AND p.wicket_number IS NOT NULL
+            )
+            SELECT * FROM ranked WHERE rnk <= :pw
+            ORDER BY wicket_number ASC, rnk ASC
+            """,
+            params,
+        )
     by_wicket: dict[int, list[dict]] = {}
     for r in rows:
         wn = r["wicket_number"]
