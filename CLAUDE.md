@@ -37,6 +37,7 @@ CLAUDE.md is the **inviolable-rules file**. Everything describing what the codeb
 - Design decisions: `internal_docs/design-decisions.md`
 - URL state discipline: `internal_docs/url-state.md`
 - Link components (TeamLink / PlayerLink / SeriesLink contract — read before writing ANY navigation): `internal_docs/links.md`
+- Inning-controls mount-site inventory (InningToggle / Splits Mosaic per route × subtab — read before adding/moving either widget): `internal_docs/inning-controls-mount-sites.md`
 
 **Data + ops**
 - Data pipeline: `internal_docs/data-pipeline.md`
