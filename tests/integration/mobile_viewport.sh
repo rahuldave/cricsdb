@@ -37,7 +37,7 @@
 set -u
 
 BASE="${BASE:-http://localhost:5173}"
-VIEWPORT_W=390
+VIEWPORT_W="${VIEWPORT_W:-390}"
 TOLERANCE=2
 PASS=0; FAIL=0; FAILS=""
 
