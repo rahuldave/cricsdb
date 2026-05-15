@@ -21,6 +21,7 @@ import BarChart from '../charts/BarChart'
 import { WISDEN } from '../charts/palette'
 import DistributionSparkline, { type SparklinePoint } from '../distribution/DistributionSparkline'
 import SeasonTickAxis from '../distribution/SeasonTickAxis'
+import ScrollableBars from '../distribution/ScrollableBars'
 import { pickTeamBowlingBaseline, type GlobalTeamBowlingBaselines } from '../distribution/globalBaselines'
 import {
   buildTeamWicketsHistogramRows,
@@ -405,14 +406,16 @@ export default function TeamBowlingDistributionPanel({
                 : null
               return (
                 <>
-                  <DistributionSparkline
-                    points={points}
-                    playerReferenceValue={cfg.playerReferenceValue}
-                    globalReferenceValue={cfg.globalReferenceValue}
-                    leagueReferenceValue={league}
-                    rollingWindow={showRolling ? ROLLING_WINDOW : undefined}
-                  />
-                  <SeasonTickAxis dates={dossier.wickets.observations.map(o => o.date)} />
+                  <ScrollableBars count={points.length}>
+                    <DistributionSparkline
+                      points={points}
+                      playerReferenceValue={cfg.playerReferenceValue}
+                      globalReferenceValue={cfg.globalReferenceValue}
+                      leagueReferenceValue={league}
+                      rollingWindow={showRolling ? ROLLING_WINDOW : undefined}
+                    />
+                    <SeasonTickAxis dates={dossier.wickets.observations.map(o => o.date)} />
+                  </ScrollableBars>
                   <div style={{
                     display: 'flex', flexWrap: 'wrap', alignItems: 'baseline',
                     columnGap: '0.85rem', rowGap: '0.15rem',

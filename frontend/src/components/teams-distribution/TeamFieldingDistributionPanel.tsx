@@ -23,6 +23,7 @@ import BarChart from '../charts/BarChart'
 import { WISDEN } from '../charts/palette'
 import DistributionSparkline, { type SparklinePoint } from '../distribution/DistributionSparkline'
 import SeasonTickAxis from '../distribution/SeasonTickAxis'
+import ScrollableBars from '../distribution/ScrollableBars'
 import { pickTeamFieldingBaseline, type GlobalTeamFieldingBaselines } from '../distribution/globalBaselines'
 import {
   buildTeamCatchesHistogramRows,
@@ -405,14 +406,16 @@ export default function TeamFieldingDistributionPanel({
                 : null
               return (
                 <>
-                  <DistributionSparkline
-                    points={points}
-                    playerReferenceValue={cfg.playerReferenceValue}
-                    globalReferenceValue={cfg.globalReferenceValue}
-                    leagueReferenceValue={league}
-                    rollingWindow={showRolling ? rollingN : undefined}
-                  />
-                  <SeasonTickAxis dates={dossier.observations.map(o => o.date)} />
+                  <ScrollableBars count={points.length}>
+                    <DistributionSparkline
+                      points={points}
+                      playerReferenceValue={cfg.playerReferenceValue}
+                      globalReferenceValue={cfg.globalReferenceValue}
+                      leagueReferenceValue={league}
+                      rollingWindow={showRolling ? rollingN : undefined}
+                    />
+                    <SeasonTickAxis dates={dossier.observations.map(o => o.date)} />
+                  </ScrollableBars>
                   <div style={{
                     display: 'flex', flexWrap: 'wrap', alignItems: 'baseline',
                     columnGap: '0.85rem', rowGap: '0.15rem',

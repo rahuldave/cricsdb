@@ -27,6 +27,7 @@ import SRHistogram from './SRHistogram'
 import DistributionStatStrip, { MilestoneChipsRow } from './DistributionStatStrip'
 import DistributionSparkline, { type SparklinePoint } from '../distribution/DistributionSparkline'
 import SeasonTickAxis from '../distribution/SeasonTickAxis'
+import ScrollableBars from '../distribution/ScrollableBars'
 import { pickBattingBaseline, type GlobalBattingBaselines } from '../distribution/globalBaselines'
 import { binIndex, binTier, srBinIndex, srBinTier } from './distributionBins'
 import { WISDEN_RUN_TIERS, WISDEN_SR_TIERS } from '../charts/palette'
@@ -349,13 +350,15 @@ export default function BatterDistributionPanel({
               const showRolling = window === 'scope' && points.length >= ROLLING_WINDOW
               return (
                 <>
-                  <DistributionSparkline
-                    points={points}
-                    playerReferenceValue={cfg.playerReferenceValue}
-                    globalReferenceValue={cfg.globalReferenceValue}
-                    rollingWindow={showRolling ? ROLLING_WINDOW : undefined}
-                  />
-                  <SeasonTickAxis dates={dossier.runs.observations.map(o => o.date)} />
+                  <ScrollableBars count={points.length}>
+                    <DistributionSparkline
+                      points={points}
+                      playerReferenceValue={cfg.playerReferenceValue}
+                      globalReferenceValue={cfg.globalReferenceValue}
+                      rollingWindow={showRolling ? ROLLING_WINDOW : undefined}
+                    />
+                    <SeasonTickAxis dates={dossier.runs.observations.map(o => o.date)} />
+                  </ScrollableBars>
                   <div style={{
                     display: 'flex', flexWrap: 'wrap', alignItems: 'baseline',
                     columnGap: '0.85rem', rowGap: '0.15rem',

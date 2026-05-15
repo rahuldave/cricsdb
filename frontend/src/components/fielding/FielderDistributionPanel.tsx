@@ -20,6 +20,7 @@ import CountHistogram from './CountHistogram'
 import { FielderStatStrip, FielderChipsRow } from './FielderStatStrip'
 import DistributionSparkline, { type SparklinePoint } from '../distribution/DistributionSparkline'
 import SeasonTickAxis from '../distribution/SeasonTickAxis'
+import ScrollableBars from '../distribution/ScrollableBars'
 import FielderFormDeltaLine from './FielderFormDeltaLine'
 import FielderSuggestedSplitsRow from './FielderSuggestedSplitsRow'
 import { WISDEN } from '../charts/palette'
@@ -232,12 +233,14 @@ export default function FielderDistributionPanel({
               const points = dossier.observations.map(sparklinePoint)
               return (
                 <>
-                  <DistributionSparkline
-                    points={points}
-                    playerReferenceValue={refs.player}
-                    globalReferenceValue={refs.global}
-                  />
-                  <SeasonTickAxis dates={dossier.observations.map(o => o.date)} />
+                  <ScrollableBars count={points.length}>
+                    <DistributionSparkline
+                      points={points}
+                      playerReferenceValue={refs.player}
+                      globalReferenceValue={refs.global}
+                    />
+                    <SeasonTickAxis dates={dossier.observations.map(o => o.date)} />
+                  </ScrollableBars>
                   <div style={{
                     display: 'flex', flexWrap: 'wrap', alignItems: 'baseline',
                     columnGap: '0.85rem', rowGap: '0.15rem',

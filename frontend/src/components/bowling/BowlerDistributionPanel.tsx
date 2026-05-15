@@ -29,6 +29,7 @@ import {
 } from './BowlerStatStrips'
 import DistributionSparkline, { type SparklinePoint } from '../distribution/DistributionSparkline'
 import SeasonTickAxis from '../distribution/SeasonTickAxis'
+import ScrollableBars from '../distribution/ScrollableBars'
 import { pickBowlingBaseline, type GlobalBowlingBaselines } from '../distribution/globalBaselines'
 import BowlerFormDeltaLine from './BowlerFormDeltaLine'
 import BowlerSuggestedSplitsRow from './BowlerSuggestedSplitsRow'
@@ -333,13 +334,15 @@ export default function BowlerDistributionPanel({
               const showRolling = window === 'scope' && points.length >= ROLLING_WINDOW
               return (
                 <>
-                  <DistributionSparkline
-                    points={points}
-                    playerReferenceValue={cfg.playerReferenceValue}
-                    globalReferenceValue={cfg.globalReferenceValue}
-                    rollingWindow={showRolling ? ROLLING_WINDOW : undefined}
-                  />
-                  <SeasonTickAxis dates={dossier.wickets.observations.map(o => o.date)} />
+                  <ScrollableBars count={points.length}>
+                    <DistributionSparkline
+                      points={points}
+                      playerReferenceValue={cfg.playerReferenceValue}
+                      globalReferenceValue={cfg.globalReferenceValue}
+                      rollingWindow={showRolling ? ROLLING_WINDOW : undefined}
+                    />
+                    <SeasonTickAxis dates={dossier.wickets.observations.map(o => o.date)} />
+                  </ScrollableBars>
                   <div style={{
                     display: 'flex', flexWrap: 'wrap', alignItems: 'baseline',
                     columnGap: '0.85rem', rowGap: '0.15rem',
