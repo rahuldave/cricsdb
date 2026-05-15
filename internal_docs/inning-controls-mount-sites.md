@@ -131,6 +131,18 @@ This is the question this doc is here to support. The matrix to think about for 
 
 Quick rule: **whenever both fit, prefer the Mosaic** (the toggle is a strict subset) — unless mobile density says otherwise.
 
+### 4.1 Standalone result-only filter (`ResultFilter.tsx`)
+
+A leaner `<ResultFilter />` component exists at `frontend/src/components/ResultFilter.tsx` — 4 pills (All / Won / Lost / Tied) with scope-wide counts, writing only `?result=`. Tied collapses ties + no-results to mirror the Mosaic and the API's `?result=tied` predicate.
+
+**Current mount sites: zero.** It was briefly mounted on Teams Match List subtab (commits `e880abd` / `ce430b2`) but unmounted in the next iteration after we decided the Mosaic's cross-axis quadrant-click affordance ("won the toss, batted first, AND won") is uniquely useful above the match list — the chronological list is exactly the materialization the user wants to scan after picking a slice. The component file stays warm for future placements:
+
+- `/head-to-head` — per-side W/L pill row is the natural rivalry framing; Mosaic doesn't fit cleanly (two subjects).
+- `/matches` with `filter_team=X` — pure list filter; no Mosaic queued there.
+- `/players?player=Y` and the discipline-page profiles — once `player_team` aux ships, ResultFilter is the lighter alternative to the full Mosaic for player-grain result narrowing.
+
+The decision rule: **mount ResultFilter where there's a clear W/L subject but the Mosaic's 3-axis chart would be overkill or has no clean baseline.** Don't co-mount with the Mosaic — they both write `?result=` and the duplication is confusing UI.
+
 ---
 
 ## 5. Maintenance
