@@ -1097,11 +1097,17 @@ a { color: inherit; }
 @media (min-width: 640px) {
   .wisden-statrow { grid-template-columns: repeat(4, 1fr); }
 }
-/* 5-card variant: use 3 cols on mobile so we get a clean 3+2 split
-   instead of 2+2+1 with an orphan, then 5 cols at lg. */
-.wisden-statrow.cols-5 { grid-template-columns: repeat(3, 1fr); }
+/* 5-card variant: 2 cols on mobile (matches the default-4 cols-4
+   row that often appears above it on the same page — without
+   parity the page reads sloppy, "some lines have 3 and some
+   without"), 5 cols at lg. The 5th tile spans both columns at
+   mobile width so the bottom row is a clean wide tile rather
+   than a 2+2+1 orphan. */
+.wisden-statrow.cols-5 { grid-template-columns: repeat(2, 1fr); }
+.wisden-statrow.cols-5 > :nth-child(5) { grid-column: 1 / -1; }
 @media (min-width: 1024px) {
   .wisden-statrow.cols-5 { grid-template-columns: repeat(5, 1fr); }
+  .wisden-statrow.cols-5 > :nth-child(5) { grid-column: auto; }
 }
 /* 3-card variant — used for leader rows (Most titles, Top scorer,
    Top wicket-taker) where 4-up leaves a lonely empty slot. */
@@ -1588,13 +1594,26 @@ a { color: inherit; }
   .wisden-scroll-hint { display: block; }
 }
 
-/* Tabs — text-only with oxblood underline on active */
+/* Tabs — text-only with oxblood underline on active.
+   Desktop: a flex row, falls back to horizontal scroll if the tab
+   count outgrows the viewport. Mobile: wraps to a second line
+   instead of scrolling — touch-swiping a horizontally-scrollable
+   tab strip is hostile UX when the page body itself can also
+   overflow (mosaic, tables) and ambiguates the scroll target. */
 .wisden-tabs {
   display: flex;
   gap: 1.5rem;
   border-bottom: 1px solid var(--rule);
   margin-bottom: 1.5rem;
   overflow-x: auto;
+}
+@media (max-width: 720px) {
+  .wisden-tabs {
+    flex-wrap: wrap;
+    row-gap: 0.25rem;
+    column-gap: 1.25rem;
+    overflow-x: visible;
+  }
 }
 .wisden-tab {
   background: transparent;
@@ -2407,6 +2426,21 @@ a { color: inherit; }
   --mosaic-unit-y: min(17vw, 200px);
 }
 @media (max-width: 720px) {
+  /* Horizontal scroll wrapper — for now (per user 2026-05-14)
+     the Mosaic uses the Compare pattern instead of trying to
+     shrink-fit on a 390 viewport. The math (9rem row-headers +
+     2 × 30vw cells + gaps = 390 exactly, plus page gutters)
+     overflowed the viewport on narrow screens. Unsetting the
+     table's max-width: 100% lets it occupy its natural content
+     width inside the scroll container. */
+  .wisden-splits-mosaic {
+    overflow-x: auto;
+    /* Avoid the touch-swipe-up-then-right "scroll-snap" that
+       bleeds horizontal scroll back to the body. */
+    overscroll-behavior-x: contain;
+  }
+  .wisden-splits-table { max-width: none; }
+
   .wisden-splits-cell-area {
     /* Portrait: smaller quadrants (so the table fits 360-wide
        viewport) and taller-than-wide aspect so labels can stack
