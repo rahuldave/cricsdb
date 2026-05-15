@@ -287,7 +287,11 @@ rolling_stroke=$(unq "$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist
 assert_eq "Rolling overlay is oxblood (#7A1F1F)" "#7A1F1F" "$rolling_stroke"
 
 # Gender-tiered global anchor: men's wickets/inn = 1
-legend=$(ab_eval "document.querySelector('.wisden-dist-sparkline')?.parentElement?.lastElementChild?.textContent || ''")
+# Anchor the legend lookup by content (looking for the gender-global
+# clause) instead of DOM traversal — the sparkline got a scroll
+# wrapper in f3ab06c, so .parentElement.lastElementChild now lands
+# on the SeasonTickAxis sibling rather than the legend.
+legend=$(ab_eval "[...document.querySelectorAll('$PANEL_SEL span')].find(s => /gender-global/.test(s.textContent || ''))?.textContent || ''")
 assert_contains "Wickets tab legend cites men's gender-global (1 wkts/inn)" "1 wkts/inn" "$legend"
 
 # Toggle to Last 10 + verify URL

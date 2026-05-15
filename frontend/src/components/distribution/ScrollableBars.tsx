@@ -22,7 +22,7 @@
  * of the scroll. Same pattern used for the Splits Mosaic.
  */
 
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 
 export const MIN_BAR_PX = 2
 
@@ -37,8 +37,34 @@ interface Props {
 }
 
 export default function ScrollableBars({ count, minBarPx = MIN_BAR_PX, children }: Props) {
+  const outerRef = useRef<HTMLDivElement | null>(null)
+
+  // Start scrolled all the way to the right so the latest matches
+  // are visible without a manual swipe. Latest = the more
+  // user-relevant tail (current form, recent IPL season, etc.).
+  // The user can scroll left to revisit older data.
+  //
+  // Re-anchors when `count` changes — i.e. a new player loads or
+  // the window selector picks a different observation set. Doesn't
+  // fire on cosmetic re-renders (metric toggle within a panel
+  // typically holds count constant), so the user's manual scroll
+  // position is preserved across metric switches.
+  //
+  // rAF wrap: setting scrollLeft synchronously inside the effect
+  // can race the inner-div's layout settling at its new minWidth.
+  // requestAnimationFrame ensures we measure scrollWidth AFTER the
+  // browser has laid out the new bar count.
+  useEffect(() => {
+    const el = outerRef.current
+    if (!el) return
+    const id = requestAnimationFrame(() => {
+      el.scrollLeft = el.scrollWidth
+    })
+    return () => cancelAnimationFrame(id)
+  }, [count])
+
   return (
-    <div style={{ overflowX: 'auto', overscrollBehaviorX: 'contain' }}>
+    <div ref={outerRef} style={{ overflowX: 'auto', overscrollBehaviorX: 'contain' }}>
       <div style={{ minWidth: `${count * minBarPx}px` }}>
         {children}
       </div>
