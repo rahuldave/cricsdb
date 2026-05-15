@@ -1080,9 +1080,17 @@ a { color: inherit; }
    row's cell top rule were drawing as a doubled line. Suppress the
    bottom rule + the gap when a statrow is followed by another statrow
    so the divider stays a single 1px line. */
+/* Every statrow variant uses `minmax(0, 1fr)` rather than bare
+   `1fr` so a wide stat-card value (e.g. "114,786" sixes, long
+   sub-line strings) can't expand its grid track past its fair
+   share and push siblings off-screen. Plain `1fr` is shorthand
+   for `minmax(auto, 1fr)`, which falls back to min-content
+   when content is wider than the track — observed on series-
+   landing (cols-6 row computed 111/143/129px instead of even
+   thirds, overflowing 9px) and the /league page (overflow 14px). */
 .wisden-statrow {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
   margin: 1.5rem 0 2rem;
   border-bottom: 1px solid var(--rule);
@@ -1095,7 +1103,7 @@ a { color: inherit; }
   margin-top: 0;
 }
 @media (min-width: 640px) {
-  .wisden-statrow { grid-template-columns: repeat(4, 1fr); }
+  .wisden-statrow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 /* 5-card variant: 2 cols on mobile (matches the default-4 cols-4
    row that often appears above it on the same page — without
@@ -1103,20 +1111,20 @@ a { color: inherit; }
    without"), 5 cols at lg. The 5th tile spans both columns at
    mobile width so the bottom row is a clean wide tile rather
    than a 2+2+1 orphan. */
-.wisden-statrow.cols-5 { grid-template-columns: repeat(2, 1fr); }
+.wisden-statrow.cols-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .wisden-statrow.cols-5 > :nth-child(5) { grid-column: 1 / -1; }
 @media (min-width: 1024px) {
-  .wisden-statrow.cols-5 { grid-template-columns: repeat(5, 1fr); }
+  .wisden-statrow.cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .wisden-statrow.cols-5 > :nth-child(5) { grid-column: auto; }
 }
 /* 3-card variant — used for leader rows (Most titles, Top scorer,
    Top wicket-taker) where 4-up leaves a lonely empty slot. */
-.wisden-statrow.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.wisden-statrow.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 /* 6-card variant — used on the aggregate row when Fours + Sixes are
    both surfaced alongside Run rate / Boundary % / Dot %. */
-.wisden-statrow.cols-6 { grid-template-columns: repeat(3, 1fr); }
+.wisden-statrow.cols-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (min-width: 1024px) {
-  .wisden-statrow.cols-6 { grid-template-columns: repeat(6, 1fr); }
+  .wisden-statrow.cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 
 /* Phase block — three-up summary used by Batting/Bowling "By Phase" */
