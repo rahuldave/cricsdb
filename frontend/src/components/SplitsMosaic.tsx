@@ -516,6 +516,9 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
           {matchesDeltaEnv && <MetricDelta env={matchesDeltaEnv} />}
         </button>
       </div>
+      <div className="wisden-splits-filter-hint">
+        Tip: click any underlined label, count, or cell to filter to that combination.
+      </div>
 
       {/* Mosaic — outer 2×2 grid (corner + col-headers row + row-
           headers col + cell area). Headers sit in fixed strips,
@@ -541,9 +544,12 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
                 className="wisden-splits-marginal wisden-splits-col-header"
                 title={`Filter to ${TOSS_LABEL[tv]}`}
               >
-                <strong className="comp-link">{TOSS_LABEL[tv]}</strong>
-                <span style={{ color: WISDEN.faint, marginLeft: '0.4em', fontWeight: 400 }}>
-                  · {m?.n ?? 0}{m?.share != null && ` (${(m.share * 100).toFixed(0)}%)`}
+                <strong className="comp-link">{TOSS_LABEL[tv]}</strong>{' '}
+                <span className="wisden-splits-marginal-stats" style={{ color: WISDEN.faint, marginLeft: '0.4em', fontWeight: 400 }}>
+                  <span className="wisden-splits-bullet-sep">·</span>{' '}{m?.n ?? 0}
+                  {m?.share != null && (
+                    <span className="wisden-splits-share-pct">{' '}({(m.share * 100).toFixed(0)}%)</span>
+                  )}
                 </span>
                 {hasSubject && (
                   <MetricDelta env={mkEnv(m?.share, m?.league_share, m?.delta_pct, 'higher_better')} />
@@ -574,7 +580,9 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
                 <div className="wisden-splits-row-secondary">({secondaryLabel})</div>
                 <div className="wisden-splits-row-stats">
                   {m?.n ?? 0}
-                  {m?.share != null && ` (${(m.share * 100).toFixed(0)}%)`}
+                  {m?.share != null && (
+                    <span className="wisden-splits-share-pct"> ({(m.share * 100).toFixed(0)}%)</span>
+                  )}
                   {hasSubject && (
                     <MetricDelta env={mkEnv(m?.share, m?.league_share, m?.delta_pct, 'higher_better')} />
                   )}
@@ -680,9 +688,20 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
               }}
             >
               <div style={summaryStyle}>
-                <span className="num" style={{ color: WISDEN.ink, fontWeight: 600 }}>
-                  {summedN}
-                </span>
+                <button
+                  type="button"
+                  className="wisden-splits-quadrant-link num"
+                  onClick={() => {
+                    setUrlParams({
+                      toss_outcome: tv,
+                      inning: String(teamInningToUserInning(iv, bowlingCtx)),
+                      result: filters.result || '',
+                    })
+                  }}
+                  title={`Filter to ${TOSS_LABEL[tv]} · ${inningLabels[String(teamInningToUserInning(iv, bowlingCtx)) as '0' | '1']}`}
+                >
+                  <span className="comp-link">{summedN}</span>
+                </button>
                 {quadrantEnv && <MetricDelta env={quadrantEnv} />}
               </div>
               <div
@@ -733,7 +752,9 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
                       {cellN > 0 && (
                         <span className="wisden-splits-subrect-label">
                           <span className="comp-link">{cellN}</span>
-                          {rv !== 'tied' && ` (${pct}%)`}
+                          {rv !== 'tied' && (
+                            <span className="wisden-splits-subrect-pct">({pct}%)</span>
+                          )}
                         </span>
                       )}
                     </div>

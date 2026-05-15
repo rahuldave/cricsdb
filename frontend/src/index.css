@@ -2336,7 +2336,12 @@ a { color: inherit; }
      by `grid-template-rows: auto auto` on the cell area. */
   grid-template-columns: 9rem auto;
   grid-template-rows: auto auto;
-  gap: 0.5rem;
+  /* gap: 0 so the corner-empty's border-right + border-bottom,
+     col-headers' border-bottom, and row-headers' border-right
+     all meet at the corner T-cross — continuous grid lines
+     instead of 4 disconnected dashes. Padding inside each
+     strip provides the breathing room. */
+  gap: 0;
   margin-top: 0.4rem;
   /* Shrink the whole table to its content width so the panel
      gutter on the right collapses when an aux filter removes
@@ -2368,7 +2373,12 @@ a { color: inherit; }
   grid-column: 2;
   grid-row: 1;
   display: flex;
-  gap: 0.5rem;
+  /* gap: 0 so the first-child's border-right (the inner Won/Lost
+     divider) sits exactly at 50% of the strip — aligns with the
+     cell-area's center-cross pseudo below.  Padding inside each
+     header (text-align: right/left + padding: 0.6rem) keeps the
+     labels from touching the divider visually. */
+  gap: 0;
 }
 .wisden-splits-col-headers > * {
   flex: 1 1 0;
@@ -2393,7 +2403,10 @@ a { color: inherit; }
   grid-row: 2;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  /* gap: 0 so the first-child's border-bottom (the inner Batted
+     first/second divider) sits exactly at 50% of the strip —
+     aligns with the cell-area's center-cross pseudo to the right. */
+  gap: 0;
 }
 .wisden-splits-row-headers > * {
   flex: 1 1 0;
@@ -2434,6 +2447,7 @@ a { color: inherit; }
   grid-template-rows: auto auto;
   gap: 4px;
   justify-content: start;
+  position: relative;
   /* Quadrant size — clamp on viewport so the mosaic scales
      between desktop and mobile while preserving relative cell
      proportions. The full 4-rect mosaic occupies ~2*unit-x wide
@@ -2441,6 +2455,11 @@ a { color: inherit; }
   --mosaic-unit-x: min(42vw, 480px);
   --mosaic-unit-y: min(17vw, 200px);
 }
+/* No center-cross through the cell area — the natural cream
+   channels between adjacent sub-rects carry the axis visual,
+   and trying to draw a continuation line through the mosaic
+   surfaces a 1-3px misalignment with the header dividers from
+   flex/grid-gap rounding (user-reported 2026-05-15). */
 @media (max-width: 720px) {
   /* Horizontal scroll wrapper — for now (per user 2026-05-14)
      the Mosaic uses the Compare pattern instead of trying to
@@ -2458,17 +2477,160 @@ a { color: inherit; }
   .wisden-splits-table { max-width: none; }
 
   .wisden-splits-cell-area {
-    /* Portrait: smaller quadrants (so the table fits 360-wide
-       viewport) and taller-than-wide aspect so labels can stack
-       vertically inside narrow cells. */
-    --mosaic-unit-x: 30vw;
-    --mosaic-unit-y: 38vw;
+    /* Portrait: quadrant width sized to fill more of the
+       available horizontal space (mosaic content width −
+       row-headers column − inner gaps).  Was 30vw — left a
+       ~16px empty strip on the right at 390w.  31vw closes
+       most of it with a small safety margin (3-4px) so the
+       mosaic doesn't trigger horizontal scroll. */
+    --mosaic-unit-x: 31vw;
+    --mosaic-unit-y: 39vw;
   }
   .wisden-splits-subrect-label {
     white-space: normal;
     text-align: center;
     font-size: 0.7rem;
     line-height: 1.1;
+  }
+}
+/* Stacked-word labels — mobile + iPad portrait (≤900). Forces
+   one word per line via `word-spacing: 100vw` so each column /
+   row header shrinks to the width of its longest word ("Batted",
+   "Lost", ~5ch). The `MetricDelta` chip is `white-space: nowrap`
+   so "↑ +5.2%" stays one token. Also hides the "(Bowled second)"
+   secondary and the bracketed share " (NN%)" to keep the stack
+   short. Net at 390w: row-headers 144 → ~50px, no overflow. */
+@media (max-width: 900px) {
+  .wisden-splits-table {
+    grid-template-columns: auto auto;
+    column-gap: 0.3rem;
+  }
+  .wisden-splits-col-headers,
+  .wisden-splits-row-headers {
+    gap: 0.3rem;
+  }
+  /* Hide the bracketed " (NN%)" share — keeps "171 ↑ +5.2%". */
+  .wisden-splits-share-pct {
+    display: none;
+  }
+  /* Hide the "·" separator between label and count — looks
+     stranded on its own line when each word wraps. */
+  .wisden-splits-col-header .wisden-splits-bullet-sep {
+    display: none;
+  }
+  /* Override MetricDelta's inline `white-space: nowrap` inside
+     the col / row headers so "↑" and "+5.2%" can wrap onto their
+     own lines.  The chip is intentionally nowrap in normal flow
+     (tabular contexts); the stacked-word mosaic mode is the
+     exception.  Selector targets MetricDelta's outer span
+     specifically (the only inline-styled nowrap descendant). */
+  .wisden-splits-col-header [style*="nowrap"],
+  .wisden-splits-row-header [style*="nowrap"] {
+    white-space: normal !important;
+  }
+
+  /* Column headers — switch the strip from flex to a 2-column
+     grid that mirrors the cell-area's 2-column track structure.
+     Headers anchor TOWARD the center cross (same as desktop):
+     Won toss right-flush in its left track, Lost toss left-
+     flush in its right track.  The center divider is drawn by a
+     pseudo-element so it spans the full strip height even when
+     the narrow min-content headers don't. */
+  .wisden-splits-col-headers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;  /* match cell-area gap */
+    position: relative;
+  }
+  .wisden-splits-col-headers::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0.1rem;
+    bottom: 0.1rem;
+    width: 1px;
+    background: var(--rule-soft);
+    pointer-events: none;
+  }
+  .wisden-splits-col-headers > * {
+    width: min-content;
+  }
+  .wisden-splits-col-header {
+    line-height: 1.15;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.3rem;
+    white-space: normal;
+  }
+  .wisden-splits-col-headers > *:first-child {
+    justify-self: end;
+    text-align: right;
+    padding-right: 0.4rem;
+    border-right: none;  /* divider now drawn by ::after */
+  }
+  .wisden-splits-col-headers > *:last-child {
+    justify-self: start;
+    text-align: left;
+    padding-left: 0.4rem;
+  }
+
+  /* Row headers — same word-wrap; collapse the flex column to
+     a single stream by inlining the child divs.  Hide the
+     "(Bowled second)" secondary — redundant when stacked,
+     tooltip still carries it.  Specificity bumped past the
+     generic `.wisden-splits-row-header > div { display: inline }`. */
+  .wisden-splits-row-header {
+    width: min-content;
+    display: block;
+    text-align: left;
+    padding: 0.2rem 0.25rem;
+    line-height: 1.15;
+    font-size: 0.8rem;
+    white-space: normal;
+  }
+  .wisden-splits-row-header > div {
+    display: inline;
+  }
+  .wisden-splits-row-header > div.wisden-splits-row-secondary {
+    display: none;
+  }
+  .wisden-splits-row-header .wisden-splits-row-stats {
+    margin-top: 0;
+  }
+  .wisden-splits-row-headers {
+    padding-right: 0.2rem;
+    align-items: flex-start;  /* left-align each row-header at strip's left edge */
+    position: relative;
+  }
+  /* Horizontal divider at 50% of the row-headers strip — same
+     role as the col-headers vertical divider, drawn via pseudo
+     so it spans the full strip width even when the narrow
+     min-content headers don't. */
+  .wisden-splits-row-headers::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0.1rem;
+    right: 0.1rem;
+    height: 1px;
+    background: var(--rule-soft);
+    pointer-events: none;
+  }
+  /* Override the desktop `flex: 1 1 0` (which stretches each row-
+     header to 50% of the strip) so they shrink to content and
+     can be anchored toward the center cross via auto margins —
+     same axis-anchoring as the desktop layout, just expressed
+     differently because content size matters here. */
+  .wisden-splits-row-headers > * {
+    flex: 0 0 auto;
+  }
+  .wisden-splits-row-headers > *:first-child {
+    margin-top: auto;
+    padding-bottom: 0.2rem;
+    border-bottom: none;  /* divider now drawn by ::after */
+  }
+  .wisden-splits-row-headers > *:last-child {
+    margin-bottom: auto;
+    padding-top: 0.2rem;
   }
 }
 .wisden-splits-quadrant {
@@ -2609,6 +2771,16 @@ a { color: inherit; }
   margin-top: -0.2rem;
   font-size: 0.82rem;
   color: var(--ink-soft);
+}
+/* Filter-affordance hint — tells the reader the mosaic itself
+   is the filter widget.  Sits below the All-toss / Both-innings
+   row, just above the mosaic table. */
+.wisden-splits-filter-hint {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--ink-faint);
+  margin: 0.3rem 0 0.4rem 0;
 }
 .wisden-splits-outcome-link {
   background: none;
@@ -2806,6 +2978,18 @@ a { color: inherit; }
   white-space: nowrap;
   pointer-events: none;
   padding: 0 0.3em;
+  /* Stack count above percentage so narrow sub-rects don't need
+     to fit "53 (45%)" horizontally — `53` on line 1, `(45%)` on
+     line 2.  Saves horizontal width inside each rect. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+}
+.wisden-splits-subrect-pct {
+  font-size: 0.72rem;
+  font-weight: 400;
+  opacity: 0.92;
 }
 .wisden-splits-subrect-tied .wisden-splits-subrect-label {
   /* Yellow segment is usually narrow; allow the count to overflow
@@ -2825,6 +3009,25 @@ a { color: inherit; }
   font-size: 0.78rem;
   text-align: right;
   background: rgba(255, 255, 255, 0.45);
+}
+/* Quadrant total — clickable link that sets toss_outcome AND
+   inning in one click (skipping the 2-step row+col header
+   path).  The parent `summaryStyle` has pointer-events: none so
+   the surrounding label doesn't catch clicks; re-enable it on
+   this button so it's interactive. */
+.wisden-splits-quadrant-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--ink);
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.wisden-splits-quadrant-link:hover .comp-link {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 .wisden-splits-legend {
   display: flex;
