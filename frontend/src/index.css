@@ -1127,6 +1127,14 @@ a { color: inherit; }
   .wisden-statrow.cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 
+/* Team Players-tab roster grid — 2-up on mobile so each cell has
+   room for "name … bat/bowl stats" without the stats span
+   overflowing the cell, 3-up on tablet+. Long names shrink via
+   ellipsis (see inline style on the Link). */
+@media (min-width: 720px) {
+  .wisden-team-roster-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+
 /* Phase block — three-up summary used by Batting/Bowling "By Phase" */
 .wisden-phase-first > .wisden-phaseblock:first-child,
 .wisden-phase-first > div:first-child > .wisden-phaseblock:first-child,

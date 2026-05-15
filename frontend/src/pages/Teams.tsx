@@ -1836,13 +1836,18 @@ function PlayersTab({ team, filters, filterDeps }: TabProps) {
                 vs {bucket.turnover.prev_season} · +{bucket.turnover.new_count} new · −{bucket.turnover.left_count} left
               </span>
             )}</>} />
-          <div style={{
+          <div className="wisden-team-roster-grid" style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            // 2 cols on mobile (each ~165px — enough room for most
+            // names + the bat/bowl stat span), 3 cols at >=720px.
+            // The `minmax(0, 1fr)` track lets cells shrink so the
+            // grid never overflows; long-name shrinking handled by
+            // the ellipsis on the Link below.
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
             gap: '0.4rem 1.5rem',
           }}>
             {bucket.players.map(p => (
-              <div key={p.person_id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+              <div key={p.person_id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', minWidth: 0 }}>
                 <Link
                   to={(() => {
                     const qs = new URLSearchParams({ player: p.person_id, filter_team: team })
@@ -1850,6 +1855,16 @@ function PlayersTab({ team, filters, filterDeps }: TabProps) {
                     return `/players?${qs.toString()}`
                   })()}
                   className="comp-link"
+                  // Names like "Mahela Jayawardene" exceed a 165px
+                  // mobile cell when combined with the nowrap stat
+                  // span. minWidth:0 lets the flex item shrink;
+                  // overflow:hidden + ellipsis truncate gracefully.
+                  style={{
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
                 >{p.name}</Link>
                 <span className="num" style={{ color: 'var(--ink-faint)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
                   {p.bat_avg != null ? (
