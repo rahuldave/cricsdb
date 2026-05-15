@@ -203,6 +203,12 @@ export default function InningBandsRow(props: Props) {
   return (
     <div className="wisden-inning-bands">
       <SectionHeader title={TITLE_FOR[props.discipline]} />
+      {/* overflow-x-auto wrapper — same Compare-pattern that
+          DataTable uses. The inning-split tables on team Bowling
+          and Fielding have 6-7 stat columns (Economy / Wickets /
+          Dot % / Boundary % / 4s / 6s), which overflows a 390-wide
+          viewport by ~200px without horizontal scroll. */}
+      <div className="overflow-x-auto">
       <table className="wisden-table">
         <thead>
           <tr>
@@ -228,6 +234,7 @@ export default function InningBandsRow(props: Props) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
