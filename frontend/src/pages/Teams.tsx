@@ -29,6 +29,7 @@ import PlayerLink from '../components/PlayerLink'
 import { ScopeContext, FILTER_KEYS } from '../components/scopeLinks'
 import TeamCompareGrid from '../components/teams/TeamCompareGrid'
 import SplitsMosaic from '../components/SplitsMosaic'
+import ResultFilter from '../components/ResultFilter'
 import TeamBattingDistributionPanel from '../components/teams-distribution/TeamBattingDistributionPanel'
 import TeamBowlingDistributionPanel from '../components/teams-distribution/TeamBowlingDistributionPanel'
 import TeamFieldingDistributionPanel from '../components/teams-distribution/TeamFieldingDistributionPanel'
@@ -584,6 +585,20 @@ export default function Teams() {
 
             {activeTab === 'Match List' && (
               <>
+                {/* Result-only filter — pill row above the match list.
+                    Counts sourced from unauxSummaryFetch (stripped of
+                    toss/inning/result) so the pill totals stay stable
+                    when the Mosaic above sets aux narrowings. First
+                    test bed for the standalone result-filter affordance
+                    — see internal_docs/inning-controls-mount-sites.md
+                    §4 for the broader rollout argument. */}
+                <ResultFilter
+                  matches={unauxSummaryFetch.data?.matches.value ?? null}
+                  wins={unauxSummaryFetch.data?.wins.value ?? null}
+                  losses={unauxSummaryFetch.data?.losses.value ?? null}
+                  ties={unauxSummaryFetch.data?.ties.value ?? null}
+                  noResults={unauxSummaryFetch.data?.no_results.value ?? null}
+                />
                 {resultsFetch.loading && <Spinner label="Loading match list…" />}
                 {resultsFetch.error && (
                   <ErrorBanner
