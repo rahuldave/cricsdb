@@ -9,11 +9,11 @@
 # InningToggle. Deep-link with ?inning=0 still worked (mount reads
 # URL); CLICKING the pill after mount silently no-op'd on EVERY page.
 #
-# The pre-existing inning test (cross_cutting_inning_split.sh §A)
-# used `agent-browser navigate` to deep-link &inning=0 — fresh mount
-# each time, deps issue invisible. §E clicked the pill but only
-# asserted URL writes, not data refetch. The bug lived in the
-# click-after-mount + DOM-refetch gap on every mount site.
+# Prior inning coverage deep-linked via `agent-browser navigate` to
+# &inning=0 — fresh mount each time, deps issue invisible. Pill
+# clicks were asserted only at the URL-write layer, not against
+# data refetch. The bug lived in the click-after-mount + DOM-refetch
+# gap on every mount site.
 #
 # This script asserts displayed DOM values AFTER the inning click on
 # EVERY page that mounts InningToggle:
