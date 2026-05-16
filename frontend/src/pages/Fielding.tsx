@@ -24,7 +24,7 @@ import {
   getFielderSummary, getFielderBySeason, getFielderByPhase, getFielderByOver,
   getFielderDismissalTypes, getFielderVictims, getFielderInnings,
   getFielderKeepingSummary, getFielderKeepingBySeason, getFielderKeepingInnings,
-  getFieldingLeaders, getFielderDistribution,
+  getFieldingLeaders, getFielderDistribution, getFielderRecords,
 } from '../api'
 import type {
   PlayerSearchResult, FieldingSummary, FieldingSeason, FieldingPhase,
@@ -33,6 +33,7 @@ import type {
   FieldingLeaders, FielderDistribution, FilterParams,
 } from '../types'
 import FielderDistributionPanel from '../components/fielding/FielderDistributionPanel'
+import FielderRecordsPanel from '../components/players/FielderRecordsPanel'
 import { SectionHeader } from '../components/ChartHeader'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
@@ -42,7 +43,7 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
 }
 
 // Tabs are filtered at render based on innings_kept (Keeping hidden when 0)
-const BASE_TABS = ['By Season', 'By Over', 'By Phase', 'Dismissal Types', 'Victims', 'Innings List'] as const
+const BASE_TABS = ['By Season', 'By Over', 'By Phase', 'Dismissal Types', 'Victims', 'Innings List', 'Records'] as const
 const KEEPING_TAB = 'Keeping' as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
@@ -134,6 +135,14 @@ export default function Fielding() {
   )
   const innings = inningsFetch.data?.innings ?? []
   const inningsTotal = inningsFetch.data?.total ?? 0
+
+  // Player fielding records — top 10 per list (catches/stumpings/dismissals).
+  const recordsFetch = useFetch<import('../types').FielderRecords | null>(
+    () => playerId && activeTab === 'Records'
+      ? getFielderRecords(playerId, { ...filters, limit: 10 })
+      : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
 
   // --- Keeping (Tier 2) ---
   const [keepOffset, setKeepOffset] = useState(0)
@@ -387,6 +396,15 @@ export default function Fielding() {
                     pagination={{ total: inningsTotal, limit: 50, offset: inningsOffset, onPage: setInningsOffset }} />
                 )}
               </>
+            )}
+
+            {activeTab === 'Records' && (
+              <FielderRecordsPanel
+                data={recordsFetch.data}
+                loading={recordsFetch.loading}
+                error={recordsFetch.error}
+                refetch={recordsFetch.refetch}
+              />
             )}
 
             {activeTab === 'Keeping' && (

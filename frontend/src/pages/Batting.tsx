@@ -25,7 +25,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import {
   getBatterSummary, getBatterInnings, getBatterVsBowlers, getBatterByOver,
   getBatterByPhase, getBatterBySeason, getBatterDismissals, getBatterInterWicket,
-  getBattingLeaders, getBatterDistribution,
+  getBattingLeaders, getBatterDistribution, getBatterRecords,
 } from '../api'
 import type {
   PlayerSearchResult, BattingSummary, BattingInnings, BowlerMatchup,
@@ -33,6 +33,7 @@ import type {
   BattingLeaders, BattingLeaderEntry, FilterParams, BatterDistribution,
 } from '../types'
 import BatterDistributionPanel from '../components/batting/BatterDistributionPanel'
+import BatterRecordsPanel from '../components/players/BatterRecordsPanel'
 import { SectionHeader } from '../components/ChartHeader'
 
 // Small helper for the consistent loading/error pattern in each tab.
@@ -42,7 +43,7 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   return null
 }
 
-const tabs = ['By Season', 'By Over', 'By Phase', 'vs Bowlers', 'Dismissals', 'Inter-Wicket', 'Innings List'] as const
+const tabs = ['By Season', 'By Over', 'By Phase', 'vs Bowlers', 'Dismissals', 'Inter-Wicket', 'Innings List', 'Records'] as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
 export default function Batting() {
@@ -152,6 +153,16 @@ export default function Batting() {
   )
   const innings = inningsFetch.data?.innings ?? []
   const inningsTotal = inningsFetch.data?.total ?? 0
+
+  // Player batting records — top 10 per list. Gated on the Records
+  // subtab so the 6-query fan-out only fires when active. Reads
+  // inningsbatterperf via /api/v1/batters/{id}/records.
+  const recordsFetch = useFetch<import('../types').BatterRecords | null>(
+    () => playerId && activeTab === 'Records'
+      ? getBatterRecords(playerId, { ...filters, limit: 10 })
+      : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
 
   const inningsColumns: Column<BattingInnings>[] = [
     { key: 'date', label: 'Date', sortable: true, format: (v: any, r: any) => (
@@ -471,6 +482,15 @@ export default function Batting() {
                     pagination={{ total: inningsTotal, limit: 50, offset: inningsOffset, onPage: setInningsOffset }} />
                 )}
               </>
+            )}
+
+            {activeTab === 'Records' && (
+              <BatterRecordsPanel
+                data={recordsFetch.data}
+                loading={recordsFetch.loading}
+                error={recordsFetch.error}
+                refetch={recordsFetch.refetch}
+              />
             )}
           </div>
         </>

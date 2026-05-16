@@ -24,7 +24,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import {
   getBowlerSummary, getBowlerInnings, getBowlerVsBatters, getBowlerByOver,
   getBowlerByPhase, getBowlerBySeason, getBowlerWickets, getBowlerDistribution,
-  getBowlingLeaders,
+  getBowlingLeaders, getBowlerRecords,
 } from '../api'
 import type {
   PlayerSearchResult, BowlingSummary, BowlingInnings, BatterMatchup,
@@ -33,6 +33,7 @@ import type {
   BowlerDistribution,
 } from '../types'
 import BowlerDistributionPanel from '../components/bowling/BowlerDistributionPanel'
+import BowlerRecordsPanel from '../components/players/BowlerRecordsPanel'
 import { SectionHeader } from '../components/ChartHeader'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
@@ -41,7 +42,7 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   return null
 }
 
-const tabs = ['By Season', 'By Over', 'By Phase', 'vs Batters', 'Wickets', 'Innings List'] as const
+const tabs = ['By Season', 'By Over', 'By Phase', 'vs Batters', 'Wickets', 'Innings List', 'Records'] as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
 export default function Bowling() {
@@ -136,6 +137,14 @@ export default function Bowling() {
   )
   const innings = inningsFetch.data?.innings ?? []
   const inningsTotal = inningsFetch.data?.total ?? 0
+
+  // Player bowling records — top 10 per list (2 lists). Gated on tab.
+  const recordsFetch = useFetch<import('../types').BowlerRecords | null>(
+    () => playerId && activeTab === 'Records'
+      ? getBowlerRecords(playerId, { ...filters, limit: 10 })
+      : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
 
   const inningsColumns: Column<BowlingInnings>[] = [
     { key: 'date', label: 'Date', sortable: true, format: (v: any, r: any) => (
@@ -456,6 +465,15 @@ export default function Bowling() {
                     pagination={{ total: inningsTotal, limit: 50, offset: inningsOffset, onPage: setInningsOffset }} />
                 )}
               </>
+            )}
+
+            {activeTab === 'Records' && (
+              <BowlerRecordsPanel
+                data={recordsFetch.data}
+                loading={recordsFetch.loading}
+                error={recordsFetch.error}
+                refetch={recordsFetch.refetch}
+              />
             )}
           </div>
         </>
