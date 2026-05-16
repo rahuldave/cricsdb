@@ -239,3 +239,18 @@ NEW teams_landing_women_pri              /api/v1/teams/landing?gender=female&tea
 NEW teams_landing_women_sec              /api/v1/teams/landing?gender=female&team_type=club&team_class=secondary_club
 
 # Multi-tier venue interaction (V4-V6) lives in tests/regression/venues/urls.txt.
+
+# ── /teams/{team}/records (subject-team scoped records — c7afdf1) ──
+# Brand new endpoint c7afdf1 + precompute swap 056a1c7. Locks the 8
+# record-list shape under varied scopes. NEW because byte-identicality
+# can't be compared against pre-endpoint HEAD; after the next stable
+# cycle these flip to REG.
+NEW team_records_mi_all                  /api/v1/teams/Mumbai%20Indians/records?limit=5
+NEW team_records_mi_ipl                  /api/v1/teams/Mumbai%20Indians/records?tournament=Indian%20Premier%20League&limit=5
+NEW team_records_mi_ipl_2025             /api/v1/teams/Mumbai%20Indians/records?tournament=Indian%20Premier%20League&season_from=2025&season_to=2025&limit=5
+NEW team_records_mi_ipl_inn0             /api/v1/teams/Mumbai%20Indians/records?tournament=Indian%20Premier%20League&inning=0&limit=5
+NEW team_records_mi_ipl_inn1             /api/v1/teams/Mumbai%20Indians/records?tournament=Indian%20Premier%20League&inning=1&limit=5
+NEW team_records_india_intl              /api/v1/teams/India/records?gender=male&team_type=international&limit=5
+NEW team_records_india_aus_bilat         /api/v1/teams/India/records?filter_opponent=Australia&gender=male&team_type=international&series_type=bilateral_only&limit=3
+NEW team_records_surrey_blast            /api/v1/teams/Surrey/records?tournament=Vitality%20Blast&gender=male&team_type=club&limit=5
+NEW team_records_australia_women         /api/v1/teams/Australia/records?gender=female&team_type=international&limit=3
