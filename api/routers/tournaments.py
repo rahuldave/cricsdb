@@ -1936,7 +1936,7 @@ async def tournament_records(
     params["lim"] = limit
 
     # Highest team totals
-    ht_rows = await db.q(
+    ht_q = db.q(
         f"""
         SELECT i.team, tot.total AS runs, m.id AS match_id,
                CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
@@ -1956,7 +1956,7 @@ async def tournament_records(
     )
 
     # Lowest all-out totals (innings where 10 wickets fell)
-    lo_rows = await db.q(
+    lo_q = db.q(
         f"""
         WITH innings_wkts AS (
           SELECT w.delivery_id, d.innings_id
@@ -1985,7 +1985,7 @@ async def tournament_records(
     )
 
     # Biggest wins by runs
-    bwr_rows = await db.q(
+    bwr_q = db.q(
         f"""
         SELECT m.outcome_winner AS winner,
                CASE WHEN m.team1 = m.outcome_winner THEN m.team2 ELSE m.team1 END AS loser,
@@ -2001,7 +2001,7 @@ async def tournament_records(
     )
 
     # Biggest wins by wickets
-    bww_rows = await db.q(
+    bww_q = db.q(
         f"""
         SELECT m.outcome_winner AS winner,
                CASE WHEN m.team1 = m.outcome_winner THEN m.team2 ELSE m.team1 END AS loser,
@@ -2017,7 +2017,7 @@ async def tournament_records(
     )
 
     # Largest partnerships
-    lp_rows = await db.q(
+    lp_q = db.q(
         f"""
         SELECT p.partnership_runs AS runs,
                p.batter1_id, p.batter2_id,
@@ -2040,7 +2040,7 @@ async def tournament_records(
 
     # Best individual batting (single innings — top score, tie-break by
     # balls ASC so 87(40) ranks above 87(60)).
-    bi_rows = await db.q(
+    bi_q = db.q(
         f"""
         WITH per_innings_batter AS (
           SELECT d.batter_id,
@@ -2078,7 +2078,7 @@ async def tournament_records(
     )
 
     # Best bowling figures (single match)
-    bb_rows = await db.q(
+    bb_q = db.q(
         f"""
         WITH per_match_bowler AS (
           SELECT d.bowler_id, m.id AS match_id,
@@ -2109,7 +2109,7 @@ async def tournament_records(
     )
 
     # Most sixes in a match
-    ms_rows = await db.q(
+    ms_q = db.q(
         f"""
         SELECT m.id AS match_id,
                SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
@@ -2125,6 +2125,15 @@ async def tournament_records(
         ORDER BY sixes DESC LIMIT :lim
         """,
         params,
+    )
+
+    # Parallel fan-out — all 8 record queries are independent reads
+    # (no inter-query data dependencies). deebase supports parallel
+    # reads via the connection pool; wall time becomes max-of-queries
+    # (~2s for best_bowling at all-cricket) instead of sum-of-queries
+    # (~13s pre-parallelisation, measured 2026-05-16).
+    ht_rows, lo_rows, bwr_rows, bww_rows, lp_rows, bi_rows, bb_rows, ms_rows = await asyncio.gather(
+        ht_q, lo_q, bwr_q, bww_q, lp_q, bi_q, bb_q, ms_q,
     )
 
     return {
