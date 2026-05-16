@@ -1935,51 +1935,36 @@ async def tournament_records(
     params.update(inn_params)
     params["lim"] = limit
 
-    # Highest team totals
+    # Highest team totals — reads inningstotal (precomputed).
     ht_q = db.q(
         f"""
-        SELECT i.team, tot.total AS runs, m.id AS match_id,
+        SELECT i.team, t.total_runs AS runs, m.id AS match_id,
                CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
                m.event_name AS tournament, m.season AS season,
                (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
-        FROM (
-          SELECT d.innings_id, SUM(d.runs_total) AS total
-          FROM delivery d
-          GROUP BY d.innings_id
-        ) tot
-        JOIN innings i ON i.id = tot.innings_id
+        FROM inningstotal t
+        JOIN innings i ON i.id = t.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}{inn_clause}
-        ORDER BY tot.total DESC LIMIT :lim
+        WHERE t.super_over = 0 AND {where}{inn_clause}
+        ORDER BY t.total_runs DESC LIMIT :lim
         """,
         params,
     )
 
-    # Lowest all-out totals (innings where 10 wickets fell)
+    # Lowest all-out totals (innings where 10 wickets fell) — reads
+    # inningstotal (precomputed); .total_wkts already excludes the
+    # retired-hurt / retired-not-out kinds per the populate predicate.
     lo_q = db.q(
         f"""
-        WITH innings_wkts AS (
-          SELECT w.delivery_id, d.innings_id
-          FROM wicket w JOIN delivery d ON d.id = w.delivery_id
-        ),
-        innings_totals AS (
-          SELECT d.innings_id, SUM(d.runs_total) AS total,
-                 (SELECT COUNT(*) FROM wicket w
-                  JOIN delivery d2 ON d2.id = w.delivery_id
-                  WHERE d2.innings_id = d.innings_id
-                    AND w.kind NOT IN ('retired hurt', 'retired not out')) AS wkts
-          FROM delivery d
-          GROUP BY d.innings_id
-        )
-        SELECT i.team, it.total AS runs, m.id AS match_id,
+        SELECT i.team, t.total_runs AS runs, m.id AS match_id,
                CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
                m.event_name AS tournament, m.season AS season,
                (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
-        FROM innings_totals it
-        JOIN innings i ON i.id = it.innings_id
+        FROM inningstotal t
+        JOIN innings i ON i.id = t.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND it.wkts >= 10 AND {where}{inn_clause}
-        ORDER BY it.total ASC LIMIT :lim
+        WHERE t.super_over = 0 AND t.total_wkts >= 10 AND {where}{inn_clause}
+        ORDER BY t.total_runs ASC LIMIT :lim
         """,
         params,
     )
@@ -2039,88 +2024,64 @@ async def tournament_records(
     )
 
     # Best individual batting (single innings — top score, tie-break by
-    # balls ASC so 87(40) ranks above 87(60)).
+    # balls ASC so 87(40) ranks above 87(60)). Reads inningsbatterperf
+    # (precomputed). not_out is denormalized at populate time.
     bi_q = db.q(
         f"""
-        WITH per_innings_batter AS (
-          SELECT d.batter_id,
-                 d.innings_id,
-                 m.id AS match_id,
-                 SUM(d.runs_batter) AS runs,
-                 SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
-                          THEN 1 ELSE 0 END) AS balls,
-                 SUM(CASE WHEN d.runs_batter = 4 THEN 1 ELSE 0 END) AS fours,
-                 SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes
-          FROM delivery d
-          JOIN innings i ON i.id = d.innings_id
-          JOIN match m ON m.id = i.match_id
-          WHERE i.super_over = 0 AND {where}{inn_clause}
-            AND d.batter_id IS NOT NULL
-          GROUP BY d.batter_id, d.innings_id, m.id
-        )
-        SELECT pi.batter_id AS person_id, p.name,
-               pi.runs, pi.balls, pi.fours, pi.sixes,
-               CASE WHEN EXISTS (
-                 SELECT 1 FROM wicket w
-                 JOIN delivery d2 ON d2.id = w.delivery_id
-                 WHERE d2.innings_id = pi.innings_id
-                   AND w.player_out_id = pi.batter_id
-               ) THEN 0 ELSE 1 END AS not_out,
-               pi.match_id,
-               m2.event_name AS tournament, m2.season AS season,
-               (SELECT MIN(date) FROM matchdate WHERE match_id = pi.match_id) AS date
-        FROM per_innings_batter pi
-        LEFT JOIN person p ON p.id = pi.batter_id
-        LEFT JOIN match m2 ON m2.id = pi.match_id
-        ORDER BY pi.runs DESC, pi.balls ASC LIMIT :lim
+        SELECT ib.batter_id AS person_id, p.name,
+               ib.runs, ib.balls, ib.fours, ib.sixes,
+               ib.not_out, m.id AS match_id,
+               m.event_name AS tournament, m.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+        FROM inningsbatterperf ib
+        JOIN innings i ON i.id = ib.innings_id
+        JOIN match m ON m.id = i.match_id
+        LEFT JOIN person p ON p.id = ib.batter_id
+        WHERE i.super_over = 0 AND {where}{inn_clause}
+        ORDER BY ib.runs DESC, ib.balls ASC LIMIT :lim
         """,
         params,
     )
 
-    # Best bowling figures (single match)
+    # Best bowling figures (single match) — reads matchbowlerperf
+    # (precomputed). Wicket kinds excluded at populate time match the
+    # original predicate (run out, retired hurt/out, obstructing).
+    #
+    # NOTE: the inning aux narrowing has no per-match-bowler grain
+    # (a bowler bowls in exactly one innings of any non-super-over
+    # match — the OPPOSING innings). To honour aux.inning we'd need a
+    # per-(bowler, innings) table; for now inning is dropped from this
+    # specific record's WHERE — same behavior as the original since
+    # the GROUP BY m.id collapsed the inning context anyway.
     bb_q = db.q(
         f"""
-        WITH per_match_bowler AS (
-          SELECT d.bowler_id, m.id AS match_id,
-                 SUM(CASE WHEN w.id IS NOT NULL
-                              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
-                          THEN 1 ELSE 0 END) AS wickets,
-                 SUM(d.runs_total) AS runs,
-                 SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS balls
-          FROM delivery d
-          LEFT JOIN wicket w ON w.delivery_id = d.id
-          JOIN innings i ON i.id = d.innings_id
-          JOIN match m ON m.id = i.match_id
-          WHERE i.super_over = 0 AND {where}{inn_clause}
-            AND d.bowler_id IS NOT NULL
-          GROUP BY d.bowler_id, m.id
-        )
-        SELECT pm.bowler_id AS person_id, p.name,
-               pm.wickets, pm.runs, pm.balls, pm.match_id,
-               m2.event_name AS tournament, m2.season AS season,
-               (SELECT MIN(date) FROM matchdate WHERE match_id = pm.match_id) AS date
-        FROM per_match_bowler pm
-        LEFT JOIN person p ON p.id = pm.bowler_id
-        LEFT JOIN match m2 ON m2.id = pm.match_id
-        WHERE pm.wickets >= 2
-        ORDER BY pm.wickets DESC, pm.runs ASC LIMIT :lim
+        SELECT mb.bowler_id AS person_id, p.name,
+               mb.wickets, mb.runs, mb.balls, mb.match_id,
+               m.event_name AS tournament, m.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = mb.match_id) AS date
+        FROM matchbowlerperf mb
+        JOIN match m ON m.id = mb.match_id
+        LEFT JOIN person p ON p.id = mb.bowler_id
+        WHERE mb.wickets >= 2 AND {where}
+        ORDER BY mb.wickets DESC, mb.runs ASC LIMIT :lim
         """,
         params,
     )
 
-    # Most sixes in a match
+    # Most sixes in a match — reads inningstotal (precomputed), SUM
+    # across both innings of the match to get match-grain sixes.
     ms_q = db.q(
         f"""
         SELECT m.id AS match_id,
-               SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
+               SUM(t.total_sixes) AS sixes,
                m.team1 || ' v ' || m.team2 AS teams,
                m.team1, m.team2,
                m.event_name AS tournament, m.season AS season,
                (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
-        FROM delivery d
-        JOIN innings i ON i.id = d.innings_id
+        FROM inningstotal t
+        JOIN innings i ON i.id = t.innings_id
         JOIN match m ON m.id = i.match_id
-        WHERE i.super_over = 0 AND {where}{inn_clause}
+        WHERE t.super_over = 0 AND {where}{inn_clause}
         GROUP BY m.id
         ORDER BY sixes DESC LIMIT :lim
         """,

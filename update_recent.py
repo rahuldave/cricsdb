@@ -350,6 +350,14 @@ async def main():
                 )
                 await bb_incr(db, new_match_ids)
 
+                # Records-page precomputed aggregates — innings_total +
+                # innings_batter_perf + match_bowler_perf. Deletes the
+                # touched-match rows and reinserts.
+                from scripts.populate_records_aggregates import (
+                    populate_incremental as records_incr,
+                )
+                await records_incr(db, new_match_ids)
+
                 # Refresh query planner stats and ensure leaderboard
                 # indexes exist. Index CREATE is a no-op if already
                 # there; ANALYZE is cheap and keeps bowling-leader

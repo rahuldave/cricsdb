@@ -528,3 +528,52 @@ class BucketBaselinePartnershipTop:
     partnership_id: int
     runs: int
     balls: int
+
+
+# ─── Records-page precomputed aggregates ──────────────────────────────
+#
+# Three tables back the /series/records + /teams/{team}/records
+# endpoints. Without them, every records request runs 5 full delivery-
+# table scans (3M rows) per request — ~13s unfiltered at all-cricket.
+# With them, each record list is a single read on the small aggregate
+# table joined to match for scope filtering. See spec-driven request
+# 2026-05-16 + commits 854b10a (parallelise) + c7afdf1 (team records).
+
+
+class InningsTotal:
+    """Per-innings aggregate — total runs, wickets that fell, sixes,
+    fours, plus denormalized super_over so the records SQL can filter
+    without re-joining innings."""
+    innings_id: ForeignKey[int, "innings"]
+    total_runs: int
+    total_wkts: int  # excludes retired hurt / retired not out
+    total_sixes: int
+    total_fours: int
+    super_over: bool
+
+
+class InningsBatterPerf:
+    """Per-(batter, innings) batting performance — feeds best-individual
+    -batting and any per-innings batting record list. not_out is denormal-
+    ized from the EXISTS(wicket WHERE player_out_id = batter) check the
+    live query does inline."""
+    batter_id: ForeignKey[str, "person"]
+    innings_id: ForeignKey[int, "innings"]
+    runs: int
+    balls: int  # legal balls (excludes wides + no-balls)
+    fours: int
+    sixes: int
+    not_out: bool
+
+
+class MatchBowlerPerf:
+    """Per-(bowler, match) bowling performance — feeds best-bowling-
+    figures. wickets uses Convention-3-style attribution (excludes
+    run-outs and retired-hurt-style wickets the bowler doesn't own).
+    Matches the live SQL's `kind NOT IN ('run out', 'retired hurt',
+    'retired out', 'obstructing the field')` predicate."""
+    bowler_id: ForeignKey[str, "person"]
+    match_id: ForeignKey[int, "match"]
+    wickets: int
+    runs: int  # runs conceded (sum runs_total over bowler's deliveries)
+    balls: int  # legal balls bowled

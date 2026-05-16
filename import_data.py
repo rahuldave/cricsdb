@@ -523,6 +523,15 @@ async def main():
     from scripts.populate_bucket_baseline import populate_full as bb_full
     await bb_full(db)
 
+    # Records-page precomputed aggregates — innings_total +
+    # innings_batter_perf + match_bowler_perf. Back the /series/records
+    # and /teams/{team}/records endpoints. Sub-second at all-cricket
+    # scope; without these the records request runs 5 full delivery
+    # scans (~13s).
+    print("\nPopulating records aggregates (inningstotal + inningsbatterperf + matchbowlerperf)…")
+    from scripts.populate_records_aggregates import populate_full as records_full
+    await records_full(db)
+
     # Composite covering indexes + analyze for the leaderboard queries
     # on the Batting/Bowling landing pages. Without these, an unfiltered
     # SELECT … GROUP BY batter_id scan is 3s+; with them it drops to
