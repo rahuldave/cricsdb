@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import statistics
 from datetime import date, timedelta
 from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Optional
 
+from ..aux_clauses import splice_aux_join_clauses
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams, _is_set
 from ..form_windows import scope_anchor
@@ -6114,5 +6116,303 @@ async def team_partnerships_by_season(
                 "best_runs": r["best_runs"],
             }
             for r in rows
+        ],
+    }
+
+
+@router.get("/{team}/records")
+async def team_records(
+    team: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    limit: int = Query(5, ge=1, le=20),
+):
+    """Records lists for the team-scoped match-set — each capped at top-N.
+
+    Subject-team semantics throughout — every list reads "team X's ..."
+    rather than "any team's ... in matches involving X":
+      - highest / lowest team totals → team X's batting innings
+      - biggest wins by runs / wickets → team X is the winner
+      - largest partnerships → team X's batters (batting side)
+      - best individual batting → team X's batter
+      - best bowling figures → team X's bowler (bowling at opponent)
+      - most sixes in a match → sixes hit BY team X in a single match
+        (NOT match-grain total across both sides — that's the Series
+        endpoint's semantic and would conflate team X with opponent)
+
+    Honours all FilterBar narrowings + aux.inning. Same response shape
+    as /series/records so the `RecordsTab` component renders both.
+    Mirrors the asyncio.gather pattern from /series/records (commit
+    854b10a) — the 8 reads are independent.
+
+    Spec: internal_docs/inning-controls-mount-sites.md §4.1 + the
+    spec-driven request 2026-05-16.
+    """
+    db = get_db()
+    where, params = _team_filter_clause(filters, aux=aux, team_value=team)
+    params["team"] = team
+    inn_clause = splice_aux_join_clauses(aux, params)
+    params["lim"] = limit
+
+    # Highest team totals — team X's batting innings.
+    ht_q = db.q(
+        f"""
+        SELECT i.team, tot.total AS runs, m.id AS match_id,
+               CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
+               m.event_name AS tournament, m.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+        FROM (
+          SELECT d.innings_id, SUM(d.runs_total) AS total
+          FROM delivery d
+          GROUP BY d.innings_id
+        ) tot
+        JOIN innings i ON i.id = tot.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE i.super_over = 0 AND i.team = :team AND {where}{inn_clause}
+        ORDER BY tot.total DESC LIMIT :lim
+        """,
+        params,
+    )
+
+    # Lowest all-out totals — team X's all-out batting innings.
+    lo_q = db.q(
+        f"""
+        WITH innings_totals AS (
+          SELECT d.innings_id, SUM(d.runs_total) AS total,
+                 (SELECT COUNT(*) FROM wicket w
+                  JOIN delivery d2 ON d2.id = w.delivery_id
+                  WHERE d2.innings_id = d.innings_id
+                    AND w.kind NOT IN ('retired hurt', 'retired not out')) AS wkts
+          FROM delivery d
+          GROUP BY d.innings_id
+        )
+        SELECT i.team, it.total AS runs, m.id AS match_id,
+               CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END AS opponent,
+               m.event_name AS tournament, m.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+        FROM innings_totals it
+        JOIN innings i ON i.id = it.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE i.super_over = 0 AND i.team = :team AND it.wkts >= 10
+          AND {where}{inn_clause}
+        ORDER BY it.total ASC LIMIT :lim
+        """,
+        params,
+    )
+
+    # Biggest wins by runs — team X is the winner.
+    bwr_q = db.q(
+        f"""
+        SELECT m.outcome_winner AS winner,
+               CASE WHEN m.team1 = m.outcome_winner THEN m.team2 ELSE m.team1 END AS loser,
+               m.outcome_by_runs AS margin,
+               m.id AS match_id,
+               m.event_name AS tournament, m.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+        FROM match m
+        WHERE {where} AND m.outcome_winner = :team AND m.outcome_by_runs IS NOT NULL
+        ORDER BY m.outcome_by_runs DESC LIMIT :lim
+        """,
+        params,
+    )
+
+    # Biggest wins by wickets — team X is the winner.
+    bww_q = db.q(
+        f"""
+        SELECT m.outcome_winner AS winner,
+               CASE WHEN m.team1 = m.outcome_winner THEN m.team2 ELSE m.team1 END AS loser,
+               m.outcome_by_wickets AS margin,
+               m.id AS match_id,
+               m.event_name AS tournament, m.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+        FROM match m
+        WHERE {where} AND m.outcome_winner = :team AND m.outcome_by_wickets IS NOT NULL
+        ORDER BY m.outcome_by_wickets DESC, m.outcome_by_runs ASC LIMIT :lim
+        """,
+        params,
+    )
+
+    # Largest partnerships — team X is the batting side.
+    lp_q = db.q(
+        f"""
+        SELECT p.partnership_runs AS runs,
+               p.batter1_id, p.batter2_id,
+               p1.name AS b1_name, p2.name AS b2_name,
+               m.id AS match_id,
+               m.team1, m.team2,
+               i.team AS batting_team,
+               m.event_name AS tournament, m.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+        FROM partnership p
+        JOIN innings i ON i.id = p.innings_id
+        JOIN match m ON m.id = i.match_id
+        LEFT JOIN person p1 ON p1.id = p.batter1_id
+        LEFT JOIN person p2 ON p2.id = p.batter2_id
+        WHERE i.super_over = 0 AND i.team = :team AND {where}{inn_clause}
+        ORDER BY p.partnership_runs DESC LIMIT :lim
+        """,
+        params,
+    )
+
+    # Best individual batting — team X's batter (in team X's innings).
+    bi_q = db.q(
+        f"""
+        WITH per_innings_batter AS (
+          SELECT d.batter_id,
+                 d.innings_id,
+                 m.id AS match_id,
+                 SUM(d.runs_batter) AS runs,
+                 SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
+                          THEN 1 ELSE 0 END) AS balls,
+                 SUM(CASE WHEN d.runs_batter = 4 THEN 1 ELSE 0 END) AS fours,
+                 SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes
+          FROM delivery d
+          JOIN innings i ON i.id = d.innings_id
+          JOIN match m ON m.id = i.match_id
+          WHERE i.super_over = 0 AND i.team = :team AND {where}{inn_clause}
+            AND d.batter_id IS NOT NULL
+          GROUP BY d.batter_id, d.innings_id, m.id
+        )
+        SELECT pi.batter_id AS person_id, p.name,
+               pi.runs, pi.balls, pi.fours, pi.sixes,
+               CASE WHEN EXISTS (
+                 SELECT 1 FROM wicket w
+                 JOIN delivery d2 ON d2.id = w.delivery_id
+                 WHERE d2.innings_id = pi.innings_id
+                   AND w.player_out_id = pi.batter_id
+               ) THEN 0 ELSE 1 END AS not_out,
+               pi.match_id,
+               m2.event_name AS tournament, m2.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = pi.match_id) AS date
+        FROM per_innings_batter pi
+        LEFT JOIN person p ON p.id = pi.batter_id
+        LEFT JOIN match m2 ON m2.id = pi.match_id
+        ORDER BY pi.runs DESC, pi.balls ASC LIMIT :lim
+        """,
+        params,
+    )
+
+    # Best bowling figures — team X's bowler bowling AT the opponent.
+    # When team X is bowling, the innings' batting team is the OTHER
+    # team; hence `i.team != :team` is the bowling-side filter.
+    bb_q = db.q(
+        f"""
+        WITH per_match_bowler AS (
+          SELECT d.bowler_id, m.id AS match_id,
+                 SUM(CASE WHEN w.id IS NOT NULL
+                              AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+                          THEN 1 ELSE 0 END) AS wickets,
+                 SUM(d.runs_total) AS runs,
+                 SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS balls
+          FROM delivery d
+          LEFT JOIN wicket w ON w.delivery_id = d.id
+          JOIN innings i ON i.id = d.innings_id
+          JOIN match m ON m.id = i.match_id
+          WHERE i.super_over = 0 AND i.team != :team AND {where}{inn_clause}
+            AND d.bowler_id IS NOT NULL
+          GROUP BY d.bowler_id, m.id
+        )
+        SELECT pm.bowler_id AS person_id, p.name,
+               pm.wickets, pm.runs, pm.balls, pm.match_id,
+               m2.event_name AS tournament, m2.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = pm.match_id) AS date
+        FROM per_match_bowler pm
+        LEFT JOIN person p ON p.id = pm.bowler_id
+        LEFT JOIN match m2 ON m2.id = pm.match_id
+        WHERE pm.wickets >= 2
+        ORDER BY pm.wickets DESC, pm.runs ASC LIMIT :lim
+        """,
+        params,
+    )
+
+    # Most sixes BY team X in a single match (innings-grain — teams bat
+    # once per match in T20 non-super-over). Diverges from /series/records
+    # which sums sixes across both teams' innings; here we want the
+    # subject team's sixes only.
+    ms_q = db.q(
+        f"""
+        SELECT m.id AS match_id, i.team,
+               SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
+               m.team1 || ' v ' || m.team2 AS teams,
+               m.team1, m.team2,
+               m.event_name AS tournament, m.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE i.super_over = 0 AND i.team = :team AND {where}{inn_clause}
+        GROUP BY m.id
+        ORDER BY sixes DESC LIMIT :lim
+        """,
+        params,
+    )
+
+    ht_rows, lo_rows, bwr_rows, bww_rows, lp_rows, bi_rows, bb_rows, ms_rows = await asyncio.gather(
+        ht_q, lo_q, bwr_q, bww_q, lp_q, bi_q, bb_q, ms_q,
+    )
+
+    return {
+        "team": team,
+        "canonical": filters.tournament or "",
+        "highest_team_totals": [
+            {"team": r["team"], "runs": r["runs"], "opponent": r["opponent"],
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
+            for r in ht_rows
+        ],
+        "lowest_all_out_totals": [
+            {"team": r["team"], "runs": r["runs"], "opponent": r["opponent"],
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
+            for r in lo_rows
+        ],
+        "biggest_wins_by_runs": [
+            {"winner": r["winner"], "loser": r["loser"], "margin": r["margin"],
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
+            for r in bwr_rows
+        ],
+        "biggest_wins_by_wickets": [
+            {"winner": r["winner"], "loser": r["loser"], "margin": r["margin"],
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
+            for r in bww_rows
+        ],
+        "largest_partnerships": [
+            {"runs": r["runs"],
+             "batter1": {"person_id": r["batter1_id"], "name": r["b1_name"]},
+             "batter2": {"person_id": r["batter2_id"], "name": r["b2_name"]},
+             "teams": f"{r['team1']} v {r['team2']}",
+             "team1": r["team1"], "team2": r["team2"],
+             "batting_team": r["batting_team"],
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
+            for r in lp_rows
+        ],
+        "best_individual_batting": [
+            {"person_id": r["person_id"], "name": r["name"],
+             "runs": r["runs"], "balls": r["balls"],
+             "fours": r["fours"], "sixes": r["sixes"],
+             "not_out": bool(r["not_out"]),
+             "figures": f"{r['runs']}{'*' if r['not_out'] else ''} ({r['balls']})",
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
+            for r in bi_rows
+        ],
+        "best_bowling_figures": [
+            {"person_id": r["person_id"], "name": r["name"],
+             "wickets": r["wickets"], "runs": r["runs"], "balls": r["balls"],
+             "figures": f"{r['wickets']}/{r['runs']}",
+             "match_id": r["match_id"], "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
+            for r in bb_rows
+        ],
+        "most_sixes_in_a_match": [
+            {"match_id": r["match_id"], "sixes": r["sixes"],
+             "teams": r["teams"],
+             "team1": r["team1"], "team2": r["team2"],
+             "date": r["date"],
+             "tournament": r["tournament"], "season": r["season"]}
+            for r in ms_rows
         ],
     }

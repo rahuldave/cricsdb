@@ -11,6 +11,7 @@ import {
   getTeamSummary, getTeamByseason, getTeamVs, getTeamResults,
   getTeamOpponentsMatrix, getTeamPlayersBySeason, getTeamsLanding,
   getTeamSplits,
+  getTeamRecords,
   getTeamBattingSummary, getTeamBattingBySeason, getTeamBattingByPhase, getTeamBattingByInning, getTeamTopBatters,
   getTeamBattingPhaseSeasonHeatmap, getTeamBattingDistribution,
   getTeamBowlingSummary, getTeamBowlingBySeason, getTeamBowlingByPhase, getTeamBowlingByInning, getTeamTopBowlers,
@@ -29,6 +30,7 @@ import PlayerLink from '../components/PlayerLink'
 import { ScopeContext, FILTER_KEYS } from '../components/scopeLinks'
 import TeamCompareGrid from '../components/teams/TeamCompareGrid'
 import SplitsMosaic from '../components/SplitsMosaic'
+import { RecordsTab } from '../components/tournaments/TournamentDossier'
 import TeamBattingDistributionPanel from '../components/teams-distribution/TeamBattingDistributionPanel'
 import TeamBowlingDistributionPanel from '../components/teams-distribution/TeamBowlingDistributionPanel'
 import TeamFieldingDistributionPanel from '../components/teams-distribution/TeamFieldingDistributionPanel'
@@ -73,7 +75,7 @@ import { SectionHeader } from '../components/ChartHeader'
 const tabs = [
   'By Season', 'vs Opponent', 'Compare',
   'Batting', 'Bowling', 'Fielding', 'Partnerships',
-  'Players', 'Match List',
+  'Players', 'Records', 'Match List',
 ] as const
 
 export default function Teams() {
@@ -355,6 +357,19 @@ export default function Teams() {
   const results = resultsFetch.data?.results ?? []
   const resultsTotal = resultsFetch.data?.total ?? 0
 
+  // Team Records — gated on tab so it doesn't fan out 8 SQL queries
+  // every time the user lands on the page. Shape matches /series/records
+  // so the existing RecordsTab component renders both. Spec: see
+  // internal_docs/inning-controls-mount-sites.md §4.1 + the records
+  // perf trio (commit 854b10a + this commit + the precomputed-tables
+  // followup).
+  const recordsFetch = useFetch<import('../types').TournamentRecords | null>(
+    () => selected && activeTab === 'Records'
+      ? getTeamRecords(selected, { ...filters, limit: 10 })
+      : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+
   const selectTeam = (name: string, gender?: string | null) => {
     if (gender && !filters.gender) {
       setUrlParams({ team: name, gender })
@@ -614,6 +629,17 @@ export default function Teams() {
             )}
             {activeTab === 'Players' && selected && (
               <PlayersTab team={selected} filters={filters} filterDeps={filterDeps} />
+            )}
+            {activeTab === 'Records' && selected && (
+              <RecordsTab
+                loading={recordsFetch.loading}
+                error={recordsFetch.error}
+                data={recordsFetch.data}
+                refetch={recordsFetch.refetch}
+                tournament={filters.tournament || null}
+                gender={filters.gender}
+                team_type={filters.team_type}
+              />
             )}
           </div>
         </ScopeContext.Provider>

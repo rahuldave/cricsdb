@@ -103,6 +103,8 @@ export const getTeamsLanding = (filters?: F) =>
   fetchApi<import('./types').TeamsLanding>(`/api/v1/teams/landing`, filters as Record<string, string>)
 export const getTeamSplits = (filters?: F & { team?: string }) =>
   fetchApi<import('./types').TeamSplits>(`/api/v1/teams/splits`, filters as Record<string, string>)
+export const getTeamRecords = (team: string, filters?: F & { limit?: number }) =>
+  fetchApi<import('./types').TournamentRecords>(`/api/v1/teams/${encodeURIComponent(team)}/records`, filters as Record<string, string>)
 
 // Batting
 export const getBattingLeaders = (filters?: F & { limit?: number; min_balls?: number; min_dismissals?: number }) =>
