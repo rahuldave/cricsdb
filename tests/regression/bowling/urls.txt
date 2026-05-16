@@ -68,3 +68,11 @@ REG bow_by_innings_bumrah_vs_aus_bilat                 /api/v1/bowlers/462411b3/
 # club-tier team_class — bowling leaders + dossier narrowing
 NEW bowling_leaders_club_pri             /api/v1/bowlers/leaders?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club&limit=10
 NEW bowling_leaders_club_sec             /api/v1/bowlers/leaders?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club&limit=10
+
+# ── /bowlers/{id}/records — player bowling records (d2026e5) ────
+# 2 lists: best_figures + most_economical (min 3 overs).
+# 462411b3 = JJ Bumrah, b0946605 = AS Joseph.
+NEW bowler_records_bumrah_all            /api/v1/bowlers/462411b3/records?limit=5
+NEW bowler_records_bumrah_ipl            /api/v1/bowlers/462411b3/records?tournament=Indian%20Premier%20League&limit=5
+NEW bowler_records_bumrah_intl           /api/v1/bowlers/462411b3/records?gender=male&team_type=international&limit=5
+NEW bowler_records_joseph                /api/v1/bowlers/b0946605/records?tournament=Indian%20Premier%20League&limit=5

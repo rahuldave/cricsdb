@@ -71,3 +71,14 @@ REG bat_by_innings_kohli_vs_aus_bilat                  /api/v1/batters/ba607b88/
 NEW batting_leaders_club_pri             /api/v1/batters/leaders?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club&limit=10
 NEW batting_leaders_club_sec             /api/v1/batters/leaders?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club&limit=10
 NEW batting_leaders_intl_pri_noop        /api/v1/batters/leaders?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=primary_club&limit=10
+
+# ── /batters/{id}/records — player batting records (d2026e5) ────
+# NEW until first stable cycle. Six lists per scope: highest/fastest
+# 50s/fastest 100s/most sixes/most fours/best SR. Anchors:
+#   ba607b88 = V Kohli, e66732f8 = RD Rickelton.
+NEW batter_records_kohli_all             /api/v1/batters/ba607b88/records?limit=5
+NEW batter_records_kohli_ipl             /api/v1/batters/ba607b88/records?tournament=Indian%20Premier%20League&limit=5
+NEW batter_records_kohli_intl            /api/v1/batters/ba607b88/records?gender=male&team_type=international&limit=5
+NEW batter_records_kohli_inn0            /api/v1/batters/ba607b88/records?inning=0&limit=5
+NEW batter_records_kohli_inn1            /api/v1/batters/ba607b88/records?inning=1&limit=5
+NEW batter_records_rickelton             /api/v1/batters/e66732f8/records?tournament=Indian%20Premier%20League&limit=5

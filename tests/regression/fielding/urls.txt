@@ -75,3 +75,11 @@ REG field_summary_kohli_vs_aus_bilat                   /api/v1/fielders/ba607b88
 # club-tier team_class — fielding leaders narrowing
 REG fielding_leaders_club_pri            /api/v1/fielders/leaders?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club&limit=10
 REG fielding_leaders_club_sec            /api/v1/fielders/leaders?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club&limit=10
+
+# ── /fielders/{id}/records — player fielding records (d2026e5) ──
+# 3 lists: most_catches / most_stumpings / most_dismissals in a match.
+# Catches incl C&B per Convention 3. 4a8a2e3b = MS Dhoni (keeper —
+# meaningful stumpings rows), ba607b88 = V Kohli (outfielder).
+NEW fielder_records_dhoni_all            /api/v1/fielders/4a8a2e3b/records?limit=5
+NEW fielder_records_dhoni_ipl            /api/v1/fielders/4a8a2e3b/records?tournament=Indian%20Premier%20League&limit=5
+NEW fielder_records_kohli_fld            /api/v1/fielders/ba607b88/records?limit=5
