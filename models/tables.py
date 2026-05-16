@@ -577,3 +577,19 @@ class MatchBowlerPerf:
     wickets: int
     runs: int  # runs conceded (sum runs_total over bowler's deliveries)
     balls: int  # legal balls bowled
+
+
+class MatchFielderPerf:
+    """Per-(fielder, match) fielding performance — feeds the per-player
+    fielding records lists. Catches INCLUDE caught_and_bowled per
+    Convention 3 (codebase invariant — see CLAUDE.md). Volume framing
+    (no is_substitute filter) — substitute appearances count.
+
+    dismissals is the denormalized catches + stumpings + run_outs sum
+    so ORDER BY dismissals DESC works without expression columns."""
+    fielder_id: ForeignKey[str, "person"]
+    match_id: ForeignKey[int, "match"]
+    catches: int  # incl caught_and_bowled
+    stumpings: int
+    run_outs: int
+    dismissals: int  # catches + stumpings + run_outs

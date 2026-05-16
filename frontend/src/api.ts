@@ -111,6 +111,8 @@ export const getBattingLeaders = (filters?: F & { limit?: number; min_balls?: nu
   fetchApi<import('./types').BattingLeaders>(`/api/v1/batters/leaders`, filters as Record<string, string>)
 export const getBatterSummary = (id: string, filters?: F) =>
   fetchApi<BattingSummary>(`/api/v1/batters/${id}/summary`, filters as Record<string, string>)
+export const getBatterRecords = (id: string, filters?: F & { limit?: number }) =>
+  fetchApi<import('./types').BatterRecords>(`/api/v1/batters/${id}/records`, filters as Record<string, string>)
 export const getBatterInnings = (id: string, filters?: F & { limit?: number; offset?: number; sort?: string }) =>
   fetchApi<{ innings: BattingInnings[]; total: number }>(`/api/v1/batters/${id}/by-innings`, filters as Record<string, string>)
 export const getBatterVsBowlers = (id: string, filters?: F & { bowler_id?: string; min_balls?: number }) =>
@@ -133,6 +135,8 @@ export const getBowlingLeaders = (filters?: F & { limit?: number; min_balls?: nu
   fetchApi<import('./types').BowlingLeaders>(`/api/v1/bowlers/leaders`, filters as Record<string, string>)
 export const getBowlerSummary = (id: string, filters?: F) =>
   fetchApi<BowlingSummary>(`/api/v1/bowlers/${id}/summary`, filters as Record<string, string>)
+export const getBowlerRecords = (id: string, filters?: F & { limit?: number }) =>
+  fetchApi<import('./types').BowlerRecords>(`/api/v1/bowlers/${id}/records`, filters as Record<string, string>)
 export const getBowlerInnings = (id: string, filters?: F & { limit?: number; offset?: number }) =>
   fetchApi<{ innings: BowlingInnings[]; total: number }>(`/api/v1/bowlers/${id}/by-innings`, filters as Record<string, string>)
 export const getBowlerVsBatters = (id: string, filters?: F & { batter_id?: string; min_balls?: number }) =>
@@ -154,6 +158,8 @@ export const getFieldingLeaders = (filters?: F & { limit?: number }) =>
   fetchApi<import('./types').FieldingLeaders>(`/api/v1/fielders/leaders`, filters as Record<string, string>)
 export const getFielderSummary = (id: string, filters?: F) =>
   fetchApi<import('./types').FieldingSummary>(`/api/v1/fielders/${id}/summary`, filters as Record<string, string>)
+export const getFielderRecords = (id: string, filters?: F & { limit?: number }) =>
+  fetchApi<import('./types').FielderRecords>(`/api/v1/fielders/${id}/records`, filters as Record<string, string>)
 export const getFielderBySeason = (id: string, filters?: F) =>
   fetchApi<{ by_season: import('./types').FieldingSeason[] }>(`/api/v1/fielders/${id}/by-season`, filters as Record<string, string>)
 export const getFielderByPhase = (id: string, filters?: F) =>

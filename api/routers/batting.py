@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import statistics
 from datetime import date, timedelta
 from fastapi import APIRouter, Query, Depends
@@ -1259,4 +1260,116 @@ async def batting_distribution(
         "lifetime": lifetime,
         "form": form,
         "suggested_splits": splits,
+    }
+
+
+def _row_to_batting_record(r: dict) -> dict:
+    """Project an inningsbatterperf row → API response shape.
+
+    figures: "141* (54)" or "141 (54)" depending on not_out.
+    strike_rate: balls > 0 enforced at SQL level via the gating queries.
+    """
+    runs = r["runs"]
+    balls = r["balls"]
+    not_out = bool(r["not_out"])
+    sr = round(runs * 100.0 / balls, 1) if balls else None
+    star = "*" if not_out else ""
+    return {
+        "runs": runs, "balls": balls,
+        "fours": r["fours"], "sixes": r["sixes"],
+        "not_out": not_out,
+        "figures": f"{runs}{star} ({balls})",
+        "strike_rate": sr,
+        "match_id": r["match_id"],
+        "opponent": r["opponent"],
+        "team": r["team"],
+        "date": r["date"],
+        "tournament": r["tournament"],
+        "season": r["season"],
+    }
+
+
+@router.get("/{person_id}/records")
+async def batting_records(
+    person_id: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    limit: int = Query(10, ge=1, le=20),
+):
+    """Per-player batting record lists — each capped at top-N.
+
+    Six lists: highest scores, fastest 50s, fastest 100s, most sixes
+    in an innings, most fours in an innings, best strike rates (min
+    20 balls gate). Honours FilterParams scope + aux.inning.
+
+    Reads from inningsbatterperf (precomputed). The batter's team in
+    each match comes from the matchplayer join; opponent is derived
+    from match.team1/team2 vs the player's team.
+
+    Spec: internal_docs/inning-controls-mount-sites.md §5 + the
+    spec-driven 2026-05-16 player-records request.
+    """
+    db = get_db()
+    where, params = filters.build(has_innings_join=True, aux=aux)
+    params["person_id"] = person_id
+    params["lim"] = limit
+
+    # Common SELECT + JOIN + WHERE fragment. The WHERE pins:
+    #   ib.batter_id = :person_id  — the subject player
+    #   i.super_over = 0           — exclude super overs
+    #   {where} (FilterParams)     — match-level scope + aux.inning
+    base_filt = f"ib.batter_id = :person_id AND i.super_over = 0"
+    if where:
+        base_filt = f"{base_filt} AND {where}"
+
+    select_clause = """
+        SELECT ib.runs, ib.balls, ib.fours, ib.sixes, ib.not_out,
+               m.id AS match_id,
+               mp.team AS team,
+               CASE WHEN m.team1 = mp.team THEN m.team2 ELSE m.team1 END AS opponent,
+               m.event_name AS tournament, m.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+        FROM inningsbatterperf ib
+        JOIN innings i ON i.id = ib.innings_id
+        JOIN match m ON m.id = i.match_id
+        JOIN matchplayer mp ON mp.match_id = m.id AND mp.person_id = ib.batter_id
+    """
+
+    hs_q = db.q(f"""{select_clause}
+        WHERE {base_filt}
+        ORDER BY ib.runs DESC, ib.balls ASC LIMIT :lim""", params)
+    f50_q = db.q(f"""{select_clause}
+        WHERE {base_filt} AND ib.runs >= 50
+        ORDER BY ib.balls ASC, ib.runs DESC LIMIT :lim""", params)
+    f100_q = db.q(f"""{select_clause}
+        WHERE {base_filt} AND ib.runs >= 100
+        ORDER BY ib.balls ASC, ib.runs DESC LIMIT :lim""", params)
+    ms_q = db.q(f"""{select_clause}
+        WHERE {base_filt} AND ib.sixes > 0
+        ORDER BY ib.sixes DESC, ib.runs DESC LIMIT :lim""", params)
+    mf_q = db.q(f"""{select_clause}
+        WHERE {base_filt} AND ib.fours > 0
+        ORDER BY ib.fours DESC, ib.runs DESC LIMIT :lim""", params)
+    # min 20 balls — filters out 1-ball-6-runs cameos. Order by SR
+    # computed as runs * 100.0 / balls (no precomp column for SR
+    # since the gate makes the index moot).
+    sr_q = db.q(f"""{select_clause}
+        WHERE {base_filt} AND ib.balls >= 20
+        ORDER BY (ib.runs * 100.0 / ib.balls) DESC, ib.runs DESC LIMIT :lim""", params)
+
+    name_q = db.q("SELECT name FROM person WHERE id = :person_id", {"person_id": person_id})
+
+    hs, f50, f100, ms, mf, sr, name_rows = await asyncio.gather(
+        hs_q, f50_q, f100_q, ms_q, mf_q, sr_q, name_q,
+    )
+
+    return {
+        "person_id": person_id,
+        "name": name_rows[0]["name"] if name_rows else person_id,
+        "highest_scores": [_row_to_batting_record(r) for r in hs],
+        "fastest_50s": [_row_to_batting_record(r) for r in f50],
+        "fastest_100s": [_row_to_batting_record(r) for r in f100],
+        "most_sixes_innings": [_row_to_batting_record(r) for r in ms],
+        "most_fours_innings": [_row_to_batting_record(r) for r in mf],
+        "best_strike_rates": [_row_to_batting_record(r) for r in sr],
     }

@@ -2471,6 +2471,78 @@ export interface TournamentRecordMatchSixes {
   season: string | null
 }
 
+// Per-player records — /api/v1/{batters,bowlers,fielders}/{id}/records
+
+export interface PlayerBattingRecord {
+  runs: number
+  balls: number
+  fours: number
+  sixes: number
+  not_out: boolean
+  figures: string  // "141 (54)" or "141* (54)"
+  strike_rate: number | null
+  match_id: number
+  opponent: string
+  team: string
+  date: string | null
+  tournament: string | null
+  season: string | null
+}
+
+export interface BatterRecords {
+  person_id: string
+  name: string
+  highest_scores: PlayerBattingRecord[]
+  fastest_50s: PlayerBattingRecord[]
+  fastest_100s: PlayerBattingRecord[]
+  most_sixes_innings: PlayerBattingRecord[]
+  most_fours_innings: PlayerBattingRecord[]
+  best_strike_rates: PlayerBattingRecord[]
+}
+
+export interface PlayerBowlingRecord {
+  wickets: number
+  runs: number
+  balls: number
+  overs: string
+  economy: number | null
+  figures: string  // "5/35"
+  match_id: number
+  opponent: string
+  team: string
+  date: string | null
+  tournament: string | null
+  season: string | null
+}
+
+export interface BowlerRecords {
+  person_id: string
+  name: string
+  best_figures: PlayerBowlingRecord[]
+  most_economical: PlayerBowlingRecord[]
+}
+
+export interface PlayerFieldingRecord {
+  catches: number
+  stumpings: number
+  run_outs: number
+  dismissals: number
+  match_id: number
+  opponent: string
+  team: string
+  date: string | null
+  tournament: string | null
+  season: string | null
+}
+
+export interface FielderRecords {
+  person_id: string
+  name: string
+  most_catches_match: PlayerFieldingRecord[]
+  most_stumpings_match: PlayerFieldingRecord[]
+  most_dismissals_match: PlayerFieldingRecord[]
+}
+
 export interface TournamentRecords {
   canonical: string
   highest_team_totals: TournamentRecordTeamTotal[]

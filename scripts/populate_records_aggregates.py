@@ -40,8 +40,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from deebase import Database
 from models import (
-    Person, Match, Innings, Delivery, Wicket,
-    InningsTotal, InningsBatterPerf, MatchBowlerPerf,
+    Person, Match, Innings, Delivery, Wicket, FieldingCredit,
+    InningsTotal, InningsBatterPerf, MatchBowlerPerf, MatchFielderPerf,
 )
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -58,6 +58,7 @@ async def _ensure_tables(db, incremental: bool = False):
     await db.create(Innings, pk="id", if_not_exists=True)
     await db.create(Delivery, pk="id", if_not_exists=True)
     await db.create(Wicket, pk="id", if_not_exists=True)
+    await db.create(FieldingCredit, pk="id", if_not_exists=True)
 
     # InningsTotal: PK on innings_id. Sort indexes for the records SQL:
     #   total_runs DESC (highest), total_runs ASC + wkts>=10 (lowest
@@ -89,6 +90,18 @@ async def _ensure_tables(db, incremental: bool = False):
     await db.create(
         MatchBowlerPerf, pk=["bowler_id", "match_id"],
         if_not_exists=True, **mb_idx,
+    )
+
+    # MatchFielderPerf: composite PK (fielder_id, match_id). Secondary
+    # index on match_id alone for join-from-match scope filters. Plus
+    # standalone indexes on the three count columns + dismissals
+    # (denormalized sum) for the per-record-list ORDER BY clauses.
+    mf_idx = {} if incremental else {
+        "indexes": ["match_id", "catches", "stumpings", "dismissals"],
+    }
+    await db.create(
+        MatchFielderPerf, pk=["fielder_id", "match_id"],
+        if_not_exists=True, **mf_idx,
     )
 
 
@@ -238,19 +251,64 @@ async def _populate_match_bowler_perf(db, scope_clause: str = ""):
         return result.rowcount
 
 
+async def _populate_match_fielder_perf(db, scope_clause: str = ""):
+    """Per-(fielder, match) fielding tallies — feeds /fielders/{id}/records.
+
+    Source: fielding_credit table (already populated by
+    populate_fielding_credits). Catches INCLUDE caught_and_bowled per
+    Convention 3. Volume framing — no is_substitute filter.
+    """
+    if scope_clause:
+        # scope_clause is `i.match_id IN (...)` — translate to match ids.
+        m_ids = await db.q(
+            f"SELECT DISTINCT i.match_id FROM innings i WHERE {scope_clause.replace('i.', '')}"
+        )
+        ids = [r["match_id"] for r in m_ids]
+        if not ids:
+            return 0
+        id_list = ",".join(str(i) for i in ids)
+        scope_m = f"AND m.id IN ({id_list})"
+    else:
+        scope_m = ""
+
+    # fc.delivery_id → delivery → innings → match. fc has no direct
+    # match_id; thread through delivery.
+    sql = f"""
+        INSERT INTO matchfielderperf
+            (fielder_id, match_id, catches, stumpings, run_outs, dismissals)
+        SELECT
+            fc.fielder_id,
+            m.id AS match_id,
+            SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled') THEN 1 ELSE 0 END) AS catches,
+            SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+            SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+            COUNT(*) AS dismissals
+        FROM fieldingcredit fc
+        JOIN delivery d ON d.id = fc.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE fc.fielder_id IS NOT NULL
+          {scope_m}
+        GROUP BY fc.fielder_id, m.id
+    """
+    async with db._engine.begin() as conn:
+        from sqlalchemy import text
+        result = await conn.execute(text(sql))
+        return result.rowcount
+
+
 async def populate_full(db):
     """Truncate and rebuild all three records aggregate tables."""
     print("Populating records aggregates (full rebuild)…")
     start = time.time()
 
-    # Drop existing rows BEFORE _ensure_tables — drop is on the
-    # underlying SQLite tables which exist iff a prior populate ran.
-    for tbl in ("inningstotal", "inningsbatterperf", "matchbowlerperf"):
-        rows = await db.q(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{tbl}'"
-        )
-        if rows:
-            await db.q(f"DELETE FROM {tbl}")
+    # DROP TABLE before re-create — DELETE FROM would leave the old
+    # indexes, then _ensure_tables (incremental=False) would try to
+    # CREATE INDEX on them again and fail. DROP TABLE wipes both rows
+    # and indexes; the indexes get recreated cleanly below.
+    for tbl in ("inningstotal", "inningsbatterperf", "matchbowlerperf",
+                "matchfielderperf"):
+        await db.q(f"DROP TABLE IF EXISTS {tbl}")
 
     await _ensure_tables(db, incremental=False)
 
@@ -265,6 +323,10 @@ async def populate_full(db):
     t0 = time.time()
     n = await _populate_match_bowler_perf(db)
     print(f"  match_bowler_perf: {n} rows in {time.time()-t0:.1f}s")
+
+    t0 = time.time()
+    n = await _populate_match_fielder_perf(db)
+    print(f"  match_fielder_perf: {n} rows in {time.time()-t0:.1f}s")
 
     elapsed = time.time() - start
     print(f"Done in {elapsed:.1f}s")
@@ -295,13 +357,15 @@ async def populate_incremental(db, new_match_ids: list[int]):
         await db.q(f"DELETE FROM inningstotal WHERE innings_id IN ({inn_list})")
         await db.q(f"DELETE FROM inningsbatterperf WHERE innings_id IN ({inn_list})")
 
-    # match_bowler_perf is per-match grain.
+    # match_bowler_perf + match_fielder_perf are per-match grain.
     await db.q(f"DELETE FROM matchbowlerperf WHERE match_id IN ({match_id_list})")
+    await db.q(f"DELETE FROM matchfielderperf WHERE match_id IN ({match_id_list})")
 
     scope = f"i.match_id IN ({match_id_list})"
     await _populate_innings_total(db, scope)
     await _populate_innings_batter_perf(db, scope)
     await _populate_match_bowler_perf(db, scope)
+    await _populate_match_fielder_perf(db, scope)
 
 
 async def main():

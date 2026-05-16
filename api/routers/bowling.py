@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import statistics
 from datetime import date, timedelta
 from fastapi import APIRouter, Query, Depends
@@ -1356,4 +1357,91 @@ async def bowling_distribution(
         "lifetime": lifetime,
         "form": form,
         "suggested_splits": splits,
+    }
+
+
+def _format_overs(balls: int) -> str:
+    """4 = '0.4', 24 = '4.0', 25 = '4.1'."""
+    return f"{balls // 6}.{balls % 6}"
+
+
+def _row_to_bowling_record(r: dict) -> dict:
+    wickets = r["wickets"]
+    runs = r["runs"]
+    balls = r["balls"]
+    econ = round(runs * 6.0 / balls, 2) if balls else None
+    return {
+        "wickets": wickets, "runs": runs, "balls": balls,
+        "overs": _format_overs(balls),
+        "economy": econ,
+        "figures": f"{wickets}/{runs}",
+        "match_id": r["match_id"],
+        "opponent": r["opponent"],
+        "team": r["team"],
+        "date": r["date"],
+        "tournament": r["tournament"],
+        "season": r["season"],
+    }
+
+
+@router.get("/{person_id}/records")
+async def bowling_records(
+    person_id: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    limit: int = Query(10, ge=1, le=20),
+):
+    """Per-player bowling record lists — best figures + most economical.
+
+    Two lists for now (bowling has narrower record categories than
+    batting):
+      - best_figures: ORDER BY wickets DESC, runs ASC.
+      - most_economical: min 18 balls (3 overs) gate, ORDER BY
+        economy ASC. Cameo 6-ball spells with 0 runs are filtered out.
+
+    Honours FilterParams scope. Inning aux narrowing is NOT applied
+    here — matchbowlerperf is per-match grain and collapses the
+    inning the bowler bowled in (per the bb_q comment in /series/
+    records). If inning aux is required, a per-(bowler, innings)
+    table is the right primitive.
+
+    Reads from matchbowlerperf (precomputed).
+    """
+    db = get_db()
+    where, params = filters.build(has_innings_join=False, aux=aux)
+    params["person_id"] = person_id
+    params["lim"] = limit
+
+    base_filt = "mb.bowler_id = :person_id"
+    if where:
+        base_filt = f"{base_filt} AND {where}"
+
+    select_clause = """
+        SELECT mb.wickets, mb.runs, mb.balls,
+               m.id AS match_id,
+               mp.team AS team,
+               CASE WHEN m.team1 = mp.team THEN m.team2 ELSE m.team1 END AS opponent,
+               m.event_name AS tournament, m.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+        FROM matchbowlerperf mb
+        JOIN match m ON m.id = mb.match_id
+        JOIN matchplayer mp ON mp.match_id = m.id AND mp.person_id = mb.bowler_id
+    """
+
+    bf_q = db.q(f"""{select_clause}
+        WHERE {base_filt} AND mb.wickets >= 2
+        ORDER BY mb.wickets DESC, mb.runs ASC LIMIT :lim""", params)
+    econ_q = db.q(f"""{select_clause}
+        WHERE {base_filt} AND mb.balls >= 18
+        ORDER BY (mb.runs * 6.0 / mb.balls) ASC, mb.wickets DESC LIMIT :lim""", params)
+
+    name_q = db.q("SELECT name FROM person WHERE id = :person_id", {"person_id": person_id})
+
+    bf, econ, name_rows = await asyncio.gather(bf_q, econ_q, name_q)
+
+    return {
+        "person_id": person_id,
+        "name": name_rows[0]["name"] if name_rows else person_id,
+        "best_figures": [_row_to_bowling_record(r) for r in bf],
+        "most_economical": [_row_to_bowling_record(r) for r in econ],
     }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import statistics
 from datetime import date, timedelta
 from fastapi import APIRouter, Query, Depends
@@ -935,4 +936,86 @@ async def fielding_distribution(
         "lifetime": lifetime,
         "form": form,
         "suggested_splits": splits,
+    }
+
+
+def _row_to_fielding_record(r: dict) -> dict:
+    return {
+        "catches": r["catches"], "stumpings": r["stumpings"],
+        "run_outs": r["run_outs"], "dismissals": r["dismissals"],
+        "match_id": r["match_id"],
+        "opponent": r["opponent"],
+        "team": r["team"],
+        "date": r["date"],
+        "tournament": r["tournament"],
+        "season": r["season"],
+    }
+
+
+@router.get("/{person_id}/records")
+async def fielding_records(
+    person_id: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    limit: int = Query(10, ge=1, le=20),
+):
+    """Per-player fielding record lists — three lists by dismissal type.
+
+    Lists:
+      - most_catches_match (catches DESC, then dismissals DESC tiebreak)
+      - most_stumpings_match (stumpings DESC; populated only for
+        keepers — typically empty / single-row for outfielders)
+      - most_dismissals_match (catches + stumpings + run_outs DESC)
+
+    Catches INCLUDE caught_and_bowled (Convention 3 invariant). Volume
+    framing — substitute appearances counted (matches the /leaders
+    semantic for catches, NOT the /distribution master-sample
+    semantic).
+
+    Reads from matchfielderperf (precomputed). Inning aux is not
+    applied — fielding dismissals are tracked per-match in the
+    precomp table (a fielder can field across both innings but the
+    grain is per-match for record framing).
+    """
+    db = get_db()
+    where, params = filters.build(has_innings_join=False, aux=aux)
+    params["person_id"] = person_id
+    params["lim"] = limit
+
+    base_filt = "mf.fielder_id = :person_id"
+    if where:
+        base_filt = f"{base_filt} AND {where}"
+
+    select_clause = """
+        SELECT mf.catches, mf.stumpings, mf.run_outs, mf.dismissals,
+               m.id AS match_id,
+               mp.team AS team,
+               CASE WHEN m.team1 = mp.team THEN m.team2 ELSE m.team1 END AS opponent,
+               m.event_name AS tournament, m.season AS season,
+               (SELECT MIN(date) FROM matchdate WHERE match_id = m.id) AS date
+        FROM matchfielderperf mf
+        JOIN match m ON m.id = mf.match_id
+        JOIN matchplayer mp ON mp.match_id = m.id AND mp.person_id = mf.fielder_id
+    """
+
+    mc_q = db.q(f"""{select_clause}
+        WHERE {base_filt} AND mf.catches > 0
+        ORDER BY mf.catches DESC, mf.dismissals DESC LIMIT :lim""", params)
+    ms_q = db.q(f"""{select_clause}
+        WHERE {base_filt} AND mf.stumpings > 0
+        ORDER BY mf.stumpings DESC, mf.dismissals DESC LIMIT :lim""", params)
+    md_q = db.q(f"""{select_clause}
+        WHERE {base_filt} AND mf.dismissals > 0
+        ORDER BY mf.dismissals DESC LIMIT :lim""", params)
+
+    name_q = db.q("SELECT name FROM person WHERE id = :person_id", {"person_id": person_id})
+
+    mc, ms, md, name_rows = await asyncio.gather(mc_q, ms_q, md_q, name_q)
+
+    return {
+        "person_id": person_id,
+        "name": name_rows[0]["name"] if name_rows else person_id,
+        "most_catches_match": [_row_to_fielding_record(r) for r in mc],
+        "most_stumpings_match": [_row_to_fielding_record(r) for r in ms],
+        "most_dismissals_match": [_row_to_fielding_record(r) for r in md],
     }
