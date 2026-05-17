@@ -2,21 +2,95 @@
 
 > T20 cricket analytics platform with 12,940 matches (international + 18 club leagues), 2.95M ball-by-ball deliveries, and 160K wickets. Source data from cricsheet.org. The site is fully driven by a public read-only REST API — an LLM can answer questions about any team, player, series, or match without touching the UI.
 
-The site at https://t20.rahuldave.com is a React SPA over a FastAPI backend. Every page's state (filters, selected entity, tab) lives in URL search params, and every UI view is backed by a documented JSON endpoint under `/api/v1/`. Prefer calling the API directly over scraping HTML.
+The site at <https://t20.rahuldave.com> is a React SPA over a FastAPI backend. Every page's state (filters, selected entity, tab) lives in URL search params, and every UI view is backed by a documented JSON endpoint under `/api/v1/`. **Prefer calling the API directly over scraping HTML** — the JSON is canonical, the rendered DOM is a downstream view.
 
-## API
+This file is the discovery index. Below: a glossary so a downstream model can ground answers in CricsDB-specific vocabulary, then links to every authoritative reference an agent might need.
 
-- [API reference (narrative)](https://raw.githubusercontent.com/rahuldave/cricsdb/main/docs/api.md): Plain-markdown walkthrough of every endpoint — path, query params, example `curl`, abbreviated JSON response. This is the best single document for an LLM to ground answers in.
-- [Interactive API docs (Swagger UI)](https://t20.rahuldave.com/api/docs): Live, tryable FastAPI-generated docs. Use this to confirm request/response shapes against the running server.
-- [ReDoc](https://t20.rahuldave.com/api/redoc): Alternate rendering of the same schema.
-- [OpenAPI schema (JSON)](https://t20.rahuldave.com/api/openapi.json): Machine-readable schema — parse this for programmatic tool-use.
+## How CricsDB models cricket
 
-## User manual
+A short shared vocabulary. Detailed semantics live in the linked docs.
 
-- [User manual (raw markdown)](https://raw.githubusercontent.com/rahuldave/cricsdb/main/frontend/src/content/user-help.md): How the site is organised — filter bar, landing defaults, tab-by-tab guide, URL conventions. Written for humans but equally useful for an agent that wants to map a natural-language question onto the right endpoint + filters.
-- [User manual (rendered)](https://t20.rahuldave.com/help/usage): Same content with screenshots.
-- [About / context](https://t20.rahuldave.com/help): Project background and design notes.
+### Cricket fundamentals (T20 framing)
+
+- **T20** — Twenty20 cricket. Each side bats one **innings** of up to 20 **overs** = 120 legal **balls**, plus a chase that ends early if the target is reached. A "match" in this dataset is always T20 unless otherwise noted (super-overs are recorded but excluded from leaderboards by default).
+- **Innings** — one side's batting turn. A T20 match has two regular innings (`innings_number = 0` and `1`); super-overs add more but are filtered out everywhere by default. **In CricsDB's URL convention `?inning=0` is always the match's first innings (the side that batted first), regardless of which page POV you're reading from.**
+- **Over** — a sequence of 6 legal balls. Wides and no-balls don't count toward the 6, so an over can be longer than 6 deliveries.
+- **Phase** — overs grouped for analysis: **Powerplay** = overs 1–6 (fielding restrictions, attacking batting), **Middle** = overs 7–15 (consolidation), **Death** = overs 16–20 (acceleration).
+- **DLS-shortened innings** — a chase truncated by rain under the Duckworth-Lewis-Stern rule. ~5.9% of 2nd innings in this DB are DLS-shortened. **They are included in every endpoint** — overs-denominator stats use the actual legal-ball count, per-innings denominators count them as 1 innings each.
+
+### Batting metrics
+
+- **Runs** — runs scored by the batter (no extras).
+- **Balls faced** — legal deliveries; wides excluded, no-balls included.
+- **Average (avg)** = runs / dismissals. Higher is better. Not-outs are excluded from the dismissals denominator, so a batter with many not-outs has an inflated avg by design.
+- **Strike rate (SR)** = (runs / balls) × 100. Runs per 100 balls. Higher is better for batters.
+- **Dot ball** — a legal ball with zero runs scored. Dot % is a defensive-pressure metric.
+- **Boundary** — a four (4 runs) or six (6 runs).
+- **Partnership** — runs scored while two specific batters are at the crease together. Tracked per-wicket (1st-wicket partnership, 2nd-wicket, …, 10th-wicket).
+- **Run rate (RR)** — runs per over for a team's innings. `runs * 6 / legal_balls`.
+
+### Bowling metrics
+
+- **Wickets** — dismissals credited to a bowler (`bowled`, `caught`, `caught_and_bowled`, `lbw`, `stumped`, `hit_wicket`).
+- **Economy** — runs conceded per over. `runs * 6 / legal_balls_bowled`. Lower is better.
+- **Bowling strike rate (SR)** — balls per wicket. `legal_balls / wickets`. Lower is better. NOT the same as batting SR.
+- **Bowling figures** — conventionally written `W/R` (wickets/runs), e.g. `5/21` = 5 wickets for 21 runs.
+
+### Fielding metrics
+
+- **Catch** — credit to the fielder who caught a batter (kind `caught`). **CricsDB convention 3:** the `catches` headline on every `/summary` and `/leaders` endpoint includes both `caught` AND `caught_and_bowled`. The `/distribution` endpoint is the one exception (it splits sample by `matchplayer`, so substitute appearances are excluded and `caught_and_bowled` is a separate bowler-credited block).
+- **Stumping** — out by the wicketkeeper. Only the designated keeper can stump.
+- **Run-out** — a fielding-side dismissal that doesn't require a catch (the ball hits the stumps with the batter out of their ground).
+- **Substitute fielder** — fielding while not in the named XI. Substitutes can take catches and run-outs but cannot bowl, bat, or stump. **CricsDB convention:** substitute catches are INCLUDED in `/leaders` (volume framing — they took the catch, full stop) but EXCLUDED from `/distribution` (per-match-rate framing — sample denominator is XI matchplayers, so subs would miscalibrate the rate).
+
+### Outcome / match-level
+
+- **Result** — `won` / `lost` / `tied`. From a path team's POV. `tied` collapses true ties (super-over loss) AND no-results (rain-abandoned with no DLS verdict) — T20 ties go to super-over and the winner becomes `outcome_winner`, so `outcome_winner IS NULL` is almost always rain.
+- **Toss outcome** — `won` / `lost`. The toss is the pre-match coin flip; the toss winner picks bat-first or field-first.
+- **Bat first / field first** — what the team did when it had the choice (or didn't). `inning=0` for batting first; `inning=1` for batting second / chasing.
+
+### CricsDB-specific vocabulary
+
+- **Tournament** — a named competition (`match.event_name`): IPL, BBL, T20 World Cup (Men), Vitality Blast, etc. CricsDB canonicalises three cricsheet variants ("ICC World Twenty20" / "World T20" / "ICC Men's T20 World Cup") into one canonical name: "T20 World Cup (Men)". The FilterBar dropdown is canonicalised; the API expands it back to the IN-list at query time.
+- **Series** — overlaps with tournament in cricket usage. The `/series` tab covers both *tournament editions* (IPL 2024) AND *bilateral rivalries* (India vs Australia T20Is). The same dossier shape applies to both.
+- **Bilateral series** — international non-ICC tour matches (England's T20I tour of South Africa, etc.). Sliced via `series_type=bilateral`.
+- **ICC event** — an ICC-organised international tournament (T20 World Cup, Asia Cup). Sliced via `series_type=icc`.
+- **Team type** — `international` (national teams playing T20Is) or `club` (every franchise + domestic league).
+- **Team class (`team_class`)** — tier within team_type. `full_member` (intl): match between two ICC full members. `primary_club` (club): match in a marquee international franchise league (IPL/BBL/PSL/CPL/SA20/ILT20/LPL/MLC/Hundred/WBBL/WPL/WCSL). `secondary_club` (club): match in a domestic state/county league (Vitality Blast, Syed Mushtaq Ali, etc.). Cross-type combinations (intl + `primary_club`) are silent no-ops.
+- **Scope** — the set of matches the current FilterBar narrows to. Every API response is "in scope". The dossier-shaped pages (Series, Teams, Venues, H2H) bind extra path-level scope (`?team=X`, `?tournament=Y`) on top of the FilterBar.
+- **FilterBar** — sticky filter controls at the top of every page. Their state is in URL params and survives navigation: gender, team_type, tournament, season_from, season_to, filter_venue. Server-side enforced via the `FilterBarParams` Pydantic dependency.
+- **Aux filters (`AuxParams`)** — page-local narrowings, not sticky: `inning`, `result`, `toss_outcome`, `series_type`, `team_class`, `scope_to_team`, `filter_team`, `filter_opponent`. State is in URL params (share-link reproducibility) but doesn't follow you to other pages.
+- **POV (point of view)** — fielding pages narrate from the fielding side; batting pages from the batting side. `inning=0` URL is constant, but the rendered pill label adapts: "Batting first" on batting pages, "Bowling first" on bowling/fielding pages, neutral "1st innings" on multi-discipline pages.
+- **Venue canonicalisation** — `match.venue` and `match.city` are normalised at insert. "Wankhede" becomes "Wankhede Stadium, Mumbai"; "County Ground" disambiguates to "County Ground (Taunton)" vs "County Ground (Bristol)". The `/api/v1/venues?q=…` typeahead returns the canonical form — always pass that exact string to `filter_venue=`.
+
+### Identifier conventions
+
+- **`person_id`** — 8-character hex string (`ba607b88` = V Kohli, `462411b3` = JJ Bumrah, `4a8a2e3b` = MS Dhoni). Use `/api/v1/players?q=<name>` to resolve a name to an id.
+- **`match.id`** — integer.
+- **Team name** — canonical string, URL-encoded in paths. `Mumbai%20Indians`, `Royal%20Challengers%20Bengaluru`. The same string can mean men's AND women's sides ("India", "Royal Challengers Bengaluru") — combine with `gender=` to disambiguate.
+- **Season** — cricsheet's mix of calendar years (`"2024"`) and split-year labels (`"2024/25"`). Lex sort matches chronology.
+
+## API references
+
+- [**API reference (narrative)**](https://raw.githubusercontent.com/rahuldave/cricsdb/main/docs/api.md) — plain-markdown walkthrough of every endpoint with path, query params, example `curl`, and abbreviated JSON response. This is the best single document for an LLM to ground answers in.
+- [**Interactive API docs (Swagger UI)**](https://t20.rahuldave.com/api/docs) — live, tryable FastAPI-generated docs. Use this to confirm request/response shapes against the running server.
+- [**ReDoc**](https://t20.rahuldave.com/api/redoc) — alternate rendering of the same schema.
+- [**OpenAPI schema (JSON)**](https://t20.rahuldave.com/api/openapi.json) — machine-readable schema. Parse this for programmatic tool-use.
+
+## Tab structure and filtering scheme
+
+- [**Tab structure + filtering scheme**](https://raw.githubusercontent.com/rahuldave/cricsdb/main/docs/tab-structure.md) — for each route, the subtabs, the URL params that drive them, the endpoint(s) that back them, and how FilterBar + Aux params compose. Pair this with the API reference when mapping a natural-language question onto endpoints + filters.
+- [**User manual (raw markdown)**](https://raw.githubusercontent.com/rahuldave/cricsdb/main/frontend/src/content/user-help.md) — conversational human-facing tour: filter bar, landing defaults, tab-by-tab guide, URL conventions.
+- [**User manual (rendered)**](https://t20.rahuldave.com/help/usage) — same content with screenshots.
+- [**About / context**](https://t20.rahuldave.com/help) — project background and design notes.
 
 ## Source
 
-- [GitHub repository](https://github.com/rahuldave/cricsdb): Full source — FastAPI backend, React frontend, data pipeline, SQL schema.
+- [**GitHub repository**](https://github.com/rahuldave/cricsdb) — full source: FastAPI backend, React frontend, data pipeline, SQL schema.
+
+## What's NOT in the data
+
+- **Afghanistan cricket** (men's + women's) — cricsheet doesn't publish their matches. Every other ICC full member is present.
+- **Commentary** — no natural-language ball-by-ball text. The innings grid and worm chart on the match page visualise the same information.
+- **Player bios, videos, photos** — out of scope. Use cricinfo and national-board sources for those.
+- **Super-over deliveries** — stored but excluded from leaderboards by default (1–6 ball samples would muddy averages).

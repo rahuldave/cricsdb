@@ -1216,6 +1216,54 @@ curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/fielding/distribution?
 }
 ```
 
+## `GET /api/v1/teams/{team}/records`
+
+Team-scoped record lists — same response shape as `/series/records`
+so the frontend `RecordsTab` component renders both. Subject-team
+semantics throughout: every list reads "team X's …" rather than
+"any team's … in matches involving X":
+
+| List | Predicate |
+|---|---|
+| `highest_team_totals` | team X's batting innings |
+| `lowest_all_out_totals` | team X's all-out batting innings (≥10 wickets) |
+| `biggest_wins_by_runs` | team X is `outcome_winner`, by runs |
+| `biggest_wins_by_wickets` | team X is `outcome_winner`, by wickets |
+| `largest_partnerships` | partnership where the batting side is team X |
+| `best_individual_batting` | a team X batter in a team X innings |
+| `best_bowling_figures` | a team X bowler (≥2 wickets gate) |
+| `most_sixes_in_a_match` | sixes hit BY team X in a single match — NOT match-grain total across both sides (the `/series/records` semantic) |
+
+Each list capped at `limit` (default 5, max 20). Reads from the
+precomp tables `inningstotal`, `inningsbatterperf`, `matchbowlerperf`
+populated by `scripts/populate_*.py`. Honours all FilterBar
+narrowings + `aux.inning` (applied at match level for win lists,
+at innings level for batting/partnership lists). The 8 reads run
+in parallel via `asyncio.gather`.
+
+```bash
+curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/records?tournament=Indian%20Premier%20League&limit=2"
+```
+
+```json
+{
+  "team": "Mumbai Indians",
+  "canonical": "Indian Premier League",
+  "highest_team_totals":   [ "…" ],
+  "lowest_all_out_totals": [ "…" ],
+  "biggest_wins_by_runs":  [ "…" ],
+  "biggest_wins_by_wickets": [ "…" ],
+  "largest_partnerships":  [ "…" ],
+  "best_individual_batting": [ "…" ],
+  "best_bowling_figures":  [ "…" ],
+  "most_sixes_in_a_match": [ "…" ]
+}
+```
+
+Every row carries `tournament` + `season` so the Records subtab
+can render an Edition column + per-row `(ed)` link to that
+specific edition (independent of the FilterBar's season window).
+
 ## Compare metric envelope
 
 The 5 team-compare summary endpoints —
@@ -1449,6 +1497,50 @@ Partnership-segment analysis: runs + rate in each "between-wickets"
 span of an innings. `{ inter_wicket: [ { after_wicket, avg_runs,
 avg_balls, run_rate, n } ] }`.
 
+## `GET /api/v1/batters/{id}/records`
+
+Per-player batting record lists — six top-N lists capped at `limit`
+(default 10, max 20):
+
+- `highest_scores` — by runs DESC, balls ASC tiebreak.
+- `fastest_50s` — innings reaching 50, by balls ASC.
+- `fastest_100s` — innings reaching 100, by balls ASC.
+- `most_sixes_innings` — by sixes DESC.
+- `most_fours_innings` — by fours DESC.
+- `best_strike_rates` — min 20 balls gate, by SR DESC. The 20-ball
+  floor filters out 1-ball-6-runs cameos.
+
+Reads from `inningsbatterperf` (precomputed per-(batter,innings)
+aggregate populated by `scripts/populate_inningsbatterperf.py`).
+Honours all FilterBar narrowings + `aux.inning`.
+
+```bash
+curl "http://localhost:8000/api/v1/batters/ba607b88/records?tournament=Indian%20Premier%20League&limit=3"
+```
+
+```json
+{
+  "person_id": "ba607b88",
+  "name": "V Kohli",
+  "highest_scores": [
+    { "runs": 113, "balls": 48, "fours": 12, "sixes": 8, "not_out": false,
+      "figures": "113 (48)", "strike_rate": 235.4,
+      "match_id": 6592, "team": "Royal Challengers Bengaluru",
+      "opponent": "Punjab Kings", "tournament": "Indian Premier League",
+      "season": "2016", "date": "2016-05-18" }
+  ],
+  "fastest_50s":   [ "…" ],
+  "fastest_100s":  [ "…" ],
+  "most_sixes_innings":  [ "…" ],
+  "most_fours_innings":  [ "…" ],
+  "best_strike_rates":   [ "…" ]
+}
+```
+
+Every row carries `tournament` + `season` so the frontend Records
+subtab can render an Edition column + per-row `(ed)` link to that
+specific tournament+season.
+
 ## `GET /api/v1/batters/{id}/distribution`
 
 Per-innings runs distribution dossier: lifetime + form-window
@@ -1680,6 +1772,40 @@ curl "http://localhost:8000/api/v1/bowlers/462411b3/distribution?tournament=Indi
 }
 ```
 
+## `GET /api/v1/bowlers/{id}/records`
+
+Per-player bowling record lists — two top-N lists capped at `limit`
+(default 10, max 20):
+
+- `best_figures` — wickets DESC, runs ASC tiebreak; min 2 wickets gate.
+- `most_economical` — economy ASC; min 18 balls (3 overs) gate.
+
+Reads from `matchbowlerperf` (precomputed per-(bowler, match)
+aggregate populated by `scripts/populate_matchbowlerperf.py`).
+`aux.inning` is NOT applied — `matchbowlerperf` collapses across
+both innings the bowler bowled in, so an inning-specific record
+list would require a per-(bowler, innings) primitive that doesn't
+yet exist.
+
+```bash
+curl "http://localhost:8000/api/v1/bowlers/462411b3/records?tournament=Indian%20Premier%20League&limit=3"
+```
+
+```json
+{
+  "person_id": "462411b3",
+  "name": "JJ Bumrah",
+  "best_figures": [
+    { "wickets": 5, "runs": 10, "balls": 24,
+      "overs": "4.0", "economy": 2.5, "figures": "5/10",
+      "match_id": 5782, "team": "Mumbai Indians",
+      "opponent": "Kolkata Knight Riders", "tournament": "Indian Premier League",
+      "season": "2022", "date": "2022-05-09" }
+  ],
+  "most_economical": [ "…" ]
+}
+```
+
 ## Other endpoints (same shape pattern)
 
 - `GET /by-innings` — innings list with bowling figures. Params:
@@ -1787,6 +1913,51 @@ block. The frontend Distribution panel renders three discrete bars
 in the INDIGO/SAGE/OCHRE palette to match.
 
 Spec: `internal_docs/spec-distribution-stats.md` §13.
+
+## `GET /api/v1/fielders/{id}/records`
+
+Per-player fielding record lists — three top-N lists capped at
+`limit` (default 10, max 20):
+
+- `most_catches_match` — catches DESC; dismissals DESC tiebreak.
+- `most_stumpings_match` — stumpings DESC. Populated only when the
+  player has appeared as the designated keeper; typically empty for
+  outfielders.
+- `most_dismissals_match` — catches + stumpings + run_outs DESC.
+
+Reads from `matchfielderperf` (precomputed per-(fielder, match)
+aggregate populated by `scripts/populate_matchfielderperf.py`).
+
+**Catches use the volume framing**: `kind IN ('caught',
+'caught_and_bowled')` AND no `is_substitute` filter. This matches
+the `/leaders` and `/summary` semantics (Convention 3) rather than
+the `/distribution` semantic that excludes substitute appearances.
+A substitute who took a catch took a catch — the record list
+reflects that.
+
+`aux.inning` is not applied — the precomp grain is per-match (a
+fielder can field across both innings), so the inning toggle is a
+no-op on this endpoint.
+
+```bash
+curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/records?limit=3"
+```
+
+```json
+{
+  "person_id": "4a8a2e3b",
+  "name": "MS Dhoni",
+  "most_catches_match": [
+    { "catches": 4, "stumpings": 0, "run_outs": 0, "dismissals": 4,
+      "match_id": 5616, "team": "Chennai Super Kings",
+      "opponent": "Kolkata Knight Riders",
+      "tournament": "Indian Premier League",
+      "season": "2020/21", "date": "2020-10-07" }
+  ],
+  "most_stumpings_match":  [ "…" ],
+  "most_dismissals_match": [ "…" ]
+}
+```
 
 ## Other endpoints
 
