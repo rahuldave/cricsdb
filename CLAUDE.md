@@ -370,6 +370,7 @@ The two endpoints apply different `is_substitute` predicates **intentionally**:
 - `/fielders/{id}/distribution` per-match `catches` — `is_substitute = 0` filter. The master sample is `matchplayer`-based (matches the player was in the squad); substitute appearances aren't in that sample, so counting substitute catches against the matchplayer denominator would miscalibrate per-match averages.
 - `/fielders/{id}/distribution.lifetime.substitute_catches` — sibling reconciliation scalar (`is_substitute = 1`).
 - `/fielders/{id}/summary.catches` — NO filter (volume framing, matches /leaders).
+- `/fielders/{id}/records.most_catches_match` — NO filter (volume framing, matches /leaders). The matchfielderperf precomp table populates from fieldingcredit with no is_substitute predicate; the matchplayer JOIN in the read SQL is for display (team / opponent) NOT for denominator construction, so it doesn't trigger the distribution-side rule.
 
 The asymmetry is **structural** (sample-denominator consistency), NOT a normative judgment that subs don't deserve credit. A sub who took a catch took a catch — leaderboards reflect that; per-match-rate panels can't fold them in without breaking the denominator.
 
