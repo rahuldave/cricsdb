@@ -536,6 +536,16 @@ async def main():
     )
     await psso_full(db)
 
+    # Populate playerscopestats_fielding_position — per (fielder,
+    # dismissed-batter-position) aggregates. Substitute fielders
+    # excluded. Spec §4.4. Drives the fielding cohort baseline and
+    # per-fielder dismissed-position histograms.
+    print("\nPopulating playerscopestats_fielding_position…")
+    from scripts.populate_playerscopestats_fielding_position import (
+        populate_full as pssfp_full,
+    )
+    await pssfp_full(db)
+
     # Phase 2 of Compare-tab perf — per-cell precomputed baselines.
     # See internal_docs/spec-team-bucket-baseline.md.
     print("\nPopulating bucket_baseline_*…")

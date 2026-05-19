@@ -266,6 +266,37 @@ class PlayerScopeStatsOver:
     boundaries: int = 0
 
 
+class PlayerScopeStatsFieldingPosition:
+    """One row per (fielder, scope, dismissed-batter-position-bucket).
+
+    Child of PlayerScopeStats: same scope_key semantics; the
+    `position_bucket` describes the DISMISSED batter's position in the
+    innings (1=opener for positions 1+2 merged, 2=#3, …, 10=#11).
+    person_id is the FIELDER (the one credited with the catch /
+    stumping / run-out).
+
+    Substitute fielders are EXCLUDED (is_substitute = 0 filter applied
+    at populate). Spec §5.2 + CLAUDE.md "Substitute fielders —
+    INCLUDED in /leaders, EXCLUDED in /distribution" — the child
+    table's downstream consumers are distribution-side endpoints.
+
+    Convention 3 (CLAUDE.md): `catches` is the inclusive count of
+    kind IN ('caught', 'caught_and_bowled'); caught_and_bowled is a
+    sub-component of the catches headline, not summed separately.
+
+    Drives the fielding cohort baseline endpoint (Phase 3) and the
+    per-fielder dismissed-position histogram (next-spec viz). Spec:
+    `internal_docs/spec-player-compare-average.md` §4.4.
+    """
+    person_id: ForeignKey[str, "person"]  # the FIELDER
+    scope_key: str  # matches PlayerScopeStats.scope_key
+    position_bucket: int  # 1=opener, 2=#3, ..., 10=#11 (DISMISSED batter's bucket)
+    catches: int = 0
+    stumpings: int = 0
+    run_outs: int = 0
+    dismissals: int = 0  # catches + stumpings + run_outs
+
+
 class PlayerScopeStatsPosition:
     """One row per (person, scope, position_bucket) — per-position batting aggregates.
 

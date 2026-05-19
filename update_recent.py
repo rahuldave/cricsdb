@@ -357,6 +357,14 @@ async def main():
                 )
                 await psso_incr(db, new_match_ids)
 
+                # playerscopestats_fielding_position — per (fielder,
+                # dismissed-batter-position) aggregates. Substitute
+                # fielders excluded (distribution-side semantics).
+                from scripts.populate_playerscopestats_fielding_position import (
+                    populate_incremental as pssfp_incr,
+                )
+                await pssfp_incr(db, new_match_ids)
+
                 # bucket_baseline_* — per-cell precomputed team / league
                 # baselines for the Compare tab and team endpoints.
                 # Recomputes only cells touched by new matches.

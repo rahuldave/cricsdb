@@ -13,6 +13,11 @@ from ..filters import FilterParams, AuxParams
 from ..aux_clauses import splice_aux_join_clauses
 from ..player_nationality import player_nationalities
 from ..scope_links import suggested_splits, scope_dict_from_filters
+from ..tournament_canonical import (
+    is_canonical_with_variants,
+    variants as canonical_variants,
+    event_name_in_clause,
+)
 from ..wilson import prob_record
 from ..form_windows import scope_anchor
 
@@ -23,6 +28,85 @@ def _safe_div(a, b, mul=1, ndigits=2):
     if not b:
         return None
     return round(a * mul / b, ndigits)
+
+
+async def _dismissal_position_distribution(
+    db, person_id: str, filters: FilterParams
+) -> list[dict]:
+    """Return the fielder's per-(dismissed batter position) aggregates.
+
+    Length-10 array keyed by `bucket` (1=opener, 2=#3, …, 10=#11).
+    Substitute catches are EXCLUDED — the populate applied
+    `is_substitute = 0`, matching the distribution-side semantics
+    (CLAUDE.md "Substitute fielders — INCLUDED in /leaders, EXCLUDED
+    in /distribution"). Convention 3: `catches` is inclusive of
+    caught_and_bowled; not broken out separately.
+
+    Joined from playerscopestats_fielding_position → playerscopestats;
+    honours scope_key axes only (tournament/season/gender/team_type)
+    per the precomputed-table-only contract this rollout uses.
+    """
+    clauses = ["pss.person_id = :pid"]
+    params: dict = {"pid": person_id}
+    if filters.gender:
+        clauses.append("pss.gender = :gender")
+        params["gender"] = filters.gender
+    if filters.team_type:
+        clauses.append("pss.team_type = :team_type")
+        params["team_type"] = filters.team_type
+    if filters.tournament:
+        if is_canonical_with_variants(filters.tournament):
+            clauses.append(event_name_in_clause(
+                canonical_variants(filters.tournament),
+                col="pss.tournament",
+            ))
+        else:
+            clauses.append("pss.tournament = :tournament")
+            params["tournament"] = filters.tournament
+    if filters.season_from:
+        clauses.append("pss.season >= :season_from")
+        params["season_from"] = filters.season_from
+    if filters.season_to:
+        clauses.append("pss.season <= :season_to")
+        params["season_to"] = filters.season_to
+    where = " AND ".join(clauses)
+
+    rows = await db.q(
+        f"""
+        SELECT pssfp.position_bucket,
+               SUM(pssfp.catches)    AS catches,
+               SUM(pssfp.stumpings)  AS stumpings,
+               SUM(pssfp.run_outs)   AS run_outs,
+               SUM(pssfp.dismissals) AS dismissals
+        FROM playerscopestatsfieldingposition pssfp
+        JOIN playerscopestats pss
+          ON pss.scope_key = pssfp.scope_key
+         AND pss.person_id = pssfp.person_id
+        WHERE {where}
+        GROUP BY pssfp.position_bucket
+        ORDER BY pssfp.position_bucket
+        """,
+        params,
+    )
+
+    by_bucket = {r["position_bucket"]: r for r in rows}
+    out: list[dict] = []
+    for b in range(1, 11):
+        r = by_bucket.get(b)
+        if r is None:
+            out.append({
+                "bucket": b, "catches": 0, "stumpings": 0,
+                "run_outs": 0, "dismissals": 0,
+            })
+        else:
+            out.append({
+                "bucket":     b,
+                "catches":    r["catches"] or 0,
+                "stumpings":  r["stumpings"] or 0,
+                "run_outs":   r["run_outs"] or 0,
+                "dismissals": r["dismissals"] or 0,
+            })
+    return out
 
 
 def _fielding_filter(filters: FilterParams, person_id: str, aux: AuxParams | None = None):
@@ -275,6 +359,9 @@ async def fielding_summary(
     innings_kept = keeping_rows[0]["c"] if keeping_rows else 0
 
     nationalities = await player_nationalities(db, person_id)
+    dismissal_position_distribution = await _dismissal_position_distribution(
+        db, person_id, filters,
+    )
 
     return {
         "person_id": person_id,
@@ -289,6 +376,7 @@ async def fielding_summary(
         "dismissals_per_match": _safe_div(total, matches),
         "substitute_catches": substitute_catches,
         "innings_kept": innings_kept,
+        "dismissal_position_distribution": dismissal_position_distribution,
     }
 
 
