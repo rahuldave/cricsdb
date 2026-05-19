@@ -59,6 +59,19 @@ def _is_set(v) -> bool:
     return v not in (None, "", ANY_SENTINEL)
 
 
+# Axis names recognised by FilterBarParams.build(drop=...). The single
+# `season` name masks both season_from and season_to. Per-endpoint
+# structural plumbing for tautology-prone baseline surfaces (player-
+# compare position baselines, H2H baselines, venue character strips);
+# not a user-facing toggle. Spec: internal_docs/spec-player-compare-
+# average.md §4.6.
+_DROP_AXES: frozenset[str] = frozenset({
+    "gender", "team_type", "tournament", "season",
+    "filter_venue", "filter_team", "filter_opponent",
+    "team_class", "series_type",
+})
+
+
 class AuxParams:
     """Internal-plumbing narrowings, distinct from the FilterBar UI.
 
@@ -255,6 +268,7 @@ class FilterBarParams:
         table_alias: str = "m",
         innings_alias: str = "i",
         aux: Optional[AuxParams] = None,
+        drop: Optional[set[str]] = None,
     ) -> tuple[str, dict]:
         """Build WHERE clause fragments and params dict.
 
@@ -265,27 +279,49 @@ class FilterBarParams:
             innings_alias: Alias for the innings table.
             aux: Optional AuxParams to fold in page-local clauses (e.g.
                 series_type) without each router having to hand-wire them.
+            drop: Optional set of axis names to mask from clause construction.
+                When an axis name is in `drop`, its clause and params are
+                skipped entirely — useful for tautology-prone surfaces that
+                need a "baseline with this narrowing removed" computation
+                (e.g. compute the league baseline at the same scope as the
+                player query but with the venue narrowing dropped). Per-
+                endpoint structural plumbing, not a user-facing toggle. See
+                internal_docs/spec-player-compare-average.md §4.6.
+                Recognised names: gender, team_type, tournament, season,
+                filter_venue, filter_team, filter_opponent, team_class,
+                series_type. The single `season` name masks both
+                season_from and season_to. Unknown names raise ValueError.
 
         Returns:
             (where_clause_str, params_dict) — the clause string includes leading
             AND for each condition so it can be appended after a WHERE 1=1 or
             existing conditions.
         """
+        if drop:
+            unknown = drop - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"FilterParams.build(drop=...) got unknown axis name(s): "
+                    f"{sorted(unknown)}. Recognised: {sorted(_DROP_AXES)}."
+                )
+        else:
+            drop = set()
+
         clauses: list[str] = []
         params: dict = {}
 
         if has_innings_join:
             clauses.append(f"{innings_alias}.super_over = 0")
 
-        if _is_set(self.gender):
+        if "gender" not in drop and _is_set(self.gender):
             clauses.append(f"{table_alias}.gender = :gender")
             params["gender"] = self.gender
 
-        if _is_set(self.team_type):
+        if "team_type" not in drop and _is_set(self.team_type):
             clauses.append(f"{table_alias}.team_type = :team_type")
             params["team_type"] = self.team_type
 
-        if _is_set(self.tournament):
+        if "tournament" not in drop and _is_set(self.tournament):
             # Canonical tournaments (e.g. "T20 World Cup (Men)") expand
             # to `event_name IN (variants)` — see api/tournament_canonical.py.
             # Single-variant / non-canonical names stay as equality.
@@ -301,19 +337,19 @@ class FilterBarParams:
                 clauses.append(f"{table_alias}.event_name = :tournament")
                 params["tournament"] = self.tournament
 
-        if _is_set(self.season_from):
+        if "season" not in drop and _is_set(self.season_from):
             clauses.append(f"{table_alias}.season >= :season_from")
             params["season_from"] = self.season_from
 
-        if _is_set(self.season_to):
+        if "season" not in drop and _is_set(self.season_to):
             clauses.append(f"{table_alias}.season <= :season_to")
             params["season_to"] = self.season_to
 
-        if _is_set(self.venue):
+        if "filter_venue" not in drop and _is_set(self.venue):
             clauses.append(f"{table_alias}.venue = :filter_venue")
             params["filter_venue"] = self.venue
 
-        if _is_set(self.team):
+        if "filter_team" not in drop and _is_set(self.team):
             if has_innings_join:
                 clauses.append(f"{innings_alias}.team = :team")
             else:
@@ -322,7 +358,7 @@ class FilterBarParams:
                 )
             params["team"] = self.team
 
-        if _is_set(self.opponent):
+        if "filter_opponent" not in drop and _is_set(self.opponent):
             if has_innings_join:
                 clauses.append(
                     f"(({table_alias}.team1 = :opponent AND {innings_alias}.team = {table_alias}.team2)"
@@ -338,17 +374,25 @@ class FilterBarParams:
         # with one team_type; cross-type combinations are silent
         # no-ops (preserves URL robustness when the frontend gate
         # fails or a curl request mixes them). Spec §3.
-        if _is_set(self.team_class):
-            if self.team_class == "full_member" and self.team_type == "international":
+        #
+        # When `team_type` is in `drop`, the polymorphism guard sees
+        # team_type as effectively None — so team_class clauses
+        # (which embed their own `m.team_type = …` predicate) do not
+        # fire either. This keeps `drop={'team_type'}` semantically
+        # equivalent to "as if team_type was never set" rather than
+        # leaving team_class's embedded team_type predicate behind.
+        eff_team_type = None if "team_type" in drop else self.team_type
+        if "team_class" not in drop and _is_set(self.team_class):
+            if self.team_class == "full_member" and eff_team_type == "international":
                 clauses.append(full_member_clause(table_alias=table_alias))
-            elif self.team_class == "primary_club" and self.team_type == "club":
+            elif self.team_class == "primary_club" and eff_team_type == "club":
                 clauses.append(primary_club_clause(table_alias=table_alias))
-            elif self.team_class == "secondary_club" and self.team_type == "club":
+            elif self.team_class == "secondary_club" and eff_team_type == "club":
                 clauses.append(secondary_club_clause(table_alias=table_alias))
 
         # series_type — promoted to FilterBar 2026-04-28. Reads from
         # self; the historical `aux.series_type` path is removed.
-        if _is_set(self.series_type):
+        if "series_type" not in drop and _is_set(self.series_type):
             st = series_type_clause(self.series_type, alias=table_alias)
             if st:
                 clauses.append(st)

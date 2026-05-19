@@ -93,6 +93,78 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     "count_50_plus":    None,
     "count_100_plus":   None,
     "avg_runs":         "higher_better",
+
+    # ── batting (per-player) ───────────────────────────────────────
+    # Player-grain batting summary fields. Prefixed with `bat_` to
+    # disambiguate from team-grain semantics where unprefixed
+    # `average` / `strike_rate` carry the BOWLING direction. Fields
+    # like `bat_dot_pct` already exist above (team-side) with matching
+    # player-side semantics and are reused — only fields that need a
+    # new mapping live here. Spec:
+    # internal_docs/spec-player-compare-average.md §5.7.
+    "bat_innings":             None,
+    "bat_runs":                None,
+    "bat_balls_faced":         None,
+    "bat_not_outs":            None,
+    "bat_dismissals":          None,
+    "bat_average":             "higher_better",
+    "bat_strike_rate":         "higher_better",
+    "bat_hundreds":            None,
+    "bat_fifties":             None,
+    "bat_thirties":            None,
+    "bat_ducks":               None,
+    "bat_fours":               None,
+    "bat_sixes":               None,
+    "bat_boundaries":          None,
+    "bat_dots":                None,
+    "bat_balls_per_four":      "lower_better",
+    "bat_balls_per_six":       "lower_better",
+    "bat_balls_per_boundary":  "lower_better",
+
+    # ── bowling (per-player) ───────────────────────────────────────
+    # `bowl_dot_pct` already defined above (team-side, higher_better,
+    # matches player semantics) — reused.
+    "bowl_innings":             None,
+    "bowl_balls":               None,
+    "bowl_runs_conceded":       None,
+    "bowl_wickets":             None,
+    "bowl_average":             "lower_better",
+    "bowl_economy":             "lower_better",
+    "bowl_strike_rate":         "lower_better",
+    "bowl_four_wicket_hauls":   None,
+    "bowl_fours_conceded":      None,
+    "bowl_sixes_conceded":      None,
+    "bowl_boundaries_conceded": None,
+    "bowl_dots":                None,
+    "bowl_wides":               None,
+    "bowl_noballs":             None,
+    "bowl_balls_per_four":      "higher_better",
+    "bowl_balls_per_six":       "higher_better",
+    "bowl_balls_per_boundary":  "higher_better",
+    "bowl_maiden_overs":        None,
+
+    # ── fielding (per-player) ──────────────────────────────────────
+    "field_catches":              None,
+    "field_caught_and_bowled":    None,
+    "field_stumpings":            None,
+    "field_run_outs":             None,
+    "field_total_dismissals":     None,
+    "field_dismissals_per_match": "higher_better",
+    "field_catches_per_match":    "higher_better",
+    "field_stumpings_per_match":  "higher_better",
+    "field_run_outs_per_match":   "higher_better",
+    "field_substitute_catches":   None,
+    "field_innings_kept":         None,
+
+    # ── keeping (per-player) ───────────────────────────────────────
+    "keep_innings_kept":           None,
+    "keep_stumpings":              None,
+    "keep_catches":                None,
+    "keep_run_outs":               None,
+    "keep_byes":                   None,
+    "keep_byes_per_innings":       "lower_better",
+    "keep_dismissals":             None,
+    "keep_dismissals_per_innings": "higher_better",
 }
 
 
