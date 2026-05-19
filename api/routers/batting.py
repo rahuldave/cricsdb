@@ -13,6 +13,11 @@ from ..filters import FilterParams, AuxParams
 from ..aux_clauses import splice_aux_join_clauses
 from ..player_nationality import player_nationalities
 from ..scope_links import suggested_splits, scope_dict_from_filters
+from ..tournament_canonical import (
+    is_canonical_with_variants,
+    variants as canonical_variants,
+    event_name_in_clause,
+)
 from ..wilson import prob_record
 from ..form_windows import scope_anchor
 
@@ -24,6 +29,92 @@ def _safe_div(a, b, mul=1, ndigits=2):
     if not b:
         return None
     return round(a * mul / b, ndigits)
+
+
+async def _position_distribution(db, person_id: str, filters: FilterParams) -> list[dict]:
+    """Return the player's per-position batting aggregates as a length-10 array.
+
+    Joined from `playerscopestats_position` (child) → `playerscopestats`
+    (parent, carries the scope-key columns: tournament/season/gender/
+    team_type). Only the four scope_key axes are honoured here; venue
+    / team / opponent / team_class / series_type narrowings scope
+    below the scope_key grain and would require a delivery-level
+    fallback. The spec contract (§4.7) is "sourced from
+    playerscopestats_position", so we honour the precomputed-table-
+    only scoping — the cohort baselines in Phase 3 will compose
+    against the same scoping, keeping mix-vector and cohort consistent.
+
+    Returns a length-10 list keyed by `bucket` (1=opener, 2=#3, …,
+    10=#11). Missing buckets render as zero rows so consumers can
+    iterate without index gaps.
+    """
+    clauses = ["pss.person_id = :pid"]
+    params: dict = {"pid": person_id}
+    if filters.gender:
+        clauses.append("pss.gender = :gender")
+        params["gender"] = filters.gender
+    if filters.team_type:
+        clauses.append("pss.team_type = :team_type")
+        params["team_type"] = filters.team_type
+    if filters.tournament:
+        if is_canonical_with_variants(filters.tournament):
+            clauses.append(event_name_in_clause(
+                canonical_variants(filters.tournament),
+                col="pss.tournament",
+            ))
+        else:
+            clauses.append("pss.tournament = :tournament")
+            params["tournament"] = filters.tournament
+    if filters.season_from:
+        clauses.append("pss.season >= :season_from")
+        params["season_from"] = filters.season_from
+    if filters.season_to:
+        clauses.append("pss.season <= :season_to")
+        params["season_to"] = filters.season_to
+    where = " AND ".join(clauses)
+
+    rows = await db.q(
+        f"""
+        SELECT pssp.position_bucket,
+               SUM(pssp.innings)      AS innings,
+               SUM(pssp.runs)         AS runs,
+               SUM(pssp.legal_balls)  AS legal_balls,
+               SUM(pssp.dismissals)   AS dismissals,
+               SUM(pssp.fours)        AS fours,
+               SUM(pssp.sixes)        AS sixes,
+               SUM(pssp.dots)         AS dots
+        FROM playerscopestatsposition pssp
+        JOIN playerscopestats pss
+          ON pss.scope_key = pssp.scope_key
+         AND pss.person_id = pssp.person_id
+        WHERE {where}
+        GROUP BY pssp.position_bucket
+        ORDER BY pssp.position_bucket
+        """,
+        params,
+    )
+
+    by_bucket = {r["position_bucket"]: r for r in rows}
+    out: list[dict] = []
+    for b in range(1, 11):
+        r = by_bucket.get(b)
+        if r is None:
+            out.append({
+                "bucket": b, "innings": 0, "runs": 0, "legal_balls": 0,
+                "dismissals": 0, "fours": 0, "sixes": 0, "dots": 0,
+            })
+        else:
+            out.append({
+                "bucket": b,
+                "innings":     r["innings"] or 0,
+                "runs":        r["runs"] or 0,
+                "legal_balls": r["legal_balls"] or 0,
+                "dismissals":  r["dismissals"] or 0,
+                "fours":       r["fours"] or 0,
+                "sixes":       r["sixes"] or 0,
+                "dots":        r["dots"] or 0,
+            })
+    return out
 
 
 def _batting_filter(filters: FilterParams, person_id: str, bowler_id: str | None = None, aux: AuxParams | None = None):
@@ -289,6 +380,7 @@ async def batting_summary(
 
     matches_count = len({r["match_id"] for r in innings_rows})
     nationalities = await player_nationalities(db, person_id)
+    position_distribution = await _position_distribution(db, person_id, filters)
 
     return {
         "person_id": person_id,
@@ -315,6 +407,7 @@ async def batting_summary(
         "balls_per_four": _safe_div(balls, fours),
         "balls_per_six": _safe_div(balls, sixes),
         "balls_per_boundary": _safe_div(balls, boundaries),
+        "position_distribution": position_distribution,
     }
 
 

@@ -342,6 +342,14 @@ async def main():
                 )
                 await pss_incr(db, new_match_ids)
 
+                # playerscopestats_position — per-position batting
+                # child of player_scope_stats. Same touched-scope
+                # recompute strategy.
+                from scripts.populate_playerscopestats_position import (
+                    populate_incremental as pssp_incr,
+                )
+                await pssp_incr(db, new_match_ids)
+
                 # bucket_baseline_* — per-cell precomputed team / league
                 # baselines for the Compare tab and team endpoints.
                 # Recomputes only cells touched by new matches.

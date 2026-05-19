@@ -226,6 +226,38 @@ class PlayerScopeStats:
     matches_as_keeper: int = 0
 
 
+class PlayerScopeStatsPosition:
+    """One row per (person, scope, position_bucket) — per-position batting aggregates.
+
+    Child table to PlayerScopeStats: same scope_key semantics; further
+    keyed by the merged-opener position bucket (1=opener for positions
+    1+2 merged, 2=#3, 3=#4, …, 10=#11). The merge for openers reflects
+    `derive_positions`' arbitrary striker/non-striker assignment on
+    ball 1 — splitting them creates noise. Other positions stay
+    individual.
+
+    Drives the position-mix baseline endpoints (per-bucket cohort
+    metric) and per-player position-distribution histograms (next-spec
+    visualisation work). Both consumers read the same indexed table.
+
+    Built and maintained by
+    `scripts/populate_playerscopestats_position.py`, auto-called from
+    `import_data.py` (full) and `update_recent.py` (incremental)
+    alongside the parent PlayerScopeStats populate. Spec:
+    `internal_docs/spec-player-compare-average.md` §4.2.
+    """
+    person_id: ForeignKey[str, "person"]
+    scope_key: str  # matches PlayerScopeStats.scope_key
+    position_bucket: int  # 1=opener (pos 1+2 merged), 2=#3, ..., 10=#11
+    innings: int = 0
+    runs: int = 0
+    legal_balls: int = 0
+    dismissals: int = 0
+    fours: int = 0
+    sixes: int = 0
+    dots: int = 0
+
+
 class Partnership:
     """One row per on-field batting partnership.
 

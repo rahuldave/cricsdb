@@ -517,6 +517,16 @@ async def main():
     from scripts.populate_player_scope_stats import populate_full as pss_full
     await pss_full(db)
 
+    # Populate playerscopestats_position — per-position batting child
+    # of player_scope_stats. Drives the position-mix cohort baseline
+    # endpoints and the per-player position-distribution histograms.
+    # Spec: internal_docs/spec-player-compare-average.md §4.2.
+    print("\nPopulating playerscopestats_position…")
+    from scripts.populate_playerscopestats_position import (
+        populate_full as pssp_full,
+    )
+    await pssp_full(db)
+
     # Phase 2 of Compare-tab perf — per-cell precomputed baselines.
     # See internal_docs/spec-team-bucket-baseline.md.
     print("\nPopulating bucket_baseline_*…")
