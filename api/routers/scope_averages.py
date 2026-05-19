@@ -24,10 +24,26 @@ Spec: `internal_docs/spec-team-compare-average.md`.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+import asyncio
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional
 
 from ..filters import FilterParams, AuxParams
 from ..dependencies import get_db
+from ..metrics_metadata import wrap_metric
+from ..scope_averages_players import (
+    batting_threshold,
+    bowling_threshold,
+    fielding_threshold,
+    parse_mix,
+    parse_drop,
+    build_scope_clauses,
+    convex_combine,
+    batting_bucket_label,
+    bowling_bucket_label,
+    fielding_bucket_label,
+)
 from .teams import (
     _team_innings_clause, _partnership_filter, _scope_to_team_clause, _safe_div,
     _apply_batting_per_innings, _apply_bowling_per_innings,
@@ -1667,3 +1683,195 @@ async def _partnerships_by_season_live(filters, aux):
         }
         out.append(_apply_partnerships_per_innings(row, inn_by_season.get(season, 0)))
     return {"by_season": out}
+
+
+# ════════════════════════════════════════════════════════════════════
+# /scope/averages/players/* — Phase 3 of spec-player-compare-average.md
+# ════════════════════════════════════════════════════════════════════
+#
+# Position-adaptive cohort baseline endpoints. Each accepts a mix
+# vector + the standard FilterBar axes (scope_key axes honoured;
+# venue/team/opponent/team_class/series_type scope below the
+# precomputed-table grain and are intentionally NOT applied — matches
+# Phase 2's /summary distribution-array contract).
+#
+# Strict-cliff sliding scale: if any bucket the player has non-zero
+# mix-weight on has a cohort sample below the bucket's threshold, the
+# entire response's `scope_avg` is null. Convex combination over the
+# player's full mix otherwise — no drops, no renormalisation.
+# Spec §5.1 + §6.
+
+
+@router.get("/players/batting/summary")
+async def scope_players_batting_summary(
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    position_mix: str = Query(
+        ...,
+        description=(
+            "Comma-separated 10-element vector of the player's mix"
+            " across position buckets (1=opener for positions 1+2"
+            " merged, 2=#3, ..., 10=#11). Must sum to 1.0 +/- 0.001."
+            " Trailing zeros may be omitted."
+        ),
+    ),
+    drop: Optional[str] = Query(
+        None,
+        description=(
+            "Comma-separated FilterBar axis names to mask before"
+            " clause construction. Per-endpoint structural plumbing"
+            " for tautology-prone cohort surfaces; unused for the"
+            " player-compare baseline path. Recognised names:"
+            " gender, team_type, tournament, season, filter_venue,"
+            " filter_team, filter_opponent, team_class, series_type."
+        ),
+    ),
+):
+    """Position-mix-weighted cohort baseline for batting.
+
+    Returns cohort metadata, strict-cliff flags, six envelope-wrapped
+    headline metrics, and the per-bucket aggregates in by_position.
+    """
+    db = get_db()
+    try:
+        mix = parse_mix(position_mix, 10)
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                    f" Recognised: {sorted(_DROP_AXES)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    where, params = build_scope_clauses(filters, drop=drop_set)
+
+    # Use a scope_key IN-subquery rather than a JOIN to playerscopestats.
+    # SQLite's planner picks parent-first scan-and-search for the JOIN
+    # form (~800ms unfiltered, ~97K join lookups); the IN-subquery form
+    # runs an index seek on scope_key and aggregates in ~165ms.
+    #
+    # Parallel: launch the per-bucket aggregation and the pool-totals
+    # query together via asyncio.gather. Two index scans rather than
+    # two serial round-trips — unfiltered drops from ~520ms to ~280ms.
+    main_sql = f"""
+        SELECT pssp.position_bucket,
+               SUM(pssp.innings)      AS innings,
+               SUM(pssp.runs)         AS runs,
+               SUM(pssp.legal_balls)  AS legal_balls,
+               SUM(pssp.dismissals)   AS dismissals,
+               SUM(pssp.fours)        AS fours,
+               SUM(pssp.sixes)        AS sixes,
+               SUM(pssp.dots)         AS dots,
+               COUNT(DISTINCT pssp.person_id) AS n_players
+        FROM playerscopestatsposition pssp
+        WHERE pssp.scope_key IN (
+            SELECT scope_key FROM playerscopestats pss WHERE {where}
+        )
+        GROUP BY pssp.position_bucket
+        ORDER BY pssp.position_bucket
+    """
+    pool_sql = f"""
+        SELECT COUNT(DISTINCT pssp.person_id) AS n_players,
+               SUM(pssp.innings)              AS n_innings_total
+        FROM playerscopestatsposition pssp
+        WHERE pssp.scope_key IN (
+            SELECT scope_key FROM playerscopestats pss WHERE {where}
+        )
+    """
+    rows, pool = await asyncio.gather(
+        db.q(main_sql, params),
+        db.q(pool_sql, params),
+    )
+    by_bucket = {r["position_bucket"]: r for r in rows}
+    n_players_total = (pool[0].get("n_players") if pool else 0) or 0
+    n_innings_total = (pool[0].get("n_innings_total") if pool else 0) or 0
+
+    by_position: list[dict] = []
+    for b in range(1, 11):
+        r = by_bucket.get(b)
+        threshold = batting_threshold(b)
+        if r is None:
+            by_position.append({
+                "bucket": b, "label": batting_bucket_label(b),
+                "n_innings": 0, "n_players": 0, "threshold": threshold,
+                "below_support": True,
+                "innings_per_player": None, "runs_per_player": None,
+                "average": None, "strike_rate": None,
+                "boundary_pct": None, "dot_pct": None,
+            })
+            continue
+        innings = r["innings"] or 0
+        runs = r["runs"] or 0
+        balls = r["legal_balls"] or 0
+        dismissals = r["dismissals"] or 0
+        boundaries = (r["fours"] or 0) + (r["sixes"] or 0)
+        dots = r["dots"] or 0
+        n_p = r["n_players"] or 0
+        by_position.append({
+            "bucket": b, "label": batting_bucket_label(b),
+            "n_innings": innings, "n_players": n_p, "threshold": threshold,
+            "below_support": innings < threshold,
+            "innings_per_player": round(innings / n_p, 2) if n_p else None,
+            "runs_per_player":    round(runs / n_p, 2) if n_p else None,
+            "average":            round(runs / dismissals, 2) if dismissals else None,
+            "strike_rate":        round(runs / balls * 100, 1) if balls else None,
+            "boundary_pct":       round(boundaries / balls * 100, 1) if balls else None,
+            "dot_pct":            round(dots / balls * 100, 1) if balls else None,
+        })
+
+    # Strict-cliff gate.
+    cliff_buckets: list[int] = [
+        b for b in range(1, 11)
+        if mix[b - 1] > 0 and by_position[b - 1]["below_support"]
+    ]
+
+    cohort_block = {
+        "match_dimension": "position_mix",
+        "position_mix": mix,
+        "n_players": n_players_total,
+        "n_innings_total": n_innings_total,
+    }
+
+    if cliff_buckets:
+        return {
+            "cohort": cohort_block,
+            "below_support": True,
+            "cliff_buckets": cliff_buckets,
+            "innings_batted": wrap_metric(None, None, "bat_innings",     sample_size=n_innings_total),
+            "runs":           wrap_metric(None, None, "bat_runs",        sample_size=n_innings_total),
+            "average":        wrap_metric(None, None, "bat_average",     sample_size=n_innings_total),
+            "strike_rate":    wrap_metric(None, None, "bat_strike_rate", sample_size=n_innings_total),
+            "boundary_pct":   wrap_metric(None, None, "boundary_pct",    sample_size=n_innings_total),
+            "dot_pct":        wrap_metric(None, None, "bat_dot_pct",     sample_size=n_innings_total),
+            "by_position": by_position,
+        }
+
+    def cv(field: str) -> Optional[float]:
+        return convex_combine(mix, {b: by_position[b - 1][field] for b in range(1, 11)})
+
+    cc_innings = cv("innings_per_player")
+    cc_runs    = cv("runs_per_player")
+    cc_avg     = cv("average")
+    cc_sr      = cv("strike_rate")
+    cc_bp      = cv("boundary_pct")
+    cc_dp      = cv("dot_pct")
+
+    def _r(v: Optional[float], ndigits: int) -> Optional[float]:
+        return round(v, ndigits) if v is not None else None
+
+    return {
+        "cohort": cohort_block,
+        "below_support": False,
+        "cliff_buckets": [],
+        "innings_batted": wrap_metric(_r(cc_innings, 2), _r(cc_innings, 2), "bat_innings",     sample_size=n_innings_total),
+        "runs":           wrap_metric(_r(cc_runs, 2),    _r(cc_runs, 2),    "bat_runs",        sample_size=n_innings_total),
+        "average":        wrap_metric(_r(cc_avg, 2),     _r(cc_avg, 2),     "bat_average",     sample_size=n_innings_total),
+        "strike_rate":    wrap_metric(_r(cc_sr, 1),      _r(cc_sr, 1),      "bat_strike_rate", sample_size=n_innings_total),
+        "boundary_pct":   wrap_metric(_r(cc_bp, 1),      _r(cc_bp, 1),      "boundary_pct",    sample_size=n_innings_total),
+        "dot_pct":        wrap_metric(_r(cc_dp, 1),      _r(cc_dp, 1),      "bat_dot_pct",     sample_size=n_innings_total),
+        "by_position": by_position,
+    }
