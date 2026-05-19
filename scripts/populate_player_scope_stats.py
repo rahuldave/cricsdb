@@ -52,6 +52,7 @@ from models import (
     Person, Match, MatchPlayer, Innings, Delivery, Wicket,
     FieldingCredit, KeeperAssignment, Partnership, PlayerScopeStats,
 )
+from api.innings_positions import derive_positions
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(PROJECT_ROOT, "cricket.db")
@@ -201,32 +202,6 @@ def _phase(over_number: int) -> str:
     return "death"
 
 
-def _derive_positions(deliveries: list[dict]) -> dict[str, int]:
-    """Return {person_id: position} for one innings, by delivery order.
-
-    Position 1 = striker on first ball, position 2 = non_striker on
-    first ball, then each new face in delivery order gets the next
-    position. We only key by person_id (skip rows where it's NULL —
-    those don't contribute to player_scope_stats anyway).
-    """
-    positions: dict[str, int] = {}
-    next_pos = 1
-    for d in deliveries:
-        for pid in (d["batter_id"], d["non_striker_id"]):
-            if pid is None:
-                continue
-            if pid not in positions:
-                if next_pos > 11:
-                    # Shouldn't happen in practice — 11 distinct batters
-                    # per innings is the convention. Park the rest in
-                    # bucket 11 (super-rare 12th-man-style edge cases).
-                    positions[pid] = 11
-                else:
-                    positions[pid] = next_pos
-                    next_pos += 1
-    return positions
-
-
 # ============================================================
 # Full / scoped recompute over a set of matches
 # ============================================================
@@ -334,7 +309,7 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
             if not ds:
                 continue
             mid = innings_match[iid]
-            positions = _derive_positions(ds)
+            positions = derive_positions(ds)
 
             # Track the set of batters who actually faced ≥1 legal ball
             # this innings — those are the players who get an
