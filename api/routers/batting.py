@@ -118,7 +118,16 @@ async def _position_distribution(db, person_id: str, filters: FilterParams) -> l
 
 
 def _batting_filter(filters: FilterParams, person_id: str, bowler_id: str | None = None, aux: AuxParams | None = None):
-    """Build WHERE clause for batting delivery queries."""
+    """Build WHERE clause for batting delivery queries (striker-side).
+
+    Restricts to deliveries the player FACED — d.batter_id = :person_id
+    on legal balls. Use this for ball-level batting aggregates (runs,
+    fours, sixes, dots, etc.) that count only when the player is on
+    strike. For per-innings / per-match enumerations that must include
+    non-striker dismissals (run-outs at the non-striker's end, the
+    occasional obstruction / handled-ball off a delivery the player
+    wasn't facing), use `_batting_innings_filter` instead.
+    """
     where, params = filters.build(has_innings_join=True, aux=aux)
     params["person_id"] = person_id
     parts = ["d.batter_id = :person_id", "d.extras_wides = 0", "d.extras_noballs = 0"]
@@ -127,6 +136,38 @@ def _batting_filter(filters: FilterParams, person_id: str, bowler_id: str | None
     if bowler_id:
         parts.append("d.bowler_id = :bowler_id")
         params["bowler_id"] = bowler_id
+    return " AND ".join(parts), params
+
+
+def _batting_innings_filter(filters: FilterParams, person_id: str, aux: AuxParams | None = None):
+    """Build WHERE clause for per-innings batting queries.
+
+    Includes deliveries where the player was EITHER striker OR non-
+    striker, so wicket-table joins on `w.player_out_id = pid` catch
+    non-striker dismissals (run-outs at the bowler's end, the rare
+    obstructing-the-field at the non-striker's end, etc). 4.2% of
+    dismissals in cricket.db are non-striker — 6,765 run-outs +
+    9 other kinds across the population — and 615 of those are
+    "diamond ducks" (innings where the batter never faced a single
+    legal ball; the entire innings was previously invisible to the
+    striker-only filter).
+
+    Wides + no-balls are NOT filtered at the outer WHERE — so
+    dismissals on wides/no-balls (rare but legal) still join the
+    wicket. Per-aggregate sites must add their own
+    `d.batter_id = :person_id AND d.extras_wides = 0 AND
+    d.extras_noballs = 0` CASE-WHEN to gate striker-side run / ball
+    counts correctly.
+
+    Used by /batters/{id}/summary, /by-innings, /by-season,
+    /distribution. See `_batting_filter` for the striker-side
+    variant.
+    """
+    where, params = filters.build(has_innings_join=True, aux=aux)
+    params["person_id"] = person_id
+    parts = ["(d.batter_id = :person_id OR d.non_striker_id = :person_id)"]
+    if where:
+        parts.append(where)
     return " AND ".join(parts), params
 
 
@@ -337,15 +378,24 @@ async def batting_summary(
     )
     c = core[0] if core else {}
 
-    # Per-innings stats (for highest, 50s, 100s, ducks, not-outs, innings count)
-    inn_where = where  # same filters
+    # Per-innings stats (for highest, 50s, 100s, ducks, not-outs,
+    # innings count). Uses the innings-inclusive filter so non-striker
+    # dismissals are caught — see `_batting_innings_filter`. Striker-
+    # side aggregates (innings_runs, innings_balls) gate via
+    # CASE WHEN d.batter_id = :person_id AND legal to stay correct
+    # when the player is the non-striker on a delivery.
+    inn_where, inn_params = _batting_innings_filter(filters, person_id, aux=aux)
     innings_rows = await db.q(
         f"""
         SELECT
             i.match_id,
             i.innings_number,
-            SUM(d.runs_batter) as innings_runs,
-            COUNT(*) as innings_balls,
+            SUM(CASE WHEN d.batter_id = :person_id
+                      AND d.extras_wides = 0 AND d.extras_noballs = 0
+                     THEN d.runs_batter ELSE 0 END) as innings_runs,
+            SUM(CASE WHEN d.batter_id = :person_id
+                      AND d.extras_wides = 0 AND d.extras_noballs = 0
+                     THEN 1 ELSE 0 END) as innings_balls,
             MAX(CASE WHEN w.id IS NOT NULL THEN 1 ELSE 0 END) as was_dismissed
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
@@ -356,7 +406,7 @@ async def batting_summary(
         WHERE {inn_where}
         GROUP BY i.match_id, i.innings_number
         """,
-        params,
+        inn_params,
     )
 
     innings_count = len(innings_rows)
@@ -422,7 +472,16 @@ async def batting_by_innings(
     sort: str = Query("date"),
 ):
     db = get_db()
-    where, params = _batting_filter(filters, person_id, bowler_id, aux=aux)
+    # bowler_id filter is striker-side (matchup vs a specific bowler);
+    # when set, fall through to the original delivery-filtered path
+    # because non-striker dismissals on someone else's delivery
+    # aren't part of a "vs bowler X" view. When no bowler_id, use the
+    # innings-inclusive filter so non-striker dismissals appear in
+    # the per-innings list.
+    if bowler_id:
+        where, params = _batting_filter(filters, person_id, bowler_id, aux=aux)
+    else:
+        where, params = _batting_innings_filter(filters, person_id, aux=aux)
     params["limit"] = limit
     params["offset"] = offset
 
@@ -446,6 +505,33 @@ async def batting_by_innings(
     )
     total = count_rows[0]["total"] if count_rows else 0
 
+    # Striker-side aggregates gated via CASE so non-striker deliveries
+    # don't contribute to runs/balls/etc. for this player.
+    if bowler_id:
+        # bowler_id path: striker-only WHERE already filters; original
+        # aggregations work as-is.
+        runs_expr   = "SUM(d.runs_batter)"
+        balls_expr  = "COUNT(*)"
+        fours_expr  = ("SUM(CASE WHEN d.runs_batter = 4 "
+                       "AND COALESCE(d.runs_non_boundary, 0) = 0 "
+                       "THEN 1 ELSE 0 END)")
+        sixes_expr  = "SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END)"
+        sr_expr     = "ROUND(SUM(d.runs_batter) * 100.0 / COUNT(*), 2)"
+    else:
+        # Inclusive path: gate striker-side counts on batter_id match
+        # and legal-ball filter.
+        _stk = ("d.batter_id = :person_id "
+                "AND d.extras_wides = 0 AND d.extras_noballs = 0")
+        runs_expr  = f"SUM(CASE WHEN {_stk} THEN d.runs_batter ELSE 0 END)"
+        balls_expr = f"SUM(CASE WHEN {_stk} THEN 1 ELSE 0 END)"
+        fours_expr = (f"SUM(CASE WHEN {_stk} AND d.runs_batter = 4 "
+                      "AND COALESCE(d.runs_non_boundary, 0) = 0 "
+                      "THEN 1 ELSE 0 END)")
+        sixes_expr = f"SUM(CASE WHEN {_stk} AND d.runs_batter = 6 THEN 1 ELSE 0 END)"
+        # SR denominator is the legal-balls-faced count; guard zero.
+        sr_expr = (f"CASE WHEN SUM(CASE WHEN {_stk} THEN 1 ELSE 0 END) > 0 "
+                   f"THEN ROUND({runs_expr} * 100.0 / {balls_expr}, 2) ELSE NULL END")
+
     rows = await db.q(
         f"""
         SELECT
@@ -456,12 +542,11 @@ async def batting_by_innings(
             CASE WHEN m.team1 = i.team THEN m.team2 ELSE m.team1 END as opponent,
             m.venue,
             m.event_name as tournament,
-            SUM(d.runs_batter) as runs,
-            COUNT(*) as balls,
-            SUM(CASE WHEN d.runs_batter = 4
-                     AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
-            SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) as sixes,
-            ROUND(SUM(d.runs_batter) * 100.0 / COUNT(*), 2) as strike_rate,
+            {runs_expr} as runs,
+            {balls_expr} as balls,
+            {fours_expr} as fours,
+            {sixes_expr} as sixes,
+            {sr_expr} as strike_rate,
             MAX(CASE WHEN w.id IS NOT NULL THEN 1 ELSE 0 END) as was_out,
             MAX(w.kind) as how_out,
             MAX(CASE WHEN w.id IS NOT NULL THEN d.bowler ELSE NULL END) as dismissed_by
@@ -766,14 +851,20 @@ async def batting_by_season(
         params,
     )
 
-    # Per-innings stats for 50s/100s/dismissals/innings count per season
+    # Per-innings stats for 50s/100s/dismissals/innings count per season.
+    # Uses the innings-inclusive filter so non-striker dismissals are
+    # caught — same fix as /summary. Striker-side runs/balls aggregates
+    # gate via CASE WHEN d.batter_id = :person_id AND legal.
+    inn_where, inn_params = _batting_innings_filter(filters, person_id, aux=aux)
     innings_rows = await db.q(
         f"""
         SELECT
             m.season,
             i.match_id,
             i.innings_number,
-            SUM(d.runs_batter) as innings_runs,
+            SUM(CASE WHEN d.batter_id = :person_id
+                      AND d.extras_wides = 0 AND d.extras_noballs = 0
+                     THEN d.runs_batter ELSE 0 END) as innings_runs,
             MAX(CASE WHEN w.id IS NOT NULL THEN 1 ELSE 0 END) as was_dismissed
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
@@ -781,10 +872,10 @@ async def batting_by_season(
         LEFT JOIN wicket w ON w.delivery_id = d.id
             AND w.player_out_id = :person_id
             AND w.kind NOT IN ('retired hurt', 'retired out')
-        WHERE {where}
+        WHERE {inn_where}
         GROUP BY m.season, i.match_id, i.innings_number
         """,
-        params,
+        inn_params,
     )
 
     # Build per-season innings aggregates
@@ -1080,7 +1171,15 @@ async def _innings_master_sample(
     active filter scope. One row per (match, innings the batter batted
     in). Used as the master sample for the distribution dossier and
     its form windows. Spec §8.2."""
-    where, params = _batting_filter(filters, person_id, aux=aux)
+    # Uses the innings-inclusive filter so non-striker dismissals and
+    # diamond-duck innings (where the batter never faced a legal ball
+    # before being run out as non-striker) are included. Striker-side
+    # counts (runs / balls / boundaries / dots / phase breakdowns)
+    # gate on d.batter_id = person_id AND legal so non-striker
+    # deliveries don't inflate the per-innings totals.
+    where, params = _batting_innings_filter(filters, person_id, aux=aux)
+    _stk = ("d.batter_id = :person_id "
+            "AND d.extras_wides = 0 AND d.extras_noballs = 0")
     rows = await db.q(
         f"""
         SELECT
@@ -1089,24 +1188,25 @@ async def _innings_master_sample(
             i.innings_number,
             (SELECT md.date FROM matchdate md WHERE md.match_id = i.match_id
              ORDER BY md.date LIMIT 1) AS date,
-            SUM(d.runs_batter) AS runs,
-            COUNT(*) AS balls,
+            SUM(CASE WHEN {_stk} THEN d.runs_batter ELSE 0 END) AS runs,
+            SUM(CASE WHEN {_stk} THEN 1 ELSE 0 END) AS balls,
             MAX(CASE WHEN w.id IS NOT NULL THEN 1 ELSE 0 END) AS dismissed,
-            SUM(CASE WHEN d.runs_batter = 4
-                     AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) AS fours,
-            SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
-            SUM(CASE WHEN d.runs_total = 0 AND d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS dots,
-            SUM(CASE WHEN d.over_number BETWEEN 0 AND 5
+            SUM(CASE WHEN {_stk} AND d.runs_batter = 4
+                      AND COALESCE(d.runs_non_boundary, 0) = 0
+                     THEN 1 ELSE 0 END) AS fours,
+            SUM(CASE WHEN {_stk} AND d.runs_batter = 6 THEN 1 ELSE 0 END) AS sixes,
+            SUM(CASE WHEN {_stk} AND d.runs_total = 0 THEN 1 ELSE 0 END) AS dots,
+            SUM(CASE WHEN {_stk} AND d.over_number BETWEEN 0 AND 5
                      THEN d.runs_batter ELSE 0 END) AS runs_pp,
-            SUM(CASE WHEN d.over_number BETWEEN 0 AND 5
+            SUM(CASE WHEN {_stk} AND d.over_number BETWEEN 0 AND 5
                      THEN 1 ELSE 0 END) AS balls_pp,
-            SUM(CASE WHEN d.over_number BETWEEN 6 AND 14
+            SUM(CASE WHEN {_stk} AND d.over_number BETWEEN 6 AND 14
                      THEN d.runs_batter ELSE 0 END) AS runs_mid,
-            SUM(CASE WHEN d.over_number BETWEEN 6 AND 14
+            SUM(CASE WHEN {_stk} AND d.over_number BETWEEN 6 AND 14
                      THEN 1 ELSE 0 END) AS balls_mid,
-            SUM(CASE WHEN d.over_number BETWEEN 15 AND 19
+            SUM(CASE WHEN {_stk} AND d.over_number BETWEEN 15 AND 19
                      THEN d.runs_batter ELSE 0 END) AS runs_death,
-            SUM(CASE WHEN d.over_number BETWEEN 15 AND 19
+            SUM(CASE WHEN {_stk} AND d.over_number BETWEEN 15 AND 19
                      THEN 1 ELSE 0 END) AS balls_death
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
