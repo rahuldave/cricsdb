@@ -2204,3 +2204,107 @@ async def scope_players_fielding_summary(
         "dismissals_per_match": wrap_metric(dismissals_pm, dismissals_pm, "field_dismissals_per_match", sample_size=n_matches),
         "by_dismissed_position": by_dis,
     }
+
+
+@router.get("/players/keeping/summary")
+async def scope_players_keeping_summary(
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    drop: Optional[str] = Query(
+        None,
+        description="See batting/summary for recognised axis names.",
+    ),
+):
+    """Cohort baseline for KEEPING — matches the keeper partition of
+    fielding/summary?is_keeper=1, surfaced as its own endpoint so the
+    Phase 4 /fielders/{id}/keeping/summary envelope migration can
+    pair 1:1 with a dedicated cohort source.
+
+    Headline rates use matches_as_keeper as the per-keeper denominator
+    rather than total matches — distinguishing keeping rate from
+    catch-as-outfielder rate. catches_as_keeper, stumpings, and
+    run_outs come from parent playerscopestats (stumpings only happen
+    when keeping, so the parent count is exact; catches_as_keeper is
+    populated by the parent script via the keeperassignment cross-
+    reference).
+
+    Byes-per-innings is NOT surfaced here — it needs a
+    keeperassignment + delivery join not precomputed in
+    playerscopestats. Reserved for a future cohort enhancement when
+    byes precompute lands.
+    """
+    db = get_db()
+    try:
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                    f" Recognised: {sorted(_DROP_AXES)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    where, params = build_scope_clauses(filters, drop=drop_set)
+
+    # Aggregate over keeper-active rows. matches_as_keeper > 0 selects
+    # the keeper cohort; the per-keeper-match denominator is exact
+    # because stumpings + catches_as_keeper only accrue during keeping.
+    pool_sql = f"""
+        SELECT COUNT(*)                    AS n_keepers,
+               SUM(pss.matches_as_keeper)  AS n_matches_keeping,
+               SUM(pss.catches_as_keeper)  AS catches_as_keeper,
+               SUM(pss.stumpings)          AS stumpings
+        FROM playerscopestats pss
+        WHERE pss.matches_as_keeper > 0
+          AND {where}
+    """
+    # run_outs while keeping aren't separately tracked on parent;
+    # approximate by summing the fielding-position child's run_outs
+    # for the same keeper-cohort rows (per-(person, scope) JOIN, same
+    # pattern as Phase 3.3).
+    runouts_sql = f"""
+        SELECT SUM(pssfp.run_outs) AS run_outs
+        FROM playerscopestatsfieldingposition pssfp
+        JOIN playerscopestats pss
+          ON pss.person_id = pssfp.person_id
+         AND pss.scope_key = pssfp.scope_key
+        WHERE pss.matches_as_keeper > 0
+          AND {where}
+    """
+    pool, ro_row = await asyncio.gather(
+        db.q(pool_sql, params),
+        db.q(runouts_sql, params),
+    )
+
+    n_keepers = (pool[0].get("n_keepers") if pool else 0) or 0
+    n_matches_keeping = (pool[0].get("n_matches_keeping") if pool else 0) or 0
+    catches = (pool[0].get("catches_as_keeper") if pool else 0) or 0
+    stumpings = (pool[0].get("stumpings") if pool else 0) or 0
+    run_outs = (ro_row[0].get("run_outs") if ro_row else 0) or 0
+    dismissals = catches + stumpings + run_outs
+
+    def _r(num: int, den: int, ndigits: int) -> Optional[float]:
+        return round(num / den, ndigits) if den else None
+
+    catches_pm     = _r(catches,    n_matches_keeping, 3)
+    stumpings_pm   = _r(stumpings,  n_matches_keeping, 3)
+    run_outs_pm    = _r(run_outs,   n_matches_keeping, 3)
+    dismissals_pm  = _r(dismissals, n_matches_keeping, 3)
+
+    cohort_block = {
+        "match_dimension": "is_keeper",
+        "is_keeper": 1,
+        "n_keepers": n_keepers,
+        "n_matches_keeping": n_matches_keeping,
+    }
+
+    return {
+        "cohort": cohort_block,
+        "catches_per_match":    wrap_metric(catches_pm,    catches_pm,    "keep_catches_per_match",    sample_size=n_matches_keeping),
+        "stumpings_per_match":  wrap_metric(stumpings_pm,  stumpings_pm,  "keep_stumpings_per_match",  sample_size=n_matches_keeping),
+        "run_outs_per_match":   wrap_metric(run_outs_pm,   run_outs_pm,   "keep_run_outs_per_match",   sample_size=n_matches_keeping),
+        "dismissals_per_match": wrap_metric(dismissals_pm, dismissals_pm, "keep_dismissals_per_match", sample_size=n_matches_keeping),
+    }

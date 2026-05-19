@@ -171,6 +171,13 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     "keep_byes_per_innings":       "lower_better",
     "keep_dismissals":             None,
     "keep_dismissals_per_innings": "higher_better",
+    # Per-match keeping rates surfaced by the keeping cohort baseline
+    # endpoint (Phase 3.4). Denominator is matches_as_keeper, not
+    # total matches.
+    "keep_catches_per_match":      "higher_better",
+    "keep_stumpings_per_match":    "higher_better",
+    "keep_run_outs_per_match":     "higher_better",
+    "keep_dismissals_per_match":   "higher_better",
 }
 
 

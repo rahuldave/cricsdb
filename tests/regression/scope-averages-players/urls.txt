@@ -61,3 +61,17 @@ NEW players_field_primary_club_out_2024 /api/v1/scope/averages/players/fielding/
 
 # Unfiltered keepers.
 NEW players_field_unfiltered_keeper    /api/v1/scope/averages/players/fielding/summary?is_keeper=1
+
+# ── /scope/averages/players/keeping/summary ──────────────────────
+
+# IPL keepers (per-keeping-match rates).
+NEW players_keep_ipl                   /api/v1/scope/averages/players/keeping/summary?tournament=Indian%20Premier%20League
+
+# Men's international keepers.
+NEW players_keep_men_intl              /api/v1/scope/averages/players/keeping/summary?gender=male&team_type=international
+
+# Unfiltered keeping cohort.
+NEW players_keep_unfiltered            /api/v1/scope/averages/players/keeping/summary
+
+# Women's club keeping in 2024.
+NEW players_keep_women_club_2024       /api/v1/scope/averages/players/keeping/summary?gender=female&team_type=club&season_from=2024&season_to=2024
