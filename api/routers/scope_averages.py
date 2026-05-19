@@ -2041,3 +2041,166 @@ async def scope_players_bowling_summary(
         "boundary_pct":     wrap_metric(_r(cc_bp, 1),   _r(cc_bp, 1),   "bowl_boundary_pct",    sample_size=n_balls_total),
         "by_over": by_over_arr,
     }
+
+
+@router.get("/players/fielding/summary")
+async def scope_players_fielding_summary(
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    is_keeper: int = Query(
+        ...,
+        description=(
+            "Binary axis. 0 = outfielder cohort (pss.matches_as_keeper"
+            " = 0); 1 = keeper cohort (pss.matches_as_keeper > 0)."
+            " Spec §5.4 — fielding is NOT position-weighted at the"
+            " headline; the partition is on this binary instead."
+        ),
+        ge=0, le=1,
+    ),
+    drop: Optional[str] = Query(
+        None,
+        description="See batting/summary for recognised axis names.",
+    ),
+):
+    """Keeper-flag-partitioned cohort baseline for fielding.
+
+    Returns per-match rates (catches, stumpings, run_outs, total
+    dismissals — all higher=better) over the partition selected by
+    is_keeper. Substitute catches are EXCLUDED from the numerator
+    (Spec §5.2 + CLAUDE.md). Per-dismissed-position cohort sub-rates
+    are returned in by_dismissed_position[10] for next-spec impact-
+    weighted analyses; this headline doesn't weight by position.
+    """
+    db = get_db()
+    try:
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                    f" Recognised: {sorted(_DROP_AXES)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    where, params = build_scope_clauses(filters, drop=drop_set)
+
+    # Cohort partition: matches_as_keeper > 0 selects keepers; = 0
+    # selects pure outfielders. Subtotals over `catches`, `stumpings`,
+    # `runouts`, `matches` aggregated from parent playerscopestats —
+    # non-substitute numerator comes from the fielding-position child
+    # in parallel (substitute fielders excluded there at populate).
+    # The keeper-flag partition is PER (person, scope) — a player who
+    # kept in 2023 but not 2024 belongs to the outfielder cohort for
+    # 2024 only. Use a JOIN so the matches_as_keeper predicate gates
+    # at the right grain rather than IN-subquery which leaks across
+    # scope_keys for one person.
+    keeper_pred = ">" if is_keeper else "="
+    pool_sql = f"""
+        SELECT COUNT(*)                       AS n_fielders,
+               SUM(pss.matches)               AS n_matches_total
+        FROM playerscopestats pss
+        WHERE pss.matches_as_keeper {keeper_pred} 0
+          AND {where}
+    """
+    # Non-substitute catches/stumpings/run_outs from the fielding-
+    # position child, joined per-row to the parent keeper-partition.
+    nonsub_sql = f"""
+        SELECT SUM(pssfp.catches)    AS catches,
+               SUM(pssfp.stumpings)  AS stumpings,
+               SUM(pssfp.run_outs)   AS run_outs,
+               SUM(pssfp.dismissals) AS dismissals
+        FROM playerscopestatsfieldingposition pssfp
+        JOIN playerscopestats pss
+          ON pss.person_id = pssfp.person_id
+         AND pss.scope_key = pssfp.scope_key
+        WHERE pss.matches_as_keeper {keeper_pred} 0
+          AND {where}
+    """
+    by_dis_pos_sql = f"""
+        SELECT pssfp.position_bucket,
+               SUM(pssfp.catches)    AS catches,
+               SUM(pssfp.stumpings)  AS stumpings,
+               SUM(pssfp.run_outs)   AS run_outs,
+               SUM(pssfp.dismissals) AS dismissals,
+               COUNT(DISTINCT pssfp.person_id) AS n_players
+        FROM playerscopestatsfieldingposition pssfp
+        JOIN playerscopestats pss
+          ON pss.person_id = pssfp.person_id
+         AND pss.scope_key = pssfp.scope_key
+        WHERE pss.matches_as_keeper {keeper_pred} 0
+          AND {where}
+        GROUP BY pssfp.position_bucket
+        ORDER BY pssfp.position_bucket
+    """
+
+    pool, nonsub, by_dis_rows = await asyncio.gather(
+        db.q(pool_sql, params),
+        db.q(nonsub_sql, params),
+        db.q(by_dis_pos_sql, params),
+    )
+
+    n_fielders = (pool[0].get("n_fielders") if pool else 0) or 0
+    n_matches = (pool[0].get("n_matches_total") if pool else 0) or 0
+
+    nonsub_catches    = (nonsub[0].get("catches") if nonsub else 0) or 0
+    nonsub_stumpings  = (nonsub[0].get("stumpings") if nonsub else 0) or 0
+    nonsub_run_outs   = (nonsub[0].get("run_outs") if nonsub else 0) or 0
+    nonsub_dismissals = (nonsub[0].get("dismissals") if nonsub else 0) or 0
+
+    def _r(num: int, den: int, ndigits: int) -> Optional[float]:
+        return round(num / den, ndigits) if den else None
+
+    catches_pm    = _r(nonsub_catches,    n_matches, 3)
+    stumpings_pm  = _r(nonsub_stumpings,  n_matches, 3)
+    run_outs_pm   = _r(nonsub_run_outs,   n_matches, 3)
+    dismissals_pm = _r(nonsub_dismissals, n_matches, 3)
+
+    # by_dismissed_position — per-bucket cohort sub-rates for next-spec.
+    by_dis: list[dict] = []
+    by_dis_by_bucket = {r["position_bucket"]: r for r in by_dis_rows}
+    for b in range(1, 11):
+        r = by_dis_by_bucket.get(b)
+        threshold = fielding_threshold(b)
+        if r is None:
+            by_dis.append({
+                "bucket": b, "label": fielding_bucket_label(b),
+                "n_dismissals": 0, "n_players": 0, "threshold": threshold,
+                "below_support": True,
+                "catches_per_match": None, "stumpings_per_match": None,
+                "run_outs_per_match": None, "dismissals_per_match": None,
+            })
+            continue
+        dis = r["dismissals"] or 0
+        by_dis.append({
+            "bucket": b, "label": fielding_bucket_label(b),
+            "n_dismissals": dis, "n_players": r["n_players"] or 0,
+            "threshold": threshold,
+            "below_support": dis < threshold,
+            "catches_per_match":    _r(r["catches"] or 0, n_matches, 4),
+            "stumpings_per_match":  _r(r["stumpings"] or 0, n_matches, 4),
+            "run_outs_per_match":   _r(r["run_outs"] or 0, n_matches, 4),
+            "dismissals_per_match": _r(dis, n_matches, 4),
+        })
+
+    cohort_block = {
+        "match_dimension": "is_keeper",
+        "is_keeper": is_keeper,
+        "n_fielders": n_fielders,
+        "n_matches_total": n_matches,
+    }
+
+    # No per-headline cliff for fielding (spec §5.4): the binary
+    # is_keeper axis isn't a sliding-scale dimension. The
+    # by_dismissed_position[].below_support flags surface for the
+    # next-spec impact-weighted analyses to consume.
+    return {
+        "cohort": cohort_block,
+        "catches_per_match":    wrap_metric(catches_pm,    catches_pm,    "field_catches_per_match",    sample_size=n_matches),
+        "stumpings_per_match":  wrap_metric(stumpings_pm,  stumpings_pm,  "field_stumpings_per_match",  sample_size=n_matches),
+        "run_outs_per_match":   wrap_metric(run_outs_pm,   run_outs_pm,   "field_run_outs_per_match",   sample_size=n_matches),
+        "dismissals_per_match": wrap_metric(dismissals_pm, dismissals_pm, "field_dismissals_per_match", sample_size=n_matches),
+        "by_dismissed_position": by_dis,
+    }

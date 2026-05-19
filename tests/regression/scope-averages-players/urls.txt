@@ -44,3 +44,20 @@ NEW players_bowl_men_intl_death        /api/v1/scope/averages/players/bowling/su
 
 # Primary-club 2024 — Phase 3.2 drop= activation.
 NEW players_bowl_primary_club_2024     /api/v1/scope/averages/players/bowling/summary?team_type=club&team_class=primary_club&season_from=2024&season_to=2024&over_mix=0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05
+
+# ── /scope/averages/players/fielding/summary ─────────────────────
+
+# IPL outfielders.
+NEW players_field_ipl_outfielder       /api/v1/scope/averages/players/fielding/summary?tournament=Indian%20Premier%20League&is_keeper=0
+
+# IPL keepers.
+NEW players_field_ipl_keeper           /api/v1/scope/averages/players/fielding/summary?tournament=Indian%20Premier%20League&is_keeper=1
+
+# Men's international keepers (smaller, stumps-heavy cohort).
+NEW players_field_intl_keeper          /api/v1/scope/averages/players/fielding/summary?gender=male&team_type=international&is_keeper=1
+
+# Primary-club outfielders 2024.
+NEW players_field_primary_club_out_2024 /api/v1/scope/averages/players/fielding/summary?team_type=club&team_class=primary_club&season_from=2024&season_to=2024&is_keeper=0
+
+# Unfiltered keepers.
+NEW players_field_unfiltered_keeper    /api/v1/scope/averages/players/fielding/summary?is_keeper=1
