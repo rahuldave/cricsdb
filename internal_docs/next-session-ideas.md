@@ -3,23 +3,51 @@
 > **NO DEPLOYS gate is OFF** as of 2026-04-21. Resume normal deploy
 > cadence.
 
-## NEXT SESSION — top of queue (2026-05-14+)
+## NEXT SESSION — top of queue (2026-05-19)
 
-**`spec-series-precompute-followup.md` Phases C + D** are the top
-priority. Phases B + A SHIPPED in the 2026-05-14 follow-up session
-(commits `d152ec2`, `f11b323`, `228e5ba`, `c10c869`, `e59e637` —
-plus prior session's `0eb5ec9` for moments). End-to-end /series at
-all-cricket now sub-second across every key endpoint (was 3-6s).
-Phase E permanently deferred 2026-05-14.
+**`spec-player-compare-average.md` Phase 1 — `METRIC_DIRECTIONS`
+audit + `drop=` plumbing.** Build-ready spec drafted 2026-05-19; 17-
+commit rollout across 5 phases:
 
-See `internal_docs/session-handoff-2026-05-14b.md` for the full
-handoff — measured wall-clocks, verification done, what to do next
-session for C + D.
+1. Phase 1 (1 commit): extend `api/metrics_metadata.py` with player-
+   grain metric keys; add `FilterParams.build(drop=...)` masking.
+2. Phase 2 (3 commits — one per discipline): child tables
+   `playerscopestats_position` / `_over` / `_fielding_position` +
+   populate-full + populate-incremental + add `*_distribution[]`
+   array on the corresponding `/summary` endpoint (Q5 resolution —
+   ships early so next-spec UI can prototype). Each commit deploys
+   with `bash deploy.sh --first`.
+3. Phase 3 (4 commits): `/scope/averages/players/*` endpoints
+   (batting/bowling/fielding/keeping).
+4. Phase 4 (8 commits — flip+migration per endpoint): envelope-
+   migrate the 4 player summary endpoints (can batch flips → 5
+   commits, decide at the time).
+5. Phase 5 (1 commit): frontend inline-baseline rendering on
+   `PlayerSummaryRow`.
 
-**Deploy gate:** bucketbaselinemoments + (forthcoming C/D tables)
-don't exist on production. User decision 2026-05-14: bundle B + A +
-C + D into a single `bash deploy.sh --first` deploy after C + D
-land, rather than deploying B + A alone first.
+Key design decisions baked in (see spec §13 Resolution log):
+- Bucketed convex-combination cohort (not continuous-range filter).
+- 10 batting buckets (Opener=pos 1+2; #3…#11 individual).
+- 20 bowling per-over buckets.
+- Fielding cohort is keeper/outfielder binary; per-position-of-
+  dismissed-batter histogram surfaced for **next-spec impact-
+  weighted analyses** (separate fielding spec).
+- Per-bucket sample-support thresholds + renormalisation rule.
+- `drop=` is per-endpoint structural plumbing (Surfaces 3a/4/6),
+  NOT a user-facing toggle.
+- 3 follow-up specs unblocked (purely UI/viz):
+  `spec-batting-position-chart.md`, `spec-bowling-over-chart.md`,
+  `spec-fielding-impact.md`.
+
+Older spec-series-precompute queue is SHIPPED — see
+`enhancements-roadmap.md` 2026-05-14 entries and project memory
+`project_series_precompute_shipped.md`.
+
+## OLDER NEXT-SESSION — `spec-series-precompute-followup.md` (SHIPPED 2026-05-14)
+
+Original Phases C + D shipped in commits `d3ce8ef`, `2ead91c`,
+`13cf56c`, `18e1b51`. Phase E permanently deferred. Local +
+deployed `--first` on 2026-05-14.
 
 Older queue (DOM-test rollout, series_type FilterBar) follows:
 
