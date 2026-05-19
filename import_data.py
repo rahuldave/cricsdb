@@ -527,6 +527,15 @@ async def main():
     )
     await pssp_full(db)
 
+    # Populate playerscopestats_over — per-over bowling child of
+    # player_scope_stats. Drives the over-mix cohort baseline endpoint
+    # and the per-bowler over-distribution histograms. Spec §4.3.
+    print("\nPopulating playerscopestats_over…")
+    from scripts.populate_playerscopestats_over import (
+        populate_full as psso_full,
+    )
+    await psso_full(db)
+
     # Phase 2 of Compare-tab perf — per-cell precomputed baselines.
     # See internal_docs/spec-team-bucket-baseline.md.
     print("\nPopulating bucket_baseline_*…")

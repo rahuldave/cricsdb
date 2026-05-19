@@ -13,6 +13,11 @@ from ..filters import FilterParams, AuxParams
 from ..aux_clauses import splice_aux_join_clauses
 from ..player_nationality import player_nationalities
 from ..scope_links import suggested_splits, scope_dict_from_filters
+from ..tournament_canonical import (
+    is_canonical_with_variants,
+    variants as canonical_variants,
+    event_name_in_clause,
+)
 from ..wilson import prob_record
 from ..form_windows import scope_anchor
 
@@ -23,6 +28,86 @@ def _safe_div(a, b, mul=1, ndigits=2):
     if not b:
         return None
     return round(a * mul / b, ndigits)
+
+
+async def _over_distribution(db, person_id: str, filters: FilterParams) -> list[dict]:
+    """Return the bowler's per-over aggregates as a length-20 array.
+
+    Joined from `playerscopestats_over` (child) → `playerscopestats`
+    (parent, carries the scope-key columns). Only the four scope_key
+    axes are honoured (tournament/season/gender/team_type); venue /
+    team / opponent / team_class / series_type scope below the
+    scope_key grain — same precomputed-table-only contract Phase 2a
+    used for `position_distribution`. Phase 3 cohort baselines
+    compose against this same scoping so the mix-vector and the
+    cohort track each other.
+
+    Returns a length-20 list keyed by `over` (1..20). Missing overs
+    render as zero rows so consumers can iterate without index gaps.
+    """
+    clauses = ["pss.person_id = :pid"]
+    params: dict = {"pid": person_id}
+    if filters.gender:
+        clauses.append("pss.gender = :gender")
+        params["gender"] = filters.gender
+    if filters.team_type:
+        clauses.append("pss.team_type = :team_type")
+        params["team_type"] = filters.team_type
+    if filters.tournament:
+        if is_canonical_with_variants(filters.tournament):
+            clauses.append(event_name_in_clause(
+                canonical_variants(filters.tournament),
+                col="pss.tournament",
+            ))
+        else:
+            clauses.append("pss.tournament = :tournament")
+            params["tournament"] = filters.tournament
+    if filters.season_from:
+        clauses.append("pss.season >= :season_from")
+        params["season_from"] = filters.season_from
+    if filters.season_to:
+        clauses.append("pss.season <= :season_to")
+        params["season_to"] = filters.season_to
+    where = " AND ".join(clauses)
+
+    rows = await db.q(
+        f"""
+        SELECT psso.over_number,
+               SUM(psso.runs_conceded) AS runs_conceded,
+               SUM(psso.legal_balls)   AS legal_balls,
+               SUM(psso.wickets)       AS wickets,
+               SUM(psso.dots)          AS dots,
+               SUM(psso.boundaries)    AS boundaries
+        FROM playerscopestatsover psso
+        JOIN playerscopestats pss
+          ON pss.scope_key = psso.scope_key
+         AND pss.person_id = psso.person_id
+        WHERE {where}
+        GROUP BY psso.over_number
+        ORDER BY psso.over_number
+        """,
+        params,
+    )
+
+    by_over = {r["over_number"]: r for r in rows}
+    out: list[dict] = []
+    for o in range(1, 21):
+        r = by_over.get(o)
+        if r is None:
+            out.append({
+                "over": o, "runs_conceded": 0, "legal_balls": 0,
+                "wickets": 0, "dots": 0, "boundaries": 0,
+            })
+        else:
+            out.append({
+                "over":          o,
+                "runs_conceded": r["runs_conceded"] or 0,
+                "legal_balls":   r["legal_balls"] or 0,
+                "wickets":       r["wickets"] or 0,
+                "dots":          r["dots"] or 0,
+                "boundaries":    r["boundaries"] or 0,
+            })
+    return out
 
 
 def _bowling_legal_filter(filters: FilterParams, person_id: str, batter_id: str | None = None, aux: AuxParams | None = None):
@@ -376,6 +461,7 @@ async def bowling_summary(
     boundaries = fours + sixes
 
     nationalities = await player_nationalities(db, person_id)
+    over_distribution = await _over_distribution(db, person_id, filters)
 
     return {
         "person_id": person_id,
@@ -403,6 +489,7 @@ async def bowling_summary(
         "balls_per_six": _safe_div(balls, sixes),
         "balls_per_boundary": _safe_div(balls, boundaries),
         "maiden_overs": maidens,
+        "over_distribution": over_distribution,
     }
 
 

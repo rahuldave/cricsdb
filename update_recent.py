@@ -350,6 +350,13 @@ async def main():
                 )
                 await pssp_incr(db, new_match_ids)
 
+                # playerscopestats_over — per-over bowling child of
+                # player_scope_stats. Same touched-scope recompute.
+                from scripts.populate_playerscopestats_over import (
+                    populate_incremental as psso_incr,
+                )
+                await psso_incr(db, new_match_ids)
+
                 # bucket_baseline_* — per-cell precomputed team / league
                 # baselines for the Compare tab and team endpoints.
                 # Recomputes only cells touched by new matches.

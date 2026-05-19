@@ -226,6 +226,46 @@ class PlayerScopeStats:
     matches_as_keeper: int = 0
 
 
+class PlayerScopeStatsOver:
+    """One row per (person, scope, over_number) — per-over bowling aggregates.
+
+    Child of PlayerScopeStats: same scope_key semantics, further keyed
+    by the over the delivery occurred in. over_number is 1..20 in this
+    table (the delivery table stores 0..19; we shift to 1-indexed at
+    populate time so consumers can refer to "Over 1" through "Over 20"
+    without translating).
+
+    Drives the over-mix bowling cohort baseline endpoint
+    (`/scope/averages/players/bowling/summary`) and the per-bowler
+    over-distribution histogram (next-spec viz work).
+
+    Built and maintained by
+    `scripts/populate_playerscopestats_over.py`, auto-called from
+    `import_data.py` (full) and `update_recent.py` (incremental).
+    Spec: `internal_docs/spec-player-compare-average.md` §4.3.
+
+    Per-over aggregates (legal-balls-only for the rate denominator):
+      runs_conceded — SUM(runs_total) over ALL deliveries in the over
+                       (matches the bowling router's economy basis).
+      legal_balls   — count of deliveries where extras_wides=0 AND
+                       extras_noballs=0.
+      wickets       — count of wicket-table rows credited to the
+                       bowler at this over, excluding run out / retired
+                       hurt / retired out / obstructing the field.
+      dots          — count of deliveries where runs_batter=0 AND
+                       runs_total=0 (effectively legal AND dot).
+      boundaries    — count of deliveries where runs_batter=4 OR 6.
+    """
+    person_id: ForeignKey[str, "person"]
+    scope_key: str  # matches PlayerScopeStats.scope_key
+    over_number: int  # 1..20 (1-indexed in this table)
+    runs_conceded: int = 0
+    legal_balls: int = 0
+    wickets: int = 0
+    dots: int = 0
+    boundaries: int = 0
+
+
 class PlayerScopeStatsPosition:
     """One row per (person, scope, position_bucket) — per-position batting aggregates.
 
