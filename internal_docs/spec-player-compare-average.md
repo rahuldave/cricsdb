@@ -73,7 +73,9 @@ visualisation spec.
   - `GET /fielders/{id}/keeping/summary`
   Each numeric field becomes `{value, scope_avg, delta_pct, direction,
   sample_size}` via backend-folded composition.
-- Per-bucket sample-support thresholds + renormalisation rule (§6).
+- Per-bucket sample-support sliding-scale thresholds (§6): strict
+  cliff — if any bucket the player has weight on falls below cohort
+  threshold, the response's `scope_avg` is null.
 - Distribution arrays on the four player summary endpoints
   (`position_distribution`, `over_distribution`,
   `dismissal_position_distribution`) — present in the API in this spec,
@@ -130,9 +132,9 @@ vs base 28.7   ↑ +47.7%
 - Coloured delta chip — green when aligned with direction, red when
   not, neutral grey when `direction === null` (counts).
 
-When `scope_avg` is null (player has no data in scope, or every bucket
-fell below sample-support after renormalisation) — the second + third
-tier hide, the bold value stays.
+When `scope_avg` is null (player has no data in scope, or any bucket
+the player has weight on is below cohort sample-support threshold) —
+the second + third tier hide, the bold value stays.
 
 ### Inline baseline rendering (compare columns)
 
@@ -172,12 +174,24 @@ Death 20; Keeper / Outfielder).
 
 ### Small-sample suppression
 
-Per-bucket — see §6. If every bucket in the player's mix is below
-support → the cell renders as `—` with tooltip "Cohort sample
-insufficient at this scope." If some buckets are below support →
-they're dropped from the convex combination AND the player's mix is
-renormalised over the remaining buckets. Tooltip lists which buckets
-were excluded.
+Per-bucket sliding-scale thresholds gate whether the response computes
+at all — strict cliff. See §6.
+
+For every bucket where the player has non-zero mix-weight, the cohort
+sample at that bucket must be at or above the bucket's threshold. If
+**any** such bucket falls below → the entire response's `scope_avg`
+is null and the cell renders as `—` with tooltip "Cohort sample
+insufficient at this scope" (listing the offending buckets).
+
+If all buckets the player touches are above their thresholds → the
+convex combination is computed over the player's full mix unchanged
+(no drops, no renormalisation).
+
+Buckets the player does NOT touch (mix-weight = 0) are not gated —
+their cohort sample is irrelevant to the headline. They may still
+appear flagged `below_support: true` in `by_<axis>` for completeness;
+that flag is per-bucket cohort metadata, independent of the headline
+cliff.
 
 ## Data layer
 
@@ -408,14 +422,17 @@ malformed input.
       "runs": 482.1, "strike_rate": 138.7, "average": 31.2, ... },
     { "bucket": 2,  "label": "#3",     "n_innings": 3214, "below_support": false, ... },
     /* ... 10 entries total */
-    { "bucket": 10, "label": "#11",    "n_innings":   12, "below_support": true,  ... }
+    { "bucket": 10, "label": "#11",    "n_innings":    4, "below_support": true,
+      "runs": 18.7, "strike_rate": 102.1, "average": 9.4, ... }
   ]
 }
 ```
 
-`by_position` carries every bucket's metrics independently — drives
-the renormalisation (frontend-visible: which buckets were excluded)
-AND the next-spec drill-down ("at #3 specifically, Kohli vs cohort").
+`by_position` carries every bucket's metrics independently — the
+`below_support` flag per bucket surfaces in the frontend tooltip
+(when a player-weighted bucket is below threshold, it explains why
+the headline is `—`); the same array also feeds the next-spec drill-
+down ("at #3 specifically, Kohli vs cohort").
 
 ### Response shape — bowling
 
@@ -511,10 +528,13 @@ against the map; add missing keys. Suspect additions:
 The audit happens in the first commit (extending `metrics_metadata.py`)
 before any endpoint migration.
 
-## Sample support + renormalisation
+## Sample support — sliding scale
 
-Per-bucket sample-support thresholds gate whether a bucket contributes
-to the convex combination.
+Per-bucket sliding-scale thresholds gate whether the response computes
+at all. Strict cliff: if any bucket the player has non-zero weight on
+has a cohort sample below threshold, the entire response's `scope_avg`
+is null. If all weighted buckets are above their thresholds, the
+convex combination is computed over the player's full mix as-is.
 
 ### Batting (10 buckets, linear scale)
 
@@ -564,19 +584,39 @@ threshold(bucket) = 13 - bucket    -- 12, 11, 10, 9, ..., 3
 | 9  | #10    |  4 |
 | 10 | #11    |  3 |
 
-### Renormalisation rule
+### Sliding-scale behaviour (strict cliff)
 
-When a bucket falls below threshold:
+The per-bucket threshold is the **only** support mechanism, applied
+as a hard gate on the response:
 
-1. Drop that bucket from the player's mix.
-2. Renormalise remaining bucket weights to sum to 1.0.
-3. Compute the convex combination over the renormalised mix.
-4. The response's `by_<axis>` array marks the dropped bucket with
-   `below_support: true`; the tooltip on the frontend lists which
-   buckets were excluded.
+1. For each bucket b where the player's mix-weight `mix[b] > 0`,
+   look up the cohort's innings/balls/dismissals at bucket b in scope.
+2. If that cohort sample is **below** the bucket's threshold (§6
+   tables), the entire response is suppressed:
+   `scope_avg = null`, `delta_pct = null`. Frontend renders `—`. The
+   response includes the offending bucket(s) flagged
+   `below_support: true` in `by_<axis>`; the frontend tooltip lists
+   them.
+3. If every player-weighted bucket is **at or above** its threshold,
+   the convex combination computes over the player's full mix
+   unchanged — no drops, no renormalisation.
+4. Buckets the player does NOT weight (mix-weight = 0) are irrelevant
+   to the cliff. Their `below_support` flag may still appear in
+   `by_<axis>` for cohort-level completeness (next-spec drill-downs
+   consume this), but the headline computes regardless of them.
+5. Sub-rates in `by_<axis>[B]` (runs / strike_rate / average / …)
+   are returned for every bucket regardless of the flag — the flag
+   is metadata, not a numeric mask.
 
-When ALL buckets are below threshold → response `scope_avg = null`,
-delta_pct = null. Frontend renders the cell as `—`.
+Two earlier alternatives were considered and **rejected**:
+
+- A "drop below-support buckets and renormalise the remaining
+  weights to 1.0" rule. Rejected — partial credit is misleading when
+  any participating bucket's cohort is thin; strict cliff is safer.
+- A "supported mix-weight summed < 0.30 → render `—`" global
+  secondary gate. Rejected — the per-bucket thresholds already encode
+  the confidence calibration the 30% gate was trying to express, and
+  the strict cliff makes the 30% gate moot.
 
 ## Frontend
 
@@ -643,10 +683,11 @@ New: `tests/integration/player_compare_baseline.sh`. Browser-agent walk:
 5. Narrow scope to a season where Bumrah didn't bat — verify his
    batting band hides AND no baseline fetch is fired.
 6. Set scope to a thin tournament — verify the cell renders `—` for
-   the baseline when all buckets are below support, with appropriate
-   tooltip.
-7. Verify renormalisation behaviour: a player whose mix includes a
-   below-support bucket sees the tooltip flag exclusion.
+   the baseline when at least one player-weighted bucket is below
+   support, with the tooltip naming the offending bucket(s).
+7. Verify strict-cliff behaviour: a player whose mix includes a
+   below-support bucket sees `—` (not a partial baseline), and the
+   tooltip lists the bucket(s) that triggered the cliff.
 
 ### Sanity tests (SQL ↔ API)
 
@@ -659,10 +700,15 @@ New file: `tests/sanity/test_player_scope_averages.py`. Per discipline:
    from `playerscopestats_position` for the same filter scope.
 3. `drop=` invariant: response with `drop=filter_team,filter_opponent`
    equals response without those filters set in the first place.
-4. Renormalisation invariant: if bucket B is below threshold, the
-   response `by_<axis>[B].below_support = true` AND the headline
-   `scope_avg` equals the convex combination over buckets where
-   `below_support = false`, with renormalised weights.
+4. Strict-cliff invariant:
+   (a) If the cohort at any player-weighted bucket is below threshold,
+       the response's headline `scope_avg = null` AND the offending
+       bucket(s) carry `below_support: true` in `by_<axis>`.
+   (b) Conversely, when all player-weighted buckets are above
+       threshold, the headline equals the convex combination over the
+       player's full unchanged mix (no drops, no renormalisation).
+   (c) Buckets with mix-weight 0 may carry `below_support: true`
+       without nullifying the headline.
 
 ### Match-dimension derivation tests
 
@@ -755,7 +801,7 @@ One commit each for batting / bowling / fielding / keeping. Each:
 - Adds the endpoint to `api/routers/scope_averages.py`.
 - Adds 3-5 regression URLs (NEW).
 - Adds the sanity test verifying SQL ↔ API (convex combination, pool
-  conservation, drop= invariant, renormalisation invariant).
+  conservation, drop= invariant, strict-cliff invariant).
 
 Frontend types added, not yet consumed.
 
@@ -807,24 +853,20 @@ cleaner.
    Recommend (a) — same pattern as the batting / bowling distributions
    read from their child tables. The aggregation is one indexed query.
 
-2. **Should we cap the per-bucket `by_<axis>` sub-rates at the same
-   sample-support threshold the convex combination uses?** I.e. if
-   bucket B is below_support for the cohort, do we still return its
-   sub-rate in `by_<axis>[B]`, or set those numbers to null too? The
-   sub-rates are used by next-spec for impact-weighted analyses;
-   silently noisy sub-rates could be misread.
-   Recommend: return them but mark `below_support: true`. Frontend in
-   the next-spec is responsible for honoring the flag.
+2. ~~**Cap per-bucket `by_<axis>` sub-rates at sample-support
+   threshold?**~~ **Resolved 2026-05-19**: sub-rates are returned for
+   every bucket regardless of `below_support`; the flag is metadata,
+   not a numeric mask. Next-spec consumers honour the flag when
+   displaying drill-downs. See §6.
 
-3. **Renormalisation when MOST buckets are below_support.** If a
-   player's mix has 90% weight on a single below-support bucket and
-   the remaining 10% spreads over a couple of supported buckets, the
-   renormalised baseline is computed entirely from those 10%. The
-   result is technically defensible (it's the supported part of the
-   cohort) but it's misleading the user about what they're seeing.
-   Suggest a secondary gate: if the supported mix-weight summed
-   < 0.30 of the original mix, render `—`. Otherwise compute. Bake
-   into §6 if you confirm.
+3. ~~**Renormalise the player's mix after dropping below-support
+   buckets?** Or apply a "supported-mix-weight < 0.30 → render `—`"
+   secondary gate?~~ **Resolved 2026-05-19**: neither. The sliding
+   scale is a strict cliff — if any bucket the player has weight on
+   is below cohort threshold, the entire response's `scope_avg` is
+   null and the cell renders `—`. If all player-weighted buckets are
+   above threshold, the convex combination uses the player's full mix
+   unchanged (no drops, no renormalisation). See §6.
 
 4. **Backend folding latency cost.** Each player summary endpoint now
    composes a scope-averages call internally. For unfiltered scopes
@@ -905,8 +947,16 @@ the original `outlook-comparisons.md` proposal:
    three child tables. Same denormalisation, cleaner relational shape.
 6. **Sample-support thresholds**: per-bucket linear scale for batting
    (25→7, step −2), U-shape for bowling (60-50-30-50-60), linear for
-   fielding (12→3, step −1). Renormalisation drops below-support
-   buckets and resmooths the remaining weights.
+   fielding (12→3, step −1). The sliding scale is a **strict cliff**:
+   if the cohort sample at any bucket the player has non-zero weight
+   on is below threshold, the entire response's `scope_avg` is null
+   and the frontend renders `—`. If all player-weighted buckets are
+   at or above threshold, the convex combination uses the player's
+   full mix unchanged — **no drop, no renormalisation**. Two
+   alternatives were considered and rejected: (a) drop below-support
+   buckets and renormalise the remaining weights to 1.0; (b) a
+   "supported-mix-weight summed < 0.30 → render `—`" global
+   secondary gate. The strict-cliff design supersedes both.
 7. **Fielding cohort baseline**: position-weighted approach
    investigated, rejected on dimensional grounds. Headline baseline is
    binary keeper/outfielder; per-position-of-dismissed-batter data is
