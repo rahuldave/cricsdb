@@ -142,6 +142,12 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     "bowl_balls_per_six":       "higher_better",
     "bowl_balls_per_boundary":  "higher_better",
     "bowl_maiden_overs":        None,
+    # Bowling rate metrics surfaced by the per-over cohort baseline
+    # endpoint (Phase 3.2). wickets_per_over higher = better;
+    # boundary_pct (bowler-side, fraction of balls hit for boundary)
+    # lower = better.
+    "bowl_wickets_per_over":    "higher_better",
+    "bowl_boundary_pct":        "lower_better",
 
     # ── fielding (per-player) ──────────────────────────────────────
     "field_catches":              None,

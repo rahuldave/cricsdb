@@ -1875,3 +1875,169 @@ async def scope_players_batting_summary(
         "dot_pct":        wrap_metric(_r(cc_dp, 1),      _r(cc_dp, 1),      "bat_dot_pct",     sample_size=n_innings_total),
         "by_position": by_position,
     }
+
+
+@router.get("/players/bowling/summary")
+async def scope_players_bowling_summary(
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    over_mix: str = Query(
+        ...,
+        description=(
+            "Comma-separated 20-element vector of the bowler's mix"
+            " across overs 1..20. Must sum to 1.0 +/- 0.001."
+            " Trailing zeros may be omitted."
+        ),
+    ),
+    drop: Optional[str] = Query(
+        None,
+        description=(
+            "Comma-separated FilterBar axis names to mask before"
+            " clause construction. Recognised: gender, team_type,"
+            " tournament, season, filter_venue, filter_team,"
+            " filter_opponent, team_class, series_type."
+        ),
+    ),
+):
+    """Over-mix-weighted cohort baseline for bowling.
+
+    Returns cohort metadata, strict-cliff flags, five envelope-wrapped
+    headline rates (economy, average, strike_rate, dot_pct,
+    wickets_per_over), and per-over aggregates in by_over[20].
+
+    Sliding-scale thresholds on cohort `legal_balls` per over:
+    U-shape (60-50-30-50-60). Any over the bowler has non-zero
+    mix-weight on must be at or above its threshold; otherwise the
+    entire response's scope_avg is null.
+    """
+    db = get_db()
+    try:
+        mix = parse_mix(over_mix, 20)
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                    f" Recognised: {sorted(_DROP_AXES)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    where, params = build_scope_clauses(filters, drop=drop_set)
+
+    main_sql = f"""
+        SELECT psso.over_number,
+               SUM(psso.runs_conceded) AS runs_conceded,
+               SUM(psso.legal_balls)   AS legal_balls,
+               SUM(psso.wickets)       AS wickets,
+               SUM(psso.dots)          AS dots,
+               SUM(psso.boundaries)    AS boundaries,
+               COUNT(DISTINCT psso.person_id) AS n_players
+        FROM playerscopestatsover psso
+        WHERE psso.scope_key IN (
+            SELECT scope_key FROM playerscopestats pss WHERE {where}
+        )
+        GROUP BY psso.over_number
+        ORDER BY psso.over_number
+    """
+    pool_sql = f"""
+        SELECT COUNT(DISTINCT psso.person_id) AS n_players,
+               SUM(psso.legal_balls)           AS n_balls_total
+        FROM playerscopestatsover psso
+        WHERE psso.scope_key IN (
+            SELECT scope_key FROM playerscopestats pss WHERE {where}
+        )
+    """
+    rows, pool = await asyncio.gather(
+        db.q(main_sql, params),
+        db.q(pool_sql, params),
+    )
+    by_over = {r["over_number"]: r for r in rows}
+    n_players_total = (pool[0].get("n_players") if pool else 0) or 0
+    n_balls_total = (pool[0].get("n_balls_total") if pool else 0) or 0
+
+    by_over_arr: list[dict] = []
+    for o in range(1, 21):
+        r = by_over.get(o)
+        threshold = bowling_threshold(o)
+        if r is None:
+            by_over_arr.append({
+                "over": o, "label": bowling_bucket_label(o),
+                "n_balls": 0, "n_players": 0, "threshold": threshold,
+                "below_support": True,
+                "economy": None, "average": None, "strike_rate": None,
+                "dot_pct": None, "wickets_per_over": None,
+                "boundary_pct": None,
+            })
+            continue
+        balls = r["legal_balls"] or 0
+        runs = r["runs_conceded"] or 0
+        wickets = r["wickets"] or 0
+        dots = r["dots"] or 0
+        boundaries = r["boundaries"] or 0
+        by_over_arr.append({
+            "over": o, "label": bowling_bucket_label(o),
+            "n_balls": balls, "n_players": r["n_players"] or 0,
+            "threshold": threshold,
+            "below_support": balls < threshold,
+            "economy":          round(runs * 6 / balls, 2)            if balls else None,
+            "average":          round(runs / wickets, 2)              if wickets else None,
+            "strike_rate":      round(balls / wickets, 2)             if wickets else None,
+            "dot_pct":          round(dots / balls * 100, 1)          if balls else None,
+            "wickets_per_over": round(wickets * 6 / balls, 3)         if balls else None,
+            "boundary_pct":     round(boundaries / balls * 100, 1)    if balls else None,
+        })
+
+    cliff_buckets: list[int] = [
+        o for o in range(1, 21)
+        if mix[o - 1] > 0 and by_over_arr[o - 1]["below_support"]
+    ]
+
+    cohort_block = {
+        "match_dimension": "over_mix",
+        "over_mix": mix,
+        "n_players": n_players_total,
+        "n_balls_total": n_balls_total,
+    }
+
+    if cliff_buckets:
+        return {
+            "cohort": cohort_block,
+            "below_support": True,
+            "cliff_buckets": cliff_buckets,
+            "economy":          wrap_metric(None, None, "bowl_economy",      sample_size=n_balls_total),
+            "average":          wrap_metric(None, None, "bowl_average",      sample_size=n_balls_total),
+            "strike_rate":      wrap_metric(None, None, "bowl_strike_rate",  sample_size=n_balls_total),
+            "dot_pct":          wrap_metric(None, None, "bowl_dot_pct",      sample_size=n_balls_total),
+            "wickets_per_over": wrap_metric(None, None, "bowl_wickets_per_over", sample_size=n_balls_total),
+            "boundary_pct":     wrap_metric(None, None, "bowl_boundary_pct", sample_size=n_balls_total),
+            "by_over": by_over_arr,
+        }
+
+    def cv(field: str) -> Optional[float]:
+        return convex_combine(mix, {o: by_over_arr[o - 1][field] for o in range(1, 21)})
+
+    cc_econ = cv("economy")
+    cc_avg  = cv("average")
+    cc_sr   = cv("strike_rate")
+    cc_dp   = cv("dot_pct")
+    cc_wpo  = cv("wickets_per_over")
+    cc_bp   = cv("boundary_pct")
+
+    def _r(v: Optional[float], ndigits: int) -> Optional[float]:
+        return round(v, ndigits) if v is not None else None
+
+    return {
+        "cohort": cohort_block,
+        "below_support": False,
+        "cliff_buckets": [],
+        "economy":          wrap_metric(_r(cc_econ, 2), _r(cc_econ, 2), "bowl_economy",         sample_size=n_balls_total),
+        "average":          wrap_metric(_r(cc_avg, 2),  _r(cc_avg, 2),  "bowl_average",         sample_size=n_balls_total),
+        "strike_rate":      wrap_metric(_r(cc_sr, 2),   _r(cc_sr, 2),   "bowl_strike_rate",     sample_size=n_balls_total),
+        "dot_pct":          wrap_metric(_r(cc_dp, 1),   _r(cc_dp, 1),   "bowl_dot_pct",         sample_size=n_balls_total),
+        "wickets_per_over": wrap_metric(_r(cc_wpo, 3),  _r(cc_wpo, 3),  "bowl_wickets_per_over", sample_size=n_balls_total),
+        "boundary_pct":     wrap_metric(_r(cc_bp, 1),   _r(cc_bp, 1),   "bowl_boundary_pct",    sample_size=n_balls_total),
+        "by_over": by_over_arr,
+    }
