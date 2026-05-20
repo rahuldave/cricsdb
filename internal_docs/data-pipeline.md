@@ -116,6 +116,30 @@ populates four denormalized tables:
    parent + position child populates — computed ONCE per innings
    and threaded across the three downstream scripts. Sanity:
    `tests/sanity/test_playerscopestats_fielding_position.py`.
+8. `playerscopestats_batting_phase` (~112K rows, one per
+   (person, scope_key, phase_bucket) — 3 phase buckets:
+   1=powerplay/2=middle/3=death, same boundaries as the parent's
+   `_phase`) via
+   `scripts/populate_playerscopestats_batting_phase.py:populate_full()`.
+   Backs `/api/v1/scope/averages/players/batting/by-phase`. Sanity:
+   `tests/sanity/test_playerscopestats_batting_phase.py` (ball-grain
+   pool conservation against parent + upper-bound
+   `innings_in_phase ≤ 3 × parent.innings_batted`).
+9. `playerscopestats_fielding_phase` (~72K rows, one per
+   (fielder, scope_key, phase_bucket)) via
+   `scripts/populate_playerscopestats_fielding_phase.py:populate_full()`.
+   Substitute fielders EXCLUDED. Convention 3 applied. Backs
+   `/api/v1/scope/averages/players/fielding/by-phase`. Sanity:
+   `tests/sanity/test_playerscopestats_fielding_phase.py`.
+
+Steps 8-9 added 2026-05-20 by `spec-player-baseline-parity.md` §3.1.
+Steps 1-7 also gained schema columns in that rollout:
+`playerscopestats` got `thirties / fifties / hundreds / ducks` (per-
+innings milestone counts) and `playerscopestatsover` got `maidens`
+(per-(person, scope, over) maiden-over count). Idempotent
+ALTER TABLE ADD COLUMN blocks in the populate scripts migrate
+pre-existing DBs; new DBs created by `db.create` have the columns
+from the start.
 
 ### Incremental updates
 
@@ -123,12 +147,13 @@ populates four denormalized tables:
 filters to T20/IT20 (international + club), dedupes against
 `match.filename`, and imports only what's new. After importing, it
 automatically adds fielding credits, keeper assignments,
-partnerships, player_scope_stats AND the three child tables
-(`playerscopestats_position`, `playerscopestats_over`,
-`playerscopestats_fielding_position`) for the new matches only (via
+partnerships, player_scope_stats AND the five playerscopestats
+child tables (`playerscopestats_position`, `playerscopestats_over`,
+`playerscopestats_fielding_position`, `playerscopestats_batting_phase`,
+`playerscopestats_fielding_phase`) for the new matches only (via
 `populate_incremental()` on each denormalized table) — no separate
 step needed. New ambiguous keeper innings get appended to today's
-partition CSV under `docs/keeper-ambiguous/`. All four
+partition CSV under `docs/keeper-ambiguous/`. All six
 playerscopestats-family incremental paths use the same touched-
 scope recompute strategy: identify scope_keys touched by the new
 matches, find ALL matches in those scopes, recompute the

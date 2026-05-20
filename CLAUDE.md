@@ -432,12 +432,21 @@ The player-baseline rollout (`spec-player-compare-average.md`, shipped 2026-05-2
 
 **Sliding-scale thresholds (spec §6):** per-bucket cohort sample minimums. Batting linear `27 − 2·bucket` → 25, 23, 21, 19, 17, 15, 13, 11, 9, 7. Bowling U-shape: 60 at overs 1-2/20, 50 at overs 3-6/16-19, 30 at overs 7-15. Fielding linear `13 − bucket` → 12, 11, 10, …, 3 (used by the next-spec impact-weighted analyses, not by this rollout's headline). Strict cliff: any bucket the player has non-zero mix-weight on must be at or above its threshold; otherwise the entire response's `scope_avg` is null. No drops, no renormalisation.
 
+**Phase 4 child tables (added 2026-05-20 by `spec-player-baseline-parity.md` §3.1):**
+
+- `playerscopestats_batting_phase` — one row per (person, scope_key, phase_bucket); phase_bucket = 1=powerplay (overs 0-5) / 2=middle (6-14) / 3=death (15-19). Same phase boundaries as `populate_player_scope_stats.py::_phase` and the team-side conventions. Backs `/api/v1/scope/averages/players/batting/by-phase` (position-flat — no position × phase precompute).
+- `playerscopestats_fielding_phase` — one row per (fielder, scope_key, phase_bucket); same phase mapping. Substitute fielders EXCLUDED at populate (is_substitute = 0). Convention 3: `catches_in_phase` includes c&b. Backs `/api/v1/scope/averages/players/fielding/by-phase`.
+
+By-season + by-phase cohort endpoints exist for all three disciplines (`/scope/averages/players/{batting,bowling,fielding}/{by-season,by-phase}`) — all accept `person_id` (not a caller-supplied mix vector) so the endpoint derives per-season/per-phase mix server-side. Mirror that convention on new variants.
+
 **Tells you might be about to break this:**
 - New surface adds a 5-bucket "position-group" batting axis. → Don't. Reuse the 10-bucket axis (collapse client-side if needed).
 - Tempted to split opener into "pos 1" vs "pos 2". → Don't. `derive_positions` makes it arbitrary on ball 1.
 - New fielding surface wants position-weighted catches-per-match. → That's `spec-fielding-impact.md` territory (deferred). Keep this spec's headline keeper-binary.
+- New "by-X" cohort endpoint accepting `position_mix=…` directly. → Don't. By-season/by-phase variants take `person_id` and derive the mix internally; only the lifetime `/summary` endpoints take the mix vector externally (for the compare-grid case where there's no subject player).
+- New playerscopestats child table NOT wired into both `import_data.py` (full) AND `update_recent.py` (incremental, touched-scope-recompute pattern). → Wire both; sibling populates establish the contract.
 
-Spec: `internal_docs/spec-player-compare-average.md` §4 + §6.
+Spec: `internal_docs/spec-player-compare-average.md` §4 + §6; `internal_docs/spec-player-baseline-parity.md` §3.1 + §3.2.
 
 ---
 
