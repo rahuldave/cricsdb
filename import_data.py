@@ -546,6 +546,16 @@ async def main():
     )
     await pssfp_full(db)
 
+    # Populate playerscopestats_batting_phase — per-phase batting
+    # child of player_scope_stats. Drives the per-phase batting cohort
+    # baseline endpoint and per-batter phase-distribution visuals.
+    # Spec: internal_docs/spec-player-baseline-parity.md §3.1.1.
+    print("\nPopulating playerscopestats_batting_phase…")
+    from scripts.populate_playerscopestats_batting_phase import (
+        populate_full as pssbp_full,
+    )
+    await pssbp_full(db)
+
     # Phase 2 of Compare-tab perf — per-cell precomputed baselines.
     # See internal_docs/spec-team-bucket-baseline.md.
     print("\nPopulating bucket_baseline_*…")

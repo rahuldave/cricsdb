@@ -311,6 +311,42 @@ class PlayerScopeStatsFieldingPosition:
     dismissals: int = 0  # catches + stumpings + run_outs
 
 
+class PlayerScopeStatsBattingPhase:
+    """One row per (person, scope, phase_bucket) — per-phase batting aggregates.
+
+    Child of PlayerScopeStats: same scope_key semantics, further keyed
+    by the phase the ball was bowled in (1=powerplay overs 0-5, 2=middle
+    overs 6-14, 3=death overs 15-19 — matching the parent populate's
+    `_phase` boundaries and `api/routers/teams.py`).
+
+    Drives the per-phase batting cohort baseline endpoint
+    (`/api/v1/scope/averages/players/batting/by-phase`) and the per-
+    batter phase-distribution visualisations (next-spec viz). Both
+    consumers read the same indexed table.
+
+    Built and maintained by
+    `scripts/populate_playerscopestats_batting_phase.py`, auto-called
+    from `import_data.py` (full) and `update_recent.py` (incremental)
+    alongside the position child populate. Spec:
+    `internal_docs/spec-player-baseline-parity.md` §3.1.1.
+
+    Aggregation excluded-kinds match the parent:
+      - Batter dismissals exclude 'retired hurt' / 'retired out'
+        (BATTER_DISMISSAL_EXCLUDED).
+    """
+    person_id: ForeignKey[str, "person"]
+    scope_key: str  # matches PlayerScopeStats.scope_key
+    phase_bucket: int  # 1=powerplay, 2=middle, 3=death
+    innings_in_phase: int = 0    # innings where the batter faced ≥1 ball in this phase
+    balls_in_phase: int = 0       # legal balls faced in this phase
+    runs_in_phase: int = 0        # runs scored in this phase
+    dots_in_phase: int = 0
+    fours_in_phase: int = 0
+    sixes_in_phase: int = 0
+    boundaries_in_phase: int = 0  # fours + sixes
+    dismissals_in_phase: int = 0
+
+
 class PlayerScopeStatsPosition:
     """One row per (person, scope, position_bucket) — per-position batting aggregates.
 

@@ -365,6 +365,14 @@ async def main():
                 )
                 await pssfp_incr(db, new_match_ids)
 
+                # playerscopestats_batting_phase — per-phase batting
+                # child of player_scope_stats. Same touched-scope
+                # recompute. Spec: spec-player-baseline-parity.md §3.1.1.
+                from scripts.populate_playerscopestats_batting_phase import (
+                    populate_incremental as pssbp_incr,
+                )
+                await pssbp_incr(db, new_match_ids)
+
                 # bucket_baseline_* — per-cell precomputed team / league
                 # baselines for the Compare tab and team endpoints.
                 # Recomputes only cells touched by new matches.
