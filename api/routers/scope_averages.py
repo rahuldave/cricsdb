@@ -2486,6 +2486,223 @@ async def scope_players_bowling_summary(
     return await compute_players_bowling_cohort(db, filters, aux, mix, drop_set)
 
 
+# ============================================================
+# /scope/averages/players/bowling/by-season — Phase 4 of
+# spec-player-baseline-parity.md. Per-season cohort baseline
+# computed under the player's PER-SEASON over-mix (Q2 decision).
+# ============================================================
+
+
+async def compute_players_bowling_by_season(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-season bowling cohort baseline keyed off the player's
+    per-season over-mix. Spec: spec-player-baseline-parity.md §3.2.
+    """
+    where, params = build_scope_clauses(filters, drop=drop_set)
+
+    # Q1: player's per-season legal_balls by over_number (mix derivation).
+    player_sql = f"""
+        SELECT pss.season,
+               psso.over_number,
+               psso.legal_balls
+        FROM playerscopestatsover psso
+        JOIN playerscopestats pss
+          ON pss.scope_key = psso.scope_key
+         AND pss.person_id = psso.person_id
+        WHERE {where}
+          AND psso.person_id = :__pid
+        ORDER BY pss.season, psso.over_number
+    """
+    # Q2: cohort aggregates per (season, over_number).
+    cohort_sql = f"""
+        SELECT pss.season,
+               psso.over_number,
+               SUM(psso.runs_conceded) AS runs_conceded,
+               SUM(psso.legal_balls)   AS legal_balls,
+               SUM(psso.wickets)       AS wickets,
+               SUM(psso.dots)          AS dots,
+               SUM(psso.boundaries)    AS boundaries,
+               SUM(psso.maidens)       AS maidens,
+               COUNT(DISTINCT psso.person_id) AS n_players
+        FROM playerscopestatsover psso
+        JOIN playerscopestats pss
+          ON pss.scope_key = psso.scope_key
+         AND pss.person_id = psso.person_id
+        WHERE {where}
+        GROUP BY pss.season, psso.over_number
+        ORDER BY pss.season, psso.over_number
+    """
+    # Q3: per-season pool totals.
+    pool_sql = f"""
+        SELECT pss.season,
+               COUNT(DISTINCT psso.person_id) AS n_players,
+               SUM(psso.legal_balls)          AS n_balls_total
+        FROM playerscopestatsover psso
+        JOIN playerscopestats pss
+          ON pss.scope_key = psso.scope_key
+         AND pss.person_id = psso.person_id
+        WHERE {where}
+        GROUP BY pss.season
+        ORDER BY pss.season
+    """
+    p_params = {**params, "__pid": person_id}
+    player_rows, cohort_rows, pool_rows = await asyncio.gather(
+        db.q(player_sql, p_params),
+        db.q(cohort_sql, params),
+        db.q(pool_sql, params),
+    )
+
+    # Roll up.
+    cohort_by_season: dict[str, dict[int, dict]] = {}
+    for r in cohort_rows:
+        cohort_by_season.setdefault(r["season"], {})[r["over_number"]] = r
+    pool_by_season: dict[str, dict] = {r["season"]: r for r in pool_rows}
+    player_balls: dict[str, dict[int, int]] = {}
+    # innings per season for wickets_per_innings derivation. The bowling
+    # child table doesn't carry innings directly; we approximate via
+    # the parent playerscopestats (innings_batted excludes pure
+    # bowling-innings; use n_balls / 6 as a proxy span when not
+    # surfaced — for now we elide wickets_per_innings on by-season
+    # and surface wickets at the more natural per-over rate).
+    for r in player_rows:
+        player_balls.setdefault(r["season"], {})[r["over_number"]] = r["legal_balls"]
+
+    by_season: list[dict] = []
+    for season in sorted(player_balls.keys()):
+        overs = player_balls[season]
+        total = sum(overs.values())
+        if total == 0:
+            continue
+        mix = [0.0] * 20
+        for o, n in overs.items():
+            if 1 <= o <= 20:
+                mix[o - 1] = n / total
+
+        season_cohort = cohort_by_season.get(season, {})
+        by_over: list[dict] = []
+        cliff_overs: list[int] = []
+        for o in range(1, 21):
+            threshold = bowling_threshold(o)
+            r = season_cohort.get(o)
+            if r is None:
+                by_over.append({"below_support": True, "balls": 0})
+                if mix[o - 1] > 0:
+                    cliff_overs.append(o)
+                continue
+            balls = r["legal_balls"] or 0
+            runs = r["runs_conceded"] or 0
+            wickets = r["wickets"] or 0
+            dots = r["dots"] or 0
+            boundaries = r["boundaries"] or 0
+            maidens = r["maidens"] or 0
+            below = balls < threshold
+            if below and mix[o - 1] > 0:
+                cliff_overs.append(o)
+            by_over.append({
+                "below_support": below,
+                "economy":           (runs * 6 / balls) if balls else None,
+                "average":           (runs / wickets) if wickets else None,
+                "strike_rate":       (balls / wickets) if wickets else None,
+                "dot_pct":           (dots / balls * 100) if balls else None,
+                "boundary_pct":      (boundaries / balls * 100) if balls else None,
+                "balls_per_boundary": (balls / boundaries) if boundaries else None,
+                "wickets_per_over":  (wickets * 6 / balls) if balls else None,
+                "maidens_per_player_over": (maidens / r["n_players"]) if r["n_players"] else None,
+            })
+
+        pool = pool_by_season.get(season, {})
+        n_players_total = pool.get("n_players") or 0
+        n_balls_total = pool.get("n_balls_total") or 0
+
+        row: dict = {
+            "season": season,
+            "mix": [round(m, 4) for m in mix],
+            "n_players": n_players_total,
+            "n_balls": n_balls_total,
+        }
+
+        if cliff_overs:
+            row.update({
+                "below_support": True,
+                "cliff_overs": cliff_overs,
+                "economy": None, "bowling_avg": None,
+                "strike_rate": None, "dot_pct": None,
+                "boundary_pct": None, "balls_per_boundary": None,
+                "wickets_per_over": None, "wickets_per_innings": None,
+                "maidens_per_innings": None,
+            })
+            by_season.append(row)
+            continue
+
+        def cv(field: str) -> Optional[float]:
+            return convex_combine(mix, {o: by_over[o - 1].get(field) for o in range(1, 21)})
+
+        def _r(v, n):
+            return round(v, n) if v is not None else None
+
+        # wickets_per_innings ≈ wickets/over × 4 (a typical bowler
+        # bowls ~4 overs/innings). Approximate per Q6 envelope shape.
+        cc_wpo = cv("wickets_per_over")
+        cc_mpo = cv("maidens_per_player_over")
+        row.update({
+            "below_support": False,
+            "cliff_overs": [],
+            "economy":            _r(cv("economy"), 2),
+            "bowling_avg":        _r(cv("average"), 2),
+            "strike_rate":        _r(cv("strike_rate"), 2),
+            "dot_pct":            _r(cv("dot_pct"), 1),
+            "boundary_pct":       _r(cv("boundary_pct"), 1),
+            "balls_per_boundary": _r(cv("balls_per_boundary"), 2),
+            "wickets_per_over":   _r(cc_wpo, 3),
+            # Per-innings rates approximated against a typical 4-over
+            # innings span — finer-grained than per-over but coarse
+            # enough that the Q6 chip remains meaningful.
+            "wickets_per_innings": _r(cc_wpo * 4 if cc_wpo is not None else None, 3),
+            "maidens_per_innings": _r(cc_mpo * 4 if cc_mpo is not None else None, 3),
+        })
+        by_season.append(row)
+
+    return {"by_season": by_season}
+
+
+@router.get("/players/bowling/by-season")
+async def scope_players_bowling_by_season(
+    person_id: str = Query(
+        ...,
+        description=(
+            "Player ID. The endpoint derives per-season over-mix"
+            " server-side from playerscopestatsover joined on this"
+            " person_id; per-season cohort baseline is then computed"
+            " under each season's mix."
+        ),
+    ),
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    drop: Optional[str] = Query(None),
+):
+    """Per-season over-mix-weighted cohort baseline for bowling."""
+    db = get_db()
+    try:
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await compute_players_bowling_by_season(
+        db, person_id, filters, aux, drop_set,
+    )
+
+
 async def compute_players_fielding_cohort(
     db,
     filters: FilterParams,
