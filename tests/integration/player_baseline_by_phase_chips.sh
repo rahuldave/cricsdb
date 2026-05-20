@@ -235,6 +235,78 @@ for phase in powerplay middle death; do
   assert_contains "/fielding By Phase: $phase Total chip cites API base $api_dpm_3" "vs base $api_dpm_3" "$block"
 done
 
+# ───────────────────────────────────────────────────────────────────
+# Phase G — cohort tooltip threaded into By Phase chips
+# ───────────────────────────────────────────────────────────────────
+# Phase G refactored the per-page PhaseChip helpers into a shared
+# BaselineChip + threaded each page's cohortTooltip (Position-mix /
+# Over-mix / Keeper-binary phrasing) into the chip's hover title.
+# Hovering any By Phase chip should now show the same cohort phrase
+# the summary tile chips do. Spec §5.1 Q5.
+
+echo
+echo "=== Phase G — cohort tooltips on By Phase chips ==="
+
+ab open "$BASE/batting?player=$KOHLI&$SCOPE_URL&tab=By%20Phase"
+sleep 3
+agent-browser eval --json "(() => {
+  const pp = Array.from(document.querySelectorAll('.wisden-phaseblock'))
+    .find(b => b.querySelector('h3')?.textContent?.toLowerCase() === 'powerplay');
+  return pp
+    ? Array.from(pp.querySelectorAll('span[title]')).map(s => s.getAttribute('title'))
+    : [];
+})()" > /tmp/tt.json 2>/dev/null
+n=$(python3 -c "
+import json
+tt = json.load(open('/tmp/tt.json'))['data']['result']
+print(len([t for t in tt if t and 'Position-mix' in t]))
+")
+if [ "$n" -ge 3 ]; then
+  ok "/batting By Phase: ≥3 chips carry 'Position-mix baseline' tooltip (=$n)"
+else
+  bad "/batting By Phase: only $n chips have Position-mix tooltip, expected ≥3"
+fi
+
+ab open "$BASE/bowling?player=$BUMRAH&$SCOPE_URL&tab=By%20Phase"
+sleep 3
+agent-browser eval --json "(() => {
+  const pp = Array.from(document.querySelectorAll('.wisden-phaseblock'))
+    .find(b => b.querySelector('h3')?.textContent === 'Powerplay');
+  return pp
+    ? Array.from(pp.querySelectorAll('span[title]')).map(s => s.getAttribute('title'))
+    : [];
+})()" > /tmp/tt.json 2>/dev/null
+n=$(python3 -c "
+import json
+tt = json.load(open('/tmp/tt.json'))['data']['result']
+print(len([t for t in tt if t and 'Over-mix' in t]))
+")
+if [ "$n" -ge 3 ]; then
+  ok "/bowling By Phase: ≥3 chips carry 'Over-mix baseline' tooltip (=$n)"
+else
+  bad "/bowling By Phase: only $n chips have Over-mix tooltip, expected ≥3"
+fi
+
+ab open "$BASE/fielding?player=$KOHLI&$SCOPE_URL&tab=By%20Phase"
+sleep 3
+agent-browser eval --json "(() => {
+  const pp = Array.from(document.querySelectorAll('.wisden-phaseblock'))
+    .find(b => b.querySelector('h3')?.textContent?.toLowerCase() === 'powerplay');
+  return pp
+    ? Array.from(pp.querySelectorAll('span[title]')).map(s => s.getAttribute('title'))
+    : [];
+})()" > /tmp/tt.json 2>/dev/null
+n=$(python3 -c "
+import json
+tt = json.load(open('/tmp/tt.json'))['data']['result']
+print(len([t for t in tt if t and ('Outfielder-cohort' in t or 'Keeper-cohort' in t)]))
+")
+if [ "$n" -ge 1 ]; then
+  ok "/fielding By Phase: ≥1 chip carries fielding cohort tooltip (=$n)"
+else
+  bad "/fielding By Phase: $n chips with fielding cohort tooltip, expected ≥1"
+fi
+
 echo
 echo "─────────────────────────────────────────"
 echo "Results: $PASS passed, $FAIL failed"
