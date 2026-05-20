@@ -57,7 +57,7 @@ CLAUDE.md is the **inviolable-rules file**. Everything describing what the codeb
 **Active work**
 - Next-session agenda + NO-DEPLOYS gate: `internal_docs/next-session-ideas.md`
 - A–Q lettered roadmap, dated session logs, deferred queue: `internal_docs/enhancements-roadmap.md`
-- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md`, `internal_docs/spec-splits-mosaic.md`, `internal_docs/splits-mosaic-cross-page.md`
+- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md`, `internal_docs/spec-splits-mosaic.md`, `internal_docs/splits-mosaic-cross-page.md`, `internal_docs/spec-rate-vs-volume-audit.md` (next-up Phase I — absolute-vs-per-innings tile/chart hygiene; backend extensions front of doc)
 - Club-tier classification: `internal_docs/club-tier-classification.md` + anchor numbers `internal_docs/club-tier-anchor-numbers.md`
 
 ---
@@ -250,6 +250,24 @@ When a tile renders a `MetricDelta` chip against `scope_avg` (the league-side du
 Use `LineChart`'s `referenceData` prop (auto-derives the legend label from `abbreviateScope(filters, { discipline }) + " avg"`) and fetch the baseline unconditionally — `/scope/averages/{discipline}/by-season` accepts the same FilterParams the chip's summary endpoint does, so the baseline tracks whatever the FilterBar describes.
 
 User flagged 2026-05-13: CSK win % showed +14.9% at `tournament=IPL` and +16.0% without — the chip surfaced the scope_avg movement at every scope but the chart only drew the green line at one. Naming: avoid `tournamentBaseline` for a variable that fetches at every scope; `scopeBaseline` reads correctly.
+
+### Absolute-vs-per-innings dimensional discipline for chips
+
+A MetricDelta chip ("vs base N · ↑+M%") next to a bold tile value is only coherent when the chip's `scope_avg` is in the SAME dimension as the bold value. Pairing an absolute count (9 hundreds, 125 catches) with a per-innings or per-match rate chip (0.006 hundreds/inn, 0.316 catches/match) creates a dimensional mismatch that the reader can't parse — `9 vs base 0.006 → +450%` reads as nonsense.
+
+**Rules:**
+- **Absolute tiles** (counts: `Runs`, `100s`, `Catches`, `Maiden Overs`, `Wickets`) → bold value only, **no chip**.
+- **Per-innings / per-match tiles** (rates: `Avg`, `SR`, `100s/Inn`, `Catches/Match`, `Econ`) → bold value + chip OK.
+- **"Show both"** — pair every absolute with a sibling per-innings tile so the reader gets both the count AND the comparison. Don't stuff a rate chip onto a volume tile as a shortcut.
+
+Same rule for charts: absolute-per-season chart → no baseline overlay; per-rate-per-season chart → green-line overlay.
+
+User flagged 2026-05-20 after Phase F of `spec-player-baseline-parity.md` shipped Kohli IPL profile with "100s 9 — vs base 0.006 ↑+450%" tiles. Full audit + fix plan in `internal_docs/spec-rate-vs-volume-audit.md`.
+
+**Tells you're about to violate this:**
+- Adding `subtitle={baselineSub(b.runs, …)}` on a Runs tile — Runs is volume, subtitle would render a rate chip.
+- Pairing `<StatCard label="Catches" value={f.catches.value} subtitle={…catches_per_match}>` — bold is volume, chip is rate; split into two tiles.
+- Adding a green baseline overlay to a Volume-by-Season BarChart/LineChart — drop the overlay or convert the chart to per-rate-by-season.
 
 ### No CSS-pixel shortcuts when a structural fix exists
 
