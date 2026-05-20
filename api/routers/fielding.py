@@ -382,6 +382,9 @@ async def fielding_summary(
 
     cohort_sample = cohort["cohort"]["n_matches_total"] if cohort else None
     dismissals_pm_val = _safe_div(total, matches, 1, 3)
+    catches_pm_val = _safe_div(catches, matches, 1, 3)
+    stumpings_pm_val = _safe_div(stumpings, matches, 1, 3)
+    run_outs_pm_val = _safe_div(run_outs, matches, 1, 3)
 
     return {
         "person_id": person_id,
@@ -396,10 +399,27 @@ async def fielding_summary(
         "total_dismissals":    wrap_metric(total,              None, "field_total_dismissals",     sample_size=cohort_sample),
         "substitute_catches":  wrap_metric(substitute_catches, None, "field_substitute_catches",   sample_size=cohort_sample),
         "innings_kept":        wrap_metric(innings_kept,       None, "field_innings_kept",         sample_size=cohort_sample),
-        # Rate metric.
+        # Rate metrics — per-match rates against the keeper-binary
+        # cohort. dismissals_per_match shipped Phase 4; the three
+        # sub-component envelopes (catches/stumpings/run_outs)
+        # close a spec gap (spec-player-baseline-parity.md §4.4
+        # assumed they already existed; cohort returns them but the
+        # player-side endpoint didn't thread them through).
         "dismissals_per_match": wrap_metric(
             dismissals_pm_val, _cohort_scope_avg("dismissals_per_match"),
             "field_dismissals_per_match", sample_size=cohort_sample,
+        ),
+        "catches_per_match": wrap_metric(
+            catches_pm_val, _cohort_scope_avg("catches_per_match"),
+            "field_catches_per_match", sample_size=cohort_sample,
+        ),
+        "stumpings_per_match": wrap_metric(
+            stumpings_pm_val, _cohort_scope_avg("stumpings_per_match"),
+            "field_stumpings_per_match", sample_size=cohort_sample,
+        ),
+        "run_outs_per_match": wrap_metric(
+            run_outs_pm_val, _cohort_scope_avg("run_outs_per_match"),
+            "field_run_outs_per_match", sample_size=cohort_sample,
         ),
         "dismissal_position_distribution": dismissal_position_distribution,
         "cohort": cohort["cohort"] if cohort else None,
@@ -433,6 +453,29 @@ async def fielding_by_season(
         params,
     )
 
+    # Per-season matches the player appeared in — needed for the
+    # by-season chart's cohort overlay to rescale a per-match rate
+    # baseline back to per-season volume (spec-player-baseline-
+    # parity.md §4.4). Match-level filter clause (build with
+    # has_innings_join=False) joined on matchplayer.
+    match_where, match_params = filters.build(has_innings_join=False, aux=aux)
+    match_params["person_id"] = person_id
+    match_parts = ["mp.person_id = :person_id"]
+    if match_where:
+        match_parts.append(match_where)
+    match_clause = " AND ".join(match_parts)
+    matches_rows = await db.q(
+        f"""
+        SELECT m.season, COUNT(DISTINCT m.id) AS n_matches
+        FROM matchplayer mp
+        JOIN match m ON m.id = mp.match_id
+        WHERE {match_clause}
+        GROUP BY m.season
+        """,
+        match_params,
+    )
+    matches_by_season = {r["season"]: r["n_matches"] for r in matches_rows}
+
     from collections import defaultdict
     seasons = defaultdict(lambda: {"caught_only": 0, "stumpings": 0, "run_outs": 0, "caught_and_bowled": 0})
     for r in rows:
@@ -459,6 +502,7 @@ async def fielding_by_season(
             "run_outs": s["run_outs"],
             "caught_and_bowled": s["caught_and_bowled"],
             "total": total,
+            "matches": matches_by_season.get(season, 0),
         })
 
     return {"by_season": by_season}
