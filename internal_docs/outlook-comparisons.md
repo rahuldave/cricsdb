@@ -53,26 +53,49 @@ remainder.
 
 ## Surface 1 — Player compare with position-matched average
 
-**Highest-value surface.** Mirrors Teams Compare's new average column
-into `/players?player=X&compare=Y`. Add a slot: "+ Add average batter /
-bowler / fielder in scope". The match dimension auto-derives from the
-primary player's role (batting-primary → position-matched batting
-baseline; bowling-primary → phase-mix-matched bowling baseline).
+→ **Promoted to `spec-player-compare-average.md` and SHIPPED
+2026-05-20.** The design hardened across the 2026-05-19 session:
+continuous position-band → convex combination over a 10-bucket
+position-mix (opener + #3..#11); bowling → 20-bucket per-over mix;
+fielding → keeper-flag binary (NOT position-weighted; dimensional
+analysis on per-position catches/match doesn't compose). Three
+child tables (`playerscopestats_position`, `playerscopestats_over`,
+`playerscopestats_fielding_position`) back the cohort aggregation
++ the per-player histograms the follow-up viz specs consume.
+
+Four new endpoints `/api/v1/scope/averages/players/{batting,bowling,
+fielding,keeping}/summary` carry the cohort baseline + the per-
+bucket sliding-scale gate (strict cliff — any weighted bucket
+below threshold → scope_avg null). The four player /summary
+endpoints are envelope-wrapped with the cohort folded in-process
+(no extra HTTP roundtrip).
+
+Visual: inline three-tier per StatCard on `/players` (value /
+`vs base N` / coloured delta chip) and inline delta-chip per cell
+in the N-way compare grid. The `+ Add average <role>` slot from
+the original draft was superseded by inline-everywhere — every
+numeric stat shows its baseline natively, no toggle.
+
+The `drop=` query parameter shipped on every `/scope/averages/
+players/*` endpoint as per-endpoint structural plumbing for the
+later tautology-prone surfaces (3a venue character strip; Surface
+4 H2H baseline; Surface 6 tournament era). Unused for Surface 1
+itself.
+
+**Historical proposal (preserved for the design arc):**
+
+Mirrors Teams Compare's new average column into `/players?player=X&
+compare=Y`. Add a slot: "+ Add average batter / bowler / fielder in
+scope". The match dimension auto-derives from the primary player's
+role (batting-primary → position-matched batting baseline; bowling-
+primary → phase-mix-matched bowling baseline).
 
 Data dependency: `player_scope_stats` (the reason it exists).
-
-New endpoints: `/scope/averages/players/batting/summary?position_band=2.5,3.5`,
-equivalents for bowling with a phase-mix band, and for fielding with a
-keeper/outfield flag. All read from `player_scope_stats` +
-`METRIC_DIRECTIONS`.
 
 UX shape: same grid as Teams Compare's average column — raw value,
 scope_avg, (future) delta_pct. Position band defaulted from primary's
 `avg_batting_position ± 0.5`; a small control lets the user widen /
 narrow the band.
-
-Scope of work: ~1 spec, medium (schema already in place; endpoint +
-UI work). Biggest design question is the band-width UX.
 
 ## Surface 2 — Leaderboard Δ columns
 

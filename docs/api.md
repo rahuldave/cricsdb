@@ -1264,6 +1264,110 @@ Every row carries `tournament` + `season` so the Records subtab
 can render an Edition column + per-row `(ed)` link to that
 specific edition (independent of the FilterBar's season window).
 
+## Player position-mix cohort baselines
+
+The four `/api/v1/scope/averages/players/*` endpoints expose
+position/over/keeper-mix-weighted cohort baselines used by the
+player `/summary` endpoints during envelope composition. Each is
+also a standalone read for ad-hoc analysis.
+
+Shipped 2026-05-20 with the player-baseline rollout
+(`internal_docs/spec-player-compare-average.md`).
+
+Shared shape: a `cohort: {…}` metadata block + envelope-wrapped
+headline metrics + a `by_<axis>` array carrying per-bucket
+aggregates. Each endpoint applies a sliding-scale strict cliff:
+if any bucket the player has non-zero mix-weight on has cohort
+sample below the bucket's threshold, the entire response's
+`scope_avg` is null and `cliff_buckets` lists the offending
+buckets.
+
+### `GET /api/v1/scope/averages/players/batting/summary`
+
+Position-mix-weighted cohort baseline for batting. Mix vector =
+10 floats (opener at index 0 = positions 1+2 merged, then
+#3..#11), summing to 1.0 ± 0.001.
+
+```bash
+curl "http://localhost:8000/api/v1/scope/averages/players/batting/summary?tournament=Indian+Premier+League&position_mix=0.54,0.38,0.05,0.03"
+```
+
+Returns six envelope-wrapped headline metrics (`innings_batted`,
+`runs`, `average`, `strike_rate`, `boundary_pct`, `dot_pct`),
+cohort metadata (`n_players`, `n_innings_total`, the input
+`position_mix`), and `by_position[10]` with per-bucket
+aggregates + thresholds + `below_support` flags.
+
+Per-bucket thresholds (`cohort innings`): linear `27 − 2·bucket`
+→ 25, 23, 21, 19, 17, 15, 13, 11, 9, 7.
+
+### `GET /api/v1/scope/averages/players/bowling/summary`
+
+Over-mix-weighted cohort baseline for bowling. Mix vector = 20
+floats indexed by 0-based over (0 = "Over 1"; rendered 1-indexed
+in tooltips/labels).
+
+```bash
+curl "http://localhost:8000/api/v1/scope/averages/players/bowling/summary?tournament=Indian+Premier+League&over_mix=0.02,0.10,0.05,0.10,0.07,0.08,0.02,0.01,0.01,0.01,0.03,0.04,0.05,0.04,0.05,0.04,0.10,0.07,0.08,0.03"
+```
+
+Six headline rates (`economy`, `average`, `strike_rate`,
+`dot_pct`, `wickets_per_over`, `boundary_pct`) + `by_over[20]`.
+
+Per-over thresholds (`cohort legal_balls`): U-shape — 60 at
+overs 1-2 and 20, 50 at overs 3-6 and 16-19, 30 at overs 7-15.
+
+### `GET /api/v1/scope/averages/players/fielding/summary`
+
+Keeper-flag-partitioned cohort baseline. NOT position-weighted
+(dimensional analysis on per-position catches/match doesn't
+compose into a comparable rate — see
+`spec-player-compare-average.md` §5.4). Query: `?is_keeper=0|1`.
+
+```bash
+curl "http://localhost:8000/api/v1/scope/averages/players/fielding/summary?tournament=Indian+Premier+League&is_keeper=1"
+```
+
+Four headline rates (`catches_per_match`, `stumpings_per_match`,
+`run_outs_per_match`, `dismissals_per_match`) +
+`by_dismissed_position[10]` (per-dismissed-batter-position
+sub-rates for the deferred `spec-fielding-impact.md`).
+
+The keeper partition is **per-(person, scope)** — a player who
+kept in 2023 but not 2024 belongs to the outfielder cohort for
+2024 only. Substitute catches are excluded from the numerator
+(distribution-side semantics — CLAUDE.md "Substitute fielders
+INCLUDED in /leaders, EXCLUDED in /distribution").
+
+### `GET /api/v1/scope/averages/players/keeping/summary`
+
+Keeper-only cohort baseline; per-match rates use
+`matches_as_keeper` as the denominator (rather than total
+matches, so keeping-rate isn't diluted by outfielding matches).
+No mix parameter — simple binary partition.
+
+```bash
+curl "http://localhost:8000/api/v1/scope/averages/players/keeping/summary?tournament=Indian+Premier+League"
+```
+
+Four headline rates (catches/stumpings/run_outs/dismissals
+`_per_match`). Byes-per-innings deferred — needs a
+keeperassignment + delivery join not precomputed in
+playerscopestats.
+
+### `drop=` query parameter
+
+Every `/scope/averages/players/*` endpoint accepts `?drop=`
+with a comma-separated list of axis names to mask before clause
+construction: `gender, team_type, tournament, season,
+filter_venue, filter_team, filter_opponent, team_class,
+series_type`. Per-endpoint structural plumbing for tautology-
+prone surfaces (next-spec H2H baselines, venue character
+strips, tournament-era comparisons). Unknown axis names → 400.
+Unused by Surface 1 itself.
+
+---
+
 ## Compare metric envelope
 
 The 5 team-compare summary endpoints —
@@ -1417,23 +1521,70 @@ contextual ones.
 ## `GET /api/v1/batters/{id}/summary`
 
 Career totals scoped to filters. Drives the StatCard row on a
-player's batting page.
+player's batting page (and the Batting band on `/players`).
+
+**Response shape — Phase 4 envelope migration (2026-05-20).** Each
+numeric field is a `MetricEnvelope` object (`{value, scope_avg,
+delta_pct, direction, sample_size}`) carrying the player's value
+alongside a position-mix-weighted cohort baseline. Identity-bearing
+fields stay flat (`highest_score`, `name`, `person_id`,
+`nationalities`). See "Player position-mix cohort baselines" above
+and `internal_docs/spec-player-compare-average.md`.
+
+Counts (`matches, innings, runs, hundreds, …`) have
+`direction: null` → `delta_pct` always null. Rates (`average`,
+`strike_rate`, `dot_pct`, `boundary_pct`, `balls_per_*`) carry a
+direction + signed `delta_pct` vs. the cohort.
+
+The response also includes a `position_distribution: [10]` array
+(per-position aggregates feeding the next-spec position-histogram
+viz), a `cohort: {…}` metadata block, and `cohort_below_support` /
+`cohort_cliff_buckets` flags surfacing the sliding-scale gate.
 
 ```bash
-curl "http://localhost:8000/api/v1/batters/ba607b88/summary?gender=male&team_type=international"
+curl "http://localhost:8000/api/v1/batters/ba607b88/summary?tournament=Indian+Premier+League"
 ```
 
-```json
+```jsonc
 {
   "person_id": "ba607b88", "name": "V Kohli",
-  "innings": 112, "runs": 3934, "balls_faced": 2895,
-  "not_outs": 31, "dismissals": 81,
-  "average": 48.57, "strike_rate": 135.89,
-  "highest_score": 91, "hundreds": 0, "fifties": 37, "thirties": 17, "ducks": 6,
-  "fours": 347, "sixes": 114, "boundaries": 461, "dots": 810,
-  "dot_pct": 28.0, "balls_per_four": 8.34, "balls_per_six": 25.39, "balls_per_boundary": 6.28
+  "nationalities": [{"team":"India","gender":"male","matches":118}],
+  "highest_score": 113,
+  "matches":      {"value": 271,  "scope_avg": null,   "delta_pct": null,   "direction": null,            "sample_size": 18852},
+  "innings":      {"value": 271,  "scope_avg": 15.85,  "delta_pct": null,   "direction": null,            "sample_size": 18852},
+  "runs":         {"value": 9126, "scope_avg": 437.12, "delta_pct": null,   "direction": null,            "sample_size": 18852},
+  "dismissals":   {"value": 228,  "scope_avg": null,   "delta_pct": null,   "direction": null,            "sample_size": 18852},
+  "not_outs":     {"value":  43,  "scope_avg": null,   "delta_pct": null,   "direction": null,            "sample_size": 18852},
+  "average":      {"value": 40.03,"scope_avg": 29.5,   "delta_pct": 35.7,   "direction": "higher_better", "sample_size": 18852},
+  "strike_rate":  {"value": 134.34,"scope_avg": 134.7, "delta_pct": -0.3,   "direction": "higher_better", "sample_size": 18852},
+  "dot_pct":      {"value": 31.7, "scope_avg": 36.2,   "delta_pct": -12.4,  "direction": "lower_better",  "sample_size": 18852},
+  "boundary_pct": {"value": 16.7, "scope_avg": 18.4,   "delta_pct": -9.2,   "direction": "higher_better", "sample_size": 18852},
+  // … fours, sixes, boundaries, hundreds, fifties, thirties, ducks,
+  // balls_faced, dots, balls_per_{four,six,boundary} also envelope-wrapped.
+  "position_distribution": [
+    {"bucket":1,"innings":140,"runs":5481,"legal_balls":3883,"dismissals":116,"fours":499,"sixes":134,"dots":1182},
+    {"bucket":2,"innings":93, "runs":2809,"legal_balls":2266,"dismissals":80, "fours":252,"sixes":86, "dots":702},
+    /* … 10 entries total */
+  ],
+  "cohort": {
+    "match_dimension": "position_mix",
+    "position_mix": [0.517, 0.343, 0.048, 0.030, 0.048, 0.015, 0, 0, 0, 0],
+    "n_players": 735,
+    "n_innings_total": 18852
+  },
+  "cohort_below_support": false,
+  "cohort_cliff_buckets": []
 }
 ```
+
+**Non-striker dismissals (fix shipped 2026-05-20).** `dismissals` /
+`not_outs` count includes wickets where the batter was at the non-
+striker's end (run-outs at the bowler's end, the rare obstructing
+/ handled-the-ball as non-striker). Pre-fix, those dismissals were
+invisible to this endpoint because the per-innings query filtered
+`d.batter_id = :pid` AND LEFT-JOIN'd wicket. 4.2% of dismissals in
+cricket.db are non-striker; for Kohli at IPL the fix moved the
+count from 226 to 228.
 
 ## `GET /api/v1/batters/{id}/by-innings`
 
@@ -1617,19 +1768,31 @@ Source: `api/routers/bowling.py`. Mirror of the batters pattern.
 
 ## `GET /api/v1/bowlers/{id}/summary`
 
+Same Phase 4 envelope shape as `/batters/{id}/summary` (see above).
+Mix axis is over-mix (20 elements); cohort thresholds U-shape per
+over. Identity fields (`overs` formatted string, `best_figures`)
+stay flat. Includes `over_distribution[20]` array + `cohort: {…}`
+metadata.
+
 ```bash
-curl "http://localhost:8000/api/v1/bowlers/462411b3/summary?gender=male&team_type=international"
+curl "http://localhost:8000/api/v1/bowlers/462411b3/summary?tournament=Indian+Premier+League"
 ```
 
-```json
+```jsonc
 {
   "person_id": "462411b3", "name": "JJ Bumrah",
-  "innings": 90, "balls": 1966, "overs": "327.4",
-  "runs_conceded": 2223, "wickets": 117,
-  "average": 19.0, "economy": 6.78, "strike_rate": 16.8,
-  "best_figures": "4/15", "four_wicket_hauls": 1,
-  "fours_conceded": 210, "sixes_conceded": 54, "dots": 906, "dot_pct": 46.1,
-  "wides": 73, "noballs": 11, "maiden_overs": 9
+  "overs": "597.1", "best_figures": "5/10",
+  "matches":       {"value": 156,  "scope_avg": null,   "delta_pct": null,  "direction": null,           "sample_size": 280513},
+  "wickets":       {"value": 186,  "scope_avg": null,   "delta_pct": null,  "direction": null,           "sample_size": 280513},
+  "runs_conceded": {"value": 4490, "scope_avg": null,   "delta_pct": null,  "direction": null,           "sample_size": 280513},
+  "average":       {"value": 24.14,"scope_avg": 29.85,  "delta_pct": -19.1, "direction": "lower_better", "sample_size": 280513},
+  "economy":       {"value": 7.52, "scope_avg": 8.96,   "delta_pct": -16.1, "direction": "lower_better", "sample_size": 280513},
+  "strike_rate":   {"value": 19.26,"scope_avg": 20.68,  "delta_pct": -6.9,  "direction": "lower_better", "sample_size": 280513},
+  "dot_pct":       {"value": 40.0, "scope_avg": 34.9,   "delta_pct": 14.6,  "direction": "higher_better","sample_size": 280513},
+  // … other numerics envelope-wrapped.
+  "over_distribution": [/* 20 entries — see /scope/averages/players/bowling/summary */],
+  "cohort": {"match_dimension":"over_mix","over_mix":[…20…],"n_players":573,"n_balls_total":280513},
+  "cohort_below_support": false, "cohort_cliff_buckets": []
 }
 ```
 
@@ -1826,21 +1989,38 @@ table.
 
 ## `GET /api/v1/fielders/{id}/summary`
 
+Same Phase 4 envelope shape. Partition is binary `is_keeper`
+derived from `innings_kept > 0`. Counts have `direction: null`;
+the single rate `dismissals_per_match` is `higher_better` with
+`delta_pct` vs. the keeper-or-outfielder cohort. Includes
+`dismissal_position_distribution[10]` (per-dismissed-batter-
+position aggregates for the deferred impact-weighted spec) +
+`cohort: {match_dimension: "is_keeper", is_keeper, n_fielders,
+n_matches_total}`.
+
 ```bash
-curl "http://localhost:8000/api/v1/fielders/a757b0d8/summary?gender=male&team_type=club"
+curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/summary?tournament=Indian+Premier+League"
 ```
 
-```json
+```jsonc
 {
-  "person_id": "a757b0d8", "name": "KA Pollard",
-  "matches": 534,
-  "catches": 300, "stumpings": 0, "run_outs": 19, "caught_and_bowled": 13,
-  "total_dismissals": 332, "dismissals_per_match": 0.62,
-  "substitute_catches": 0, "innings_kept": 0
+  "person_id": "4a8a2e3b", "name": "MS Dhoni",
+  "matches":               {"value": 277, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
+  "catches":               {"value": 158, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
+  "stumpings":             {"value": 47,  "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
+  "run_outs":              {"value": 53,  "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
+  "total_dismissals":      {"value": 258, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
+  "dismissals_per_match":  {"value": 0.931,"scope_avg": 0.899,"delta_pct": 3.6,  "direction": "higher_better","sample_size": 2565},
+  "innings_kept":          {"value": 245, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
+  "dismissal_position_distribution": [/* 10 entries */],
+  "cohort": {"match_dimension":"is_keeper","is_keeper":1,"n_fielders":232,"n_matches_total":2565},
+  "is_keeper": 1
 }
 ```
 
-`innings_kept > 0` signals to the frontend to show the Keeping tab.
+`is_keeper` (top-level field) signals to the frontend to show the
+Keeping tab. The dismissals/match cohort baseline is keeper-vs-
+keeper here (Dhoni partitioned into the keeper cohort).
 
 ## `GET /api/v1/fielders/{id}/distribution`
 
@@ -1981,19 +2161,30 @@ innings to this person). See `docs/spec-fielding-tier2.md` for the
 
 ## `GET /keeping/summary`
 
+Same Phase 4 envelope shape. `innings_kept_by_confidence` stays
+flat (it's a dict of category counts). All other numerics
+envelope-wrapped. `byes_per_innings` carries `lower_better`
+direction. `cohort: {match_dimension: "is_keeper", is_keeper: 1,
+n_keepers, n_matches_keeping}` surfaces the keeper cohort
+metadata — note the per-MATCH (not per-innings) denominator
+mismatch with this endpoint's rates, so the cohort headline rates
+aren't directly used as `scope_avg` here. Reserved for a future
+cohort enhancement when byes precompute lands.
+
 ```bash
-curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/keeping/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League"
+curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/keeping/summary?tournament=Indian+Premier+League"
 ```
 
-```json
+```jsonc
 {
   "person_id": "4a8a2e3b", "name": "MS Dhoni",
-  "innings_kept": 245,
-  "innings_kept_by_confidence": { "definitive": 39, "high": 177, "medium": 29, "low": 0 },
-  "stumpings": 47, "keeping_catches": 142,
-  "run_outs_while_keeping": 46, "byes_conceded": 100, "byes_per_innings": 0.41,
-  "dismissals_while_keeping": 235, "keeping_dismissals_per_innings": 0.96,
-  "ambiguous_innings": 32
+  "innings_kept_by_confidence": {"definitive":39,"high":177,"medium":29,"low":0},
+  "innings_kept":                   {"value":245,"direction":null, …},
+  "stumpings":                      {"value": 47,"direction":null, …},
+  "keeping_catches":                {"value":142,"direction":null, …},
+  "byes_per_innings":               {"value":0.41,"direction":"lower_better","scope_avg":null, …},
+  "keeping_dismissals_per_innings": {"value":0.96,"direction":"higher_better","scope_avg":null, …},
+  "cohort": {"match_dimension":"is_keeper","is_keeper":1,"n_keepers":232,"n_matches_keeping":2166}
 }
 ```
 

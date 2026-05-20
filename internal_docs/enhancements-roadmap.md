@@ -416,6 +416,79 @@ on 2026-04-19. They cover work that doesn't slot into a single A–Q
 letter (cross-cutting refactors, audit walks, infra fixes, follow-up
 batches) and serves as the "what shipped on day X" history.
 
+### Shipped 2026-05-20 (Player position-adaptive baselines — Surface 1)
+
+`spec-player-compare-average.md` fully implemented across 22
+commits. The Players page (and the dedicated `/batting` / `/bowling`
+/ `/fielding` pages' summary strips, transparently) now show every
+numeric stat against a position/over/keeper-mix-weighted cohort
+baseline.
+
+Visual: three-tier inline on `/players` — bold value / `vs base N` /
+coloured delta chip — wired via `MetricDelta` with the new `label`
+and `scopeAvgTooltip` props. Compact compare grid (`?player=X&
+compare=Y`) carries an inline delta chip per cell; each column's
+baseline is derived independently from that column's mix.
+
+Backend infrastructure (Phases 1–4):
+
+- 3 new child tables — `playerscopestats_position` (97K rows),
+  `playerscopestats_over` (282K rows),
+  `playerscopestats_fielding_position` (94K rows). Per-bucket
+  aggregates; populate + incremental hooks wired into
+  `import_data.py` + `update_recent.py`.
+- 4 new endpoints — `/api/v1/scope/averages/players/{batting,
+  bowling,fielding,keeping}/summary` returning cohort metadata +
+  envelope-wrapped headline + per-bucket `by_<axis>` array.
+- 4 player /summary endpoints envelope-migrated via in-process
+  `compute_players_<discipline>_cohort()` helpers in
+  `api/routers/scope_averages.py` — single round-trip preserved.
+- `MetricEnvelope` extended to player-grain across ~52 metric keys
+  (`bat_*`, `bowl_*`, `field_*`, `keep_*` prefixes) in
+  `api/metrics_metadata.py`.
+- New helpers `api/innings_positions.py::derive_positions` (shared
+  across the three child-table populates) and
+  `api/scope_averages_players.py` (sliding-scale thresholds, mix
+  parsing, scope-clause builder, convex-combination evaluator).
+- `FilterParams.build(drop=...)` plumbing — per-endpoint structural
+  axis-masking for tautology-prone future surfaces (3a / 4 / 6).
+  Unused by Surface 1 itself.
+
+Strict-cliff sliding scale (spec §6): per-bucket cohort sample
+thresholds (batting 25→7, bowling U-shape 60-50-30-50-60, fielding
+12→3). If ANY bucket the player has weight on is below threshold,
+the entire response's `scope_avg` is null and the inline `vs base`
+tier hides — leaving the bold value alone. No drops, no
+renormalisation. Resolution log in spec §11.
+
+Side trip — non-striker dismissals bug fix (commits 5e15783 →
+569332d): every per-innings query in `api/routers/batting.py`
+LEFT-JOIN'd wicket against deliveries filtered by `d.batter_id =
+:pid`, missing 6,774 non-striker dismissals across the DB (4.2%).
+615 of those were "diamond ducks" — entire innings invisible to
+`/batters/{id}/*`. Fix: new `_batting_innings_filter` that includes
+deliveries where the player was either striker or non-striker;
+striker-side aggregates gate via CASE WHEN. Kohli IPL `/summary.
+dismissals` went from 226 → 228 (correct). Cross-checked Narine
+(315) and Russell (344) against SQL truth.
+
+Tests:
+- 20 regression URLs (NEW) at `tests/regression/scope-averages-
+  players/urls.txt`; ~70 batting/bowling/fielding/keeping URLs
+  flipped REG→NEW for the envelope-shape change then flipped back
+  to lock the new baseline.
+- 8 sanity tests covering pool conservation, convex-combination
+  invariant, strict-cliff invariant, drop= invariant per discipline.
+- `tests/integration/player_compare_baseline.sh` — 13 assertions
+  across 6 scenarios (Kohli/Bumrah/Dhoni at IPL, compare grid,
+  mobile viewport).
+- All 4 affected regression suites green at zero REG drift.
+
+Spec, design log, and three deferred follow-up specs
+(spec-batting-position-chart.md, spec-bowling-over-chart.md,
+spec-fielding-impact.md — pure-UI specs over the data this rollout
+shipped) live in `internal_docs/spec-player-compare-average.md`.
+
 ### Shipped 2026-05-08 (Team distribution dossiers — backend §16 IMPLEMENTED)
 
 Three sibling per-innings distribution endpoints under

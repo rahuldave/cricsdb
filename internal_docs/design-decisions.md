@@ -2302,3 +2302,95 @@ the hook, not roll their own resolution.
 
 Spec: `spec-inning-split.md` §7.1 (post-2026-05-12 rewrite) +
 `CLAUDE.md` "Inning-toggle labels" under Page conventions.
+
+
+## Player inline baselines are convex combinations over bucket-mix vectors
+
+Cite 2026-05-19 design session. The Players page (and the player-
+grain `/summary` endpoints behind it) compares each player's stat
+against a cohort baseline derived as a **convex combination of per-
+bucket cohort metrics, weighted by the player's own bucket-mix in
+scope**:
+
+```
+scope_avg(metric) = Σ_b  (player_mix[b] × cohort_metric[b])
+```
+
+- **Batting**: position bucket (10 buckets — opener=positions 1+2
+  merged, then #3..#11 individual); `player_mix` is the share of
+  innings at each bucket.
+- **Bowling**: per-over bucket (20 buckets — overs 1..20); `player_
+  mix` is the share of balls bowled at each over.
+- **Fielding**: keeper-flag binary (NOT position-weighted — see
+  next entry).
+
+**Why this rather than a naive flat-pool baseline?** Mixing
+structurally-distinct cohorts (an opener's SR is not the same kind
+of number as #11's SR — different conditions, different overs of
+innings) flattens out the comparison. A position-mix-weighted
+convex combination produces a single rate that's directly
+comparable to the player's value because both are weighted by the
+same mix.
+
+Spec: `spec-player-compare-average.md` §2 + §5.
+
+## Fielding baseline is keeper-flag binary, not position-weighted
+
+Cite 2026-05-19. For fielding the per-bucket sub-rates (catches at
+opener position per match, catches at #11 per match, …) are **sub-
+components of one overall rate** — they sum to total catches/match.
+Weighting them by a fielder's dismissal-position-mix produces a
+dimensionally-confused number (fraction × rate ≠ rate). So:
+
+- **Headline baseline**: `catches/match`, `stumpings/match`,
+  `run_outs/match`, `dismissals/match` partitioned on
+  `is_keeper=0|1` (outfielder vs keeper cohort).
+- **Per-position data**: still collected in
+  `playerscopestats_fielding_position` and surfaced as
+  `by_dismissed_position[10]` on the cohort response — consumed by
+  the deferred `spec-fielding-impact.md` for impact-weighted
+  framings ("opener catches count more than #11 catches"), NOT by
+  this spec's headline.
+
+The keeper partition is **per-(person, scope)** — a player who
+kept in IPL 2023 but not 2024 belongs to the outfielder cohort
+for 2024 only. Caught during Phase 3.3 testing — an `IN`-subquery
+form leaked one player's keeping stats into the outfielder cohort
+for adjacent scopes; fixed by JOIN'ing `playerscopestats` to
+`playerscopestats_fielding_position` on `(person_id, scope_key)`
+so `matches_as_keeper` gates at the correct grain.
+
+Spec: `spec-player-compare-average.md` §5.4.
+
+## `drop=` is per-endpoint structural plumbing for tautology-prone cohort surfaces
+
+Cite 2026-05-19. Every `/scope/averages/players/*` endpoint accepts
+`?drop=<comma-separated axes>` that masks named FilterBar axes
+before clause construction. Recognised axes: `gender, team_type,
+tournament, season, filter_venue, filter_team, filter_opponent,
+team_class, series_type`. Threaded through `FilterParams.build(drop
+=...)`. Unknown axes → `400 Bad Request`.
+
+**This is structural plumbing, not a user-facing toggle.** Reserved
+for tautology-prone baseline contexts:
+
+- **Surface 3a** (venue character strip) — `drop=filter_venue` to
+  compute the league baseline at the same scope minus the venue
+  narrowing; otherwise the baseline IS the player's venue subset
+  and the delta tautologically goes to zero.
+- **Surface 4** (H2H baseline) — `drop=filter_team,filter_opponent`
+  to remove the rivalry constraint from the baseline.
+- **Surface 6** (tournament era) — `drop=season_from,season_to` to
+  compute the all-time baseline vs the in-season value.
+
+Surface 1 (the player-compare baseline that shipped) **does not
+use `drop=`**: the player-at-venue / player-in-rivalry case wants
+both sides scoped identically (home-specialist signal is preserved).
+The plumbing lands now so later surfaces don't require retrofitting.
+
+Implementation note: when `team_type` is in `drop`, the polymorphism
+guard for `team_class` also sees team_type as None — so club-tier
+clauses don't fire either (they'd otherwise leave `m.team_type =
+'club'` embedded). Caught by `tests/sanity/test_filter_drop.py`.
+
+Spec: `spec-player-compare-average.md` §4.6.

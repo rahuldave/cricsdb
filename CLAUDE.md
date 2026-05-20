@@ -422,6 +422,23 @@ Adding a new FilterBar season button? Slice the array; don't re-fetch with diffe
 
 Spec: `design-decisions.md` "FilterBar season-window quick-select buttons — scope-aware AND player-aware".
 
+### Player baseline buckets — opener merged + per-over + keeper-binary
+
+The player-baseline rollout (`spec-player-compare-average.md`, shipped 2026-05-20) locks three bucket definitions across three child tables and four cohort endpoints. Any new endpoint or surface that derives a player cohort baseline MUST use the same buckets to stay comparable:
+
+- **Batting** — 10 position buckets. Bucket 1 = positions 1+2 merged (opener — `derive_positions` assigns the ball-1 striker/non-striker arbitrarily, so splitting them is noise). Buckets 2..10 = positions #3..#11 individual. Position derivation lives at `api/innings_positions.py::derive_positions`; reused across three populate scripts. Child table: `playerscopestats_position`. Cohort endpoint: `/api/v1/scope/averages/players/batting/summary?position_mix=…`.
+- **Bowling** — 20 buckets, 1-indexed overs 1..20. Child table: `playerscopestats_over`. Cohort endpoint: `/api/v1/scope/averages/players/bowling/summary?over_mix=…`.
+- **Fielding** — binary keeper flag (`is_keeper=0|1`), NOT position-weighted. Position-mix-weighting fielding fails dimensional analysis (per-position catches/match are sub-components of one rate, not separate rates). Per-dismissed-position data still collected in `playerscopestats_fielding_position` for the deferred impact-weighted spec. Cohort endpoint: `/api/v1/scope/averages/players/fielding/summary?is_keeper=…`.
+
+**Sliding-scale thresholds (spec §6):** per-bucket cohort sample minimums. Batting linear `27 − 2·bucket` → 25, 23, 21, 19, 17, 15, 13, 11, 9, 7. Bowling U-shape: 60 at overs 1-2/20, 50 at overs 3-6/16-19, 30 at overs 7-15. Fielding linear `13 − bucket` → 12, 11, 10, …, 3 (used by the next-spec impact-weighted analyses, not by this rollout's headline). Strict cliff: any bucket the player has non-zero mix-weight on must be at or above its threshold; otherwise the entire response's `scope_avg` is null. No drops, no renormalisation.
+
+**Tells you might be about to break this:**
+- New surface adds a 5-bucket "position-group" batting axis. → Don't. Reuse the 10-bucket axis (collapse client-side if needed).
+- Tempted to split opener into "pos 1" vs "pos 2". → Don't. `derive_positions` makes it arbitrary on ball 1.
+- New fielding surface wants position-weighted catches-per-match. → That's `spec-fielding-impact.md` territory (deferred). Keep this spec's headline keeper-binary.
+
+Spec: `internal_docs/spec-player-compare-average.md` §4 + §6.
+
 ---
 
 ## Page conventions

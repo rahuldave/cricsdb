@@ -105,6 +105,18 @@ The page also surfaces a condensed top-5 Records section
 `/batters/{id}/records` + `/bowlers/{id}/records` +
 `/fielders/{id}/records`.
 
+**Inline baseline visual** (shipped 2026-05-20). Every numeric stat
+tile on the player bands renders as a three-tier stack: bold value
+/ `vs base N` subtitle / coloured delta chip. The baseline is a
+position-mix-weighted cohort (batting: 10 position buckets opener
++ #3..#11; bowling: 20 per-over buckets; fielding: keeper-flag
+binary), computed in-process from the corresponding
+`/api/v1/scope/averages/players/<disc>/summary` endpoint and folded
+into the existing /summary roundtrip. Hover the `vs base N` text
+for the cohort phrasing (player mix + cohort size). Compare-grid
+columns each show an inline delta chip derived from that column's
+own mix. Spec: `internal_docs/spec-player-compare-average.md`.
+
 ### `/batting` (Batter deep dive)
 
 URL: `?player=<id>` for a single batter; the landing view (no

@@ -87,12 +87,35 @@ populates four denormalized tables:
    Teams > Partnerships tab — see `internal_docs/spec-team-stats.md`.
 4. `player_scope_stats` (~65K rows, one per `(person, scope_key)`
    where scope_key encodes tournament/season/gender/team_type) via
-   `scripts/populate_player_scope_stats.py:populate_full()`. Built but
-   NOT consumed by any endpoint in Spec 1 of
-   `internal_docs/spec-team-compare-average.md` — exists as
-   infrastructure for Spec 2 (`internal_docs/outlook-comparisons.md`),
-   particularly position-matched player compare. Sanity tests:
-   `tests/sanity/test_player_scope_stats.py`.
+   `scripts/populate_player_scope_stats.py:populate_full()`. Now
+   consumed by the player-baseline rollout (`spec-player-compare-
+   average.md`) — was originally landed as infrastructure for that
+   work. Sanity tests: `tests/sanity/test_player_scope_stats.py`.
+5. `playerscopestats_position` (~97K rows, one per (person,
+   scope_key, position_bucket) — 10 batting position buckets,
+   opener=1+2 merged) via
+   `scripts/populate_playerscopestats_position.py:populate_full()`.
+   Per-bucket batting aggregates; backs the per-position cohort
+   baseline endpoint + the per-player position-distribution
+   histogram. Sanity:
+   `tests/sanity/test_playerscopestats_position.py` (pool
+   conservation against the parent player_scope_stats row).
+6. `playerscopestats_over` (~282K rows, one per (person, scope_key,
+   over_number) — 20 buckets, 1-indexed overs 1..20) via
+   `scripts/populate_playerscopestats_over.py:populate_full()`.
+   Per-over bowling aggregates. Sanity:
+   `tests/sanity/test_playerscopestats_over.py`.
+7. `playerscopestats_fielding_position` (~94K rows, one per
+   (fielder, scope_key, dismissed-batter-position-bucket)) via
+   `scripts/populate_playerscopestats_fielding_position.py:populate_full()`.
+   Substitute catches EXCLUDED at populate (distribution-side
+   semantics — CLAUDE.md "Substitute fielders — INCLUDED in
+   /leaders, EXCLUDED in /distribution"). Convention 3 applied:
+   `catches` includes caught_and_bowled. Position derivation reuses
+   `api/innings_positions.py::derive_positions` shared with the
+   parent + position child populates — computed ONCE per innings
+   and threaded across the three downstream scripts. Sanity:
+   `tests/sanity/test_playerscopestats_fielding_position.py`.
 
 ### Incremental updates
 
@@ -100,13 +123,17 @@ populates four denormalized tables:
 filters to T20/IT20 (international + club), dedupes against
 `match.filename`, and imports only what's new. After importing, it
 automatically adds fielding credits, keeper assignments,
-partnerships, AND player_scope_stats for the new matches only (via
+partnerships, player_scope_stats AND the three child tables
+(`playerscopestats_position`, `playerscopestats_over`,
+`playerscopestats_fielding_position`) for the new matches only (via
 `populate_incremental()` on each denormalized table) — no separate
 step needed. New ambiguous keeper innings get appended to today's
-partition CSV under `docs/keeper-ambiguous/`. The
-`player_scope_stats` incremental path recomputes only the
-`(person, scope_key)` cells whose scope is touched by the new
-matches; an unrelated scope's rows stay byte-identical.
+partition CSV under `docs/keeper-ambiguous/`. All four
+playerscopestats-family incremental paths use the same touched-
+scope recompute strategy: identify scope_keys touched by the new
+matches, find ALL matches in those scopes, recompute the
+`(person, scope_key, …)` cells from scratch over that set,
+delete + reinsert. Exact and avoids in-place upsert drift.
 
 **People-registry refresh (auto, since 2026-04-30):** Before any
 match imports, `update_recent.py` does two things:

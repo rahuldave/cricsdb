@@ -221,6 +221,34 @@ only numbers; add a rivalry lens (click a context link like "· vs
 Australia ›" elsewhere in the app) and the whole comparison is
 scoped to that rivalry.
 
+**Inline baseline (`vs base N`).** Every numeric stat on a player
+band carries a small subtitle showing how it compares to a *position-
+matched cohort* in the same scope. So Kohli's IPL Avg of `40.03`
+sits above `vs base 29.50 ↑ +35.7%` — meaning the average batter
+weighted to Kohli's position mix at IPL averaged 29.50, and Kohli
+beat that by 35.7%. The arrow is coloured green when better, red
+when worse. Hover the `vs base N` text to see exactly how the
+cohort was chosen — a one-line summary like *"Position-mix baseline
+— Opener 51.7%, #3 34.3%, …; cohort: 735 players, 18,852
+innings."*
+
+The cohort match adapts per discipline:
+
+- **Batting** — weighted by the player's share of innings at each
+  position (opener through #11).
+- **Bowling** — weighted by share of balls bowled per over (1
+  through 20). Bumrah's death-heavy mix gets compared against
+  death-overs cohort metrics; a spinner who bowls overs 7-14 gets
+  compared against the middle-overs cohort.
+- **Fielding / keeping** — partitioned by keeper flag rather than
+  position (the dimensional analysis on per-position catches/match
+  doesn't compose). Outfielders compared against outfielders,
+  keepers against keepers.
+
+When the scope is too thin for a reliable cohort baseline (a single
+sparse season, for example), the subtitle hides — the bold value
+still shows, just without the comparison.
+
 ## The filter bar
 
 Every page (except the home page and individual match scorecards)
