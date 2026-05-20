@@ -96,12 +96,26 @@ async def _ensure_tables(db, incremental: bool = False):
             "scope_key",
         ],
     }
-    return await db.create(
+    table = await db.create(
         PlayerScopeStats,
         pk=["person_id", "scope_key"],
         if_not_exists=True,
         **idx,
     )
+    # Idempotent column migrations for milestone bucketing (Q6 of
+    # spec-player-baseline-parity.md). Pre-existing DBs that pre-date
+    # this populate version get the new columns appended; new DBs
+    # created by `db.create` above already have them in the schema.
+    for col in ("thirties", "fifties", "hundreds", "ducks"):
+        try:
+            await db.q(
+                f"ALTER TABLE playerscopestats ADD COLUMN {col} "
+                f"INTEGER NOT NULL DEFAULT 0"
+            )
+        except Exception as e:
+            if "duplicate column" not in str(e).lower():
+                raise
+    return table
 
 
 # ============================================================
@@ -124,6 +138,7 @@ class _Acc:
         "powerplay_legal", "middle_legal", "death_legal",
         "catches", "runouts", "stumpings",
         "catches_as_keeper", "matches_as_keeper_set",
+        "thirties", "fifties", "hundreds", "ducks",
     )
 
     def __init__(self, tournament, season, gender, team_type):
@@ -155,6 +170,12 @@ class _Acc:
         self.stumpings = 0
         self.catches_as_keeper = 0
         self.matches_as_keeper_set = set()
+        # Milestone bucketing — filled by the post-aggregation pass in
+        # _aggregate_matches that walks per-innings (batter, runs).
+        self.thirties = 0
+        self.fifties = 0
+        self.hundreds = 0
+        self.ducks = 0
 
     def to_row(self, person_id: str, scope_key: str) -> dict:
         if self.position_innings > 0:
@@ -191,6 +212,10 @@ class _Acc:
             "stumpings": self.stumpings,
             "catches_as_keeper": self.catches_as_keeper,
             "matches_as_keeper": len(self.matches_as_keeper_set),
+            "thirties": self.thirties,
+            "fifties": self.fifties,
+            "hundreds": self.hundreds,
+            "ducks": self.ducks,
         }
 
 
@@ -244,6 +269,13 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
         return {}
 
     accs: dict[tuple[str, str], _Acc] = {}
+
+    # Per-innings tallies needed for milestone bucketing (Q6). Filled
+    # during the deliveries pass (runs) and the wickets pass (dismissed
+    # batters), then drained into _Acc.thirties / fifties / hundreds /
+    # ducks at the end of this function.
+    innings_runs: dict[tuple[str, int], int] = {}     # (batter_id, iid) -> runs this innings
+    innings_dismissed: set[tuple[str, int]] = set()   # (batter_id, iid) — dismissed this innings (excluding retired)
 
     def get_acc(person_id: str, match_id: int) -> _Acc:
         m = match_meta[match_id]
@@ -321,6 +353,10 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
                 batters_appeared.add(pid)
                 acc = get_acc(pid, mid)
                 acc.innings_batted_set.add(iid)
+                # Seed per-innings runs at 0 so non-strikers who never
+                # face a legal ball still get a milestone-bucket row at
+                # the end (relevant for ducks).
+                innings_runs.setdefault((pid, iid), 0)
                 pos = positions[pid]
                 acc.position_sum += pos
                 acc.position_innings += 1
@@ -341,6 +377,11 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
                     acc.legal_balls += 1
                     rb = d["runs_batter"]
                     acc.runs += rb
+                    # Track per-innings runs for milestone bucketing (Q6).
+                    # Counted only on legal balls — matches the runs
+                    # numerator above.
+                    ir_key = (bid, iid)
+                    innings_runs[ir_key] = innings_runs.get(ir_key, 0) + rb
                     # Dot rule mirrors api/routers/batting.py: legal AND
                     # runs_batter=0 AND no extras. On a legal ball, no
                     # wides/noballs, so runs_total=0 implies runs_batter,
@@ -394,12 +435,14 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
             WHERE d.innings_id IN ({sub_list})
         """)
         for w in w_rows:
-            mid = innings_match[w["innings_id"]]
+            iid = w["innings_id"]
+            mid = innings_match[iid]
             kind = w["kind"]
             # Batter dismissals.
             pout = w["player_out_id"]
             if pout is not None and kind not in BATTER_DISMISSAL_EXCLUDED:
                 get_acc(pout, mid).dismissals += 1
+                innings_dismissed.add((pout, iid))
             # Bowler wickets.
             bow = w["bowler_id"]
             if bow is not None and kind not in BOWLER_WICKET_EXCLUDED:
@@ -466,6 +509,28 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
             if kpid is not None and r["fielder_id"] == kpid:
                 mid = innings_match[iid]
                 get_acc(kpid, mid).catches_as_keeper += 1
+
+    # ------------------------------------------------------------
+    # Milestone bucketing (Q6). For every (batter, innings) tuple
+    # that appeared in this aggregation window, bucket the batter's
+    # innings runs into 30s / 50s / 100s, and credit a duck when the
+    # batter scored 0 AND was dismissed in that innings.
+    # ------------------------------------------------------------
+    for (pid, iid), runs in innings_runs.items():
+        mid = innings_match.get(iid)
+        if mid is None:
+            continue
+        acc = accs.get((pid, match_meta[mid]["scope_key"]))
+        if acc is None:
+            continue
+        if runs >= 100:
+            acc.hundreds += 1
+        elif runs >= 50:
+            acc.fifties += 1
+        elif runs >= 30:
+            acc.thirties += 1
+        if runs == 0 and (pid, iid) in innings_dismissed:
+            acc.ducks += 1
 
     return accs
 

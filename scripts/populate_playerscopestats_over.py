@@ -57,6 +57,7 @@ BOWLER_WICKET_EXCLUDED = {
 class _Acc:
     __slots__ = (
         "runs_conceded", "legal_balls", "wickets", "dots", "boundaries",
+        "maidens",
     )
 
     def __init__(self):
@@ -65,6 +66,10 @@ class _Acc:
         self.wickets = 0
         self.dots = 0
         self.boundaries = 0
+        # Maiden overs bowled by this person at this over-number across
+        # scope. Filled by the post-pass that walks per (innings, over,
+        # bowler) tuples and checks legal_balls == 6 AND runs == 0.
+        self.maidens = 0
 
     def to_row(self, person_id: str, scope_key: str, over_number: int) -> dict:
         return {
@@ -76,6 +81,7 @@ class _Acc:
             "wickets": self.wickets,
             "dots": self.dots,
             "boundaries": self.boundaries,
+            "maidens": self.maidens,
         }
 
 
@@ -94,12 +100,24 @@ async def _ensure_tables(db, incremental: bool = False):
             "scope_key",
         ],
     }
-    return await db.create(
+    table = await db.create(
         PlayerScopeStatsOver,
         pk=["person_id", "scope_key", "over_number"],
         if_not_exists=True,
         **idx,
     )
+    # Idempotent column migration for maidens (Q6 of
+    # spec-player-baseline-parity.md). New DBs already have it via the
+    # model; pre-existing DBs get it appended.
+    try:
+        await db.q(
+            "ALTER TABLE playerscopestatsover ADD COLUMN maidens "
+            "INTEGER NOT NULL DEFAULT 0"
+        )
+    except Exception as e:
+        if "duplicate column" not in str(e).lower():
+            raise
+    return table
 
 
 async def _aggregate_matches(
@@ -151,6 +169,12 @@ async def _aggregate_matches(
 
     accs: dict[tuple[str, str, int], _Acc] = {}
 
+    # Per (innings, over_number, bowler) tally to detect maiden overs.
+    # A maiden = the bowler bowled all 6 legal balls of an over with 0
+    # runs conceded (off the bat + extras). Filled in the deliveries
+    # pass, drained into _Acc.maidens at the end.
+    over_tally: dict[tuple[int, int, str], dict] = {}
+
     def get_acc(person_id: str, scope_key: str, over_number: int) -> _Acc:
         key = (person_id, scope_key, over_number)
         acc = accs.get(key)
@@ -175,7 +199,8 @@ async def _aggregate_matches(
             bow = d["bowler_id"]
             if bow is None:
                 continue
-            mid = innings_match[d["innings_id"]]
+            iid = d["innings_id"]
+            mid = innings_match[iid]
             scope_key = match_meta[mid]["scope_key"]
             # 1-indexed bucket (delivery.over_number is 0-indexed).
             over_bucket = d["over_number"] + 1
@@ -190,6 +215,18 @@ async def _aggregate_matches(
                 acc.dots += 1
             if rb == 4 or rb == 6:
                 acc.boundaries += 1
+
+            # Per-over maiden tally (keyed at innings × over × bowler so
+            # split-over cases credit only the bowler who bowled all 6
+            # legal balls).
+            tkey = (iid, d["over_number"], bow)
+            tally = over_tally.get(tkey)
+            if tally is None:
+                tally = {"legal": 0, "runs": 0}
+                over_tally[tkey] = tally
+            if legal:
+                tally["legal"] += 1
+            tally["runs"] += d["runs_total"]
 
     # Pass 2: wickets — credit the bowler's over bucket.
     for start in range(0, len(innings_ids), chunk):
@@ -210,6 +247,18 @@ async def _aggregate_matches(
             scope_key = match_meta[mid]["scope_key"]
             over_bucket = w["over_number"] + 1
             get_acc(bow, scope_key, over_bucket).wickets += 1
+
+    # Maiden detection — credit a maiden when one bowler bowled all 6
+    # legal balls of an over conceding 0 runs (off the bat + extras).
+    # Split overs (e.g. bowler retires hurt mid-over) never satisfy the
+    # 6-legal-balls test under a single bowler key, so they're correctly
+    # excluded by the same rule.
+    for (iid, over_number_0idx, bow), tally in over_tally.items():
+        if tally["legal"] == 6 and tally["runs"] == 0:
+            mid = innings_match[iid]
+            scope_key = match_meta[mid]["scope_key"]
+            over_bucket = over_number_0idx + 1
+            get_acc(bow, scope_key, over_bucket).maidens += 1
 
     return accs
 

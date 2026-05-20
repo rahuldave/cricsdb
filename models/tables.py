@@ -224,6 +224,14 @@ class PlayerScopeStats:
     stumpings: int = 0
     catches_as_keeper: int = 0
     matches_as_keeper: int = 0
+    # milestone counts (per-innings batting bucketing) — Q6 of spec-player-
+    # baseline-parity.md. Bucketed at populate time from per-innings runs.
+    # `ducks` = innings where runs=0 AND the batter was dismissed in that
+    # innings (matches the cricketing convention).
+    thirties: int = 0   # innings with 30 ≤ runs < 50
+    fifties: int = 0    # innings with 50 ≤ runs < 100
+    hundreds: int = 0   # innings with runs ≥ 100
+    ducks: int = 0      # innings with runs = 0 AND dismissed
 
 
 class PlayerScopeStatsOver:
@@ -264,6 +272,12 @@ class PlayerScopeStatsOver:
     wickets: int = 0
     dots: int = 0
     boundaries: int = 0
+    # Maiden overs bowled by this person at this over-number in this scope.
+    # A maiden = the bowler bowled all 6 legal balls of the over with 0
+    # runs conceded (off the bat + extras). Added per Q6 of
+    # `spec-player-baseline-parity.md` to back maidens_per_innings cohort
+    # baselines.
+    maidens: int = 0
 
 
 class PlayerScopeStatsFieldingPosition:
