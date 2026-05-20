@@ -2105,6 +2105,109 @@ export interface ScopeAverageProfile {
   partnerships_by_season: { by_season: ScopePartnershipsSeason[] } | null
 }
 
+// ─── Player-cohort by-season + by-phase (spec-player-baseline-parity.md §3.2) ───
+// Position-mix-weighted (batting), over-mix-weighted (bowling), or
+// keeper-binary (fielding) cohort baselines at by-season + by-phase
+// granularity. Each row's metric fields are null when the per-bucket
+// sample minimums failed for that season/phase (Q4 — chart renders a
+// gap, chip subtitle suppresses).
+
+export interface ScopePlayerBattingSeason {
+  season: string
+  mix: number[]
+  n_players: number
+  n_innings: number
+  below_support: boolean
+  cliff_buckets: number[]
+  total_runs: number | null
+  run_rate: number | null
+  strike_rate: number | null
+  boundary_pct: number | null
+  dot_pct: number | null
+  balls_per_four: number | null
+  balls_per_boundary: number | null
+  sixes_per_innings: number | null
+  fours_per_innings: number | null
+  boundaries_per_innings: number | null
+}
+
+export interface ScopePlayerBattingPhase {
+  phase: string
+  phase_bucket: number
+  n_players: number
+  n_innings_in_phase: number
+  below_support: boolean
+  strike_rate: number | null
+  dot_pct: number | null
+  boundary_pct: number | null
+  balls_per_four: number | null
+  balls_per_boundary: number | null
+  runs_per_innings_in_phase: number | null
+  sixes_per_innings: number | null
+  fours_per_innings: number | null
+  boundaries_per_innings: number | null
+}
+
+export interface ScopePlayerBowlingSeason {
+  season: string
+  mix: number[]
+  n_players: number
+  n_balls: number
+  below_support: boolean
+  cliff_overs: number[]
+  economy: number | null
+  bowling_avg: number | null
+  strike_rate: number | null
+  dot_pct: number | null
+  boundary_pct: number | null
+  balls_per_boundary: number | null
+  wickets_per_over: number | null
+  wickets_per_innings: number | null
+  maidens_per_innings: number | null
+}
+
+export interface ScopePlayerBowlingPhase {
+  phase: string
+  phase_bucket: number
+  mix: number[]
+  overs: number[]
+  n_players: number
+  n_balls_in_phase: number
+  below_support: boolean
+  cliff_overs: number[]
+  economy: number | null
+  strike_rate: number | null
+  dot_pct: number | null
+  boundary_pct: number | null
+  wickets_per_over: number | null
+  wickets_per_innings_in_phase: number | null
+}
+
+export interface ScopePlayerFieldingSeason {
+  season: string
+  is_keeper: number
+  n_players: number
+  n_matches: number
+  below_support: boolean
+  catches_per_match: number | null
+  stumpings_per_match: number | null
+  run_outs_per_match: number | null
+  dismissals_per_match: number | null
+}
+
+export interface ScopePlayerFieldingPhase {
+  phase: string
+  phase_bucket: number
+  is_keeper: number
+  n_players: number
+  n_matches: number
+  below_support: boolean
+  catches_per_match: number | null
+  stumpings_per_match: number | null
+  run_outs_per_match: number | null
+  dismissals_per_match: number | null
+}
+
 export interface TeamFieldingSeason {
   season: string
   catches: number

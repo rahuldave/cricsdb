@@ -341,6 +341,35 @@ export const getScopeFieldingSummary = (filters?: F) =>
   fetchApi<import('./types').ScopeFieldingSummary>('/api/v1/scope/averages/fielding/summary', filters as Record<string, string>)
 export const getScopeFieldingBySeason = (filters?: F) =>
   fetchApi<{ by_season: import('./types').ScopeFieldingSeason[] }>('/api/v1/scope/averages/fielding/by-season', filters as Record<string, string>)
+// ─── Player-cohort by-season + by-phase (spec-player-baseline-parity.md §3.2) ───
+// person_id is required — the endpoint derives the cohort mix
+// server-side from playerscopestats_{position,over,fielding_position}
+// joined on (person_id, scope_key). Per-season and per-phase responses
+// share a single FilterParams scope so the cohort baseline narrows
+// with every FilterBar / aux click identical to chip ↔ chart symmetry.
+
+const playerScope = <T>(path: string, personId: string, filters?: F) =>
+  fetchApi<T>(path, { ...(filters as Record<string, string>), person_id: personId })
+
+export const getScopePlayersBattingBySeason = (personId: string, filters?: F) =>
+  playerScope<{ by_season: import('./types').ScopePlayerBattingSeason[] }>(
+    '/api/v1/scope/averages/players/batting/by-season', personId, filters)
+export const getScopePlayersBattingByPhase = (personId: string, filters?: F) =>
+  playerScope<{ by_phase: import('./types').ScopePlayerBattingPhase[] }>(
+    '/api/v1/scope/averages/players/batting/by-phase', personId, filters)
+export const getScopePlayersBowlingBySeason = (personId: string, filters?: F) =>
+  playerScope<{ by_season: import('./types').ScopePlayerBowlingSeason[] }>(
+    '/api/v1/scope/averages/players/bowling/by-season', personId, filters)
+export const getScopePlayersBowlingByPhase = (personId: string, filters?: F) =>
+  playerScope<{ by_phase: import('./types').ScopePlayerBowlingPhase[] }>(
+    '/api/v1/scope/averages/players/bowling/by-phase', personId, filters)
+export const getScopePlayersFieldingBySeason = (personId: string, filters?: F) =>
+  playerScope<{ by_season: import('./types').ScopePlayerFieldingSeason[] }>(
+    '/api/v1/scope/averages/players/fielding/by-season', personId, filters)
+export const getScopePlayersFieldingByPhase = (personId: string, filters?: F) =>
+  playerScope<{ by_phase: import('./types').ScopePlayerFieldingPhase[] }>(
+    '/api/v1/scope/averages/players/fielding/by-phase', personId, filters)
+
 export const getScopePartnershipsSummary = (filters?: F) =>
   fetchApi<import('./types').ScopePartnershipsSummary>('/api/v1/scope/averages/partnerships/summary', filters as Record<string, string>)
 export const getScopePartnershipsByWicket = (filters?: F) =>
