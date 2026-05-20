@@ -3062,6 +3062,153 @@ async def compute_players_fielding_cohort(
     }
 
 
+# ============================================================
+# /scope/averages/players/fielding/by-season — Phase 4 of
+# spec-player-baseline-parity.md. Per-season cohort baseline for
+# fielding. The cohort is keeper-binary; for each season the
+# endpoint determines whether the player kept in that season
+# (matches_as_keeper > 0 → keeper, else outfielder) and surfaces
+# the matching cohort's per-match rates.
+# ============================================================
+
+
+async def compute_players_fielding_by_season(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-season fielding cohort baseline keyed off the player's
+    per-season keeper status (binary). Returns one row per season.
+    Spec: spec-player-baseline-parity.md §3.2.
+    """
+    where, params = build_scope_clauses(filters, drop=drop_set)
+
+    # Q1: player's per-season keeper status.
+    player_sql = f"""
+        SELECT pss.season,
+               CASE WHEN pss.matches_as_keeper > 0 THEN 1 ELSE 0 END AS is_keeper,
+               pss.matches AS player_matches
+        FROM playerscopestats pss
+        WHERE {where}
+          AND pss.person_id = :__pid
+        ORDER BY pss.season
+    """
+    # Q2: cohort pool per (season, keeper_flag) from parent.
+    pool_sql = f"""
+        SELECT pss.season,
+               CASE WHEN pss.matches_as_keeper > 0 THEN 1 ELSE 0 END AS is_keeper,
+               COUNT(*)                AS n_fielders,
+               SUM(pss.matches)        AS n_matches_total
+        FROM playerscopestats pss
+        WHERE {where}
+        GROUP BY pss.season, is_keeper
+        ORDER BY pss.season, is_keeper
+    """
+    # Q3: cohort fielding aggregates per (season, keeper_flag) from
+    # the fielding-position child (non-substitute) joined to parent.
+    nonsub_sql = f"""
+        SELECT pss.season,
+               CASE WHEN pss.matches_as_keeper > 0 THEN 1 ELSE 0 END AS is_keeper,
+               SUM(pssfp.catches)    AS catches,
+               SUM(pssfp.stumpings)  AS stumpings,
+               SUM(pssfp.run_outs)   AS run_outs,
+               SUM(pssfp.dismissals) AS dismissals
+        FROM playerscopestatsfieldingposition pssfp
+        JOIN playerscopestats pss
+          ON pss.person_id = pssfp.person_id
+         AND pss.scope_key = pssfp.scope_key
+        WHERE {where}
+        GROUP BY pss.season, is_keeper
+        ORDER BY pss.season, is_keeper
+    """
+    p_params = {**params, "__pid": person_id}
+    player_rows, pool_rows, nonsub_rows = await asyncio.gather(
+        db.q(player_sql, p_params),
+        db.q(pool_sql, params),
+        db.q(nonsub_sql, params),
+    )
+
+    # Roll up. Key by (season, is_keeper).
+    pool_by = {(r["season"], r["is_keeper"]): r for r in pool_rows}
+    nonsub_by = {(r["season"], r["is_keeper"]): r for r in nonsub_rows}
+
+    def _r(num, den, n):
+        return round(num / den, n) if den else None
+
+    by_season: list[dict] = []
+    for pr in player_rows:
+        season = pr["season"]
+        is_keeper = pr["is_keeper"]
+        pool = pool_by.get((season, is_keeper))
+        nonsub = nonsub_by.get((season, is_keeper))
+
+        n_fielders = (pool.get("n_fielders") if pool else 0) or 0
+        n_matches  = (pool.get("n_matches_total") if pool else 0) or 0
+        catches    = (nonsub.get("catches") if nonsub else 0) or 0
+        stumpings  = (nonsub.get("stumpings") if nonsub else 0) or 0
+        run_outs   = (nonsub.get("run_outs") if nonsub else 0) or 0
+        dismissals = (nonsub.get("dismissals") if nonsub else 0) or 0
+
+        below = n_fielders < 3  # tiny-cohort guard
+
+        row = {
+            "season": season,
+            "is_keeper": is_keeper,
+            "n_players": n_fielders,
+            "n_matches": n_matches,
+            "below_support": below,
+        }
+        if below:
+            row.update({
+                "catches_per_match": None, "stumpings_per_match": None,
+                "run_outs_per_match": None, "dismissals_per_match": None,
+            })
+        else:
+            row.update({
+                "catches_per_match":    _r(catches,    n_matches, 4),
+                "stumpings_per_match":  _r(stumpings,  n_matches, 4),
+                "run_outs_per_match":   _r(run_outs,   n_matches, 4),
+                "dismissals_per_match": _r(dismissals, n_matches, 4),
+            })
+        by_season.append(row)
+
+    return {"by_season": by_season}
+
+
+@router.get("/players/fielding/by-season")
+async def scope_players_fielding_by_season(
+    person_id: str = Query(
+        ...,
+        description=(
+            "Player ID. The endpoint determines per-season is_keeper"
+            " status from matches_as_keeper > 0 and surfaces the"
+            " matching keeper-binary cohort's per-match rates."
+        ),
+    ),
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    drop: Optional[str] = Query(None),
+):
+    """Per-season keeper-binary cohort baseline for fielding."""
+    db = get_db()
+    try:
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await compute_players_fielding_by_season(
+        db, person_id, filters, aux, drop_set,
+    )
+
+
 @router.get("/players/fielding/summary")
 async def scope_players_fielding_summary(
     filters: FilterParams = Depends(),
