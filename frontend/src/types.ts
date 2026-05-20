@@ -408,6 +408,16 @@ export interface BattingSummary {
   balls_per_four: MetricEnvelope
   balls_per_six: MetricEnvelope
   balls_per_boundary: MetricEnvelope
+  // Q6 per-innings rate envelopes (spec-player-baseline-parity.md
+  // §3.3.1) — shipped session 1 in commit 55c890a. Each is a rate
+  // metric: numerator (volume above) divided by innings_total.
+  boundaries_per_innings: MetricEnvelope
+  sixes_per_innings: MetricEnvelope
+  fours_per_innings: MetricEnvelope
+  thirties_per_innings: MetricEnvelope
+  fifties_per_innings: MetricEnvelope
+  hundreds_per_innings: MetricEnvelope
+  ducks_per_innings: MetricEnvelope
   // Per-bucket position distribution + cohort context (next-spec viz
   // consumes the by-bucket data; this spec uses just the cohort
   // baseline aggregated by the backend).
@@ -1227,6 +1237,12 @@ export interface BowlingSummary {
   balls_per_four: MetricEnvelope
   balls_per_six: MetricEnvelope
   balls_per_boundary: MetricEnvelope
+  // Q6 per-innings rate envelopes (spec-player-baseline-parity.md
+  // §3.3.3) — shipped session 1 in commit 55c890a. wickets_per_innings
+  // is the bowling-side milestone-grade rate; maidens_per_innings
+  // surfaces a low-volume but high-signal economy proxy.
+  wickets_per_innings: MetricEnvelope
+  maidens_per_innings: MetricEnvelope
   // Per-over distribution + cohort context.
   over_distribution: BowlingOverDistributionEntry[]
   cohort: BowlingCohortMeta | null

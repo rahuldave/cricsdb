@@ -196,18 +196,36 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     const b = profile.batting
     if (!b) return null
     const tt = b.cohort ? battingCohortTooltip(b.cohort as BattingCohortMeta) : undefined
-    // cols-6 — 3 cols on mobile (≤720px) → 6 cols on desktop, via
-    // index.css. Inline `gridTemplateColumns: 'repeat(6, 1fr)'` would
-    // override the mobile rule, so leave the layout to the class.
+    // Two-row layout (Phase F of spec-player-baseline-parity.md §4.1
+    // + Q6 (ii)). Row 1: existing kernel tiles. Row 2: per-innings
+    // rate tiles surfacing the Q6 envelopes shipped session 1 in
+    // commit 55c890a (boundaries/innings, sixes/innings, fours/
+    // innings, milestone-per-innings).
     return (
-      <div className="wisden-statrow cols-6">
-        <StatCard label="Runs"  value={b.runs.value} subtitle={baselineSub(b.runs, tt, 0)} />
-        <StatCard label="Avg"   value={fmt(b.average.value)} subtitle={baselineSub(b.average, tt, 2)} />
-        <StatCard label="SR"    value={fmt(b.strike_rate.value)} subtitle={baselineSub(b.strike_rate, tt, 1)} />
-        <StatCard label="100s"  value={b.hundreds.value} />
-        <StatCard label="50s"   value={b.fifties.value} />
-        <StatCard label="HS"    value={b.highest_score} />
-      </div>
+      <>
+        <div className="wisden-statrow cols-6">
+          <StatCard label="Runs"  value={b.runs.value} subtitle={baselineSub(b.runs, tt, 0)} />
+          <StatCard label="Avg"   value={fmt(b.average.value)} subtitle={baselineSub(b.average, tt, 2)} />
+          <StatCard label="SR"    value={fmt(b.strike_rate.value)} subtitle={baselineSub(b.strike_rate, tt, 1)} />
+          <StatCard label="100s"  value={b.hundreds.value} subtitle={baselineSub(b.hundreds_per_innings, tt, 3)} />
+          <StatCard label="50s"   value={b.fifties.value} subtitle={baselineSub(b.fifties_per_innings, tt, 3)} />
+          <StatCard label="HS"    value={b.highest_score} />
+        </div>
+        <div className="wisden-statrow cols-6">
+          <StatCard label="4s/Inn"   value={fmt(b.fours_per_innings.value, 2)}
+            subtitle={baselineSub(b.fours_per_innings, tt, 2)} />
+          <StatCard label="6s/Inn"   value={fmt(b.sixes_per_innings.value, 2)}
+            subtitle={baselineSub(b.sixes_per_innings, tt, 2)} />
+          <StatCard label="Bndr/Inn" value={fmt(b.boundaries_per_innings.value, 2)}
+            subtitle={baselineSub(b.boundaries_per_innings, tt, 2)} />
+          <StatCard label="30s/Inn"  value={fmt(b.thirties_per_innings.value, 3)}
+            subtitle={baselineSub(b.thirties_per_innings, tt, 3)} />
+          <StatCard label="Dot%"     value={b.dot_pct.value != null ? `${b.dot_pct.value}%` : '-'}
+            subtitle={baselineSub(b.dot_pct, tt, 1)} />
+          <StatCard label="B/Bndry"  value={fmt(b.balls_per_boundary.value, 2)}
+            subtitle={baselineSub(b.balls_per_boundary, tt, 2)} />
+        </div>
+      </>
     )
   }
 
@@ -215,14 +233,18 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     const b = profile.bowling
     if (!b) return null
     const tt = b.cohort ? bowlingCohortTooltip(b.cohort as BowlingCohortMeta) : undefined
-    // No extra class — `.wisden-statrow` default is 2 cols on
-    // mobile, 4 cols at tablet+; matches the 4-tile bowling shape.
+    // Six tiles. Phase F adds Wkts/Inn + Maidens/Inn to the existing
+    // four (Wickets, Avg, Econ, SR) — Q6 envelopes shipped session 1.
     return (
-      <div className="wisden-statrow">
+      <div className="wisden-statrow cols-6">
         <StatCard label="Wickets" value={b.wickets.value ?? 0} />
         <StatCard label="Avg"     value={fmt(b.average.value)} subtitle={baselineSub(b.average, tt, 2)} />
         <StatCard label="Econ"    value={fmt(b.economy.value)} subtitle={baselineSub(b.economy, tt, 2)} />
         <StatCard label="SR"      value={fmt(b.strike_rate.value)} subtitle={baselineSub(b.strike_rate, tt, 2)} />
+        <StatCard label="Wkts/Inn"    value={fmt(b.wickets_per_innings.value, 2)}
+          subtitle={baselineSub(b.wickets_per_innings, tt, 2)} />
+        <StatCard label="Maidens/Inn" value={fmt(b.maidens_per_innings.value, 3)}
+          subtitle={baselineSub(b.maidens_per_innings, tt, 3)} />
       </div>
     )
   }
@@ -231,11 +253,20 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     const f = profile.fielding
     if (!f) return null
     const tt = f.cohort ? fieldingCohortTooltip(f.cohort as FieldingCohortMeta) : undefined
+    // Phase F: Catches/Stumpings/Run-outs tiles gain per-match-rate
+    // chip subtitles surfacing the envelopes Phase E added to
+    // /fielders/{id}/summary. Volume stays bold; rate vs cohort is
+    // the chip context. Stumpings chip is suppressed when value=0
+    // (non-keeper).
     return (
       <div className="wisden-statrow cols-5">
-        <StatCard label="Catches"    value={f.catches.value ?? 0} />
-        <StatCard label="Stumpings"  value={f.stumpings.value ?? 0} />
-        <StatCard label="Run-outs"   value={f.run_outs.value ?? 0} />
+        <StatCard label="Catches"    value={f.catches.value ?? 0}
+          subtitle={baselineSub(f.catches_per_match, tt, 3)} />
+        <StatCard label="Stumpings"  value={f.stumpings.value ?? 0}
+          subtitle={f.stumpings_per_match.value
+            ? baselineSub(f.stumpings_per_match, tt, 3) : undefined} />
+        <StatCard label="Run-outs"   value={f.run_outs.value ?? 0}
+          subtitle={baselineSub(f.run_outs_per_match, tt, 3)} />
         <StatCard label="Total"      value={f.total_dismissals.value ?? 0} />
         <StatCard label="Dis/Match"  value={fmt(f.dismissals_per_match.value, 3)}
           subtitle={baselineSub(f.dismissals_per_match, tt, 3)} />
