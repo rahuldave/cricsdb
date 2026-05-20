@@ -14,6 +14,9 @@ import ScopedPageHeader from '../components/ScopedPageHeader'
 import { useDormancy } from '../components/DormancyContext'
 import InningToggle from '../components/InningToggle'
 import StatCard from '../components/StatCard'
+import MetricDelta from '../components/MetricDelta'
+import { bowlingCohortTooltip } from '../components/players/cohortTooltip'
+import type { BowlingCohortMeta } from '../types'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
 import ScatterChart from '../components/charts/ScatterChart'
@@ -224,12 +227,24 @@ export default function Bowling() {
             )}
           </ScopedPageHeader>
           <ScopeIndicator filters={filters} />
+          {(() => {
+            const cohortTT = summary.cohort
+              ? bowlingCohortTooltip(summary.cohort as BowlingCohortMeta)
+              : undefined
+            return (
+              <>
           <div className="wisden-statrow cols-5">
             <StatCard label="Matches" value={summary.matches.value ?? 0} />
             <StatCard label="Innings" value={summary.innings.value ?? 0} />
             <StatCard label="Wickets" value={summary.wickets.value ?? 0} />
-            <StatCard label="Average" value={fmt(summary.average.value)} />
-            <StatCard label="Economy" value={fmt(summary.economy.value)} />
+            <StatCard label="Average" value={fmt(summary.average.value)}
+              subtitle={summary.average.scope_avg != null
+                ? <MetricDelta env={summary.average} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                : undefined} />
+            <StatCard label="Economy" value={fmt(summary.economy.value)}
+              subtitle={summary.economy.scope_avg != null
+                ? <MetricDelta env={summary.economy} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                : undefined} />
           </div>
           {playerId && (
             <BowlerDistributionPanel
@@ -241,11 +256,23 @@ export default function Bowling() {
           )}
           <div className="wisden-statrow cols-5">
             <StatCard label="Overs" value={summary.overs} />
-            <StatCard label="Strike Rate" value={fmt(summary.strike_rate.value)} />
+            <StatCard label="Strike Rate" value={fmt(summary.strike_rate.value)}
+              subtitle={summary.strike_rate.scope_avg != null
+                ? <MetricDelta env={summary.strike_rate} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                : undefined} />
             <StatCard label="Best Figures" value={summary.best_figures || '-'} />
-            <StatCard label="Dot %" value={summary.dot_pct.value != null ? `${summary.dot_pct.value}%` : '-'} />
-            <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary.value)} />
+            <StatCard label="Dot %" value={summary.dot_pct.value != null ? `${summary.dot_pct.value}%` : '-'}
+              subtitle={summary.dot_pct.scope_avg != null
+                ? <MetricDelta env={summary.dot_pct} withScopeAvg label="base" fmt={1} scopeAvgTooltip={cohortTT} />
+                : undefined} />
+            <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary.value)}
+              subtitle={summary.balls_per_boundary.scope_avg != null
+                ? <MetricDelta env={summary.balls_per_boundary} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                : undefined} />
           </div>
+              </>
+            )
+          })()}
 
           <div className="wisden-tabs">
             {tabs.map(tab => (

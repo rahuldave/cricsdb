@@ -14,6 +14,9 @@ import ScopedPageHeader from '../components/ScopedPageHeader'
 import { useDormancy } from '../components/DormancyContext'
 import InningToggle from '../components/InningToggle'
 import StatCard from '../components/StatCard'
+import MetricDelta from '../components/MetricDelta'
+import { fieldingCohortTooltip } from '../components/players/cohortTooltip'
+import type { FieldingCohortMeta } from '../types'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
 import DonutChart from '../components/charts/DonutChart'
@@ -278,7 +281,11 @@ export default function Fielding() {
             <StatCard label="Run Outs" value={summary.run_outs.value ?? 0} />
             <StatCard label="Total" value={summary.total_dismissals.value ?? 0} />
             <StatCard label="Matches" value={summary.matches.value ?? 0} />
-            <StatCard label="Dis/Match" value={fmt(summary.dismissals_per_match.value)} />
+            <StatCard label="Dis/Match" value={fmt(summary.dismissals_per_match.value)}
+              subtitle={summary.dismissals_per_match.scope_avg != null
+                ? <MetricDelta env={summary.dismissals_per_match} withScopeAvg label="base" fmt={3}
+                    scopeAvgTooltip={summary.cohort ? fieldingCohortTooltip(summary.cohort as FieldingCohortMeta) : undefined} />
+                : undefined} />
           </div>
 
           <FielderDistributionPanel
