@@ -19,6 +19,7 @@ import { fieldingCohortTooltip } from '../components/players/cohortTooltip'
 import type { FieldingCohortMeta } from '../types'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
+import LineChart from '../components/charts/LineChart'
 import DonutChart from '../components/charts/DonutChart'
 import { WISDEN, WISDEN_PHASES } from '../components/charts/palette'
 import Spinner from '../components/Spinner'
@@ -28,12 +29,14 @@ import {
   getFielderDismissalTypes, getFielderVictims, getFielderInnings,
   getFielderKeepingSummary, getFielderKeepingBySeason, getFielderKeepingInnings,
   getFieldingLeaders, getFielderDistribution, getFielderRecords,
+  getScopePlayersFieldingBySeason, getScopePlayersFieldingByPhase,
 } from '../api'
 import type {
   PlayerSearchResult, FieldingSummary, FieldingSeason, FieldingPhase,
   FieldingVictim, FieldingInnings,
   KeepingSummary, KeepingSeason, KeepingInnings,
   FieldingLeaders, FielderDistribution, FilterParams,
+  ScopePlayerFieldingSeason, ScopePlayerFieldingPhase,
 } from '../types'
 import FielderDistributionPanel from '../components/fielding/FielderDistributionPanel'
 import FielderRecordsPanel from '../components/players/FielderRecordsPanel'
@@ -43,6 +46,31 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   if (fetch.loading) return <Spinner label="Loading…" />
   if (fetch.error) return <ErrorBanner message={fetch.error} onRetry={fetch.refetch} />
   return null
+}
+
+// Per-phase chip — synthesises a MetricEnvelope from (player value,
+// cohort value, polarity). See Bowling.tsx / Batting.tsx for context;
+// Phase G of spec-player-baseline-parity.md will extract a shared
+// <BaselineTooltip> component.
+function PhaseChip({ v, base, dir, fmt: digits = 1 }: {
+  v: number | null | undefined
+  base: number | null | undefined
+  dir: 'higher_better' | 'lower_better'
+  fmt?: number
+}) {
+  if (v == null || base == null || base === 0) return null
+  const env = {
+    value: v,
+    scope_avg: base,
+    delta_pct: ((v - base) / base) * 100,
+    direction: dir,
+    sample_size: null,
+  }
+  return (
+    <div style={{ fontSize: '0.7rem', marginTop: '0.15rem', fontWeight: 400 }}>
+      <MetricDelta env={env} withScopeAvg label="base" fmt={digits} />
+    </div>
+  )
 }
 
 // Tabs are filtered at render based on innings_kept (Keeping hidden when 0)
@@ -102,6 +130,18 @@ export default function Fielding() {
   )
   const seasonData = seasonFetch.data?.by_season ?? []
 
+  // Per-season keeper-binary cohort baseline (spec §3.2 + §4.4). Drives
+  // the forest-green referenceData overlay on the Dismissals-by-Season
+  // LineChart. Fielding cohort is keeper-binary, not position-mix-
+  // weighted (cf. batting/bowling) — fielding rates are dimensionally
+  // coupled in a way position-mix-weighting fails.
+  const seasonBaselineFetch = useFetch<{ by_season: ScopePlayerFieldingSeason[] } | null>(
+    () => playerId && activeTab === 'By Season'
+      ? getScopePlayersFieldingBySeason(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const seasonBaseline = seasonBaselineFetch.data?.by_season ?? []
+
   const overFetch = useFetch<{ by_over: { over_number: number; dismissals: number }[] } | null>(
     () => playerId && activeTab === 'By Over'
       ? getFielderByOver(playerId, filters) : Promise.resolve(null),
@@ -115,6 +155,16 @@ export default function Fielding() {
     [...filterDeps, activeTab],
   )
   const phaseData = phaseFetch.data?.by_phase ?? []
+
+  // Per-phase keeper-binary cohort baseline (spec §4.4). Drives a
+  // Total/Match chip per phase block; volume tiles (Catches, Stumpings,
+  // Run Outs, C&B) stay un-chipped per spec.
+  const phaseBaselineFetch = useFetch<{ by_phase: ScopePlayerFieldingPhase[] } | null>(
+    () => playerId && activeTab === 'By Phase'
+      ? getScopePlayersFieldingByPhase(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const phaseBaseline = phaseBaselineFetch.data?.by_phase ?? []
 
   const dismissalTypesFetch = useFetch<{ total: number; by_kind: Record<string, number> } | null>(
     () => playerId && activeTab === 'Dismissal Types'
@@ -275,18 +325,37 @@ export default function Fielding() {
             )}
           </ScopedPageHeader>
           <ScopeIndicator filters={filters} />
-          <div className="wisden-statrow cols-6">
-            <StatCard label="Catches" value={summary.catches.value ?? 0} />
-            <StatCard label="Stumpings" value={summary.stumpings.value ?? 0} />
-            <StatCard label="Run Outs" value={summary.run_outs.value ?? 0} />
-            <StatCard label="Total" value={summary.total_dismissals.value ?? 0} />
-            <StatCard label="Matches" value={summary.matches.value ?? 0} />
-            <StatCard label="Dis/Match" value={fmt(summary.dismissals_per_match.value)}
-              subtitle={summary.dismissals_per_match.scope_avg != null
-                ? <MetricDelta env={summary.dismissals_per_match} withScopeAvg label="base" fmt={3}
-                    scopeAvgTooltip={summary.cohort ? fieldingCohortTooltip(summary.cohort as FieldingCohortMeta) : undefined} />
-                : undefined} />
-          </div>
+          {(() => {
+            const cohortTT = summary.cohort
+              ? fieldingCohortTooltip(summary.cohort as FieldingCohortMeta)
+              : undefined
+            return (
+              <div className="wisden-statrow cols-6">
+                <StatCard label="Catches" value={summary.catches.value ?? 0}
+                  subtitle={summary.catches_per_match.scope_avg != null
+                    ? <MetricDelta env={summary.catches_per_match} withScopeAvg label="base" fmt={3}
+                        scopeAvgTooltip={cohortTT} />
+                    : undefined} />
+                <StatCard label="Stumpings" value={summary.stumpings.value ?? 0}
+                  subtitle={summary.stumpings_per_match.scope_avg != null && summary.stumpings_per_match.value
+                    ? <MetricDelta env={summary.stumpings_per_match} withScopeAvg label="base" fmt={3}
+                        scopeAvgTooltip={cohortTT} />
+                    : undefined} />
+                <StatCard label="Run Outs" value={summary.run_outs.value ?? 0}
+                  subtitle={summary.run_outs_per_match.scope_avg != null
+                    ? <MetricDelta env={summary.run_outs_per_match} withScopeAvg label="base" fmt={3}
+                        scopeAvgTooltip={cohortTT} />
+                    : undefined} />
+                <StatCard label="Total" value={summary.total_dismissals.value ?? 0} />
+                <StatCard label="Matches" value={summary.matches.value ?? 0} />
+                <StatCard label="Dis/Match" value={fmt(summary.dismissals_per_match.value)}
+                  subtitle={summary.dismissals_per_match.scope_avg != null
+                    ? <MetricDelta env={summary.dismissals_per_match} withScopeAvg label="base" fmt={3}
+                        scopeAvgTooltip={cohortTT} />
+                    : undefined} />
+              </div>
+            )
+          })()}
 
           <FielderDistributionPanel
             playerId={playerId}
@@ -312,9 +381,32 @@ export default function Fielding() {
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
                 {!seasonFetch.loading && !seasonFetch.error && seasonData.length > 0 && (
                   <>
-                    <BarChart data={seasonData} categoryAccessor="season" valueAccessor="total"
-                      title="Dismissals by Season" categoryLabel="Season" valueLabel="Dismissals"
-                      height={350} />
+                    {/* Volume chart, cohort baseline rescaled by player's
+                        matches-in-season for dimensional parity (spec
+                        §4.4). Cohort row has dismissals_per_match;
+                        rescaled = cohort.dismissals_per_match ×
+                        player.matches_in_that_season. Q5 → label="base". */}
+                    {(() => {
+                      const dismissalsRef = seasonBaseline
+                        .filter(b => b.dismissals_per_match != null)
+                        .map(b => {
+                          const playerRow = seasonData.find(s => s.season === b.season)
+                          const matchesIn = playerRow?.matches ?? 0
+                          return matchesIn > 0
+                            ? { season: b.season, total: b.dismissals_per_match! * matchesIn }
+                            : null
+                        })
+                        .filter((r): r is { season: string; total: number } => r !== null)
+                      return (
+                        <LineChart data={seasonData}
+                          xAccessor="season" yAccessor="total"
+                          referenceData={dismissalsRef} referenceLabel="base"
+                          primaryLabel={summary?.name ?? 'Player'}
+                          title="Dismissals by Season" xLabel="Season" yLabel="Dismissals"
+                          height={350}
+                          showPoints />
+                      )
+                    })()}
                     {seasonData.some(s => s.season.includes('/')) && (
                       <p className="wisden-tab-help">
                         Seasons like 2025/26 are Oct–Mar tournaments (BBL, Super Smash, SA20,
@@ -350,19 +442,35 @@ export default function Fielding() {
                 <TabState fetch={phaseFetch as FetchState<unknown>} />
                 {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 wisden-phase-first">
-                    {phaseData.map(p => (
-                      <div key={p.phase} className="wisden-phaseblock">
-                        <h3>{p.phase}</h3>
-                        <div className="wisden-phaseblock-overs">Overs {p.overs}</div>
-                        <div className="wisden-phaseblock-grid">
-                          <div><span className="lbl">Catches</span></div><div className="num">{p.catches}</div>
-                          <div><span className="lbl">Stumpings</span></div><div className="num">{p.stumpings}</div>
-                          <div><span className="lbl">Run Outs</span></div><div className="num">{p.run_outs}</div>
-                          <div><span className="lbl">C&B</span></div><div className="num">{p.caught_and_bowled}</div>
-                          <div><span className="lbl">Total</span></div><div className="num">{p.total}</div>
+                    {phaseData.map(p => {
+                      // Per-phase cohort baseline match. Player phase
+                      // labels are 'Powerplay'/'Middle'/'Death';
+                      // cohort phases are lowercase ('powerplay').
+                      const baseRow = phaseBaseline.find(
+                        b => b.phase.toLowerCase() === p.phase.toLowerCase(),
+                      )
+                      const matches = summary.matches.value ?? 0
+                      const playerTotalPerMatch = matches > 0 ? p.total / matches : null
+                      return (
+                        <div key={p.phase} className="wisden-phaseblock">
+                          <h3>{p.phase}</h3>
+                          <div className="wisden-phaseblock-overs">Overs {p.overs}</div>
+                          <div className="wisden-phaseblock-grid">
+                            <div><span className="lbl">Catches</span></div><div className="num">{p.catches}</div>
+                            <div><span className="lbl">Stumpings</span></div><div className="num">{p.stumpings}</div>
+                            <div><span className="lbl">Run Outs</span></div><div className="num">{p.run_outs}</div>
+                            <div><span className="lbl">C&B</span></div><div className="num">{p.caught_and_bowled}</div>
+                            <div><span className="lbl">Total</span></div>
+                            <div className="num">
+                              {p.total}
+                              <PhaseChip v={playerTotalPerMatch}
+                                base={baseRow?.dismissals_per_match}
+                                dir="higher_better" fmt={3} />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </>

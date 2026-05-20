@@ -1360,6 +1360,9 @@ export interface FieldingSummary {
   caught_and_bowled: MetricEnvelope
   total_dismissals: MetricEnvelope
   dismissals_per_match: MetricEnvelope
+  catches_per_match: MetricEnvelope
+  stumpings_per_match: MetricEnvelope
+  run_outs_per_match: MetricEnvelope
   substitute_catches: MetricEnvelope
   /** Tier 2 — innings where this person was assigned keeper. Used to gate the "Keeping" tab. */
   innings_kept: MetricEnvelope
@@ -1444,6 +1447,10 @@ export interface FieldingSeason {
   run_outs: number
   caught_and_bowled: number
   total: number
+  /** Matches the player appeared in this season — used to rescale
+   *  the per-match cohort baseline back to per-season volume on the
+   *  By Season chart (spec-player-baseline-parity.md §4.4). */
+  matches: number
 }
 
 export interface FieldingPhase {
