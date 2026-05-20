@@ -1751,13 +1751,48 @@ async def compute_players_batting_cohort(
             SELECT scope_key FROM playerscopestats pss WHERE {where}
         )
     """
-    rows, pool = await asyncio.gather(
+    # Q6 (spec-player-baseline-parity.md §3.3): scope-wide per-innings
+    # milestone + boundary rates. The position child table doesn't
+    # carry milestone counts (only the parent does), so this is a
+    # scope-FLAT baseline shared across all positions — fine for the
+    # /players band tile chips since milestones aren't position-mix-
+    # weighted in the player's data either (a 50 is a 50 regardless of
+    # where the batter came in).
+    pi_sql = f"""
+        SELECT
+            SUM(pss.innings_batted) AS innings_total,
+            SUM(pss.fours)          AS fours_total,
+            SUM(pss.sixes)          AS sixes_total,
+            SUM(pss.fours + pss.sixes) AS boundaries_total,
+            SUM(pss.thirties)       AS thirties_total,
+            SUM(pss.fifties)        AS fifties_total,
+            SUM(pss.hundreds)       AS hundreds_total,
+            SUM(pss.ducks)          AS ducks_total
+        FROM playerscopestats pss
+        WHERE {where}
+    """
+    rows, pool, pi = await asyncio.gather(
         db.q(main_sql, params),
         db.q(pool_sql, params),
+        db.q(pi_sql, params),
     )
     by_bucket = {r["position_bucket"]: r for r in rows}
     n_players_total = (pool[0].get("n_players") if pool else 0) or 0
     n_innings_total = (pool[0].get("n_innings_total") if pool else 0) or 0
+
+    # Per-innings cohort rates (scope-flat).
+    pir = pi[0] if pi else {}
+    _pi_inn = pir.get("innings_total") or 0
+    def _pi_rate(total_key: str) -> Optional[float]:
+        total = pir.get(total_key) or 0
+        return round(total / _pi_inn, 3) if _pi_inn else None
+    cc_boundaries_pi = _pi_rate("boundaries_total")
+    cc_sixes_pi      = _pi_rate("sixes_total")
+    cc_fours_pi      = _pi_rate("fours_total")
+    cc_thirties_pi   = _pi_rate("thirties_total")
+    cc_fifties_pi    = _pi_rate("fifties_total")
+    cc_hundreds_pi   = _pi_rate("hundreds_total")
+    cc_ducks_pi      = _pi_rate("ducks_total")
 
     by_position: list[dict] = []
     for b in range(1, 11):
@@ -1829,6 +1864,16 @@ async def compute_players_batting_cohort(
             "balls_per_four":     wrap_metric(None, None, "bat_balls_per_four",     sample_size=n_innings_total),
             "balls_per_six":      wrap_metric(None, None, "bat_balls_per_six",      sample_size=n_innings_total),
             "balls_per_boundary": wrap_metric(None, None, "bat_balls_per_boundary", sample_size=n_innings_total),
+            # Q6: scope-flat per-innings rates (still surfaced under
+            # cliff — these are derived from the parent table, not the
+            # per-position one).
+            "boundaries_per_innings": wrap_metric(cc_boundaries_pi, cc_boundaries_pi, "bat_boundaries_per_innings", sample_size=n_innings_total),
+            "sixes_per_innings":      wrap_metric(cc_sixes_pi,      cc_sixes_pi,      "bat_sixes_per_innings",      sample_size=n_innings_total),
+            "fours_per_innings":      wrap_metric(cc_fours_pi,      cc_fours_pi,      "bat_fours_per_innings",      sample_size=n_innings_total),
+            "thirties_per_innings":   wrap_metric(cc_thirties_pi,   cc_thirties_pi,   "bat_thirties_per_innings",   sample_size=n_innings_total),
+            "fifties_per_innings":    wrap_metric(cc_fifties_pi,    cc_fifties_pi,    "bat_fifties_per_innings",    sample_size=n_innings_total),
+            "hundreds_per_innings":   wrap_metric(cc_hundreds_pi,   cc_hundreds_pi,   "bat_hundreds_per_innings",   sample_size=n_innings_total),
+            "ducks_per_innings":      wrap_metric(cc_ducks_pi,      cc_ducks_pi,      "bat_ducks_per_innings",      sample_size=n_innings_total),
             "by_position": by_position,
         }
 
@@ -1861,6 +1906,14 @@ async def compute_players_batting_cohort(
         "balls_per_four":     wrap_metric(_r(cc_bpf, 2), _r(cc_bpf, 2), "bat_balls_per_four",     sample_size=n_innings_total),
         "balls_per_six":      wrap_metric(_r(cc_bps, 2), _r(cc_bps, 2), "bat_balls_per_six",      sample_size=n_innings_total),
         "balls_per_boundary": wrap_metric(_r(cc_bpb, 2), _r(cc_bpb, 2), "bat_balls_per_boundary", sample_size=n_innings_total),
+        # Q6: scope-flat per-innings rates from playerscopestats parent.
+        "boundaries_per_innings": wrap_metric(cc_boundaries_pi, cc_boundaries_pi, "bat_boundaries_per_innings", sample_size=n_innings_total),
+        "sixes_per_innings":      wrap_metric(cc_sixes_pi,      cc_sixes_pi,      "bat_sixes_per_innings",      sample_size=n_innings_total),
+        "fours_per_innings":      wrap_metric(cc_fours_pi,      cc_fours_pi,      "bat_fours_per_innings",      sample_size=n_innings_total),
+        "thirties_per_innings":   wrap_metric(cc_thirties_pi,   cc_thirties_pi,   "bat_thirties_per_innings",   sample_size=n_innings_total),
+        "fifties_per_innings":    wrap_metric(cc_fifties_pi,    cc_fifties_pi,    "bat_fifties_per_innings",    sample_size=n_innings_total),
+        "hundreds_per_innings":   wrap_metric(cc_hundreds_pi,   cc_hundreds_pi,   "bat_hundreds_per_innings",   sample_size=n_innings_total),
+        "ducks_per_innings":      wrap_metric(cc_ducks_pi,      cc_ducks_pi,      "bat_ducks_per_innings",      sample_size=n_innings_total),
         "by_position": by_position,
     }
 
@@ -2345,13 +2398,45 @@ async def compute_players_bowling_cohort(
             SELECT scope_key FROM playerscopestats pss WHERE {where}
         )
     """
-    rows, pool = await asyncio.gather(
+    # Q6: scope-flat wickets-per-innings + maidens-per-innings from
+    # parent + per-over child. Used by the /bowlers/{id}/summary chip
+    # extensions.
+    pi_sql = f"""
+        SELECT
+            SUM(pss.innings_batted) AS innings_total_dummy,
+            SUM(pss.wickets)        AS wickets_total
+        FROM playerscopestats pss
+        WHERE {where}
+    """
+    # Bowling innings isn't stored on the parent (innings_batted is
+    # batting). Approximate per-innings denominator as ceil(balls/24)
+    # — typical bowler delivers ~4 overs (24 balls) per bowled innings.
+    maidens_sql = f"""
+        SELECT SUM(psso.maidens) AS maidens_total,
+               SUM(psso.legal_balls) AS balls_total
+        FROM playerscopestatsover psso
+        WHERE psso.scope_key IN (
+            SELECT scope_key FROM playerscopestats pss WHERE {where}
+        )
+    """
+    rows, pool, pi, mi = await asyncio.gather(
         db.q(main_sql, params),
         db.q(pool_sql, params),
+        db.q(pi_sql, params),
+        db.q(maidens_sql, params),
     )
     by_over = {r["over_number"]: r for r in rows}
     n_players_total = (pool[0].get("n_players") if pool else 0) or 0
     n_balls_total = (pool[0].get("n_balls_total") if pool else 0) or 0
+
+    # Per-innings approximation: typical bowler bowls 24 legal balls
+    # per innings. So innings_bowled ≈ legal_balls / 24 cohort-wide.
+    bowling_innings_approx = (mi[0].get("balls_total") if mi else 0) or 0
+    bowling_innings_approx = bowling_innings_approx / 24 if bowling_innings_approx else 0
+    wickets_total = (pi[0].get("wickets_total") if pi else 0) or 0
+    maidens_total = (mi[0].get("maidens_total") if mi else 0) or 0
+    cc_wickets_per_innings = round(wickets_total / bowling_innings_approx, 3) if bowling_innings_approx else None
+    cc_maidens_per_innings = round(maidens_total / bowling_innings_approx, 3) if bowling_innings_approx else None
 
     by_over_arr: list[dict] = []
     for o in range(1, 21):
@@ -2414,6 +2499,9 @@ async def compute_players_bowling_cohort(
             "wickets_per_over": wrap_metric(None, None, "bowl_wickets_per_over", sample_size=n_balls_total),
             "boundary_pct":     wrap_metric(None, None, "bowl_boundary_pct", sample_size=n_balls_total),
             "balls_per_boundary": wrap_metric(None, None, "bowl_balls_per_boundary", sample_size=n_balls_total),
+            # Q6 envelope additions (scope-flat).
+            "wickets_per_innings": wrap_metric(cc_wickets_per_innings, cc_wickets_per_innings, "bowl_wickets_per_innings", sample_size=n_balls_total),
+            "maidens_per_innings": wrap_metric(cc_maidens_per_innings, cc_maidens_per_innings, "bowl_maidens_per_innings", sample_size=n_balls_total),
             "by_over": by_over_arr,
         }
 
@@ -2442,6 +2530,9 @@ async def compute_players_bowling_cohort(
         "wickets_per_over": wrap_metric(_r(cc_wpo, 3),  _r(cc_wpo, 3),  "bowl_wickets_per_over", sample_size=n_balls_total),
         "boundary_pct":     wrap_metric(_r(cc_bp, 1),   _r(cc_bp, 1),   "bowl_boundary_pct",    sample_size=n_balls_total),
         "balls_per_boundary": wrap_metric(_r(cc_bpb, 2), _r(cc_bpb, 2), "bowl_balls_per_boundary", sample_size=n_balls_total),
+        # Q6 envelope additions (scope-flat per-innings rates).
+        "wickets_per_innings": wrap_metric(cc_wickets_per_innings, cc_wickets_per_innings, "bowl_wickets_per_innings", sample_size=n_balls_total),
+        "maidens_per_innings": wrap_metric(cc_maidens_per_innings, cc_maidens_per_innings, "bowl_maidens_per_innings", sample_size=n_balls_total),
         "by_over": by_over_arr,
     }
 

@@ -462,6 +462,14 @@ async def batting_summary(
     balls_per_four_val = _safe_div(balls, fours)
     balls_per_six_val = _safe_div(balls, sixes)
     balls_per_boundary_val = _safe_div(balls, boundaries)
+    # Q6 (spec-player-baseline-parity.md §3.3.1): per-innings rates.
+    boundaries_per_innings_val = round(boundaries / innings_count, 3) if innings_count else None
+    sixes_per_innings_val      = round(sixes / innings_count, 3)      if innings_count else None
+    fours_per_innings_val      = round(fours / innings_count, 3)      if innings_count else None
+    thirties_per_innings_val   = round(thirties / innings_count, 3)   if innings_count else None
+    fifties_per_innings_val    = round(fifties / innings_count, 3)    if innings_count else None
+    hundreds_per_innings_val   = round(hundreds / innings_count, 3)   if innings_count else None
+    ducks_per_innings_val      = round(ducks / innings_count, 3)      if innings_count else None
 
     def _cohort_scope_avg(key: str) -> Optional[float]:
         if cohort is None:
@@ -501,6 +509,17 @@ async def batting_summary(
         "balls_per_four":     wrap_metric(balls_per_four_val,     _cohort_scope_avg("balls_per_four"),     "bat_balls_per_four",     sample_size=cohort_sample),
         "balls_per_six":      wrap_metric(balls_per_six_val,      _cohort_scope_avg("balls_per_six"),      "bat_balls_per_six",      sample_size=cohort_sample),
         "balls_per_boundary": wrap_metric(balls_per_boundary_val, _cohort_scope_avg("balls_per_boundary"), "bat_balls_per_boundary", sample_size=cohort_sample),
+        # Q6 (spec-player-baseline-parity.md §3.3.1): per-innings rates
+        # with cohort scope_avg from the parent-table scope-flat
+        # baseline. Direction tied to the metric: more sixes/boundaries
+        # = better, more ducks = worse.
+        "boundaries_per_innings": wrap_metric(boundaries_per_innings_val, _cohort_scope_avg("boundaries_per_innings"), "bat_boundaries_per_innings", sample_size=cohort_sample),
+        "sixes_per_innings":      wrap_metric(sixes_per_innings_val,      _cohort_scope_avg("sixes_per_innings"),      "bat_sixes_per_innings",      sample_size=cohort_sample),
+        "fours_per_innings":      wrap_metric(fours_per_innings_val,      _cohort_scope_avg("fours_per_innings"),      "bat_fours_per_innings",      sample_size=cohort_sample),
+        "thirties_per_innings":   wrap_metric(thirties_per_innings_val,   _cohort_scope_avg("thirties_per_innings"),   "bat_thirties_per_innings",   sample_size=cohort_sample),
+        "fifties_per_innings":    wrap_metric(fifties_per_innings_val,    _cohort_scope_avg("fifties_per_innings"),    "bat_fifties_per_innings",    sample_size=cohort_sample),
+        "hundreds_per_innings":   wrap_metric(hundreds_per_innings_val,   _cohort_scope_avg("hundreds_per_innings"),   "bat_hundreds_per_innings",   sample_size=cohort_sample),
+        "ducks_per_innings":      wrap_metric(ducks_per_innings_val,      _cohort_scope_avg("ducks_per_innings"),      "bat_ducks_per_innings",      sample_size=cohort_sample),
         # Position distribution + cohort metadata for the next-spec viz.
         "position_distribution": position_distribution,
         "cohort": cohort["cohort"] if cohort else None,

@@ -120,6 +120,16 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     "bat_balls_per_four":      "lower_better",
     "bat_balls_per_six":       "lower_better",
     "bat_balls_per_boundary":  "lower_better",
+    # Q6 per-innings rates (spec-player-baseline-parity.md §3.3.1).
+    # More boundaries/sixes/fours/milestones per innings is better;
+    # more ducks per innings is worse.
+    "bat_boundaries_per_innings": "higher_better",
+    "bat_sixes_per_innings":      "higher_better",
+    "bat_fours_per_innings":      "higher_better",
+    "bat_thirties_per_innings":   "higher_better",
+    "bat_fifties_per_innings":    "higher_better",
+    "bat_hundreds_per_innings":   "higher_better",
+    "bat_ducks_per_innings":      "lower_better",
 
     # ── bowling (per-player) ───────────────────────────────────────
     # `bowl_dot_pct` already defined above (team-side, higher_better,
@@ -148,6 +158,9 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     # lower = better.
     "bowl_wickets_per_over":    "higher_better",
     "bowl_boundary_pct":        "lower_better",
+    # Q6 per-innings rates (spec-player-baseline-parity.md §3.3.3).
+    "bowl_wickets_per_innings": "higher_better",
+    "bowl_maidens_per_innings": "higher_better",
 
     # ── fielding (per-player) ──────────────────────────────────────
     "field_catches":              None,

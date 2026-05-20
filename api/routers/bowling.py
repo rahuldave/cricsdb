@@ -488,6 +488,9 @@ async def bowling_summary(
     balls_per_four_val = _safe_div(balls, fours)
     balls_per_six_val = _safe_div(balls, sixes)
     balls_per_boundary_val = _safe_div(balls, boundaries)
+    # Q6 (spec-player-baseline-parity.md §3.3.3): per-innings rates.
+    wickets_per_innings_val = round(wickets / innings_count, 3) if innings_count else None
+    maidens_per_innings_val = round(maidens / innings_count, 3) if innings_count else None
 
     def _cohort_scope_avg(key: str) -> Optional[float]:
         if cohort is None:
@@ -531,6 +534,9 @@ async def bowling_summary(
         "balls_per_four":      wrap_metric(balls_per_four_val,     None, "bowl_balls_per_four",     sample_size=cohort_sample),
         "balls_per_six":       wrap_metric(balls_per_six_val,      None, "bowl_balls_per_six",      sample_size=cohort_sample),
         "balls_per_boundary":  wrap_metric(balls_per_boundary_val, _cohort_scope_avg("balls_per_boundary"), "bowl_balls_per_boundary", sample_size=cohort_sample),
+        # Q6 (spec-player-baseline-parity.md §3.3.3): per-innings rates.
+        "wickets_per_innings": wrap_metric(wickets_per_innings_val, _cohort_scope_avg("wickets_per_innings"), "bowl_wickets_per_innings", sample_size=cohort_sample),
+        "maidens_per_innings": wrap_metric(maidens_per_innings_val, _cohort_scope_avg("maidens_per_innings"), "bowl_maidens_per_innings", sample_size=cohort_sample),
         # Over distribution + cohort metadata for next-spec viz.
         "over_distribution": over_distribution,
         "cohort": cohort["cohort"] if cohort else None,
