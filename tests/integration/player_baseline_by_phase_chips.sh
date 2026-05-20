@@ -111,12 +111,80 @@ for phase in powerplay middle death; do
   assert_contains "/batting By Phase: $phase B/4 chip cites API base $api_b4_2" "vs base $api_b4_2" "$block"
 done
 
+# Helper for cohort by-phase metrics on the bowling endpoint.
+cohort_phase_metric_bowling() {
+  local url="$1" phase="$2" field="$3"
+  curl -s "$url" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+for r in d.get('by_phase', []):
+    if r.get('phase') == '$phase':
+        v = r.get('$field')
+        print(f'{v:.2f}' if isinstance(v, float) else v)
+        sys.exit(0)
+print('MISSING')
+"
+}
+
 # ───────────────────────────────────────────────────────────────────
-# /bowling — Phase D (deferred)
+# /bowling — Phase D (shipped)
 # ───────────────────────────────────────────────────────────────────
-# Add an equivalent block here when Phase D ships, using Bumrah
-# (462411b3) and the bowling /by-phase endpoint variants for
-# Economy, SR, Dots per phase.
+
+echo
+echo "=== /bowling — Bumrah IPL By Phase ==="
+BUMRAH=462411b3
+
+ab open "$BASE/bowling?player=$BUMRAH&$SCOPE_URL&tab=By%20Phase"
+sleep 3
+
+cohort_url="$API/api/v1/scope/averages/players/bowling/by-phase?person_id=$BUMRAH&$SCOPE"
+
+# Sub-phase blocks ("1–3", "4–6") nested under Powerplay receive
+# NO chips (cohort doesn't carry sub-phase data), so test only the
+# three main blocks. phase_block_text matches case-insensitively.
+for phase in powerplay middle death; do
+  block=$(phase_block_text "$phase")
+  if [ -z "$block" ]; then
+    bad "/bowling By Phase: $phase block not found"
+    continue
+  fi
+  vs_base_count=$(echo "$block" | grep -o "vs base " | wc -l | tr -d ' ')
+  if [ "$vs_base_count" -ge 3 ]; then
+    ok "/bowling By Phase: $phase has ≥3 'vs base' chips (=$vs_base_count)"
+  else
+    bad "/bowling By Phase: $phase has only $vs_base_count 'vs base' chips, expected ≥3"
+  fi
+
+  # Econ + SR are 2-decimal places (lower-is-better), Dots is 1.
+  api_econ=$(cohort_phase_metric_bowling "$cohort_url" "$phase" "economy")
+  api_econ_2=$(printf '%.2f' "$api_econ")
+  assert_contains "/bowling By Phase: $phase Econ chip cites API base $api_econ_2" "vs base $api_econ_2" "$block"
+
+  api_sr=$(cohort_phase_metric_bowling "$cohort_url" "$phase" "strike_rate")
+  api_sr_2=$(printf '%.2f' "$api_sr")
+  assert_contains "/bowling By Phase: $phase SR chip cites API base $api_sr_2" "vs base $api_sr_2" "$block"
+
+  api_dot=$(cohort_phase_metric_bowling "$cohort_url" "$phase" "dot_pct")
+  api_dot_1=$(printf '%.1f' "$api_dot")
+  assert_contains "/bowling By Phase: $phase Dots chip cites API base $api_dot_1" "vs base $api_dot_1" "$block"
+done
+
+# Sanity — sub-phase blocks ("1–3", "4–6") must NOT carry chips,
+# because the cohort only ships powerplay / middle / death and a
+# bogus sub-phase chip would have been an accidental wiring.
+for sub in "1–3" "4–6"; do
+  block=$(phase_block_text "$sub")
+  if [ -z "$block" ]; then
+    bad "/bowling By Phase: sub-phase '$sub' block not found"
+    continue
+  fi
+  vs_base_count=$(echo "$block" | grep -o "vs base " | wc -l | tr -d ' ')
+  if [ "$vs_base_count" -eq 0 ]; then
+    ok "/bowling By Phase: sub-phase '$sub' has no chips (=0)"
+  else
+    bad "/bowling By Phase: sub-phase '$sub' unexpectedly has $vs_base_count chips"
+  fi
+done
 
 # ───────────────────────────────────────────────────────────────────
 # /fielding — Phase E (deferred)

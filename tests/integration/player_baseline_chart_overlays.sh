@@ -181,10 +181,73 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────────────
-# /bowling — Phase D (deferred)
+# /bowling — Phase D (shipped)
 # ───────────────────────────────────────────────────────────────────
-# Add an equivalent block here when Phase D ships, using Bumrah
-# (person_id=462411b3) and the bowling endpoint variants.
+
+echo
+echo "=== /bowling — Bumrah IPL By Season ==="
+BUMRAH=462411b3
+
+ab open "$BASE/bowling?player=$BUMRAH&$SCOPE_URL&tab=By%20Season"
+sleep 3
+
+legend=$(chart_legend_texts)
+assert_contains "/bowling By Season: legend names player as primary" "JJ Bumrah" "$legend"
+assert_contains "/bowling By Season: legend names cohort as 'base'" "base" "$legend"
+
+titles=$(ab_eval "
+  Array.from(document.querySelectorAll('h2,h3,h4'))
+    .map(e => e.textContent?.trim())
+    .filter(Boolean)
+    .join('|')
+")
+assert_contains "/bowling By Season: 'Wickets by Season' chart title present" "Wickets by Season" "$titles"
+assert_contains "/bowling By Season: 'Bowling Strike Rate by Season' chart title present" "Bowling Strike Rate by Season" "$titles"
+
+cohort_url="$API/api/v1/scope/averages/players/bowling/by-season?person_id=$BUMRAH&$SCOPE"
+sr_nonnull=$(cohort_nonnull_count "$cohort_url" "strike_rate")
+if [ "$sr_nonnull" -ge 5 ]; then
+  ok "/bowling cohort by-season has ≥5 SR rows (=$sr_nonnull)"
+else
+  bad "/bowling cohort by-season SR rows too few (=$sr_nonnull)"
+fi
+
+agent-browser eval --json "(() => {
+  const frames = Array.from(document.querySelectorAll('.stream-xy-frame'));
+  return {
+    n_frames: frames.length,
+    canvas_counts: frames.map(f => f.querySelectorAll('canvas').length),
+    legend_texts: frames.map(f =>
+      Array.from(f.querySelectorAll('g.legend-item text'))
+        .map(t => t.textContent && t.textContent.trim())
+    ),
+  };
+})()" > /tmp/chart_probe.json 2>/dev/null
+n_frames=$(python3 -c "import json;print(json.load(open('/tmp/chart_probe.json'))['data']['result']['n_frames'])")
+assert_eq "/bowling By Season: 2 stream-xy-frame containers (Wickets + SR)" "2" "$n_frames"
+both_series=$(python3 -c "
+import json
+d = json.load(open('/tmp/chart_probe.json'))['data']['result']
+ok = d['legend_texts'] and all('JJ Bumrah' in lbls and 'base' in lbls for lbls in d['legend_texts'])
+print('yes' if ok else 'no')
+")
+assert_eq "/bowling By Season: each chart's legend names both series" "yes" "$both_series"
+both_canvas=$(python3 -c "
+import json
+d = json.load(open('/tmp/chart_probe.json'))['data']['result']
+ok = d['canvas_counts'] and all(c == 2 for c in d['canvas_counts'])
+print('yes' if ok else 'no')
+")
+assert_eq "/bowling By Season: each chart has primary+ref canvases (2)" "yes" "$both_canvas"
+
+# Cohort shifts on season-window narrowing — same axis as batting.
+sr_2018=$(cohort_metric_at_season "$cohort_url&season_from=2018&season_to=2018" "strike_rate" "2018")
+sr_2021=$(cohort_metric_at_season "$cohort_url&season_from=2021&season_to=2021" "strike_rate" "2021")
+if [ "$sr_2018" != "MISSING" ] && [ "$sr_2021" != "MISSING" ] && [ "$sr_2018" != "$sr_2021" ]; then
+  ok "/bowling cohort shifts on season window (IPL 2018 SR=$sr_2018, 2021 SR=$sr_2021)"
+else
+  bad "/bowling cohort did NOT shift on season window (2018=$sr_2018, 2021=$sr_2021)"
+fi
 
 # ───────────────────────────────────────────────────────────────────
 # /fielding — Phase E (deferred)
