@@ -15,6 +15,7 @@ import { useDormancy } from '../components/DormancyContext'
 import InningToggle from '../components/InningToggle'
 import StatCard from '../components/StatCard'
 import MetricDelta from '../components/MetricDelta'
+import BaselineChip from '../components/baseline/BaselineChip'
 import { fieldingCohortTooltip } from '../components/players/cohortTooltip'
 import type { FieldingCohortMeta } from '../types'
 import DataTable, { type Column } from '../components/DataTable'
@@ -48,30 +49,6 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   return null
 }
 
-// Per-phase chip — synthesises a MetricEnvelope from (player value,
-// cohort value, polarity). See Bowling.tsx / Batting.tsx for context;
-// Phase G of spec-player-baseline-parity.md will extract a shared
-// <BaselineTooltip> component.
-function PhaseChip({ v, base, dir, fmt: digits = 1 }: {
-  v: number | null | undefined
-  base: number | null | undefined
-  dir: 'higher_better' | 'lower_better'
-  fmt?: number
-}) {
-  if (v == null || base == null || base === 0) return null
-  const env = {
-    value: v,
-    scope_avg: base,
-    delta_pct: ((v - base) / base) * 100,
-    direction: dir,
-    sample_size: null,
-  }
-  return (
-    <div style={{ fontSize: '0.7rem', marginTop: '0.15rem', fontWeight: 400 }}>
-      <MetricDelta env={env} withScopeAvg label="base" fmt={digits} />
-    </div>
-  )
-}
 
 // Tabs are filtered at render based on innings_kept (Keeping hidden when 0)
 const BASE_TABS = ['By Season', 'By Over', 'By Phase', 'Dismissal Types', 'Victims', 'Innings List', 'Records'] as const
@@ -440,39 +417,47 @@ export default function Fielding() {
             {activeTab === 'By Phase' && (
               <>
                 <TabState fetch={phaseFetch as FetchState<unknown>} />
-                {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 wisden-phase-first">
-                    {phaseData.map(p => {
-                      // Per-phase cohort baseline match. Player phase
-                      // labels are 'Powerplay'/'Middle'/'Death';
-                      // cohort phases are lowercase ('powerplay').
-                      const baseRow = phaseBaseline.find(
-                        b => b.phase.toLowerCase() === p.phase.toLowerCase(),
-                      )
-                      const matches = summary.matches.value ?? 0
-                      const playerTotalPerMatch = matches > 0 ? p.total / matches : null
-                      return (
-                        <div key={p.phase} className="wisden-phaseblock">
-                          <h3>{p.phase}</h3>
-                          <div className="wisden-phaseblock-overs">Overs {p.overs}</div>
-                          <div className="wisden-phaseblock-grid">
-                            <div><span className="lbl">Catches</span></div><div className="num">{p.catches}</div>
-                            <div><span className="lbl">Stumpings</span></div><div className="num">{p.stumpings}</div>
-                            <div><span className="lbl">Run Outs</span></div><div className="num">{p.run_outs}</div>
-                            <div><span className="lbl">C&B</span></div><div className="num">{p.caught_and_bowled}</div>
-                            <div><span className="lbl">Total</span></div>
-                            <div className="num">
-                              {p.total}
-                              <PhaseChip v={playerTotalPerMatch}
-                                base={baseRow?.dismissals_per_match}
-                                dir="higher_better" fmt={3} />
+                {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (() => {
+                  // Cohort phrasing for the chip's hover tooltip.
+                  // Phase G threads the same cohortTooltip used by
+                  // summary tile chips through By Phase chips too.
+                  const phaseTT = summary.cohort
+                    ? fieldingCohortTooltip(summary.cohort as FieldingCohortMeta)
+                    : undefined
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 wisden-phase-first">
+                      {phaseData.map(p => {
+                        // Per-phase cohort baseline match. Player phase
+                        // labels are 'Powerplay'/'Middle'/'Death';
+                        // cohort phases are lowercase ('powerplay').
+                        const baseRow = phaseBaseline.find(
+                          b => b.phase.toLowerCase() === p.phase.toLowerCase(),
+                        )
+                        const matches = summary.matches.value ?? 0
+                        const playerTotalPerMatch = matches > 0 ? p.total / matches : null
+                        return (
+                          <div key={p.phase} className="wisden-phaseblock">
+                            <h3>{p.phase}</h3>
+                            <div className="wisden-phaseblock-overs">Overs {p.overs}</div>
+                            <div className="wisden-phaseblock-grid">
+                              <div><span className="lbl">Catches</span></div><div className="num">{p.catches}</div>
+                              <div><span className="lbl">Stumpings</span></div><div className="num">{p.stumpings}</div>
+                              <div><span className="lbl">Run Outs</span></div><div className="num">{p.run_outs}</div>
+                              <div><span className="lbl">C&B</span></div><div className="num">{p.caught_and_bowled}</div>
+                              <div><span className="lbl">Total</span></div>
+                              <div className="num">
+                                {p.total}
+                                <BaselineChip v={playerTotalPerMatch}
+                                  base={baseRow?.dismissals_per_match}
+                                  dir="higher_better" fmt={3} tooltip={phaseTT} />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
               </>
             )}
 

@@ -15,6 +15,7 @@ import { useDormancy } from '../components/DormancyContext'
 import InningToggle from '../components/InningToggle'
 import StatCard from '../components/StatCard'
 import MetricDelta from '../components/MetricDelta'
+import BaselineChip from '../components/baseline/BaselineChip'
 import { bowlingCohortTooltip } from '../components/players/cohortTooltip'
 import type { BowlingCohortMeta } from '../types'
 import DataTable, { type Column } from '../components/DataTable'
@@ -48,30 +49,6 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   return null
 }
 
-// Per-phase chip helper — see Batting.tsx PhaseChip for context. The
-// /by-phase player endpoint returns scalars, so synthesise an envelope
-// from (player value, cohort value, polarity).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function PhaseChip({ v, base, dir, fmt: digits = 1 }: {
-  v: number | null | undefined
-  base: number | null | undefined
-  dir: 'higher_better' | 'lower_better'
-  fmt?: number
-}) {
-  if (v == null || base == null || base === 0) return null
-  const env = {
-    value: v,
-    scope_avg: base,
-    delta_pct: ((v - base) / base) * 100,
-    direction: dir,
-    sample_size: null,
-  }
-  return (
-    <div style={{ fontSize: '0.7rem', marginTop: '0.15rem', fontWeight: 400 }}>
-      <MetricDelta env={env} withScopeAvg label="base" fmt={digits} />
-    </div>
-  )
-}
 
 const tabs = ['By Season', 'By Over', 'By Phase', 'vs Batters', 'Wickets', 'Innings List', 'Records'] as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
@@ -418,6 +395,13 @@ export default function Bowling() {
                   const middle = phaseData.find((p: any) => p.phase === 'middle')
                   const death = phaseData.find((p: any) => p.phase === 'death')
 
+                  // Cohort tooltip phrasing — same one driving the
+                  // summary tile chips. Phase G routes By Phase chips
+                  // through the same explanation.
+                  const phaseTT = summary.cohort
+                    ? bowlingCohortTooltip(summary.cohort as BowlingCohortMeta)
+                    : undefined
+
                   const PhaseBlock = ({ p, label, hideSubtitle, small, baseRow }: {
                     p: any
                     label?: string
@@ -435,20 +419,20 @@ export default function Bowling() {
                         <div><span className="lbl">Econ</span></div>
                         <div className="num">
                           {fmt(p.economy)}
-                          <PhaseChip v={p.economy} base={baseRow?.economy}
-                            dir="lower_better" fmt={2} />
+                          <BaselineChip v={p.economy} base={baseRow?.economy}
+                            dir="lower_better" fmt={2} tooltip={phaseTT} />
                         </div>
                         <div><span className="lbl">SR</span></div>
                         <div className="num">
                           {fmt(p.strike_rate)}
-                          <PhaseChip v={p.strike_rate} base={baseRow?.strike_rate}
-                            dir="lower_better" fmt={2} />
+                          <BaselineChip v={p.strike_rate} base={baseRow?.strike_rate}
+                            dir="lower_better" fmt={2} tooltip={phaseTT} />
                         </div>
                         <div><span className="lbl">Dots</span></div>
                         <div className="num">
                           {fmt(p.dot_pct)}%
-                          <PhaseChip v={p.dot_pct} base={baseRow?.dot_pct}
-                            dir="higher_better" fmt={1} />
+                          <BaselineChip v={p.dot_pct} base={baseRow?.dot_pct}
+                            dir="higher_better" fmt={1} tooltip={phaseTT} />
                         </div>
                       </div>
                     </div>

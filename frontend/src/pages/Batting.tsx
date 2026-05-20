@@ -15,6 +15,7 @@ import ScopeIndicator from '../components/ScopeIndicator'
 import InningToggle from '../components/InningToggle'
 import StatCard from '../components/StatCard'
 import MetricDelta from '../components/MetricDelta'
+import BaselineChip from '../components/baseline/BaselineChip'
 import { battingCohortTooltip } from '../components/players/cohortTooltip'
 import type { BattingCohortMeta } from '../types'
 import DataTable, { type Column } from '../components/DataTable'
@@ -46,32 +47,6 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   if (fetch.loading) return <Spinner label="Loading…" />
   if (fetch.error) return <ErrorBanner message={fetch.error} onRetry={fetch.refetch} />
   return null
-}
-
-// Tiny MetricDelta wrapper for per-phase block tiles. By Phase
-// payload returns scalar fields (not envelopes), so we synthesize
-// the envelope here from (player value, cohort value, polarity).
-// Renders nothing when either piece is missing (the chip's null-
-// guard would skip anyway, but explicit avoids an empty wrapper).
-function PhaseChip({ v, base, dir, fmt: digits = 1 }: {
-  v: number | null | undefined
-  base: number | null | undefined
-  dir: 'higher_better' | 'lower_better'
-  fmt?: number
-}) {
-  if (v == null || base == null || base === 0) return null
-  const env = {
-    value: v,
-    scope_avg: base,
-    delta_pct: ((v - base) / base) * 100,
-    direction: dir,
-    sample_size: null,
-  }
-  return (
-    <div style={{ fontSize: '0.7rem', marginTop: '0.15rem', fontWeight: 400 }}>
-      <MetricDelta env={env} withScopeAvg label="base" fmt={digits} />
-    </div>
-  )
 }
 
 const tabs = ['By Season', 'By Over', 'By Phase', 'vs Bowlers', 'Dismissals', 'Inter-Wicket', 'Innings List', 'Records'] as const
@@ -419,52 +394,60 @@ export default function Batting() {
             {activeTab === 'By Phase' && (
               <>
                 <TabState fetch={phaseFetch as FetchState<unknown>} />
-                {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 wisden-phase-first">
-                    {phaseData.map(p => {
-                      // Per-phase cohort baseline match — phaseBaseline rows
-                      // carry `phase` strings ('powerplay'/'middle'/'death')
-                      // and the player-side `p.phase` is the display label
-                      // ('Powerplay'/'Middle'/'Death'). Case-insensitive
-                      // match keeps the join robust. Spec §3.2.
-                      const baseRow = phaseBaseline.find(
-                        b => b.phase.toLowerCase() === p.phase.toLowerCase(),
-                      )
-                      return (
-                        <div key={p.phase} className="wisden-phaseblock">
-                          <h3>{p.phase}</h3>
-                          <div className="wisden-phaseblock-overs">Overs {p.overs}</div>
-                          <div className="wisden-phaseblock-grid">
-                            <div><span className="lbl">Runs</span></div><div className="num">{p.runs}</div>
-                            <div><span className="lbl">Balls</span></div><div className="num">{p.balls}</div>
-                            <div><span className="lbl">SR</span></div>
-                            <div className="num">
-                              {fmt(p.strike_rate)}
-                              <PhaseChip v={p.strike_rate} base={baseRow?.strike_rate}
-                                dir="higher_better" fmt={1} />
-                            </div>
-                            <div><span className="lbl">Dots</span></div>
-                            <div className="num">
-                              {fmt(p.dot_pct)}%
-                              <PhaseChip v={p.dot_pct} base={baseRow?.dot_pct}
-                                dir="lower_better" fmt={1} />
-                            </div>
-                            <div><span className="lbl">4s</span></div><div className="num">{p.fours}</div>
-                            <div><span className="lbl">6s</span></div><div className="num">{p.sixes}</div>
-                            <div><span className="lbl">B/4</span></div>
-                            <div className="num">
-                              {fmt(p.fours > 0 ? p.balls / p.fours : null)}
-                              <PhaseChip
-                                v={p.fours > 0 ? p.balls / p.fours : null}
-                                base={baseRow?.balls_per_four}
-                                dir="lower_better" fmt={2} />
+                {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (() => {
+                  // Cohort phrasing for the chip's hover tooltip — same
+                  // helper that powers the summary tile chips. Phase G:
+                  // route By Phase chips through the same explanation.
+                  const phaseTT = summary.cohort
+                    ? battingCohortTooltip(summary.cohort as BattingCohortMeta)
+                    : undefined
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 wisden-phase-first">
+                      {phaseData.map(p => {
+                        // Per-phase cohort baseline match — phaseBaseline rows
+                        // carry `phase` strings ('powerplay'/'middle'/'death')
+                        // and the player-side `p.phase` is the display label
+                        // ('Powerplay'/'Middle'/'Death'). Case-insensitive
+                        // match keeps the join robust. Spec §3.2.
+                        const baseRow = phaseBaseline.find(
+                          b => b.phase.toLowerCase() === p.phase.toLowerCase(),
+                        )
+                        return (
+                          <div key={p.phase} className="wisden-phaseblock">
+                            <h3>{p.phase}</h3>
+                            <div className="wisden-phaseblock-overs">Overs {p.overs}</div>
+                            <div className="wisden-phaseblock-grid">
+                              <div><span className="lbl">Runs</span></div><div className="num">{p.runs}</div>
+                              <div><span className="lbl">Balls</span></div><div className="num">{p.balls}</div>
+                              <div><span className="lbl">SR</span></div>
+                              <div className="num">
+                                {fmt(p.strike_rate)}
+                                <BaselineChip v={p.strike_rate} base={baseRow?.strike_rate}
+                                  dir="higher_better" fmt={1} tooltip={phaseTT} />
+                              </div>
+                              <div><span className="lbl">Dots</span></div>
+                              <div className="num">
+                                {fmt(p.dot_pct)}%
+                                <BaselineChip v={p.dot_pct} base={baseRow?.dot_pct}
+                                  dir="lower_better" fmt={1} tooltip={phaseTT} />
+                              </div>
+                              <div><span className="lbl">4s</span></div><div className="num">{p.fours}</div>
+                              <div><span className="lbl">6s</span></div><div className="num">{p.sixes}</div>
+                              <div><span className="lbl">B/4</span></div>
+                              <div className="num">
+                                {fmt(p.fours > 0 ? p.balls / p.fours : null)}
+                                <BaselineChip
+                                  v={p.fours > 0 ? p.balls / p.fours : null}
+                                  base={baseRow?.balls_per_four}
+                                  dir="lower_better" fmt={2} tooltip={phaseTT} />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
               </>
             )}
 
