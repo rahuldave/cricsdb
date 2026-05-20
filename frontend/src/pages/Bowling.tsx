@@ -19,6 +19,7 @@ import { bowlingCohortTooltip } from '../components/players/cohortTooltip'
 import type { BowlingCohortMeta } from '../types'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
+import LineChart from '../components/charts/LineChart'
 import ScatterChart from '../components/charts/ScatterChart'
 import DonutChart from '../components/charts/DonutChart'
 import { WISDEN, WISDEN_PHASES } from '../components/charts/palette'
@@ -28,12 +29,14 @@ import {
   getBowlerSummary, getBowlerInnings, getBowlerVsBatters, getBowlerByOver,
   getBowlerByPhase, getBowlerBySeason, getBowlerWickets, getBowlerDistribution,
   getBowlingLeaders, getBowlerRecords,
+  getScopePlayersBowlingBySeason, getScopePlayersBowlingByPhase,
 } from '../api'
 import type {
   PlayerSearchResult, BowlingSummary, BowlingInnings, BatterMatchup,
   OverStats, PhaseStats, WicketAnalysis,
   BowlingLeaders, BowlingLeaderEntry, FilterParams,
   BowlerDistribution,
+  ScopePlayerBowlingSeason, ScopePlayerBowlingPhase,
 } from '../types'
 import BowlerDistributionPanel from '../components/bowling/BowlerDistributionPanel'
 import BowlerRecordsPanel from '../components/players/BowlerRecordsPanel'
@@ -43,6 +46,31 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   if (fetch.loading) return <Spinner label="Loading…" />
   if (fetch.error) return <ErrorBanner message={fetch.error} onRetry={fetch.refetch} />
   return null
+}
+
+// Per-phase chip helper — see Batting.tsx PhaseChip for context. The
+// /by-phase player endpoint returns scalars, so synthesise an envelope
+// from (player value, cohort value, polarity).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function PhaseChip({ v, base, dir, fmt: digits = 1 }: {
+  v: number | null | undefined
+  base: number | null | undefined
+  dir: 'higher_better' | 'lower_better'
+  fmt?: number
+}) {
+  if (v == null || base == null || base === 0) return null
+  const env = {
+    value: v,
+    scope_avg: base,
+    delta_pct: ((v - base) / base) * 100,
+    direction: dir,
+    sample_size: null,
+  }
+  return (
+    <div style={{ fontSize: '0.7rem', marginTop: '0.15rem', fontWeight: 400 }}>
+      <MetricDelta env={env} withScopeAvg label="base" fmt={digits} />
+    </div>
+  )
 }
 
 const tabs = ['By Season', 'By Over', 'By Phase', 'vs Batters', 'Wickets', 'Innings List', 'Records'] as const
@@ -103,6 +131,16 @@ export default function Bowling() {
   )
   const seasonData = seasonFetch.data?.by_season ?? []
 
+  // Per-season over-mix cohort baseline (spec-player-baseline-parity.md
+  // §3.2 + §4.3). Drives the forest-green referenceData overlay on the
+  // By Season LineCharts.
+  const seasonBaselineFetch = useFetch<{ by_season: ScopePlayerBowlingSeason[] } | null>(
+    () => playerId && activeTab === 'By Season'
+      ? getScopePlayersBowlingBySeason(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const seasonBaseline = seasonBaselineFetch.data?.by_season ?? []
+
   const overFetch = useFetch<{ by_over: OverStats[] } | null>(
     () => playerId && activeTab === 'By Over'
       ? getBowlerByOver(playerId, filters) : Promise.resolve(null),
@@ -116,6 +154,17 @@ export default function Bowling() {
     [...filterDeps, activeTab],
   )
   const phaseData = phaseFetch.data?.by_phase ?? []
+
+  // Per-phase over-mix cohort baseline (spec §4.3). Bowling-by-phase
+  // is over-mix-weighted because over IS the bowling cohort identity
+  // (unlike batting which is position-flat). Drives Econ/SR/Dots
+  // chips on the powerplay, middle, death blocks.
+  const phaseBaselineFetch = useFetch<{ by_phase: ScopePlayerBowlingPhase[] } | null>(
+    () => playerId && activeTab === 'By Phase'
+      ? getScopePlayersBowlingByPhase(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const phaseBaseline = phaseBaselineFetch.data?.by_phase ?? []
 
   const matchupsFetch = useFetch<{ matchups: BatterMatchup[] } | null>(
     () => playerId && activeTab === 'vs Batters'
@@ -288,15 +337,46 @@ export default function Bowling() {
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
                 {!seasonFetch.loading && !seasonFetch.error && seasonData.length > 0 && (
                   <>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <BarChart data={seasonData} categoryAccessor="season" valueAccessor={(d: Record<string, any>) => (d.wickets as number) ?? (d.dismissals as number) ?? 0}
-                        title="Wickets by Season" categoryLabel="Season" valueLabel="Wickets"
-                        height={350} colorScheme={[WISDEN.oxblood]} />
-                      <BarChart data={seasonData.filter(s => s.strike_rate != null)}
-                        categoryAccessor="season" valueAccessor={(d: Record<string, any>) => d.strike_rate ?? 0}
-                        title="Bowling Strike Rate by Season" categoryLabel="Season" valueLabel="SR"
-                        height={350} />
-                    </div>
+                    {/* Cohort baseline overlays (spec §4.3). Wickets is a
+                        volume chart, so the cohort's per-innings wicket
+                        rate is rescaled to the player's per-season
+                        innings count for dimensional parity. SR shares
+                        the field name with player + cohort, no remap
+                        needed. Q5 → label="base". */}
+                    {(() => {
+                      const wktsRef = seasonBaseline
+                        .filter(b => b.wickets_per_innings != null)
+                        .map(b => {
+                          const playerRow = seasonData.find((s: Record<string, any>) => s.season === b.season)
+                          const innings = playerRow?.innings ?? 0
+                          return innings > 0
+                            ? { season: b.season, wickets: b.wickets_per_innings! * innings }
+                            : null
+                        })
+                        .filter((r): r is { season: string; wickets: number } => r !== null)
+                      const srRef = seasonBaseline
+                        .filter(b => b.strike_rate != null)
+                        .map(b => ({ season: b.season, strike_rate: b.strike_rate! }))
+                      return (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <LineChart data={seasonData}
+                            xAccessor="season"
+                            yAccessor={(d: Record<string, any>) => (d.wickets as number) ?? (d.dismissals as number) ?? 0}
+                            referenceData={wktsRef} referenceLabel="base"
+                            primaryLabel={summary?.name ?? 'Player'}
+                            title="Wickets by Season" xLabel="Season" yLabel="Wickets"
+                            height={350} colorScheme={[WISDEN.oxblood]}
+                            showPoints />
+                          <LineChart data={seasonData.filter(s => s.strike_rate != null)}
+                            xAccessor="season" yAccessor="strike_rate"
+                            referenceData={srRef} referenceLabel="base"
+                            primaryLabel={summary?.name ?? 'Player'}
+                            title="Bowling Strike Rate by Season" xLabel="Season" yLabel="SR"
+                            height={350}
+                            showPoints />
+                        </div>
+                      )
+                    })()}
                     {seasonData.some((s: Record<string, any>) => String(s.season).includes('/')) && (
                       <p className="wisden-tab-help">
                         Seasons like 2025/26 are Oct–Mar tournaments (BBL, Super Smash, SA20,
@@ -338,7 +418,13 @@ export default function Bowling() {
                   const middle = phaseData.find((p: any) => p.phase === 'middle')
                   const death = phaseData.find((p: any) => p.phase === 'death')
 
-                  const PhaseBlock = ({ p, label, hideSubtitle, small }: { p: any; label?: string; hideSubtitle?: boolean; small?: boolean }) => (
+                  const PhaseBlock = ({ p, label, hideSubtitle, small, baseRow }: {
+                    p: any
+                    label?: string
+                    hideSubtitle?: boolean
+                    small?: boolean
+                    baseRow?: ScopePlayerBowlingPhase
+                  }) => (
                     <div className="wisden-phaseblock" style={small ? { padding: '0.6rem 0.4rem' } : undefined}>
                       <h3 style={small ? { fontSize: '0.95rem' } : undefined}>{label || p.phase}</h3>
                       {!hideSubtitle && <div className="wisden-phaseblock-overs">Overs {p.overs_range || p.overs}</div>}
@@ -346,18 +432,36 @@ export default function Bowling() {
                         <div><span className="lbl">Balls</span></div><div className="num">{p.balls}</div>
                         <div><span className="lbl">Runs</span></div><div className="num">{p.runs_conceded ?? p.runs}</div>
                         <div><span className="lbl">Wkts</span></div><div className="num">{p.wickets ?? 0}</div>
-                        <div><span className="lbl">Econ</span></div><div className="num">{fmt(p.economy)}</div>
-                        <div><span className="lbl">SR</span></div><div className="num">{fmt(p.strike_rate)}</div>
-                        <div><span className="lbl">Dots</span></div><div className="num">{fmt(p.dot_pct)}%</div>
+                        <div><span className="lbl">Econ</span></div>
+                        <div className="num">
+                          {fmt(p.economy)}
+                          <PhaseChip v={p.economy} base={baseRow?.economy}
+                            dir="lower_better" fmt={2} />
+                        </div>
+                        <div><span className="lbl">SR</span></div>
+                        <div className="num">
+                          {fmt(p.strike_rate)}
+                          <PhaseChip v={p.strike_rate} base={baseRow?.strike_rate}
+                            dir="lower_better" fmt={2} />
+                        </div>
+                        <div><span className="lbl">Dots</span></div>
+                        <div className="num">
+                          {fmt(p.dot_pct)}%
+                          <PhaseChip v={p.dot_pct} base={baseRow?.dot_pct}
+                            dir="higher_better" fmt={1} />
+                        </div>
                       </div>
                     </div>
                   )
+
+                  const baseFor = (name: string) =>
+                    phaseBaseline.find(b => b.phase === name)
 
                   return (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 wisden-phase-first">
                       {/* Powerplay column: main block + nested sub-phase splits */}
                       <div>
-                        {pp && <PhaseBlock p={pp} label="Powerplay" />}
+                        {pp && <PhaseBlock p={pp} label="Powerplay" baseRow={baseFor('powerplay')} />}
                         {(ppEarly || ppLate) && (
                           <div className="grid grid-cols-2 gap-0" style={{ borderTop: '1px solid var(--rule-soft)' }}>
                             {ppEarly && <PhaseBlock p={ppEarly} label="1–3" hideSubtitle small />}
@@ -365,8 +469,8 @@ export default function Bowling() {
                           </div>
                         )}
                       </div>
-                      {middle && <PhaseBlock p={middle} label="Middle" />}
-                      {death && <PhaseBlock p={death} label="Death" />}
+                      {middle && <PhaseBlock p={middle} label="Middle" baseRow={baseFor('middle')} />}
+                      {death && <PhaseBlock p={death} label="Death" baseRow={baseFor('death')} />}
                     </div>
                   )
                 })()}
