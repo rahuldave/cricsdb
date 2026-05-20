@@ -1,0 +1,134 @@
+#!/bin/bash
+# Player baseline — By Phase chip integration test.
+#
+# Spec: internal_docs/spec-player-baseline-parity.md §4.2/§4.3/§4.4
+# + §6.3.
+#
+# Phase C ships /batting By Phase chips on SR, Dots, B/4 — each
+# phase block renders a "vs base N.NN" subtitle anchored against
+# /api/v1/scope/averages/players/batting/by-phase. Phase D extends
+# to /bowling (Economy, SR, Dots); Phase E extends to /fielding
+# (dismissals_per_match). Structure mirrors that order — each
+# discipline gets its own block.
+#
+# Per CLAUDE.md "Integration tests anchor against /summary's
+# scope_avg, not re-derived SQL": expecteds pull from the
+# /by-phase endpoint, not a re-derived SQL query.
+set -u
+
+BASE="${BASE:-http://localhost:5173}"
+API="${API:-http://localhost:8000}"
+PASS=0; FAIL=0; FAILS=""
+
+ab()      { agent-browser "$@" >/dev/null 2>&1; }
+ok()  { PASS=$((PASS+1)); echo "  PASS: $1"; }
+bad() { FAIL=$((FAIL+1)); FAILS="$FAILS\n  - $1"; echo "  FAIL: $1"; }
+
+assert_contains() {
+  local label="$1" needle="$2" actual="$3"
+  if [[ "$actual" == *"$needle"* ]]; then ok "$label"
+  else bad "$label — '$needle' not found in: $actual"; fi
+}
+
+# Get the textContent of a phase block by phase title (case-insensitive).
+# Returns the full grid text so chip subtitles can be substring-matched.
+phase_block_text() {
+  local phase_title="$1"
+  agent-browser eval --json "(() => {
+    const block = Array.from(document.querySelectorAll('.wisden-phaseblock'))
+      .find(b => b.querySelector('h3') &&
+                 b.querySelector('h3').textContent.trim().toLowerCase()
+                   === '$phase_title'.toLowerCase());
+    if (!block) return null;
+    const grid = block.querySelector('.wisden-phaseblock-grid');
+    return grid ? grid.textContent.replace(/\s+/g, ' ').trim() : null;
+  })()" 2>/dev/null > /tmp/phase_probe.json
+  python3 -c "
+import json
+d = json.load(open('/tmp/phase_probe.json'))
+print(d['data']['result'] if d.get('success') else '')
+"
+}
+
+# Pull a metric from the cohort by-phase response. Phase is the
+# lowercase API name ('powerplay'/'middle'/'death').
+cohort_phase_metric() {
+  local url="$1" phase="$2" field="$3"
+  curl -s "$url" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+for r in d.get('by_phase', []):
+    if r.get('phase') == '$phase':
+        v = r.get('$field')
+        print(f'{v:.2f}' if isinstance(v, float) else v)
+        sys.exit(0)
+print('MISSING')
+"
+}
+
+# ───────────────────────────────────────────────────────────────────
+# /batting — Phase C (shipped)
+# ───────────────────────────────────────────────────────────────────
+
+echo
+echo "=== /batting — Kohli IPL By Phase ==="
+KOHLI=ba607b88
+SCOPE='gender=male&team_type=club&tournament=Indian+Premier+League'
+SCOPE_URL='gender=male&team_type=club&tournament=Indian%20Premier%20League'
+
+ab open "$BASE/batting?player=$KOHLI&$SCOPE_URL&tab=By%20Phase"
+sleep 3
+
+cohort_url="$API/api/v1/scope/averages/players/batting/by-phase?person_id=$KOHLI&$SCOPE"
+
+for phase in powerplay middle death; do
+  block=$(phase_block_text "$phase")
+  if [ -z "$block" ]; then
+    bad "/batting By Phase: $phase block not found"
+    continue
+  fi
+  # Each block must show "vs base N.NN" three times (SR, Dots, B/4)
+  vs_base_count=$(echo "$block" | grep -o "vs base " | wc -l | tr -d ' ')
+  if [ "$vs_base_count" -ge 3 ]; then
+    ok "/batting By Phase: $phase has ≥3 'vs base' chips (=$vs_base_count)"
+  else
+    bad "/batting By Phase: $phase has only $vs_base_count 'vs base' chips, expected ≥3"
+  fi
+
+  # Confirm the chip's scope_avg value matches the API response. The
+  # MetricDelta renders the value with `fmt=1` (SR/Dots) or `fmt=2`
+  # (B/4). API returns one decimal precision for SR/Dots already.
+  api_sr=$(cohort_phase_metric "$cohort_url" "$phase" "strike_rate")
+  api_sr_1=$(printf '%.1f' "$api_sr")
+  assert_contains "/batting By Phase: $phase SR chip cites API base $api_sr_1" "vs base $api_sr_1" "$block"
+
+  api_dot=$(cohort_phase_metric "$cohort_url" "$phase" "dot_pct")
+  api_dot_1=$(printf '%.1f' "$api_dot")
+  assert_contains "/batting By Phase: $phase Dots chip cites API base $api_dot_1" "vs base $api_dot_1" "$block"
+
+  api_b4=$(cohort_phase_metric "$cohort_url" "$phase" "balls_per_four")
+  api_b4_2=$(printf '%.2f' "$api_b4")
+  assert_contains "/batting By Phase: $phase B/4 chip cites API base $api_b4_2" "vs base $api_b4_2" "$block"
+done
+
+# ───────────────────────────────────────────────────────────────────
+# /bowling — Phase D (deferred)
+# ───────────────────────────────────────────────────────────────────
+# Add an equivalent block here when Phase D ships, using Bumrah
+# (462411b3) and the bowling /by-phase endpoint variants for
+# Economy, SR, Dots per phase.
+
+# ───────────────────────────────────────────────────────────────────
+# /fielding — Phase E (deferred)
+# ───────────────────────────────────────────────────────────────────
+# Add an equivalent block here when Phase E ships, anchoring on
+# /scope/averages/players/fielding/by-phase.
+
+echo
+echo "─────────────────────────────────────────"
+echo "Results: $PASS passed, $FAIL failed"
+if [ "$FAIL" -gt 0 ]; then
+  echo -e "Failures:$FAILS"
+  exit 1
+fi
+echo "OK"
