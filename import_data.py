@@ -556,6 +556,15 @@ async def main():
     )
     await pssbp_full(db)
 
+    # Populate playerscopestats_fielding_phase — per (fielder, phase)
+    # aggregates. Substitute fielders excluded. Convention 3 applied.
+    # Spec: internal_docs/spec-player-baseline-parity.md §3.1.2.
+    print("\nPopulating playerscopestats_fielding_phase…")
+    from scripts.populate_playerscopestats_fielding_phase import (
+        populate_full as pssfph_full,
+    )
+    await pssfph_full(db)
+
     # Phase 2 of Compare-tab perf — per-cell precomputed baselines.
     # See internal_docs/spec-team-bucket-baseline.md.
     print("\nPopulating bucket_baseline_*…")

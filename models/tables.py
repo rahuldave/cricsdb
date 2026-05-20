@@ -347,6 +347,37 @@ class PlayerScopeStatsBattingPhase:
     dismissals_in_phase: int = 0
 
 
+class PlayerScopeStatsFieldingPhase:
+    """One row per (person, scope, phase_bucket) — per-phase fielding aggregates.
+
+    Child of PlayerScopeStats: same scope_key semantics; phase_bucket
+    matches PlayerScopeStatsBattingPhase (1=pp overs 0-5, 2=middle 6-14,
+    3=death 15-19). The fielder is credited based on the phase the
+    delivery (the one carrying the fielding credit) occurred in.
+
+    Substitute fielders EXCLUDED at populate (is_substitute = 0),
+    matching the existing fielding-distribution rule (CLAUDE.md
+    "Substitute fielders — INCLUDED in /leaders, EXCLUDED in
+    /distribution"). Per-match denominators on the consumer side are
+    drawn from playerscopestats.matches (matchplayer-based), where
+    subs aren't counted either — sample consistency is preserved.
+
+    Convention 3 (CLAUDE.md): `catches_in_phase` is the inclusive count
+    of `kind IN ('caught', 'caught_and_bowled')` in this phase.
+
+    Drives the per-phase fielding cohort baseline endpoint
+    (`/api/v1/scope/averages/players/fielding/by-phase`). Spec:
+    `internal_docs/spec-player-baseline-parity.md` §3.1.2.
+    """
+    person_id: ForeignKey[str, "person"]  # the FIELDER
+    scope_key: str
+    phase_bucket: int  # 1=powerplay, 2=middle, 3=death
+    catches_in_phase: int = 0       # kind IN ('caught','caught_and_bowled') AND is_substitute=0
+    run_outs_in_phase: int = 0      # kind='run_out' AND is_substitute=0
+    stumpings_in_phase: int = 0     # kind='stumped' AND is_substitute=0
+    dismissals_in_phase: int = 0    # catches + run_outs + stumpings (stored for query convenience)
+
+
 class PlayerScopeStatsPosition:
     """One row per (person, scope, position_bucket) — per-position batting aggregates.
 

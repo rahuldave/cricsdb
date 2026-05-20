@@ -1,0 +1,311 @@
+"""Populate playerscopestats_fielding_phase — per-phase fielding aggregates.
+
+Spec: `internal_docs/spec-player-baseline-parity.md` §3.1.2.
+One row per (person_id [FIELDER], scope_key, phase_bucket); phase_bucket
+is 1=powerplay (overs 0-5), 2=middle (6-14), 3=death (15-19) — matches
+the parent populate's `_phase` boundaries and the team-side conventions.
+
+Conventions (CLAUDE.md):
+
+  - **Convention 3**: `catches_in_phase` includes caught_and_bowled —
+    predicate is `kind IN ('caught', 'caught_and_bowled')`. The c&b
+    sub-count isn't broken out; it's folded into the catches headline.
+
+  - **Substitute fielders EXCLUDED** (is_substitute = 0). Matches the
+    sibling _fielding_position child table — this child feeds the
+    cohort baseline endpoint where per-match denominators are
+    matchplayer-based.
+
+Modes:
+  Full rebuild (default, standalone):
+    uv run python scripts/populate_playerscopestats_fielding_phase.py
+
+  Incremental (called from update_recent.py):
+    populate_incremental(db, new_match_ids)
+
+Auto-called by import_data.py (full) and update_recent.py
+(incremental) immediately after the batting_phase populate.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from deebase import Database
+from models import (
+    Person, Match, MatchPlayer, Innings, Delivery, Wicket,
+    FieldingCredit, PlayerScopeStatsFieldingPhase,
+)
+from scripts.populate_player_scope_stats import make_scope_key
+from scripts.populate_playerscopestats_batting_phase import phase_bucket
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(PROJECT_ROOT, "cricket.db")
+
+
+class _Acc:
+    __slots__ = ("catches", "stumpings", "run_outs")
+
+    def __init__(self):
+        self.catches = 0
+        self.stumpings = 0
+        self.run_outs = 0
+
+    def to_row(self, person_id: str, scope_key: str, bucket: int) -> dict:
+        return {
+            "person_id": person_id,
+            "scope_key": scope_key,
+            "phase_bucket": bucket,
+            "catches_in_phase": self.catches,
+            "stumpings_in_phase": self.stumpings,
+            "run_outs_in_phase": self.run_outs,
+            "dismissals_in_phase": self.catches + self.stumpings + self.run_outs,
+        }
+
+
+async def _ensure_tables(db, incremental: bool = False):
+    """Register tables; create indexes only on full rebuild."""
+    await db.create(Person, pk="id", if_not_exists=True)
+    await db.create(Match, pk="id", if_not_exists=True)
+    await db.create(MatchPlayer, pk="id", if_not_exists=True)
+    await db.create(Innings, pk="id", if_not_exists=True)
+    await db.create(Delivery, pk="id", if_not_exists=True)
+    await db.create(Wicket, pk="id", if_not_exists=True)
+    await db.create(FieldingCredit, pk="id", if_not_exists=True)
+
+    idx = {} if incremental else {
+        "indexes": [
+            ("scope_key", "phase_bucket"),
+            "scope_key",
+        ],
+    }
+    return await db.create(
+        PlayerScopeStatsFieldingPhase,
+        pk=["person_id", "scope_key", "phase_bucket"],
+        if_not_exists=True,
+        **idx,
+    )
+
+
+async def _aggregate_matches(
+    db, match_ids: list[int] | None
+) -> dict[tuple[str, str, int], _Acc]:
+    """Aggregate per (fielder_id, scope_key, phase_bucket) over the given matches."""
+    if match_ids is not None and not match_ids:
+        return {}
+
+    # Match metadata.
+    if match_ids is None:
+        match_rows = await db.q("""
+            SELECT id, event_name AS tournament, season, gender, team_type
+            FROM match
+        """)
+    else:
+        id_list = ",".join(str(m) for m in match_ids)
+        match_rows = await db.q(f"""
+            SELECT id, event_name AS tournament, season, gender, team_type
+            FROM match
+            WHERE id IN ({id_list})
+        """)
+    match_meta: dict[int, dict] = {}
+    for r in match_rows:
+        match_meta[r["id"]] = {
+            "scope_key": make_scope_key(
+                r["tournament"], r["season"] or "",
+                r["gender"] or "", r["team_type"] or "",
+            ),
+        }
+    if not match_meta:
+        return {}
+
+    # Innings list (regular only).
+    mid_list = ",".join(str(i) for i in match_meta.keys())
+    innings_rows = await db.q(f"""
+        SELECT id, match_id
+        FROM innings
+        WHERE super_over = 0
+          AND match_id IN ({mid_list})
+    """)
+    innings_match: dict[int, int] = {r["id"]: r["match_id"] for r in innings_rows}
+    innings_ids = list(innings_match.keys())
+    if not innings_ids:
+        return {}
+
+    accs: dict[tuple[str, str, int], _Acc] = {}
+
+    def get_acc(person_id: str, scope_key: str, bucket: int) -> _Acc:
+        key = (person_id, scope_key, bucket)
+        acc = accs.get(key)
+        if acc is None:
+            acc = _Acc()
+            accs[key] = acc
+        return acc
+
+    # Pass: fieldingcredit joined to delivery for over_number → phase.
+    chunk = 500
+    for start in range(0, len(innings_ids), chunk):
+        sub = innings_ids[start:start + chunk]
+        sub_list = ",".join(str(i) for i in sub)
+        fc_rows = await db.q(f"""
+            SELECT fc.fielder_id, fc.kind, d.innings_id, d.over_number
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            WHERE fc.fielder_id IS NOT NULL
+              AND COALESCE(fc.is_substitute, 0) = 0
+              AND d.innings_id IN ({sub_list})
+        """)
+        for fc in fc_rows:
+            fielder = fc["fielder_id"]
+            kind = fc["kind"]
+            iid = fc["innings_id"]
+            mid = innings_match[iid]
+            scope_key = match_meta[mid]["scope_key"]
+            bucket = phase_bucket(fc["over_number"])
+            acc = get_acc(fielder, scope_key, bucket)
+            # Convention 3: caught + caught_and_bowled both count as catches.
+            if kind in ("caught", "caught_and_bowled"):
+                acc.catches += 1
+            elif kind == "stumped":
+                acc.stumpings += 1
+            elif kind == "run_out":
+                acc.run_outs += 1
+
+    return accs
+
+
+# ============================================================
+# Write paths
+# ============================================================
+
+async def _flush(db, table, rows: list[dict]) -> int:
+    if not rows:
+        return 0
+    sa_table = table.sa_table
+    async with db._engine.begin() as conn:
+        await conn.execute(sa_table.insert(), rows)
+    return len(rows)
+
+
+async def populate_full(db) -> int:
+    """Truncate playerscopestats_fielding_phase and rebuild from every regular match."""
+    print("Populating playerscopestats_fielding_phase (full rebuild)...")
+    start = time.time()
+
+    existing = await db.q(
+        "SELECT name FROM sqlite_master "
+        "WHERE type='table' AND name='playerscopestatsfieldingphase'"
+    )
+    table_exists = len(existing) > 0
+    table = await _ensure_tables(db, incremental=table_exists)
+    if table_exists:
+        await db.q("DELETE FROM playerscopestatsfieldingphase")
+
+    print("  scanning all matches…")
+    accs = await _aggregate_matches(db, match_ids=None)
+    print(f"  {len(accs)} (fielder, scope_key, phase) cells aggregated")
+
+    rows: list[dict] = []
+    batch = 2000
+    total = 0
+    for (person_id, scope_key, bucket), acc in accs.items():
+        rows.append(acc.to_row(person_id, scope_key, bucket))
+        if len(rows) >= batch:
+            total += await _flush(db, table, rows)
+            rows = []
+    total += await _flush(db, table, rows)
+
+    elapsed = time.time() - start
+    print(f"  Inserted {total} rows in {elapsed:.1f}s")
+    return total
+
+
+async def populate_incremental(db, new_match_ids: list[int]) -> int:
+    """Recompute rows touched by the new matches (scope-recompute strategy)."""
+    if not new_match_ids:
+        print("playerscopestats_fielding_phase: no new matches, skipping")
+        return 0
+
+    print(f"Populating playerscopestats_fielding_phase for {len(new_match_ids)} new matches…")
+    table = await _ensure_tables(db, incremental=True)
+
+    id_list = ",".join(str(m) for m in new_match_ids)
+    rows = await db.q(f"""
+        SELECT DISTINCT event_name AS tournament, season, gender, team_type
+        FROM match
+        WHERE id IN ({id_list})
+    """)
+    touched_scopes = [
+        (r["tournament"], r["season"] or "", r["gender"] or "", r["team_type"] or "")
+        for r in rows
+    ]
+    if not touched_scopes:
+        print("  no scopes resolved, skipping")
+        return 0
+
+    scope_keys = [make_scope_key(*s) for s in touched_scopes]
+    print(f"  {len(scope_keys)} scopes touched")
+
+    where_parts = []
+    params: dict = {}
+    for i, (tn, se, ge, tt) in enumerate(touched_scopes):
+        if tn is None:
+            tn_clause = "event_name IS NULL"
+        else:
+            tn_clause = f"event_name = :tn{i}"
+            params[f"tn{i}"] = tn
+        where_parts.append(
+            f"({tn_clause} AND season = :se{i} AND gender = :ge{i} AND team_type = :tt{i})"
+        )
+        params[f"se{i}"] = se
+        params[f"ge{i}"] = ge
+        params[f"tt{i}"] = tt
+    where_sql = " OR ".join(where_parts)
+    match_rows = await db.q(f"SELECT id FROM match WHERE {where_sql}", params)
+    affected_match_ids = [r["id"] for r in match_rows]
+    print(f"  {len(affected_match_ids)} total matches in touched scopes")
+
+    accs = await _aggregate_matches(db, match_ids=affected_match_ids)
+
+    sk_list = ",".join(f"'{sk}'" for sk in scope_keys)
+    deleted_rows = await db.q(
+        f"SELECT COUNT(*) AS c FROM playerscopestatsfieldingphase WHERE scope_key IN ({sk_list})"
+    )
+    old_count = deleted_rows[0]["c"] if deleted_rows else 0
+    await db.q(f"DELETE FROM playerscopestatsfieldingphase WHERE scope_key IN ({sk_list})")
+
+    rows_to_insert: list[dict] = []
+    batch = 2000
+    total = 0
+    for (person_id, scope_key, bucket), acc in accs.items():
+        if scope_key not in scope_keys:
+            continue
+        rows_to_insert.append(acc.to_row(person_id, scope_key, bucket))
+        if len(rows_to_insert) >= batch:
+            total += await _flush(db, table, rows_to_insert)
+            rows_to_insert = []
+    total += await _flush(db, table, rows_to_insert)
+
+    print(f"  playerscopestats_fielding_phase: replaced {old_count} rows with {total}")
+    return total
+
+
+async def main():
+    argparse.ArgumentParser(description="Populate playerscopestats_fielding_phase").parse_args()
+
+    if not os.path.exists(DB_PATH):
+        print(f"ERROR: {DB_PATH} not found", file=sys.stderr)
+        sys.exit(1)
+
+    db = Database(f"sqlite+aiosqlite:///{DB_PATH}")
+    await db.q("PRAGMA journal_mode = WAL")
+    await populate_full(db)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

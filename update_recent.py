@@ -373,6 +373,14 @@ async def main():
                 )
                 await pssbp_incr(db, new_match_ids)
 
+                # playerscopestats_fielding_phase — per (fielder, phase)
+                # aggregates. Substitute fielders excluded. Same
+                # touched-scope recompute. Spec §3.1.2.
+                from scripts.populate_playerscopestats_fielding_phase import (
+                    populate_incremental as pssfph_incr,
+                )
+                await pssfph_incr(db, new_match_ids)
+
                 # bucket_baseline_* — per-cell precomputed team / league
                 # baselines for the Compare tab and team endpoints.
                 # Recomputes only cells touched by new matches.
