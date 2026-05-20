@@ -525,9 +525,12 @@ async def bowling_summary(
         "dot_pct":             wrap_metric(dot_pct_val, _cohort_scope_avg("dot_pct"),         "bowl_dot_pct",          sample_size=cohort_sample),
         "boundary_pct":        wrap_metric(bp_val,     _cohort_scope_avg("boundary_pct"),     "bowl_boundary_pct",     sample_size=cohort_sample),
         "wickets_per_over":    wrap_metric(wpo_val,    _cohort_scope_avg("wickets_per_over"), "bowl_wickets_per_over", sample_size=cohort_sample),
+        # Bowling cohort doesn't compute per-bucket 4s/6s separately
+        # (the over child table only has combined boundaries); leave
+        # those scope_avgs null. balls_per_boundary IS available.
         "balls_per_four":      wrap_metric(balls_per_four_val,     None, "bowl_balls_per_four",     sample_size=cohort_sample),
         "balls_per_six":       wrap_metric(balls_per_six_val,      None, "bowl_balls_per_six",      sample_size=cohort_sample),
-        "balls_per_boundary":  wrap_metric(balls_per_boundary_val, None, "bowl_balls_per_boundary", sample_size=cohort_sample),
+        "balls_per_boundary":  wrap_metric(balls_per_boundary_val, _cohort_scope_avg("balls_per_boundary"), "bowl_balls_per_boundary", sample_size=cohort_sample),
         # Over distribution + cohort metadata for next-spec viz.
         "over_distribution": over_distribution,
         "cohort": cohort["cohort"] if cohort else None,

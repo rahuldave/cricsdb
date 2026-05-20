@@ -498,9 +498,9 @@ async def batting_summary(
         "strike_rate":      wrap_metric(sr_val,          _cohort_scope_avg("strike_rate"),  "bat_strike_rate",     sample_size=cohort_sample),
         "dot_pct":          wrap_metric(dot_pct_val,     _cohort_scope_avg("dot_pct"),      "bat_dot_pct",         sample_size=cohort_sample),
         "boundary_pct":     wrap_metric(boundary_pct_val, _cohort_scope_avg("boundary_pct"), "boundary_pct",        sample_size=cohort_sample),
-        "balls_per_four":   wrap_metric(balls_per_four_val,     None, "bat_balls_per_four",     sample_size=cohort_sample),
-        "balls_per_six":    wrap_metric(balls_per_six_val,      None, "bat_balls_per_six",      sample_size=cohort_sample),
-        "balls_per_boundary": wrap_metric(balls_per_boundary_val, None, "bat_balls_per_boundary", sample_size=cohort_sample),
+        "balls_per_four":     wrap_metric(balls_per_four_val,     _cohort_scope_avg("balls_per_four"),     "bat_balls_per_four",     sample_size=cohort_sample),
+        "balls_per_six":      wrap_metric(balls_per_six_val,      _cohort_scope_avg("balls_per_six"),      "bat_balls_per_six",      sample_size=cohort_sample),
+        "balls_per_boundary": wrap_metric(balls_per_boundary_val, _cohort_scope_avg("balls_per_boundary"), "bat_balls_per_boundary", sample_size=cohort_sample),
         # Position distribution + cohort metadata for the next-spec viz.
         "position_distribution": position_distribution,
         "cohort": cohort["cohort"] if cohort else None,

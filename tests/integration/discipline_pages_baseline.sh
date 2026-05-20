@@ -123,6 +123,14 @@ assert_contains "SR subtitle has 'vs base'" "vs base " "$sr_sub"
 dp_sub=$(tile_sub "Dot %")
 assert_contains "Dot % subtitle has 'vs base'" "vs base " "$dp_sub"
 
+# B/Four + B/Boundary baselines (added 2026-05-20 — cohort endpoint
+# now derives balls_per_{four,six,boundary} per bucket as the
+# inverse of fours/balls × 100, then convex-combines).
+bf_sub=$(tile_sub "B/Four")
+assert_contains "B/Four subtitle has 'vs base'" "vs base " "$bf_sub"
+bb_sub=$(tile_sub "B/Boundary")
+assert_contains "B/Boundary subtitle has 'vs base'" "vs base " "$bb_sub"
+
 # Counts that don't have a cohort baseline should NOT have subtitles
 # (Matches, Innings, Runs).
 matches_sub=$(tile_sub "Matches")
@@ -170,6 +178,13 @@ avg_sub=$(tile_sub "Average")
 assert_contains "Bowling Avg subtitle has 'vs base'" "vs base " "$avg_sub"
 sr_sub=$(tile_sub "Strike Rate")
 assert_contains "Bowling SR subtitle has 'vs base'" "vs base " "$sr_sub"
+
+# B/Boundary baseline (added 2026-05-20 — bowling cohort derives
+# balls_per_boundary from the combined boundaries column).
+bb_sub=$(tile_sub "B/Boundary")
+assert_contains "Bowling B/Boundary subtitle has 'vs base'" "vs base " "$bb_sub"
+# Higher = better for bowler; Bumrah elite → ↑ arrow.
+assert_contains "Bowling B/Boundary subtitle has ↑ (higher=better aligned)" "↑" "$bb_sub"
 
 # API scope_avg matches DOM scope_avg for economy.
 api_econ_scope=$(curl -s "$API/api/v1/bowlers/$BUMRAH/summary?tournament=$IPL_ENC&season_from=2016&season_to=2016" \

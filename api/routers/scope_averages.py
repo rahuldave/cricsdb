@@ -1771,13 +1771,17 @@ async def compute_players_batting_cohort(
                 "innings_per_player": None, "runs_per_player": None,
                 "average": None, "strike_rate": None,
                 "boundary_pct": None, "dot_pct": None,
+                "balls_per_four": None, "balls_per_six": None,
+                "balls_per_boundary": None,
             })
             continue
         innings = r["innings"] or 0
         runs = r["runs"] or 0
         balls = r["legal_balls"] or 0
         dismissals = r["dismissals"] or 0
-        boundaries = (r["fours"] or 0) + (r["sixes"] or 0)
+        fours = r["fours"] or 0
+        sixes = r["sixes"] or 0
+        boundaries = fours + sixes
         dots = r["dots"] or 0
         n_p = r["n_players"] or 0
         by_position.append({
@@ -1790,6 +1794,12 @@ async def compute_players_batting_cohort(
             "strike_rate":        round(runs / balls * 100, 1) if balls else None,
             "boundary_pct":       round(boundaries / balls * 100, 1) if balls else None,
             "dot_pct":            round(dots / balls * 100, 1) if balls else None,
+            # Inverse boundary-frequency rates. Lower = better for the
+            # batter (fewer balls between scoring shots). Convex-
+            # combined like the other rates.
+            "balls_per_four":      round(balls / fours, 2)      if fours else None,
+            "balls_per_six":       round(balls / sixes, 2)      if sixes else None,
+            "balls_per_boundary":  round(balls / boundaries, 2) if boundaries else None,
         })
 
     # Strict-cliff gate.
@@ -1816,6 +1826,9 @@ async def compute_players_batting_cohort(
             "strike_rate":    wrap_metric(None, None, "bat_strike_rate", sample_size=n_innings_total),
             "boundary_pct":   wrap_metric(None, None, "boundary_pct",    sample_size=n_innings_total),
             "dot_pct":        wrap_metric(None, None, "bat_dot_pct",     sample_size=n_innings_total),
+            "balls_per_four":     wrap_metric(None, None, "bat_balls_per_four",     sample_size=n_innings_total),
+            "balls_per_six":      wrap_metric(None, None, "bat_balls_per_six",      sample_size=n_innings_total),
+            "balls_per_boundary": wrap_metric(None, None, "bat_balls_per_boundary", sample_size=n_innings_total),
             "by_position": by_position,
         }
 
@@ -1828,6 +1841,9 @@ async def compute_players_batting_cohort(
     cc_sr      = cv("strike_rate")
     cc_bp      = cv("boundary_pct")
     cc_dp      = cv("dot_pct")
+    cc_bpf     = cv("balls_per_four")
+    cc_bps     = cv("balls_per_six")
+    cc_bpb     = cv("balls_per_boundary")
 
     def _r(v: Optional[float], ndigits: int) -> Optional[float]:
         return round(v, ndigits) if v is not None else None
@@ -1842,6 +1858,9 @@ async def compute_players_batting_cohort(
         "strike_rate":    wrap_metric(_r(cc_sr, 1),      _r(cc_sr, 1),      "bat_strike_rate", sample_size=n_innings_total),
         "boundary_pct":   wrap_metric(_r(cc_bp, 1),      _r(cc_bp, 1),      "boundary_pct",    sample_size=n_innings_total),
         "dot_pct":        wrap_metric(_r(cc_dp, 1),      _r(cc_dp, 1),      "bat_dot_pct",     sample_size=n_innings_total),
+        "balls_per_four":     wrap_metric(_r(cc_bpf, 2), _r(cc_bpf, 2), "bat_balls_per_four",     sample_size=n_innings_total),
+        "balls_per_six":      wrap_metric(_r(cc_bps, 2), _r(cc_bps, 2), "bat_balls_per_six",      sample_size=n_innings_total),
+        "balls_per_boundary": wrap_metric(_r(cc_bpb, 2), _r(cc_bpb, 2), "bat_balls_per_boundary", sample_size=n_innings_total),
         "by_position": by_position,
     }
 
@@ -1945,7 +1964,7 @@ async def compute_players_bowling_cohort(
                 "below_support": True,
                 "economy": None, "average": None, "strike_rate": None,
                 "dot_pct": None, "wickets_per_over": None,
-                "boundary_pct": None,
+                "boundary_pct": None, "balls_per_boundary": None,
             })
             continue
         balls = r["legal_balls"] or 0
@@ -1964,6 +1983,11 @@ async def compute_players_bowling_cohort(
             "dot_pct":          round(dots / balls * 100, 1)          if balls else None,
             "wickets_per_over": round(wickets * 6 / balls, 3)         if balls else None,
             "boundary_pct":     round(boundaries / balls * 100, 1)    if balls else None,
+            # Inverse boundary-frequency. Higher = better for the
+            # bowler (more balls between boundaries conceded).
+            # The over child table doesn't break out 4s vs 6s, so
+            # only the combined balls_per_boundary is available.
+            "balls_per_boundary": round(balls / boundaries, 2)        if boundaries else None,
         })
 
     cliff_buckets: list[int] = [
@@ -1989,6 +2013,7 @@ async def compute_players_bowling_cohort(
             "dot_pct":          wrap_metric(None, None, "bowl_dot_pct",      sample_size=n_balls_total),
             "wickets_per_over": wrap_metric(None, None, "bowl_wickets_per_over", sample_size=n_balls_total),
             "boundary_pct":     wrap_metric(None, None, "bowl_boundary_pct", sample_size=n_balls_total),
+            "balls_per_boundary": wrap_metric(None, None, "bowl_balls_per_boundary", sample_size=n_balls_total),
             "by_over": by_over_arr,
         }
 
@@ -2001,6 +2026,7 @@ async def compute_players_bowling_cohort(
     cc_dp   = cv("dot_pct")
     cc_wpo  = cv("wickets_per_over")
     cc_bp   = cv("boundary_pct")
+    cc_bpb  = cv("balls_per_boundary")
 
     def _r(v: Optional[float], ndigits: int) -> Optional[float]:
         return round(v, ndigits) if v is not None else None
@@ -2015,6 +2041,7 @@ async def compute_players_bowling_cohort(
         "dot_pct":          wrap_metric(_r(cc_dp, 1),   _r(cc_dp, 1),   "bowl_dot_pct",         sample_size=n_balls_total),
         "wickets_per_over": wrap_metric(_r(cc_wpo, 3),  _r(cc_wpo, 3),  "bowl_wickets_per_over", sample_size=n_balls_total),
         "boundary_pct":     wrap_metric(_r(cc_bp, 1),   _r(cc_bp, 1),   "bowl_boundary_pct",    sample_size=n_balls_total),
+        "balls_per_boundary": wrap_metric(_r(cc_bpb, 2), _r(cc_bpb, 2), "bowl_balls_per_boundary", sample_size=n_balls_total),
         "by_over": by_over_arr,
     }
 
