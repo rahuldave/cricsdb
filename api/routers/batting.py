@@ -11,6 +11,7 @@ from typing import Optional
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
 from ..aux_clauses import splice_aux_join_clauses
+from ..metrics_metadata import wrap_metric
 from ..player_nationality import player_nationalities
 from ..scope_links import suggested_splits, scope_dict_from_filters
 from ..tournament_canonical import (
@@ -432,32 +433,79 @@ async def batting_summary(
     nationalities = await player_nationalities(db, person_id)
     position_distribution = await _position_distribution(db, person_id, filters)
 
+    # Compute the player's position-mix from their distribution and
+    # fold the cohort baseline in-process. Skip the cohort fetch when
+    # the player has zero innings in scope or when a bowler_id filter
+    # is active (matchup view — cohort baseline doesn't apply to a
+    # per-bowler slice). Phase 4: spec §7.
+    cohort: Optional[dict] = None
+    if innings_count > 0 and not bowler_id:
+        total_pos_innings = sum((p["innings"] or 0) for p in position_distribution)
+        if total_pos_innings > 0:
+            mix = [
+                (p["innings"] or 0) / total_pos_innings
+                for p in position_distribution
+            ]
+            # Pad to length 10 (position_distribution already is, but
+            # defensive).
+            while len(mix) < 10:
+                mix.append(0.0)
+            from .scope_averages import compute_players_batting_cohort
+            cohort = await compute_players_batting_cohort(
+                db, filters, aux, mix[:10], drop_set=None,
+            )
+
+    avg_val = _safe_div(runs, dismissals)
+    sr_val = _safe_div(runs, balls, 100)
+    dot_pct_val = _safe_div(dots, balls, 100, 1)
+    boundary_pct_val = _safe_div(boundaries, balls, 100, 1)
+    balls_per_four_val = _safe_div(balls, fours)
+    balls_per_six_val = _safe_div(balls, sixes)
+    balls_per_boundary_val = _safe_div(balls, boundaries)
+
+    def _cohort_scope_avg(key: str) -> Optional[float]:
+        if cohort is None:
+            return None
+        m = cohort.get(key)
+        return m.get("scope_avg") if m else None
+
+    cohort_sample = cohort["cohort"]["n_innings_total"] if cohort else None
+
     return {
         "person_id": person_id,
         "name": name,
         "nationalities": nationalities,
-        "matches": matches_count,
-        "innings": innings_count,
-        "runs": runs,
-        "balls_faced": balls,
-        "not_outs": not_outs,
-        "dismissals": dismissals,
-        "average": _safe_div(runs, dismissals),
-        "strike_rate": _safe_div(runs, balls, 100),
+        # Identity-bearing or non-numeric fields stay flat.
         "highest_score": highest,
-        "hundreds": hundreds,
-        "fifties": fifties,
-        "thirties": thirties,
-        "ducks": ducks,
-        "fours": fours,
-        "sixes": sixes,
-        "boundaries": boundaries,
-        "dots": dots,
-        "dot_pct": _safe_div(dots, balls, 100, 1),
-        "balls_per_four": _safe_div(balls, fours),
-        "balls_per_six": _safe_div(balls, sixes),
-        "balls_per_boundary": _safe_div(balls, boundaries),
+        # Numeric fields envelope-wrapped per spec Phase 4.
+        # Counts (direction=None): delta_pct stays null.
+        "matches":          wrap_metric(matches_count,  None,                            "matches",            sample_size=cohort_sample),
+        "innings":          wrap_metric(innings_count,  _cohort_scope_avg("innings_batted"), "bat_innings",     sample_size=cohort_sample),
+        "runs":             wrap_metric(runs,           _cohort_scope_avg("runs"),       "bat_runs",           sample_size=cohort_sample),
+        "balls_faced":      wrap_metric(balls,          None,                            "bat_balls_faced",    sample_size=cohort_sample),
+        "not_outs":         wrap_metric(not_outs,       None,                            "bat_not_outs",       sample_size=cohort_sample),
+        "dismissals":       wrap_metric(dismissals,     None,                            "bat_dismissals",     sample_size=cohort_sample),
+        "hundreds":         wrap_metric(hundreds,       None,                            "bat_hundreds",       sample_size=cohort_sample),
+        "fifties":          wrap_metric(fifties,        None,                            "bat_fifties",        sample_size=cohort_sample),
+        "thirties":         wrap_metric(thirties,       None,                            "bat_thirties",       sample_size=cohort_sample),
+        "ducks":            wrap_metric(ducks,          None,                            "bat_ducks",          sample_size=cohort_sample),
+        "fours":            wrap_metric(fours,          None,                            "bat_fours",          sample_size=cohort_sample),
+        "sixes":            wrap_metric(sixes,          None,                            "bat_sixes",          sample_size=cohort_sample),
+        "boundaries":       wrap_metric(boundaries,     None,                            "bat_boundaries",     sample_size=cohort_sample),
+        "dots":             wrap_metric(dots,           None,                            "bat_dots",           sample_size=cohort_sample),
+        # Rate metrics (direction set): delta_pct computed.
+        "average":          wrap_metric(avg_val,         _cohort_scope_avg("average"),      "bat_average",         sample_size=cohort_sample),
+        "strike_rate":      wrap_metric(sr_val,          _cohort_scope_avg("strike_rate"),  "bat_strike_rate",     sample_size=cohort_sample),
+        "dot_pct":          wrap_metric(dot_pct_val,     _cohort_scope_avg("dot_pct"),      "bat_dot_pct",         sample_size=cohort_sample),
+        "boundary_pct":     wrap_metric(boundary_pct_val, _cohort_scope_avg("boundary_pct"), "boundary_pct",        sample_size=cohort_sample),
+        "balls_per_four":   wrap_metric(balls_per_four_val,     None, "bat_balls_per_four",     sample_size=cohort_sample),
+        "balls_per_six":    wrap_metric(balls_per_six_val,      None, "bat_balls_per_six",      sample_size=cohort_sample),
+        "balls_per_boundary": wrap_metric(balls_per_boundary_val, None, "bat_balls_per_boundary", sample_size=cohort_sample),
+        # Position distribution + cohort metadata for the next-spec viz.
         "position_distribution": position_distribution,
+        "cohort": cohort["cohort"] if cohort else None,
+        "cohort_below_support": cohort["below_support"] if cohort else False,
+        "cohort_cliff_buckets": cohort["cliff_buckets"] if cohort else [],
     }
 
 

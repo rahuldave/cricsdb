@@ -170,9 +170,9 @@ async function fetchStrip(tile: ProfileTile, filters: FilterParams): Promise<Sta
     }
   }
   const s = await getBatterSummary(tile.id, filters).catch(() => null)
-  if (!s || s.innings === 0) return null
+  if (!s || (s.innings.value ?? 0) === 0) return null
   return {
-    text: `${fmt0(s.matches)} m · ${fmt0(s.runs)} runs · ${fmt2(s.average)} avg`,
+    text: `${fmt0(s.matches.value ?? 0)} m · ${fmt0(s.runs.value ?? 0)} runs · ${fmt2(s.average.value)} avg`,
   }
 }
 

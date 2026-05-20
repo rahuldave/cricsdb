@@ -3,7 +3,7 @@ import type { PlayerProfile, FilterParams } from '../../types'
 // Per-discipline "has meaningful data" gates. Thresholds mirror the
 // existing leaderboard minimums so a landing-ranked player doesn't
 // render a row the leaderboard itself would have excluded.
-export const hasBatting  = (p: PlayerProfile) => (p.batting?.innings ?? 0) > 0
+export const hasBatting  = (p: PlayerProfile) => (p.batting?.innings.value ?? 0) > 0
 export const hasBowling  = (p: PlayerProfile) => (p.bowling?.balls ?? 0) > 0
 export const hasFielding = (p: PlayerProfile) => {
   const f = p.fielding
@@ -47,16 +47,23 @@ export const KEEPING_INNINGS_THRESHOLD      = 3
 export function classifyRole(p: PlayerProfile): string {
   const b = p.batting
   const bw = p.bowling
+  // Batting numerics are envelope-wrapped per Phase 4. Pull .value
+  // for the threshold comparisons; null averages (zero dismissals)
+  // are treated as 0 here so the tail-ender gate still excludes
+  // them, matching pre-envelope behaviour.
+  const batInnings = b?.innings.value ?? 0
+  const batBalls   = b?.balls_faced.value ?? 0
+  const batAvg     = b?.average.value ?? 0
   const batted = !!b
-    && b.innings >= ROLE_BATTED_MIN_INNINGS
-    && b.balls_faced / Math.max(b.innings, 1) >= ROLE_BATTED_MIN_BALLS_PER_INN
-    && (b.average ?? 0) >= ROLE_BATTED_MIN_AVERAGE
+    && batInnings >= ROLE_BATTED_MIN_INNINGS
+    && batBalls / Math.max(batInnings, 1) >= ROLE_BATTED_MIN_BALLS_PER_INN
+    && batAvg >= ROLE_BATTED_MIN_AVERAGE
   // Use total career matches (from fielding — everyone fields every
   // match) as the denominator, falling back to bowling.matches only
   // if fielding is missing for some reason.
   const totalMatches = Math.max(
     p.fielding?.matches ?? 0,
-    p.batting?.matches  ?? 0,
+    p.batting?.matches.value ?? 0,
     bw?.matches ?? 0,
     1,
   )
@@ -79,7 +86,7 @@ export function classifyRole(p: PlayerProfile): string {
  *  handles specialist roles where one summary may be null. */
 export function matchesInScope(p: PlayerProfile): number {
   return Math.max(
-    p.batting?.matches  ?? 0,
+    p.batting?.matches.value ?? 0,
     p.bowling?.matches  ?? 0,
     p.fielding?.matches ?? 0,
   )

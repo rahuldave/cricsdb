@@ -1702,51 +1702,20 @@ async def _partnerships_by_season_live(filters, aux):
 # Spec §5.1 + §6.
 
 
-@router.get("/players/batting/summary")
-async def scope_players_batting_summary(
-    filters: FilterParams = Depends(),
-    aux: AuxParams = Depends(),
-    position_mix: str = Query(
-        ...,
-        description=(
-            "Comma-separated 10-element vector of the player's mix"
-            " across position buckets (1=opener for positions 1+2"
-            " merged, 2=#3, ..., 10=#11). Must sum to 1.0 +/- 0.001."
-            " Trailing zeros may be omitted."
-        ),
-    ),
-    drop: Optional[str] = Query(
-        None,
-        description=(
-            "Comma-separated FilterBar axis names to mask before"
-            " clause construction. Per-endpoint structural plumbing"
-            " for tautology-prone cohort surfaces; unused for the"
-            " player-compare baseline path. Recognised names:"
-            " gender, team_type, tournament, season, filter_venue,"
-            " filter_team, filter_opponent, team_class, series_type."
-        ),
-    ),
-):
-    """Position-mix-weighted cohort baseline for batting.
+async def compute_players_batting_cohort(
+    db,
+    filters: FilterParams,
+    aux: AuxParams,
+    mix: list[float],
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """In-process batting cohort baseline — same shape as the HTTP
+    endpoint. Phase 4 player /summary endpoints call this to fold the
+    cohort baseline into their envelope-wrapped response without a
+    second HTTP roundtrip. The HTTP endpoint is a thin wrapper.
 
-    Returns cohort metadata, strict-cliff flags, six envelope-wrapped
-    headline metrics, and the per-bucket aggregates in by_position.
+    Spec: spec-player-compare-average.md Phase 4 (backend folding).
     """
-    db = get_db()
-    try:
-        mix = parse_mix(position_mix, 10)
-        drop_set = parse_drop(drop)
-        if drop_set is not None:
-            from ..filters import _DROP_AXES
-            unknown = drop_set - _DROP_AXES
-            if unknown:
-                raise ValueError(
-                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
-                    f" Recognised: {sorted(_DROP_AXES)}."
-                )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
     where, params = build_scope_clauses(filters, drop=drop_set)
 
     # Use a scope_key IN-subquery rather than a JOIN to playerscopestats.
@@ -1875,6 +1844,49 @@ async def scope_players_batting_summary(
         "dot_pct":        wrap_metric(_r(cc_dp, 1),      _r(cc_dp, 1),      "bat_dot_pct",     sample_size=n_innings_total),
         "by_position": by_position,
     }
+
+
+@router.get("/players/batting/summary")
+async def scope_players_batting_summary(
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    position_mix: str = Query(
+        ...,
+        description=(
+            "Comma-separated 10-element vector of the player's mix"
+            " across position buckets (1=opener for positions 1+2"
+            " merged, 2=#3, ..., 10=#11). Must sum to 1.0 +/- 0.001."
+            " Trailing zeros may be omitted."
+        ),
+    ),
+    drop: Optional[str] = Query(
+        None,
+        description=(
+            "Comma-separated FilterBar axis names to mask before"
+            " clause construction. Per-endpoint structural plumbing"
+            " for tautology-prone cohort surfaces; unused for the"
+            " player-compare baseline path. Recognised names:"
+            " gender, team_type, tournament, season, filter_venue,"
+            " filter_team, filter_opponent, team_class, series_type."
+        ),
+    ),
+):
+    """Position-mix-weighted cohort baseline for batting (HTTP wrapper)."""
+    db = get_db()
+    try:
+        mix = parse_mix(position_mix, 10)
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                    f" Recognised: {sorted(_DROP_AXES)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await compute_players_batting_cohort(db, filters, aux, mix, drop_set)
 
 
 @router.get("/players/bowling/summary")

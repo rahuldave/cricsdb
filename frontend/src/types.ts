@@ -359,31 +359,62 @@ export interface NationalityEntry {
   matches: number
 }
 
+export interface BattingPositionDistributionEntry {
+  bucket: number
+  innings: number
+  runs: number
+  legal_balls: number
+  dismissals: number
+  fours: number
+  sixes: number
+  dots: number
+}
+
+export interface BattingCohortMeta {
+  match_dimension: 'position_mix'
+  position_mix: number[]
+  n_players: number
+  n_innings_total: number
+}
+
 export interface BattingSummary {
   person_id: string
   name: string
   nationalities: NationalityEntry[]
-  matches: number
-  innings: number
-  runs: number
-  balls_faced: number
-  not_outs: number
-  dismissals: number
-  average: number | null
-  strike_rate: number | null
+  // Identity-bearing fields stay flat.
   highest_score: number
-  hundreds: number
-  fifties: number
-  thirties: number
-  ducks: number
-  fours: number
-  sixes: number
-  boundaries: number
-  dots: number
-  dot_pct: number | null
-  balls_per_four: number | null
-  balls_per_six: number | null
-  balls_per_boundary: number | null
+  // Numeric fields are envelope-wrapped per Phase 4
+  // (spec-player-compare-average.md). Counts have direction=null;
+  // rate metrics (average, strike_rate, dot_pct, boundary_pct) carry
+  // direction + delta_pct vs the position-mix-weighted cohort.
+  matches: MetricEnvelope
+  innings: MetricEnvelope
+  runs: MetricEnvelope
+  balls_faced: MetricEnvelope
+  not_outs: MetricEnvelope
+  dismissals: MetricEnvelope
+  hundreds: MetricEnvelope
+  fifties: MetricEnvelope
+  thirties: MetricEnvelope
+  ducks: MetricEnvelope
+  fours: MetricEnvelope
+  sixes: MetricEnvelope
+  boundaries: MetricEnvelope
+  dots: MetricEnvelope
+  average: MetricEnvelope
+  strike_rate: MetricEnvelope
+  dot_pct: MetricEnvelope
+  boundary_pct: MetricEnvelope
+  balls_per_four: MetricEnvelope
+  balls_per_six: MetricEnvelope
+  balls_per_boundary: MetricEnvelope
+  // Per-bucket position distribution + cohort context (next-spec viz
+  // consumes the by-bucket data; this spec uses just the cohort
+  // baseline aggregated by the backend).
+  position_distribution: BattingPositionDistributionEntry[]
+  cohort: BattingCohortMeta | null
+  cohort_below_support: boolean
+  cohort_cliff_buckets: number[]
 }
 
 export interface BattingInnings {

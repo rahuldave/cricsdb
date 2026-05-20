@@ -113,20 +113,20 @@ def main() -> int:
     print(f"    direct wicket-table dismissals: {sql_kohli_dismissals}")
     print(f"    distinct innings appeared in:   {sql_kohli_innings}")
 
-    # /summary
+    # /summary — numerics are envelope-wrapped post Phase 4 (read .value).
     print("\n  1. /batters/{id}/summary:")
     summary = get(args.host, f"/api/v1/batters/{KOHLI}/summary", tournament=IPL)
     ok, line = check(
         "summary.dismissals matches SQL wicket-table count",
-        summary["dismissals"] == sql_kohli_dismissals,
-        f"endpoint={summary['dismissals']}, sql={sql_kohli_dismissals}",
+        summary["dismissals"]["value"] == sql_kohli_dismissals,
+        f"endpoint={summary['dismissals']['value']}, sql={sql_kohli_dismissals}",
     )
     print(line); all_passed &= ok
 
     ok, line = check(
         "summary.innings matches SQL innings-appearance count",
-        summary["innings"] == sql_kohli_innings,
-        f"endpoint={summary['innings']}, sql={sql_kohli_innings}",
+        summary["innings"]["value"] == sql_kohli_innings,
+        f"endpoint={summary['innings']['value']}, sql={sql_kohli_innings}",
     )
     print(line); all_passed &= ok
 
@@ -134,8 +134,8 @@ def main() -> int:
     expected_not_outs = sql_kohli_innings - sql_kohli_dismissals
     ok, line = check(
         "summary.not_outs == innings - dismissals",
-        summary["not_outs"] == expected_not_outs,
-        f"endpoint={summary['not_outs']}, expected={expected_not_outs}",
+        summary["not_outs"]["value"] == expected_not_outs,
+        f"endpoint={summary['not_outs']['value']}, expected={expected_not_outs}",
     )
     print(line); all_passed &= ok
 

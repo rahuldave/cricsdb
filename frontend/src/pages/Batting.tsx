@@ -246,11 +246,11 @@ export default function Batting() {
           </ScopedPageHeader>
           <ScopeIndicator filters={filters} />
           <div className="wisden-statrow cols-5">
-            <StatCard label="Matches" value={summary.matches} />
-            <StatCard label="Innings" value={summary.innings} />
-            <StatCard label="Runs" value={summary.runs} />
-            <StatCard label="Average" value={fmt(summary.average)} />
-            <StatCard label="Strike Rate" value={fmt(summary.strike_rate)} />
+            <StatCard label="Matches" value={summary.matches.value} />
+            <StatCard label="Innings" value={summary.innings.value} />
+            <StatCard label="Runs" value={summary.runs.value} />
+            <StatCard label="Average" value={fmt(summary.average.value)} />
+            <StatCard label="Strike Rate" value={fmt(summary.strike_rate.value)} />
           </div>
           {playerId && (
             <BatterDistributionPanel
@@ -261,11 +261,11 @@ export default function Batting() {
             />
           )}
           <div className="wisden-statrow cols-5">
-            <StatCard label="Boundaries" value={summary.boundaries} subtitle={`${summary.fours} 4s, ${summary.sixes} 6s`} />
-            <StatCard label="B/Four" value={fmt(summary.balls_per_four)} />
-            <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary)} />
-            <StatCard label="Dot %" value={summary.dot_pct != null ? `${summary.dot_pct}%` : '-'} />
-            <StatCard label="30s / 50s / 100s" value={`${summary.thirties} / ${summary.fifties} / ${summary.hundreds}`} />
+            <StatCard label="Boundaries" value={summary.boundaries.value} subtitle={`${summary.fours.value} 4s, ${summary.sixes.value} 6s`} />
+            <StatCard label="B/Four" value={fmt(summary.balls_per_four.value)} />
+            <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary.value)} />
+            <StatCard label="Dot %" value={summary.dot_pct.value != null ? `${summary.dot_pct.value}%` : '-'} />
+            <StatCard label="30s / 50s / 100s" value={`${summary.thirties.value} / ${summary.fifties.value} / ${summary.hundreds.value}`} />
           </div>
 
           <div className="wisden-tabs">

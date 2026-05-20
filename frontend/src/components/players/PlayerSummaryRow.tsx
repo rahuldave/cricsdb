@@ -108,11 +108,11 @@ function compactStatsFor(
   if (discipline === 'batting') {
     const b = profile.batting; if (!b) return null
     return [
-      ['Runs',  b.runs.toLocaleString()],
-      ['Avg',   fmt(b.average)],
-      ['SR',    fmt(b.strike_rate)],
-      ['100s',  b.hundreds],
-      ['50s',   b.fifties],
+      ['Runs',  (b.runs.value ?? 0).toLocaleString()],
+      ['Avg',   fmt(b.average.value)],
+      ['SR',    fmt(b.strike_rate.value)],
+      ['100s',  b.hundreds.value ?? 0],
+      ['50s',   b.fifties.value ?? 0],
       ['HS',    b.highest_score],
     ]
   }
@@ -150,11 +150,11 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     if (!b) return null
     return (
       <div className="wisden-statrow cols-5" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
-        <StatCard label="Runs"  value={b.runs} />
-        <StatCard label="Avg"   value={fmt(b.average)} />
-        <StatCard label="SR"    value={fmt(b.strike_rate)} />
-        <StatCard label="100s"  value={b.hundreds} />
-        <StatCard label="50s"   value={b.fifties} />
+        <StatCard label="Runs"  value={b.runs.value} />
+        <StatCard label="Avg"   value={fmt(b.average.value)} />
+        <StatCard label="SR"    value={fmt(b.strike_rate.value)} />
+        <StatCard label="100s"  value={b.hundreds.value} />
+        <StatCard label="50s"   value={b.fifties.value} />
         <StatCard label="HS"    value={b.highest_score} />
       </div>
     )
