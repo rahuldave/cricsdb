@@ -186,11 +186,54 @@ for sub in "1–3" "4–6"; do
   fi
 done
 
+# Helper for cohort by-phase metrics on the fielding endpoint.
+cohort_phase_metric_fielding() {
+  local url="$1" phase="$2" field="$3"
+  curl -s "$url" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+for r in d.get('by_phase', []):
+    if r.get('phase') == '$phase':
+        v = r.get('$field')
+        print(f'{v:.3f}' if isinstance(v, float) else v)
+        sys.exit(0)
+print('MISSING')
+"
+}
+
 # ───────────────────────────────────────────────────────────────────
-# /fielding — Phase E (deferred)
+# /fielding — Phase E (shipped)
 # ───────────────────────────────────────────────────────────────────
-# Add an equivalent block here when Phase E ships, anchoring on
-# /scope/averages/players/fielding/by-phase.
+
+echo
+echo "=== /fielding — Kohli IPL By Phase ==="
+
+ab open "$BASE/fielding?player=$KOHLI&$SCOPE_URL&tab=By%20Phase"
+sleep 3
+
+cohort_url="$API/api/v1/scope/averages/players/fielding/by-phase?person_id=$KOHLI&$SCOPE"
+
+# Fielding By Phase chip is on Total only (spec §4.4); Catches /
+# Stumpings / Run Outs stay as volume tiles.
+for phase in powerplay middle death; do
+  block=$(phase_block_text "$phase")
+  if [ -z "$block" ]; then
+    bad "/fielding By Phase: $phase block not found"
+    continue
+  fi
+  vs_base_count=$(echo "$block" | grep -o "vs base " | wc -l | tr -d ' ')
+  if [ "$vs_base_count" -eq 1 ]; then
+    ok "/fielding By Phase: $phase has exactly 1 'vs base' chip (Total)"
+  else
+    bad "/fielding By Phase: $phase has $vs_base_count chips, expected exactly 1"
+  fi
+
+  api_dpm=$(cohort_phase_metric_fielding "$cohort_url" "$phase" "dismissals_per_match")
+  # The cohort API rounds to 4 decimals; the UI re-formats to 3 via
+  # MetricDelta's fmt=3. Truncate the API value to 3 decimals.
+  api_dpm_3=$(printf '%.3f' "$api_dpm")
+  assert_contains "/fielding By Phase: $phase Total chip cites API base $api_dpm_3" "vs base $api_dpm_3" "$block"
+done
 
 echo
 echo "─────────────────────────────────────────"

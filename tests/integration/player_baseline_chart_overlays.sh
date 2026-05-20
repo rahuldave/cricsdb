@@ -250,9 +250,101 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────────────
-# /fielding — Phase E (deferred)
+# /fielding — Phase E (shipped)
 # ───────────────────────────────────────────────────────────────────
-# Add an equivalent block here when Phase E ships.
+
+echo
+echo "=== /fielding — Kohli IPL By Season ==="
+
+ab open "$BASE/fielding?player=$KOHLI&$SCOPE_URL&tab=By%20Season"
+sleep 3
+
+legend=$(chart_legend_texts)
+assert_contains "/fielding By Season: legend names player as primary" "V Kohli" "$legend"
+assert_contains "/fielding By Season: legend names cohort as 'base'" "base" "$legend"
+
+titles=$(ab_eval "
+  Array.from(document.querySelectorAll('h2,h3,h4'))
+    .map(e => e.textContent?.trim())
+    .filter(Boolean)
+    .join('|')
+")
+assert_contains "/fielding By Season: 'Dismissals by Season' chart title present" "Dismissals by Season" "$titles"
+
+cohort_url="$API/api/v1/scope/averages/players/fielding/by-season?person_id=$KOHLI&$SCOPE"
+dpm_nonnull=$(curl -s "$cohort_url" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(sum(1 for r in d.get('by_season', []) if r.get('dismissals_per_match') is not None))
+")
+if [ "$dpm_nonnull" -ge 5 ]; then
+  ok "/fielding cohort by-season has ≥5 dismissals_per_match rows (=$dpm_nonnull)"
+else
+  bad "/fielding cohort by-season rows too few (=$dpm_nonnull)"
+fi
+
+agent-browser eval --json "(() => {
+  const frames = Array.from(document.querySelectorAll('.stream-xy-frame'));
+  return {
+    n_frames: frames.length,
+    canvas_counts: frames.map(f => f.querySelectorAll('canvas').length),
+    legend_texts: frames.map(f =>
+      Array.from(f.querySelectorAll('g.legend-item text'))
+        .map(t => t.textContent && t.textContent.trim())
+    ),
+  };
+})()" > /tmp/chart_probe.json 2>/dev/null
+n_frames=$(python3 -c "import json;print(json.load(open('/tmp/chart_probe.json'))['data']['result']['n_frames'])")
+assert_eq "/fielding By Season: 1 stream-xy-frame container (Dismissals)" "1" "$n_frames"
+both_series=$(python3 -c "
+import json
+d = json.load(open('/tmp/chart_probe.json'))['data']['result']
+ok = d['legend_texts'] and all('V Kohli' in lbls and 'base' in lbls for lbls in d['legend_texts'])
+print('yes' if ok else 'no')
+")
+assert_eq "/fielding By Season: chart legend names both series" "yes" "$both_series"
+both_canvas=$(python3 -c "
+import json
+d = json.load(open('/tmp/chart_probe.json'))['data']['result']
+ok = d['canvas_counts'] and all(c == 2 for c in d['canvas_counts'])
+print('yes' if ok else 'no')
+")
+assert_eq "/fielding By Season: chart has primary+ref canvases (2)" "yes" "$both_canvas"
+
+# Stat-row chip assertion — Catches and Run Outs (and Dis/Match)
+# must carry a "vs base" subtitle anchored against /fielders/{id}/
+# summary (Phase E gap-fill: backend now serves catches_per_match,
+# stumpings_per_match, run_outs_per_match envelopes per spec §4.4).
+api_summary=$(curl -s "$API/api/v1/fielders/$KOHLI/summary?$SCOPE")
+agent-browser eval --json "(() => {
+  return Array.from(document.querySelectorAll('.wisden-statrow .wisden-stat')).map(s => ({
+    label: s.querySelector('.wisden-stat-label')?.textContent?.trim(),
+    sub: s.querySelector('.wisden-stat-sub')?.textContent?.trim(),
+  }));
+})()" > /tmp/fld_row.json 2>/dev/null
+
+for tile in catches run_outs dismissals; do
+  case "$tile" in
+    catches) label="Catches"; field="catches_per_match" ;;
+    run_outs) label="Run Outs"; field="run_outs_per_match" ;;
+    dismissals) label="Dis/Match"; field="dismissals_per_match" ;;
+  esac
+  api_base=$(echo "$api_summary" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+v = d['$field']['scope_avg']
+print(f'{v:.3f}' if v is not None else 'NULL')
+")
+  sub_text=$(python3 -c "
+import json
+rows = json.load(open('/tmp/fld_row.json'))['data']['result']
+for r in rows:
+    if r['label'] == '$label':
+        print(r.get('sub') or '')
+        break
+")
+  assert_contains "/fielding stat-row: $label chip cites API base $api_base" "vs base $api_base" "$sub_text"
+done
 
 echo
 echo "─────────────────────────────────────────"
