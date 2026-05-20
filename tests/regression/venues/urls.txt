@@ -25,8 +25,8 @@ NEW bow_summary_ipl                   /api/v1/bowlers/462411b3/summary?tournamen
 NEW bow_summary_venue_wankhede        /api/v1/bowlers/462411b3/summary?filter_venue=Wankhede%20Stadium
 
 # ── fielding ─────────────────────────────────────────────────────
-REG field_summary_plain               /api/v1/fielders/ba607b88/summary
-REG field_summary_venue_wankhede      /api/v1/fielders/ba607b88/summary?filter_venue=Wankhede%20Stadium
+NEW field_summary_plain               /api/v1/fielders/ba607b88/summary
+NEW field_summary_venue_wankhede      /api/v1/fielders/ba607b88/summary?filter_venue=Wankhede%20Stadium
 
 # ── teams (uses filters.build directly via _team_filter_clause) ──
 REG teams_landing_plain               /api/v1/teams/landing
