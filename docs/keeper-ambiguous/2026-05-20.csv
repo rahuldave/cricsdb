@@ -1,0 +1,11 @@
+innings_id,match_id,date,tournament,season,fielding_team,innings_number,ambiguous_reason,candidate_ids,candidate_names,resolved_keeper_id,resolved_source,notes
+26343,13168,2026-05-15,Indian Premier League,2026,Lucknow Super Giants,0,multi_career,"3241e3fd,919a3be2,989889ff","N Pooran,RR Pant,JP Inglis",,,
+26354,13173,2026-05-19,Indian Premier League,2026,Lucknow Super Giants,1,multi_career,"3241e3fd,919a3be2,989889ff","N Pooran,RR Pant,JP Inglis",,,
+26368,13180,2026-05-17,Japan Twenty20 Tri-Series,2026,Fiji,1,no_candidate,,,,,
+26378,13185,2026-05-16,ICC Men's T20 World Cup Sub Regional Europe Qualifier A,2026,Cyprus,1,no_candidate,,,,,
+26390,13191,2026-05-17,ICC Men's T20 World Cup Sub Regional Europe Qualifier A,2026,Slovenia,1,no_candidate,,,,,
+26391,13192,2026-05-17,ICC Men's T20 World Cup Sub Regional Europe Qualifier A,2026,Cyprus,0,no_candidate,,,,,
+26394,13193,2026-05-19,ICC Men's T20 World Cup Sub Regional Europe Qualifier A,2026,France,1,no_candidate,,,,,
+26396,13194,2026-05-19,ICC Men's T20 World Cup Sub Regional Europe Qualifier A,2026,Slovenia,1,no_candidate,,,,,
+26402,13197,2026-05-20,ICC Men's T20 World Cup Sub Regional Europe Qualifier A,2026,Slovenia,1,no_candidate,,,,,
+26403,13198,2026-05-20,ICC Men's T20 World Cup Sub Regional Europe Qualifier A,2026,Cyprus,0,no_candidate,,,,,
