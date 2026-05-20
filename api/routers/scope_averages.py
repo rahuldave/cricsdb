@@ -1908,6 +1908,254 @@ async def scope_players_batting_summary(
     return await compute_players_batting_cohort(db, filters, aux, mix, drop_set)
 
 
+# ============================================================
+# /scope/averages/players/batting/by-season — Phase 4 of
+# spec-player-baseline-parity.md (this spec). Per-season cohort
+# baseline computed under the player's PER-SEASON position-mix.
+# Q2 decision: by-season endpoints take `person_id`, derive
+# per-season mix server-side from playerscopestats_position.
+# ============================================================
+
+
+async def compute_players_batting_by_season(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-season batting cohort baseline keyed off the player's
+    per-season position-mix. Returns `{by_season: [...]}` where each
+    season row is one of:
+      - {season, mix, n_players, n_innings, <metrics with scope_avg>}
+      - {season, mix, n_players, n_innings, below_support: true,
+         cliff_buckets: [...], <metrics all null>}
+    Spec: spec-player-baseline-parity.md §3.2.
+    """
+    where, params = build_scope_clauses(filters, drop=drop_set)
+
+    # Q1: player's per-season position innings, for mix derivation.
+    player_sql = f"""
+        SELECT pss.season,
+               pssp.position_bucket,
+               pssp.innings
+        FROM playerscopestatsposition pssp
+        JOIN playerscopestats pss
+          ON pss.scope_key = pssp.scope_key
+         AND pss.person_id = pssp.person_id
+        WHERE {where}
+          AND pssp.person_id = :__pid
+        ORDER BY pss.season, pssp.position_bucket
+    """
+    # Q2: cohort aggregates per (season, position_bucket) over the
+    # whole population at the filtered scope.
+    cohort_sql = f"""
+        SELECT pss.season,
+               pssp.position_bucket,
+               SUM(pssp.innings)      AS innings,
+               SUM(pssp.runs)         AS runs,
+               SUM(pssp.legal_balls)  AS legal_balls,
+               SUM(pssp.dismissals)   AS dismissals,
+               SUM(pssp.fours)        AS fours,
+               SUM(pssp.sixes)        AS sixes,
+               SUM(pssp.dots)         AS dots,
+               COUNT(DISTINCT pssp.person_id) AS n_players
+        FROM playerscopestatsposition pssp
+        JOIN playerscopestats pss
+          ON pss.scope_key = pssp.scope_key
+         AND pss.person_id = pssp.person_id
+        WHERE {where}
+        GROUP BY pss.season, pssp.position_bucket
+        ORDER BY pss.season, pssp.position_bucket
+    """
+    # Q3: per-season pool totals (n_players, n_innings) — denominator
+    # for the cohort_block metadata.
+    pool_sql = f"""
+        SELECT pss.season,
+               COUNT(DISTINCT pssp.person_id) AS n_players,
+               SUM(pssp.innings)              AS n_innings_total
+        FROM playerscopestatsposition pssp
+        JOIN playerscopestats pss
+          ON pss.scope_key = pssp.scope_key
+         AND pss.person_id = pssp.person_id
+        WHERE {where}
+        GROUP BY pss.season
+        ORDER BY pss.season
+    """
+    p_params = {**params, "__pid": person_id}
+    player_rows, cohort_rows, pool_rows = await asyncio.gather(
+        db.q(player_sql, p_params),
+        db.q(cohort_sql, params),
+        db.q(pool_sql, params),
+    )
+
+    # Roll cohort aggregates into {season: {bucket: row}}.
+    cohort_by_season: dict[str, dict[int, dict]] = {}
+    for r in cohort_rows:
+        season = r["season"]
+        cohort_by_season.setdefault(season, {})[r["position_bucket"]] = r
+
+    # Pool totals per season.
+    pool_by_season: dict[str, dict] = {r["season"]: r for r in pool_rows}
+
+    # Player's per-season mix from innings per bucket.
+    player_innings: dict[str, dict[int, int]] = {}
+    for r in player_rows:
+        player_innings.setdefault(r["season"], {})[r["position_bucket"]] = r["innings"]
+
+    by_season: list[dict] = []
+    for season in sorted(player_innings.keys()):
+        # Derive mix vector from player innings.
+        buckets = player_innings[season]
+        total = sum(buckets.values())
+        if total == 0:
+            continue
+        mix = [0.0] * 10
+        for b, n in buckets.items():
+            if 1 <= b <= 10:
+                mix[b - 1] = n / total
+
+        # Per-bucket cohort aggregates for this season.
+        season_cohort = cohort_by_season.get(season, {})
+        by_bucket: list[dict] = []
+        cliff_buckets: list[int] = []
+        for b in range(1, 11):
+            threshold = batting_threshold(b)
+            r = season_cohort.get(b)
+            if r is None:
+                by_bucket.append({"below_support": True, "innings": 0})
+                if mix[b - 1] > 0:
+                    cliff_buckets.append(b)
+                continue
+            innings = r["innings"] or 0
+            runs = r["runs"] or 0
+            balls = r["legal_balls"] or 0
+            dismissals = r["dismissals"] or 0
+            fours = r["fours"] or 0
+            sixes = r["sixes"] or 0
+            dots = r["dots"] or 0
+            boundaries = fours + sixes
+            n_p = r["n_players"] or 0
+            below = innings < threshold
+            if below and mix[b - 1] > 0:
+                cliff_buckets.append(b)
+            by_bucket.append({
+                "below_support": below,
+                "innings_per_player": (innings / n_p) if n_p else None,
+                "runs_per_player":    (runs / n_p) if n_p else None,
+                "average":            (runs / dismissals) if dismissals else None,
+                "strike_rate":        (runs / balls * 100) if balls else None,
+                "boundary_pct":       (boundaries / balls * 100) if balls else None,
+                "dot_pct":            (dots / balls * 100) if balls else None,
+                "balls_per_four":     (balls / fours) if fours else None,
+                "balls_per_six":      (balls / sixes) if sixes else None,
+                "balls_per_boundary": (balls / boundaries) if boundaries else None,
+                "sixes_per_innings": (sixes / innings) if innings else None,
+                "fours_per_innings": (fours / innings) if innings else None,
+                "boundaries_per_innings": (boundaries / innings) if innings else None,
+            })
+
+        pool = pool_by_season.get(season, {})
+        n_players_total = pool.get("n_players") or 0
+        n_innings_total = pool.get("n_innings_total") or 0
+
+        row: dict = {
+            "season": season,
+            "mix": [round(m, 4) for m in mix],
+            "n_players": n_players_total,
+            "n_innings": n_innings_total,
+        }
+
+        if cliff_buckets:
+            row.update({
+                "below_support": True,
+                "cliff_buckets": cliff_buckets,
+                "total_runs":            None,
+                "run_rate":              None,
+                "strike_rate":           None,
+                "boundary_pct":          None,
+                "dot_pct":               None,
+                "balls_per_four":        None,
+                "balls_per_boundary":    None,
+                "sixes_per_innings":     None,
+                "fours_per_innings":     None,
+                "boundaries_per_innings": None,
+            })
+            by_season.append(row)
+            continue
+
+        def cv(field: str) -> Optional[float]:
+            return convex_combine(mix, {b: by_bucket[b - 1].get(field) for b in range(1, 11)})
+
+        def _r(v, n):
+            return round(v, n) if v is not None else None
+
+        # total_runs and run_rate aren't directly in by_bucket — derive
+        # from runs_per_player (totals are extensive, rate is intensive).
+        cc_runs_per_player = cv("runs_per_player")
+        cc_innings_per_player = cv("innings_per_player")
+        # run_rate = runs / balls × 6 (overs sense). Re-derive at the
+        # bucket grain (runs / balls) and convex-combine.
+        # Approximate: cv(strike_rate)/100*6 ≈ runs/over.
+        row.update({
+            "below_support": False,
+            "cliff_buckets": [],
+            "total_runs":         _r(cc_runs_per_player, 2),
+            "run_rate":           _r((cv("strike_rate") or 0) * 6 / 100, 2) if cv("strike_rate") is not None else None,
+            "strike_rate":        _r(cv("strike_rate"), 1),
+            "boundary_pct":       _r(cv("boundary_pct"), 1),
+            "dot_pct":            _r(cv("dot_pct"), 1),
+            "balls_per_four":     _r(cv("balls_per_four"), 2),
+            "balls_per_boundary": _r(cv("balls_per_boundary"), 2),
+            "sixes_per_innings":  _r(cv("sixes_per_innings"), 3),
+            "fours_per_innings":  _r(cv("fours_per_innings"), 3),
+            "boundaries_per_innings": _r(cv("boundaries_per_innings"), 3),
+        })
+        by_season.append(row)
+
+    return {"by_season": by_season}
+
+
+@router.get("/players/batting/by-season")
+async def scope_players_batting_by_season(
+    person_id: str = Query(
+        ...,
+        description=(
+            "Player ID. The endpoint derives per-season position-mix"
+            " server-side from playerscopestats_position joined on this"
+            " person_id; per-season cohort baseline is then computed"
+            " under each season's mix."
+        ),
+    ),
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    drop: Optional[str] = Query(
+        None,
+        description=(
+            "Comma-separated FilterBar axis names to mask before"
+            " clause construction. Same semantics as the existing"
+            " /players/batting/summary endpoint."
+        ),
+    ),
+):
+    """Per-season position-mix-weighted cohort baseline for batting."""
+    db = get_db()
+    try:
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await compute_players_batting_by_season(
+        db, person_id, filters, aux, drop_set,
+    )
+
+
 async def compute_players_bowling_cohort(
     db,
     filters: FilterParams,
