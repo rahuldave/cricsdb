@@ -164,9 +164,9 @@ interface StatStrip { text: string }
 async function fetchStrip(tile: ProfileTile, filters: FilterParams): Promise<StatStrip | null> {
   if (tile.role === 'bowler') {
     const s = await getBowlerSummary(tile.id, filters).catch(() => null)
-    if (!s || s.balls === 0) return null
+    if (!s || (s.balls.value ?? 0) === 0) return null
     return {
-      text: `${fmt0(s.matches)} m · ${fmt0(s.wickets)} wkts · ${fmt2(s.economy)} econ`,
+      text: `${fmt0(s.matches.value ?? 0)} m · ${fmt0(s.wickets.value ?? 0)} wkts · ${fmt2(s.economy.value)} econ`,
     }
   }
   const s = await getBatterSummary(tile.id, filters).catch(() => null)

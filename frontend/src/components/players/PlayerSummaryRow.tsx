@@ -119,10 +119,10 @@ function compactStatsFor(
   if (discipline === 'bowling') {
     const b = profile.bowling; if (!b) return null
     return [
-      ['Wickets', b.wickets],
-      ['Avg',     fmt(b.average)],
-      ['Econ',    fmt(b.economy)],
-      ['SR',      fmt(b.strike_rate)],
+      ['Wickets', b.wickets.value ?? 0],
+      ['Avg',     fmt(b.average.value)],
+      ['Econ',    fmt(b.economy.value)],
+      ['SR',      fmt(b.strike_rate.value)],
     ]
   }
   if (discipline === 'fielding') {
@@ -165,10 +165,10 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     if (!b) return null
     return (
       <div className="wisden-statrow">
-        <StatCard label="Wickets" value={b.wickets} />
-        <StatCard label="Avg"     value={fmt(b.average)} />
-        <StatCard label="Econ"    value={fmt(b.economy)} />
-        <StatCard label="SR"      value={fmt(b.strike_rate)} />
+        <StatCard label="Wickets" value={b.wickets.value ?? 0} />
+        <StatCard label="Avg"     value={fmt(b.average.value)} />
+        <StatCard label="Econ"    value={fmt(b.economy.value)} />
+        <StatCard label="SR"      value={fmt(b.strike_rate.value)} />
       </div>
     )
   }

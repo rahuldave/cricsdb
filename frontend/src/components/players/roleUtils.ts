@@ -4,7 +4,7 @@ import type { PlayerProfile, FilterParams } from '../../types'
 // existing leaderboard minimums so a landing-ranked player doesn't
 // render a row the leaderboard itself would have excluded.
 export const hasBatting  = (p: PlayerProfile) => (p.batting?.innings.value ?? 0) > 0
-export const hasBowling  = (p: PlayerProfile) => (p.bowling?.balls ?? 0) > 0
+export const hasBowling  = (p: PlayerProfile) => (p.bowling?.balls.value ?? 0) > 0
 export const hasFielding = (p: PlayerProfile) => {
   const f = p.fielding
   if (!f) return false
@@ -64,12 +64,13 @@ export function classifyRole(p: PlayerProfile): string {
   const totalMatches = Math.max(
     p.fielding?.matches ?? 0,
     p.batting?.matches.value ?? 0,
-    bw?.matches ?? 0,
+    bw?.matches.value ?? 0,
     1,
   )
+  const bowlBalls = bw?.balls.value ?? 0
   const bowled = !!bw
-    && bw.balls >= ROLE_BOWLED_MIN_BALLS
-    && bw.balls / totalMatches >= ROLE_BOWLED_MIN_BALLS_PER_MATCH
+    && bowlBalls >= ROLE_BOWLED_MIN_BALLS
+    && bowlBalls / totalMatches >= ROLE_BOWLED_MIN_BALLS_PER_MATCH
   const kept = (p.keeping?.innings_kept ?? 0) >= KEEPING_INNINGS_THRESHOLD
   const fielded = hasFielding(p)
 
@@ -87,7 +88,7 @@ export function classifyRole(p: PlayerProfile): string {
 export function matchesInScope(p: PlayerProfile): number {
   return Math.max(
     p.batting?.matches.value ?? 0,
-    p.bowling?.matches  ?? 0,
+    p.bowling?.matches.value ?? 0,
     p.fielding?.matches ?? 0,
   )
 }

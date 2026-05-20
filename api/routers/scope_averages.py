@@ -1889,54 +1889,18 @@ async def scope_players_batting_summary(
     return await compute_players_batting_cohort(db, filters, aux, mix, drop_set)
 
 
-@router.get("/players/bowling/summary")
-async def scope_players_bowling_summary(
-    filters: FilterParams = Depends(),
-    aux: AuxParams = Depends(),
-    over_mix: str = Query(
-        ...,
-        description=(
-            "Comma-separated 20-element vector of the bowler's mix"
-            " across overs 1..20. Must sum to 1.0 +/- 0.001."
-            " Trailing zeros may be omitted."
-        ),
-    ),
-    drop: Optional[str] = Query(
-        None,
-        description=(
-            "Comma-separated FilterBar axis names to mask before"
-            " clause construction. Recognised: gender, team_type,"
-            " tournament, season, filter_venue, filter_team,"
-            " filter_opponent, team_class, series_type."
-        ),
-    ),
-):
-    """Over-mix-weighted cohort baseline for bowling.
-
-    Returns cohort metadata, strict-cliff flags, five envelope-wrapped
-    headline rates (economy, average, strike_rate, dot_pct,
-    wickets_per_over), and per-over aggregates in by_over[20].
-
-    Sliding-scale thresholds on cohort `legal_balls` per over:
-    U-shape (60-50-30-50-60). Any over the bowler has non-zero
-    mix-weight on must be at or above its threshold; otherwise the
-    entire response's scope_avg is null.
+async def compute_players_bowling_cohort(
+    db,
+    filters: FilterParams,
+    aux: AuxParams,
+    mix: list[float],
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """In-process bowling cohort baseline — same shape as the HTTP
+    endpoint. Phase 4 player /summary endpoints call this to fold the
+    cohort baseline into their envelope-wrapped response without a
+    second HTTP roundtrip.
     """
-    db = get_db()
-    try:
-        mix = parse_mix(over_mix, 20)
-        drop_set = parse_drop(drop)
-        if drop_set is not None:
-            from ..filters import _DROP_AXES
-            unknown = drop_set - _DROP_AXES
-            if unknown:
-                raise ValueError(
-                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
-                    f" Recognised: {sorted(_DROP_AXES)}."
-                )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
     where, params = build_scope_clauses(filters, drop=drop_set)
 
     main_sql = f"""
@@ -2053,6 +2017,46 @@ async def scope_players_bowling_summary(
         "boundary_pct":     wrap_metric(_r(cc_bp, 1),   _r(cc_bp, 1),   "bowl_boundary_pct",    sample_size=n_balls_total),
         "by_over": by_over_arr,
     }
+
+
+@router.get("/players/bowling/summary")
+async def scope_players_bowling_summary(
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    over_mix: str = Query(
+        ...,
+        description=(
+            "Comma-separated 20-element vector of the bowler's mix"
+            " across overs 1..20. Must sum to 1.0 +/- 0.001."
+            " Trailing zeros may be omitted."
+        ),
+    ),
+    drop: Optional[str] = Query(
+        None,
+        description=(
+            "Comma-separated FilterBar axis names to mask before"
+            " clause construction. Recognised: gender, team_type,"
+            " tournament, season, filter_venue, filter_team,"
+            " filter_opponent, team_class, series_type."
+        ),
+    ),
+):
+    """Over-mix-weighted cohort baseline for bowling (HTTP wrapper)."""
+    db = get_db()
+    try:
+        mix = parse_mix(over_mix, 20)
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                    f" Recognised: {sorted(_DROP_AXES)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await compute_players_bowling_cohort(db, filters, aux, mix, drop_set)
 
 
 @router.get("/players/fielding/summary")

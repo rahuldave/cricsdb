@@ -225,11 +225,11 @@ export default function Bowling() {
           </ScopedPageHeader>
           <ScopeIndicator filters={filters} />
           <div className="wisden-statrow cols-5">
-            <StatCard label="Matches" value={summary.matches} />
-            <StatCard label="Innings" value={summary.innings} />
-            <StatCard label="Wickets" value={summary.wickets} />
-            <StatCard label="Average" value={fmt(summary.average)} />
-            <StatCard label="Economy" value={fmt(summary.economy)} />
+            <StatCard label="Matches" value={summary.matches.value ?? 0} />
+            <StatCard label="Innings" value={summary.innings.value ?? 0} />
+            <StatCard label="Wickets" value={summary.wickets.value ?? 0} />
+            <StatCard label="Average" value={fmt(summary.average.value)} />
+            <StatCard label="Economy" value={fmt(summary.economy.value)} />
           </div>
           {playerId && (
             <BowlerDistributionPanel
@@ -241,10 +241,10 @@ export default function Bowling() {
           )}
           <div className="wisden-statrow cols-5">
             <StatCard label="Overs" value={summary.overs} />
-            <StatCard label="Strike Rate" value={fmt(summary.strike_rate)} />
+            <StatCard label="Strike Rate" value={fmt(summary.strike_rate.value)} />
             <StatCard label="Best Figures" value={summary.best_figures || '-'} />
-            <StatCard label="Dot %" value={summary.dot_pct != null ? `${summary.dot_pct}%` : '-'} />
-            <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary)} />
+            <StatCard label="Dot %" value={summary.dot_pct.value != null ? `${summary.dot_pct.value}%` : '-'} />
+            <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary.value)} />
           </div>
 
           <div className="wisden-tabs">

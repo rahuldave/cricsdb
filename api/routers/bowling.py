@@ -11,6 +11,7 @@ from typing import Optional
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
 from ..aux_clauses import splice_aux_join_clauses
+from ..metrics_metadata import wrap_metric
 from ..player_nationality import player_nationalities
 from ..scope_links import suggested_splits, scope_dict_from_filters
 from ..tournament_canonical import (
@@ -463,33 +464,75 @@ async def bowling_summary(
     nationalities = await player_nationalities(db, person_id)
     over_distribution = await _over_distribution(db, person_id, filters)
 
+    # Derive over-mix from over_distribution and fold the cohort
+    # baseline in-process (spec Phase 4). Skip when no balls in scope
+    # or when a batter_id matchup filter is active.
+    cohort: Optional[dict] = None
+    if balls > 0 and not batter_id:
+        total_dist_balls = sum((o.get("legal_balls") or 0) for o in over_distribution)
+        if total_dist_balls > 0:
+            mix = [(o.get("legal_balls") or 0) / total_dist_balls for o in over_distribution]
+            while len(mix) < 20:
+                mix.append(0.0)
+            from .scope_averages import compute_players_bowling_cohort
+            cohort = await compute_players_bowling_cohort(
+                db, filters, aux, mix[:20], drop_set=None,
+            )
+
+    avg_val = _safe_div(runs_conceded, wickets)
+    econ_val = _safe_div(runs_conceded, balls, 6)
+    sr_val = _safe_div(balls, wickets) if wickets else None
+    dot_pct_val = _safe_div(dots, balls, 100, 1)
+    bp_val = _safe_div(boundaries, balls, 100, 1)
+    wpo_val = round(wickets * 6 / balls, 3) if balls else None
+    balls_per_four_val = _safe_div(balls, fours)
+    balls_per_six_val = _safe_div(balls, sixes)
+    balls_per_boundary_val = _safe_div(balls, boundaries)
+
+    def _cohort_scope_avg(key: str) -> Optional[float]:
+        if cohort is None:
+            return None
+        m = cohort.get(key)
+        return m.get("scope_avg") if m else None
+
+    cohort_sample = cohort["cohort"]["n_balls_total"] if cohort else None
+
     return {
         "person_id": person_id,
         "name": name,
         "nationalities": nationalities,
-        "matches": matches_count,
-        "innings": innings_count,
-        "balls": balls,
+        # Identity-bearing / formatted display fields stay flat.
         "overs": _format_overs(balls),
-        "runs_conceded": runs_conceded,
-        "wickets": wickets,
-        "average": _safe_div(runs_conceded, wickets),
-        "economy": _safe_div(runs_conceded, balls, 6),
-        "strike_rate": _safe_div(balls, wickets) if wickets else None,
         "best_figures": best,
-        "four_wicket_hauls": four_wkt_hauls,
-        "fours_conceded": fours,
-        "sixes_conceded": sixes,
-        "boundaries_conceded": boundaries,
-        "dots": dots,
-        "dot_pct": _safe_div(dots, balls, 100, 1),
-        "wides": ac.get("wides") or 0,
-        "noballs": ac.get("noballs") or 0,
-        "balls_per_four": _safe_div(balls, fours),
-        "balls_per_six": _safe_div(balls, sixes),
-        "balls_per_boundary": _safe_div(balls, boundaries),
-        "maiden_overs": maidens,
+        # Numeric fields envelope-wrapped per Phase 4.
+        "matches":             wrap_metric(matches_count,    None,                                     "matches",                  sample_size=cohort_sample),
+        "innings":             wrap_metric(innings_count,    None,                                     "bowl_innings",             sample_size=cohort_sample),
+        "balls":               wrap_metric(balls,            None,                                     "bowl_balls",               sample_size=cohort_sample),
+        "runs_conceded":       wrap_metric(runs_conceded,    None,                                     "bowl_runs_conceded",       sample_size=cohort_sample),
+        "wickets":             wrap_metric(wickets,          None,                                     "bowl_wickets",             sample_size=cohort_sample),
+        "four_wicket_hauls":   wrap_metric(four_wkt_hauls,   None,                                     "bowl_four_wicket_hauls",   sample_size=cohort_sample),
+        "fours_conceded":      wrap_metric(fours,            None,                                     "bowl_fours_conceded",      sample_size=cohort_sample),
+        "sixes_conceded":      wrap_metric(sixes,            None,                                     "bowl_sixes_conceded",      sample_size=cohort_sample),
+        "boundaries_conceded": wrap_metric(boundaries,       None,                                     "bowl_boundaries_conceded", sample_size=cohort_sample),
+        "dots":                wrap_metric(dots,             None,                                     "bowl_dots",                sample_size=cohort_sample),
+        "wides":               wrap_metric(ac.get("wides") or 0,    None,                              "bowl_wides",               sample_size=cohort_sample),
+        "noballs":             wrap_metric(ac.get("noballs") or 0,  None,                              "bowl_noballs",             sample_size=cohort_sample),
+        "maiden_overs":        wrap_metric(maidens,          None,                                     "bowl_maiden_overs",        sample_size=cohort_sample),
+        # Rate metrics — directional, delta_pct vs cohort.
+        "average":             wrap_metric(avg_val,    _cohort_scope_avg("average"),          "bowl_average",          sample_size=cohort_sample),
+        "economy":             wrap_metric(econ_val,   _cohort_scope_avg("economy"),          "bowl_economy",          sample_size=cohort_sample),
+        "strike_rate":         wrap_metric(sr_val,     _cohort_scope_avg("strike_rate"),      "bowl_strike_rate",      sample_size=cohort_sample),
+        "dot_pct":             wrap_metric(dot_pct_val, _cohort_scope_avg("dot_pct"),         "bowl_dot_pct",          sample_size=cohort_sample),
+        "boundary_pct":        wrap_metric(bp_val,     _cohort_scope_avg("boundary_pct"),     "bowl_boundary_pct",     sample_size=cohort_sample),
+        "wickets_per_over":    wrap_metric(wpo_val,    _cohort_scope_avg("wickets_per_over"), "bowl_wickets_per_over", sample_size=cohort_sample),
+        "balls_per_four":      wrap_metric(balls_per_four_val,     None, "bowl_balls_per_four",     sample_size=cohort_sample),
+        "balls_per_six":       wrap_metric(balls_per_six_val,      None, "bowl_balls_per_six",      sample_size=cohort_sample),
+        "balls_per_boundary":  wrap_metric(balls_per_boundary_val, None, "bowl_balls_per_boundary", sample_size=cohort_sample),
+        # Over distribution + cohort metadata for next-spec viz.
         "over_distribution": over_distribution,
+        "cohort": cohort["cohort"] if cohort else None,
+        "cohort_below_support": cohort["below_support"] if cohort else False,
+        "cohort_cliff_buckets": cohort["cliff_buckets"] if cohort else [],
     }
 
 

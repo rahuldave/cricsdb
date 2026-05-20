@@ -1180,32 +1180,58 @@ export interface TeamFieldingDistribution {
   suggested_splits: SuggestedSplit[]
 }
 
+export interface BowlingOverDistributionEntry {
+  over: number
+  runs_conceded: number
+  legal_balls: number
+  wickets: number
+  dots: number
+  boundaries: number
+}
+
+export interface BowlingCohortMeta {
+  match_dimension: 'over_mix'
+  over_mix: number[]
+  n_players: number
+  n_balls_total: number
+}
+
 export interface BowlingSummary {
   person_id: string
   name: string
   nationalities: NationalityEntry[]
-  matches: number
-  innings: number
-  balls: number
+  // Identity / formatted display fields stay flat.
   overs: string
-  runs_conceded: number
-  wickets: number
-  average: number | null
-  economy: number | null
-  strike_rate: number | null
   best_figures: string | null
-  four_wicket_hauls: number
-  fours_conceded: number
-  sixes_conceded: number
-  boundaries_conceded: number
-  dots: number
-  dot_pct: number | null
-  wides: number
-  noballs: number
-  balls_per_four: number | null
-  balls_per_six: number | null
-  balls_per_boundary: number | null
-  maiden_overs: number
+  // Numeric fields envelope-wrapped per Phase 4.
+  matches: MetricEnvelope
+  innings: MetricEnvelope
+  balls: MetricEnvelope
+  runs_conceded: MetricEnvelope
+  wickets: MetricEnvelope
+  four_wicket_hauls: MetricEnvelope
+  fours_conceded: MetricEnvelope
+  sixes_conceded: MetricEnvelope
+  boundaries_conceded: MetricEnvelope
+  dots: MetricEnvelope
+  wides: MetricEnvelope
+  noballs: MetricEnvelope
+  maiden_overs: MetricEnvelope
+  // Rate metrics (lower_better for econ/avg/SR; higher_better for dot_pct).
+  average: MetricEnvelope
+  economy: MetricEnvelope
+  strike_rate: MetricEnvelope
+  dot_pct: MetricEnvelope
+  boundary_pct: MetricEnvelope
+  wickets_per_over: MetricEnvelope
+  balls_per_four: MetricEnvelope
+  balls_per_six: MetricEnvelope
+  balls_per_boundary: MetricEnvelope
+  // Per-over distribution + cohort context.
+  over_distribution: BowlingOverDistributionEntry[]
+  cohort: BowlingCohortMeta | null
+  cohort_below_support: boolean
+  cohort_cliff_buckets: number[]
 }
 
 export interface BowlingInnings {
