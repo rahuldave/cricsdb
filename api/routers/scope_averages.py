@@ -2156,6 +2156,158 @@ async def scope_players_batting_by_season(
     )
 
 
+# ============================================================
+# /scope/averages/players/batting/by-phase — Phase 4 of
+# spec-player-baseline-parity.md (this spec). Per-phase cohort
+# baseline for batting. Position-flat: the new
+# playerscopestats_batting_phase table is keyed by phase only (not
+# position × phase), so this endpoint surfaces the league-wide
+# per-phase aggregate at the filtered scope without further
+# position-mix weighting. person_id is accepted for API symmetry
+# with the other by-season / by-phase endpoints but not used to
+# narrow the cohort (a future spec extension could add a
+# (person × scope × position × phase) table for true position-
+# weighted phase baselines).
+# ============================================================
+
+
+# Minimum cohort innings per phase to count as supported. Below
+# this, the phase row's scope_avg fields are null. Mirrors the
+# bowling-middle threshold (30 balls); on the population grain
+# even narrow scopes typically have plenty.
+PHASE_INNINGS_THRESHOLD = 30
+
+
+async def compute_players_batting_by_phase(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-phase batting cohort baseline (position-flat).
+
+    Returns `{ by_phase: [{ phase, n_players, n_innings_in_phase,
+    strike_rate, dot_pct, boundary_pct, balls_per_four,
+    balls_per_boundary, runs_per_innings_in_phase, sixes_per_innings,
+    fours_per_innings, boundaries_per_innings, below_support }, …] }`
+    over phases 1=powerplay / 2=middle / 3=death. Spec:
+    spec-player-baseline-parity.md §3.2.
+    """
+    where, params = build_scope_clauses(filters, drop=drop_set)
+
+    sql = f"""
+        SELECT pssbp.phase_bucket,
+               SUM(pssbp.innings_in_phase)     AS innings,
+               SUM(pssbp.balls_in_phase)       AS balls,
+               SUM(pssbp.runs_in_phase)        AS runs,
+               SUM(pssbp.dots_in_phase)        AS dots,
+               SUM(pssbp.fours_in_phase)       AS fours,
+               SUM(pssbp.sixes_in_phase)       AS sixes,
+               SUM(pssbp.boundaries_in_phase)  AS boundaries,
+               SUM(pssbp.dismissals_in_phase)  AS dismissals,
+               COUNT(DISTINCT pssbp.person_id) AS n_players
+        FROM playerscopestatsbattingphase pssbp
+        JOIN playerscopestats pss
+          ON pss.scope_key = pssbp.scope_key
+         AND pss.person_id = pssbp.person_id
+        WHERE {where}
+        GROUP BY pssbp.phase_bucket
+        ORDER BY pssbp.phase_bucket
+    """
+    rows = await db.q(sql, params)
+    PHASE_NAMES = {1: "powerplay", 2: "middle", 3: "death"}
+
+    by_phase: list[dict] = []
+    for b in range(1, 4):
+        match = next((r for r in rows if r["phase_bucket"] == b), None)
+        out: dict = {
+            "phase": PHASE_NAMES[b],
+            "phase_bucket": b,
+        }
+        if match is None:
+            out.update({
+                "n_players": 0, "n_innings_in_phase": 0,
+                "below_support": True,
+                "strike_rate": None, "dot_pct": None,
+                "boundary_pct": None, "balls_per_four": None,
+                "balls_per_boundary": None,
+                "runs_per_innings_in_phase": None,
+                "sixes_per_innings": None, "fours_per_innings": None,
+                "boundaries_per_innings": None,
+            })
+            by_phase.append(out)
+            continue
+
+        innings = match["innings"] or 0
+        balls = match["balls"] or 0
+        runs = match["runs"] or 0
+        dots = match["dots"] or 0
+        fours = match["fours"] or 0
+        sixes = match["sixes"] or 0
+        boundaries = match["boundaries"] or 0
+        n_p = match["n_players"] or 0
+        below = innings < PHASE_INNINGS_THRESHOLD
+
+        def _r(v, n):
+            return round(v, n) if v is not None else None
+
+        out.update({
+            "n_players": n_p,
+            "n_innings_in_phase": innings,
+            "below_support": below,
+            "strike_rate":         _r((runs / balls * 100) if balls else None, 1) if not below else None,
+            "dot_pct":             _r((dots / balls * 100) if balls else None, 1) if not below else None,
+            "boundary_pct":        _r((boundaries / balls * 100) if balls else None, 1) if not below else None,
+            "balls_per_four":      _r((balls / fours) if fours else None, 2) if not below else None,
+            "balls_per_boundary":  _r((balls / boundaries) if boundaries else None, 2) if not below else None,
+            "runs_per_innings_in_phase": _r((runs / innings) if innings else None, 2) if not below else None,
+            "sixes_per_innings":   _r((sixes / innings) if innings else None, 3) if not below else None,
+            "fours_per_innings":   _r((fours / innings) if innings else None, 3) if not below else None,
+            "boundaries_per_innings": _r((boundaries / innings) if innings else None, 3) if not below else None,
+        })
+        by_phase.append(out)
+
+    # person_id is accepted for API symmetry (parity with by-season
+    # which uses it to derive per-season mix); not used for cohort
+    # narrowing here. Surfaced so downstream consumers can tell which
+    # subject the response was requested for.
+    return {"by_phase": by_phase, "person_id": person_id}
+
+
+@router.get("/players/batting/by-phase")
+async def scope_players_batting_by_phase(
+    person_id: str = Query(
+        ...,
+        description=(
+            "Player ID. Accepted for API symmetry with by-season; the"
+            " per-phase cohort is position-flat (no per-phase position"
+            " sub-mix data available), so person_id doesn't narrow the"
+            " response — it only labels the request."
+        ),
+    ),
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    drop: Optional[str] = Query(None),
+):
+    """Per-phase position-flat cohort baseline for batting."""
+    db = get_db()
+    try:
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await compute_players_batting_by_phase(
+        db, person_id, filters, aux, drop_set,
+    )
+
+
 async def compute_players_bowling_cohort(
     db,
     filters: FilterParams,
