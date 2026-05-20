@@ -3245,6 +3245,158 @@ async def scope_players_fielding_summary(
     return await compute_players_fielding_cohort(db, filters, aux, is_keeper, drop_set)
 
 
+# ============================================================
+# /scope/averages/players/fielding/by-phase — Phase 4 of
+# spec-player-baseline-parity.md. Per-phase keeper-binary cohort
+# baseline for fielding. Backed by playerscopestats_fielding_phase.
+# ============================================================
+
+
+async def compute_players_fielding_by_phase(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-phase keeper-binary fielding cohort baseline. The player's
+    LIFETIME keeper status (matches_as_keeper > 0 anywhere in scope)
+    determines which cohort the phase row reads — per-season variation
+    is surfaced in /by-season; the phase view is by design a stable
+    role-baseline.
+    Spec: spec-player-baseline-parity.md §3.2.
+    """
+    where, params = build_scope_clauses(filters, drop=drop_set)
+
+    # Q1: player's keeper status across all scope (lifetime).
+    player_sql = f"""
+        SELECT CASE WHEN COALESCE(SUM(pss.matches_as_keeper), 0) > 0
+                    THEN 1 ELSE 0 END AS is_keeper,
+               COALESCE(SUM(pss.matches), 0) AS player_matches
+        FROM playerscopestats pss
+        WHERE {where}
+          AND pss.person_id = :__pid
+    """
+    # Q2: cohort fielding aggregates per (phase, keeper_flag) from the
+    # new phase child table joined to parent for the keeper partition.
+    cohort_sql = f"""
+        SELECT pssfph.phase_bucket,
+               CASE WHEN pss.matches_as_keeper > 0 THEN 1 ELSE 0 END AS is_keeper,
+               SUM(pssfph.catches_in_phase)    AS catches,
+               SUM(pssfph.stumpings_in_phase)  AS stumpings,
+               SUM(pssfph.run_outs_in_phase)   AS run_outs,
+               SUM(pssfph.dismissals_in_phase) AS dismissals,
+               COUNT(DISTINCT pssfph.person_id) AS n_players
+        FROM playerscopestatsfieldingphase pssfph
+        JOIN playerscopestats pss
+          ON pss.person_id = pssfph.person_id
+         AND pss.scope_key = pssfph.scope_key
+        WHERE {where}
+        GROUP BY pssfph.phase_bucket, is_keeper
+        ORDER BY pssfph.phase_bucket, is_keeper
+    """
+    # Q3: pool denominator (n_matches) per keeper_flag — used as the
+    # per-match-rate denominator. Same partition logic as the cohort
+    # summary's pool query.
+    pool_sql = f"""
+        SELECT CASE WHEN pss.matches_as_keeper > 0 THEN 1 ELSE 0 END AS is_keeper,
+               COUNT(*)         AS n_fielders,
+               SUM(pss.matches) AS n_matches_total
+        FROM playerscopestats pss
+        WHERE {where}
+        GROUP BY is_keeper
+    """
+    p_params = {**params, "__pid": person_id}
+    player_rows, cohort_rows, pool_rows = await asyncio.gather(
+        db.q(player_sql, p_params),
+        db.q(cohort_sql, params),
+        db.q(pool_sql, params),
+    )
+
+    is_keeper = (player_rows[0].get("is_keeper") if player_rows else 0) or 0
+    pool_by_keeper = {r["is_keeper"]: r for r in pool_rows}
+    pool = pool_by_keeper.get(is_keeper, {})
+    n_matches = (pool.get("n_matches_total") or 0)
+    n_fielders = (pool.get("n_fielders") or 0)
+
+    cohort_by_phase = {
+        r["phase_bucket"]: r for r in cohort_rows if r["is_keeper"] == is_keeper
+    }
+
+    PHASE_NAMES = {1: "powerplay", 2: "middle", 3: "death"}
+
+    def _r(num, den, n):
+        return round(num / den, n) if den else None
+
+    by_phase: list[dict] = []
+    for b in (1, 2, 3):
+        r = cohort_by_phase.get(b)
+        out = {
+            "phase": PHASE_NAMES[b],
+            "phase_bucket": b,
+            "is_keeper": is_keeper,
+            "n_players": n_fielders,
+            "n_matches": n_matches,
+        }
+        if r is None or n_matches == 0:
+            out.update({
+                "below_support": True,
+                "catches_per_match": None, "stumpings_per_match": None,
+                "run_outs_per_match": None, "dismissals_per_match": None,
+            })
+            by_phase.append(out)
+            continue
+
+        catches = r["catches"] or 0
+        stumpings = r["stumpings"] or 0
+        run_outs = r["run_outs"] or 0
+        dismissals = r["dismissals"] or 0
+        # Below-support: tiny cohort.
+        below = (r["n_players"] or 0) < 3
+        out.update({
+            "below_support": below,
+            "catches_per_match":    None if below else _r(catches,    n_matches, 4),
+            "stumpings_per_match":  None if below else _r(stumpings,  n_matches, 4),
+            "run_outs_per_match":   None if below else _r(run_outs,   n_matches, 4),
+            "dismissals_per_match": None if below else _r(dismissals, n_matches, 4),
+        })
+        by_phase.append(out)
+
+    return {"by_phase": by_phase, "person_id": person_id, "is_keeper": is_keeper}
+
+
+@router.get("/players/fielding/by-phase")
+async def scope_players_fielding_by_phase(
+    person_id: str = Query(
+        ...,
+        description=(
+            "Player ID. Lifetime keeper status (matches_as_keeper > 0"
+            " anywhere in scope) selects the keeper-binary cohort;"
+            " per-phase rates are then surfaced for that cohort."
+        ),
+    ),
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    drop: Optional[str] = Query(None),
+):
+    """Per-phase keeper-binary cohort baseline for fielding."""
+    db = get_db()
+    try:
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await compute_players_fielding_by_phase(
+        db, person_id, filters, aux, drop_set,
+    )
+
+
 @router.get("/players/keeping/summary")
 async def scope_players_keeping_summary(
     filters: FilterParams = Depends(),
