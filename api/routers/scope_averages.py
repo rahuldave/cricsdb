@@ -2703,6 +2703,232 @@ async def scope_players_bowling_by_season(
     )
 
 
+# ============================================================
+# /scope/averages/players/bowling/by-phase — derives from
+# playerscopestatsover (no new table) by mapping over_number to
+# phase. Uses the player's phase-specific over-mix (overs in
+# phase renormalized) so the cohort baseline reflects bowlers in
+# the same role at the same phase.
+# ============================================================
+
+
+# Over → phase bucket mapping matches the batting populate / team-
+# side conventions: 1-6 → pp, 7-15 → middle, 16-20 → death (1-indexed
+# over_number in playerscopestatsover).
+PHASE_OVERS = {
+    1: list(range(1, 7)),     # powerplay
+    2: list(range(7, 16)),    # middle
+    3: list(range(16, 21)),   # death
+}
+
+
+async def compute_players_bowling_by_phase(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-phase bowling cohort baseline with phase-specific over-mix.
+
+    Derives from playerscopestatsover — for each phase, the cohort
+    rates are convex-combined across the overs in that phase, weighted
+    by the player's renormalized over distribution within that phase.
+
+    Spec: spec-player-baseline-parity.md §3.2.
+    """
+    where, params = build_scope_clauses(filters, drop=drop_set)
+
+    player_sql = f"""
+        SELECT psso.over_number, psso.legal_balls
+        FROM playerscopestatsover psso
+        WHERE psso.scope_key IN (
+            SELECT scope_key FROM playerscopestats pss WHERE {where}
+        )
+          AND psso.person_id = :__pid
+    """
+    cohort_sql = f"""
+        SELECT psso.over_number,
+               SUM(psso.runs_conceded) AS runs_conceded,
+               SUM(psso.legal_balls)   AS legal_balls,
+               SUM(psso.wickets)       AS wickets,
+               SUM(psso.dots)          AS dots,
+               SUM(psso.boundaries)    AS boundaries,
+               SUM(psso.maidens)       AS maidens,
+               COUNT(DISTINCT psso.person_id) AS n_players
+        FROM playerscopestatsover psso
+        WHERE psso.scope_key IN (
+            SELECT scope_key FROM playerscopestats pss WHERE {where}
+        )
+        GROUP BY psso.over_number
+        ORDER BY psso.over_number
+    """
+    p_params = {**params, "__pid": person_id}
+    player_rows, cohort_rows = await asyncio.gather(
+        db.q(player_sql, p_params),
+        db.q(cohort_sql, params),
+    )
+
+    cohort_by_over = {r["over_number"]: r for r in cohort_rows}
+    player_balls_by_over = {r["over_number"]: r["legal_balls"] for r in player_rows}
+
+    PHASE_NAMES = {1: "powerplay", 2: "middle", 3: "death"}
+
+    def _r(v, n):
+        return round(v, n) if v is not None else None
+
+    by_phase: list[dict] = []
+    for phase in (1, 2, 3):
+        overs = PHASE_OVERS[phase]
+        # Player mix within this phase.
+        phase_balls_total = sum(player_balls_by_over.get(o, 0) for o in overs)
+        phase_mix = {o: 0.0 for o in overs}
+        if phase_balls_total > 0:
+            for o in overs:
+                phase_mix[o] = player_balls_by_over.get(o, 0) / phase_balls_total
+
+        # Cliff: any over with player mix > 0 must meet bowling_threshold.
+        cliff_overs: list[int] = []
+        per_over_rates: dict[int, dict] = {}
+        for o in overs:
+            r = cohort_by_over.get(o)
+            threshold = bowling_threshold(o)
+            if r is None:
+                if phase_mix[o] > 0:
+                    cliff_overs.append(o)
+                per_over_rates[o] = {"below_support": True}
+                continue
+            balls = r["legal_balls"] or 0
+            runs = r["runs_conceded"] or 0
+            wickets = r["wickets"] or 0
+            dots = r["dots"] or 0
+            boundaries = r["boundaries"] or 0
+            maidens = r["maidens"] or 0
+            n_p = r["n_players"] or 0
+            below = balls < threshold
+            if below and phase_mix[o] > 0:
+                cliff_overs.append(o)
+            per_over_rates[o] = {
+                "below_support": below,
+                "economy":           (runs * 6 / balls) if balls else None,
+                "strike_rate":       (balls / wickets) if wickets else None,
+                "dot_pct":           (dots / balls * 100) if balls else None,
+                "boundary_pct":      (boundaries / balls * 100) if balls else None,
+                "wickets_per_over":  (wickets * 6 / balls) if balls else None,
+                "maidens_per_player_over": (maidens / n_p) if n_p else None,
+            }
+
+        # Cohort-wide phase aggregates for n_players + n_balls totals.
+        phase_balls_cohort = sum(
+            (cohort_by_over.get(o, {}).get("legal_balls") or 0) for o in overs
+        )
+        phase_players_cohort = max(
+            ((cohort_by_over.get(o, {}).get("n_players") or 0) for o in overs),
+            default=0,
+        )
+
+        row: dict = {
+            "phase": PHASE_NAMES[phase],
+            "phase_bucket": phase,
+            "mix": [round(phase_mix[o], 4) for o in overs],
+            "overs": overs,
+            "n_players": phase_players_cohort,
+            "n_balls_in_phase": phase_balls_cohort,
+        }
+
+        if cliff_overs or phase_balls_total == 0:
+            row.update({
+                "below_support": True,
+                "cliff_overs": cliff_overs,
+                "economy": None, "strike_rate": None, "dot_pct": None,
+                "boundary_pct": None, "wickets_per_over": None,
+                "wickets_per_innings_in_phase": None,
+            })
+            by_phase.append(row)
+            continue
+
+        # Convex-combine using the phase mix (normalized within phase
+        # overs only).
+        def pcv(field: str) -> Optional[float]:
+            total_w = 0.0
+            total_v = 0.0
+            for o in overs:
+                w = phase_mix[o]
+                if w == 0:
+                    continue
+                total_w += w
+                v = per_over_rates[o].get(field)
+                if v is None:
+                    continue
+                total_v += w * v
+            if total_w == 0:
+                return None
+            return total_v
+
+        cc_wpo = pcv("wickets_per_over")
+        row.update({
+            "below_support": False,
+            "cliff_overs": [],
+            "economy":      _r(pcv("economy"), 2),
+            "strike_rate":  _r(pcv("strike_rate"), 2),
+            "dot_pct":      _r(pcv("dot_pct"), 1),
+            "boundary_pct": _r(pcv("boundary_pct"), 1),
+            "wickets_per_over": _r(cc_wpo, 3),
+            # Per-innings approximation: typical bowler bowls 1.x overs
+            # of a phase per innings. Phase 1 (PP, 6 overs of innings),
+            # phase 2 (middle, 9 overs of innings), phase 3 (death, 5
+            # overs of innings). The player's actual within-phase
+            # workload varies; we'd need per-innings data for an exact
+            # number. For the chip purpose, we expose wickets_per_over
+            # (exact) — wickets_per_innings_in_phase = wickets_per_over
+            # × (phase_balls_total / n_innings_for_player). Without
+            # per-innings, we approximate by the cohort's typical phase
+            # workload as overs in the phase that the cohort bowled
+            # per player: phase_balls_cohort / phase_players_cohort / 6.
+            "wickets_per_innings_in_phase": _r(
+                cc_wpo * (phase_balls_cohort / phase_players_cohort / 6)
+                if (cc_wpo is not None and phase_players_cohort > 0) else None,
+                3,
+            ),
+        })
+        by_phase.append(row)
+
+    return {"by_phase": by_phase, "person_id": person_id}
+
+
+@router.get("/players/bowling/by-phase")
+async def scope_players_bowling_by_phase(
+    person_id: str = Query(
+        ...,
+        description=(
+            "Player ID. The endpoint derives the bowler's phase-"
+            "specific over-mix (renormalized within each phase's"
+            " overs) from playerscopestatsover; per-phase cohort"
+            " baseline is computed under each phase's mix."
+        ),
+    ),
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    drop: Optional[str] = Query(None),
+):
+    """Per-phase phase-mix-weighted cohort baseline for bowling."""
+    db = get_db()
+    try:
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await compute_players_bowling_by_phase(
+        db, person_id, filters, aux, drop_set,
+    )
+
+
 async def compute_players_fielding_cohort(
     db,
     filters: FilterParams,
