@@ -1,61 +1,103 @@
 import type { MetricEnvelope } from '../types'
 
-/** Tiny chip: "↑ +6.2% vs league" / "↓ -3.1% vs league" — color-
- *  coded by direction so the reader doesn't have to remember which
- *  way is "good" for each metric (econ lower-better, RR higher-
- *  better, etc.). Used inline next to compare-grid stat values
- *  AND as a StatCard subtitle on single-team tabs.
+/** Inline scope-avg subtitle + directional delta chip.
  *
- *  Returns null when the envelope is missing, delta is null, or
- *  direction is null (counts) — callers don't need to gate. */
+ *  Visual (with `withScopeAvg`):
+ *    vs <label> 28.7   ↑ +47.7%
+ *
+ *  - The "vs <label> <scope_avg>" portion renders whenever
+ *    `withScopeAvg && scope_avg != null` (so count metrics that
+ *    carry a cohort baseline but no delta still show the baseline).
+ *  - The delta chip renders whenever `delta_pct != null` —
+ *    coloured by `direction` (green when aligned, red when not,
+ *    neutral grey when direction is null or delta is exactly 0).
+ *  - Returns null when neither piece can render.
+ *
+ *  Used by team-side Compare grids (default label='avg') and by
+ *  player-side baseline rendering on /players /batting /bowling /
+ *  fielding (callers pass label='base' per spec-player-compare-
+ *  average.md §3.1). */
 export default function MetricDelta({
-  env, withScopeAvg = false, fmt = 1,
+  env, withScopeAvg = false, fmt = 1, label = 'avg', scopeAvgTooltip,
 }: {
   env: MetricEnvelope | null | undefined
-  /** When true, render "(<value> vs <scope_avg>)" as a small prefix
+  /** When true, render "vs <label> <scope_avg>" as a small prefix
    *  before the chip. Useful for StatCard subtitles where horizontal
    *  space is generous; off for inline compare cells where the chip
    *  alone keeps rows compact. */
   withScopeAvg?: boolean
   /** Decimal places when rendering scope_avg in the subtitle. */
   fmt?: number
+  /** Override the cohort-baseline label. Team-side leaves the default
+   *  'avg'; player pages pass 'base' to reflect the position-mix
+   *  weighted cohort (spec §3.1, §11 resolution log #8). */
+  label?: string
+  /** Optional tooltip on the "vs <label> N" portion — caller passes
+   *  the cohort-mix phrasing per spec §3.4 (e.g. "Position-mix
+   *  baseline — Opener (54% of innings); 287 players in cohort"). */
+  scopeAvgTooltip?: string
 }) {
-  if (!env || env.delta_pct == null) return null
-  const d = env.delta_pct
+  if (!env) return null
+  const hasScopeAvg = withScopeAvg && env.scope_avg != null
+  const hasDelta = env.delta_pct != null
+  if (!hasScopeAvg && !hasDelta) return null
+
+  const d = env.delta_pct ?? 0
   const aligned = env.direction != null && (
     (env.direction === 'higher_better' && d > 0) ||
     (env.direction === 'lower_better' && d < 0)
   )
-  // Non-directional metric (toss/inning marginals on the Splits Mosaic,
-  // where "60% won toss vs league 50%" isn't good or bad — just
-  // informational): render the delta in neutral gray. Per
-  // CLAUDE.md / spec-splits-mosaic.md "percentages and deltas are
-  // different — show percentages always; deltas use this component
-  // with direction-aware coloring where applicable, neutral otherwise."
+  // Non-directional metric (counts, toss/inning marginals on the
+  // Splits Mosaic): render the delta in neutral gray.
   const color =
     env.direction == null || d === 0
       ? 'rgb(120,120,120)'
       : aligned ? 'rgb(36,128,68)' : 'rgb(170,52,52)'
   const arrow = d > 0 ? '↑' : d < 0 ? '↓' : '·'
   const sign = d > 0 ? '+' : ''
-  const tip = env.direction == null
-    ? `${env.value} vs scope avg ${env.scope_avg} — ${sign}${d.toFixed(1)}%`
-    : `${env.value} vs scope avg ${env.scope_avg} — ${sign}${d.toFixed(1)}% ${aligned ? '(better)' : '(worse)'}`
+  const tip = hasDelta
+    ? (env.direction == null
+        ? `${env.value} vs ${label} ${env.scope_avg} — ${sign}${d.toFixed(1)}%`
+        : `${env.value} vs ${label} ${env.scope_avg} — ${sign}${d.toFixed(1)}% ${aligned ? '(better)' : '(worse)'}`)
+    : undefined
   const scopeAvgText = env.scope_avg != null
     ? typeof env.scope_avg === 'number'
       ? env.scope_avg.toFixed(fmt)
       : env.scope_avg
     : '-'
+  // Each part stays on its own logical line (no internal wrapping)
+  // but the two parts can stack on narrow screens. The container
+  // doesn't pin whiteSpace=nowrap on the outer, so when card width
+  // can't fit both "vs base 29.50" + "↑ +35.7%" inline, the chip
+  // flows to a second line — keeping the three-tier read clean at
+  // mobile width.
+  // flex wrap so the scope-avg span and delta chip can stack on
+  // narrow cards (mobile width) without forcing the parent grid
+  // track wider than its 1fr allotment. Each child stays whitespace-
+  // nowrap internally; only the BETWEEN-pieces break opportunity
+  // applies.
   return (
-    <span title={tip} style={{ whiteSpace: 'nowrap' }}>
-      {withScopeAvg && (
-        <span style={{ opacity: 0.65, marginRight: '0.4rem' }}>
-          vs avg <span className="num">{scopeAvgText}</span>
+    <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+      {hasScopeAvg && (
+        <span
+          title={scopeAvgTooltip}
+          style={{
+            opacity: 0.65,
+            whiteSpace: 'nowrap',
+            cursor: scopeAvgTooltip ? 'help' : undefined,
+          }}
+        >
+          vs {label} <span className="num">{scopeAvgText}</span>
         </span>
       )}
-      <span style={{ color, fontWeight: 500 }}>
-        {arrow} {sign}{d.toFixed(1)}%
-      </span>
+      {hasDelta && (
+        <span
+          title={tip}
+          style={{ color, fontWeight: 500, whiteSpace: 'nowrap' }}
+        >
+          {arrow} {sign}{d.toFixed(1)}%
+        </span>
+      )}
     </span>
   )
 }

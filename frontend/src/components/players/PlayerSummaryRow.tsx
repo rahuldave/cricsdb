@@ -1,9 +1,18 @@
+import type React from 'react'
 import { Link } from 'react-router-dom'
 import StatCard from '../StatCard'
-import type { PlayerProfile, FilterParams } from '../../types'
+import MetricDelta from '../MetricDelta'
+import type {
+  PlayerProfile, FilterParams, MetricEnvelope,
+  BattingCohortMeta, BowlingCohortMeta, FieldingCohortMeta, KeepingCohortMeta,
+} from '../../types'
 import {
   hasBatting, hasBowling, hasFielding, hasKeeping, carryFilters,
 } from './roleUtils'
+import {
+  battingCohortTooltip, bowlingCohortTooltip,
+  fieldingCohortTooltip, keepingCohortTooltip,
+} from './cohortTooltip'
 
 type Discipline = 'batting' | 'bowling' | 'fielding' | 'keeping'
 
@@ -92,67 +101,109 @@ function renderCompact(discipline: Discipline, profile: PlayerProfile) {
   if (!stats) return null
   return (
     <dl className="wisden-player-compact">
-      {stats.map(([label, value]) => (
+      {stats.map(({ label, value, delta }) => (
         <div key={label} className="wisden-player-compact-row">
           <dt>{label}</dt>
-          <dd className="num">{value}</dd>
+          <dd className="num">
+            {value}
+            {delta != null && <span style={{ marginLeft: '0.4rem' }}>{delta}</span>}
+          </dd>
         </div>
       ))}
     </dl>
   )
 }
 
+/** One compact-mode row entry. `delta` is an optional MetricDelta
+ *  chip rendered to the right of the value — direction-coloured.
+ *  Per spec §3.2: each compare-grid column's baseline is derived
+ *  independently from that column's primary (mix vector / partition).
+ */
+interface CompactStat {
+  label: string
+  value: React.ReactNode
+  delta?: React.ReactNode
+}
+
 function compactStatsFor(
   discipline: Discipline, profile: PlayerProfile,
-): [string, string | number][] | null {
+): CompactStat[] | null {
   if (discipline === 'batting') {
     const b = profile.batting; if (!b) return null
     return [
-      ['Runs',  (b.runs.value ?? 0).toLocaleString()],
-      ['Avg',   fmt(b.average.value)],
-      ['SR',    fmt(b.strike_rate.value)],
-      ['100s',  b.hundreds.value ?? 0],
-      ['50s',   b.fifties.value ?? 0],
-      ['HS',    b.highest_score],
+      { label: 'Runs',  value: (b.runs.value ?? 0).toLocaleString() },
+      { label: 'Avg',   value: fmt(b.average.value),      delta: <MetricDelta env={b.average} /> },
+      { label: 'SR',    value: fmt(b.strike_rate.value),  delta: <MetricDelta env={b.strike_rate} /> },
+      { label: '100s',  value: b.hundreds.value ?? 0 },
+      { label: '50s',   value: b.fifties.value ?? 0 },
+      { label: 'HS',    value: b.highest_score },
     ]
   }
   if (discipline === 'bowling') {
     const b = profile.bowling; if (!b) return null
     return [
-      ['Wickets', b.wickets.value ?? 0],
-      ['Avg',     fmt(b.average.value)],
-      ['Econ',    fmt(b.economy.value)],
-      ['SR',      fmt(b.strike_rate.value)],
+      { label: 'Wickets', value: b.wickets.value ?? 0 },
+      { label: 'Avg',     value: fmt(b.average.value),      delta: <MetricDelta env={b.average} /> },
+      { label: 'Econ',    value: fmt(b.economy.value),      delta: <MetricDelta env={b.economy} /> },
+      { label: 'SR',      value: fmt(b.strike_rate.value),  delta: <MetricDelta env={b.strike_rate} /> },
     ]
   }
   if (discipline === 'fielding') {
     const f = profile.fielding; if (!f) return null
     return [
-      ['Catches',   f.catches.value ?? 0],
-      ['Stumpings', f.stumpings.value ?? 0],
-      ['Run-outs',  f.run_outs.value ?? 0],
-      ['Total',     f.total_dismissals.value ?? 0],
+      { label: 'Catches',   value: f.catches.value ?? 0 },
+      { label: 'Stumpings', value: f.stumpings.value ?? 0 },
+      { label: 'Run-outs',  value: f.run_outs.value ?? 0 },
+      { label: 'Total',     value: f.total_dismissals.value ?? 0 },
+      { label: 'Dis/M',     value: fmt(f.dismissals_per_match.value, 3),
+                            delta: <MetricDelta env={f.dismissals_per_match} /> },
     ]
   }
   const k = profile.keeping; if (!k) return null
   return [
-    ['Innings kept', k.innings_kept.value ?? 0],
-    ['Stumpings',    k.stumpings.value ?? 0],
-    ['Catches',      k.keeping_catches.value ?? 0],
-    ['Byes',         k.byes_conceded.value ?? 0],
-    ['Byes / inn',   fmt(k.byes_per_innings.value)],
+    { label: 'Innings kept', value: k.innings_kept.value ?? 0 },
+    { label: 'Stumpings',    value: k.stumpings.value ?? 0 },
+    { label: 'Catches',      value: k.keeping_catches.value ?? 0 },
+    { label: 'Byes',         value: k.byes_conceded.value ?? 0 },
+    { label: 'Byes / inn',   value: fmt(k.byes_per_innings.value) },
   ]
 }
+
+/** Render a MetricEnvelope as a StatCard subtitle ready to slot under
+ *  the bold value. Tier 2 ("vs base N") + tier 3 (delta chip) auto-
+ *  hide when scope_avg/delta_pct are null. */
+function baselineSub(
+  env: MetricEnvelope | undefined | null,
+  cohortTooltip: string | undefined,
+  fmtDigits = 2,
+): React.ReactNode {
+  if (!env) return undefined
+  if (env.scope_avg == null && env.delta_pct == null) return undefined
+  return (
+    <MetricDelta
+      env={env}
+      withScopeAvg={true}
+      label="base"
+      fmt={fmtDigits}
+      scopeAvgTooltip={cohortTooltip}
+    />
+  )
+}
+
 
 function renderCards(discipline: Discipline, profile: PlayerProfile) {
   if (discipline === 'batting') {
     const b = profile.batting
     if (!b) return null
+    const tt = b.cohort ? battingCohortTooltip(b.cohort as BattingCohortMeta) : undefined
+    // cols-6 — 3 cols on mobile (≤720px) → 6 cols on desktop, via
+    // index.css. Inline `gridTemplateColumns: 'repeat(6, 1fr)'` would
+    // override the mobile rule, so leave the layout to the class.
     return (
-      <div className="wisden-statrow cols-5" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
-        <StatCard label="Runs"  value={b.runs.value} />
-        <StatCard label="Avg"   value={fmt(b.average.value)} />
-        <StatCard label="SR"    value={fmt(b.strike_rate.value)} />
+      <div className="wisden-statrow cols-6">
+        <StatCard label="Runs"  value={b.runs.value} subtitle={baselineSub(b.runs, tt, 0)} />
+        <StatCard label="Avg"   value={fmt(b.average.value)} subtitle={baselineSub(b.average, tt, 2)} />
+        <StatCard label="SR"    value={fmt(b.strike_rate.value)} subtitle={baselineSub(b.strike_rate, tt, 1)} />
         <StatCard label="100s"  value={b.hundreds.value} />
         <StatCard label="50s"   value={b.fifties.value} />
         <StatCard label="HS"    value={b.highest_score} />
@@ -163,12 +214,15 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
   if (discipline === 'bowling') {
     const b = profile.bowling
     if (!b) return null
+    const tt = b.cohort ? bowlingCohortTooltip(b.cohort as BowlingCohortMeta) : undefined
+    // No extra class — `.wisden-statrow` default is 2 cols on
+    // mobile, 4 cols at tablet+; matches the 4-tile bowling shape.
     return (
       <div className="wisden-statrow">
         <StatCard label="Wickets" value={b.wickets.value ?? 0} />
-        <StatCard label="Avg"     value={fmt(b.average.value)} />
-        <StatCard label="Econ"    value={fmt(b.economy.value)} />
-        <StatCard label="SR"      value={fmt(b.strike_rate.value)} />
+        <StatCard label="Avg"     value={fmt(b.average.value)} subtitle={baselineSub(b.average, tt, 2)} />
+        <StatCard label="Econ"    value={fmt(b.economy.value)} subtitle={baselineSub(b.economy, tt, 2)} />
+        <StatCard label="SR"      value={fmt(b.strike_rate.value)} subtitle={baselineSub(b.strike_rate, tt, 2)} />
       </div>
     )
   }
@@ -176,12 +230,15 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
   if (discipline === 'fielding') {
     const f = profile.fielding
     if (!f) return null
+    const tt = f.cohort ? fieldingCohortTooltip(f.cohort as FieldingCohortMeta) : undefined
     return (
-      <div className="wisden-statrow">
+      <div className="wisden-statrow cols-5">
         <StatCard label="Catches"    value={f.catches.value ?? 0} />
         <StatCard label="Stumpings"  value={f.stumpings.value ?? 0} />
         <StatCard label="Run-outs"   value={f.run_outs.value ?? 0} />
         <StatCard label="Total"      value={f.total_dismissals.value ?? 0} />
+        <StatCard label="Dis/Match"  value={fmt(f.dismissals_per_match.value, 3)}
+          subtitle={baselineSub(f.dismissals_per_match, tt, 3)} />
       </div>
     )
   }
@@ -189,13 +246,15 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
   // keeping
   const k = profile.keeping
   if (!k) return null
+  const tt = k.cohort ? keepingCohortTooltip(k.cohort as KeepingCohortMeta) : undefined
   return (
     <div className="wisden-statrow cols-5">
       <StatCard label="Innings kept" value={k.innings_kept.value ?? 0} />
       <StatCard label="Stumpings"    value={k.stumpings.value ?? 0} />
       <StatCard label="Catches"      value={k.keeping_catches.value ?? 0} />
       <StatCard label="Byes"         value={k.byes_conceded.value ?? 0} />
-      <StatCard label="Byes / inn"   value={fmt(k.byes_per_innings.value)} />
+      <StatCard label="Byes / inn"   value={fmt(k.byes_per_innings.value)}
+        subtitle={tt ? <span style={{ opacity: 0.65 }} title={tt}>(keeping cohort)</span> : undefined} />
     </div>
   )
 }
