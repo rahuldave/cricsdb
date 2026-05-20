@@ -11,6 +11,7 @@ from typing import Optional
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
 from ..aux_clauses import splice_aux_join_clauses
+from ..metrics_metadata import wrap_metric
 from ..player_nationality import player_nationalities
 from ..scope_links import suggested_splits, scope_dict_from_filters
 from ..tournament_canonical import (
@@ -363,20 +364,46 @@ async def fielding_summary(
         db, person_id, filters,
     )
 
+    # Cohort baseline: partition by is_keeper (innings_kept > 0).
+    # Phase 4 spec — fold the cohort response into the envelope.
+    is_keeper_val = 1 if innings_kept > 0 else 0
+    cohort: Optional[dict] = None
+    if matches > 0:
+        from .scope_averages import compute_players_fielding_cohort
+        cohort = await compute_players_fielding_cohort(
+            db, filters, aux, is_keeper_val, drop_set=None,
+        )
+
+    def _cohort_scope_avg(key: str) -> Optional[float]:
+        if cohort is None:
+            return None
+        m = cohort.get(key)
+        return m.get("scope_avg") if m else None
+
+    cohort_sample = cohort["cohort"]["n_matches_total"] if cohort else None
+    dismissals_pm_val = _safe_div(total, matches, 1, 3)
+
     return {
         "person_id": person_id,
         "name": name,
         "nationalities": nationalities,
-        "matches": matches,
-        "catches": catches,
-        "stumpings": stumpings,
-        "run_outs": run_outs,
-        "caught_and_bowled": caught_and_bowled,
-        "total_dismissals": total,
-        "dismissals_per_match": _safe_div(total, matches),
-        "substitute_catches": substitute_catches,
-        "innings_kept": innings_kept,
+        # Numeric fields envelope-wrapped per Phase 4.
+        "matches":             wrap_metric(matches,            None, "matches",                    sample_size=cohort_sample),
+        "catches":             wrap_metric(catches,            None, "field_catches",              sample_size=cohort_sample),
+        "stumpings":           wrap_metric(stumpings,          None, "field_stumpings",            sample_size=cohort_sample),
+        "run_outs":            wrap_metric(run_outs,           None, "field_run_outs",             sample_size=cohort_sample),
+        "caught_and_bowled":   wrap_metric(caught_and_bowled,  None, "field_caught_and_bowled",    sample_size=cohort_sample),
+        "total_dismissals":    wrap_metric(total,              None, "field_total_dismissals",     sample_size=cohort_sample),
+        "substitute_catches":  wrap_metric(substitute_catches, None, "field_substitute_catches",   sample_size=cohort_sample),
+        "innings_kept":        wrap_metric(innings_kept,       None, "field_innings_kept",         sample_size=cohort_sample),
+        # Rate metric.
+        "dismissals_per_match": wrap_metric(
+            dismissals_pm_val, _cohort_scope_avg("dismissals_per_match"),
+            "field_dismissals_per_match", sample_size=cohort_sample,
+        ),
         "dismissal_position_distribution": dismissal_position_distribution,
+        "cohort": cohort["cohort"] if cohort else None,
+        "is_keeper": is_keeper_val,
     }
 
 

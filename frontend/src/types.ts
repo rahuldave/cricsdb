@@ -1333,41 +1333,69 @@ export interface PlayerProfile {
 }
 
 // Fielding
+export interface FieldingDismissalPositionEntry {
+  bucket: number
+  catches: number
+  stumpings: number
+  run_outs: number
+  dismissals: number
+}
+
+export interface FieldingCohortMeta {
+  match_dimension: 'is_keeper'
+  is_keeper: 0 | 1
+  n_fielders: number
+  n_matches_total: number
+}
+
 export interface FieldingSummary {
   person_id: string
   name: string
   nationalities: NationalityEntry[]
-  matches: number
-  catches: number
-  stumpings: number
-  run_outs: number
-  caught_and_bowled: number
-  total_dismissals: number
-  dismissals_per_match: number | null
-  substitute_catches: number
+  // Numeric fields envelope-wrapped per Phase 4.
+  matches: MetricEnvelope
+  catches: MetricEnvelope
+  stumpings: MetricEnvelope
+  run_outs: MetricEnvelope
+  caught_and_bowled: MetricEnvelope
+  total_dismissals: MetricEnvelope
+  dismissals_per_match: MetricEnvelope
+  substitute_catches: MetricEnvelope
   /** Tier 2 — innings where this person was assigned keeper. Used to gate the "Keeping" tab. */
-  innings_kept: number
+  innings_kept: MetricEnvelope
+  dismissal_position_distribution: FieldingDismissalPositionEntry[]
+  cohort: FieldingCohortMeta | null
+  is_keeper: 0 | 1
 }
 
 // Keeping (Tier 2 fielding — wicketkeeper-specific stats)
+export interface KeepingCohortMeta {
+  match_dimension: 'is_keeper'
+  is_keeper: 1
+  n_keepers: number
+  n_matches_keeping: number
+}
+
 export interface KeepingSummary {
   person_id: string
   name: string
-  innings_kept: number
   innings_kept_by_confidence: {
     definitive: number
     high: number
     medium: number
     low: number
   }
-  stumpings: number
-  keeping_catches: number
-  run_outs_while_keeping: number
-  byes_conceded: number
-  byes_per_innings: number | null
-  dismissals_while_keeping: number
-  keeping_dismissals_per_innings: number | null
-  ambiguous_innings: number
+  // Numeric fields envelope-wrapped per Phase 4.
+  innings_kept: MetricEnvelope
+  stumpings: MetricEnvelope
+  keeping_catches: MetricEnvelope
+  run_outs_while_keeping: MetricEnvelope
+  byes_conceded: MetricEnvelope
+  byes_per_innings: MetricEnvelope
+  dismissals_while_keeping: MetricEnvelope
+  keeping_dismissals_per_innings: MetricEnvelope
+  ambiguous_innings: MetricEnvelope
+  cohort: KeepingCohortMeta | null
 }
 
 export interface KeepingSeason {

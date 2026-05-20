@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Query
 
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams
+from ..metrics_metadata import wrap_metric
 
 router = APIRouter(prefix="/api/v1/fielders", tags=["Keeping"])
 
@@ -153,24 +154,49 @@ async def keeping_summary(
 
     dismissals = stumpings + keeping_catches + run_outs
 
+    # Cohort baseline (Phase 4): the keeping cohort uses per-match
+    # rates (matches_as_keeper as denominator), whereas this endpoint
+    # quotes per-innings rates (innings_kept as denominator). The two
+    # rate-shapes aren't directly comparable, so we fold ONLY metrics
+    # that share the cohort's denominator semantic — none right now.
+    # We still surface the cohort metadata for completeness so the
+    # Phase 5 frontend can derive comparisons if needed.
+    cohort: Optional[dict] = None
+    if innings_kept > 0:
+        from .scope_averages import compute_players_keeping_cohort
+        cohort = await compute_players_keeping_cohort(
+            db, filters, aux, drop_set=None,
+        )
+
+    byes_per_innings_val = _safe_div(byes_conceded, innings_kept)
+    keeping_dismissals_per_innings_val = _safe_div(dismissals, innings_kept)
+
+    cohort_sample = cohort["cohort"]["n_matches_keeping"] if cohort else None
+
     return {
         "person_id": person_id,
         "name": name,
-        "innings_kept": innings_kept,
+        # Identity / non-numeric dict stays flat.
         "innings_kept_by_confidence": {
             "definitive": by_conf.get("definitive", 0),
             "high": by_conf.get("high", 0),
             "medium": by_conf.get("medium", 0),
             "low": by_conf.get("low", 0),
         },
-        "stumpings": stumpings,
-        "keeping_catches": keeping_catches,
-        "run_outs_while_keeping": run_outs,
-        "byes_conceded": byes_conceded,
-        "byes_per_innings": _safe_div(byes_conceded, innings_kept),
-        "dismissals_while_keeping": dismissals,
-        "keeping_dismissals_per_innings": _safe_div(dismissals, innings_kept),
-        "ambiguous_innings": ambiguous_innings,
+        # Numeric fields envelope-wrapped per Phase 4.
+        "innings_kept":                 wrap_metric(innings_kept,    None, "keep_innings_kept",              sample_size=cohort_sample),
+        "stumpings":                    wrap_metric(stumpings,       None, "keep_stumpings",                 sample_size=cohort_sample),
+        "keeping_catches":              wrap_metric(keeping_catches, None, "keep_catches",                   sample_size=cohort_sample),
+        "run_outs_while_keeping":       wrap_metric(run_outs,        None, "keep_run_outs",                  sample_size=cohort_sample),
+        "byes_conceded":                wrap_metric(byes_conceded,   None, "keep_byes",                      sample_size=cohort_sample),
+        "byes_per_innings":             wrap_metric(byes_per_innings_val, None, "keep_byes_per_innings",     sample_size=cohort_sample),
+        "dismissals_while_keeping":     wrap_metric(dismissals,      None, "keep_dismissals",                sample_size=cohort_sample),
+        "keeping_dismissals_per_innings": wrap_metric(
+            keeping_dismissals_per_innings_val, None,
+            "keep_dismissals_per_innings", sample_size=cohort_sample,
+        ),
+        "ambiguous_innings":            wrap_metric(ambiguous_innings, None, "keep_ambiguous_innings",       sample_size=cohort_sample),
+        "cohort": cohort["cohort"] if cohort else None,
     }
 
 

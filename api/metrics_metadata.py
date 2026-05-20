@@ -178,6 +178,7 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     "keep_stumpings_per_match":    "higher_better",
     "keep_run_outs_per_match":     "higher_better",
     "keep_dismissals_per_match":   "higher_better",
+    "keep_ambiguous_innings":      None,
 }
 
 

@@ -273,12 +273,12 @@ export default function Fielding() {
           </ScopedPageHeader>
           <ScopeIndicator filters={filters} />
           <div className="wisden-statrow cols-6">
-            <StatCard label="Catches" value={summary.catches} />
-            <StatCard label="Stumpings" value={summary.stumpings} />
-            <StatCard label="Run Outs" value={summary.run_outs} />
-            <StatCard label="Total" value={summary.total_dismissals} />
-            <StatCard label="Matches" value={summary.matches} />
-            <StatCard label="Dis/Match" value={fmt(summary.dismissals_per_match)} />
+            <StatCard label="Catches" value={summary.catches.value ?? 0} />
+            <StatCard label="Stumpings" value={summary.stumpings.value ?? 0} />
+            <StatCard label="Run Outs" value={summary.run_outs.value ?? 0} />
+            <StatCard label="Total" value={summary.total_dismissals.value ?? 0} />
+            <StatCard label="Matches" value={summary.matches.value ?? 0} />
+            <StatCard label="Dis/Match" value={fmt(summary.dismissals_per_match.value)} />
           </div>
 
           <FielderDistributionPanel
@@ -289,7 +289,7 @@ export default function Fielding() {
           />
 
           <div className="wisden-tabs">
-            {(summary.innings_kept > 0
+            {((summary.innings_kept.value ?? 0) > 0
               ? [...BASE_TABS, KEEPING_TAB] as const
               : BASE_TABS
             ).map(tab => (
@@ -413,16 +413,16 @@ export default function Fielding() {
                 {!keepSummaryFetch.loading && !keepSummaryFetch.error && keepSummary && (
                   <>
                     <div className="wisden-statrow cols-4">
-                      <StatCard label="Stumpings" value={keepSummary.stumpings} />
-                      <StatCard label="Keep Catches" value={keepSummary.keeping_catches} />
-                      <StatCard label="Byes Conceded" value={keepSummary.byes_conceded}
-                        subtitle={keepSummary.byes_per_innings != null ? `${fmt(keepSummary.byes_per_innings)}/inn` : undefined} />
-                      <StatCard label="Innings Kept" value={keepSummary.innings_kept} />
+                      <StatCard label="Stumpings" value={keepSummary.stumpings.value ?? 0} />
+                      <StatCard label="Keep Catches" value={keepSummary.keeping_catches.value ?? 0} />
+                      <StatCard label="Byes Conceded" value={keepSummary.byes_conceded.value ?? 0}
+                        subtitle={keepSummary.byes_per_innings.value != null ? `${fmt(keepSummary.byes_per_innings.value)}/inn` : undefined} />
+                      <StatCard label="Innings Kept" value={keepSummary.innings_kept.value ?? 0} />
                     </div>
 
                     {/* Confidence breakdown — transparency about how we identified the keeper */}
                     <p className="wisden-tab-help">
-                      Of {keepSummary.innings_kept} keeping innings:{' '}
+                      Of {keepSummary.innings_kept.value ?? 0} keeping innings:{' '}
                       <span style={{ color: 'var(--ink)' }}>{keepSummary.innings_kept_by_confidence.definitive} definitive</span>
                       {' · '}
                       {keepSummary.innings_kept_by_confidence.high} high
@@ -430,8 +430,8 @@ export default function Fielding() {
                       {keepSummary.innings_kept_by_confidence.medium} medium
                       {' · '}
                       {keepSummary.innings_kept_by_confidence.low} low confidence
-                      {keepSummary.ambiguous_innings > 0 && (
-                        <>. {keepSummary.ambiguous_innings} additional innings ambiguous.</>
+                      {(keepSummary.ambiguous_innings.value ?? 0) > 0 && (
+                        <>. {keepSummary.ambiguous_innings.value} additional innings ambiguous.</>
                       )}
                       {' '}
                       <span style={{ opacity: 0.7 }}>

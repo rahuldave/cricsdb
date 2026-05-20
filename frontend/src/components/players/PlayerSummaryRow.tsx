@@ -128,19 +128,19 @@ function compactStatsFor(
   if (discipline === 'fielding') {
     const f = profile.fielding; if (!f) return null
     return [
-      ['Catches',   f.catches],
-      ['Stumpings', f.stumpings],
-      ['Run-outs',  f.run_outs],
-      ['Total',     f.total_dismissals],
+      ['Catches',   f.catches.value ?? 0],
+      ['Stumpings', f.stumpings.value ?? 0],
+      ['Run-outs',  f.run_outs.value ?? 0],
+      ['Total',     f.total_dismissals.value ?? 0],
     ]
   }
   const k = profile.keeping; if (!k) return null
   return [
-    ['Innings kept', k.innings_kept],
-    ['Stumpings',    k.stumpings],
-    ['Catches',      k.keeping_catches],
-    ['Byes',         k.byes_conceded],
-    ['Byes / inn',   fmt(k.byes_per_innings)],
+    ['Innings kept', k.innings_kept.value ?? 0],
+    ['Stumpings',    k.stumpings.value ?? 0],
+    ['Catches',      k.keeping_catches.value ?? 0],
+    ['Byes',         k.byes_conceded.value ?? 0],
+    ['Byes / inn',   fmt(k.byes_per_innings.value)],
   ]
 }
 
@@ -178,10 +178,10 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     if (!f) return null
     return (
       <div className="wisden-statrow">
-        <StatCard label="Catches"    value={f.catches} />
-        <StatCard label="Stumpings"  value={f.stumpings} />
-        <StatCard label="Run-outs"   value={f.run_outs} />
-        <StatCard label="Total"      value={f.total_dismissals} />
+        <StatCard label="Catches"    value={f.catches.value ?? 0} />
+        <StatCard label="Stumpings"  value={f.stumpings.value ?? 0} />
+        <StatCard label="Run-outs"   value={f.run_outs.value ?? 0} />
+        <StatCard label="Total"      value={f.total_dismissals.value ?? 0} />
       </div>
     )
   }
@@ -191,11 +191,11 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
   if (!k) return null
   return (
     <div className="wisden-statrow cols-5">
-      <StatCard label="Innings kept" value={k.innings_kept} />
-      <StatCard label="Stumpings"    value={k.stumpings} />
-      <StatCard label="Catches"      value={k.keeping_catches} />
-      <StatCard label="Byes"         value={k.byes_conceded} />
-      <StatCard label="Byes / inn"   value={fmt(k.byes_per_innings)} />
+      <StatCard label="Innings kept" value={k.innings_kept.value ?? 0} />
+      <StatCard label="Stumpings"    value={k.stumpings.value ?? 0} />
+      <StatCard label="Catches"      value={k.keeping_catches.value ?? 0} />
+      <StatCard label="Byes"         value={k.byes_conceded.value ?? 0} />
+      <StatCard label="Byes / inn"   value={fmt(k.byes_per_innings.value)} />
     </div>
   )
 }

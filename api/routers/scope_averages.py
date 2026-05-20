@@ -2059,48 +2059,18 @@ async def scope_players_bowling_summary(
     return await compute_players_bowling_cohort(db, filters, aux, mix, drop_set)
 
 
-@router.get("/players/fielding/summary")
-async def scope_players_fielding_summary(
-    filters: FilterParams = Depends(),
-    aux: AuxParams = Depends(),
-    is_keeper: int = Query(
-        ...,
-        description=(
-            "Binary axis. 0 = outfielder cohort (pss.matches_as_keeper"
-            " = 0); 1 = keeper cohort (pss.matches_as_keeper > 0)."
-            " Spec §5.4 — fielding is NOT position-weighted at the"
-            " headline; the partition is on this binary instead."
-        ),
-        ge=0, le=1,
-    ),
-    drop: Optional[str] = Query(
-        None,
-        description="See batting/summary for recognised axis names.",
-    ),
-):
-    """Keeper-flag-partitioned cohort baseline for fielding.
-
-    Returns per-match rates (catches, stumpings, run_outs, total
-    dismissals — all higher=better) over the partition selected by
-    is_keeper. Substitute catches are EXCLUDED from the numerator
-    (Spec §5.2 + CLAUDE.md). Per-dismissed-position cohort sub-rates
-    are returned in by_dismissed_position[10] for next-spec impact-
-    weighted analyses; this headline doesn't weight by position.
+async def compute_players_fielding_cohort(
+    db,
+    filters: FilterParams,
+    aux: AuxParams,
+    is_keeper: int,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """In-process fielding cohort baseline — same shape as the HTTP
+    endpoint. Phase 4 player /summary endpoints call this to fold the
+    cohort baseline into their envelope-wrapped response without a
+    second HTTP roundtrip.
     """
-    db = get_db()
-    try:
-        drop_set = parse_drop(drop)
-        if drop_set is not None:
-            from ..filters import _DROP_AXES
-            unknown = drop_set - _DROP_AXES
-            if unknown:
-                raise ValueError(
-                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
-                    f" Recognised: {sorted(_DROP_AXES)}."
-                )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
     where, params = build_scope_clauses(filters, drop=drop_set)
 
     # Cohort partition: matches_as_keeper > 0 selects keepers; = 0
@@ -2222,33 +2192,26 @@ async def scope_players_fielding_summary(
     }
 
 
-@router.get("/players/keeping/summary")
-async def scope_players_keeping_summary(
+@router.get("/players/fielding/summary")
+async def scope_players_fielding_summary(
     filters: FilterParams = Depends(),
     aux: AuxParams = Depends(),
+    is_keeper: int = Query(
+        ...,
+        description=(
+            "Binary axis. 0 = outfielder cohort (pss.matches_as_keeper"
+            " = 0); 1 = keeper cohort (pss.matches_as_keeper > 0)."
+            " Spec §5.4 — fielding is NOT position-weighted at the"
+            " headline; the partition is on this binary instead."
+        ),
+        ge=0, le=1,
+    ),
     drop: Optional[str] = Query(
         None,
         description="See batting/summary for recognised axis names.",
     ),
 ):
-    """Cohort baseline for KEEPING — matches the keeper partition of
-    fielding/summary?is_keeper=1, surfaced as its own endpoint so the
-    Phase 4 /fielders/{id}/keeping/summary envelope migration can
-    pair 1:1 with a dedicated cohort source.
-
-    Headline rates use matches_as_keeper as the per-keeper denominator
-    rather than total matches — distinguishing keeping rate from
-    catch-as-outfielder rate. catches_as_keeper, stumpings, and
-    run_outs come from parent playerscopestats (stumpings only happen
-    when keeping, so the parent count is exact; catches_as_keeper is
-    populated by the parent script via the keeperassignment cross-
-    reference).
-
-    Byes-per-innings is NOT surfaced here — it needs a
-    keeperassignment + delivery join not precomputed in
-    playerscopestats. Reserved for a future cohort enhancement when
-    byes precompute lands.
-    """
+    """Keeper-flag-partitioned cohort baseline for fielding (HTTP wrapper)."""
     db = get_db()
     try:
         drop_set = parse_drop(drop)
@@ -2262,7 +2225,47 @@ async def scope_players_keeping_summary(
                 )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    return await compute_players_fielding_cohort(db, filters, aux, is_keeper, drop_set)
 
+
+@router.get("/players/keeping/summary")
+async def scope_players_keeping_summary(
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    drop: Optional[str] = Query(
+        None,
+        description="See batting/summary for recognised axis names.",
+    ),
+):
+    """Cohort baseline for KEEPING (HTTP wrapper around the in-process helper)."""
+    db = get_db()
+    try:
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                    f" Recognised: {sorted(_DROP_AXES)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await compute_players_keeping_cohort(db, filters, aux, drop_set)
+
+
+async def compute_players_keeping_cohort(
+    db,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """In-process keeping cohort baseline.
+
+    Headline rates use matches_as_keeper as the per-keeper denominator
+    (catches_as_keeper, stumpings, run_outs — all higher_better).
+    Byes-per-innings deferred — needs keeperassignment join.
+    """
     where, params = build_scope_clauses(filters, drop=drop_set)
 
     # Aggregate over keeper-active rows. matches_as_keeper > 0 selects

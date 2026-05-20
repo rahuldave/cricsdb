@@ -8,9 +8,9 @@ export const hasBowling  = (p: PlayerProfile) => (p.bowling?.balls.value ?? 0) >
 export const hasFielding = (p: PlayerProfile) => {
   const f = p.fielding
   if (!f) return false
-  return (f.catches + f.stumpings + f.run_outs) > 0
+  return ((f.catches.value ?? 0) + (f.stumpings.value ?? 0) + (f.run_outs.value ?? 0)) > 0
 }
-export const hasKeeping  = (p: PlayerProfile) => (p.keeping?.innings_kept ?? 0) > 0
+export const hasKeeping  = (p: PlayerProfile) => (p.keeping?.innings_kept.value ?? 0) > 0
 
 // Role-classification thresholds. These are stricter than the "has data"
 // gates above — they decide whether someone is meaningfully a batter /
@@ -62,7 +62,7 @@ export function classifyRole(p: PlayerProfile): string {
   // match) as the denominator, falling back to bowling.matches only
   // if fielding is missing for some reason.
   const totalMatches = Math.max(
-    p.fielding?.matches ?? 0,
+    p.fielding?.matches.value ?? 0,
     p.batting?.matches.value ?? 0,
     bw?.matches.value ?? 0,
     1,
@@ -71,7 +71,7 @@ export function classifyRole(p: PlayerProfile): string {
   const bowled = !!bw
     && bowlBalls >= ROLE_BOWLED_MIN_BALLS
     && bowlBalls / totalMatches >= ROLE_BOWLED_MIN_BALLS_PER_MATCH
-  const kept = (p.keeping?.innings_kept ?? 0) >= KEEPING_INNINGS_THRESHOLD
+  const kept = (p.keeping?.innings_kept.value ?? 0) >= KEEPING_INNINGS_THRESHOLD
   const fielded = hasFielding(p)
 
   if (kept && batted)      return 'keeper-batter'
@@ -89,7 +89,7 @@ export function matchesInScope(p: PlayerProfile): number {
   return Math.max(
     p.batting?.matches.value ?? 0,
     p.bowling?.matches.value ?? 0,
-    p.fielding?.matches ?? 0,
+    p.fielding?.matches.value ?? 0,
   )
 }
 
