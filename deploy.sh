@@ -78,6 +78,13 @@ cp models/__init__.py models/tables.py "$BUILD_DIR/models/"
 # Built frontend
 cp -r frontend/dist/* "$BUILD_DIR/frontend/dist/"
 
+# Mirror site-stats.json at the build root so api/social_meta.py can
+# read current totals (matches / deliveries) for DEFAULT_DESCRIPTION at
+# module-import time. Home.tsx imports the same JSON via the vite
+# bundle; this copy gives the FastAPI side the same source of truth for
+# the social-card meta description without a DB query at startup.
+cp frontend/src/generated/site-stats.json "$BUILD_DIR/site-stats.json"
+
 # Restore .plash identity
 if [ -n "$PLASH_BAK" ]; then
     echo "$PLASH_BAK" > "$BUILD_DIR/.plash"

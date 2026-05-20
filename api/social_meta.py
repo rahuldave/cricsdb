@@ -42,10 +42,34 @@ from .dependencies import get_db
 
 SITE_NAME = "T20 & CricsDB"
 SITE_BASE = "https://t20.rahuldave.com"
-DEFAULT_DESCRIPTION = (
-    "An almanack of Twenty20 cricket — 13,019 matches, 2.95M "
-    "deliveries, across international and club competition the world over."
-)
+
+
+def _default_description() -> str:
+    """Format the site-wide social-card description from site-stats.json
+    — the same file Home.tsx imports for the visible homepage totals.
+    Local dev reads frontend/src/generated/; deploy.sh stages a copy at
+    the build root so this path resolves on plash too. Any failure
+    falls back to the last-known counts so SPA fallback never crashes."""
+    import json
+    from pathlib import Path
+    matches, deliveries = 13201, 3013653  # last-known fallback (2026-05-20)
+    for p in (Path("site-stats.json"), Path("frontend/src/generated/site-stats.json")):
+        try:
+            if p.exists():
+                totals = json.loads(p.read_text()).get("totals", {})
+                matches = totals.get("matches", matches)
+                deliveries = totals.get("deliveries", deliveries)
+                break
+        except Exception:
+            continue
+    return (
+        f"An almanack of Twenty20 cricket — {matches:,} matches, "
+        f"{deliveries / 1_000_000:.2f}M deliveries, across international "
+        f"and club competition the world over."
+    )
+
+
+DEFAULT_DESCRIPTION = _default_description()
 DEFAULT_TITLE = f"{SITE_NAME} — An almanack of Twenty20 cricket"
 
 
