@@ -39,7 +39,8 @@ interface LineChartProps<T extends Record<string, any>> {
    *  stroke (`internal_docs/colors.md`'s league-avg reference color);
    *  the primary keeps WISDEN_PALETTE's first color. Ignored when
    *  `lineBy` is already set (multi-series mode wins). */
-  referenceData?: T[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  referenceData?: Record<string, any>[]
   /** Legend label for the reference series. When omitted, auto-
    *  derived from `abbreviateScope(filters, { discipline })` + " avg"
    *  so the legend always tells the reader exactly which pool the
