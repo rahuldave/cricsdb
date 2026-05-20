@@ -964,3 +964,93 @@ the original `outlook-comparisons.md` proposal:
 8. **Visual identity**: `vs base N` (not `vs avg`) on player pages to
    distinguish the position-mix-weighted cohort from the pool-weighted
    team baseline.
+
+
+## Addendum — shipped 2026-05-20
+
+Rollout closed at commit `35b323c`. **25 commits total** since the
+spec rewrite (`8869f6a` → `35b323c`).
+
+### Out-of-spec work that happened anyway
+
+These weren't in the original spec scope but were either prerequisites
+the rollout surfaced, or quick polish on adjacent surfaces where the
+data was already landing in envelopes.
+
+**Non-striker dismissals fix** (3 commits, `5e15783` flip → `7d8499f`
+fix → `569332d` flip-back). Discovered during Phase 2a spot-check of
+Kohli's IPL `/summary.dismissals` (226 in live, 228 in
+`playerscopestats`). Root cause: `/batters/{id}/{summary,by-innings,
+by-season,distribution}` LEFT-JOIN'd wicket against deliveries
+filtered by `d.batter_id = :pid`, missing 6,774 non-striker
+dismissals across the DB (4.2%) — 6,765 run-outs, 9 other kinds. 615
+of those were "diamond ducks" (entire innings invisible to the
+endpoints because the batter never faced a legal ball before being
+run out as non-striker). Fix: new `_batting_innings_filter` that
+includes deliveries where the player is either striker or non-
+striker; striker-side aggregates gate via `CASE WHEN d.batter_id =
+:pid AND legal`. Sanity test `test_non_striker_dismissals.py` locks
+6 assertions across `/summary`, `/by-innings`, `/by-season`,
+`/distribution`.
+
+**Three-tier visual on `/batting`, `/bowling`, `/fielding`** (commit
+`12d7049`). Phase 5 spec only mandated the visual on `/players`, but
+the data was already in envelopes from Phase 4. Wired the same
+`<StatCard subtitle={MetricDelta withScopeAvg label="base" …}>`
+pattern into the dedicated discipline pages — 11 tiles across 3
+pages. Integration test
+`tests/integration/discipline_pages_baseline.sh` — 25 SQL-anchored
+assertions against the stable IPL 2016 scope.
+
+**`balls_per_{four,six,boundary}` cohort baselines** (commit
+`35b323c`). After the discipline-page polish surfaced that B/Four
+and B/Boundary tiles on `/batting` had no subtitles, added the
+inverse boundary-frequency rates to the batting cohort response
+(derived per-bucket as `legal_balls / fours|sixes|boundaries`,
+convex-combined). Bowling cohort gained `balls_per_boundary` (the
+over child table doesn't store separate fours/sixes, so
+`balls_per_{four,six}` for bowling stay `scope_avg=null`).
+
+### Commit-cadence deviation noted
+
+The original verbose Phase 4 plan was 8 commits (4 REG→NEW flip
+commits + 4 migration commits, one pair per discipline endpoint). I
+overshot a `git reset --soft HEAD~N` when staging the Phase 4
+flip-back, which lost the separate commit boundaries between Phase
+4.3b (fielding migration), Phase 4.4a (keeping URL flip), and Phase
+4.4b (keeping migration). Re-committed as a bundle in `9fabef7`
+("Phase 4.3b + 4.4: envelope-wrap fielding + keeping summaries").
+Net result: 7 Phase 4 commits instead of 8. The commit message
+documents the bundling. `git bisect` granularity within Phase 4 is
+mildly degraded but the bundle is internally coherent (both
+endpoints touched, both with sanity tests).
+
+### Open follow-up specs (deferred per §11)
+
+All three remain on the queue. Each is now pure-UI work over the
+data this rollout shipped:
+
+1. **`spec-batting-position-chart.md`** — position-distribution
+   histogram on `/batting?player=X`. Reads `position_distribution`
+   + cohort `by_position` from the summary endpoint family.
+2. **`spec-bowling-over-chart.md`** — per-over distribution on
+   `/bowling?player=X`. Reads `over_distribution` + `by_over`.
+3. **`spec-fielding-impact.md`** — impact-weighted fielding
+   analysis on `/fielding?player=X`. Reads
+   `dismissal_position_distribution` + `by_dismissed_position`.
+   Defines the impact-weight scheme (e.g. opener × 1.5, tail × 0.5)
+   and renders both the histogram + the single impact-weighted
+   score.
+
+Additionally surfaced during rollout but not specced:
+
+- **`balls_per_{four,six}` bowling cohort baselines.** Would require
+  splitting the combined `boundaries` column in
+  `playerscopestats_over` into separate `fours` and `sixes`, plus
+  a `--first` deploy to push the schema change. Low priority —
+  the bowling page's B/Boundary baseline already conveys the
+  insight; per-shot-type bowling breakdowns are deeper analysis.
+- **Investigation: `playerscopestats.dismissals` vs live
+  `/summary.dismissals` 226-vs-228 origin.** Resolved during Phase
+  2a as "non-striker dismissals" — see the fix commits above. Both
+  paths now agree at 228 for Kohli IPL.
