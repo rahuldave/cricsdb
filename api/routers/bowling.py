@@ -1596,11 +1596,27 @@ async def bowling_distribution(
             _enrich_bowling_wickets_milestones_with_cohort(
                 lifetime["wickets"]["milestones"], cohort,
             )
+            _enrich_bowling_economy_milestones_with_cohort(
+                lifetime["economy"]["milestones"], cohort,
+            )
+            _enrich_bowling_runs_milestones_with_cohort(
+                lifetime["runs_conceded"]["milestones"], cohort,
+            )
             for window_key in ("last_10", "last_60d", "last_6mo", "last_1yr"):
                 window_doss = form.get(window_key)
-                if window_doss and "wickets" in window_doss:
+                if not window_doss:
+                    continue
+                if "wickets" in window_doss:
                     _enrich_bowling_wickets_milestones_with_cohort(
                         window_doss["wickets"]["milestones"], cohort,
+                    )
+                if "economy" in window_doss:
+                    _enrich_bowling_economy_milestones_with_cohort(
+                        window_doss["economy"]["milestones"], cohort,
+                    )
+                if "runs_conceded" in window_doss:
+                    _enrich_bowling_runs_milestones_with_cohort(
+                        window_doss["runs_conceded"]["milestones"], cohort,
                     )
 
     # last_match_date — drives the frontend dormancy badge.
@@ -1656,18 +1672,88 @@ def _enrich_bowling_wickets_milestones_with_cohort(
 
     spec-prob-baselines.md §4.2.
     """
+    _enrich_milestones_block(
+        milestones, cohort,
+        _BOWLING_WKTS_PROB_DIRECTIONS,
+        _BOWLING_WKTS_COHORT_FIELD,
+    )
+
+
+# PT3 of spec-prob-baselines.md — economy chip direction + cohort
+# field map. P(econ ≤ X) higher_better (tight spell is good for the
+# bowler); P(econ ≥ X) lower_better.
+_BOWLING_ECON_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_econ_leq_6":  "higher_better",
+    "p_econ_leq_7":  "higher_better",
+    "p_econ_geq_9":  "lower_better",
+    "p_econ_geq_10": "lower_better",
+}
+
+_BOWLING_ECON_COHORT_FIELD: dict[str, str] = {
+    "p_econ_leq_6":  "prob_econ_leq_6",
+    "p_econ_leq_7":  "prob_econ_leq_7",
+    "p_econ_geq_9":  "prob_econ_geq_9",
+    "p_econ_geq_10": "prob_econ_geq_10",
+}
+
+
+def _enrich_bowling_economy_milestones_with_cohort(
+    milestones: dict, cohort: dict,
+) -> None:
+    """Mutate each ProbRecord in the economy block. spec §4.2."""
+    _enrich_milestones_block(
+        milestones, cohort,
+        _BOWLING_ECON_PROB_DIRECTIONS,
+        _BOWLING_ECON_COHORT_FIELD,
+    )
+
+
+# PT3 of spec-prob-baselines.md — runs-conceded chip direction + cohort
+# field map. P(runs ≤ X) higher_better (cheap spell is good);
+# P(runs ≥ X) lower_better.
+_BOWLING_RUNS_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_leq_15": "higher_better",
+    "p_leq_25": "higher_better",
+    "p_geq_40": "lower_better",
+    "p_geq_50": "lower_better",
+}
+
+_BOWLING_RUNS_COHORT_FIELD: dict[str, str] = {
+    "p_leq_15": "prob_runs_leq_15",
+    "p_leq_25": "prob_runs_leq_25",
+    "p_geq_40": "prob_runs_geq_40",
+    "p_geq_50": "prob_runs_geq_50",
+}
+
+
+def _enrich_bowling_runs_milestones_with_cohort(
+    milestones: dict, cohort: dict,
+) -> None:
+    """Mutate each ProbRecord in the runs_conceded block. spec §4.2."""
+    _enrich_milestones_block(
+        milestones, cohort,
+        _BOWLING_RUNS_PROB_DIRECTIONS,
+        _BOWLING_RUNS_COHORT_FIELD,
+    )
+
+
+def _enrich_milestones_block(
+    milestones: dict, cohort: dict,
+    directions: dict[str, str | None],
+    cohort_field_map: dict[str, str],
+) -> None:
+    """Shared cohort enrichment loop for the three bowling milestone
+    blocks (wickets / economy / runs_conceded). Direction is the chip
+    polarity literal; cohort_field_map names the field on the cohort
+    response that carries the chip's scope_avg.
+    """
     cohort_info = cohort.get("cohort") or {}
-    # Bowling cohort uses ball-grain sample_size (n_balls_total) on
-    # MetricEnvelope wrappers, but for ProbRecord tooltips the more
-    # interpretable scale is the cohort's pool of spells. We don't
-    # have that as a single field on the bowling cohort response, so
-    # fall through to n_balls_total — the tooltip caption explains it.
     sample_size = cohort_info.get("n_balls_total")
-    for chip_key, direction in _BOWLING_WKTS_PROB_DIRECTIONS.items():
+    for chip_key, direction in directions.items():
         pr = milestones.get(chip_key)
         if not pr:
             continue
-        cohort_field = _BOWLING_WKTS_COHORT_FIELD[chip_key]
+        cohort_field = cohort_field_map[chip_key]
         cohort_envelope = cohort.get(cohort_field) or {}
         scope_avg = cohort_envelope.get("scope_avg")
         enrich_prob_record(pr, scope_avg, direction, sample_size)

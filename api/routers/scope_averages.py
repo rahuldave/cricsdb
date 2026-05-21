@@ -2811,6 +2811,15 @@ async def compute_players_bowling_cohort(
                SUM(psso.five_wicket_hauls)   AS five_wicket_hauls,
                SUM(psso.innings_with_wicket) AS innings_with_wicket,
                SUM(psso.innings_with_two)    AS innings_with_two,
+               SUM(psso.innings_qualifying)  AS innings_qualifying,
+               SUM(psso.innings_econ_leq_6)  AS innings_econ_leq_6,
+               SUM(psso.innings_econ_leq_7)  AS innings_econ_leq_7,
+               SUM(psso.innings_econ_geq_9)  AS innings_econ_geq_9,
+               SUM(psso.innings_econ_geq_10) AS innings_econ_geq_10,
+               SUM(psso.innings_runs_leq_15) AS innings_runs_leq_15,
+               SUM(psso.innings_runs_leq_25) AS innings_runs_leq_25,
+               SUM(psso.innings_runs_geq_40) AS innings_runs_geq_40,
+               SUM(psso.innings_runs_geq_50) AS innings_runs_geq_50,
                COUNT(DISTINCT psso.person_id) AS n_players
         FROM playerscopestatsover psso
         WHERE psso.scope_key IN (
@@ -2889,6 +2898,18 @@ async def compute_players_bowling_cohort(
                 "prob_3_given_2":    None,
                 "prob_4_given_2":    None,
                 "prob_5_given_2":    None,
+                # PT3 of spec-prob-baselines.md — econ + runs-conceded
+                # threshold probs. Per-bucket rate uses innings_qualifying
+                # as denominator so cohort matches the chip's master-
+                # sample min_balls=12 gate (apples-to-apples).
+                "prob_econ_leq_6":   None,
+                "prob_econ_leq_7":   None,
+                "prob_econ_geq_9":   None,
+                "prob_econ_geq_10":  None,
+                "prob_runs_leq_15":  None,
+                "prob_runs_leq_25":  None,
+                "prob_runs_geq_40":  None,
+                "prob_runs_geq_50":  None,
             })
             continue
         balls = r["legal_balls"] or 0
@@ -2903,6 +2924,15 @@ async def compute_players_bowling_cohort(
         five_wicket_hauls = r["five_wicket_hauls"] or 0
         innings_with_wicket = r["innings_with_wicket"] or 0
         innings_with_two = r["innings_with_two"] or 0
+        innings_qualifying = r["innings_qualifying"] or 0
+        innings_econ_leq_6  = r["innings_econ_leq_6"]  or 0
+        innings_econ_leq_7  = r["innings_econ_leq_7"]  or 0
+        innings_econ_geq_9  = r["innings_econ_geq_9"]  or 0
+        innings_econ_geq_10 = r["innings_econ_geq_10"] or 0
+        innings_runs_leq_15 = r["innings_runs_leq_15"] or 0
+        innings_runs_leq_25 = r["innings_runs_leq_25"] or 0
+        innings_runs_geq_40 = r["innings_runs_geq_40"] or 0
+        innings_runs_geq_50 = r["innings_runs_geq_50"] or 0
         by_over_arr.append({
             "over": o, "label": bowling_bucket_label(o),
             "n_balls": balls, "n_players": r["n_players"] or 0,
@@ -2951,6 +2981,18 @@ async def compute_players_bowling_cohort(
             "prob_3_given_2":  (three_wicket_hauls / innings_with_two)                    if innings_with_two else None,
             "prob_4_given_2":  (four_wicket_hauls / innings_with_two)                     if innings_with_two else None,
             "prob_5_given_2":  (five_wicket_hauls / innings_with_two)                     if innings_with_two else None,
+            # PT3 of spec-prob-baselines.md — econ + runs-conceded probs.
+            # Denominator is innings_qualifying (≥12-ball spells), the
+            # SAME population the chip's master sample shows; per-bucket
+            # rate is a direct spell-level probability (no scaling).
+            "prob_econ_leq_6":   (innings_econ_leq_6  / innings_qualifying) if innings_qualifying else None,
+            "prob_econ_leq_7":   (innings_econ_leq_7  / innings_qualifying) if innings_qualifying else None,
+            "prob_econ_geq_9":   (innings_econ_geq_9  / innings_qualifying) if innings_qualifying else None,
+            "prob_econ_geq_10":  (innings_econ_geq_10 / innings_qualifying) if innings_qualifying else None,
+            "prob_runs_leq_15":  (innings_runs_leq_15 / innings_qualifying) if innings_qualifying else None,
+            "prob_runs_leq_25":  (innings_runs_leq_25 / innings_qualifying) if innings_qualifying else None,
+            "prob_runs_geq_40":  (innings_runs_geq_40 / innings_qualifying) if innings_qualifying else None,
+            "prob_runs_geq_50":  (innings_runs_geq_50 / innings_qualifying) if innings_qualifying else None,
         })
 
     cliff_buckets: list[int] = [
@@ -2995,6 +3037,16 @@ async def compute_players_bowling_cohort(
             "prob_3_given_2": wrap_metric(None, None, "bowl_prob_3_given_2", sample_size=n_balls_total),
             "prob_4_given_2": wrap_metric(None, None, "bowl_prob_4_given_2", sample_size=n_balls_total),
             "prob_5_given_2": wrap_metric(None, None, "bowl_prob_5_given_2", sample_size=n_balls_total),
+            # PT3 of spec-prob-baselines.md — econ + runs-conceded
+            # threshold cohort probs null under cliff alongside the rates.
+            "prob_econ_leq_6":  wrap_metric(None, None, "bowl_prob_econ_leq_6",  sample_size=n_balls_total),
+            "prob_econ_leq_7":  wrap_metric(None, None, "bowl_prob_econ_leq_7",  sample_size=n_balls_total),
+            "prob_econ_geq_9":  wrap_metric(None, None, "bowl_prob_econ_geq_9",  sample_size=n_balls_total),
+            "prob_econ_geq_10": wrap_metric(None, None, "bowl_prob_econ_geq_10", sample_size=n_balls_total),
+            "prob_runs_leq_15": wrap_metric(None, None, "bowl_prob_runs_leq_15", sample_size=n_balls_total),
+            "prob_runs_leq_25": wrap_metric(None, None, "bowl_prob_runs_leq_25", sample_size=n_balls_total),
+            "prob_runs_geq_40": wrap_metric(None, None, "bowl_prob_runs_geq_40", sample_size=n_balls_total),
+            "prob_runs_geq_50": wrap_metric(None, None, "bowl_prob_runs_geq_50", sample_size=n_balls_total),
             "by_over": by_over_arr,
         }
 
@@ -3040,6 +3092,17 @@ async def compute_players_bowling_cohort(
     cc_prob_3_g_2   = cv("prob_3_given_2")
     cc_prob_4_g_2   = cv("prob_4_given_2")
     cc_prob_5_g_2   = cv("prob_5_given_2")
+    # PT3 of spec-prob-baselines.md — econ + runs-conceded threshold
+    # probs. Direct cv on the per-bucket prob rates (denominator is
+    # innings_qualifying, gated by the chip's min_balls=12 qualifier).
+    cc_prob_econ_leq_6   = cv("prob_econ_leq_6")
+    cc_prob_econ_leq_7   = cv("prob_econ_leq_7")
+    cc_prob_econ_geq_9   = cv("prob_econ_geq_9")
+    cc_prob_econ_geq_10  = cv("prob_econ_geq_10")
+    cc_prob_runs_leq_15  = cv("prob_runs_leq_15")
+    cc_prob_runs_leq_25  = cv("prob_runs_leq_25")
+    cc_prob_runs_geq_40  = cv("prob_runs_geq_40")
+    cc_prob_runs_geq_50  = cv("prob_runs_geq_50")
 
     def _r(v: Optional[float], ndigits: int) -> Optional[float]:
         return round(v, ndigits) if v is not None else None
@@ -3069,6 +3132,15 @@ async def compute_players_bowling_cohort(
         "prob_3_given_2": wrap_metric(_r(cc_prob_3_g_2, 4), _r(cc_prob_3_g_2, 4), "bowl_prob_3_given_2", sample_size=n_balls_total),
         "prob_4_given_2": wrap_metric(_r(cc_prob_4_g_2, 4), _r(cc_prob_4_g_2, 4), "bowl_prob_4_given_2", sample_size=n_balls_total),
         "prob_5_given_2": wrap_metric(_r(cc_prob_5_g_2, 4), _r(cc_prob_5_g_2, 4), "bowl_prob_5_given_2", sample_size=n_balls_total),
+        # PT3 of spec-prob-baselines.md — econ + runs-conceded threshold probs.
+        "prob_econ_leq_6":  wrap_metric(_r(cc_prob_econ_leq_6, 4),  _r(cc_prob_econ_leq_6, 4),  "bowl_prob_econ_leq_6",  sample_size=n_balls_total),
+        "prob_econ_leq_7":  wrap_metric(_r(cc_prob_econ_leq_7, 4),  _r(cc_prob_econ_leq_7, 4),  "bowl_prob_econ_leq_7",  sample_size=n_balls_total),
+        "prob_econ_geq_9":  wrap_metric(_r(cc_prob_econ_geq_9, 4),  _r(cc_prob_econ_geq_9, 4),  "bowl_prob_econ_geq_9",  sample_size=n_balls_total),
+        "prob_econ_geq_10": wrap_metric(_r(cc_prob_econ_geq_10, 4), _r(cc_prob_econ_geq_10, 4), "bowl_prob_econ_geq_10", sample_size=n_balls_total),
+        "prob_runs_leq_15": wrap_metric(_r(cc_prob_runs_leq_15, 4), _r(cc_prob_runs_leq_15, 4), "bowl_prob_runs_leq_15", sample_size=n_balls_total),
+        "prob_runs_leq_25": wrap_metric(_r(cc_prob_runs_leq_25, 4), _r(cc_prob_runs_leq_25, 4), "bowl_prob_runs_leq_25", sample_size=n_balls_total),
+        "prob_runs_geq_40": wrap_metric(_r(cc_prob_runs_geq_40, 4), _r(cc_prob_runs_geq_40, 4), "bowl_prob_runs_geq_40", sample_size=n_balls_total),
+        "prob_runs_geq_50": wrap_metric(_r(cc_prob_runs_geq_50, 4), _r(cc_prob_runs_geq_50, 4), "bowl_prob_runs_geq_50", sample_size=n_balls_total),
         "by_over": by_over_arr,
     }
 

@@ -187,6 +187,16 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     "bowl_prob_3_given_2": "higher_better",
     "bowl_prob_4_given_2": "higher_better",
     "bowl_prob_5_given_2": "higher_better",
+    # PT3 of spec-prob-baselines.md — econ + runs-conceded threshold
+    # ProbChip cohort baselines.
+    "bowl_prob_econ_leq_6":  "higher_better",  # tight spell = good
+    "bowl_prob_econ_leq_7":  "higher_better",
+    "bowl_prob_econ_geq_9":  "lower_better",   # leaky spell = bad
+    "bowl_prob_econ_geq_10": "lower_better",
+    "bowl_prob_runs_leq_15": "higher_better",  # cheap spell = good
+    "bowl_prob_runs_leq_25": "higher_better",
+    "bowl_prob_runs_geq_40": "lower_better",   # expensive spell = bad
+    "bowl_prob_runs_geq_50": "lower_better",
 
     # ── fielding (per-player) ──────────────────────────────────────
     "field_catches":              None,
