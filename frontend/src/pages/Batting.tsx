@@ -299,6 +299,7 @@ export default function Batting() {
             <BatterDistributionPanel
               playerId={playerId}
               distribution={distribution}
+              summary={summary}
               loading={distFetch.loading}
               error={distFetch.error}
             />

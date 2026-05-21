@@ -33,7 +33,7 @@ import { binIndex, binTier, srBinIndex, srBinTier } from './distributionBins'
 import { WISDEN_RUN_TIERS, WISDEN_SR_TIERS } from '../charts/palette'
 import FormDeltaLine from './FormDeltaLine'
 import SuggestedSplitsRow from './SuggestedSplitsRow'
-import type { BatterDistribution, DistributionDossier, InningsObservation } from '../../types'
+import type { BatterDistribution, BattingSummary, DistributionDossier, InningsObservation } from '../../types'
 
 import { KickerHeader } from '../ChartHeader'
 type DistWindow = 'scope' | 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
@@ -82,18 +82,28 @@ interface SparklineConfig {
   point: (o: InningsObservation) => SparklinePoint
   playerReferenceValue: number | null
   globalReferenceValue: number
+  /** Same-scope cohort baseline (Tier 6 of spec-apples-to-apples-
+   *  baselines.md). Forest green line. Sourced from /batters/{id}/
+   *  summary's per-innings envelope scope_avg — position-weighted
+   *  via Tier 1. Null when chip is below-cliff. */
+  leagueReferenceValue: number | null
   caption: string
   globalLegend: string
+  /** Short label for the green line in the sparkline legend
+   *  ("xx.x runs/inn"). Matches the chip's scope_avg display. */
+  leagueLegend: string | null
 }
 
 function sparklineFor(
   metric: DistMetric,
   scopeLifetime: DistributionDossier,
   globals: GlobalBattingBaselines,
+  summary: BattingSummary | null,
 ): SparklineConfig {
   if (metric === 'sr') {
     // Career SR: server-computed (audit §4.1) on lifetime.runs.
     const playerSR = scopeLifetime.runs.strike_rate
+    const leagueSR = summary?.strike_rate?.scope_avg ?? null
     return {
       point: o => {
         // Per-innings SR: server-computed (audit §4.5) on each observation;
@@ -110,10 +120,13 @@ function sparklineFor(
       },
       playerReferenceValue: playerSR,
       globalReferenceValue: globals.sr,
+      leagueReferenceValue: leagueSR,
       caption: 'oldest ← bars (one per innings, height = SR) → most recent',
       globalLegend: `${globals.sr} SR`,
+      leagueLegend: leagueSR != null ? `${leagueSR.toFixed(1)} SR` : null,
     }
   }
+  const leagueRuns = summary?.runs_per_innings?.scope_avg ?? null
   return {
     point: o => {
       const tier = binTier(binIndex(o.runs))
@@ -127,8 +140,10 @@ function sparklineFor(
     },
     playerReferenceValue: scopeLifetime.runs.mean_per_innings,
     globalReferenceValue: globals.runs,
+    leagueReferenceValue: leagueRuns,
     caption: 'oldest ← bars (one per innings, height = runs) → most recent',
     globalLegend: `${globals.runs} runs/inn`,
+    leagueLegend: leagueRuns != null ? `${leagueRuns.toFixed(1)} runs/inn` : null,
   }
 }
 
@@ -192,8 +207,10 @@ function SRStatStrip({ dossier }: { dossier: DistributionDossier }) {
   )
 }
 
-function SparklineLegend({ globalLegend, rollingWindow }: {
-  globalLegend: string; rollingWindow: number | null
+function SparklineLegend({ globalLegend, leagueLegend, rollingWindow }: {
+  globalLegend: string;
+  leagueLegend: string | null;
+  rollingWindow: number | null
 }) {
   // Swatch alignment pattern per commit b770918: NO inline-flex
   // wrapper; verticalAlign: middle + position: relative top -0.1em
@@ -215,8 +232,11 @@ function SparklineLegend({ globalLegend, rollingWindow }: {
       fontFamily: 'var(--serif)', fontStyle: 'italic',
       fontSize: '0.7rem', color: 'var(--ink-faint)',
     }}>
-      <span><Swatch color="#1A1714" h={2} />scope average</span>
-      <span><Swatch color="#8A7D70" />gender-global ({globalLegend})</span>
+      <span><Swatch color="#1A1714" h={2} />player scope mean</span>
+      {leagueLegend !== null && (
+        <span><Swatch color="#3F7A4D" />cohort at scope ({leagueLegend})</span>
+      )}
+      <span><Swatch color="#8A7D70" />all-T20 ({globalLegend})</span>
       {rollingWindow !== null && (
         <span><Swatch color="#7A1F1F" />rolling-{rollingWindow} mean</span>
       )}
@@ -227,12 +247,18 @@ function SparklineLegend({ globalLegend, rollingWindow }: {
 interface Props {
   playerId: string
   distribution: BatterDistribution | null
+  /** Tier 6 of spec-apples-to-apples-baselines.md — when present, the
+   *  sparkline draws a forest-green reference line at the active-scope
+   *  cohort baseline (position-weighted via Tier 1). Sourced from the
+   *  /batters/{id}/summary `runs_per_innings.scope_avg` for the runs
+   *  tab and `strike_rate.scope_avg` for the SR tab. */
+  summary: BattingSummary | null
   loading: boolean
   error: string | null
 }
 
 export default function BatterDistributionPanel({
-  playerId, distribution, loading, error,
+  playerId, distribution, summary, loading, error,
 }: Props) {
   const [windowParam, setWindowParam] = useUrlParam('dist_window')
   const [metricParam, setMetricParam] = useUrlParam('dist_metric')
@@ -345,7 +371,7 @@ export default function BatterDistributionPanel({
           <div style={{ marginTop: '0.75rem' }}>
             {(() => {
               const globals = pickBattingBaseline(distribution.scope)
-              const cfg = sparklineFor(metric, distribution.lifetime, globals)
+              const cfg = sparklineFor(metric, distribution.lifetime, globals, summary)
               const points = dossier.runs.observations.map(cfg.point)
               const showRolling = window === 'scope' && points.length >= ROLLING_WINDOW
               return (
@@ -355,6 +381,7 @@ export default function BatterDistributionPanel({
                       points={points}
                       playerReferenceValue={cfg.playerReferenceValue}
                       globalReferenceValue={cfg.globalReferenceValue}
+                      leagueReferenceValue={cfg.leagueReferenceValue}
                       rollingWindow={showRolling ? ROLLING_WINDOW : undefined}
                     />
                     <SeasonTickAxis dates={dossier.runs.observations.map(o => o.date)} />
@@ -369,6 +396,7 @@ export default function BatterDistributionPanel({
                     <span>{cfg.caption}</span>
                     <SparklineLegend
                       globalLegend={cfg.globalLegend}
+                      leagueLegend={cfg.leagueLegend}
                       rollingWindow={showRolling ? ROLLING_WINDOW : null}
                     />
                   </div>
