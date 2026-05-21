@@ -670,6 +670,28 @@ a { color: inherit; }
  * FilterBar. Width follows tournament dropdown; no max-width. */
 .wisden-venue-search { max-width: 22rem; }
 
+/* Venue group: keep the "Venue" label + search input on a single
+ * inline row, no matter how the outer FilterBar's flex track has
+ * sized the group. Without this, .wisden-playersearch's width: 100%
+ * pushes the input below the label on narrow allocations.
+ *
+ * flex-wrap: nowrap forces the label + search to stay paired;
+ * min-width on the search lets the whole group shrink (the outer
+ * FilterBar then wraps the whole group to its own row when there
+ * isn't horizontal space, which is the correct break point). */
+.wisden-filter-group-venue {
+  flex-wrap: nowrap;
+}
+.wisden-filter-group-venue .wisden-filter-label {
+  flex: 0 0 auto;
+}
+.wisden-filter-group-venue .wisden-venue-search {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 12rem;
+  max-width: 18rem;
+}
+
 /* Chip mode shown when filter_venue is active. Truncates long names
  * but the `title` tooltip gives the full value on hover. */
 .wisden-venue-chip {

@@ -435,7 +435,7 @@ export default function FilterBar() {
           )}
         </div>
 
-        <div className="wisden-filter-group">
+        <div className="wisden-filter-group wisden-filter-group-venue">
           <span className="wisden-filter-label">Venue</span>
           <VenueSearch
             value={filterVenue}
