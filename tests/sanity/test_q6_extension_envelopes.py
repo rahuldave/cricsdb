@@ -361,8 +361,74 @@ def main() -> int:
     )
     print(line); all_passed &= ok
 
-    # ─── Test 8: direction metadata is wired in ──────────────────
-    print("\n  8. direction metadata is set:")
+    # ─── Test 8: player /by-phase Group D rates ──────────────────
+    print("\n  8. /batters/{id}/by-phase Group D1 fields:")
+    bat_bp = get(
+        args.host, "/api/v1/batters/ba607b88/by-phase",
+        gender="male", team_type="club",
+        tournament="Indian Premier League",
+    )
+    pp = next((r for r in bat_bp.get("by_phase", []) if r["phase"] == "powerplay"), {})
+    iip = pp.get("innings_in_phase") or 0
+    runs_v = pp.get("runs") or 0
+    expected = round(runs_v / iip, 2) if iip else None
+    ok = approx(pp.get("runs_per_innings_in_phase"), expected, tol=0.01)
+    _, line = check(
+        "runs_per_innings_in_phase == runs / innings_in_phase (pp)",
+        ok,
+        f"expected={expected}, actual={pp.get('runs_per_innings_in_phase')}",
+    )
+    print(line); all_passed &= ok
+
+    print("\n  9. /bowlers/{id}/by-phase Group D2 fields:")
+    bowl_bp = get(
+        args.host, "/api/v1/bowlers/462411b3/by-phase",
+        gender="male", team_type="club",
+        tournament="Indian Premier League",
+    )
+    pp = next((r for r in bowl_bp.get("by_phase", []) if r["phase"] == "powerplay"), {})
+    iip = pp.get("innings_in_phase") or 0
+    wkts_v = pp.get("wickets") or 0
+    expected = round(wkts_v / iip, 3) if iip else None
+    ok = approx(pp.get("wickets_per_innings_in_phase"), expected, tol=0.001)
+    _, line = check(
+        "wickets_per_innings_in_phase == wickets / innings_in_phase (pp)",
+        ok,
+        f"expected={expected}, actual={pp.get('wickets_per_innings_in_phase')}",
+    )
+    print(line); all_passed &= ok
+
+    print("\n  10. /fielders/{id}/by-phase Group D3 fields:")
+    field_bp = get(
+        args.host, "/api/v1/fielders/4a8a2e3b/by-phase",
+        gender="male", team_type="club",
+        tournament="Indian Premier League",
+    )
+    pp = next((r for r in field_bp.get("by_phase", []) if r["phase"] == "powerplay"), {})
+    matches = pp.get("matches") or 0
+    total = pp.get("total") or 0
+    expected = round(total / matches, 3) if matches else None
+    ok = approx(pp.get("total_per_match"), expected, tol=0.001)
+    _, line = check(
+        "total_per_match == total / matches (fielding pp)",
+        ok,
+        f"expected={expected}, actual={pp.get('total_per_match')}",
+    )
+    print(line); all_passed &= ok
+    # Cross-phase invariant: matches scalar is constant across phases.
+    match_set = set(
+        (r.get("matches") or 0) for r in field_bp.get("by_phase", [])
+    )
+    ok = len(match_set) == 1
+    _, line = check(
+        "matches scalar is constant across phases (D3 invariant)",
+        ok,
+        f"observed: {match_set}",
+    )
+    print(line); all_passed &= ok
+
+    # ─── Test 11: direction metadata is wired in ─────────────────
+    print("\n  11. direction metadata is set:")
     ok = rpi.get("direction") == "higher_better"
     _, line = check(
         "runs_per_innings.direction == higher_better",

@@ -568,6 +568,28 @@ async def fielding_by_phase(
         elif r["kind"] == "caught_and_bowled":
             p["caught_and_bowled"] = r["cnt"]
 
+    # Group D3 (spec-rate-vs-volume-audit §2.1): denominator is
+    # player's matches in scope — a single scalar across phases
+    # (fielding is match-grain by convention; per-phase isn't the
+    # right denominator). Mirrors the /summary matchplayer-based
+    # match count.
+    match_where, match_params = filters.build(has_innings_join=False, aux=aux)
+    match_params["person_id"] = person_id
+    match_parts = ["mp.person_id = :person_id"]
+    if match_where:
+        match_parts.append(match_where)
+    match_clause = " AND ".join(match_parts)
+    match_rows = await db.q(
+        f"""
+        SELECT COUNT(DISTINCT mp.match_id) as matches
+        FROM matchplayer mp
+        JOIN match m ON m.id = mp.match_id
+        WHERE {match_clause}
+        """,
+        match_params,
+    )
+    matches = match_rows[0]["matches"] if match_rows else 0
+
     phase_labels = {"powerplay": "1-6", "middle": "7-15", "death": "16-20"}
     phase_order = ["powerplay", "middle", "death"]
 
@@ -579,6 +601,14 @@ async def fielding_by_phase(
         # Convention 3: catches inclusive of caught_and_bowled.
         catches = p["caught_only"] + p["caught_and_bowled"]
         total = catches + p["stumpings"] + p["run_outs"]
+        # Group D3 per-match rates per phase.
+        if matches:
+            tpm = round(total / matches, 3)
+            cpm = round(catches / matches, 3)
+            spm = round(p["stumpings"] / matches, 3)
+            rpm = round(p["run_outs"] / matches, 3)
+        else:
+            tpm = cpm = spm = rpm = None
         by_phase.append({
             "phase": phase,
             "overs": phase_labels[phase],
@@ -587,6 +617,11 @@ async def fielding_by_phase(
             "run_outs": p["run_outs"],
             "caught_and_bowled": p["caught_and_bowled"],
             "total": total,
+            "matches": matches,
+            "total_per_match": tpm,
+            "catches_per_match": cpm,
+            "stumpings_per_match": spm,
+            "run_outs_per_match": rpm,
         })
 
     return {"by_phase": by_phase}

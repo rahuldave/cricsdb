@@ -881,12 +881,55 @@ async def batting_by_phase(
     )
     dismiss_map = {r["phase"]: r["dismissals"] for r in dismiss_rows}
 
+    # Group D1 (spec-rate-vs-volume-audit §2.1): innings in phase —
+    # distinct innings where the batter faced ≥ 1 legal ball in the
+    # phase. Denominator for the new runs_per_innings_in_phase / *_per_
+    # innings rates.
+    inn_phase_rows = await db.q(
+        f"""
+        SELECT phase, COUNT(DISTINCT innings_id) AS innings_in_phase
+        FROM (
+            SELECT d.innings_id,
+                   CASE
+                       WHEN d.over_number BETWEEN 0 AND 5 THEN 'powerplay'
+                       WHEN d.over_number BETWEEN 6 AND 14 THEN 'middle'
+                       WHEN d.over_number BETWEEN 15 AND 19 THEN 'death'
+                   END as phase
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {where}
+            GROUP BY phase, d.innings_id
+        )
+        GROUP BY phase
+        """,
+        params,
+    )
+    inn_in_phase_map = {r["phase"]: r["innings_in_phase"] for r in inn_phase_rows}
+
     phase_labels = {"powerplay": "1-6", "middle": "7-15", "death": "16-20"}
     by_phase = []
     for r in rows:
         r["overs"] = phase_labels.get(r["phase"], "")
         r["dismissals"] = dismiss_map.get(r["phase"], 0)
         _enrich_batting_row(r)
+        # Group D1 per-innings rates per phase.
+        iip = inn_in_phase_map.get(r["phase"], 0)
+        r["innings_in_phase"] = iip
+        runs_v = r.get("runs") or 0
+        fours_v = r.get("fours") or 0
+        sixes_v = r.get("sixes") or 0
+        boundaries_v = r.get("boundaries") or 0
+        if iip:
+            r["runs_per_innings_in_phase"] = round(runs_v / iip, 2)
+            r["fours_per_innings"]         = round(fours_v / iip, 3)
+            r["sixes_per_innings"]         = round(sixes_v / iip, 3)
+            r["boundaries_per_innings"]    = round(boundaries_v / iip, 3)
+        else:
+            r["runs_per_innings_in_phase"] = None
+            r["fours_per_innings"]         = None
+            r["sixes_per_innings"]         = None
+            r["boundaries_per_innings"]    = None
         by_phase.append(r)
 
     return {"by_phase": by_phase}

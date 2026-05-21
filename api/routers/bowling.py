@@ -835,12 +835,48 @@ async def bowling_by_phase(
     )
     wkt_map = {r["phase"]: r["wickets"] for r in wkt_rows}
 
+    # Group D2 (spec-rate-vs-volume-audit §2.1): innings bowled per
+    # phase — distinct innings in which the bowler delivered ≥ 1 legal
+    # ball in the phase. Denominator for wickets_per_innings_in_phase.
+    inn_phase_rows = await db.q(
+        f"""
+        SELECT phase, COUNT(DISTINCT innings_id) AS innings_in_phase
+        FROM (
+            SELECT d.innings_id,
+                   CASE
+                       WHEN d.over_number BETWEEN 0 AND 5 THEN 'powerplay'
+                       WHEN d.over_number BETWEEN 6 AND 14 THEN 'middle'
+                       WHEN d.over_number BETWEEN 15 AND 19 THEN 'death'
+                   END as phase
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {legal_where}
+            GROUP BY phase, d.innings_id
+        )
+        GROUP BY phase
+        """,
+        legal_params,
+    )
+    inn_in_phase_map = {r["phase"]: r["innings_in_phase"] for r in inn_phase_rows}
+
     phase_labels = {"powerplay": "1-6", "middle": "7-15", "death": "16-20"}
     by_phase = []
     for r in rows:
         r["overs_range"] = phase_labels.get(r["phase"], "")
         r["wickets"] = wkt_map.get(r["phase"], 0)
         _enrich_bowling_row(r)
+        # Group D2 per-innings rates per phase.
+        iip = inn_in_phase_map.get(r["phase"], 0)
+        r["innings_in_phase"] = iip
+        wkts_v = r.get("wickets") or 0
+        rc_v = r.get("runs_conceded") or 0
+        if iip:
+            r["wickets_per_innings_in_phase"]      = round(wkts_v / iip, 3)
+            r["runs_conceded_per_innings_in_phase"] = round(rc_v / iip, 2)
+        else:
+            r["wickets_per_innings_in_phase"]      = None
+            r["runs_conceded_per_innings_in_phase"] = None
         by_phase.append(r)
 
     # Sub-phase splits for powerplay: overs 1-3 (0-2) and overs 4-6 (3-5).
