@@ -15,6 +15,8 @@
 import type { FielderCountBlock } from '../../types'
 import ProbChip from '../distribution/ProbChip'
 import CohortRowPrefix from '../distribution/CohortRowPrefix'
+import WindowBadge, { type DistWindow } from '../distribution/WindowBadge'
+import CohortNarrowNudge from '../distribution/CohortNarrowNudge'
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 
 const T_INDIGO = WISDEN_TIER_TINTS.indigo
@@ -103,18 +105,25 @@ interface ChipsProps {
   block: FielderCountBlock
 }
 
-export function FielderChipsRow({ block }: ChipsProps) {
+export function FielderChipsRow({
+  block, window = 'scope', playerId,
+}: ChipsProps & { window?: DistWindow; playerId?: string }) {
   const m = block.milestones
   // 0 = blanked (indigo), 1 = ticked over (sage), ≥2 = multi-event (ochre).
   return (
-    <div style={{
-      display: 'flex', flexWrap: 'wrap', gap: '0.35rem',
-      marginTop: '0.85rem',
-    }}>
-      <CohortRowPrefix />
-      <ProbChip label="P(=0)"  record={m.p_zero}  tint={T_INDIGO} />
-      <ProbChip label="P(=1)"  record={m.p_one}   tint={T_SAGE} />
-      <ProbChip label="P(≥2)"  record={m.p_geq_2} tint={T_OCHRE} />
-    </div>
+    <>
+      <WindowBadge window={window} />
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '0.35rem',
+        marginTop: '0.85rem',
+        alignItems: 'flex-end',
+      }}>
+        <CohortRowPrefix />
+        <ProbChip label="P(=0)"  record={m.p_zero}  tint={T_INDIGO} />
+        <ProbChip label="P(=1)"  record={m.p_one}   tint={T_SAGE} />
+        <ProbChip label="P(≥2)"  record={m.p_geq_2} tint={T_OCHRE} />
+        {playerId && <CohortNarrowNudge window={window} playerId={playerId} />}
+      </div>
+    </>
   )
 }

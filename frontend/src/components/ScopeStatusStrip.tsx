@@ -35,6 +35,13 @@ type Segment = {
   derivedSuffix?: string
 }
 
+const DIST_WINDOW_LABELS: Record<string, string> = {
+  last_10:  'last 10 innings',
+  last_60d: 'last 60 days',
+  last_6mo: 'last 6 months',
+  last_1yr: 'last year',
+}
+
 function buildSegments(
   filters: ReturnType<typeof useFilters>,
   pathTeam: string | null,
@@ -43,6 +50,7 @@ function buildSegments(
   pathCompare: string | null,
   tab: string | null,
   page: string | null,
+  distWindow: string | null,
   derivedSeasonRange: string | null,
   discipline: Discipline,
 ): Segment[] {
@@ -160,6 +168,15 @@ function buildSegments(
   const pageNum = page ? parseInt(page, 10) : 0
   if (pageNum > 1) segs.push({ label: 'Page', value: String(pageNum) })
 
+  // Distribution-panel form-window (last 10 / last 60d / etc.) —
+  // page-local URL param ?dist_window=. Affects ONLY the chip values
+  // + sparkline on the Distribution panel (cohort baseline stays at
+  // scope-wide). Surfaced in the status strip so the shared URL
+  // narrates which window the reader is looking at.
+  if (distWindow && DIST_WINDOW_LABELS[distWindow]) {
+    segs.push({ label: 'Dist window', value: DIST_WINDOW_LABELS[distWindow] })
+  }
+
   // Inject the SCOPE heading between path-identity and the rest.
   // Only when BOTH sides have content (avoids "Player: X · SCOPE"
   // alone on an unfiltered profile, and "SCOPE · men's" with no
@@ -189,6 +206,7 @@ export default function ScopeStatusStrip() {
   const pathCompare = params.get('compare')
   const tab = params.get('tab')
   const page = params.get('page')
+  const distWindow = params.get('dist_window')
   const seriesType = params.get('series_type') || undefined
 
   // Derived "all-time" season range — only when user hasn't picked
@@ -232,7 +250,7 @@ export default function ScopeStatusStrip() {
   const discipline = useDiscipline()
   const segments = buildSegments(
     filters, pathTeam, pathVenue, pathPlayer, pathCompare, tab, page,
-    derivedSeasonRange, discipline,
+    distWindow, derivedSeasonRange, discipline,
   )
 
   const handleCopy = async () => {

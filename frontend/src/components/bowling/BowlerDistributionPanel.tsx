@@ -42,16 +42,16 @@ type DistWindow = 'scope' | 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
 type DistMetric = 'wickets' | 'economy' | 'runs'
 
 const WINDOW_OPTIONS: { key: DistWindow; label: string; param: string; tooltip: string }[] = [
-  { key: 'scope',    label: 'Scope',    param: '',
+  { key: 'scope',    label: 'At scope', param: '',
     tooltip: 'All qualifying innings under the active filter scope.' },
   { key: 'last_10',  label: 'Last 10',  param: 'last_10',
-    tooltip: 'Most recent 10 qualifying innings.' },
+    tooltip: 'Most recent 10 qualifying innings within scope.' },
   { key: 'last_60d', label: 'Last 60d', param: 'last_60d',
-    tooltip: 'Spells in the last 60 days — current form.' },
+    tooltip: 'Spells in the last 60 days within scope — current form.' },
   { key: 'last_6mo', label: 'Last 6mo', param: 'last_6mo',
-    tooltip: 'Spells in the last 180 days — medium-term arc.' },
+    tooltip: 'Spells in the last 180 days within scope — medium-term arc.' },
   { key: 'last_1yr', label: 'Last 1y',  param: 'last_1yr',
-    tooltip: 'Spells in the last 365 days — annual gauge.' },
+    tooltip: 'Spells in the last 365 days within scope — annual gauge.' },
 ]
 
 const METRIC_OPTIONS: { key: DistMetric; label: string; param: string; tooltip: string }[] = [
@@ -284,14 +284,22 @@ export default function BowlerDistributionPanel({
           </div>
         </div>
         <div className="wisden-filter-group">
-          {WINDOW_OPTIONS.map(opt => (
-            <button
-              key={opt.key}
-              type="button"
-              className={`wisden-seg${window === opt.key ? ' is-active' : ''}`}
-              onClick={() => setWindowParam(opt.param)}
-              title={opt.tooltip}
-            >{opt.label}</button>
+          {WINDOW_OPTIONS.map((opt, i) => (
+            <span key={opt.key} style={{ display: 'inline-flex', alignItems: 'baseline' }}>
+              {i === 1 && (
+                <span style={{
+                  fontFamily: 'var(--serif)', fontStyle: 'italic',
+                  fontSize: '0.78rem', color: 'var(--ink-faint)',
+                  marginRight: '0.5rem',
+                }}>within scope:</span>
+              )}
+              <button
+                type="button"
+                className={`wisden-seg${window === opt.key ? ' is-active' : ''}`}
+                onClick={() => setWindowParam(opt.param)}
+                title={opt.tooltip}
+              >{opt.label}</button>
+            </span>
           ))}
         </div>
       </header>
@@ -359,9 +367,9 @@ export default function BowlerDistributionPanel({
               </>
             )}
           </div>
-          {metric === 'wickets' && <WicketsChipsRow block={dossier.wickets} />}
-          {metric === 'economy' && <EconomyChipsRow block={dossier.economy} />}
-          {metric === 'runs' && <RunsConcededChipsRow block={dossier.runs_conceded} />}
+          {metric === 'wickets' && <WicketsChipsRow block={dossier.wickets} window={window} playerId={playerId} />}
+          {metric === 'economy' && <EconomyChipsRow block={dossier.economy} window={window} playerId={playerId} />}
+          {metric === 'runs' && <RunsConcededChipsRow block={dossier.runs_conceded} window={window} playerId={playerId} />}
 
           <div style={{ marginTop: '0.75rem' }}>
             {(() => {

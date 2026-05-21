@@ -16,6 +16,8 @@
 import type { DistributionDossier } from '../../types'
 import ProbChip from '../distribution/ProbChip'
 import CohortRowPrefix from '../distribution/CohortRowPrefix'
+import WindowBadge, { type DistWindow } from '../distribution/WindowBadge'
+import CohortNarrowNudge from '../distribution/CohortNarrowNudge'
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 
 const T_INDIGO = WISDEN_TIER_TINTS.indigo
@@ -85,25 +87,32 @@ export default function DistributionStatStrip({ dossier }: Props) {
  * Order: simples (P(≤10), P(≥30), P(≥50), P(≥100)) first,
  * conditionals (P(≥50│≥30), P(≥70│≥50)) last.
  */
-export function MilestoneChipsRow({ dossier }: Props) {
+export function MilestoneChipsRow({
+  dossier, window = 'scope', playerId,
+}: Props & { window?: DistWindow; playerId?: string }) {
   const { milestones } = dossier
   return (
-    <div style={{
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: '0.35rem',
-      marginTop: '0.85rem',
-    }}>
-      {/* Runs palette: 0-9 = failure (indigo) / 10-49 = building
-          (sage) / 50+ = impact (ochre). Conditionals reach the
-          impact tier (50+ / 70+) so they're ochre. */}
-      <CohortRowPrefix />
-      <ProbChip label="P(≤10)"     record={milestones.p_failure_10}  tint={T_INDIGO} />
-      <ProbChip label="P(≥30)"     record={milestones.p_30_plus}     tint={T_SAGE} />
-      <ProbChip label="P(≥50)"     record={milestones.p_50_plus}     tint={T_OCHRE} />
-      <ProbChip label="P(≥100)"    record={milestones.p_100_plus}    tint={T_OCHRE} />
-      <ProbChip label="P(≥50│≥30)" record={milestones.p_50_given_30} tint={T_OCHRE} />
-      <ProbChip label="P(≥70│≥50)" record={milestones.p_70_given_50} tint={T_OCHRE} />
-    </div>
+    <>
+      <WindowBadge window={window} />
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '0.35rem',
+        marginTop: '0.85rem',
+        alignItems: 'flex-end',
+      }}>
+        {/* Runs palette: 0-9 = failure (indigo) / 10-49 = building
+            (sage) / 50+ = impact (ochre). Conditionals reach the
+            impact tier (50+ / 70+) so they're ochre. */}
+        <CohortRowPrefix />
+        <ProbChip label="P(≤10)"     record={milestones.p_failure_10}  tint={T_INDIGO} />
+        <ProbChip label="P(≥30)"     record={milestones.p_30_plus}     tint={T_SAGE} />
+        <ProbChip label="P(≥50)"     record={milestones.p_50_plus}     tint={T_OCHRE} />
+        <ProbChip label="P(≥100)"    record={milestones.p_100_plus}    tint={T_OCHRE} />
+        <ProbChip label="P(≥50│≥30)" record={milestones.p_50_given_30} tint={T_OCHRE} />
+        <ProbChip label="P(≥70│≥50)" record={milestones.p_70_given_50} tint={T_OCHRE} />
+        {playerId && <CohortNarrowNudge window={window} playerId={playerId} />}
+      </div>
+    </>
   )
 }

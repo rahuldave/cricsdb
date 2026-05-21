@@ -15,6 +15,8 @@ import type { BowlerDossier, BowlerWicketsBlock,
               BowlerEconomyBlock, BowlerRunsConcededBlock } from '../../types'
 import ProbChip from '../distribution/ProbChip'
 import CohortRowPrefix from '../distribution/CohortRowPrefix'
+import WindowBadge, { type DistWindow } from '../distribution/WindowBadge'
+import CohortNarrowNudge from '../distribution/CohortNarrowNudge'
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 
 const T_INDIGO = WISDEN_TIER_TINTS.indigo
@@ -52,15 +54,22 @@ function StatRow({ label, value, accent, tooltip }: {
   )
 }
 
-function ChipRow({ children }: { children: React.ReactNode }) {
+function ChipRow({
+  children, window = 'scope', playerId,
+}: { children: React.ReactNode; window?: DistWindow; playerId?: string }) {
   return (
-    <div style={{
-      display: 'flex', flexWrap: 'wrap', gap: '0.35rem',
-      marginTop: '0.85rem',
-    }}>
-      <CohortRowPrefix />
-      {children}
-    </div>
+    <>
+      <WindowBadge window={window} />
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '0.35rem',
+        marginTop: '0.85rem',
+        alignItems: 'flex-end',
+      }}>
+        <CohortRowPrefix />
+        {children}
+        {playerId && <CohortNarrowNudge window={window} playerId={playerId} />}
+      </div>
+    </>
   )
 }
 
@@ -110,12 +119,14 @@ export function WicketsStatStrip({ block, dossier, n_innings }: WicketsProps) {
   )
 }
 
-export function WicketsChipsRow({ block }: { block: BowlerWicketsBlock }) {
+export function WicketsChipsRow({
+  block, window = 'scope', playerId,
+}: { block: BowlerWicketsBlock; window?: DistWindow; playerId?: string }) {
   const m = block.milestones
   // Wickets palette: 0 = wicketless (indigo) / 1-2 = building (sage) /
   // 3+ = strike (ochre). Conditionals all about reaching strike-tier.
   return (
-    <ChipRow>
+    <ChipRow window={window} playerId={playerId}>
       <ProbChip label="P(0)"  record={m.p_zero}  tint={T_INDIGO} />
       <ProbChip label="P(≥1)" record={m.p_geq_1} tint={T_SAGE} />
       <ProbChip label="P(≥2)" record={m.p_geq_2} tint={T_SAGE} />
@@ -158,12 +169,14 @@ export function EconomyStatStrip({ block }: EconomyProps) {
   )
 }
 
-export function EconomyChipsRow({ block }: EconomyProps) {
+export function EconomyChipsRow({
+  block, window = 'scope', playerId,
+}: EconomyProps & { window?: DistWindow; playerId?: string }) {
   const m = block.milestones
   // Economy is lower-is-better: ≤6/≤7 are tight (ochre = good for
   // bowler); ≥9/≥10 are loose (indigo = poor outcome).
   return (
-    <ChipRow>
+    <ChipRow window={window} playerId={playerId}>
       <ProbChip label="P(econ ≤6)"  record={m.p_econ_leq_6}  tint={T_OCHRE} />
       <ProbChip label="P(econ ≤7)"  record={m.p_econ_leq_7}  tint={T_OCHRE} />
       <ProbChip label="P(econ ≥9)"  record={m.p_econ_geq_9}  tint={T_INDIGO} />
@@ -201,12 +214,14 @@ export function RunsConcededStatStrip({ block }: RunsConcededProps) {
   )
 }
 
-export function RunsConcededChipsRow({ block }: RunsConcededProps) {
+export function RunsConcededChipsRow({
+  block, window = 'scope', playerId,
+}: RunsConcededProps & { window?: DistWindow; playerId?: string }) {
   const m = block.milestones
   // Runs conceded is lower-is-better: ≤15/≤25 are tight (ochre);
   // ≥40/≥50 are loose (indigo).
   return (
-    <ChipRow>
+    <ChipRow window={window} playerId={playerId}>
       <ProbChip label="P(≤15)" record={m.p_leq_15} tint={T_OCHRE} />
       <ProbChip label="P(≤25)" record={m.p_leq_25} tint={T_OCHRE} />
       <ProbChip label="P(≥40)" record={m.p_geq_40} tint={T_INDIGO} />
