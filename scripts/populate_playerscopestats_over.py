@@ -141,9 +141,16 @@ async def _ensure_tables(db, incremental: bool = False):
     # model; pre-existing DBs get it appended.
     # innings_bowled + four_wicket_hauls added by Tier 2 of
     # spec-apples-to-apples-baselines.md.
-    for col in ("maidens", "innings_bowled", "four_wicket_hauls",
-                "three_wicket_hauls", "five_wicket_hauls",
-                "innings_with_wicket", "innings_with_two"):
+    # Idempotent ALTER fallback for the legacy Q6 + Tier 2 columns.
+    # Pre-existing DBs get them appended; new DBs already have them
+    # via the model.
+    #
+    # No ALTER for PT2 columns (three/five_wicket_hauls,
+    # innings_with_wicket, innings_with_two) — by spec-prob-baselines.md
+    # §3 workflow, schema-management is DROP+CREATE on full populate,
+    # not ALTER. The full populate's `_ensure_tables` drops the table
+    # when full mode AND table exists (see populate_full).
+    for col in ("maidens", "innings_bowled", "four_wicket_hauls"):
         try:
             await db.q(
                 f"ALTER TABLE playerscopestatsover ADD COLUMN {col} "
@@ -392,17 +399,21 @@ async def _flush(db, table, rows: list[dict]) -> int:
 
 
 async def populate_full(db) -> int:
-    """Truncate playerscopestats_over and rebuild from every regular match."""
+    """Drop+create playerscopestats_over and rebuild from every regular match.
+
+    Spec-prob-baselines.md §3 workflow: schema-management is DROP+
+    CREATE on full populate (not idempotent ALTER), so the on-disk
+    schema is always a function of the current model definition.
+    """
     print("Populating playerscopestats_over (full rebuild)...")
     start = time.time()
 
     existing = await db.q(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='playerscopestatsover'"
     )
-    table_exists = len(existing) > 0
-    table = await _ensure_tables(db, incremental=table_exists)
-    if table_exists:
-        await db.q("DELETE FROM playerscopestatsover")
+    if len(existing) > 0:
+        await db.q("DROP TABLE playerscopestatsover")
+    table = await _ensure_tables(db, incremental=False)
 
     print("  scanning all matches…")
     accs = await _aggregate_matches(db, match_ids=None)

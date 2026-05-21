@@ -42,6 +42,32 @@ Computation mirrors the existing rate path (the cv-on-per-bucket-rates pattern, 
 
 * * *
 ## 3. Data we have vs. data we need
+
+> **Schema-management workflow** — this codebase has no formal migrations.
+> "Idempotent ALTER on populate" is NOT reproducible because the on-disk
+> schema becomes a function of every populate that ever ran. Instead:
+>
+> 1. **Backup** `cricket.db` to `backups/cricket.db.pre-<spec>-<date>`
+>    BEFORE running any populate that touches a child-table schema.
+> 2. **Edit the model** (`models/tables.py`) — the dataclass is the
+>    source of truth for the table's columns.
+> 3. **Drop + create** on full populate: the populate script's
+>    `_ensure_tables` path must `DROP TABLE` (when full mode AND table
+>    exists) before `db.create(...)`, so the new schema is picked up
+>    fresh from the model.
+> 4. **Re-ingest** by re-running `populate_full` (truncate + rebuild),
+>    not `populate_incremental`. The full populate is deterministic
+>    from the parent tables (delivery / wicket / innings).
+> 5. **No idempotent ALTER** for new columns added by this spec. The
+>    incremental path will surface "no such column" loudly if anyone
+>    runs `update_recent.py` without first running the full populate
+>    against the new schema — that is the intended forcing function.
+>
+> Older `_ensure_tables` blocks may still carry ALTER fallbacks for
+> historical columns; those stay as tech debt but no NEW ALTERs join
+> them. This rule applies going forward (codified after the PT1.S/P +
+> PT2.SP retrofit on 2026-05-21).
+
 ### 3.1 Batting per-innings milestones (Tier 1 columns)
 | Milestone | Have? | Source |
 |---|---|---|

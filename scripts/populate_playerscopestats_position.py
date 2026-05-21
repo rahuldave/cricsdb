@@ -142,8 +142,17 @@ async def _ensure_tables(db, incremental: bool = False):
     # (Tier 1 of spec-apples-to-apples-baselines.md). Pre-existing DBs
     # that pre-date this populate version get the new columns appended;
     # new DBs created by `db.create` above already have them in schema.
-    for col in ("thirties", "fifties", "hundreds", "ducks",
-                "failures_10", "seventies"):
+    # Idempotent ALTER fallback for the legacy Tier 1 columns (apples-
+    # to-apples baselines). Pre-existing DBs that pre-date Tier 1 get
+    # them appended; new DBs already have them via the model.
+    #
+    # No ALTER for PT1 columns (failures_10, seventies) — by spec-prob-
+    # baselines.md §3 workflow, schema-management is DROP+CREATE on
+    # full populate, not ALTER. The full populate's `_ensure_tables`
+    # drops the table when full mode AND table exists (see
+    # populate_full), so DBs re-built from scratch pick the new
+    # columns from the model directly.
+    for col in ("thirties", "fifties", "hundreds", "ducks"):
         try:
             await db.q(
                 f"ALTER TABLE playerscopestatsposition ADD COLUMN {col} "
@@ -377,17 +386,23 @@ async def _flush(db, table, rows: list[dict]) -> int:
 
 
 async def populate_full(db) -> int:
-    """Truncate playerscopestats_position and rebuild from every regular match."""
+    """Drop+create playerscopestats_position and rebuild from every regular match.
+
+    Spec-prob-baselines.md §3 workflow: schema-management is DROP+
+    CREATE on full populate (not idempotent ALTER), so the on-disk
+    schema is always a function of the current model definition. The
+    DROP also wipes any indexes — `_ensure_tables(incremental=False)`
+    rebuilds them.
+    """
     print("Populating playerscopestats_position (full rebuild)...")
     start = time.time()
 
     existing = await db.q(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='playerscopestatsposition'"
     )
-    table_exists = len(existing) > 0
-    table = await _ensure_tables(db, incremental=table_exists)
-    if table_exists:
-        await db.q("DELETE FROM playerscopestatsposition")
+    if len(existing) > 0:
+        await db.q("DROP TABLE playerscopestatsposition")
+    table = await _ensure_tables(db, incremental=False)
 
     print("  scanning all matches…")
     accs = await _aggregate_matches(db, match_ids=None)
