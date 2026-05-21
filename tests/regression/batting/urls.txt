@@ -21,7 +21,7 @@ REG bat_by_innings_kohli_ipl          /api/v1/batters/ba607b88/by-innings?tourna
 REG bat_vs_bowlers_kohli              /api/v1/batters/ba607b88/vs-bowlers?gender=male&team_type=international&min_balls=12
 REG bat_vs_bowlers_kohli_vs_bumrah    /api/v1/batters/ba607b88/vs-bowlers?bowler_id=462411b3&min_balls=6
 REG bat_by_over_kohli                 /api/v1/batters/ba607b88/by-over?gender=male&team_type=international
-REG bat_by_phase_kohli                /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international
+NEW bat_by_phase_kohli                /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international
 REG bat_by_season_kohli               /api/v1/batters/ba607b88/by-season?gender=male
 REG bat_dismissals_kohli              /api/v1/batters/ba607b88/dismissals?gender=male&team_type=international
 REG bat_inter_wicket_kohli            /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international
@@ -46,7 +46,7 @@ REG bat_leaders_with_thresholds_fm                     /api/v1/batters/leaders?g
 REG bat_summary_kohli_intl_fm                          /api/v1/batters/ba607b88/summary?gender=male&team_type=international&team_class=full_member
 REG bat_vs_bowlers_kohli_fm                            /api/v1/batters/ba607b88/vs-bowlers?gender=male&team_type=international&min_balls=12&team_class=full_member
 REG bat_by_over_kohli_fm                               /api/v1/batters/ba607b88/by-over?gender=male&team_type=international&team_class=full_member
-REG bat_by_phase_kohli_fm                              /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international&team_class=full_member
+NEW bat_by_phase_kohli_fm                              /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international&team_class=full_member
 REG bat_dismissals_kohli_fm                            /api/v1/batters/ba607b88/dismissals?gender=male&team_type=international&team_class=full_member
 REG bat_inter_wicket_kohli_fm                          /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international&team_class=full_member
 REG bat_summary_kohli_vs_aus_fm                        /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
@@ -61,7 +61,7 @@ REG bat_leaders_with_thresholds_bilat                  /api/v1/batters/leaders?g
 REG bat_summary_kohli_intl_bilat                       /api/v1/batters/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
 REG bat_vs_bowlers_kohli_bilat                         /api/v1/batters/ba607b88/vs-bowlers?gender=male&team_type=international&min_balls=12&series_type=bilateral_only
 REG bat_by_over_kohli_bilat                            /api/v1/batters/ba607b88/by-over?gender=male&team_type=international&series_type=bilateral_only
-REG bat_by_phase_kohli_bilat                           /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international&series_type=bilateral_only
+NEW bat_by_phase_kohli_bilat                           /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international&series_type=bilateral_only
 REG bat_dismissals_kohli_bilat                         /api/v1/batters/ba607b88/dismissals?gender=male&team_type=international&series_type=bilateral_only
 REG bat_inter_wicket_kohli_bilat                       /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international&series_type=bilateral_only
 REG bat_summary_kohli_vs_aus_bilat                     /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
