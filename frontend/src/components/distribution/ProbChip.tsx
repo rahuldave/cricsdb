@@ -130,7 +130,7 @@ function captionFor(record: ProbRecord): React.ReactNode | null {
       <span
         style={{
           fontFamily: 'var(--serif)', fontStyle: 'italic',
-          fontSize: '0.65rem', color: 'var(--muted)',
+          fontSize: '0.65rem', color: 'var(--ink-faint)',
           marginTop: '0.1rem', textAlign: 'center', display: 'block',
         }}
       >
@@ -149,7 +149,7 @@ function captionFor(record: ProbRecord): React.ReactNode | null {
         className="prob-chip-caption"
         style={{
           fontFamily: 'var(--serif)', fontStyle: 'italic',
-          fontSize: '0.7rem', color: 'var(--muted)',
+          fontSize: '0.7rem', color: 'var(--ink-faint)',
           marginTop: '0.1rem', textAlign: 'center', display: 'block',
         }}
       >
@@ -159,21 +159,28 @@ function captionFor(record: ProbRecord): React.ReactNode | null {
   }
 
   const polarity = deltaPolarity(dp, dir)
-  const color = polarity === 'good' ? COLOR_GOOD
+  const deltaColor = polarity === 'good' ? COLOR_GOOD
     : polarity === 'bad' ? COLOR_BAD
-    : 'var(--muted)'
+    : 'var(--ink-faint)'
 
+  // "vs XX%" stays in the codebase's regular comparison-text style
+  // (muted italic) so it reads as an anchor, not a verdict. Only the
+  // "↑+YY%" delta carries the polarity color — that's the actionable
+  // signal. Matches the convention used elsewhere (MetricDelta etc.).
   return (
     <span
       className="prob-chip-caption"
       style={{
         fontFamily: 'var(--serif)', fontStyle: 'italic',
-        fontSize: '0.7rem', color,
+        fontSize: '0.7rem', color: 'var(--ink-faint)',
         marginTop: '0.1rem', textAlign: 'center', display: 'block',
         whiteSpace: 'nowrap',
       }}
     >
-      {baseText} {arrowFor(dp)}{fmtDelta(dp)}
+      {baseText}{' '}
+      <span style={{ color: deltaColor }}>
+        {arrowFor(dp)}{fmtDelta(dp)}
+      </span>
     </span>
   )
 }
