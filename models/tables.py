@@ -302,6 +302,24 @@ class PlayerScopeStatsOver:
     # Lets the cohort 4-fers/inn rate be convex-combined over the
     # bowler's over-mix.
     four_wicket_hauls: int = 0
+    # PT2 of spec-prob-baselines.md — wicket-ladder milestones for
+    # bowling ProbChip cohort baselines.
+    #
+    #   three_wicket_hauls / five_wicket_hauls — over-attribution
+    #     pattern (same as four_wicket_hauls): the haul is credited to
+    #     the over_bucket where the bowler's 3rd / 5th wicket fell.
+    #
+    #   innings_with_wicket / innings_with_two — per-spell-touching
+    #     pattern (different from above): for every (innings, bowler)
+    #     where the bowler bowled ≥1 legal ball at this over_bucket AND
+    #     total wickets in that spell met the threshold, increment
+    #     here. So P(≥1) per bucket = innings_with_wicket /
+    #     innings_bowled, P(≥2) per bucket = innings_with_two /
+    #     innings_bowled. Spec §3.2.
+    three_wicket_hauls: int = 0
+    five_wicket_hauls: int = 0
+    innings_with_wicket: int = 0
+    innings_with_two: int = 0
 
 
 class PlayerScopeStatsFieldingPosition:

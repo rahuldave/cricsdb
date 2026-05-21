@@ -59,6 +59,8 @@ class _Acc:
         "runs_conceded", "legal_balls", "wickets", "dots", "boundaries",
         "maidens",
         "innings_set", "four_wicket_hauls",
+        "three_wicket_hauls", "five_wicket_hauls",
+        "innings_with_wicket", "innings_with_two",
     )
 
     def __init__(self):
@@ -81,6 +83,17 @@ class _Acc:
         # the over in which the bowler's 4th wicket fell in that innings.
         # See §7 of the spec for the attribution-choice discussion.
         self.four_wicket_hauls = 0
+        # PT2 of spec-prob-baselines.md — wicket-ladder milestone
+        # counters. three/five_wicket_hauls follow the same over-
+        # attribution pattern as four_wicket_hauls (incremented on the
+        # over the 3rd / 5th wicket fell in). innings_with_wicket /
+        # innings_with_two use the per-spell-touching pattern (every
+        # over_bucket the bowler touched in an innings that met the
+        # threshold gets the credit).
+        self.three_wicket_hauls = 0
+        self.five_wicket_hauls = 0
+        self.innings_with_wicket = 0
+        self.innings_with_two = 0
 
     def to_row(self, person_id: str, scope_key: str, over_number: int) -> dict:
         return {
@@ -95,6 +108,10 @@ class _Acc:
             "maidens": self.maidens,
             "innings_bowled": len(self.innings_set),
             "four_wicket_hauls": self.four_wicket_hauls,
+            "three_wicket_hauls": self.three_wicket_hauls,
+            "five_wicket_hauls": self.five_wicket_hauls,
+            "innings_with_wicket": self.innings_with_wicket,
+            "innings_with_two": self.innings_with_two,
         }
 
 
@@ -124,7 +141,9 @@ async def _ensure_tables(db, incremental: bool = False):
     # model; pre-existing DBs get it appended.
     # innings_bowled + four_wicket_hauls added by Tier 2 of
     # spec-apples-to-apples-baselines.md.
-    for col in ("maidens", "innings_bowled", "four_wicket_hauls"):
+    for col in ("maidens", "innings_bowled", "four_wicket_hauls",
+                "three_wicket_hauls", "five_wicket_hauls",
+                "innings_with_wicket", "innings_with_two"):
         try:
             await db.q(
                 f"ALTER TABLE playerscopestatsover ADD COLUMN {col} "
@@ -195,12 +214,21 @@ async def _aggregate_matches(
     # Per (innings, bowler) running wicket count + per-(innings, bowler,
     # over) attribution slot — when the bowler's wicket count crosses 4,
     # the over_bucket is recorded as the 4-fer's attribution bucket.
-    # innings_wickets : (iid, bow) -> count
-    # haul_attributed : set of (iid, bow) already credited (one per
-    #                   bowler-innings, in the over the 4th wicket fell).
+    # innings_wickets   : (iid, bow) -> count
+    # haul_attributed_N : (iid, bow) already credited a {3,4,5}-fer
+    # haul_credits_N    : list of (bow, scope_key, over_bucket)
     innings_wickets: dict[tuple[int, str], int] = {}
-    haul_attributed: set[tuple[int, str]] = set()
-    haul_credits: list[tuple[str, str, int]] = []  # (bow, scope_key, over_bucket)
+    haul_attributed_3: set[tuple[int, str]] = set()
+    haul_attributed_4: set[tuple[int, str]] = set()
+    haul_attributed_5: set[tuple[int, str]] = set()
+    haul_credits_3: list[tuple[str, str, int]] = []
+    haul_credits_4: list[tuple[str, str, int]] = []
+    haul_credits_5: list[tuple[str, str, int]] = []
+    # PT2 of spec-prob-baselines.md — for each (innings, bowler), the
+    # set of over buckets they bowled at least one legal ball in. After
+    # we know the per-spell total wickets we walk these to credit the
+    # per-spell-touching counters (innings_with_wicket / innings_with_two).
+    bowler_innings_overs: dict[tuple[int, str], set[int]] = {}
 
     def get_acc(person_id: str, scope_key: str, over_number: int) -> _Acc:
         key = (person_id, scope_key, over_number)
@@ -241,6 +269,16 @@ async def _aggregate_matches(
                 # ≥1 legal ball at this over_number — per-bucket
                 # innings denominator.
                 acc.innings_set.add(iid)
+                # PT2 of spec-prob-baselines.md — remember the per-
+                # spell over-bucket touch set; we'll use it after the
+                # wicket walk knows the per-spell total wicket count
+                # to credit innings_with_wicket / innings_with_two.
+                ikey_bow = (iid, bow)
+                touched = bowler_innings_overs.get(ikey_bow)
+                if touched is None:
+                    touched = set()
+                    bowler_innings_overs[ikey_bow] = touched
+                touched.add(over_bucket)
             rb = d["runs_batter"]
             if rb == 0 and d["runs_total"] == 0:
                 acc.dots += 1
@@ -282,18 +320,48 @@ async def _aggregate_matches(
             scope_key = match_meta[mid]["scope_key"]
             over_bucket = w["over_number"] + 1
             get_acc(bow, scope_key, over_bucket).wickets += 1
-            # Tier 2: 4-fer attribution. Increment the running per-
-            # (innings, bowler) wicket count; on crossing 4 (and only
-            # once per bowler-innings), attribute to the over bucket.
+            # Tier 2: 4-fer attribution + PT2 of spec-prob-baselines.md
+            # 3-fer / 5-fer attribution. All three share the same
+            # "crossing threshold attributes to the over the Nth wicket
+            # fell in" pattern, credited at most once per bowler-spell.
             ikey = (iid, bow)
             innings_wickets[ikey] = innings_wickets.get(ikey, 0) + 1
-            if innings_wickets[ikey] == 4 and ikey not in haul_attributed:
-                haul_attributed.add(ikey)
-                haul_credits.append((bow, scope_key, over_bucket))
+            count = innings_wickets[ikey]
+            if count == 3 and ikey not in haul_attributed_3:
+                haul_attributed_3.add(ikey)
+                haul_credits_3.append((bow, scope_key, over_bucket))
+            elif count == 4 and ikey not in haul_attributed_4:
+                haul_attributed_4.add(ikey)
+                haul_credits_4.append((bow, scope_key, over_bucket))
+            elif count == 5 and ikey not in haul_attributed_5:
+                haul_attributed_5.add(ikey)
+                haul_credits_5.append((bow, scope_key, over_bucket))
 
-    # Drain 4-fer attributions into the per-bucket _Acc.
-    for bow, scope_key, over_bucket in haul_credits:
+    # Drain haul attributions into the per-bucket _Acc.
+    for bow, scope_key, over_bucket in haul_credits_3:
+        get_acc(bow, scope_key, over_bucket).three_wicket_hauls += 1
+    for bow, scope_key, over_bucket in haul_credits_4:
         get_acc(bow, scope_key, over_bucket).four_wicket_hauls += 1
+    for bow, scope_key, over_bucket in haul_credits_5:
+        get_acc(bow, scope_key, over_bucket).five_wicket_hauls += 1
+
+    # PT2 of spec-prob-baselines.md — per-spell-touching counts.
+    # For every (innings, bowler), if total wickets ≥ 1 / ≥ 2, credit
+    # innings_with_wicket / innings_with_two on EVERY over_bucket the
+    # bowler bowled in that spell. So per-bucket P(≥1) =
+    # innings_with_wicket / innings_bowled is "fraction of spells
+    # touching this bucket that had ≥1 wicket total in the spell".
+    for (iid, bow), buckets in bowler_innings_overs.items():
+        total_wkts = innings_wickets.get((iid, bow), 0)
+        if total_wkts < 1:
+            continue
+        mid = innings_match[iid]
+        scope_key = match_meta[mid]["scope_key"]
+        for over_bucket in buckets:
+            acc = get_acc(bow, scope_key, over_bucket)
+            acc.innings_with_wicket += 1
+            if total_wkts >= 2:
+                acc.innings_with_two += 1
 
     # Maiden detection — credit a maiden when one bowler bowled all 6
     # legal balls of an over conceding 0 runs (off the bat + extras).
