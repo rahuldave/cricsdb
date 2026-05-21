@@ -442,6 +442,54 @@ class PlayerScopeStatsPosition:
     ducks: int = 0
 
 
+class PlayerScopeStatsBattingOver:
+    """One row per (person, scope, over_number) — per-over batting aggregates.
+
+    Tier 4 of internal_docs/spec-apples-to-apples-baselines.md. Mirrors
+    PlayerScopeStatsOver on the bowling side: same scope_key semantics,
+    further keyed by the over the BATTER faced a delivery in.
+
+    over_number is 1..20 (the underlying delivery table stores 0..19;
+    we shift to 1-indexed at populate time).
+
+    Drives the per-over batting cohort baseline endpoint
+    (`/scope/averages/players/batting/by-over`) and the new
+    SR-by-Over chart overlay on /batting deep-dive.
+
+    Built and maintained by
+    `scripts/populate_playerscopestats_batting_over.py`, auto-called
+    from `import_data.py` (full) and `update_recent.py` (incremental).
+
+    Per-over aggregates (legal-balls-only for the rate denominator):
+      legal_balls_faced — count of deliveries the batter faced in this
+                          over bucket where extras_wides=0 AND
+                          extras_noballs=0.
+      runs              — SUM(runs_batter) on legal balls only (matches
+                          batting router convention).
+      dots              — count of deliveries where legal AND runs_batter=0
+                          AND runs_total=0.
+      fours / sixes     — count of legal balls where runs_batter==4 / 6.
+      dismissals        — count of wickets where the player was the
+                          dismissed batter, occurring at a delivery
+                          in this over bucket (excluding retired hurt /
+                          retired out per BATTER_DISMISSAL_EXCLUDED).
+      innings_faced     — distinct innings where the batter faced ≥1
+                          legal ball in this over bucket. Per-bucket
+                          innings denominator (same role as
+                          PlayerScopeStatsOver.innings_bowled).
+    """
+    person_id: ForeignKey[str, "person"]
+    scope_key: str  # matches PlayerScopeStats.scope_key
+    over_number: int  # 1..20
+    legal_balls_faced: int = 0
+    runs: int = 0
+    dots: int = 0
+    fours: int = 0
+    sixes: int = 0
+    dismissals: int = 0
+    innings_faced: int = 0
+
+
 class Partnership:
     """One row per on-field batting partnership.
 
