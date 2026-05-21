@@ -3562,7 +3562,7 @@ _TEAM_BOWLING_WICKET_EXCLUDE = (
 
 
 async def _innings_master_sample_team_bowling(
-    team: str, filters: FilterParams, aux: AuxParams,
+    team: Optional[str], filters: FilterParams, aux: AuxParams,
 ) -> list[dict]:
     """Per-innings observation rows of the OPPONENT's batting
     innings under the active filter scope, where the path-team is
@@ -3572,6 +3572,14 @@ async def _innings_master_sample_team_bowling(
     Wickets is the TEAM-CREDITED count (includes run-outs); see
     the comment block above for rationale and divergence from
     team-bowling/summary.
+
+    `team=None` widens the master sample to every batting innings
+    at this scope — used by the league-side dual-query that feeds
+    ProbChip scope_avg baselines (spec-prob-baselines-teams.md
+    §4.1). The opponent-pairing clause is dropped. The team-bowling
+    wicket exclusion (`_TEAM_BOWLING_WICKET_EXCLUDE`) is preserved
+    on the league side so the chip baselines use the same predicate
+    as the team-side chips.
     """
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
@@ -3958,6 +3966,74 @@ def _form_windows_team_bowling(
     }
 
 
+# spec-prob-baselines-teams.md §5 — direction tags for the team-bowling
+# milestone ProbChips. Endpoint-local per §11.3.
+_TEAM_BOWLING_WICKETS_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_leq_3":  "lower_better",
+    "p_geq_5":  "higher_better",
+    "p_geq_7":  "higher_better",
+    "p_eq_10":  "higher_better",
+    "p_7_given_5":  "higher_better",
+    "p_10_given_5": "higher_better",
+    "p_geq_3_at_10": "higher_better",
+    "p_eq_10_given_3_at_10": "higher_better",
+}
+
+# Oppo total conceded — defending POV (low oppo total = good for the
+# bowling team). p_lt_100 / p_lt_150 are higher_better (cheap defence
+# happens MORE often = good); p_geq_* are lower_better.
+_TEAM_BOWLING_RUNS_CONCEDED_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_lt_100":  "higher_better",
+    "p_lt_150":  "higher_better",
+    "p_geq_150": "lower_better",
+    "p_geq_200": "lower_better",
+    "p_geq_230": "lower_better",
+    "p_150_given_100": "lower_better",
+    "p_200_given_150": "lower_better",
+    "p_230_given_200": "lower_better",
+    "p_double_at_10":  "lower_better",
+}
+
+_TEAM_BOWLING_ECONOMY_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_econ_leq_6":  "higher_better",
+    "p_econ_leq_7":  "higher_better",
+    "p_econ_geq_9":  "lower_better",
+    "p_econ_geq_10": "lower_better",
+}
+
+
+def _enrich_team_bowling_milestones(team_doss: dict, league_doss: dict) -> None:
+    """Mutate every milestone ProbRecord on the team-side bowling
+    dossier to attach the matching league-side ProbRecord.value as
+    `scope_avg`, plus signed delta_pct, fixed direction, league denom
+    as sample_size. spec-prob-baselines-teams.md §4.1.
+
+    Three blocks — wickets / runs_conceded / economy — each with their
+    own endpoint-local direction table. Conditional chips read the
+    league-side conditional ProbRecord directly (spec §4.3).
+    """
+    for block_key, dir_table in (
+        ("wickets", _TEAM_BOWLING_WICKETS_PROB_DIRECTIONS),
+        ("runs_conceded", _TEAM_BOWLING_RUNS_CONCEDED_PROB_DIRECTIONS),
+        ("economy", _TEAM_BOWLING_ECONOMY_PROB_DIRECTIONS),
+    ):
+        team_block = team_doss.get(block_key) or {}
+        league_block = league_doss.get(block_key) or {}
+        team_ms = team_block.get("milestones") or {}
+        league_ms = league_block.get("milestones") or {}
+        for chip_key, direction in dir_table.items():
+            pr = team_ms.get(chip_key)
+            if not pr:
+                continue
+            league_pr = league_ms.get(chip_key) or {}
+            enrich_prob_record(
+                pr,
+                league_pr.get("value"),
+                direction,
+                league_pr.get("denom"),
+            )
+
+
 @router.get("/{team}/bowling/distribution")
 async def team_bowling_distribution(
     team: str,
@@ -3988,18 +4064,37 @@ async def team_bowling_distribution(
     See spec §16.3.1.
 
     Every probability field ships as `{value, num, denom, ci_low,
-    ci_high}` with a Wilson 95% CI.
+    ci_high}` with a Wilson 95% CI. Per spec-prob-baselines-teams.md,
+    every milestone ProbRecord under wickets.milestones +
+    runs_conceded.milestones + economy.milestones also carries
+    scope_avg / delta_pct / direction / sample_size from a parallel
+    dual-query of the same scope with the path team dropped. Form
+    windows compute per-window scope_avg independently.
 
     `FilterParams.filter_team` is IGNORED — the team path-param
     dominates. `FilterParams.filter_opponent` works as expected.
 
-    Spec: internal_docs/spec-distribution-stats.md §16.3.
+    Spec: internal_docs/spec-distribution-stats.md §16.3 +
+    internal_docs/spec-prob-baselines-teams.md.
     """
     today = date.fromisoformat(as_of_date) if as_of_date else date.today()
 
-    observations = await _innings_master_sample_team_bowling(team, filters, aux)
+    observations, league_observations = await asyncio.gather(
+        _innings_master_sample_team_bowling(team, filters, aux),
+        _innings_master_sample_team_bowling(None, filters, aux),
+    )
     lifetime = _distribution_dossier_team_bowling(observations)
     form = _form_windows_team_bowling(observations, today)
+
+    league_lifetime = _distribution_dossier_team_bowling(league_observations)
+    league_form = _form_windows_team_bowling(league_observations, today)
+
+    _enrich_team_bowling_milestones(lifetime, league_lifetime)
+    for window_key in ("last_10", "last_60d", "last_6mo", "last_1yr"):
+        team_window = form.get(window_key)
+        league_window = league_form.get(window_key)
+        if team_window and league_window:
+            _enrich_team_bowling_milestones(team_window, league_window)
 
     obs_dates = [o["date"] for o in observations if o.get("date")]
     lifetime["last_match_date"] = max(obs_dates) if obs_dates else None
