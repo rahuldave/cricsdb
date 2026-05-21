@@ -2799,14 +2799,18 @@ async def compute_players_bowling_cohort(
 
     main_sql = f"""
         SELECT psso.over_number,
-               SUM(psso.runs_conceded)      AS runs_conceded,
-               SUM(psso.legal_balls)        AS legal_balls,
-               SUM(psso.wickets)            AS wickets,
-               SUM(psso.dots)               AS dots,
-               SUM(psso.boundaries)         AS boundaries,
-               SUM(psso.maidens)            AS maidens,
-               SUM(psso.innings_bowled)     AS innings_bowled,
-               SUM(psso.four_wicket_hauls)  AS four_wicket_hauls,
+               SUM(psso.runs_conceded)       AS runs_conceded,
+               SUM(psso.legal_balls)         AS legal_balls,
+               SUM(psso.wickets)             AS wickets,
+               SUM(psso.dots)                AS dots,
+               SUM(psso.boundaries)          AS boundaries,
+               SUM(psso.maidens)             AS maidens,
+               SUM(psso.innings_bowled)      AS innings_bowled,
+               SUM(psso.four_wicket_hauls)   AS four_wicket_hauls,
+               SUM(psso.three_wicket_hauls)  AS three_wicket_hauls,
+               SUM(psso.five_wicket_hauls)   AS five_wicket_hauls,
+               SUM(psso.innings_with_wicket) AS innings_with_wicket,
+               SUM(psso.innings_with_two)    AS innings_with_two,
                COUNT(DISTINCT psso.person_id) AS n_players
         FROM playerscopestatsover psso
         WHERE psso.scope_key IN (
@@ -2869,6 +2873,22 @@ async def compute_players_bowling_cohort(
                 "wickets_per_innings": None,
                 "maidens_per_innings": None,
                 "four_wicket_hauls_per_innings": None,
+                # PT2 of spec-prob-baselines.md — per-bucket prob
+                # rates. Simples (P(0), P(≥1), P(≥2)) use the per-
+                # spell-touching numerators (innings_with_*); ≥3/4/5
+                # use over-attribution numerators (three/four/five_
+                # wicket_hauls) so the cv must be scaled back to per-
+                # innings via per_innings_scale at the return site.
+                # Conditionals use bucket-grain ratio per spec §4.3.
+                "prob_zero":         None,
+                "prob_geq_1":        None,
+                "prob_geq_2":        None,
+                "prob_geq_3_attr":   None,
+                "prob_geq_4_attr":   None,
+                "prob_geq_5_attr":   None,
+                "prob_3_given_2":    None,
+                "prob_4_given_2":    None,
+                "prob_5_given_2":    None,
             })
             continue
         balls = r["legal_balls"] or 0
@@ -2879,6 +2899,10 @@ async def compute_players_bowling_cohort(
         maidens = r["maidens"] or 0
         innings_bowled = r["innings_bowled"] or 0
         four_wicket_hauls = r["four_wicket_hauls"] or 0
+        three_wicket_hauls = r["three_wicket_hauls"] or 0
+        five_wicket_hauls = r["five_wicket_hauls"] or 0
+        innings_with_wicket = r["innings_with_wicket"] or 0
+        innings_with_two = r["innings_with_two"] or 0
         by_over_arr.append({
             "over": o, "label": bowling_bucket_label(o),
             "n_balls": balls, "n_players": r["n_players"] or 0,
@@ -2900,6 +2924,33 @@ async def compute_players_bowling_cohort(
             "wickets_per_innings":          (wickets / innings_bowled)          if innings_bowled else None,
             "maidens_per_innings":          (maidens / innings_bowled)          if innings_bowled else None,
             "four_wicket_hauls_per_innings": (four_wicket_hauls / innings_bowled) if innings_bowled else None,
+            # PT2 of spec-prob-baselines.md — per-bucket prob rates for
+            # the wicket-ladder chips on /bowlers/.../distribution.
+            #
+            # P(0), P(≥1), P(≥2) use per-spell-touching numerators —
+            # innings_bowled is the same per-spell-touching count, so
+            # the ratio is directly a probability without scaling.
+            #
+            # P(≥3), P(≥4), P(≥5) use over-attribution numerators
+            # (haul_at_bucket). The cv result is per-attendance and
+            # needs per_innings_scale at the return site to read as
+            # per-innings P(≥k). The cohort baseline is exact for
+            # events that happen at most once per innings (≥3/4/5
+            # wickets), matching the four_wicket_hauls_per_innings
+            # Tier 2 pattern.
+            #
+            # Conditionals (P(≥k│≥2)) divide attribution at the bucket
+            # by innings_with_two at the bucket and convex-combine the
+            # ratio — bucket-grain, per spec §4.3 (NOT ratio-of-cv).
+            "prob_zero":       ((innings_bowled - innings_with_wicket) / innings_bowled) if innings_bowled else None,
+            "prob_geq_1":      (innings_with_wicket / innings_bowled)                     if innings_bowled else None,
+            "prob_geq_2":      (innings_with_two / innings_bowled)                        if innings_bowled else None,
+            "prob_geq_3_attr": (three_wicket_hauls / innings_bowled)                      if innings_bowled else None,
+            "prob_geq_4_attr": (four_wicket_hauls / innings_bowled)                       if innings_bowled else None,
+            "prob_geq_5_attr": (five_wicket_hauls / innings_bowled)                       if innings_bowled else None,
+            "prob_3_given_2":  (three_wicket_hauls / innings_with_two)                    if innings_with_two else None,
+            "prob_4_given_2":  (four_wicket_hauls / innings_with_two)                     if innings_with_two else None,
+            "prob_5_given_2":  (five_wicket_hauls / innings_with_two)                     if innings_with_two else None,
         })
 
     cliff_buckets: list[int] = [
@@ -2933,6 +2984,17 @@ async def compute_players_bowling_cohort(
             "wickets_per_innings":          wrap_metric(None, None, "bowl_wickets_per_innings", sample_size=n_balls_total),
             "maidens_per_innings":          wrap_metric(None, None, "bowl_maidens_per_innings", sample_size=n_balls_total),
             "four_wicket_hauls_per_innings": wrap_metric(None, None, "bowl_four_wicket_hauls_per_innings", sample_size=n_balls_total),
+            # PT2 of spec-prob-baselines.md — wicket-ladder ProbChip
+            # cohort baselines null out under cliff alongside the rates.
+            "prob_zero":      wrap_metric(None, None, "bowl_prob_zero",      sample_size=n_balls_total),
+            "prob_geq_1":     wrap_metric(None, None, "bowl_prob_geq_1",     sample_size=n_balls_total),
+            "prob_geq_2":     wrap_metric(None, None, "bowl_prob_geq_2",     sample_size=n_balls_total),
+            "prob_geq_3":     wrap_metric(None, None, "bowl_prob_geq_3",     sample_size=n_balls_total),
+            "prob_geq_4":     wrap_metric(None, None, "bowl_prob_geq_4",     sample_size=n_balls_total),
+            "prob_geq_5":     wrap_metric(None, None, "bowl_prob_geq_5",     sample_size=n_balls_total),
+            "prob_3_given_2": wrap_metric(None, None, "bowl_prob_3_given_2", sample_size=n_balls_total),
+            "prob_4_given_2": wrap_metric(None, None, "bowl_prob_4_given_2", sample_size=n_balls_total),
+            "prob_5_given_2": wrap_metric(None, None, "bowl_prob_5_given_2", sample_size=n_balls_total),
             "by_over": by_over_arr,
         }
 
@@ -2962,6 +3024,22 @@ async def compute_players_bowling_cohort(
     cc_wpi  = cv_pi("wickets_per_innings")
     cc_mpi  = cv_pi("maidens_per_innings")
     cc_fwh_pi = cv_pi("four_wicket_hauls_per_innings")
+    # PT2 of spec-prob-baselines.md — wicket-ladder cohort probs.
+    # Simples P(0), P(≥1), P(≥2) cv on per-spell-touching rates: no
+    # scaling needed (denominator matches numerator semantics).
+    # P(≥3), P(≥4), P(≥5) cv on attribution rates and then per_innings_
+    # scale to convert per-attendance to per-innings, matching the chip
+    # value semantics on the bowler side. Conditionals cv per-bucket
+    # ratios directly (spec §4.3).
+    cc_prob_zero    = cv("prob_zero")
+    cc_prob_geq_1   = cv("prob_geq_1")
+    cc_prob_geq_2   = cv("prob_geq_2")
+    cc_prob_geq_3   = cv_pi("prob_geq_3_attr")
+    cc_prob_geq_4   = cv_pi("prob_geq_4_attr")
+    cc_prob_geq_5   = cv_pi("prob_geq_5_attr")
+    cc_prob_3_g_2   = cv("prob_3_given_2")
+    cc_prob_4_g_2   = cv("prob_4_given_2")
+    cc_prob_5_g_2   = cv("prob_5_given_2")
 
     def _r(v: Optional[float], ndigits: int) -> Optional[float]:
         return round(v, ndigits) if v is not None else None
@@ -2981,6 +3059,16 @@ async def compute_players_bowling_cohort(
         "wickets_per_innings":          wrap_metric(_r(cc_wpi, 3),    _r(cc_wpi, 3),    "bowl_wickets_per_innings",          sample_size=n_balls_total),
         "maidens_per_innings":          wrap_metric(_r(cc_mpi, 3),    _r(cc_mpi, 3),    "bowl_maidens_per_innings",          sample_size=n_balls_total),
         "four_wicket_hauls_per_innings": wrap_metric(_r(cc_fwh_pi, 4), _r(cc_fwh_pi, 4), "bowl_four_wicket_hauls_per_innings", sample_size=n_balls_total),
+        # PT2 of spec-prob-baselines.md — wicket-ladder probs.
+        "prob_zero":      wrap_metric(_r(cc_prob_zero, 4),  _r(cc_prob_zero, 4),  "bowl_prob_zero",      sample_size=n_balls_total),
+        "prob_geq_1":     wrap_metric(_r(cc_prob_geq_1, 4), _r(cc_prob_geq_1, 4), "bowl_prob_geq_1",     sample_size=n_balls_total),
+        "prob_geq_2":     wrap_metric(_r(cc_prob_geq_2, 4), _r(cc_prob_geq_2, 4), "bowl_prob_geq_2",     sample_size=n_balls_total),
+        "prob_geq_3":     wrap_metric(_r(cc_prob_geq_3, 4), _r(cc_prob_geq_3, 4), "bowl_prob_geq_3",     sample_size=n_balls_total),
+        "prob_geq_4":     wrap_metric(_r(cc_prob_geq_4, 4), _r(cc_prob_geq_4, 4), "bowl_prob_geq_4",     sample_size=n_balls_total),
+        "prob_geq_5":     wrap_metric(_r(cc_prob_geq_5, 4), _r(cc_prob_geq_5, 4), "bowl_prob_geq_5",     sample_size=n_balls_total),
+        "prob_3_given_2": wrap_metric(_r(cc_prob_3_g_2, 4), _r(cc_prob_3_g_2, 4), "bowl_prob_3_given_2", sample_size=n_balls_total),
+        "prob_4_given_2": wrap_metric(_r(cc_prob_4_g_2, 4), _r(cc_prob_4_g_2, 4), "bowl_prob_4_given_2", sample_size=n_balls_total),
+        "prob_5_given_2": wrap_metric(_r(cc_prob_5_g_2, 4), _r(cc_prob_5_g_2, 4), "bowl_prob_5_given_2", sample_size=n_balls_total),
         "by_over": by_over_arr,
     }
 

@@ -175,6 +175,18 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     # spec-rate-vs-volume-audit.md §2.1 Group A — sibling rate to 4-fers
     # volume. Higher (more 4-fers per innings) = better.
     "bowl_four_wicket_hauls_per_innings": "higher_better",
+    # PT2 of spec-prob-baselines.md — bowling wicket-ladder ProbChip
+    # cohort baselines. P(0) lower_better (more wicketless spells = bad
+    # for the bowler); P(≥k) and conditionals all higher_better.
+    "bowl_prob_zero":      "lower_better",
+    "bowl_prob_geq_1":     "higher_better",
+    "bowl_prob_geq_2":     "higher_better",
+    "bowl_prob_geq_3":     "higher_better",
+    "bowl_prob_geq_4":     "higher_better",
+    "bowl_prob_geq_5":     "higher_better",
+    "bowl_prob_3_given_2": "higher_better",
+    "bowl_prob_4_given_2": "higher_better",
+    "bowl_prob_5_given_2": "higher_better",
 
     # ── fielding (per-player) ──────────────────────────────────────
     "field_catches":              None,

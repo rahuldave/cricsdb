@@ -19,7 +19,7 @@ from ..tournament_canonical import (
     variants as canonical_variants,
     event_name_in_clause,
 )
-from ..wilson import prob_record
+from ..wilson import prob_record, enrich_prob_record
 from ..form_windows import scope_anchor
 
 router = APIRouter(prefix="/api/v1/bowlers", tags=["Bowling"])
@@ -1576,6 +1576,33 @@ async def bowling_distribution(
     lifetime = _distribution_dossier_bowler(observations)
     form = _form_windows_bowler(observations, today)
 
+    # PT2 of spec-prob-baselines.md — compute the bowler's over-mix
+    # from over_distribution and fold the cohort baseline into the
+    # wickets-block ProbChips on every dossier (lifetime + 4 windows).
+    if observations:
+        over_distribution = await _over_distribution(db, person_id, filters)
+        total_dist_balls = sum((o.get("legal_balls") or 0) for o in over_distribution)
+        if total_dist_balls > 0:
+            mix = [
+                (o.get("legal_balls") or 0) / total_dist_balls
+                for o in over_distribution
+            ]
+            while len(mix) < 20:
+                mix.append(0.0)
+            from .scope_averages import compute_players_bowling_cohort
+            cohort = await compute_players_bowling_cohort(
+                db, filters, aux, mix[:20], drop_set=None,
+            )
+            _enrich_bowling_wickets_milestones_with_cohort(
+                lifetime["wickets"]["milestones"], cohort,
+            )
+            for window_key in ("last_10", "last_60d", "last_6mo", "last_1yr"):
+                window_doss = form.get(window_key)
+                if window_doss and "wickets" in window_doss:
+                    _enrich_bowling_wickets_milestones_with_cohort(
+                        window_doss["wickets"]["milestones"], cohort,
+                    )
+
     # last_match_date — drives the frontend dormancy badge.
     # Spec §11 + design-decisions.md "Dormancy badge".
     obs_dates = [o["date"] for o in observations if o.get("date")]
@@ -1591,6 +1618,59 @@ async def bowling_distribution(
         "form": form,
         "suggested_splits": splits,
     }
+
+
+# PT2 of spec-prob-baselines.md — chip direction tags + cohort field
+# map for the wickets block. Mirror of _BATTING_PROB_DIRECTIONS in
+# batting.py.
+_BOWLING_WKTS_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_zero":      "lower_better",
+    "p_geq_1":     "higher_better",
+    "p_geq_2":     "higher_better",
+    "p_geq_3":     "higher_better",
+    "p_geq_4":     "higher_better",
+    "p_geq_5":     "higher_better",
+    "p_3_given_2": "higher_better",
+    "p_4_given_2": "higher_better",
+    "p_5_given_2": "higher_better",
+}
+
+_BOWLING_WKTS_COHORT_FIELD: dict[str, str] = {
+    "p_zero":      "prob_zero",
+    "p_geq_1":     "prob_geq_1",
+    "p_geq_2":     "prob_geq_2",
+    "p_geq_3":     "prob_geq_3",
+    "p_geq_4":     "prob_geq_4",
+    "p_geq_5":     "prob_geq_5",
+    "p_3_given_2": "prob_3_given_2",
+    "p_4_given_2": "prob_4_given_2",
+    "p_5_given_2": "prob_5_given_2",
+}
+
+
+def _enrich_bowling_wickets_milestones_with_cohort(
+    milestones: dict, cohort: dict,
+) -> None:
+    """Mutate each ProbRecord in the bowling wickets block to attach
+    cohort baselines. Mirrors _enrich_milestones_with_cohort in batting.py.
+
+    spec-prob-baselines.md §4.2.
+    """
+    cohort_info = cohort.get("cohort") or {}
+    # Bowling cohort uses ball-grain sample_size (n_balls_total) on
+    # MetricEnvelope wrappers, but for ProbRecord tooltips the more
+    # interpretable scale is the cohort's pool of spells. We don't
+    # have that as a single field on the bowling cohort response, so
+    # fall through to n_balls_total — the tooltip caption explains it.
+    sample_size = cohort_info.get("n_balls_total")
+    for chip_key, direction in _BOWLING_WKTS_PROB_DIRECTIONS.items():
+        pr = milestones.get(chip_key)
+        if not pr:
+            continue
+        cohort_field = _BOWLING_WKTS_COHORT_FIELD[chip_key]
+        cohort_envelope = cohort.get(cohort_field) or {}
+        scope_avg = cohort_envelope.get("scope_avg")
+        enrich_prob_record(pr, scope_avg, direction, sample_size)
 
 
 def _format_overs(balls: int) -> str:
