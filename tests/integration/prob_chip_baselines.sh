@@ -91,12 +91,18 @@ print(f'+{mag}%' if dp > 0 else (f'−{mag}%' if dp < 0 else '0%'))
 ")
 
 dom_captions=$(ab_eval "Array.from(document.querySelectorAll('.prob-chip-caption')).map(e => e.textContent).join('||')")
-assert_contains "P(≥50) caption shows API scope_avg" "vs $api_p50_sa" "$dom_captions"
+assert_contains "P(≥50) caption shows API scope_avg" "$api_p50_sa" "$dom_captions"
 assert_contains "P(≥50) caption shows API delta_pct" "$api_p50_dp" "$dom_captions"
 
-# Polarity: Kohli's P(≥50) is +Δ on a higher_better chip → green.
-p50_color=$(ab_eval "Array.from(document.querySelectorAll('.prob-chip-caption')).filter(e => e.textContent.includes('+'))[0]; getComputedStyle(Array.from(document.querySelectorAll('.prob-chip-caption')).find(e => e.textContent.includes('+')) || document.body).color")
-assert_contains "Above-cohort caption is forest-green" "63, 122, 77" "$p50_color"
+# One "vs cohort" prefix per chip row (single row label, NOT per chip).
+prefix_count=$(ab_eval "Array.from(document.querySelectorAll('span')).filter(s => s.textContent === 'vs cohort').length")
+assert_eq "1 'vs cohort' prefix on batting chip row" "1" "$prefix_count"
+
+# Polarity: Kohli's P(≥50) is +Δ on a higher_better chip → the inner
+# delta span (not the outer caption) carries forest-green. Outer
+# caption is muted (--ink-faint). Look up the inner colored span.
+p50_color=$(ab_eval "const cap = Array.from(document.querySelectorAll('.prob-chip-caption')).find(e => /↑\+\d+%/.test(e.textContent)); const inner = cap ? cap.querySelector('span') : null; inner ? getComputedStyle(inner).color : 'none'")
+assert_contains "Above-cohort delta is forest-green" "63, 122, 77" "$p50_color"
 
 # ─────────────────────────────────────────────────────────────────
 echo "Test 2 · Bowling (Bumrah IPL) — chips render across 3 tab views"
@@ -108,9 +114,9 @@ settle 4
 cap_count=$(ab_eval "document.querySelectorAll('.prob-chip-caption').length")
 assert_eq "9 wickets-tab chips render captions" "9" "$cap_count"
 
-# Bumrah's P(0) is +Δ on a lower_better chip → oxblood (bad).
-p0_color=$(ab_eval "const cap = Array.from(document.querySelectorAll('.prob-chip-caption')).find(e => /vs \d+% ↑\+\d+%/.test(e.textContent)); cap ? getComputedStyle(cap).color : 'none'")
-assert_contains "P(0) caption with +Δ on lower_better is oxblood" "122, 31, 31" "$p0_color"
+# Bumrah's P(0) is +Δ on a lower_better chip → inner delta span oxblood.
+p0_color=$(ab_eval "const cap = Array.from(document.querySelectorAll('.prob-chip-caption')).find(e => /↑\+\d+%/.test(e.textContent)); const inner = cap ? cap.querySelector('span') : null; inner ? getComputedStyle(inner).color : 'none'")
+assert_contains "P(0) delta with +Δ on lower_better is oxblood" "122, 31, 31" "$p0_color"
 
 # Click the Economy tab and verify 4 econ chips render captions.
 ab eval "Array.from(document.querySelectorAll('.wisden-seg')).find(b => b.textContent.trim() === 'Economy').click()"
@@ -145,7 +151,7 @@ v = pr['scope_avg'] * 100
 print(f'{v:.1f}%' if v < 5 else f'{v:.0f}%')
 ")
 dom_captions=$(ab_eval "Array.from(document.querySelectorAll('.prob-chip-caption')).map(e => e.textContent).join('||')")
-assert_contains "Fielding P(=0) caption matches API scope_avg" "vs $api_pzero_sa" "$dom_captions"
+assert_contains "Fielding P(=0) caption matches API scope_avg" "$api_pzero_sa" "$dom_captions"
 
 # ─────────────────────────────────────────────────────────────────
 echo "Test 4 · Mobile viewport 390×844 — no horizontal overflow"

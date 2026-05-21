@@ -40,7 +40,7 @@ export default function BaselineChip({
       <MetricDelta
         env={env}
         withScopeAvg
-        label="base"
+        label="cohort"
         fmt={digits}
         scopeAvgTooltip={tooltip}
       />

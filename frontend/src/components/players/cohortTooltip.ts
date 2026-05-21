@@ -54,8 +54,8 @@ export function battingCohortTooltip(cohort: BattingCohortMeta): string {
   if (concentrated >= 0) {
     const label = batting_bucket_label(concentrated + 1)
     return (
-      `Position-mix baseline — ${label} (${fmtPct(mix[concentrated])} of innings); `
-      + `${fmtCount(cohort.n_players)} players in cohort`
+      `Position-mix cohort — ${label} (${fmtPct(mix[concentrated])} of innings); `
+      + `${fmtCount(cohort.n_players)} players`
     )
   }
   // Spread — list every non-trivial bucket (> 1%) in descending weight.
@@ -66,7 +66,7 @@ export function battingCohortTooltip(cohort: BattingCohortMeta): string {
     .map(e => `${batting_bucket_label(e.bucket)} ${fmtPct(e.w)}`)
     .join(', ')
   return (
-    `Position-mix baseline — ${entries}; cohort: `
+    `Position-mix cohort — ${entries}; `
     + `${fmtCount(cohort.n_players)} players, `
     + `${fmtCount(cohort.n_innings_total)} innings`
   )
@@ -78,8 +78,8 @@ export function bowlingCohortTooltip(cohort: BowlingCohortMeta): string {
   const concentrated = mix.findIndex(w => w >= 0.70)
   if (concentrated >= 0) {
     return (
-      `Over-mix baseline — Over ${concentrated + 1} (${fmtPct(mix[concentrated])} of balls); `
-      + `${fmtCount(cohort.n_players)} bowlers in cohort`
+      `Over-mix cohort — Over ${concentrated + 1} (${fmtPct(mix[concentrated])} of balls); `
+      + `${fmtCount(cohort.n_players)} bowlers`
     )
   }
   const entries = mix
@@ -90,7 +90,7 @@ export function bowlingCohortTooltip(cohort: BowlingCohortMeta): string {
     .map(e => `Over ${e.over} ${fmtPct(e.w)}`)
     .join(', ')
   return (
-    `Over-mix baseline — ${entries}; cohort: `
+    `Over-mix cohort — ${entries}; `
     + `${fmtCount(cohort.n_players)} bowlers, `
     + `${fmtCount(cohort.n_balls_total)} balls`
   )
@@ -101,7 +101,7 @@ export function fieldingCohortTooltip(cohort: FieldingCohortMeta): string {
   const partition = cohort.is_keeper ? 'Keeper' : 'Outfielder'
   const partitionPlural = cohort.is_keeper ? 'keepers' : 'outfielders'
   return (
-    `${partition}-cohort baseline — `
+    `${partition} cohort — `
     + `${fmtCount(cohort.n_fielders)} ${partitionPlural}, `
     + `${fmtCount(cohort.n_matches_total)} matches`
   )
@@ -110,7 +110,7 @@ export function fieldingCohortTooltip(cohort: FieldingCohortMeta): string {
 
 export function keepingCohortTooltip(cohort: KeepingCohortMeta): string {
   return (
-    `Keeping cohort baseline — `
+    `Keeping cohort — `
     + `${fmtCount(cohort.n_keepers)} keepers, `
     + `${fmtCount(cohort.n_matches_keeping)} keeping matches`
   )

@@ -183,7 +183,7 @@ function baselineSub(
     <MetricDelta
       env={env}
       withScopeAvg={true}
-      label="base"
+      label="cohort"
       fmt={fmtDigits}
       scopeAvgTooltip={cohortTooltip}
     />

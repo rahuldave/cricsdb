@@ -15,6 +15,7 @@
 
 import type { DistributionDossier } from '../../types'
 import ProbChip from '../distribution/ProbChip'
+import CohortRowPrefix from '../distribution/CohortRowPrefix'
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 
 const T_INDIGO = WISDEN_TIER_TINTS.indigo
@@ -96,6 +97,7 @@ export function MilestoneChipsRow({ dossier }: Props) {
       {/* Runs palette: 0-9 = failure (indigo) / 10-49 = building
           (sage) / 50+ = impact (ochre). Conditionals reach the
           impact tier (50+ / 70+) so they're ochre. */}
+      <CohortRowPrefix />
       <ProbChip label="P(≤10)"     record={milestones.p_failure_10}  tint={T_INDIGO} />
       <ProbChip label="P(≥30)"     record={milestones.p_30_plus}     tint={T_SAGE} />
       <ProbChip label="P(≥50)"     record={milestones.p_50_plus}     tint={T_OCHRE} />

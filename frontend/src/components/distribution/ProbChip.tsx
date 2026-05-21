@@ -142,7 +142,10 @@ function captionFor(record: ProbRecord): React.ReactNode | null {
   // delta_pct may be null when scope_avg is 0 (e.g. rare-event cohort
   // with no occurrences) — fall back to "vs X%" without arrow/delta.
   const dp = record.delta_pct
-  const baseText = `vs ${fmtPctSmart(record.scope_avg)}`
+  // No "vs cohort" prefix here — the parent chip-row renders a single
+  // leading "vs cohort" label so the term doesn't repeat per chip.
+  // Per spec-prob-baselines.md PT5.F follow-up (2026-05-21 user fb).
+  const baseText = `${fmtPctSmart(record.scope_avg)}`
   if (dp === null || dp === undefined) {
     return (
       <span

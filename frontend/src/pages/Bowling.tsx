@@ -281,15 +281,15 @@ export default function Bowling() {
             <StatCard label="Wickets" value={summary.wickets.value ?? 0} />
             <StatCard label="Wkts/Inn" value={fmt(summary.wickets_per_innings.value, 2)}
               subtitle={summary.wickets_per_innings.scope_avg != null
-                ? <MetricDelta env={summary.wickets_per_innings} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.wickets_per_innings} withScopeAvg label="cohort" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="Average" value={fmt(summary.average.value)}
               subtitle={summary.average.scope_avg != null
-                ? <MetricDelta env={summary.average} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.average} withScopeAvg label="cohort" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="Economy" value={fmt(summary.economy.value)}
               subtitle={summary.economy.scope_avg != null
-                ? <MetricDelta env={summary.economy} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.economy} withScopeAvg label="cohort" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
           </div>
           {playerId && (
@@ -305,16 +305,16 @@ export default function Bowling() {
             <StatCard label="Overs" value={summary.overs} />
             <StatCard label="Strike Rate" value={fmt(summary.strike_rate.value)}
               subtitle={summary.strike_rate.scope_avg != null
-                ? <MetricDelta env={summary.strike_rate} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.strike_rate} withScopeAvg label="cohort" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="Best Figures" value={summary.best_figures || '-'} />
             <StatCard label="Dot %" value={summary.dot_pct.value != null ? `${summary.dot_pct.value}%` : '-'}
               subtitle={summary.dot_pct.scope_avg != null
-                ? <MetricDelta env={summary.dot_pct} withScopeAvg label="base" fmt={1} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.dot_pct} withScopeAvg label="cohort" fmt={1} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary.value)}
               subtitle={summary.balls_per_boundary.scope_avg != null
-                ? <MetricDelta env={summary.balls_per_boundary} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.balls_per_boundary} withScopeAvg label="cohort" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
           </div>
           {/* spec-rate-vs-volume-audit F6: row 3 — Maiden Overs and
@@ -324,12 +324,12 @@ export default function Bowling() {
             <StatCard label="Maiden Overs" value={summary.maiden_overs.value ?? 0} />
             <StatCard label="Maidens/Inn"  value={fmt(summary.maidens_per_innings.value, 3)}
               subtitle={summary.maidens_per_innings.scope_avg != null
-                ? <MetricDelta env={summary.maidens_per_innings} withScopeAvg label="base" fmt={3} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.maidens_per_innings} withScopeAvg label="cohort" fmt={3} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="4-fers"       value={summary.four_wicket_hauls.value ?? 0} />
             <StatCard label="4-fers/Inn"   value={fmt(summary.four_wicket_hauls_per_innings.value, 4)}
               subtitle={summary.four_wicket_hauls_per_innings.scope_avg != null
-                ? <MetricDelta env={summary.four_wicket_hauls_per_innings} withScopeAvg label="base" fmt={4} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.four_wicket_hauls_per_innings} withScopeAvg label="cohort" fmt={4} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <div />
           </div>

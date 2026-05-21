@@ -14,6 +14,7 @@
 
 import type { FielderCountBlock } from '../../types'
 import ProbChip from '../distribution/ProbChip'
+import CohortRowPrefix from '../distribution/CohortRowPrefix'
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 
 const T_INDIGO = WISDEN_TIER_TINTS.indigo
@@ -110,6 +111,7 @@ export function FielderChipsRow({ block }: ChipsProps) {
       display: 'flex', flexWrap: 'wrap', gap: '0.35rem',
       marginTop: '0.85rem',
     }}>
+      <CohortRowPrefix />
       <ProbChip label="P(=0)"  record={m.p_zero}  tint={T_INDIGO} />
       <ProbChip label="P(=1)"  record={m.p_one}   tint={T_SAGE} />
       <ProbChip label="P(≥2)"  record={m.p_geq_2} tint={T_OCHRE} />

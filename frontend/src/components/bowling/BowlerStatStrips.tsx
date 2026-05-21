@@ -14,6 +14,7 @@
 import type { BowlerDossier, BowlerWicketsBlock,
               BowlerEconomyBlock, BowlerRunsConcededBlock } from '../../types'
 import ProbChip from '../distribution/ProbChip'
+import CohortRowPrefix from '../distribution/CohortRowPrefix'
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 
 const T_INDIGO = WISDEN_TIER_TINTS.indigo
@@ -57,6 +58,7 @@ function ChipRow({ children }: { children: React.ReactNode }) {
       display: 'flex', flexWrap: 'wrap', gap: '0.35rem',
       marginTop: '0.85rem',
     }}>
+      <CohortRowPrefix />
       {children}
     </div>
   )

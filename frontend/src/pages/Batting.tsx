@@ -295,15 +295,15 @@ export default function Batting() {
             <StatCard label="Runs" value={summary.runs.value} />
             <StatCard label="Runs/Inn" value={fmt(summary.runs_per_innings.value, 2)}
               subtitle={summary.runs_per_innings.scope_avg != null
-                ? <MetricDelta env={summary.runs_per_innings} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.runs_per_innings} withScopeAvg label="cohort" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="Average" value={fmt(summary.average.value)}
               subtitle={summary.average.scope_avg != null
-                ? <MetricDelta env={summary.average} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.average} withScopeAvg label="cohort" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="Strike Rate" value={fmt(summary.strike_rate.value)}
               subtitle={summary.strike_rate.scope_avg != null
-                ? <MetricDelta env={summary.strike_rate} withScopeAvg label="base" fmt={1} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.strike_rate} withScopeAvg label="cohort" fmt={1} scopeAvgTooltip={cohortTT} />
                 : undefined} />
           </div>
           {playerId && (
@@ -319,19 +319,19 @@ export default function Batting() {
             <StatCard label="Boundaries" value={summary.boundaries.value} subtitle={`${summary.fours.value} 4s, ${summary.sixes.value} 6s`} />
             <StatCard label="Bndr/Inn" value={fmt(summary.boundaries_per_innings.value, 2)}
               subtitle={summary.boundaries_per_innings.scope_avg != null
-                ? <MetricDelta env={summary.boundaries_per_innings} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.boundaries_per_innings} withScopeAvg label="cohort" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="B/Four" value={fmt(summary.balls_per_four.value)}
               subtitle={summary.balls_per_four.scope_avg != null
-                ? <MetricDelta env={summary.balls_per_four} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.balls_per_four} withScopeAvg label="cohort" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="B/Boundary" value={fmt(summary.balls_per_boundary.value)}
               subtitle={summary.balls_per_boundary.scope_avg != null
-                ? <MetricDelta env={summary.balls_per_boundary} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.balls_per_boundary} withScopeAvg label="cohort" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="Dot %" value={summary.dot_pct.value != null ? `${summary.dot_pct.value}%` : '-'}
               subtitle={summary.dot_pct.scope_avg != null
-                ? <MetricDelta env={summary.dot_pct} withScopeAvg label="base" fmt={1} scopeAvgTooltip={cohortTT} />
+                ? <MetricDelta env={summary.dot_pct} withScopeAvg label="cohort" fmt={1} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="30s / 50s / 100s" value={`${summary.thirties.value} / ${summary.fifties.value} / ${summary.hundreds.value}`} />
           </div>
@@ -349,7 +349,7 @@ export default function Batting() {
                 {summary.thirties_per_innings.scope_avg != null
                   && summary.fifties_per_innings.scope_avg != null
                   && summary.hundreds_per_innings.scope_avg != null
-                  ? `vs base ${summary.thirties_per_innings.scope_avg.toFixed(3)} / ${summary.fifties_per_innings.scope_avg.toFixed(3)} / ${summary.hundreds_per_innings.scope_avg.toFixed(3)}`
+                  ? `vs cohort ${summary.thirties_per_innings.scope_avg.toFixed(3)} / ${summary.fifties_per_innings.scope_avg.toFixed(3)} / ${summary.hundreds_per_innings.scope_avg.toFixed(3)}`
                   : ''}
               </div>
             </div>
@@ -379,7 +379,7 @@ export default function Batting() {
                         field name (`runs`) so the LineChart's accessor
                         finds both series; null seasons (cohort sample
                         below threshold) drop out so the green line
-                        has gaps at those years. Q5 → label="base". */}
+                        has gaps at those years. Q5 → label="cohort". */}
                     {(() => {
                       // C1: Runs by Season is a volume chart — no overlay.
                       // C2: add Runs/Inn by Season with the cohort overlay

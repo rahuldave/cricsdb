@@ -319,20 +319,20 @@ export default function Fielding() {
                   <StatCard label="Catches"        value={summary.catches.value ?? 0} />
                   <StatCard label="Catches/Match"  value={fmt(summary.catches_per_match.value, 3)}
                     subtitle={summary.catches_per_match.scope_avg != null
-                      ? <MetricDelta env={summary.catches_per_match} withScopeAvg label="base" fmt={3}
+                      ? <MetricDelta env={summary.catches_per_match} withScopeAvg label="cohort" fmt={3}
                           scopeAvgTooltip={cohortTT} />
                       : undefined} />
                   <StatCard label="Run Outs"       value={summary.run_outs.value ?? 0} />
                   <StatCard label="Run-outs/Match" value={fmt(summary.run_outs_per_match.value, 3)}
                     subtitle={summary.run_outs_per_match.scope_avg != null
-                      ? <MetricDelta env={summary.run_outs_per_match} withScopeAvg label="base" fmt={3}
+                      ? <MetricDelta env={summary.run_outs_per_match} withScopeAvg label="cohort" fmt={3}
                           scopeAvgTooltip={cohortTT} />
                       : undefined} />
                   <StatCard label="Stumpings"      value={summary.stumpings.value ?? 0} />
                   {hasStump
                     ? <StatCard label="Stumpings/Match" value={fmt(summary.stumpings_per_match.value, 3)}
                         subtitle={summary.stumpings_per_match.scope_avg != null
-                          ? <MetricDelta env={summary.stumpings_per_match} withScopeAvg label="base" fmt={3}
+                          ? <MetricDelta env={summary.stumpings_per_match} withScopeAvg label="cohort" fmt={3}
                               scopeAvgTooltip={cohortTT} />
                           : undefined} />
                     : <div />}
@@ -342,7 +342,7 @@ export default function Fielding() {
                   <StatCard label="Matches"    value={summary.matches.value ?? 0} />
                   <StatCard label="Dis/Match"  value={fmt(summary.dismissals_per_match.value)}
                     subtitle={summary.dismissals_per_match.scope_avg != null
-                      ? <MetricDelta env={summary.dismissals_per_match} withScopeAvg label="base" fmt={3}
+                      ? <MetricDelta env={summary.dismissals_per_match} withScopeAvg label="cohort" fmt={3}
                           scopeAvgTooltip={cohortTT} />
                       : undefined} />
                   <div /><div /><div />
