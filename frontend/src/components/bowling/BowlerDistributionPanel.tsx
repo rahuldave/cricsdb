@@ -35,7 +35,7 @@ import BowlerFormDeltaLine from './BowlerFormDeltaLine'
 import BowlerSuggestedSplitsRow from './BowlerSuggestedSplitsRow'
 import { WISDEN_WICKET_TIERS, WISDEN_LOWER_TIERS } from '../charts/palette'
 import { wicketBin, wicketTier, economyTier, runsConcededTier } from './distributionBins'
-import type { BowlerDistribution, BowlerDossier, BowlerInningsObservation } from '../../types'
+import type { BowlerDistribution, BowlerDossier, BowlerInningsObservation, BowlingSummary } from '../../types'
 
 import { KickerHeader } from '../ChartHeader'
 type DistWindow = 'scope' | 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
@@ -90,17 +90,27 @@ interface SparklineConfig {
   playerReferenceValue: number | null
   /** Global line — gender-tiered all-bowler centre. */
   globalReferenceValue: number
+  /** Tier 6 of spec-apples-to-apples-baselines.md — same-scope cohort
+   *  baseline. Forest green. Sourced from /bowlers/{id}/summary's
+   *  over-weighted per-innings envelope scope_avg. Null when chip is
+   *  below-cliff. */
+  leagueReferenceValue: number | null
   caption: string
   /** "8 RPO" / "1 wkts/inn" / "26 runs/inn" — for the legend. */
   globalLegend: string
+  /** Short label for the green line in the sparkline legend
+   *  ("0.30 wkts/inn"). Matches the chip's scope_avg display. */
+  leagueLegend: string | null
 }
 
 function sparklineFor(
   metric: DistMetric,
   scopeLifetime: BowlerDossier,
   globals: GlobalBowlingBaselines,
+  summary: BowlingSummary | null,
 ): SparklineConfig {
   if (metric === 'wickets') {
+    const leagueWpi = summary?.wickets_per_innings?.scope_avg ?? null
     return {
       point: o => {
         const tier = wicketTier(wicketBin(o.wickets))
@@ -114,11 +124,14 @@ function sparklineFor(
       },
       playerReferenceValue: scopeLifetime.wickets.mean_per_innings,
       globalReferenceValue: globals.wickets,
+      leagueReferenceValue: leagueWpi,
       caption: 'oldest ← bars (one per innings, height = wickets) → most recent',
       globalLegend: `${globals.wickets} wkts/inn`,
+      leagueLegend: leagueWpi != null ? `${leagueWpi.toFixed(2)} wkts/inn` : null,
     }
   }
   if (metric === 'economy') {
+    const leagueEcon = summary?.economy?.scope_avg ?? null
     return {
       point: o => {
         const v = o.balls > 0 ? +(o.runs_conceded * 6 / o.balls).toFixed(2) : 0
@@ -130,10 +143,27 @@ function sparklineFor(
       },
       playerReferenceValue: scopeLifetime.economy.pool,
       globalReferenceValue: globals.rpo,
+      leagueReferenceValue: leagueEcon,
       caption: 'oldest ← bars (one per innings, height = econ RPO) → most recent',
       globalLegend: `${globals.rpo} RPO`,
+      leagueLegend: leagueEcon != null ? `${leagueEcon.toFixed(2)} RPO` : null,
     }
   }
+  // Runs-conceded tab: no first-class /summary scope_avg field for
+  // runs_per_spell exists. Approximate from economy.scope_avg × player
+  // balls-per-innings (player's own spell-length × cohort run-rate ≈
+  // cohort-typical runs conceded under player's deployment). Skipped
+  // when player has no innings. The wickets block carries the
+  // per-innings observations array (balls populated); use it as the
+  // canonical per-spell sample.
+  const econSA = summary?.economy?.scope_avg
+  const wktsObs = scopeLifetime.wickets.observations
+  const playerBallsPerInn = wktsObs.length > 0
+    ? wktsObs.reduce((s, o) => s + o.balls, 0) / wktsObs.length
+    : null
+  const leagueRunsPerSpell = (econSA != null && playerBallsPerInn != null)
+    ? +(econSA * playerBallsPerInn / 6).toFixed(1)
+    : null
   return {
     point: o => ({
       date: o.date, matchId: o.match_id, value: o.runs_conceded,
@@ -142,14 +172,18 @@ function sparklineFor(
     }),
     playerReferenceValue: scopeLifetime.runs_conceded.mean_per_innings,
     globalReferenceValue: globals.runs,
+    leagueReferenceValue: leagueRunsPerSpell,
     caption: 'oldest ← bars (one per innings, height = runs conceded) → most recent',
     globalLegend: `${globals.runs} runs/inn`,
+    leagueLegend: leagueRunsPerSpell != null
+      ? `${leagueRunsPerSpell} r/inn @ player spell length` : null,
   }
 }
 
 /** Tiny inline legend explaining the reference lines + rolling mean. */
-function SparklineLegend({ globalLegend, rollingWindow }: {
+function SparklineLegend({ globalLegend, leagueLegend, rollingWindow }: {
   globalLegend: string
+  leagueLegend: string | null
   rollingWindow: number | null
 }) {
   // Swatch alignment pattern per commit b770918 — see
@@ -170,8 +204,11 @@ function SparklineLegend({ globalLegend, rollingWindow }: {
       fontFamily: 'var(--serif)', fontStyle: 'italic',
       fontSize: '0.7rem', color: 'var(--ink-faint)',
     }}>
-      <span><Swatch color="#1A1714" h={2} />scope average</span>
-      <span><Swatch color="#8A7D70" h={1.5} />gender-global ({globalLegend})</span>
+      <span><Swatch color="#1A1714" h={2} />player scope mean</span>
+      {leagueLegend !== null && (
+        <span><Swatch color="#3F7A4D" h={1.5} />cohort at scope ({leagueLegend})</span>
+      )}
+      <span><Swatch color="#8A7D70" h={1.5} />all-T20 ({globalLegend})</span>
       {rollingWindow !== null && (
         <span><Swatch color="#7A1F1F" h={1.5} />rolling-{rollingWindow} mean</span>
       )}
@@ -183,12 +220,15 @@ function SparklineLegend({ globalLegend, rollingWindow }: {
 interface Props {
   playerId: string
   distribution: BowlerDistribution | null
+  /** Tier 6 of spec-apples-to-apples-baselines.md — same-scope cohort
+   *  baseline source for the green sparkline reference line. */
+  summary: BowlingSummary | null
   loading: boolean
   error: string | null
 }
 
 export default function BowlerDistributionPanel({
-  playerId, distribution, loading, error,
+  playerId, distribution, summary, loading, error,
 }: Props) {
   const [windowParam, setWindowParam] = useUrlParam('dist_window')
   const [metricParam, setMetricParam] = useUrlParam('dist_metric')
@@ -326,7 +366,7 @@ export default function BowlerDistributionPanel({
           <div style={{ marginTop: '0.75rem' }}>
             {(() => {
               const globals = pickBowlingBaseline(distribution.scope)
-              const cfg = sparklineFor(metric, distribution.lifetime, globals)
+              const cfg = sparklineFor(metric, distribution.lifetime, globals, summary)
               const points = dossier.wickets.observations.map(cfg.point)
               // Rolling-mean overlay only on the widest window (Scope)
               // where smoothing reads as form-arc rather than noise;
@@ -339,6 +379,7 @@ export default function BowlerDistributionPanel({
                       points={points}
                       playerReferenceValue={cfg.playerReferenceValue}
                       globalReferenceValue={cfg.globalReferenceValue}
+                      leagueReferenceValue={cfg.leagueReferenceValue}
                       rollingWindow={showRolling ? ROLLING_WINDOW : undefined}
                     />
                     <SeasonTickAxis dates={dossier.wickets.observations.map(o => o.date)} />
@@ -353,6 +394,7 @@ export default function BowlerDistributionPanel({
                     <span>{cfg.caption}</span>
                     <SparklineLegend
                       globalLegend={cfg.globalLegend}
+                      leagueLegend={cfg.leagueLegend}
                       rollingWindow={showRolling ? ROLLING_WINDOW : null}
                     />
                   </div>
