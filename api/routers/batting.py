@@ -463,6 +463,8 @@ async def batting_summary(
     balls_per_six_val = _safe_div(balls, sixes)
     balls_per_boundary_val = _safe_div(balls, boundaries)
     # Q6 (spec-player-baseline-parity.md §3.3.1): per-innings rates.
+    # runs_per_innings added by spec-rate-vs-volume-audit.md §2.1 Group
+    # A — sibling to the Runs volume tile (Phase F1 on /players).
     boundaries_per_innings_val = round(boundaries / innings_count, 3) if innings_count else None
     sixes_per_innings_val      = round(sixes / innings_count, 3)      if innings_count else None
     fours_per_innings_val      = round(fours / innings_count, 3)      if innings_count else None
@@ -470,6 +472,7 @@ async def batting_summary(
     fifties_per_innings_val    = round(fifties / innings_count, 3)    if innings_count else None
     hundreds_per_innings_val   = round(hundreds / innings_count, 3)   if innings_count else None
     ducks_per_innings_val      = round(ducks / innings_count, 3)      if innings_count else None
+    runs_per_innings_val       = round(runs / innings_count, 2)       if innings_count else None
 
     def _cohort_scope_avg(key: str) -> Optional[float]:
         if cohort is None:
@@ -520,6 +523,7 @@ async def batting_summary(
         "fifties_per_innings":    wrap_metric(fifties_per_innings_val,    _cohort_scope_avg("fifties_per_innings"),    "bat_fifties_per_innings",    sample_size=cohort_sample),
         "hundreds_per_innings":   wrap_metric(hundreds_per_innings_val,   _cohort_scope_avg("hundreds_per_innings"),   "bat_hundreds_per_innings",   sample_size=cohort_sample),
         "ducks_per_innings":      wrap_metric(ducks_per_innings_val,      _cohort_scope_avg("ducks_per_innings"),      "bat_ducks_per_innings",      sample_size=cohort_sample),
+        "runs_per_innings":       wrap_metric(runs_per_innings_val,       _cohort_scope_avg("runs_per_innings"),       "bat_runs_per_innings",       sample_size=cohort_sample),
         # Position distribution + cohort metadata for the next-spec viz.
         "position_distribution": position_distribution,
         "cohort": cohort["cohort"] if cohort else None,

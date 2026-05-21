@@ -130,6 +130,8 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     "bat_fifties_per_innings":    "higher_better",
     "bat_hundreds_per_innings":   "higher_better",
     "bat_ducks_per_innings":      "lower_better",
+    # spec-rate-vs-volume-audit.md §2.1 Group A — sibling rate to Runs.
+    "bat_runs_per_innings":       "higher_better",
 
     # ── bowling (per-player) ───────────────────────────────────────
     # `bowl_dot_pct` already defined above (team-side, higher_better,
@@ -161,6 +163,9 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     # Q6 per-innings rates (spec-player-baseline-parity.md §3.3.3).
     "bowl_wickets_per_innings": "higher_better",
     "bowl_maidens_per_innings": "higher_better",
+    # spec-rate-vs-volume-audit.md §2.1 Group A — sibling rate to 4-fers
+    # volume. Higher (more 4-fers per innings) = better.
+    "bowl_four_wicket_hauls_per_innings": "higher_better",
 
     # ── fielding (per-player) ──────────────────────────────────────
     "field_catches":              None,

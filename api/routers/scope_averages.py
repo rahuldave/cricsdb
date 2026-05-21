@@ -1761,6 +1761,7 @@ async def compute_players_batting_cohort(
     pi_sql = f"""
         SELECT
             SUM(pss.innings_batted) AS innings_total,
+            SUM(pss.runs)           AS runs_total,
             SUM(pss.fours)          AS fours_total,
             SUM(pss.sixes)          AS sixes_total,
             SUM(pss.fours + pss.sixes) AS boundaries_total,
@@ -1793,6 +1794,10 @@ async def compute_players_batting_cohort(
     cc_fifties_pi    = _pi_rate("fifties_total")
     cc_hundreds_pi   = _pi_rate("hundreds_total")
     cc_ducks_pi      = _pi_rate("ducks_total")
+    # spec-rate-vs-volume-audit.md §2.1 Group A — sibling rate to the
+    # Runs volume tile. Two decimal places to match the player-side.
+    _runs_total = pir.get("runs_total") or 0
+    cc_runs_pi = round(_runs_total / _pi_inn, 2) if _pi_inn else None
 
     by_position: list[dict] = []
     for b in range(1, 11):
@@ -1874,6 +1879,7 @@ async def compute_players_batting_cohort(
             "fifties_per_innings":    wrap_metric(cc_fifties_pi,    cc_fifties_pi,    "bat_fifties_per_innings",    sample_size=n_innings_total),
             "hundreds_per_innings":   wrap_metric(cc_hundreds_pi,   cc_hundreds_pi,   "bat_hundreds_per_innings",   sample_size=n_innings_total),
             "ducks_per_innings":      wrap_metric(cc_ducks_pi,      cc_ducks_pi,      "bat_ducks_per_innings",      sample_size=n_innings_total),
+            "runs_per_innings":       wrap_metric(cc_runs_pi,       cc_runs_pi,       "bat_runs_per_innings",       sample_size=n_innings_total),
             "by_position": by_position,
         }
 
@@ -1914,6 +1920,7 @@ async def compute_players_batting_cohort(
         "fifties_per_innings":    wrap_metric(cc_fifties_pi,    cc_fifties_pi,    "bat_fifties_per_innings",    sample_size=n_innings_total),
         "hundreds_per_innings":   wrap_metric(cc_hundreds_pi,   cc_hundreds_pi,   "bat_hundreds_per_innings",   sample_size=n_innings_total),
         "ducks_per_innings":      wrap_metric(cc_ducks_pi,      cc_ducks_pi,      "bat_ducks_per_innings",      sample_size=n_innings_total),
+        "runs_per_innings":       wrap_metric(cc_runs_pi,       cc_runs_pi,       "bat_runs_per_innings",       sample_size=n_innings_total),
         "by_position": by_position,
     }
 
@@ -2400,11 +2407,13 @@ async def compute_players_bowling_cohort(
     """
     # Q6: scope-flat wickets-per-innings + maidens-per-innings from
     # parent + per-over child. Used by the /bowlers/{id}/summary chip
-    # extensions.
+    # extensions. four_wicket_hauls total added by
+    # spec-rate-vs-volume-audit.md §2.1 Group A.
     pi_sql = f"""
         SELECT
-            SUM(pss.innings_batted) AS innings_total_dummy,
-            SUM(pss.wickets)        AS wickets_total
+            SUM(pss.innings_batted)    AS innings_total_dummy,
+            SUM(pss.wickets)           AS wickets_total,
+            SUM(pss.four_wicket_hauls) AS four_wicket_hauls_total
         FROM playerscopestats pss
         WHERE {where}
     """
@@ -2435,8 +2444,12 @@ async def compute_players_bowling_cohort(
     bowling_innings_approx = bowling_innings_approx / 24 if bowling_innings_approx else 0
     wickets_total = (pi[0].get("wickets_total") if pi else 0) or 0
     maidens_total = (mi[0].get("maidens_total") if mi else 0) or 0
+    four_wicket_hauls_total = (pi[0].get("four_wicket_hauls_total") if pi else 0) or 0
     cc_wickets_per_innings = round(wickets_total / bowling_innings_approx, 3) if bowling_innings_approx else None
     cc_maidens_per_innings = round(maidens_total / bowling_innings_approx, 3) if bowling_innings_approx else None
+    cc_four_wicket_hauls_per_innings = (
+        round(four_wicket_hauls_total / bowling_innings_approx, 4) if bowling_innings_approx else None
+    )
 
     by_over_arr: list[dict] = []
     for o in range(1, 21):
@@ -2502,6 +2515,7 @@ async def compute_players_bowling_cohort(
             # Q6 envelope additions (scope-flat).
             "wickets_per_innings": wrap_metric(cc_wickets_per_innings, cc_wickets_per_innings, "bowl_wickets_per_innings", sample_size=n_balls_total),
             "maidens_per_innings": wrap_metric(cc_maidens_per_innings, cc_maidens_per_innings, "bowl_maidens_per_innings", sample_size=n_balls_total),
+            "four_wicket_hauls_per_innings": wrap_metric(cc_four_wicket_hauls_per_innings, cc_four_wicket_hauls_per_innings, "bowl_four_wicket_hauls_per_innings", sample_size=n_balls_total),
             "by_over": by_over_arr,
         }
 
@@ -2533,6 +2547,7 @@ async def compute_players_bowling_cohort(
         # Q6 envelope additions (scope-flat per-innings rates).
         "wickets_per_innings": wrap_metric(cc_wickets_per_innings, cc_wickets_per_innings, "bowl_wickets_per_innings", sample_size=n_balls_total),
         "maidens_per_innings": wrap_metric(cc_maidens_per_innings, cc_maidens_per_innings, "bowl_maidens_per_innings", sample_size=n_balls_total),
+        "four_wicket_hauls_per_innings": wrap_metric(cc_four_wicket_hauls_per_innings, cc_four_wicket_hauls_per_innings, "bowl_four_wicket_hauls_per_innings", sample_size=n_balls_total),
         "by_over": by_over_arr,
     }
 
