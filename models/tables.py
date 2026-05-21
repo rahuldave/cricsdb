@@ -371,6 +371,55 @@ class PlayerScopeStatsBattingPhase:
     dismissals_in_phase: int = 0
 
 
+class PlayerScopeStatsBattingPhasePosition:
+    """One row per (person, scope, phase_bucket, position_bucket) —
+    position × phase per-batter aggregates.
+
+    Tier 3 of internal_docs/spec-apples-to-apples-baselines.md. Cross
+    of PlayerScopeStatsBattingPhase (phase_bucket axis) and
+    PlayerScopeStatsPosition (position_bucket axis): 3 phases × 10
+    positions = up to 30 rows per (person, scope).
+
+    Drives a position-weighted per-phase batting cohort baseline —
+    replaces the position-FLAT baseline currently used by
+    compute_players_batting_by_phase so an opener's powerplay SR is
+    compared against other openers in the powerplay, not against
+    every batter in the powerplay (which is dominated by tail-enders
+    who rarely face the new ball).
+
+    Built and maintained by
+    `scripts/populate_playerscopestats_batting_phase_position.py`,
+    auto-called from `import_data.py` (full) and `update_recent.py`
+    (incremental) alongside the other player-scope child populates.
+
+    Per-(person, scope, phase, position) aggregates:
+      innings_in_phase — distinct innings where the batter faced ≥1
+                         legal ball IN this phase, at this position.
+      balls_in_phase   — legal balls faced in this phase × position.
+      runs_in_phase    — runs scored.
+      dots_in_phase    — dots.
+      fours_in_phase / sixes_in_phase / boundaries_in_phase — same.
+      dismissals_in_phase — dismissed batter credits.
+
+    Phase boundaries match `_phase` in populate_player_scope_stats.py
+    (1=pp overs 0-5, 2=middle 6-14, 3=death 15-19). Position bucket
+    semantics match position_to_bucket (1=opener pos 1+2 merged,
+    2=#3, …, 10=#11).
+    """
+    person_id: ForeignKey[str, "person"]
+    scope_key: str  # matches PlayerScopeStats.scope_key
+    phase_bucket: int     # 1=pp, 2=middle, 3=death
+    position_bucket: int  # 1=opener, 2=#3, ..., 10=#11
+    innings_in_phase: int = 0
+    balls_in_phase: int = 0
+    runs_in_phase: int = 0
+    dots_in_phase: int = 0
+    fours_in_phase: int = 0
+    sixes_in_phase: int = 0
+    boundaries_in_phase: int = 0
+    dismissals_in_phase: int = 0
+
+
 class PlayerScopeStatsFieldingPhase:
     """One row per (person, scope, phase_bucket) — per-phase fielding aggregates.
 
