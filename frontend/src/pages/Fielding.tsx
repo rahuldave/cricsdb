@@ -306,31 +306,47 @@ export default function Fielding() {
             const cohortTT = summary.cohort
               ? fieldingCohortTooltip(summary.cohort as FieldingCohortMeta)
               : undefined
+            // spec-rate-vs-volume-audit F4: drop chips from volume
+            // tiles (Catches, Stumpings, Run Outs) and add sibling
+            // per-match rate tiles. Mirrors /players F2 — same
+            // dimensional discipline applied to the deep-dive.
+            // Stumpings/Match suppressed at stumpings=0 (non-keeper).
+            const hasStump = (summary.stumpings.value ?? 0) > 0
             return (
-              <div className="wisden-statrow cols-6">
-                <StatCard label="Catches" value={summary.catches.value ?? 0}
-                  subtitle={summary.catches_per_match.scope_avg != null
-                    ? <MetricDelta env={summary.catches_per_match} withScopeAvg label="base" fmt={3}
-                        scopeAvgTooltip={cohortTT} />
-                    : undefined} />
-                <StatCard label="Stumpings" value={summary.stumpings.value ?? 0}
-                  subtitle={summary.stumpings_per_match.scope_avg != null && summary.stumpings_per_match.value
-                    ? <MetricDelta env={summary.stumpings_per_match} withScopeAvg label="base" fmt={3}
-                        scopeAvgTooltip={cohortTT} />
-                    : undefined} />
-                <StatCard label="Run Outs" value={summary.run_outs.value ?? 0}
-                  subtitle={summary.run_outs_per_match.scope_avg != null
-                    ? <MetricDelta env={summary.run_outs_per_match} withScopeAvg label="base" fmt={3}
-                        scopeAvgTooltip={cohortTT} />
-                    : undefined} />
-                <StatCard label="Total" value={summary.total_dismissals.value ?? 0} />
-                <StatCard label="Matches" value={summary.matches.value ?? 0} />
-                <StatCard label="Dis/Match" value={fmt(summary.dismissals_per_match.value)}
-                  subtitle={summary.dismissals_per_match.scope_avg != null
-                    ? <MetricDelta env={summary.dismissals_per_match} withScopeAvg label="base" fmt={3}
-                        scopeAvgTooltip={cohortTT} />
-                    : undefined} />
-              </div>
+              <>
+                <div className="wisden-statrow cols-6">
+                  <StatCard label="Catches"        value={summary.catches.value ?? 0} />
+                  <StatCard label="Catches/Match"  value={fmt(summary.catches_per_match.value, 3)}
+                    subtitle={summary.catches_per_match.scope_avg != null
+                      ? <MetricDelta env={summary.catches_per_match} withScopeAvg label="base" fmt={3}
+                          scopeAvgTooltip={cohortTT} />
+                      : undefined} />
+                  <StatCard label="Run Outs"       value={summary.run_outs.value ?? 0} />
+                  <StatCard label="Run-outs/Match" value={fmt(summary.run_outs_per_match.value, 3)}
+                    subtitle={summary.run_outs_per_match.scope_avg != null
+                      ? <MetricDelta env={summary.run_outs_per_match} withScopeAvg label="base" fmt={3}
+                          scopeAvgTooltip={cohortTT} />
+                      : undefined} />
+                  <StatCard label="Stumpings"      value={summary.stumpings.value ?? 0} />
+                  {hasStump
+                    ? <StatCard label="Stumpings/Match" value={fmt(summary.stumpings_per_match.value, 3)}
+                        subtitle={summary.stumpings_per_match.scope_avg != null
+                          ? <MetricDelta env={summary.stumpings_per_match} withScopeAvg label="base" fmt={3}
+                              scopeAvgTooltip={cohortTT} />
+                          : undefined} />
+                    : <div />}
+                </div>
+                <div className="wisden-statrow cols-6">
+                  <StatCard label="Total"      value={summary.total_dismissals.value ?? 0} />
+                  <StatCard label="Matches"    value={summary.matches.value ?? 0} />
+                  <StatCard label="Dis/Match"  value={fmt(summary.dismissals_per_match.value)}
+                    subtitle={summary.dismissals_per_match.scope_avg != null
+                      ? <MetricDelta env={summary.dismissals_per_match} withScopeAvg label="base" fmt={3}
+                          scopeAvgTooltip={cohortTT} />
+                      : undefined} />
+                  <div /><div /><div />
+                </div>
+              </>
             )
           })()}
 

@@ -241,6 +241,47 @@ dm_f=$(printf "%.3f" "$dm_v")
 sub=$(tile_sub "Dis/Match")
 assert_contains "Kohli /players Fielding: Dis/Match chip cites base $dm_f" "vs base $dm_f" "$sub"
 
+# ───────────────────────────────────────────────────────────────────
+# Test 4 — Kohli /fielding deep-dive: F4 stat-row mirror
+# ───────────────────────────────────────────────────────────────────
+
+echo
+echo "=== Kohli /fielding — Deep-dive stat row (F4) ==="
+ab open "$BASE/fielding?player=$KOHLI&$SCOPE_URL"
+sleep 3
+snapshot_tiles
+
+# Volume tiles MUST NOT carry chips (mirror of F2 on the deep-dive).
+for label in "Catches" "Run Outs" "Stumpings"; do
+  sub=$(tile_sub "$label")
+  assert_not_contains "Kohli /fielding: $label tile MUST NOT carry chip" "vs base" "$sub"
+done
+
+# New per-match rate tiles must exist + carry cohort chip.
+for combo in \
+    "Catches/Match:catches_per_match:%.3f" \
+    "Run-outs/Match:run_outs_per_match:%.3f"; do
+  label=$(echo "$combo" | cut -d: -f1)
+  field=$(echo "$combo" | cut -d: -f2)
+  fmt=$(echo "$combo" | cut -d: -f3)
+  assert_tile_present "Kohli /fielding: $label tile exists" "$label"
+  api_v=$(summary_scope_avg "$fld_url" "$field")
+  api_f=$(printf "$fmt" "$api_v")
+  sub=$(tile_sub "$label")
+  assert_contains "Kohli /fielding: $label chip cites base $api_f" "vs base $api_f" "$sub"
+done
+
+# Stumpings/Match absent at stumpings=0.
+if python3 -c "
+import json, sys
+rows = json.load(open('/tmp/tiles.json'))['data']['result']
+sys.exit(0 if not any(r['label'] == 'Stumpings/Match' for r in rows) else 1)
+"; then
+  ok "Kohli /fielding: Stumpings/Match tile absent at stumpings=0"
+else
+  bad "Kohli /fielding: Stumpings/Match tile shouldn't render when stumpings=0"
+fi
+
 echo
 echo "─────────────────────────────────────────"
 echo "Results: $PASS passed, $FAIL failed"
