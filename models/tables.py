@@ -320,6 +320,36 @@ class PlayerScopeStatsOver:
     five_wicket_hauls: int = 0
     innings_with_wicket: int = 0
     innings_with_two: int = 0
+    # PT3 of spec-prob-baselines.md — economy + runs-conceded threshold
+    # counters for the bowling ProbChip cohort baselines on /bowlers/.../
+    # distribution's economy + runs_conceded blocks.
+    #
+    # `innings_qualifying` — distinct (innings, bowler) pairs where the
+    # bowler bowled ≥1 legal ball at THIS over_bucket AND ≥12 total
+    # legal balls in the spell. This is the per-bucket denominator for
+    # the threshold cohort baselines: the player chip's master sample
+    # filters at min_balls=12, so the cohort denominator must filter
+    # the SAME population to be apples-to-apples (otherwise the prob is
+    # biased low by ultra-short cameos that can't satisfy the chip's
+    # threshold). See spec §3.2 + §8.1 + Decision 1.
+    #
+    # The eight threshold counters apply min_balls=12 uniformly to both
+    # numerator and denominator. Spell-level predicates:
+    #   econ leq X = (spell_runs_conceded × 6 / spell_legal_balls) ≤ X,
+    #                gated by spell_legal_balls ≥ 12.
+    #   econ geq X = same comparison, ≥ X, same gating.
+    #   runs leq X = spell_runs_conceded ≤ X, gated by spell_legal_balls
+    #                ≥ 12. Matches the chip's master-sample gate.
+    #   runs geq X = same, ≥ X, same gating.
+    innings_qualifying: int = 0
+    innings_econ_leq_6: int = 0
+    innings_econ_leq_7: int = 0
+    innings_econ_geq_9: int = 0
+    innings_econ_geq_10: int = 0
+    innings_runs_leq_15: int = 0
+    innings_runs_leq_25: int = 0
+    innings_runs_geq_40: int = 0
+    innings_runs_geq_50: int = 0
 
 
 class PlayerScopeStatsFieldingPosition:

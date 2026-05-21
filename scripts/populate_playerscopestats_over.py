@@ -61,6 +61,11 @@ class _Acc:
         "innings_set", "four_wicket_hauls",
         "three_wicket_hauls", "five_wicket_hauls",
         "innings_with_wicket", "innings_with_two",
+        "innings_qualifying",
+        "innings_econ_leq_6", "innings_econ_leq_7",
+        "innings_econ_geq_9", "innings_econ_geq_10",
+        "innings_runs_leq_15", "innings_runs_leq_25",
+        "innings_runs_geq_40", "innings_runs_geq_50",
     )
 
     def __init__(self):
@@ -94,6 +99,21 @@ class _Acc:
         self.five_wicket_hauls = 0
         self.innings_with_wicket = 0
         self.innings_with_two = 0
+        # PT3 of spec-prob-baselines.md — econ + runs-conceded
+        # threshold counters. Per-spell-touching pattern: when a spell
+        # meets the spell-level threshold, every over_bucket the
+        # bowler touched in that spell gets a credit. Both numerator
+        # AND denominator (innings_qualifying) gate on spell-level
+        # legal_balls ≥ 12 (the chip's master-sample qualifier).
+        self.innings_qualifying = 0
+        self.innings_econ_leq_6 = 0
+        self.innings_econ_leq_7 = 0
+        self.innings_econ_geq_9 = 0
+        self.innings_econ_geq_10 = 0
+        self.innings_runs_leq_15 = 0
+        self.innings_runs_leq_25 = 0
+        self.innings_runs_geq_40 = 0
+        self.innings_runs_geq_50 = 0
 
     def to_row(self, person_id: str, scope_key: str, over_number: int) -> dict:
         return {
@@ -112,6 +132,15 @@ class _Acc:
             "five_wicket_hauls": self.five_wicket_hauls,
             "innings_with_wicket": self.innings_with_wicket,
             "innings_with_two": self.innings_with_two,
+            "innings_qualifying": self.innings_qualifying,
+            "innings_econ_leq_6": self.innings_econ_leq_6,
+            "innings_econ_leq_7": self.innings_econ_leq_7,
+            "innings_econ_geq_9": self.innings_econ_geq_9,
+            "innings_econ_geq_10": self.innings_econ_geq_10,
+            "innings_runs_leq_15": self.innings_runs_leq_15,
+            "innings_runs_leq_25": self.innings_runs_leq_25,
+            "innings_runs_geq_40": self.innings_runs_geq_40,
+            "innings_runs_geq_50": self.innings_runs_geq_50,
         }
 
 
@@ -236,6 +265,10 @@ async def _aggregate_matches(
     # we know the per-spell total wickets we walk these to credit the
     # per-spell-touching counters (innings_with_wicket / innings_with_two).
     bowler_innings_overs: dict[tuple[int, str], set[int]] = {}
+    # PT3 of spec-prob-baselines.md — per-(innings, bowler) spell-
+    # level totals. Drives the min_balls=12 gate + econ + runs-conceded
+    # threshold counters (innings_qualifying + 8 threshold columns).
+    spell_totals: dict[tuple[int, str], list[int]] = {}  # [legal_balls, runs_conceded]
 
     def get_acc(person_id: str, scope_key: str, over_number: int) -> _Acc:
         key = (person_id, scope_key, over_number)
@@ -269,9 +302,19 @@ async def _aggregate_matches(
             acc = get_acc(bow, scope_key, over_bucket)
             # runs_conceded counts every delivery (incl. wides + noballs).
             acc.runs_conceded += d["runs_total"]
+            # PT3 of spec-prob-baselines.md — spell-level totals for
+            # the min_balls=12 gate + threshold counters. legal_balls
+            # = legal deliveries only; runs_conceded = all deliveries.
+            stkey = (iid, bow)
+            st = spell_totals.get(stkey)
+            if st is None:
+                st = [0, 0]
+                spell_totals[stkey] = st
+            st[1] += d["runs_total"]
             legal = (d["extras_wides"] == 0 and d["extras_noballs"] == 0)
             if legal:
                 acc.legal_balls += 1
+                st[0] += 1
                 # Tier 2: distinct innings where this bowler delivered
                 # ≥1 legal ball at this over_number — per-bucket
                 # innings denominator.
@@ -381,6 +424,41 @@ async def _aggregate_matches(
             scope_key = match_meta[mid]["scope_key"]
             over_bucket = over_number_0idx + 1
             get_acc(bow, scope_key, over_bucket).maidens += 1
+
+    # PT3 of spec-prob-baselines.md — econ + runs-conceded threshold
+    # counts, gated by spell_legal_balls ≥ 12 (the chip's master-sample
+    # min_balls qualifier). For every qualifying spell, credit
+    # innings_qualifying + every threshold the spell meets on EVERY
+    # over_bucket the bowler touched.
+    MIN_BALLS_QUAL = 12
+    for (iid, bow), (spell_lb, spell_rc) in spell_totals.items():
+        if spell_lb < MIN_BALLS_QUAL:
+            continue
+        buckets = bowler_innings_overs.get((iid, bow))
+        if not buckets:
+            continue
+        mid = innings_match[iid]
+        scope_key = match_meta[mid]["scope_key"]
+        spell_econ = spell_rc * 6.0 / spell_lb
+        meets_econ_leq_6  = spell_econ <= 6.0
+        meets_econ_leq_7  = spell_econ <= 7.0
+        meets_econ_geq_9  = spell_econ >= 9.0
+        meets_econ_geq_10 = spell_econ >= 10.0
+        meets_runs_leq_15 = spell_rc <= 15
+        meets_runs_leq_25 = spell_rc <= 25
+        meets_runs_geq_40 = spell_rc >= 40
+        meets_runs_geq_50 = spell_rc >= 50
+        for over_bucket in buckets:
+            acc = get_acc(bow, scope_key, over_bucket)
+            acc.innings_qualifying += 1
+            if meets_econ_leq_6:  acc.innings_econ_leq_6 += 1
+            if meets_econ_leq_7:  acc.innings_econ_leq_7 += 1
+            if meets_econ_geq_9:  acc.innings_econ_geq_9 += 1
+            if meets_econ_geq_10: acc.innings_econ_geq_10 += 1
+            if meets_runs_leq_15: acc.innings_runs_leq_15 += 1
+            if meets_runs_leq_25: acc.innings_runs_leq_25 += 1
+            if meets_runs_geq_40: acc.innings_runs_geq_40 += 1
+            if meets_runs_geq_50: acc.innings_runs_geq_50 += 1
 
     return accs
 
