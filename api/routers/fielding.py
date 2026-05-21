@@ -19,7 +19,7 @@ from ..tournament_canonical import (
     variants as canonical_variants,
     event_name_in_clause,
 )
-from ..wilson import prob_record
+from ..wilson import prob_record, enrich_prob_record
 from ..form_windows import scope_anchor
 
 router = APIRouter(prefix="/api/v1/fielders", tags=["Fielding"])
@@ -1134,6 +1134,28 @@ async def fielding_distribution(
     lifetime = _distribution_dossier_fielder(observations, substitute_catches)
     form = _form_windows_fielder(observations, substitute_catches, today)
 
+    # PT4 of spec-prob-baselines.md — keeper-binary cohort baseline.
+    # Player's is_keeper for this scope is derived the same way the
+    # /summary endpoint does it (innings_kept > 0). Cohort fetched
+    # once, applied to lifetime + every form window's catches block
+    # (P(=0) / P(=1) / P(≥2)).
+    if observations:
+        innings_kept = sum(o["kept_innings"] for o in observations)
+        is_keeper_val = 1 if innings_kept > 0 else 0
+        from .scope_averages import compute_players_fielding_cohort
+        cohort = await compute_players_fielding_cohort(
+            db, filters, aux, is_keeper_val, drop_set=None,
+        )
+        _enrich_fielding_catches_milestones_with_cohort(
+            lifetime["catches"]["milestones"], cohort,
+        )
+        for window_key in ("last_10", "last_60d", "last_6mo", "last_1yr"):
+            window_doss = form.get(window_key)
+            if window_doss and "catches" in window_doss:
+                _enrich_fielding_catches_milestones_with_cohort(
+                    window_doss["catches"]["milestones"], cohort,
+                )
+
     # last_match_date — drives the frontend dormancy badge.
     # Spec §13 + design-decisions.md "Dormancy badge".
     obs_dates = [o["date"] for o in observations if o.get("date")]
@@ -1148,6 +1170,45 @@ async def fielding_distribution(
         "form": form,
         "suggested_splits": splits,
     }
+
+
+# PT4 of spec-prob-baselines.md — fielding catches chip direction +
+# cohort field map. P(=0) lower_better (more 0-catch matches is bad);
+# P(=1) descriptive (None — single-catch matches don't have an
+# orientation); P(≥2) higher_better.
+_FIELDING_CATCHES_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_zero":  "lower_better",
+    "p_one":   None,
+    "p_geq_2": "higher_better",
+}
+
+_FIELDING_CATCHES_COHORT_FIELD: dict[str, str] = {
+    "p_zero":  "prob_zero",
+    "p_one":   "prob_one",
+    "p_geq_2": "prob_geq_2",
+}
+
+
+def _enrich_fielding_catches_milestones_with_cohort(
+    milestones: dict, cohort: dict,
+) -> None:
+    """Mutate each ProbRecord in the fielding catches block to attach
+    cohort baselines. Mirrors the batting + bowling enrichment helpers.
+    spec-prob-baselines.md §4.2.
+
+    P(=1) has direction=None per spec §6 — descriptive, not directional;
+    enrich_prob_record's None-direction path leaves delta_pct null.
+    """
+    cohort_info = cohort.get("cohort") or {}
+    sample_size = cohort_info.get("n_matches_total")
+    for chip_key, direction in _FIELDING_CATCHES_PROB_DIRECTIONS.items():
+        pr = milestones.get(chip_key)
+        if not pr:
+            continue
+        cohort_field = _FIELDING_CATCHES_COHORT_FIELD[chip_key]
+        cohort_envelope = cohort.get(cohort_field) or {}
+        scope_avg = cohort_envelope.get("scope_avg")
+        enrich_prob_record(pr, scope_avg, direction, sample_size)
 
 
 def _row_to_fielding_record(r: dict) -> dict:

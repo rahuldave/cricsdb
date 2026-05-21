@@ -3733,10 +3733,28 @@ async def compute_players_fielding_cohort(
         ORDER BY pssfp.position_bucket
     """
 
-    pool, nonsub, by_dis_rows = await asyncio.gather(
+    # PT4 of spec-prob-baselines.md — match-grain catch distribution
+    # aggregated across the keeper-binary cohort. Backs the cohort
+    # baselines for the P(=0)/P(=1)/P(≥2) chips on /fielders/.../
+    # distribution. Joined per-row to the parent keeper-partition so
+    # the cohort matches the existing per-match-rate cohorts.
+    catch_dist_sql = f"""
+        SELECT SUM(pssfcd.matches_with_0)   AS m0,
+               SUM(pssfcd.matches_with_1)   AS m1,
+               SUM(pssfcd.matches_with_ge2) AS mge2
+        FROM playerscopestatsfieldingcatchdist pssfcd
+        JOIN playerscopestats pss
+          ON pss.person_id = pssfcd.person_id
+         AND pss.scope_key = pssfcd.scope_key
+        WHERE pss.matches_as_keeper {keeper_pred} 0
+          AND {where}
+    """
+
+    pool, nonsub, by_dis_rows, catch_dist = await asyncio.gather(
         db.q(pool_sql, params),
         db.q(nonsub_sql, params),
         db.q(by_dis_pos_sql, params),
+        db.q(catch_dist_sql, params),
     )
 
     n_fielders = (pool[0].get("n_fielders") if pool else 0) or 0
@@ -3793,12 +3811,34 @@ async def compute_players_fielding_cohort(
     # is_keeper axis isn't a sliding-scale dimension. The
     # by_dismissed_position[].below_support flags surface for the
     # next-spec impact-weighted analyses to consume.
+    # PT4 of spec-prob-baselines.md — per-match catch ProbChip cohort
+    # baselines. Aggregate counts across the keeper-binary cohort then
+    # divide by their sum (which is matches_total across the cohort).
+    # The cohort sample matches the chip's master sample exactly
+    # (Convention 3 catches + is_substitute=0, matchplayer-based).
+    cd_m0   = (catch_dist[0].get("m0")   if catch_dist else 0) or 0
+    cd_m1   = (catch_dist[0].get("m1")   if catch_dist else 0) or 0
+    cd_mge2 = (catch_dist[0].get("mge2") if catch_dist else 0) or 0
+    cd_total = cd_m0 + cd_m1 + cd_mge2
+    prob_zero  = round(cd_m0   / cd_total, 4) if cd_total else None
+    prob_one   = round(cd_m1   / cd_total, 4) if cd_total else None
+    prob_geq_2 = round(cd_mge2 / cd_total, 4) if cd_total else None
+
     return {
         "cohort": cohort_block,
         "catches_per_match":    wrap_metric(catches_pm,    catches_pm,    "field_catches_per_match",    sample_size=n_matches),
         "stumpings_per_match":  wrap_metric(stumpings_pm,  stumpings_pm,  "field_stumpings_per_match",  sample_size=n_matches),
         "run_outs_per_match":   wrap_metric(run_outs_pm,   run_outs_pm,   "field_run_outs_per_match",   sample_size=n_matches),
         "dismissals_per_match": wrap_metric(dismissals_pm, dismissals_pm, "field_dismissals_per_match", sample_size=n_matches),
+        # PT4 of spec-prob-baselines.md — catch-per-match ProbChip cohort
+        # baselines. cd_total is the cohort's matches_total (sum of the
+        # three bucket counts); sample_size mirrors the per-match-rate
+        # envelopes for consistency. direction conventions live on the
+        # chip side (spec §6) — P(=0) lower_better, P(=1) descriptive,
+        # P(≥2) higher_better.
+        "prob_zero":   wrap_metric(prob_zero,  prob_zero,  "field_prob_zero",   sample_size=cd_total),
+        "prob_one":    wrap_metric(prob_one,   prob_one,   "field_prob_one",    sample_size=cd_total),
+        "prob_geq_2":  wrap_metric(prob_geq_2, prob_geq_2, "field_prob_geq_2",  sample_size=cd_total),
         "by_dismissed_position": by_dis,
     }
 

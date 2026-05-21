@@ -208,6 +208,12 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     "field_catches_per_match":    "higher_better",
     "field_stumpings_per_match":  "higher_better",
     "field_run_outs_per_match":   "higher_better",
+    # PT4 of spec-prob-baselines.md — per-match catch ProbChip cohort
+    # baselines. P(=0) lower_better, P(=1) descriptive (None per spec
+    # §6 — no orientation), P(≥2) higher_better.
+    "field_prob_zero":   "lower_better",
+    "field_prob_one":    None,
+    "field_prob_geq_2":  "higher_better",
     "field_substitute_catches":   None,
     "field_innings_kept":         None,
 
