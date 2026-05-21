@@ -40,6 +40,11 @@ CONSERVED_COLUMNS = [
     ("wickets",       "wickets"),
     ("dots",          "bowling_dots"),
     ("boundaries",    "boundaries_conceded"),
+    # Tier 2 of spec-apples-to-apples-baselines.md — 4-fer attribution
+    # at over_number = over where the bowler's 4th wicket fell; SUM
+    # across over buckets per (person, scope) must equal the parent
+    # table's four_wicket_hauls total.
+    ("four_wicket_hauls", "four_wicket_hauls"),
 ]
 
 

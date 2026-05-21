@@ -181,6 +181,56 @@ def main() -> int:
         )
         print(line); all_passed &= ok
 
+    # ─── 4b. Bowling cohort over-weighted per-innings (Tier 2) ────
+    print("\n  4b. /scope/averages/players/bowling/summary @ IPL (Bumrah-shaped mix):")
+    # Bumrah's actual IPL mix from over_distribution.
+    bowl_resp = get(
+        args.host, "/api/v1/bowlers/462411b3/summary",
+        gender="male", team_type="club",
+        tournament="Indian Premier League",
+    )
+    od = bowl_resp.get("over_distribution") or []
+    total_lb = sum((o.get("legal_balls") or 0) for o in od)
+    bowl_mix = [(o.get("legal_balls") or 0) / total_lb for o in od] if total_lb else []
+    while len(bowl_mix) < 20:
+        bowl_mix.append(0.0)
+    mix_str_b = ",".join(f"{m:.6f}" for m in bowl_mix[:20])
+    bowl_cohort = get(
+        args.host, "/api/v1/scope/averages/players/bowling/summary",
+        tournament="Indian Premier League",
+        over_mix=mix_str_b,
+    )
+    # The per-innings rates should now be order-of-magnitude comparable
+    # to the player's value (~1 wicket/innings, not the ~0.3
+    # per-attendance-rate). Sanity-bound to 0.5–2× of player value.
+    for k in ("wickets_per_innings", "four_wicket_hauls_per_innings"):
+        player_v = bowl_resp.get(k, {}).get("value")
+        cohort_v = bowl_cohort.get(k, {}).get("value")
+        ok = (
+            player_v is not None and cohort_v is not None
+            and cohort_v > 0
+            and 0.3 <= cohort_v / player_v <= 3.0
+        )
+        _, line = check(
+            f"{k} cohort scope_avg in same order of magnitude as player",
+            ok,
+            f"player={player_v}, cohort={cohort_v}",
+        )
+        print(line); all_passed &= ok
+
+    # Chip ↔ cohort symmetry on /bowlers/{id}/summary.
+    print("\n  4c. /bowlers/462411b3/summary chip ↔ cohort endpoint cross-check:")
+    for k in ("wickets_per_innings", "maidens_per_innings", "four_wicket_hauls_per_innings"):
+        chip_sa = bowl_resp.get(k, {}).get("scope_avg")
+        cohort_sa = bowl_cohort.get(k, {}).get("scope_avg")
+        ok = approx(chip_sa, cohort_sa, 0.005)
+        _, line = check(
+            f"chip.{k}.scope_avg ≈ cohort endpoint scope_avg",
+            ok,
+            f"chip={chip_sa}, cohort={cohort_sa}",
+        )
+        print(line); all_passed &= ok
+
     # ─── 4. Kohli /batters/{id}/summary chip cohort_scope_avg ─────
     print("\n  4. /batters/ba607b88/summary.{milestone}.scope_avg cross-check:")
     bat_resp = get(

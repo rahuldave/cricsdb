@@ -2418,11 +2418,14 @@ async def compute_players_bowling_cohort(
 
     main_sql = f"""
         SELECT psso.over_number,
-               SUM(psso.runs_conceded) AS runs_conceded,
-               SUM(psso.legal_balls)   AS legal_balls,
-               SUM(psso.wickets)       AS wickets,
-               SUM(psso.dots)          AS dots,
-               SUM(psso.boundaries)    AS boundaries,
+               SUM(psso.runs_conceded)      AS runs_conceded,
+               SUM(psso.legal_balls)        AS legal_balls,
+               SUM(psso.wickets)            AS wickets,
+               SUM(psso.dots)               AS dots,
+               SUM(psso.boundaries)         AS boundaries,
+               SUM(psso.maidens)            AS maidens,
+               SUM(psso.innings_bowled)     AS innings_bowled,
+               SUM(psso.four_wicket_hauls)  AS four_wicket_hauls,
                COUNT(DISTINCT psso.person_id) AS n_players
         FROM playerscopestatsover psso
         WHERE psso.scope_key IN (
@@ -2439,50 +2442,32 @@ async def compute_players_bowling_cohort(
             SELECT scope_key FROM playerscopestats pss WHERE {where}
         )
     """
-    # Q6: scope-flat wickets-per-innings + maidens-per-innings from
-    # parent + per-over child. Used by the /bowlers/{id}/summary chip
-    # extensions. four_wicket_hauls total added by
-    # spec-rate-vs-volume-audit.md §2.1 Group A.
-    pi_sql = f"""
-        SELECT
-            SUM(pss.innings_batted)    AS innings_total_dummy,
-            SUM(pss.wickets)           AS wickets_total,
-            SUM(pss.four_wicket_hauls) AS four_wicket_hauls_total
+    # Tier 2 of spec-apples-to-apples-baselines.md — cohort_unique_innings
+    # is the per-innings denominator for the per-innings rates'
+    # dimensional alignment with the player-side value (which is
+    # wickets / distinct innings_bowled). The per-bucket cv() yields
+    # per-attendance-tuple rates; multiplying by cohort_avg_attendances_
+    # per_innings ≈ SUM(innings_bowled)/SUM(per-bucket-attendance) scales
+    # back to per-innings. The parent table now carries `bowling_innings`
+    # (populated by Tier 2.SP) so the SUM is one query.
+    bowling_inn_sql = f"""
+        SELECT SUM(pss.bowling_innings) AS bowling_innings_total
         FROM playerscopestats pss
         WHERE {where}
     """
-    # Bowling innings isn't stored on the parent (innings_batted is
-    # batting). Approximate per-innings denominator as ceil(balls/24)
-    # — typical bowler delivers ~4 overs (24 balls) per bowled innings.
-    maidens_sql = f"""
-        SELECT SUM(psso.maidens) AS maidens_total,
-               SUM(psso.legal_balls) AS balls_total
-        FROM playerscopestatsover psso
-        WHERE psso.scope_key IN (
-            SELECT scope_key FROM playerscopestats pss WHERE {where}
-        )
-    """
-    rows, pool, pi, mi = await asyncio.gather(
+    rows, pool, bi = await asyncio.gather(
         db.q(main_sql, params),
         db.q(pool_sql, params),
-        db.q(pi_sql, params),
-        db.q(maidens_sql, params),
+        db.q(bowling_inn_sql, params),
     )
     by_over = {r["over_number"]: r for r in rows}
     n_players_total = (pool[0].get("n_players") if pool else 0) or 0
     n_balls_total = (pool[0].get("n_balls_total") if pool else 0) or 0
-
-    # Per-innings approximation: typical bowler bowls 24 legal balls
-    # per innings. So innings_bowled ≈ legal_balls / 24 cohort-wide.
-    bowling_innings_approx = (mi[0].get("balls_total") if mi else 0) or 0
-    bowling_innings_approx = bowling_innings_approx / 24 if bowling_innings_approx else 0
-    wickets_total = (pi[0].get("wickets_total") if pi else 0) or 0
-    maidens_total = (mi[0].get("maidens_total") if mi else 0) or 0
-    four_wicket_hauls_total = (pi[0].get("four_wicket_hauls_total") if pi else 0) or 0
-    cc_wickets_per_innings = round(wickets_total / bowling_innings_approx, 3) if bowling_innings_approx else None
-    cc_maidens_per_innings = round(maidens_total / bowling_innings_approx, 3) if bowling_innings_approx else None
-    cc_four_wicket_hauls_per_innings = (
-        round(four_wicket_hauls_total / bowling_innings_approx, 4) if bowling_innings_approx else None
+    cohort_unique_innings = (bi[0].get("bowling_innings_total") if bi else 0) or 0
+    cohort_total_attendances = sum((r["innings_bowled"] or 0) for r in rows)
+    per_innings_scale = (
+        cohort_total_attendances / cohort_unique_innings
+        if cohort_unique_innings else 0
     )
 
     by_over_arr: list[dict] = []
@@ -2497,6 +2482,12 @@ async def compute_players_bowling_cohort(
                 "economy": None, "average": None, "strike_rate": None,
                 "dot_pct": None, "wickets_per_over": None,
                 "boundary_pct": None, "balls_per_boundary": None,
+                # Tier 2 of spec-apples-to-apples-baselines.md —
+                # per-bucket per-innings rates so the cohort can
+                # convex-combine over the bowler's over mix.
+                "wickets_per_innings": None,
+                "maidens_per_innings": None,
+                "four_wicket_hauls_per_innings": None,
             })
             continue
         balls = r["legal_balls"] or 0
@@ -2504,6 +2495,9 @@ async def compute_players_bowling_cohort(
         wickets = r["wickets"] or 0
         dots = r["dots"] or 0
         boundaries = r["boundaries"] or 0
+        maidens = r["maidens"] or 0
+        innings_bowled = r["innings_bowled"] or 0
+        four_wicket_hauls = r["four_wicket_hauls"] or 0
         by_over_arr.append({
             "over": o, "label": bowling_bucket_label(o),
             "n_balls": balls, "n_players": r["n_players"] or 0,
@@ -2520,6 +2514,11 @@ async def compute_players_bowling_cohort(
             # The over child table doesn't break out 4s vs 6s, so
             # only the combined balls_per_boundary is available.
             "balls_per_boundary": round(balls / boundaries, 2)        if boundaries else None,
+            # Tier 2: per-bucket per-innings rates. innings_bowled is
+            # the distinct-innings denominator for this over bucket.
+            "wickets_per_innings":          (wickets / innings_bowled)          if innings_bowled else None,
+            "maidens_per_innings":          (maidens / innings_bowled)          if innings_bowled else None,
+            "four_wicket_hauls_per_innings": (four_wicket_hauls / innings_bowled) if innings_bowled else None,
         })
 
     cliff_buckets: list[int] = [
@@ -2546,10 +2545,13 @@ async def compute_players_bowling_cohort(
             "wickets_per_over": wrap_metric(None, None, "bowl_wickets_per_over", sample_size=n_balls_total),
             "boundary_pct":     wrap_metric(None, None, "bowl_boundary_pct", sample_size=n_balls_total),
             "balls_per_boundary": wrap_metric(None, None, "bowl_balls_per_boundary", sample_size=n_balls_total),
-            # Q6 envelope additions (scope-flat).
-            "wickets_per_innings": wrap_metric(cc_wickets_per_innings, cc_wickets_per_innings, "bowl_wickets_per_innings", sample_size=n_balls_total),
-            "maidens_per_innings": wrap_metric(cc_maidens_per_innings, cc_maidens_per_innings, "bowl_maidens_per_innings", sample_size=n_balls_total),
-            "four_wicket_hauls_per_innings": wrap_metric(cc_four_wicket_hauls_per_innings, cc_four_wicket_hauls_per_innings, "bowl_four_wicket_hauls_per_innings", sample_size=n_balls_total),
+            # Tier 2: per-innings rates are now over-weighted via
+            # convex combination on per-bucket innings_bowled-
+            # denominated rates. Under cliff they null out alongside
+            # the other rates.
+            "wickets_per_innings":          wrap_metric(None, None, "bowl_wickets_per_innings", sample_size=n_balls_total),
+            "maidens_per_innings":          wrap_metric(None, None, "bowl_maidens_per_innings", sample_size=n_balls_total),
+            "four_wicket_hauls_per_innings": wrap_metric(None, None, "bowl_four_wicket_hauls_per_innings", sample_size=n_balls_total),
             "by_over": by_over_arr,
         }
 
@@ -2563,6 +2565,22 @@ async def compute_players_bowling_cohort(
     cc_wpo  = cv("wickets_per_over")
     cc_bp   = cv("boundary_pct")
     cc_bpb  = cv("balls_per_boundary")
+    # Tier 2 of spec-apples-to-apples-baselines.md — over-weighted
+    # per-innings rates. Replaces the prior `wickets_per_over × 4`
+    # heuristic + scope-flat parent aggregate; per-bucket rate uses the
+    # per-bucket innings_bowled (attendance) denominator. Multiplying
+    # cv result by `per_innings_scale` (cohort avg attendances/innings)
+    # converts the mix-weighted per-attendance rate to a per-unique-
+    # innings rate, dimensionally matching player.wickets_per_innings
+    # (wickets / distinct innings bowled) on the chip side.
+    def cv_pi(field: str) -> Optional[float]:
+        v = cv(field)
+        if v is None or per_innings_scale == 0:
+            return v
+        return v * per_innings_scale
+    cc_wpi  = cv_pi("wickets_per_innings")
+    cc_mpi  = cv_pi("maidens_per_innings")
+    cc_fwh_pi = cv_pi("four_wicket_hauls_per_innings")
 
     def _r(v: Optional[float], ndigits: int) -> Optional[float]:
         return round(v, ndigits) if v is not None else None
@@ -2578,10 +2596,10 @@ async def compute_players_bowling_cohort(
         "wickets_per_over": wrap_metric(_r(cc_wpo, 3),  _r(cc_wpo, 3),  "bowl_wickets_per_over", sample_size=n_balls_total),
         "boundary_pct":     wrap_metric(_r(cc_bp, 1),   _r(cc_bp, 1),   "bowl_boundary_pct",    sample_size=n_balls_total),
         "balls_per_boundary": wrap_metric(_r(cc_bpb, 2), _r(cc_bpb, 2), "bowl_balls_per_boundary", sample_size=n_balls_total),
-        # Q6 envelope additions (scope-flat per-innings rates).
-        "wickets_per_innings": wrap_metric(cc_wickets_per_innings, cc_wickets_per_innings, "bowl_wickets_per_innings", sample_size=n_balls_total),
-        "maidens_per_innings": wrap_metric(cc_maidens_per_innings, cc_maidens_per_innings, "bowl_maidens_per_innings", sample_size=n_balls_total),
-        "four_wicket_hauls_per_innings": wrap_metric(cc_four_wicket_hauls_per_innings, cc_four_wicket_hauls_per_innings, "bowl_four_wicket_hauls_per_innings", sample_size=n_balls_total),
+        # Tier 2: over-weighted per-innings rates.
+        "wickets_per_innings":          wrap_metric(_r(cc_wpi, 3),    _r(cc_wpi, 3),    "bowl_wickets_per_innings",          sample_size=n_balls_total),
+        "maidens_per_innings":          wrap_metric(_r(cc_mpi, 3),    _r(cc_mpi, 3),    "bowl_maidens_per_innings",          sample_size=n_balls_total),
+        "four_wicket_hauls_per_innings": wrap_metric(_r(cc_fwh_pi, 4), _r(cc_fwh_pi, 4), "bowl_four_wicket_hauls_per_innings", sample_size=n_balls_total),
         "by_over": by_over_arr,
     }
 
@@ -2662,12 +2680,14 @@ async def compute_players_bowling_by_season(
     cohort_sql = f"""
         SELECT pss.season,
                psso.over_number,
-               SUM(psso.runs_conceded) AS runs_conceded,
-               SUM(psso.legal_balls)   AS legal_balls,
-               SUM(psso.wickets)       AS wickets,
-               SUM(psso.dots)          AS dots,
-               SUM(psso.boundaries)    AS boundaries,
-               SUM(psso.maidens)       AS maidens,
+               SUM(psso.runs_conceded)      AS runs_conceded,
+               SUM(psso.legal_balls)        AS legal_balls,
+               SUM(psso.wickets)            AS wickets,
+               SUM(psso.dots)               AS dots,
+               SUM(psso.boundaries)         AS boundaries,
+               SUM(psso.maidens)            AS maidens,
+               SUM(psso.innings_bowled)     AS innings_bowled,
+               SUM(psso.four_wicket_hauls)  AS four_wicket_hauls,
                COUNT(DISTINCT psso.person_id) AS n_players
         FROM playerscopestatsover psso
         JOIN playerscopestats pss
@@ -2690,27 +2710,23 @@ async def compute_players_bowling_by_season(
         GROUP BY pss.season
         ORDER BY pss.season
     """
-    # Q4 (spec-rate-vs-volume-audit.md §2.1 Group C): scope-flat per-
-    # season four_wicket_hauls totals. The per-over child table doesn't
-    # carry four-wicket-hauls (those are per-innings markers, not per-
-    # over events), so this rate is surfaced as a scope-flat baseline
-    # per season aggregated from the parent. Innings denominator uses
-    # the same balls/24 approximation as the /summary cohort.
-    fwh_season_sql = f"""
+    # Tier 2 of spec-apples-to-apples-baselines.md — per-season cohort
+    # unique innings (denominator for the per-innings-scale factor that
+    # converts per-bucket-attendance-rate cv to per-unique-innings rate).
+    bowling_inn_sql = f"""
         SELECT pss.season,
-               SUM(pss.four_wicket_hauls) AS fwh_total,
-               SUM(pss.balls_bowled)      AS balls_total
+               SUM(pss.bowling_innings) AS bowling_innings_total
         FROM playerscopestats pss
         WHERE {where}
         GROUP BY pss.season
         ORDER BY pss.season
     """
     p_params = {**params, "__pid": person_id}
-    player_rows, cohort_rows, pool_rows, fwh_season_rows = await asyncio.gather(
+    player_rows, cohort_rows, pool_rows, bi_rows = await asyncio.gather(
         db.q(player_sql, p_params),
         db.q(cohort_sql, params),
         db.q(pool_sql, params),
-        db.q(fwh_season_sql, params),
+        db.q(bowling_inn_sql, params),
     )
 
     # Roll up.
@@ -2718,14 +2734,10 @@ async def compute_players_bowling_by_season(
     for r in cohort_rows:
         cohort_by_season.setdefault(r["season"], {})[r["over_number"]] = r
     pool_by_season: dict[str, dict] = {r["season"]: r for r in pool_rows}
+    bowling_inn_by_season: dict[str, int] = {
+        r["season"]: (r["bowling_innings_total"] or 0) for r in bi_rows
+    }
 
-    # Scope-flat four_wicket_hauls_per_innings per season (Group C).
-    fwh_by_season: dict[str, Optional[float]] = {}
-    for r in fwh_season_rows:
-        balls = r["balls_total"] or 0
-        inn_approx = balls / 24 if balls else 0
-        fwh = r["fwh_total"] or 0
-        fwh_by_season[r["season"]] = round(fwh / inn_approx, 4) if inn_approx else None
     player_balls: dict[str, dict[int, int]] = {}
     # innings per season for wickets_per_innings derivation. The bowling
     # child table doesn't carry innings directly; we approximate via
@@ -2764,6 +2776,8 @@ async def compute_players_bowling_by_season(
             dots = r["dots"] or 0
             boundaries = r["boundaries"] or 0
             maidens = r["maidens"] or 0
+            innings_bowled = r["innings_bowled"] or 0
+            four_wicket_hauls = r["four_wicket_hauls"] or 0
             below = balls < threshold
             if below and mix[o - 1] > 0:
                 cliff_overs.append(o)
@@ -2776,7 +2790,12 @@ async def compute_players_bowling_by_season(
                 "boundary_pct":      (boundaries / balls * 100) if balls else None,
                 "balls_per_boundary": (balls / boundaries) if boundaries else None,
                 "wickets_per_over":  (wickets * 6 / balls) if balls else None,
-                "maidens_per_player_over": (maidens / r["n_players"]) if r["n_players"] else None,
+                # Tier 2: per-bucket per-innings rates use the new
+                # innings_bowled denominator — replaces the prior
+                # wickets/over × 4 heuristic for per-innings cohort.
+                "wickets_per_innings":           (wickets / innings_bowled) if innings_bowled else None,
+                "maidens_per_innings":           (maidens / innings_bowled) if innings_bowled else None,
+                "four_wicket_hauls_per_innings": (four_wicket_hauls / innings_bowled) if innings_bowled else None,
             })
 
         pool = pool_by_season.get(season, {})
@@ -2799,8 +2818,8 @@ async def compute_players_bowling_by_season(
                 "boundary_pct": None, "balls_per_boundary": None,
                 "wickets_per_over": None, "wickets_per_innings": None,
                 "maidens_per_innings": None,
-                # Group C — scope-flat regardless of cliff.
-                "four_wicket_hauls_per_innings": fwh_by_season.get(season),
+                # Tier 2: now over-weighted, null under cliff.
+                "four_wicket_hauls_per_innings": None,
             })
             by_season.append(row)
             continue
@@ -2811,10 +2830,25 @@ async def compute_players_bowling_by_season(
         def _r(v, n):
             return round(v, n) if v is not None else None
 
-        # wickets_per_innings ≈ wickets/over × 4 (a typical bowler
-        # bowls ~4 overs/innings). Approximate per Q6 envelope shape.
         cc_wpo = cv("wickets_per_over")
-        cc_mpo = cv("maidens_per_player_over")
+        # Tier 2: per-innings rates need scaling by per-season
+        # avg_attendances_per_innings — same dimensional rationale as
+        # the /summary path (see compute_players_bowling_cohort).
+        season_attendances = sum(
+            (r["innings_bowled"] or 0) for r in season_cohort.values()
+        )
+        season_unique_innings = bowling_inn_by_season.get(season, 0)
+        season_scale = (
+            (season_attendances / season_unique_innings)
+            if season_unique_innings else 0
+        )
+
+        def cv_pi(field: str) -> Optional[float]:
+            v = cv(field)
+            if v is None or season_scale == 0:
+                return v
+            return v * season_scale
+
         row.update({
             "below_support": False,
             "cliff_overs": [],
@@ -2825,13 +2859,11 @@ async def compute_players_bowling_by_season(
             "boundary_pct":       _r(cv("boundary_pct"), 1),
             "balls_per_boundary": _r(cv("balls_per_boundary"), 2),
             "wickets_per_over":   _r(cc_wpo, 3),
-            # Per-innings rates approximated against a typical 4-over
-            # innings span — finer-grained than per-over but coarse
-            # enough that the Q6 chip remains meaningful.
-            "wickets_per_innings": _r(cc_wpo * 4 if cc_wpo is not None else None, 3),
-            "maidens_per_innings": _r(cc_mpo * 4 if cc_mpo is not None else None, 3),
-            # Group C — scope-flat per-season four-wicket-haul rate.
-            "four_wicket_hauls_per_innings": fwh_by_season.get(season),
+            # Tier 2: over-weighted per-innings rates via per-bucket
+            # innings_bowled (attendance) × per-season scaling factor.
+            "wickets_per_innings":           _r(cv_pi("wickets_per_innings"), 3),
+            "maidens_per_innings":           _r(cv_pi("maidens_per_innings"), 3),
+            "four_wicket_hauls_per_innings": _r(cv_pi("four_wicket_hauls_per_innings"), 4),
         })
         by_season.append(row)
 
