@@ -112,12 +112,26 @@ async def _ensure_tables(db, incremental: bool = False):
             "scope_key",
         ],
     }
-    return await db.create(
+    table = await db.create(
         PlayerScopeStatsPosition,
         pk=["person_id", "scope_key", "position_bucket"],
         if_not_exists=True,
         **idx,
     )
+    # Idempotent column migrations for per-position milestone bucketing
+    # (Tier 1 of spec-apples-to-apples-baselines.md). Pre-existing DBs
+    # that pre-date this populate version get the new columns appended;
+    # new DBs created by `db.create` above already have them in schema.
+    for col in ("thirties", "fifties", "hundreds", "ducks"):
+        try:
+            await db.q(
+                f"ALTER TABLE playerscopestatsposition ADD COLUMN {col} "
+                f"INTEGER NOT NULL DEFAULT 0"
+            )
+        except Exception as e:
+            if "duplicate column" not in str(e).lower():
+                raise
+    return table
 
 
 async def _aggregate_matches(

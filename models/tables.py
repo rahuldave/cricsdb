@@ -412,6 +412,14 @@ class PlayerScopeStatsPosition:
     fours: int = 0
     sixes: int = 0
     dots: int = 0
+    # Tier 1 of spec-apples-to-apples-baselines.md — per-position
+    # milestone counts so cohort per-innings rates (hundreds/inn,
+    # fifties/inn, thirties/inn, ducks/inn) can be position-weighted
+    # via convex combination on by_position[i].milestone_per_innings.
+    thirties: int = 0
+    fifties: int = 0
+    hundreds: int = 0
+    ducks: int = 0
 
 
 class Partnership:
