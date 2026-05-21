@@ -958,13 +958,65 @@ async def bowling_by_season(
     )
     wkt_map = {r["season"]: r["wickets"] for r in wkt_rows}
 
+    # Group B (spec-rate-vs-volume-audit §2.1): per-season maidens
+    # + four-wicket hauls so we can emit maidens_per_innings and
+    # four_wicket_hauls_per_innings per row. Both queries mirror the
+    # /summary path with `GROUP BY m.season` on top.
+    maiden_season_rows = await db.q(
+        f"""
+        SELECT season, COUNT(*) as maidens FROM (
+            SELECT m.season, d.innings_id, d.over_number
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {all_where}
+            GROUP BY m.season, d.innings_id, d.over_number
+            HAVING SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) = 6
+               AND SUM(d.runs_total) = 0
+        )
+        GROUP BY season
+        """,
+        all_params,
+    )
+    maiden_map = {r["season"]: r["maidens"] for r in maiden_season_rows}
+
+    fwh_season_rows = await db.q(
+        f"""
+        SELECT season, COUNT(*) as fwh FROM (
+            SELECT m.season, d.innings_id, COUNT(*) as wkts
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {wkt_where}
+            GROUP BY m.season, d.innings_id
+            HAVING COUNT(*) >= 4
+        )
+        GROUP BY season
+        """,
+        wkt_params,
+    )
+    fwh_map = {r["season"]: r["fwh"] for r in fwh_season_rows}
+
     by_season = []
     for r in rows:
         season = r["season"]
         r["runs_conceded"] = runs_map.get(season, 0)
         r["wickets"] = wkt_map.get(season, 0)
         r["overs"] = _format_overs(r["balls"] or 0)
+        r["maidens"] = maiden_map.get(season, 0)
+        r["four_wicket_hauls"] = fwh_map.get(season, 0)
         _enrich_bowling_row(r)
+        # Group B per-innings rates.
+        innings_count = r.get("innings") or 0
+        if innings_count:
+            r["wickets_per_innings"] = round(r["wickets"] / innings_count, 3)
+            r["maidens_per_innings"] = round(r["maidens"] / innings_count, 3)
+            r["four_wicket_hauls_per_innings"] = round(r["four_wicket_hauls"] / innings_count, 4)
+        else:
+            r["wickets_per_innings"] = None
+            r["maidens_per_innings"] = None
+            r["four_wicket_hauls_per_innings"] = None
         by_season.append(r)
 
     return {"by_season": by_season}

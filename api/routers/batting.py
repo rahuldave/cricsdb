@@ -961,14 +961,45 @@ async def batting_by_season(
         inns = season_inn.get(season, [])
         innings_count = len(inns)
         dismissals = sum(1 for x in inns if x["was_dismissed"])
+        thirties = sum(1 for x in inns if 30 <= (x["innings_runs"] or 0) < 50)
         fifties = sum(1 for x in inns if 50 <= (x["innings_runs"] or 0) < 100)
         hundreds = sum(1 for x in inns if (x["innings_runs"] or 0) >= 100)
+        ducks = sum(
+            1 for x in inns
+            if (x["innings_runs"] or 0) == 0 and x["was_dismissed"]
+        )
 
         r["innings"] = innings_count
         r["dismissals"] = dismissals
+        r["thirties"] = thirties
         r["fifties"] = fifties
         r["hundreds"] = hundreds
+        r["ducks"] = ducks
         _enrich_batting_row(r)
+        # Group B per-innings rates (spec-rate-vs-volume-audit §2.1).
+        # 8 rates per row; sibling to the volume fields rendered on
+        # /batting deep-dive's By Season chart.
+        runs_val = r.get("runs") or 0
+        fours_val = r.get("fours") or 0
+        sixes_val = r.get("sixes") or 0
+        boundaries_val = r.get("boundaries") or 0
+        if innings_count:
+            r["runs_per_innings"]       = round(runs_val / innings_count, 2)
+            r["hundreds_per_innings"]   = round(hundreds / innings_count, 3)
+            r["fifties_per_innings"]    = round(fifties / innings_count, 3)
+            r["thirties_per_innings"]   = round(thirties / innings_count, 3)
+            r["ducks_per_innings"]      = round(ducks / innings_count, 3)
+            r["fours_per_innings"]      = round(fours_val / innings_count, 3)
+            r["sixes_per_innings"]      = round(sixes_val / innings_count, 3)
+            r["boundaries_per_innings"] = round(boundaries_val / innings_count, 3)
+        else:
+            for k in (
+                "runs_per_innings", "hundreds_per_innings",
+                "fifties_per_innings", "thirties_per_innings",
+                "ducks_per_innings", "fours_per_innings",
+                "sixes_per_innings", "boundaries_per_innings",
+            ):
+                r[k] = None
         by_season.append(r)
 
     return {"by_season": by_season}

@@ -276,8 +276,93 @@ def main() -> int:
         )
         print(line); all_passed &= ok
 
-    # ─── Test 5: direction metadata is wired in ──────────────────
-    print("\n  5. direction metadata is set:")
+    # ─── Test 5: player /by-season Group B rates ─────────────────
+    print("\n  5. /batters/{id}/by-season Group B fields:")
+    bat_bs = get(
+        args.host, "/api/v1/batters/ba607b88/by-season",
+        gender="male", team_type="club",
+        tournament="Indian Premier League",
+        season_from="2016", season_to="2016",
+    )
+    row = bat_bs["by_season"][0] if bat_bs["by_season"] else {}
+    inn = row.get("innings") or 0
+    runs = row.get("runs") or 0
+    hundreds = row.get("hundreds") or 0
+    expected_rpi = round(runs / inn, 2) if inn else None
+    expected_hpi = round(hundreds / inn, 3) if inn else None
+    ok = approx(row.get("runs_per_innings"), expected_rpi, tol=0.01)
+    _, line = check(
+        "runs_per_innings == runs / innings (in-row)",
+        ok,
+        f"expected={expected_rpi}, actual={row.get('runs_per_innings')}",
+    )
+    print(line); all_passed &= ok
+    ok = approx(row.get("hundreds_per_innings"), expected_hpi, tol=0.001)
+    _, line = check(
+        "hundreds_per_innings == hundreds / innings (in-row)",
+        ok,
+        f"expected={expected_hpi}, actual={row.get('hundreds_per_innings')}",
+    )
+    print(line); all_passed &= ok
+
+    print("\n  6. /bowlers/{id}/by-season Group B fields:")
+    bowl_bs = get(
+        args.host, "/api/v1/bowlers/462411b3/by-season",
+        gender="male", team_type="club",
+        tournament="Indian Premier League",
+        season_from="2018", season_to="2018",
+    )
+    row = bowl_bs["by_season"][0] if bowl_bs["by_season"] else {}
+    inn = row.get("innings") or 0
+    wkts = row.get("wickets") or 0
+    fwh = row.get("four_wicket_hauls") or 0
+    expected_wpi = round(wkts / inn, 3) if inn else None
+    expected_fwhpi = round(fwh / inn, 4) if inn else None
+    ok = approx(row.get("wickets_per_innings"), expected_wpi, tol=0.001)
+    _, line = check(
+        "wickets_per_innings == wickets / innings (in-row)",
+        ok,
+        f"expected={expected_wpi}, actual={row.get('wickets_per_innings')}",
+    )
+    print(line); all_passed &= ok
+    ok = approx(row.get("four_wicket_hauls_per_innings"), expected_fwhpi, tol=0.0001)
+    _, line = check(
+        "four_wicket_hauls_per_innings == four_wicket_hauls / innings",
+        ok,
+        f"expected={expected_fwhpi}, actual={row.get('four_wicket_hauls_per_innings')}",
+    )
+    print(line); all_passed &= ok
+
+    print("\n  7. /fielders/{id}/by-season Group B fields:")
+    field_bs = get(
+        args.host, "/api/v1/fielders/4a8a2e3b/by-season",
+        gender="male", team_type="club",
+        tournament="Indian Premier League",
+        season_from="2016", season_to="2016",
+    )
+    row = field_bs["by_season"][0] if field_bs["by_season"] else {}
+    matches = row.get("matches") or 0
+    total = row.get("total") or 0
+    catches = row.get("catches") or 0
+    expected_dpm = round(total / matches, 3) if matches else None
+    expected_cpm = round(catches / matches, 3) if matches else None
+    ok = approx(row.get("dismissals_per_match"), expected_dpm, tol=0.001)
+    _, line = check(
+        "dismissals_per_match == total / matches (in-row)",
+        ok,
+        f"expected={expected_dpm}, actual={row.get('dismissals_per_match')}",
+    )
+    print(line); all_passed &= ok
+    ok = approx(row.get("catches_per_match"), expected_cpm, tol=0.001)
+    _, line = check(
+        "catches_per_match == catches / matches (in-row)",
+        ok,
+        f"expected={expected_cpm}, actual={row.get('catches_per_match')}",
+    )
+    print(line); all_passed &= ok
+
+    # ─── Test 8: direction metadata is wired in ──────────────────
+    print("\n  8. direction metadata is set:")
     ok = rpi.get("direction") == "higher_better"
     _, line = check(
         "runs_per_innings.direction == higher_better",

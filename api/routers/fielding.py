@@ -495,6 +495,19 @@ async def fielding_by_season(
         # Convention 3: catches inclusive of caught_and_bowled.
         catches = s["caught_only"] + s["caught_and_bowled"]
         total = catches + s["stumpings"] + s["run_outs"]
+        n_matches = matches_by_season.get(season, 0)
+        # Group B (spec-rate-vs-volume-audit §2.1): per-match rates so
+        # the new Dis/Match by-Season chart and its cohort overlay can
+        # render off this payload directly. Denominator is matches the
+        # player appeared in that season (not innings — fielding is
+        # match-grain by convention).
+        if n_matches:
+            dpm = round(total / n_matches, 3)
+            cpm = round(catches / n_matches, 3)
+            spm = round(s["stumpings"] / n_matches, 3)
+            rpm = round(s["run_outs"] / n_matches, 3)
+        else:
+            dpm = cpm = spm = rpm = None
         by_season.append({
             "season": season,
             "catches": catches,
@@ -502,7 +515,11 @@ async def fielding_by_season(
             "run_outs": s["run_outs"],
             "caught_and_bowled": s["caught_and_bowled"],
             "total": total,
-            "matches": matches_by_season.get(season, 0),
+            "matches": n_matches,
+            "dismissals_per_match": dpm,
+            "catches_per_match": cpm,
+            "stumpings_per_match": spm,
+            "run_outs_per_match": rpm,
         })
 
     return {"by_season": by_season}
