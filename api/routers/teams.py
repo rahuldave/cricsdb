@@ -16,7 +16,7 @@ from ..full_members import ICC_FULL_MEMBERS
 from ..metrics_metadata import wrap_metric
 from ..scope_links import scope_dict_from_filters, suggested_splits
 from ..tournament_canonical import series_type as series_type_for, canonicalize
-from ..wilson import prob_record
+from ..wilson import enrich_prob_record, prob_record
 
 router = APIRouter(prefix="/api/v1/teams", tags=["Teams"])
 
@@ -2079,7 +2079,7 @@ async def team_batting_summary(
 
 
 async def _innings_master_sample_team_batting(
-    team: str, filters: FilterParams, aux: AuxParams,
+    team: Optional[str], filters: FilterParams, aux: AuxParams,
 ) -> list[dict]:
     """Per-innings observation rows for the team's batting innings
     (`i.team = :team`), under the active filter scope. Spec §16.2.1.
@@ -2088,6 +2088,12 @@ async def _innings_master_sample_team_batting(
     matches the existing team-batting/by-phase convention so
     wickets-fallen here is consistent with `wickets_lost` elsewhere
     in the team-batting endpoints.
+
+    `team=None` widens the master sample to every team's batting
+    innings at the same scope — used by the league-side dual-query
+    that feeds the ProbChip `scope_avg` baselines
+    (spec-prob-baselines-teams.md §4.1). `_team_innings_clause`
+    already supports the None branch (drops `i.team = :team`).
     """
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="batting", aux=aux)
@@ -2388,6 +2394,68 @@ def _form_windows_team_batting(
     }
 
 
+# spec-prob-baselines-teams.md §5 — direction tags for the team-batting
+# milestone ProbChips. Endpoint-local per §11.3 (same pattern as the
+# player-side _BATTING_PROB_DIRECTIONS — direction is a chip-rendering
+# convention, not a metrics-registry concept).
+_TEAM_BATTING_RUNS_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_lt_100":  "lower_better",
+    "p_geq_100": "higher_better",
+    "p_geq_150": "higher_better",
+    "p_geq_200": "higher_better",
+    "p_geq_230": "higher_better",
+    "p_150_given_100": "higher_better",
+    "p_200_given_150": "higher_better",
+    "p_230_given_200": "higher_better",
+    "p_double_at_10":  "higher_better",
+}
+
+_TEAM_BATTING_RR_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_rr_leq_7":  "lower_better",
+    "p_rr_leq_8":  "lower_better",
+    "p_rr_geq_9":  "higher_better",
+    "p_rr_geq_10": "higher_better",
+}
+
+
+def _enrich_team_batting_milestones(team_doss: dict, league_doss: dict) -> None:
+    """Mutate every milestone ProbRecord on the team-side dossier to
+    attach the matching league-side ProbRecord.value as `scope_avg`,
+    plus signed `delta_pct`, fixed `direction`, and the league denom
+    as `sample_size`. spec-prob-baselines-teams.md §4.1.
+
+    The team and league dossiers are aligned blocks (`runs` +
+    `run_rate`) — same chip keys, different sample populations. Per
+    spec §4.3, each conditional ProbRecord (p_150_given_100 etc.) is
+    pre-computed at the league grain on the same observation list,
+    so reading the value directly is the correct conditional anchor
+    (NOT the ratio of two league probabilities).
+
+    Each block is enriched independently; if a window has zero
+    league observations (atypical), the league ProbRecord.value is
+    None and enrich_prob_record nulls out delta_pct.
+    """
+    for block_key, dir_table in (
+        ("runs", _TEAM_BATTING_RUNS_PROB_DIRECTIONS),
+        ("run_rate", _TEAM_BATTING_RR_PROB_DIRECTIONS),
+    ):
+        team_block = team_doss.get(block_key) or {}
+        league_block = league_doss.get(block_key) or {}
+        team_ms = team_block.get("milestones") or {}
+        league_ms = league_block.get("milestones") or {}
+        for chip_key, direction in dir_table.items():
+            pr = team_ms.get(chip_key)
+            if not pr:
+                continue
+            league_pr = league_ms.get(chip_key) or {}
+            enrich_prob_record(
+                pr,
+                league_pr.get("value"),
+                direction,
+                league_pr.get("denom"),
+            )
+
+
 @router.get("/{team}/batting/distribution")
 async def team_batting_distribution(
     team: str,
@@ -2412,20 +2480,51 @@ async def team_batting_distribution(
     and scope-derived suggested-splits navigation hints.
 
     Every probability field ships as `{value, num, denom, ci_low,
-    ci_high}` with a Wilson 95% CI. Calendar form windows use a
-    scope-anchored cutoff (`min(today, max_obs_date)`) so retired
-    teams get non-empty windows.
+    ci_high}` with a Wilson 95% CI. Per spec-prob-baselines-teams.md,
+    every milestone ProbRecord under `runs.milestones` and
+    `run_rate.milestones` additionally carries `scope_avg`,
+    `delta_pct`, `direction`, and `sample_size` — derived from a
+    dual-query league dossier at the same FilterParams/AuxParams with
+    the path team dropped (the same dual-query shape every team
+    /summary endpoint already runs). Per-window scope_avgs are
+    computed independently — each form window's chips compare against
+    the league's behaviour at the same scope IN THAT WINDOW, not the
+    lifetime league average carried over.
+
+    Calendar form windows use a scope-anchored cutoff
+    (`min(today, max_obs_date)`) so retired teams get non-empty windows.
 
     `FilterParams.filter_team` is IGNORED — the team path-param
     dominates. `FilterParams.filter_opponent` works as expected.
 
-    Spec: internal_docs/spec-distribution-stats.md §16.2.
+    Spec: internal_docs/spec-distribution-stats.md §16.2 +
+    internal_docs/spec-prob-baselines-teams.md.
     """
     today = date.fromisoformat(as_of_date) if as_of_date else date.today()
 
-    observations = await _innings_master_sample_team_batting(team, filters, aux)
+    # Dual-query: team-side observations + league-side observations
+    # at the same scope (team=None drops the i.team clause; the same
+    # FilterParams + AuxParams stay applied). Run in parallel — same
+    # shape as `compute_players_batting_cohort` (spec §4.2).
+    observations, league_observations = await asyncio.gather(
+        _innings_master_sample_team_batting(team, filters, aux),
+        _innings_master_sample_team_batting(None, filters, aux),
+    )
+
     lifetime = _distribution_dossier_team_batting(observations)
     form = _form_windows_team_batting(observations, today)
+
+    # League-side: same window slicing as the team side. Per spec §4
+    # decision c4 (per-window scope_avg, NOT lifetime carry-over).
+    league_lifetime = _distribution_dossier_team_batting(league_observations)
+    league_form = _form_windows_team_batting(league_observations, today)
+
+    _enrich_team_batting_milestones(lifetime, league_lifetime)
+    for window_key in ("last_10", "last_60d", "last_6mo", "last_1yr"):
+        team_window = form.get(window_key)
+        league_window = league_form.get(window_key)
+        if team_window and league_window:
+            _enrich_team_batting_milestones(team_window, league_window)
 
     obs_dates = [o["date"] for o in observations if o.get("date")]
     lifetime["last_match_date"] = max(obs_dates) if obs_dates else None
