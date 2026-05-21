@@ -489,6 +489,14 @@ class PlayerScopeStatsPosition:
     fifties: int = 0
     hundreds: int = 0
     ducks: int = 0
+    # PT1 of spec-prob-baselines.md — extra per-position milestone
+    # buckets for the batting ProbChip cohort baselines:
+    #   failures_10 = innings where runs <= 10 (the P(≤10) chip
+    #                 threshold; includes ducks).
+    #   seventies   = innings where 70 <= runs < 100 (so the cohort
+    #                 baseline for P(≥70) is seventies + hundreds).
+    failures_10: int = 0
+    seventies: int = 0
 
 
 class PlayerScopeStatsBattingOver:

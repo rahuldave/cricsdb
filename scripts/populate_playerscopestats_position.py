@@ -72,6 +72,7 @@ class _Acc:
         "innings_set", "runs", "legal_balls", "dots",
         "fours", "sixes", "dismissals",
         "thirties", "fifties", "hundreds", "ducks",
+        "failures_10", "seventies",
     )
 
     def __init__(self):
@@ -89,6 +90,11 @@ class _Acc:
         self.fifties = 0
         self.hundreds = 0
         self.ducks = 0
+        # PT1 of spec-prob-baselines.md — extra per-position milestone
+        # buckets for the batting ProbChip cohort baselines (failures
+        # threshold matches the P(≤10) chip predicate).
+        self.failures_10 = 0
+        self.seventies = 0
 
     def to_row(self, person_id: str, scope_key: str, bucket: int) -> dict:
         return {
@@ -106,6 +112,8 @@ class _Acc:
             "fifties": self.fifties,
             "hundreds": self.hundreds,
             "ducks": self.ducks,
+            "failures_10": self.failures_10,
+            "seventies": self.seventies,
         }
 
 
@@ -134,7 +142,8 @@ async def _ensure_tables(db, incremental: bool = False):
     # (Tier 1 of spec-apples-to-apples-baselines.md). Pre-existing DBs
     # that pre-date this populate version get the new columns appended;
     # new DBs created by `db.create` above already have them in schema.
-    for col in ("thirties", "fifties", "hundreds", "ducks"):
+    for col in ("thirties", "fifties", "hundreds", "ducks",
+                "failures_10", "seventies"):
         try:
             await db.q(
                 f"ALTER TABLE playerscopestatsposition ADD COLUMN {col} "
@@ -337,6 +346,17 @@ async def _aggregate_matches(
             acc.fifties += 1
         elif runs >= 30:
             acc.thirties += 1
+        # PT1 of spec-prob-baselines.md — non-elif counters layered on
+        # top of the elif chain above. `seventies` overlaps `fifties`
+        # (both count 70 ≤ runs < 100) so `fifties` keeps the
+        # conventional "50-99" cricket meaning that Tier 1 (apples-to-
+        # apples) baselines and existing API consumers depend on.
+        # `failures_10` is independent of the chain; ducks (runs == 0)
+        # are a subset.
+        if 70 <= runs < 100:
+            acc.seventies += 1
+        if runs <= 10:
+            acc.failures_10 += 1
         if runs == 0 and (pid, iid) in innings_dismissed:
             acc.ducks += 1
 
