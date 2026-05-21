@@ -22,14 +22,14 @@ REG bat_vs_bowlers_kohli              /api/v1/batters/ba607b88/vs-bowlers?gender
 REG bat_vs_bowlers_kohli_vs_bumrah    /api/v1/batters/ba607b88/vs-bowlers?bowler_id=462411b3&min_balls=6
 REG bat_by_over_kohli                 /api/v1/batters/ba607b88/by-over?gender=male&team_type=international
 REG bat_by_phase_kohli                /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international
-REG bat_by_season_kohli               /api/v1/batters/ba607b88/by-season?gender=male
+NEW bat_by_season_kohli               /api/v1/batters/ba607b88/by-season?gender=male
 REG bat_dismissals_kohli              /api/v1/batters/ba607b88/dismissals?gender=male&team_type=international
 REG bat_inter_wicket_kohli            /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international
 
 # ── rivalry scope (filter_team / filter_opponent) ────────────────
 REG bat_summary_kohli_vs_aus          /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
 REG bat_by_innings_kohli_vs_aus       /api/v1/batters/ba607b88/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5
-REG bat_by_season_kohli_ipl_rcb       /api/v1/batters/ba607b88/by-season?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_team=Royal%20Challengers%20Bangalore
+NEW bat_by_season_kohli_ipl_rcb       /api/v1/batters/ba607b88/by-season?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_team=Royal%20Challengers%20Bangalore
 
 # ── venue-scope sanity ───────────────────────────────────────────
 REG bat_summary_kohli_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
