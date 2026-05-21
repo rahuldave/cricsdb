@@ -352,6 +352,41 @@ class PlayerScopeStatsOver:
     innings_runs_geq_50: int = 0
 
 
+class PlayerScopeStatsFieldingCatchDist:
+    """One row per (person, scope) — per-match catches distribution.
+
+    PT4 of internal_docs/spec-prob-baselines.md. Backs the fielding
+    ProbChip cohort baselines P(=0) / P(=1) / P(≥2) on the
+    /fielders/{id}/distribution catches block.
+
+    For every match the person played in (matchplayer-based), counts
+    their non-substitute catches in that match (FieldingCredit
+    kind IN ('caught', 'caught_and_bowled') AND is_substitute=0 per
+    Convention 3 + the spec's master-sample contract). Buckets each
+    match into one of three slots:
+      matches_with_0    — match where the player took 0 catches (most).
+      matches_with_1    — match where the player took exactly 1 catch.
+      matches_with_ge2  — match where the player took ≥ 2 catches.
+
+    Per-bucket cohort prob (for the keeper-binary cohort):
+      P(=0) = SUM(matches_with_0)   / SUM(matches_total)
+      P(=1) = SUM(matches_with_1)   / SUM(matches_total)
+      P(≥2) = SUM(matches_with_ge2) / SUM(matches_total)
+    where matches_total = matches_with_0 + matches_with_1 + matches_with_ge2.
+
+    Built and maintained by
+    `scripts/populate_playerscopestats_fielding_catch_dist.py`,
+    auto-called from `import_data.py` (full) and `update_recent.py`
+    (incremental). DROP+CREATE on full populate per spec §3 — no
+    idempotent ALTER.
+    """
+    person_id: ForeignKey[str, "person"]
+    scope_key: str
+    matches_with_0: int = 0
+    matches_with_1: int = 0
+    matches_with_ge2: int = 0
+
+
 class PlayerScopeStatsFieldingPosition:
     """One row per (fielder, scope, dismissed-batter-position-bucket).
 

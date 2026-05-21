@@ -546,6 +546,17 @@ async def main():
     )
     await pssfp_full(db)
 
+    # Populate playerscopestats_fielding_catch_dist — per (person, scope)
+    # match-grain catch distribution buckets (matches_with_0/_1/_ge2).
+    # Drives the fielding ProbChip cohort baselines (P(=0)/P(=1)/P(≥2))
+    # on /fielders/{id}/distribution. Spec:
+    # internal_docs/spec-prob-baselines.md PT4.
+    print("\nPopulating playerscopestats_fielding_catch_dist…")
+    from scripts.populate_playerscopestats_fielding_catch_dist import (
+        populate_full as pssfcd_full,
+    )
+    await pssfcd_full(db)
+
     # Populate playerscopestats_batting_phase — per-phase batting
     # child of player_scope_stats. Drives the per-phase batting cohort
     # baseline endpoint and per-batter phase-distribution visuals.

@@ -365,6 +365,15 @@ async def main():
                 )
                 await pssfp_incr(db, new_match_ids)
 
+                # playerscopestats_fielding_catch_dist — per (person, scope)
+                # match-grain catch distribution (matches_with_0/_1/_ge2).
+                # Backs the fielding ProbChip cohort baselines (PT4 of
+                # spec-prob-baselines.md). Same touched-scope recompute.
+                from scripts.populate_playerscopestats_fielding_catch_dist import (
+                    populate_incremental as pssfcd_incr,
+                )
+                await pssfcd_incr(db, new_match_ids)
+
                 # playerscopestats_batting_phase — per-phase batting
                 # child of player_scope_stats. Same touched-scope
                 # recompute. Spec: spec-player-baseline-parity.md §3.1.1.
