@@ -19,37 +19,36 @@
 # from team-bowling/summary's bowler-credited count. See spec
 # §16.3.1 + the endpoint docstring.
 #
-# All NEW pending TT2.B (spec-prob-baselines-teams.md): every
-# milestone ProbRecord under wickets.milestones + runs_conceded.
-# milestones + economy.milestones gains scope_avg / delta_pct /
-# direction / sample_size from the dual-query league dossier. Re-
-# lock to REG once stable (3-commit dance per regression-testing-
-# api.md).
+# All REG — locks the v1 shape including the TT2.B
+# spec-prob-baselines-teams.md scope_avg/delta_pct/direction/
+# sample_size fields on every ProbRecord under wickets.milestones
+# + runs_conceded.milestones + economy.milestones (lifetime + 4
+# form windows).
 
 # ── Mumbai Indians (marquee IPL franchise) ───────────────────────
-NEW dist_mi_all_time              /api/v1/teams/Mumbai%20Indians/bowling/distribution?as_of_date=2025-01-01
-NEW dist_mi_ipl                   /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
-NEW dist_mi_ipl_2024              /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
-NEW dist_mi_ipl_2023              /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2023&season_to=2023&as_of_date=2025-01-01
-NEW dist_mi_vs_csk_ipl            /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_opponent=Chennai%20Super%20Kings&as_of_date=2025-01-01
-NEW dist_mi_at_wankhede           /api/v1/teams/Mumbai%20Indians/bowling/distribution?filter_venue=Wankhede%20Stadium%2C%20Mumbai&as_of_date=2025-01-01
+REG dist_mi_all_time              /api/v1/teams/Mumbai%20Indians/bowling/distribution?as_of_date=2025-01-01
+REG dist_mi_ipl                   /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
+REG dist_mi_ipl_2024              /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
+REG dist_mi_ipl_2023              /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2023&season_to=2023&as_of_date=2025-01-01
+REG dist_mi_vs_csk_ipl            /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_opponent=Chennai%20Super%20Kings&as_of_date=2025-01-01
+REG dist_mi_at_wankhede           /api/v1/teams/Mumbai%20Indians/bowling/distribution?filter_venue=Wankhede%20Stadium%2C%20Mumbai&as_of_date=2025-01-01
 
 # ── Chennai Super Kings (sibling franchise) ──────────────────────
-NEW dist_csk_all_time             /api/v1/teams/Chennai%20Super%20Kings/bowling/distribution?as_of_date=2025-01-01
-NEW dist_csk_ipl_2023             /api/v1/teams/Chennai%20Super%20Kings/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2023&season_to=2023&as_of_date=2025-01-01
+REG dist_csk_all_time             /api/v1/teams/Chennai%20Super%20Kings/bowling/distribution?as_of_date=2025-01-01
+REG dist_csk_ipl_2023             /api/v1/teams/Chennai%20Super%20Kings/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2023&season_to=2023&as_of_date=2025-01-01
 
 # ── India men (international marquee) ────────────────────────────
-NEW dist_ind_men_all_time         /api/v1/teams/India/bowling/distribution?gender=male&team_type=international&as_of_date=2025-01-01
-NEW dist_ind_vs_pak_men           /api/v1/teams/India/bowling/distribution?gender=male&team_type=international&filter_opponent=Pakistan&as_of_date=2025-01-01
-NEW dist_ind_men_2024             /api/v1/teams/India/bowling/distribution?gender=male&team_type=international&season_from=2024&season_to=2024&as_of_date=2025-01-01
+REG dist_ind_men_all_time         /api/v1/teams/India/bowling/distribution?gender=male&team_type=international&as_of_date=2025-01-01
+REG dist_ind_vs_pak_men           /api/v1/teams/India/bowling/distribution?gender=male&team_type=international&filter_opponent=Pakistan&as_of_date=2025-01-01
+REG dist_ind_men_2024             /api/v1/teams/India/bowling/distribution?gender=male&team_type=international&season_from=2024&season_to=2024&as_of_date=2025-01-01
 
 # ── Australia men ────────────────────────────────────────────────
-NEW dist_aus_men_all_time         /api/v1/teams/Australia/bowling/distribution?gender=male&team_type=international&as_of_date=2025-01-01
-NEW dist_aus_vs_ind_men           /api/v1/teams/Australia/bowling/distribution?gender=male&team_type=international&filter_opponent=India&as_of_date=2025-01-01
+REG dist_aus_men_all_time         /api/v1/teams/Australia/bowling/distribution?gender=male&team_type=international&as_of_date=2025-01-01
+REG dist_aus_vs_ind_men           /api/v1/teams/Australia/bowling/distribution?gender=male&team_type=international&filter_opponent=India&as_of_date=2025-01-01
 
 # ── inning-aux narrowing (page-local AuxParam) ───────────────────
-NEW dist_mi_ipl_inning0           /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=0&as_of_date=2025-01-01
-NEW dist_mi_ipl_inning1           /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=1&as_of_date=2025-01-01
+REG dist_mi_ipl_inning0           /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=0&as_of_date=2025-01-01
+REG dist_mi_ipl_inning1           /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=1&as_of_date=2025-01-01
 
 # ── empty scope (no matches) — regression marker for empty handling
-NEW dist_mi_at_nonexistent_venue  /api/v1/teams/Mumbai%20Indians/bowling/distribution?filter_venue=Nonexistent%20Ground&as_of_date=2025-01-01
+REG dist_mi_at_nonexistent_venue  /api/v1/teams/Mumbai%20Indians/bowling/distribution?filter_venue=Nonexistent%20Ground&as_of_date=2025-01-01
