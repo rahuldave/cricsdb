@@ -448,7 +448,7 @@ export default function Teams() {
           )}
           <ScopedPageHeader
             filters={filters}
-            comparison={{ label: 'avg', text: 'every team at this scope' }}
+            comparison={{ label: 'avg', text: 'over all teams that match this {scope}' }}
           >
             {selected}
             {/* FlagBadge returns null for franchise sides (they're not
