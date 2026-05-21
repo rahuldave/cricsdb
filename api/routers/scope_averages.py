@@ -2279,27 +2279,61 @@ async def compute_players_batting_by_phase(
     aux: AuxParams,
     drop_set: Optional[set[str]] = None,
 ) -> dict:
-    """Per-phase batting cohort baseline (position-flat).
+    """Per-phase batting cohort baseline — POSITION-WEIGHTED (Tier 3
+    of spec-apples-to-apples-baselines.md).
 
-    Returns `{ by_phase: [{ phase, n_players, n_innings_in_phase,
-    strike_rate, dot_pct, boundary_pct, balls_per_four,
-    balls_per_boundary, runs_per_innings_in_phase, sixes_per_innings,
-    fours_per_innings, boundaries_per_innings, below_support }, …] }`
-    over phases 1=powerplay / 2=middle / 3=death. Spec:
-    spec-player-baseline-parity.md §3.2.
+    For each phase, derives the player's per-phase position mix from
+    the new playerscopestatsbattingphaseposition child table (per-
+    phase innings_in_phase per position bucket), then convex-combines
+    per-(phase, position) cohort rates by that mix. Drops the prior
+    position-FLAT path that compared an opener's powerplay against the
+    league-wide powerplay (dominated by tail-enders).
+
+    Returns `{ by_phase: [{ phase, phase_bucket, n_players,
+    n_innings_in_phase, mix, strike_rate, dot_pct, boundary_pct,
+    balls_per_four, balls_per_boundary, runs_per_innings_in_phase,
+    sixes_per_innings, fours_per_innings, boundaries_per_innings,
+    below_support, cliff_buckets }, …] }`.
     """
     where, params = build_scope_clauses(filters, drop=drop_set)
 
-    sql = f"""
+    # Q1: player's per-(phase, position) innings → mix derivation.
+    player_sql = f"""
+        SELECT pssbpp.phase_bucket, pssbpp.position_bucket,
+               pssbpp.innings_in_phase AS innings
+        FROM playerscopestatsbattingphaseposition pssbpp
+        JOIN playerscopestats pss
+          ON pss.scope_key = pssbpp.scope_key
+         AND pss.person_id = pssbpp.person_id
+        WHERE {where}
+          AND pssbpp.person_id = :__pid
+    """
+    # Q2: cohort aggregates per (phase, position).
+    cohort_sql = f"""
+        SELECT pssbpp.phase_bucket,
+               pssbpp.position_bucket,
+               SUM(pssbpp.innings_in_phase)     AS innings,
+               SUM(pssbpp.balls_in_phase)       AS balls,
+               SUM(pssbpp.runs_in_phase)        AS runs,
+               SUM(pssbpp.dots_in_phase)        AS dots,
+               SUM(pssbpp.fours_in_phase)       AS fours,
+               SUM(pssbpp.sixes_in_phase)       AS sixes,
+               SUM(pssbpp.boundaries_in_phase)  AS boundaries,
+               SUM(pssbpp.dismissals_in_phase)  AS dismissals,
+               COUNT(DISTINCT pssbpp.person_id) AS n_players
+        FROM playerscopestatsbattingphaseposition pssbpp
+        JOIN playerscopestats pss
+          ON pss.scope_key = pssbpp.scope_key
+         AND pss.person_id = pssbpp.person_id
+        WHERE {where}
+        GROUP BY pssbpp.phase_bucket, pssbpp.position_bucket
+        ORDER BY pssbpp.phase_bucket, pssbpp.position_bucket
+    """
+    # Q3: per-phase pool totals (cohort-wide n_innings_in_phase + n_players
+    # at the phase grain). Used for surface-level cohort metadata.
+    pool_sql = f"""
         SELECT pssbp.phase_bucket,
-               SUM(pssbp.innings_in_phase)     AS innings,
-               SUM(pssbp.balls_in_phase)       AS balls,
-               SUM(pssbp.runs_in_phase)        AS runs,
-               SUM(pssbp.dots_in_phase)        AS dots,
-               SUM(pssbp.fours_in_phase)       AS fours,
-               SUM(pssbp.sixes_in_phase)       AS sixes,
-               SUM(pssbp.boundaries_in_phase)  AS boundaries,
-               SUM(pssbp.dismissals_in_phase)  AS dismissals,
+               SUM(pssbp.innings_in_phase) AS innings,
                COUNT(DISTINCT pssbp.person_id) AS n_players
         FROM playerscopestatsbattingphase pssbp
         JOIN playerscopestats pss
@@ -2307,22 +2341,135 @@ async def compute_players_batting_by_phase(
          AND pss.person_id = pssbp.person_id
         WHERE {where}
         GROUP BY pssbp.phase_bucket
-        ORDER BY pssbp.phase_bucket
     """
-    rows = await db.q(sql, params)
+    p_params = {**params, "__pid": person_id}
+    player_rows, cohort_rows, pool_rows = await asyncio.gather(
+        db.q(player_sql, p_params),
+        db.q(cohort_sql, params),
+        db.q(pool_sql, params),
+    )
+
+    # Roll cohort into {phase: {position: row}}.
+    cohort_by_phase: dict[int, dict[int, dict]] = {}
+    for r in cohort_rows:
+        cohort_by_phase.setdefault(r["phase_bucket"], {})[r["position_bucket"]] = r
+
+    # Player innings per (phase, position) → per-phase mix vector.
+    player_inn_by_phase: dict[int, dict[int, int]] = {}
+    for r in player_rows:
+        player_inn_by_phase.setdefault(r["phase_bucket"], {})[r["position_bucket"]] = r["innings"]
+
+    pool_by_phase: dict[int, dict] = {r["phase_bucket"]: r for r in pool_rows}
+
     PHASE_NAMES = {1: "powerplay", 2: "middle", 3: "death"}
 
+    def _r(v, n):
+        return round(v, n) if v is not None else None
+
     by_phase: list[dict] = []
-    for b in range(1, 4):
-        match = next((r for r in rows if r["phase_bucket"] == b), None)
+    for phase_b in range(1, 4):
         out: dict = {
-            "phase": PHASE_NAMES[b],
-            "phase_bucket": b,
+            "phase": PHASE_NAMES[phase_b],
+            "phase_bucket": phase_b,
         }
-        if match is None:
+
+        pool = pool_by_phase.get(phase_b, {})
+        n_players_total = pool.get("n_players") or 0
+        n_innings_total = pool.get("innings") or 0
+
+        # Player mix at this phase: per-position fraction of player's
+        # phase-innings. Sums to 1 (or 0 if player never appears in
+        # this phase).
+        player_buckets = player_inn_by_phase.get(phase_b, {})
+        player_total = sum(player_buckets.values())
+        mix = [0.0] * 10
+        if player_total > 0:
+            for pos_b, inn in player_buckets.items():
+                if 1 <= pos_b <= 10:
+                    mix[pos_b - 1] = inn / player_total
+
+        # No data for player at this phase → return cohort-wide pool
+        # rate (the prior position-flat behavior) so the chip still
+        # shows a meaningful comparison rather than null. Same
+        # approach the by-season cohort takes when the player has
+        # zero innings in a season.
+        season_cohort_for_phase = cohort_by_phase.get(phase_b, {})
+        if player_total == 0:
+            # Aggregate phase-wide as fallback (sum across all positions).
+            agg_runs = sum((r["runs"] or 0) for r in season_cohort_for_phase.values())
+            agg_balls = sum((r["balls"] or 0) for r in season_cohort_for_phase.values())
+            agg_dots = sum((r["dots"] or 0) for r in season_cohort_for_phase.values())
+            agg_fours = sum((r["fours"] or 0) for r in season_cohort_for_phase.values())
+            agg_sixes = sum((r["sixes"] or 0) for r in season_cohort_for_phase.values())
+            agg_bdr = sum((r["boundaries"] or 0) for r in season_cohort_for_phase.values())
+            agg_inn = sum((r["innings"] or 0) for r in season_cohort_for_phase.values())
+            below = agg_inn < PHASE_INNINGS_THRESHOLD
             out.update({
-                "n_players": 0, "n_innings_in_phase": 0,
+                "mix": mix,
+                "n_players": n_players_total,
+                "n_innings_in_phase": n_innings_total,
+                "below_support": below,
+                "cliff_buckets": [],
+                "strike_rate":         _r((agg_runs / agg_balls * 100) if agg_balls else None, 1) if not below else None,
+                "dot_pct":             _r((agg_dots / agg_balls * 100) if agg_balls else None, 1) if not below else None,
+                "boundary_pct":        _r((agg_bdr  / agg_balls * 100) if agg_balls else None, 1) if not below else None,
+                "balls_per_four":      _r((agg_balls / agg_fours) if agg_fours else None, 2) if not below else None,
+                "balls_per_boundary":  _r((agg_balls / agg_bdr) if agg_bdr else None, 2) if not below else None,
+                "runs_per_innings_in_phase": _r((agg_runs / agg_inn) if agg_inn else None, 2) if not below else None,
+                "sixes_per_innings":   _r((agg_sixes / agg_inn) if agg_inn else None, 3) if not below else None,
+                "fours_per_innings":   _r((agg_fours / agg_inn) if agg_inn else None, 3) if not below else None,
+                "boundaries_per_innings": _r((agg_bdr / agg_inn) if agg_inn else None, 3) if not below else None,
+            })
+            by_phase.append(out)
+            continue
+
+        # Build per-(phase, position) rate dict + cliff check.
+        per_bucket_rates: dict[str, dict[int, Optional[float]]] = {
+            "strike_rate": {}, "dot_pct": {}, "boundary_pct": {},
+            "balls_per_four": {}, "balls_per_boundary": {},
+            "runs_per_innings_in_phase": {},
+            "sixes_per_innings": {},
+            "fours_per_innings": {},
+            "boundaries_per_innings": {},
+        }
+        cliff_buckets: list[int] = []
+        for pos_b in range(1, 11):
+            r = season_cohort_for_phase.get(pos_b)
+            if r is None:
+                if mix[pos_b - 1] > 0:
+                    cliff_buckets.append(pos_b)
+                for k in per_bucket_rates:
+                    per_bucket_rates[k][pos_b] = None
+                continue
+            innings = r["innings"] or 0
+            balls = r["balls"] or 0
+            runs = r["runs"] or 0
+            dots = r["dots"] or 0
+            fours = r["fours"] or 0
+            sixes = r["sixes"] or 0
+            boundaries = r["boundaries"] or 0
+            # Per-bucket support threshold = PHASE_INNINGS_THRESHOLD
+            # (30 innings at this phase × position). Mirrors the prior
+            # phase-only cliff but applies at the finer grain.
+            if mix[pos_b - 1] > 0 and innings < PHASE_INNINGS_THRESHOLD:
+                cliff_buckets.append(pos_b)
+            per_bucket_rates["strike_rate"][pos_b] = (runs / balls * 100) if balls else None
+            per_bucket_rates["dot_pct"][pos_b] = (dots / balls * 100) if balls else None
+            per_bucket_rates["boundary_pct"][pos_b] = (boundaries / balls * 100) if balls else None
+            per_bucket_rates["balls_per_four"][pos_b] = (balls / fours) if fours else None
+            per_bucket_rates["balls_per_boundary"][pos_b] = (balls / boundaries) if boundaries else None
+            per_bucket_rates["runs_per_innings_in_phase"][pos_b] = (runs / innings) if innings else None
+            per_bucket_rates["sixes_per_innings"][pos_b] = (sixes / innings) if innings else None
+            per_bucket_rates["fours_per_innings"][pos_b] = (fours / innings) if innings else None
+            per_bucket_rates["boundaries_per_innings"][pos_b] = (boundaries / innings) if innings else None
+
+        if cliff_buckets:
+            out.update({
+                "mix": [round(m, 4) for m in mix],
+                "n_players": n_players_total,
+                "n_innings_in_phase": n_innings_total,
                 "below_support": True,
+                "cliff_buckets": cliff_buckets,
                 "strike_rate": None, "dot_pct": None,
                 "boundary_pct": None, "balls_per_four": None,
                 "balls_per_boundary": None,
@@ -2333,39 +2480,24 @@ async def compute_players_batting_by_phase(
             by_phase.append(out)
             continue
 
-        innings = match["innings"] or 0
-        balls = match["balls"] or 0
-        runs = match["runs"] or 0
-        dots = match["dots"] or 0
-        fours = match["fours"] or 0
-        sixes = match["sixes"] or 0
-        boundaries = match["boundaries"] or 0
-        n_p = match["n_players"] or 0
-        below = innings < PHASE_INNINGS_THRESHOLD
-
-        def _r(v, n):
-            return round(v, n) if v is not None else None
-
         out.update({
-            "n_players": n_p,
-            "n_innings_in_phase": innings,
-            "below_support": below,
-            "strike_rate":         _r((runs / balls * 100) if balls else None, 1) if not below else None,
-            "dot_pct":             _r((dots / balls * 100) if balls else None, 1) if not below else None,
-            "boundary_pct":        _r((boundaries / balls * 100) if balls else None, 1) if not below else None,
-            "balls_per_four":      _r((balls / fours) if fours else None, 2) if not below else None,
-            "balls_per_boundary":  _r((balls / boundaries) if boundaries else None, 2) if not below else None,
-            "runs_per_innings_in_phase": _r((runs / innings) if innings else None, 2) if not below else None,
-            "sixes_per_innings":   _r((sixes / innings) if innings else None, 3) if not below else None,
-            "fours_per_innings":   _r((fours / innings) if innings else None, 3) if not below else None,
-            "boundaries_per_innings": _r((boundaries / innings) if innings else None, 3) if not below else None,
+            "mix": [round(m, 4) for m in mix],
+            "n_players": n_players_total,
+            "n_innings_in_phase": n_innings_total,
+            "below_support": False,
+            "cliff_buckets": [],
+            "strike_rate":         _r(convex_combine(mix, per_bucket_rates["strike_rate"]), 1),
+            "dot_pct":             _r(convex_combine(mix, per_bucket_rates["dot_pct"]), 1),
+            "boundary_pct":        _r(convex_combine(mix, per_bucket_rates["boundary_pct"]), 1),
+            "balls_per_four":      _r(convex_combine(mix, per_bucket_rates["balls_per_four"]), 2),
+            "balls_per_boundary":  _r(convex_combine(mix, per_bucket_rates["balls_per_boundary"]), 2),
+            "runs_per_innings_in_phase": _r(convex_combine(mix, per_bucket_rates["runs_per_innings_in_phase"]), 2),
+            "sixes_per_innings":   _r(convex_combine(mix, per_bucket_rates["sixes_per_innings"]), 3),
+            "fours_per_innings":   _r(convex_combine(mix, per_bucket_rates["fours_per_innings"]), 3),
+            "boundaries_per_innings": _r(convex_combine(mix, per_bucket_rates["boundaries_per_innings"]), 3),
         })
         by_phase.append(out)
 
-    # person_id is accepted for API symmetry (parity with by-season
-    # which uses it to derive per-season mix); not used for cohort
-    # narrowing here. Surfaced so downstream consumers can tell which
-    # subject the response was requested for.
     return {"by_phase": by_phase, "person_id": person_id}
 
 
