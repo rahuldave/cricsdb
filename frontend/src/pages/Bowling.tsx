@@ -426,23 +426,19 @@ export default function Bowling() {
                       valueAccessor={(d: Record<string, any>) => (d.economy as number) ?? 0}
                       title="Economy by Over" categoryLabel="Over" valueLabel="Economy"
                       colorBy="phase" colorScheme={WISDEN_PHASES}
-                      height={350} />
-                    {/* spec-rate-vs-volume-audit C3: cohort econ-by-over
-                        baseline. Rendered as a text strip below the
-                        chart (BarChart doesn't accept referenceData;
-                        adding that prop is a chart-component-level
-                        change outside this audit's scope). Values come
-                        from the over-mix-weighted cohort summary. */}
-                    {overBaseline.length > 0 && (
-                      <p className="wisden-tab-help" style={{ marginTop: '0.5rem' }}>
-                        Cohort Econ by Over (over-mix-weighted at this scope):{' '}
-                        {[1, 6, 15, 20].map(o => {
-                          const r = overBaseline.find(b => b.over === o)
-                          const v = r?.economy
-                          return v != null ? `Over ${o}: ${v.toFixed(2)}` : `Over ${o}: —`
-                        }).join(' · ')}
-                      </p>
-                    )}
+                      height={350}
+                      // Tier 5 of spec-apples-to-apples-baselines.md
+                      // upgrades the prior C3 text strip into a native
+                      // BarChart overlay — short dashed forest-green
+                      // segment per over-bucket at the cohort's
+                      // econ-at-this-bucket, over-mix-weighted at the
+                      // active scope. Same `overBaseline` data the text
+                      // strip used to read.
+                      referenceData={overBaseline.length > 0 ? overBaseline.map(b => ({
+                        category: String(b.over),
+                        value: b.economy ?? null,
+                      })) : undefined}
+                      referenceLabel="cohort econ per over (over-mix-weighted at scope)" />
                   </>
                 )}
               </>

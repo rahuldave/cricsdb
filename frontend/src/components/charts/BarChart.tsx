@@ -38,6 +38,20 @@ interface BarChartProps<T extends Record<string, any>> {
    * to skip a label for a given row.
    */
   topLabelFormat?: (d: T, i: number) => string | null
+  /**
+   * Tier 5 of spec-apples-to-apples-baselines.md. Per-category cohort
+   * reference values rendered as short dashed forest-green segments
+   * over each bar at the reference value's y-position. Categories
+   * absent from `referenceData` are skipped — useful when the cohort
+   * baseline is only defined for some seasons (e.g. seasons with
+   * enough sample to clear the cliff threshold). Use this for
+   * per-category cohort overlays (closes spec §2.0 A8 for the
+   * /bowling Econ-by-Over chart).
+   */
+  referenceData?: { category: string; value: number | null }[]
+  /** Legend label for the dashed reference line series ("League avg"
+   *  / "Cohort econ" etc). When omitted, no legend hint renders. */
+  referenceLabel?: string
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,6 +60,8 @@ export default function BarChart<T extends Record<string, any>>({
   colorScheme = WISDEN_PALETTE, colorBy, categoryLabel, valueLabel, orientation,
   rotateCategoryLabels = 'auto',
   topLabelFormat,
+  referenceData,
+  referenceLabel,
 }: BarChartProps<T>) {
   const [ref, measuredWidth] = useContainerWidth()
   const effectiveWidth = width ?? measuredWidth
@@ -133,7 +149,22 @@ export default function BarChart<T extends Record<string, any>>({
     }
     return 0
   }
+  // Reference data lookup keyed by category label; absent entries skip
+  // the per-bar overlay segment.
+  const referenceByCategory = new Map<string, number>()
+  if (referenceData) {
+    for (const r of referenceData) {
+      if (r.value != null) referenceByCategory.set(String(r.category), r.value)
+    }
+  }
+  // Top-label math uses the bar-only max (matches Semiotic's auto-
+  // scaled y-axis); the reference overlay uses the combined max so a
+  // reference value higher than any bar stays on-chart.
   const maxValue = data.reduce((m, d) => Math.max(m, getValue(d) || 0), 0)
+  const refMax = referenceData
+    ? Math.max(0, ...referenceData.map(r => r.value ?? 0))
+    : 0
+  const refScaleMax = Math.max(maxValue, refMax)
 
   return (
     <ChartContainer
@@ -209,6 +240,75 @@ export default function BarChart<T extends Record<string, any>>({
               </div>
             )
           })}
+        </div>
+      )}
+      {/* Tier 5 of spec-apples-to-apples-baselines.md — per-category
+          reference overlay. Short dashed forest-green segment over
+          each bar at the reference value's y-position. Same pinned-
+          margin math as the topLabelFormat overlay so segment x lines
+          up with the bar beneath. */}
+      {referenceData && effectiveWidth > 0 && data.length > 0 && refScaleMax > 0 && (
+        <div style={{
+          position: 'absolute',
+          left: activeMargin.left,
+          top: 0,
+          width: effectiveWidth - activeMargin.left - activeMargin.right,
+          height: finalHeight,
+          pointerEvents: 'none',
+        }}>
+          {data.map((d, i) => {
+            const label = getLabel(d)
+            const refVal = referenceByCategory.get(label)
+            if (refVal == null) return null
+            // Semiotic auto-scales its y-axis based on the bars (not
+            // the reference). If reference > maxValue we'd draw above
+            // the plot area — clamp to maxValue so the line sits on
+            // the chart's top edge instead of floating off-chart.
+            const scaleMax = Math.max(maxValue, refMax)
+            const y = activeMargin.top + (innerHeight - (refVal / scaleMax) * innerHeight)
+            const segWidth = `${(1 / data.length) * 100}%`
+            const xPctCenter = ((i + 0.5) / data.length) * 100
+            return (
+              <div key={`ref-${i}`} style={{
+                position: 'absolute',
+                left: `${xPctCenter}%`,
+                top: y,
+                width: segWidth,
+                transform: 'translate(-50%, -1px)',
+                height: 2,
+                background:
+                  // Dashed effect via linear-gradient — semiotic
+                  // doesn't expose a way to draw arbitrary SVG
+                  // segments over its frame.
+                  'repeating-linear-gradient(to right, #3F7A4D 0, #3F7A4D 4px, transparent 4px, transparent 7px)',
+              }} />
+            )
+          })}
+        </div>
+      )}
+      {/* Reference legend hint — small inline caption under the chart
+          when referenceLabel is provided. Sits just under the
+          finalHeight so it doesn't interfere with rotated x-axis
+          labels (which live in the same band). */}
+      {referenceData && referenceLabel && data.length > 0 && refScaleMax > 0 && (
+        <div style={{
+          position: 'absolute',
+          left: activeMargin.left,
+          bottom: 4,
+          fontFamily: 'var(--serif)',
+          fontStyle: 'italic',
+          fontSize: '0.7rem',
+          color: 'var(--ink-faint)',
+          pointerEvents: 'none',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.3rem',
+        }}>
+          <span aria-hidden="true" style={{
+            display: 'inline-block', width: 14, height: 2,
+            background: 'repeating-linear-gradient(to right, #3F7A4D 0, #3F7A4D 4px, transparent 4px, transparent 7px)',
+          }} />
+          {referenceLabel}
         </div>
       )}
       {/* Top-label annotation: small labels positioned just above each
