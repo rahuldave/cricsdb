@@ -246,19 +246,30 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     const b = profile.bowling
     if (!b) return null
     const tt = b.cohort ? bowlingCohortTooltip(b.cohort as BowlingCohortMeta) : undefined
-    // Six tiles. Phase F adds Wkts/Inn + Maidens/Inn to the existing
-    // four (Wickets, Avg, Econ, SR) — Q6 envelopes shipped session 1.
+    // spec-rate-vs-volume-audit F3: add Maiden Overs, 4-fers (both
+    // volume), and 4-fers/Inn (rate, sibling to 4-fers).  Maidens/Inn
+    // is already present from Phase F. Wickets volume tile already
+    // had no chip — that was correct; left unchanged.
     return (
-      <div className="wisden-statrow cols-6">
-        <StatCard label="Wickets" value={b.wickets.value ?? 0} />
-        <StatCard label="Avg"     value={fmt(b.average.value)} subtitle={baselineSub(b.average, tt, 2)} />
-        <StatCard label="Econ"    value={fmt(b.economy.value)} subtitle={baselineSub(b.economy, tt, 2)} />
-        <StatCard label="SR"      value={fmt(b.strike_rate.value)} subtitle={baselineSub(b.strike_rate, tt, 2)} />
-        <StatCard label="Wkts/Inn"    value={fmt(b.wickets_per_innings.value, 2)}
-          subtitle={baselineSub(b.wickets_per_innings, tt, 2)} />
-        <StatCard label="Maidens/Inn" value={fmt(b.maidens_per_innings.value, 3)}
-          subtitle={baselineSub(b.maidens_per_innings, tt, 3)} />
-      </div>
+      <>
+        <div className="wisden-statrow cols-6">
+          <StatCard label="Wickets" value={b.wickets.value ?? 0} />
+          <StatCard label="Avg"     value={fmt(b.average.value)} subtitle={baselineSub(b.average, tt, 2)} />
+          <StatCard label="Econ"    value={fmt(b.economy.value)} subtitle={baselineSub(b.economy, tt, 2)} />
+          <StatCard label="SR"      value={fmt(b.strike_rate.value)} subtitle={baselineSub(b.strike_rate, tt, 2)} />
+          <StatCard label="Wkts/Inn"    value={fmt(b.wickets_per_innings.value, 2)}
+            subtitle={baselineSub(b.wickets_per_innings, tt, 2)} />
+          <StatCard label="Maidens/Inn" value={fmt(b.maidens_per_innings.value, 3)}
+            subtitle={baselineSub(b.maidens_per_innings, tt, 3)} />
+        </div>
+        <div className="wisden-statrow cols-6">
+          <StatCard label="Maiden Overs" value={b.maiden_overs.value ?? 0} />
+          <StatCard label="4-fers"      value={b.four_wicket_hauls.value ?? 0} />
+          <StatCard label="4-fers/Inn"  value={fmt(b.four_wicket_hauls_per_innings.value, 4)}
+            subtitle={baselineSub(b.four_wicket_hauls_per_innings, tt, 4)} />
+          <div /><div /><div />
+        </div>
+      </>
     )
   }
 

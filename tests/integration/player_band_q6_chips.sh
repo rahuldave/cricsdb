@@ -175,6 +175,20 @@ for combo in \
   assert_contains "Bumrah /players Bowling: $label chip cites base $api_f" "vs base $api_f" "$sub"
 done
 
+# spec-rate-vs-volume-audit F3 — new volume tiles (Maiden Overs,
+# 4-fers) MUST exist and carry NO chip. New rate tile (4-fers/Inn)
+# MUST exist and carry the cohort chip.
+for label in "Maiden Overs" "4-fers"; do
+  assert_tile_present "Bumrah /players Bowling: $label tile exists" "$label"
+  sub=$(tile_sub "$label")
+  assert_not_contains "Bumrah /players Bowling: $label tile MUST NOT carry chip" "vs base" "$sub"
+done
+assert_tile_present "Bumrah /players Bowling: 4-fers/Inn tile exists" "4-fers/Inn"
+fwh_v=$(summary_scope_avg "$bowl_url" "four_wicket_hauls_per_innings")
+fwh_f=$(printf "%.4f" "$fwh_v")
+sub=$(tile_sub "4-fers/Inn")
+assert_contains "Bumrah /players Bowling: 4-fers/Inn chip cites base $fwh_f" "vs base $fwh_f" "$sub"
+
 # ───────────────────────────────────────────────────────────────────
 # Test 3 — Kohli /players: Fielding band per-match chips (Phase F)
 # ───────────────────────────────────────────────────────────────────
