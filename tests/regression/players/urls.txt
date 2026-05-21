@@ -21,31 +21,31 @@ REG players_search_mandhana           /api/v1/players?q=Mandhana&limit=5
 REG players_search_short              /api/v1/players?q=KL&limit=5
 
 # ── Kohli profile bundle (batter-role tile shows bat stat strip) ─
-NEW player_kohli_bat_summary          /api/v1/batters/ba607b88/summary?gender=male&team_type=international
+REG player_kohli_bat_summary          /api/v1/batters/ba607b88/summary?gender=male&team_type=international
 REG player_kohli_bow_summary          /api/v1/bowlers/ba607b88/summary?gender=male&team_type=international
 REG player_kohli_field_summary        /api/v1/fielders/ba607b88/summary?gender=male&team_type=international
 REG player_kohli_keep_summary         /api/v1/fielders/ba607b88/keeping/summary?gender=male&team_type=international
 
 # ── Bumrah profile bundle (bowler-role tile) ────────────────────
-NEW player_bumrah_bat_summary         /api/v1/batters/462411b3/summary?gender=male&team_type=international
+REG player_bumrah_bat_summary         /api/v1/batters/462411b3/summary?gender=male&team_type=international
 REG player_bumrah_bow_summary         /api/v1/bowlers/462411b3/summary?gender=male&team_type=international
 REG player_bumrah_field_summary       /api/v1/fielders/462411b3/summary?gender=male&team_type=international
 REG player_bumrah_keep_summary        /api/v1/fielders/462411b3/keeping/summary?gender=male&team_type=international
 
 # ── Dhoni profile bundle (keeper path exercised) ────────────────
-NEW player_dhoni_bat_summary          /api/v1/batters/4a8a2e3b/summary?gender=male&team_type=international
+REG player_dhoni_bat_summary          /api/v1/batters/4a8a2e3b/summary?gender=male&team_type=international
 REG player_dhoni_bow_summary          /api/v1/bowlers/4a8a2e3b/summary?gender=male&team_type=international
 REG player_dhoni_field_summary        /api/v1/fielders/4a8a2e3b/summary?gender=male&team_type=international
 REG player_dhoni_keep_summary         /api/v1/fielders/4a8a2e3b/keeping/summary?gender=male&team_type=international
 
 # ── Mandhana profile bundle (women's) ───────────────────────────
-NEW player_mandhana_bat_summary       /api/v1/batters/5d2eda89/summary?gender=female&team_type=international
+REG player_mandhana_bat_summary       /api/v1/batters/5d2eda89/summary?gender=female&team_type=international
 REG player_mandhana_field_summary     /api/v1/fielders/5d2eda89/summary?gender=female&team_type=international
 
 # ── compare scope narrowing (rivalry lens applies to all tiles) ─
-NEW player_kohli_bat_vs_aus           /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+REG player_kohli_bat_vs_aus           /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
 REG player_kohli_bow_vs_aus           /api/v1/bowlers/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
-NEW player_bumrah_bat_vs_aus          /api/v1/batters/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+REG player_bumrah_bat_vs_aus          /api/v1/batters/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
 REG player_bumrah_bow_vs_aus          /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
 
 # ── landings the Players page may cross-link to ─────────────────
@@ -56,23 +56,23 @@ REG field_leaders_from_players        /api/v1/fielders/leaders?gender=male&team_
 # Source: each row mirrors a REG row in urls.txt with &team_class=full_member appended.
 # Filter: only intl-context REG entries qualify.
 
-NEW player_kohli_bat_summary_fm                        /api/v1/batters/ba607b88/summary?gender=male&team_type=international&team_class=full_member
+REG player_kohli_bat_summary_fm                        /api/v1/batters/ba607b88/summary?gender=male&team_type=international&team_class=full_member
 REG player_kohli_bow_summary_fm                        /api/v1/bowlers/ba607b88/summary?gender=male&team_type=international&team_class=full_member
 REG player_kohli_field_summary_fm                      /api/v1/fielders/ba607b88/summary?gender=male&team_type=international&team_class=full_member
 REG player_kohli_keep_summary_fm                       /api/v1/fielders/ba607b88/keeping/summary?gender=male&team_type=international&team_class=full_member
-NEW player_bumrah_bat_summary_fm                       /api/v1/batters/462411b3/summary?gender=male&team_type=international&team_class=full_member
+REG player_bumrah_bat_summary_fm                       /api/v1/batters/462411b3/summary?gender=male&team_type=international&team_class=full_member
 REG player_bumrah_bow_summary_fm                       /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&team_class=full_member
 REG player_bumrah_field_summary_fm                     /api/v1/fielders/462411b3/summary?gender=male&team_type=international&team_class=full_member
 REG player_bumrah_keep_summary_fm                      /api/v1/fielders/462411b3/keeping/summary?gender=male&team_type=international&team_class=full_member
-NEW player_dhoni_bat_summary_fm                        /api/v1/batters/4a8a2e3b/summary?gender=male&team_type=international&team_class=full_member
+REG player_dhoni_bat_summary_fm                        /api/v1/batters/4a8a2e3b/summary?gender=male&team_type=international&team_class=full_member
 REG player_dhoni_bow_summary_fm                        /api/v1/bowlers/4a8a2e3b/summary?gender=male&team_type=international&team_class=full_member
 REG player_dhoni_field_summary_fm                      /api/v1/fielders/4a8a2e3b/summary?gender=male&team_type=international&team_class=full_member
 REG player_dhoni_keep_summary_fm                       /api/v1/fielders/4a8a2e3b/keeping/summary?gender=male&team_type=international&team_class=full_member
-NEW player_mandhana_bat_summary_fm                     /api/v1/batters/5d2eda89/summary?gender=female&team_type=international&team_class=full_member
+REG player_mandhana_bat_summary_fm                     /api/v1/batters/5d2eda89/summary?gender=female&team_type=international&team_class=full_member
 REG player_mandhana_field_summary_fm                   /api/v1/fielders/5d2eda89/summary?gender=female&team_type=international&team_class=full_member
-NEW player_kohli_bat_vs_aus_fm                         /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
+REG player_kohli_bat_vs_aus_fm                         /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
 REG player_kohli_bow_vs_aus_fm                         /api/v1/bowlers/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
-NEW player_bumrah_bat_vs_aus_fm                        /api/v1/batters/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
+REG player_bumrah_bat_vs_aus_fm                        /api/v1/batters/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
 REG player_bumrah_bow_vs_aus_fm                        /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
 REG bat_leaders_from_players_fm                        /api/v1/batters/leaders?gender=male&team_type=international&limit=5&team_class=full_member
 REG bow_leaders_from_players_fm                        /api/v1/bowlers/leaders?gender=male&team_type=international&limit=5&team_class=full_member
@@ -82,23 +82,23 @@ REG field_leaders_from_players_fm                      /api/v1/fielders/leaders?
 # Tag REG (not NEW): promotion is inert by design — backend output is byte-identical pre/post.
 # Filter: only intl-context REG entries qualify (bilateral_only requires team_type=international).
 
-NEW player_kohli_bat_summary_bilat                     /api/v1/batters/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_kohli_bat_summary_bilat                     /api/v1/batters/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
 REG player_kohli_bow_summary_bilat                     /api/v1/bowlers/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
 REG player_kohli_field_summary_bilat                   /api/v1/fielders/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
 REG player_kohli_keep_summary_bilat                    /api/v1/fielders/ba607b88/keeping/summary?gender=male&team_type=international&series_type=bilateral_only
-NEW player_bumrah_bat_summary_bilat                    /api/v1/batters/462411b3/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_bumrah_bat_summary_bilat                    /api/v1/batters/462411b3/summary?gender=male&team_type=international&series_type=bilateral_only
 REG player_bumrah_bow_summary_bilat                    /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&series_type=bilateral_only
 REG player_bumrah_field_summary_bilat                  /api/v1/fielders/462411b3/summary?gender=male&team_type=international&series_type=bilateral_only
 REG player_bumrah_keep_summary_bilat                   /api/v1/fielders/462411b3/keeping/summary?gender=male&team_type=international&series_type=bilateral_only
-NEW player_dhoni_bat_summary_bilat                     /api/v1/batters/4a8a2e3b/summary?gender=male&team_type=international&series_type=bilateral_only
+REG player_dhoni_bat_summary_bilat                     /api/v1/batters/4a8a2e3b/summary?gender=male&team_type=international&series_type=bilateral_only
 REG player_dhoni_bow_summary_bilat                     /api/v1/bowlers/4a8a2e3b/summary?gender=male&team_type=international&series_type=bilateral_only
 REG player_dhoni_field_summary_bilat                   /api/v1/fielders/4a8a2e3b/summary?gender=male&team_type=international&series_type=bilateral_only
 REG player_dhoni_keep_summary_bilat                    /api/v1/fielders/4a8a2e3b/keeping/summary?gender=male&team_type=international&series_type=bilateral_only
-NEW player_mandhana_bat_summary_bilat                  /api/v1/batters/5d2eda89/summary?gender=female&team_type=international&series_type=bilateral_only
+REG player_mandhana_bat_summary_bilat                  /api/v1/batters/5d2eda89/summary?gender=female&team_type=international&series_type=bilateral_only
 REG player_mandhana_field_summary_bilat                /api/v1/fielders/5d2eda89/summary?gender=female&team_type=international&series_type=bilateral_only
-NEW player_kohli_bat_vs_aus_bilat                      /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
+REG player_kohli_bat_vs_aus_bilat                      /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
 REG player_kohli_bow_vs_aus_bilat                      /api/v1/bowlers/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
-NEW player_bumrah_bat_vs_aus_bilat                     /api/v1/batters/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
+REG player_bumrah_bat_vs_aus_bilat                     /api/v1/batters/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
 REG player_bumrah_bow_vs_aus_bilat                     /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
 REG bat_leaders_from_players_bilat                     /api/v1/batters/leaders?gender=male&team_type=international&limit=5&series_type=bilateral_only
 REG bow_leaders_from_players_bilat                     /api/v1/bowlers/leaders?gender=male&team_type=international&limit=5&series_type=bilateral_only
@@ -110,9 +110,9 @@ REG field_leaders_from_players_bilat                   /api/v1/fielders/leaders?
 # pin the split: 49 primary + 20 secondary = 69 unbounded matches;
 # 1210 + 602 = 1812 batting runs.
 
-NEW player_smc_summary_unb               /api/v1/batters/e94915e6/summary?gender=male&team_type=club&season_from=2024&season_to=2025
-NEW player_smc_summary_pri               /api/v1/batters/e94915e6/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
-NEW player_smc_summary_sec               /api/v1/batters/e94915e6/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
+REG player_smc_summary_unb               /api/v1/batters/e94915e6/summary?gender=male&team_type=club&season_from=2024&season_to=2025
+REG player_smc_summary_pri               /api/v1/batters/e94915e6/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
+REG player_smc_summary_sec               /api/v1/batters/e94915e6/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
 NEW player_smc_by_phase_pri              /api/v1/batters/e94915e6/by-phase?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club
 NEW player_smc_by_phase_sec              /api/v1/batters/e94915e6/by-phase?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
 NEW player_smc_by_season_pri             /api/v1/batters/e94915e6/by-season?gender=male&team_type=club&team_class=primary_club
@@ -121,4 +121,4 @@ NEW player_smc_bowl_summary_pri          /api/v1/bowlers/e94915e6/summary?gender
 NEW player_smc_bowl_summary_sec          /api/v1/bowlers/e94915e6/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=secondary_club
 
 # Cross-type silent no-op (player + cross-type tier value)
-NEW player_smc_summary_fm_noop           /api/v1/batters/e94915e6/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=full_member
+REG player_smc_summary_fm_noop           /api/v1/batters/e94915e6/summary?gender=male&team_type=club&season_from=2024&season_to=2025&team_class=full_member

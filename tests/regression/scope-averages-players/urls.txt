@@ -14,19 +14,19 @@
 # ── /scope/averages/players/batting/summary ──────────────────────
 
 # Unfiltered (broadest cohort) — top-order mix.
-NEW players_bat_unfiltered_top         /api/v1/scope/averages/players/batting/summary?position_mix=0.55,0.30,0.10,0.05
+REG players_bat_unfiltered_top         /api/v1/scope/averages/players/batting/summary?position_mix=0.55,0.30,0.10,0.05
 
 # IPL all-time, Kohli-like top-order weighting.
-NEW players_bat_ipl_top                /api/v1/scope/averages/players/batting/summary?tournament=Indian%20Premier%20League&position_mix=0.54,0.38,0.05,0.03
+REG players_bat_ipl_top                /api/v1/scope/averages/players/batting/summary?tournament=Indian%20Premier%20League&position_mix=0.54,0.38,0.05,0.03
 
 # IPL, lower-order weighting (#7-#11 — finishers and tail).
-NEW players_bat_ipl_lower              /api/v1/scope/averages/players/batting/summary?tournament=Indian%20Premier%20League&position_mix=0,0,0,0,0,0.1,0.2,0.3,0.25,0.15
+REG players_bat_ipl_lower              /api/v1/scope/averages/players/batting/summary?tournament=Indian%20Premier%20League&position_mix=0,0,0,0,0,0.1,0.2,0.3,0.25,0.15
 
 # Men's bilateral T20Is — opener-only mix.
-NEW players_bat_men_intl_opener        /api/v1/scope/averages/players/batting/summary?gender=male&team_type=international&series_type=bilateral&position_mix=1.0
+REG players_bat_men_intl_opener        /api/v1/scope/averages/players/batting/summary?gender=male&team_type=international&series_type=bilateral&position_mix=1.0
 
 # IPL with drop=tournament (widens cohort to all club cricket).
-NEW players_bat_ipl_drop_tournament    /api/v1/scope/averages/players/batting/summary?tournament=Indian%20Premier%20League&team_type=club&position_mix=0.54,0.38,0.05,0.03&drop=tournament
+REG players_bat_ipl_drop_tournament    /api/v1/scope/averages/players/batting/summary?tournament=Indian%20Premier%20League&team_type=club&position_mix=0.54,0.38,0.05,0.03&drop=tournament
 
 # ── /scope/averages/players/bowling/summary ──────────────────────
 

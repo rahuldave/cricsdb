@@ -13,10 +13,10 @@
 # made them part of the stable API. Phase 3 must not perturb them.
 #
 # ── batting (auto-covered via FilterParams) ──────────────────────
-NEW bat_summary_plain                 /api/v1/batters/ba607b88/summary
-NEW bat_summary_ipl                   /api/v1/batters/ba607b88/summary?tournament=Indian%20Premier%20League
+REG bat_summary_plain                 /api/v1/batters/ba607b88/summary
+REG bat_summary_ipl                   /api/v1/batters/ba607b88/summary?tournament=Indian%20Premier%20League
 REG bat_byinn_plain                   /api/v1/batters/ba607b88/by-innings?limit=5
-NEW bat_summary_venue_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium
+REG bat_summary_venue_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium
 REG bat_byinn_venue_wankhede          /api/v1/batters/ba607b88/by-innings?filter_venue=Wankhede%20Stadium&limit=5
 
 # ── bowling ──────────────────────────────────────────────────────
