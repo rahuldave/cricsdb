@@ -16,7 +16,7 @@ import InningToggle from '../components/InningToggle'
 import StatCard from '../components/StatCard'
 import MetricDelta from '../components/MetricDelta'
 import BaselineChip from '../components/baseline/BaselineChip'
-import { battingCohortTooltip } from '../components/players/cohortTooltip'
+import { battingCohortTooltip, battingCohortLine } from '../components/players/cohortTooltip'
 import type { BattingCohortMeta } from '../types'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
@@ -272,7 +272,12 @@ export default function Batting() {
 
       {playerId && summary && !summaryFetch.loading && (
         <>
-          <ScopedPageHeader filters={filters}>
+          <ScopedPageHeader
+            filters={filters}
+            comparison={summary.cohort
+              ? { label: 'cohort', text: battingCohortLine(summary.cohort as BattingCohortMeta) }
+              : null}
+          >
             {summary.name}
             {summary.nationalities?.length > 0 && (
               <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>

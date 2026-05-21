@@ -446,7 +446,10 @@ export default function Teams() {
               Refreshing…
             </div>
           )}
-          <ScopedPageHeader filters={filters}>
+          <ScopedPageHeader
+            filters={filters}
+            comparison={{ label: 'avg', text: 'every team at this scope' }}
+          >
             {selected}
             {/* FlagBadge returns null for franchise sides (they're not
                 in TEAM_TO_FLAG) — no need to branch on team_type. */}

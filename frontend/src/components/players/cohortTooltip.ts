@@ -115,3 +115,23 @@ export function keepingCohortTooltip(cohort: KeepingCohortMeta): string {
     + `${fmtCount(cohort.n_matches_keeping)} keeping matches`
   )
 }
+
+
+// ─── One-line cohort summaries ───────────────────────────────────────
+//
+// Short phrases for the COHORT line on ScopedPageHeader (the second
+// row that sits below the SCOPE pill on Batting / Bowling / Fielding).
+// The tooltips above retain the full mix breakdown for hover.
+
+export function battingCohortLine(_cohort: BattingCohortMeta | null): string {
+  return "all batters at scope, weighted to this player's position mix"
+}
+
+export function bowlingCohortLine(_cohort: BowlingCohortMeta | null): string {
+  return "all bowlers at scope, weighted to this player's over usage"
+}
+
+export function fieldingCohortLine(cohort: FieldingCohortMeta | null): string {
+  if (cohort?.is_keeper === 1) return 'every keeper at this scope'
+  return 'every outfielder at this scope'
+}

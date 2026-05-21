@@ -32,10 +32,17 @@ interface Props {
    *  scope renders "Men's club Twenty20 cricket, 2024–2025" — the
    *  abbreviation would just repeat the title). */
   hideAbbrev?: boolean
+  /** Optional comparison-anchor line that wraps to its own row below
+   *  the SCOPE pill. `label` is the small-caps accent prefix (e.g.
+   *  "COHORT" on player pages, "AVG" on team pages); `text` is the
+   *  one-line phrase describing what the chip baselines compare
+   *  against. Same italic / muted-grey styling as the SCOPE phrase
+   *  so the two lines read as a paired anchor. */
+  comparison?: { label: string; text: string } | null
   children: ReactNode
 }
 
-export default function ScopedPageHeader({ filters, omit, hideAbbrev, children }: Props) {
+export default function ScopedPageHeader({ filters, omit, hideAbbrev, comparison, children }: Props) {
   const scoped: FilterParams = omit && omit.length > 0
     ? { ...filters, ...Object.fromEntries(omit.map(k => [k, undefined])) }
     : filters
@@ -74,6 +81,29 @@ export default function ScopedPageHeader({ filters, omit, hideAbbrev, children }
             marginRight: '0.4rem',
           }}>scope</span>
           {abbrev}
+        </span>
+      )}
+      {comparison && (
+        <span style={{
+          fontFamily: 'var(--serif)',
+          fontStyle: 'italic',
+          fontSize: '0.95rem',
+          color: 'var(--ink-faint)',
+          // flexBasis: 100% forces this onto its own row below the
+          // h2 + SCOPE pair; the phrase itself can be long ("all
+          // batters at scope, weighted to this player's position
+          // mix") so dropping to a new row keeps the title legible.
+          flexBasis: '100%',
+        }}>
+          <span style={{
+            fontVariant: 'all-small-caps',
+            letterSpacing: '0.08em',
+            fontWeight: 700,
+            fontStyle: 'normal',
+            color: 'var(--accent)',
+            marginRight: '0.4rem',
+          }}>{comparison.label}</span>
+          {comparison.text}
         </span>
       )}
     </div>

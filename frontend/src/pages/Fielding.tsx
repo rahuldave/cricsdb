@@ -16,7 +16,7 @@ import InningToggle from '../components/InningToggle'
 import StatCard from '../components/StatCard'
 import MetricDelta from '../components/MetricDelta'
 import BaselineChip from '../components/baseline/BaselineChip'
-import { fieldingCohortTooltip } from '../components/players/cohortTooltip'
+import { fieldingCohortTooltip, fieldingCohortLine } from '../components/players/cohortTooltip'
 import type { FieldingCohortMeta } from '../types'
 import DataTable, { type Column } from '../components/DataTable'
 import BarChart from '../components/charts/BarChart'
@@ -292,7 +292,12 @@ export default function Fielding() {
 
       {playerId && summary && !summaryFetch.loading && (
         <>
-          <ScopedPageHeader filters={filters}>
+          <ScopedPageHeader
+            filters={filters}
+            comparison={summary.cohort
+              ? { label: 'cohort', text: fieldingCohortLine(summary.cohort as FieldingCohortMeta) }
+              : null}
+          >
             {summary.name}
             {summary.nationalities?.length > 0 && (
               <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
