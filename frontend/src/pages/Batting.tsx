@@ -278,10 +278,14 @@ export default function Batting() {
               : undefined
             return (
               <>
-          <div className="wisden-statrow cols-5">
+          <div className="wisden-statrow cols-6">
             <StatCard label="Matches" value={summary.matches.value} />
             <StatCard label="Innings" value={summary.innings.value} />
             <StatCard label="Runs" value={summary.runs.value} />
+            <StatCard label="Runs/Inn" value={fmt(summary.runs_per_innings.value, 2)}
+              subtitle={summary.runs_per_innings.scope_avg != null
+                ? <MetricDelta env={summary.runs_per_innings} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                : undefined} />
             <StatCard label="Average" value={fmt(summary.average.value)}
               subtitle={summary.average.scope_avg != null
                 ? <MetricDelta env={summary.average} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
@@ -299,8 +303,12 @@ export default function Batting() {
               error={distFetch.error}
             />
           )}
-          <div className="wisden-statrow cols-5">
+          <div className="wisden-statrow cols-6">
             <StatCard label="Boundaries" value={summary.boundaries.value} subtitle={`${summary.fours.value} 4s, ${summary.sixes.value} 6s`} />
+            <StatCard label="Bndr/Inn" value={fmt(summary.boundaries_per_innings.value, 2)}
+              subtitle={summary.boundaries_per_innings.scope_avg != null
+                ? <MetricDelta env={summary.boundaries_per_innings} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                : undefined} />
             <StatCard label="B/Four" value={fmt(summary.balls_per_four.value)}
               subtitle={summary.balls_per_four.scope_avg != null
                 ? <MetricDelta env={summary.balls_per_four} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
@@ -314,6 +322,26 @@ export default function Batting() {
                 ? <MetricDelta env={summary.dot_pct} withScopeAvg label="base" fmt={1} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="30s / 50s / 100s" value={`${summary.thirties.value} / ${summary.fifties.value} / ${summary.hundreds.value}`} />
+          </div>
+          {/* spec-rate-vs-volume-audit F7: per-innings sibling to the
+              combined milestone tile. Each value rendered alongside
+              its cohort delta chip; the composite displays the player's
+              per-innings rates for 30s · 50s · 100s in one tile. */}
+          <div className="wisden-statrow cols-3">
+            <div className="wisden-stat">
+              <div className="wisden-stat-label">30s/Inn · 50s/Inn · 100s/Inn</div>
+              <div className="wisden-stat-value num">
+                {fmt(summary.thirties_per_innings.value, 3)} / {fmt(summary.fifties_per_innings.value, 3)} / {fmt(summary.hundreds_per_innings.value, 3)}
+              </div>
+              <div className="wisden-stat-sub">
+                {summary.thirties_per_innings.scope_avg != null
+                  && summary.fifties_per_innings.scope_avg != null
+                  && summary.hundreds_per_innings.scope_avg != null
+                  ? `vs base ${summary.thirties_per_innings.scope_avg.toFixed(3)} / ${summary.fifties_per_innings.scope_avg.toFixed(3)} / ${summary.hundreds_per_innings.scope_avg.toFixed(3)}`
+                  : ''}
+              </div>
+            </div>
+            <div /><div />
           </div>
               </>
             )

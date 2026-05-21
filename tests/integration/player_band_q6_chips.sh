@@ -318,6 +318,46 @@ for combo in \
   assert_contains "Bumrah /bowling: $label chip cites base $api_f" "vs base $api_f" "$sub"
 done
 
+# ───────────────────────────────────────────────────────────────────
+# Test 6 — Kohli /batting deep-dive: F7 new tiles
+# ───────────────────────────────────────────────────────────────────
+
+echo
+echo "=== Kohli /batting — Deep-dive new tiles (F7) ==="
+ab open "$BASE/batting?player=$KOHLI&$SCOPE_URL"
+sleep 3
+snapshot_tiles
+bat_url="$API/api/v1/batters/$KOHLI/summary?$SCOPE"
+
+# New tiles must exist.
+for label in "Runs/Inn" "Bndr/Inn" "30s/Inn · 50s/Inn · 100s/Inn"; do
+  assert_tile_present "Kohli /batting: $label tile exists" "$label"
+done
+
+# Volume tiles MUST NOT carry chips.
+sub=$(tile_sub "Runs")
+assert_not_contains "Kohli /batting: Runs tile MUST NOT carry chip" "vs base" "$sub"
+sub=$(tile_sub "30s / 50s / 100s")
+assert_not_contains "Kohli /batting: 30s/50s/100s combined volume tile MUST NOT carry chip" "vs base" "$sub"
+
+# Runs/Inn chip cites the cohort.
+api_v=$(summary_scope_avg "$bat_url" "runs_per_innings")
+api_f=$(printf "%.2f" "$api_v")
+sub=$(tile_sub "Runs/Inn")
+assert_contains "Kohli /batting: Runs/Inn chip cites base $api_f" "vs base $api_f" "$sub"
+
+# Bndr/Inn chip cites the cohort.
+api_v=$(summary_scope_avg "$bat_url" "boundaries_per_innings")
+api_f=$(printf "%.2f" "$api_v")
+sub=$(tile_sub "Bndr/Inn")
+assert_contains "Kohli /batting: Bndr/Inn chip cites base $api_f" "vs base $api_f" "$sub"
+
+# Combined milestone per-Inn tile shows all 3 base values in subtitle.
+hpi=$(summary_scope_avg "$bat_url" "hundreds_per_innings")
+hpi_f=$(printf "%.3f" "$hpi")
+sub=$(tile_sub "30s/Inn · 50s/Inn · 100s/Inn")
+assert_contains "Kohli /batting: combined per-Inn tile cites hundreds_per_innings base $hpi_f" "$hpi_f" "$sub"
+
 echo
 echo "─────────────────────────────────────────"
 echo "Results: $PASS passed, $FAIL failed"
