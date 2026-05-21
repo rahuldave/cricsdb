@@ -2042,11 +2042,31 @@ async def compute_players_batting_by_season(
         GROUP BY pss.season
         ORDER BY pss.season
     """
+    # Q4 (spec-rate-vs-volume-audit.md §2.1 Group C): scope-flat per-
+    # season milestone totals. The position child table doesn't carry
+    # milestone counts — milestones live on the parent only — so
+    # hundreds_per_innings / fifties_per_innings / thirties_per_innings
+    # / ducks_per_innings are surfaced per season as scope-flat baselines
+    # (sum across all players at that scope and season). Consistent
+    # with the /summary cohort treatment of the same fields.
+    pi_season_sql = f"""
+        SELECT pss.season,
+               SUM(pss.innings_batted) AS innings_total,
+               SUM(pss.thirties)       AS thirties_total,
+               SUM(pss.fifties)        AS fifties_total,
+               SUM(pss.hundreds)       AS hundreds_total,
+               SUM(pss.ducks)          AS ducks_total
+        FROM playerscopestats pss
+        WHERE {where}
+        GROUP BY pss.season
+        ORDER BY pss.season
+    """
     p_params = {**params, "__pid": person_id}
-    player_rows, cohort_rows, pool_rows = await asyncio.gather(
+    player_rows, cohort_rows, pool_rows, pi_season_rows = await asyncio.gather(
         db.q(player_sql, p_params),
         db.q(cohort_sql, params),
         db.q(pool_sql, params),
+        db.q(pi_season_sql, params),
     )
 
     # Roll cohort aggregates into {season: {bucket: row}}.
@@ -2057,6 +2077,20 @@ async def compute_players_batting_by_season(
 
     # Pool totals per season.
     pool_by_season: dict[str, dict] = {r["season"]: r for r in pool_rows}
+
+    # Per-season scope-flat milestone rates (spec-rate-vs-volume-audit
+    # §2.1 Group C). Keyed by season, each value is a small dict of
+    # {hundreds_per_innings, fifties_per_innings, …} or `None` rates
+    # when the per-season cohort innings_total is zero.
+    pi_season_by_season: dict[str, dict[str, Optional[float]]] = {}
+    for r in pi_season_rows:
+        inn = r["innings_total"] or 0
+        pi_season_by_season[r["season"]] = {
+            "hundreds_per_innings": round((r["hundreds_total"] or 0) / inn, 3) if inn else None,
+            "fifties_per_innings":  round((r["fifties_total"]  or 0) / inn, 3) if inn else None,
+            "thirties_per_innings": round((r["thirties_total"] or 0) / inn, 3) if inn else None,
+            "ducks_per_innings":    round((r["ducks_total"]    or 0) / inn, 3) if inn else None,
+        }
 
     # Player's per-season mix from innings per bucket.
     player_innings: dict[str, dict[int, int]] = {}
@@ -2113,6 +2147,7 @@ async def compute_players_batting_by_season(
                 "sixes_per_innings": (sixes / innings) if innings else None,
                 "fours_per_innings": (fours / innings) if innings else None,
                 "boundaries_per_innings": (boundaries / innings) if innings else None,
+                "runs_per_innings": (runs / innings) if innings else None,
             })
 
         pool = pool_by_season.get(season, {})
@@ -2125,6 +2160,11 @@ async def compute_players_batting_by_season(
             "n_players": n_players_total,
             "n_innings": n_innings_total,
         }
+
+        # Scope-flat per-season milestones (Group C). Always surfaced
+        # regardless of cliff — they're derived from the parent table,
+        # not the per-position child.
+        pi_season = pi_season_by_season.get(season, {})
 
         if cliff_buckets:
             row.update({
@@ -2140,6 +2180,13 @@ async def compute_players_batting_by_season(
                 "sixes_per_innings":     None,
                 "fours_per_innings":     None,
                 "boundaries_per_innings": None,
+                "runs_per_innings":      None,
+                # Milestones still surface even under cliff — same
+                # discipline as the /summary cohort.
+                "hundreds_per_innings":  pi_season.get("hundreds_per_innings"),
+                "fifties_per_innings":   pi_season.get("fifties_per_innings"),
+                "thirties_per_innings":  pi_season.get("thirties_per_innings"),
+                "ducks_per_innings":     pi_season.get("ducks_per_innings"),
             })
             by_season.append(row)
             continue
@@ -2170,6 +2217,15 @@ async def compute_players_batting_by_season(
             "sixes_per_innings":  _r(cv("sixes_per_innings"), 3),
             "fours_per_innings":  _r(cv("fours_per_innings"), 3),
             "boundaries_per_innings": _r(cv("boundaries_per_innings"), 3),
+            # Group C additions (spec-rate-vs-volume-audit §2.1).
+            # runs_per_innings is position-weighted (derivable from
+            # the position child); the four milestone rates are
+            # scope-flat per-season (parent-only data).
+            "runs_per_innings":      _r(cv("runs_per_innings"), 2),
+            "hundreds_per_innings":  pi_season.get("hundreds_per_innings"),
+            "fifties_per_innings":   pi_season.get("fifties_per_innings"),
+            "thirties_per_innings":  pi_season.get("thirties_per_innings"),
+            "ducks_per_innings":     pi_season.get("ducks_per_innings"),
         })
         by_season.append(row)
 
@@ -2656,11 +2712,27 @@ async def compute_players_bowling_by_season(
         GROUP BY pss.season
         ORDER BY pss.season
     """
+    # Q4 (spec-rate-vs-volume-audit.md §2.1 Group C): scope-flat per-
+    # season four_wicket_hauls totals. The per-over child table doesn't
+    # carry four-wicket-hauls (those are per-innings markers, not per-
+    # over events), so this rate is surfaced as a scope-flat baseline
+    # per season aggregated from the parent. Innings denominator uses
+    # the same balls/24 approximation as the /summary cohort.
+    fwh_season_sql = f"""
+        SELECT pss.season,
+               SUM(pss.four_wicket_hauls) AS fwh_total,
+               SUM(pss.balls_bowled)      AS balls_total
+        FROM playerscopestats pss
+        WHERE {where}
+        GROUP BY pss.season
+        ORDER BY pss.season
+    """
     p_params = {**params, "__pid": person_id}
-    player_rows, cohort_rows, pool_rows = await asyncio.gather(
+    player_rows, cohort_rows, pool_rows, fwh_season_rows = await asyncio.gather(
         db.q(player_sql, p_params),
         db.q(cohort_sql, params),
         db.q(pool_sql, params),
+        db.q(fwh_season_sql, params),
     )
 
     # Roll up.
@@ -2668,6 +2740,14 @@ async def compute_players_bowling_by_season(
     for r in cohort_rows:
         cohort_by_season.setdefault(r["season"], {})[r["over_number"]] = r
     pool_by_season: dict[str, dict] = {r["season"]: r for r in pool_rows}
+
+    # Scope-flat four_wicket_hauls_per_innings per season (Group C).
+    fwh_by_season: dict[str, Optional[float]] = {}
+    for r in fwh_season_rows:
+        balls = r["balls_total"] or 0
+        inn_approx = balls / 24 if balls else 0
+        fwh = r["fwh_total"] or 0
+        fwh_by_season[r["season"]] = round(fwh / inn_approx, 4) if inn_approx else None
     player_balls: dict[str, dict[int, int]] = {}
     # innings per season for wickets_per_innings derivation. The bowling
     # child table doesn't carry innings directly; we approximate via
@@ -2741,6 +2821,8 @@ async def compute_players_bowling_by_season(
                 "boundary_pct": None, "balls_per_boundary": None,
                 "wickets_per_over": None, "wickets_per_innings": None,
                 "maidens_per_innings": None,
+                # Group C — scope-flat regardless of cliff.
+                "four_wicket_hauls_per_innings": fwh_by_season.get(season),
             })
             by_season.append(row)
             continue
@@ -2770,6 +2852,8 @@ async def compute_players_bowling_by_season(
             # enough that the Q6 chip remains meaningful.
             "wickets_per_innings": _r(cc_wpo * 4 if cc_wpo is not None else None, 3),
             "maidens_per_innings": _r(cc_mpo * 4 if cc_mpo is not None else None, 3),
+            # Group C — scope-flat per-season four-wicket-haul rate.
+            "four_wicket_hauls_per_innings": fwh_by_season.get(season),
         })
         by_season.append(row)
 

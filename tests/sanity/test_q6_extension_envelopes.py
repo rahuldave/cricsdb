@@ -198,8 +198,86 @@ def main() -> int:
     )
     print(line); all_passed &= ok
 
-    # ─── Test 3: direction metadata is wired in ──────────────────
-    print("\n  3. direction metadata is set:")
+    # ─── Test 3: cohort /by-season — Group C mirrors ─────────────
+    print("\n  3. /scope/averages/players/batting/by-season Group C fields:")
+    bat_bs = get(
+        args.host, "/api/v1/scope/averages/players/batting/by-season",
+        person_id="ba607b88", gender="male", team_type="club",
+        tournament="Indian Premier League",
+        season_from="2016", season_to="2016",
+    )
+    seasons = bat_bs.get("by_season", [])
+    ok = len(seasons) == 1 and seasons[0]["season"] == "2016"
+    _, line = check("one season row (IPL 2016) returned", ok)
+    print(line); all_passed &= ok
+    if ok:
+        r = seasons[0]
+        for k in (
+            "runs_per_innings", "hundreds_per_innings",
+            "fifties_per_innings", "thirties_per_innings",
+            "ducks_per_innings",
+        ):
+            ok = k in r and r[k] is not None
+            _, line = check(f"  field {k} present and non-null", ok,
+                            f"value={r.get(k)}")
+            print(line); all_passed &= ok
+        # Cross-check milestone rate against SQL (scope-flat).
+        row = conn.execute("""
+            SELECT SUM(hundreds)*1.0/SUM(innings_batted) AS hpi
+            FROM playerscopestats
+            WHERE tournament='Indian Premier League' AND season='2016'
+              AND gender='male' AND team_type='club'
+        """).fetchone()
+        sql_hpi = round(row["hpi"], 3) if row["hpi"] is not None else None
+        ok = approx(r["hundreds_per_innings"], sql_hpi, tol=0.001)
+        _, line = check(
+            "hundreds_per_innings matches sqlite3 scope-flat SQL",
+            ok,
+            f"sql={sql_hpi}, api={r['hundreds_per_innings']}",
+        )
+        print(line); all_passed &= ok
+
+    print("\n  4. /scope/averages/players/bowling/by-season Group C field:")
+    bowl_bs = get(
+        args.host, "/api/v1/scope/averages/players/bowling/by-season",
+        person_id="462411b3", gender="male", team_type="club",
+        tournament="Indian Premier League",
+        season_from="2018", season_to="2018",
+    )
+    seasons = bowl_bs.get("by_season", [])
+    ok = len(seasons) == 1 and seasons[0]["season"] == "2018"
+    _, line = check("one season row (IPL 2018) returned", ok)
+    print(line); all_passed &= ok
+    if ok:
+        r = seasons[0]
+        ok = (
+            "four_wicket_hauls_per_innings" in r
+            and r["four_wicket_hauls_per_innings"] is not None
+        )
+        _, line = check(
+            "field four_wicket_hauls_per_innings present and non-null",
+            ok,
+            f"value={r.get('four_wicket_hauls_per_innings')}",
+        )
+        print(line); all_passed &= ok
+        # Cross-check against SQL (scope-flat with balls/24 denominator).
+        row = conn.execute("""
+            SELECT SUM(four_wicket_hauls)*1.0 / (SUM(balls_bowled)/24.0) AS fwhpi
+            FROM playerscopestats
+            WHERE tournament='Indian Premier League' AND season='2018'
+              AND gender='male' AND team_type='club'
+        """).fetchone()
+        sql_fwhpi = round(row["fwhpi"], 4) if row["fwhpi"] is not None else None
+        ok = approx(r["four_wicket_hauls_per_innings"], sql_fwhpi, tol=0.0005)
+        _, line = check(
+            "four_wicket_hauls_per_innings matches sqlite3 scope-flat SQL",
+            ok,
+            f"sql={sql_fwhpi}, api={r['four_wicket_hauls_per_innings']}",
+        )
+        print(line); all_passed &= ok
+
+    # ─── Test 5: direction metadata is wired in ──────────────────
+    print("\n  5. direction metadata is set:")
     ok = rpi.get("direction") == "higher_better"
     _, line = check(
         "runs_per_innings.direction == higher_better",
