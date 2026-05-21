@@ -1,10 +1,13 @@
 /**
  * Shared probability chip — renders a backend ProbRecord
- * `{ value, num, denom, ci_low, ci_high }` with Wilson 95% CI.
+ * `{ value, num, denom, ci_low, ci_high }` with Wilson 95% CI, and
+ * (PT5 of spec-prob-baselines.md) an Option C cohort-baseline caption
+ * below the pill when the record carries `scope_avg / delta_pct /
+ * direction / sample_size`.
  *
- * Used by both the bowler and batter Distribution panels. One
- * source of truth so the two panels can't drift on small-n
- * styling, hover format, or null handling.
+ * Used by both the bowler and batter Distribution panels + the
+ * fielder chips row. One source of truth so the consumers can't
+ * drift on small-n styling, hover format, or null handling.
  *
  * Visual contract:
  *  - Value rendered as `XX%` (rounded to 0 dp).
@@ -20,12 +23,27 @@
  *    its threshold falls in and passes the matching `tint` from
  *    `WISDEN_TIER_TINTS`. This is what makes a P(≥3) chip color-
  *    match the wickets histogram bar at value 3.
+ *  - **Cohort baseline caption (PT5 of spec-prob-baselines.md)**
+ *    renders below the pill when `record.scope_avg` is defined and
+ *    `record.direction` is set. Form: `vs XX% ↑+YY%` in oxblood
+ *    when the player trails the cohort (per `direction` polarity)
+ *    or forest-green when ahead. `direction = null` (descriptive
+ *    chips like fielding P(=1)) renders no caption. Null scope_avg
+ *    on a known-cohort chip (below-sample) renders "vs — (below
+ *    sample)" in muted italic.
  *
  * Spec: internal_docs/spec-distribution-stats.md §11.3 (helper),
- * §12.2.5 (visual contract).
+ * §12.2.5 (visual contract); internal_docs/spec-prob-baselines.md
+ * §5 Option C (caption + polarity).
  */
 
 import type { ProbRecord } from '../../types'
+
+// Per CLAUDE.md "Accent strokes" — oxblood for under-cohort,
+// forest-green for over-cohort. Matches the inline MetricDelta
+// rendering elsewhere in the codebase.
+const COLOR_GOOD = '#3F7A4D'
+const COLOR_BAD = '#7A1F1F'
 
 interface Props {
   label: string
@@ -42,18 +60,134 @@ function fmtPct(v: number | null | undefined, digits = 0): string {
   return `${(v * 100).toFixed(digits)}%`
 }
 
+function fmtPctSmart(v: number | null | undefined): string {
+  // Cohort scope_avg is often a small probability (e.g. 0.012 →
+  // "1%" loses meaning). When the value is < 5%, show 1 decimal so
+  // P(≥100) cohort=1.2% reads as "1.2%" not "1%".
+  if (v === null || v === undefined) return '—'
+  const pct = v * 100
+  if (pct < 5) return `${pct.toFixed(1)}%`
+  return `${pct.toFixed(0)}%`
+}
+
+function fmtDelta(delta_pct: number): string {
+  // delta_pct is signed; magnitude formatted to 0 dp + sign character.
+  const mag = Math.abs(delta_pct).toFixed(0)
+  if (delta_pct > 0) return `+${mag}%`
+  if (delta_pct < 0) return `−${mag}%`
+  return '0%'
+}
+
 function tooltipFor(record: ProbRecord): string {
   if (record.denom <= 0) return 'n=0 (no qualifying innings)'
   const lo = fmtPct(record.ci_low, 1)
   const hi = fmtPct(record.ci_high, 1)
-  return `95% CI [${lo}–${hi}], n=${record.denom}`
+  const base = `95% CI [${lo}–${hi}], n=${record.denom}`
+  if (
+    record.scope_avg !== null && record.scope_avg !== undefined &&
+    record.sample_size
+  ) {
+    return `${base} · cohort ${fmtPctSmart(record.scope_avg)} (n=${record.sample_size})`
+  }
+  return base
+}
+
+/**
+ * Whether the player's delta is "good" given the chip's polarity.
+ * higher_better + positive → green ↑; lower_better + negative → green ↓.
+ */
+function deltaPolarity(
+  delta_pct: number,
+  direction: 'higher_better' | 'lower_better',
+): 'good' | 'bad' | 'neutral' {
+  if (delta_pct === 0) return 'neutral'
+  const positive = delta_pct > 0
+  if (direction === 'higher_better') return positive ? 'good' : 'bad'
+  return positive ? 'bad' : 'good'
+}
+
+function arrowFor(delta_pct: number): string {
+  if (delta_pct > 0) return '↑'
+  if (delta_pct < 0) return '↓'
+  return ''
+}
+
+function captionFor(record: ProbRecord): React.ReactNode | null {
+  // Only render captions for chips whose backend has actually wired
+  // the cohort fields. Bowler/batter/fielder distribution chips do;
+  // team / compare-grid chips don't (deferred to follow-up spec).
+  // Detect by checking direction — a wired-and-directional chip has
+  // 'higher_better' | 'lower_better'. direction === null is wired-
+  // and-descriptive (e.g. fielding P(=1)) — no caption.
+  const dir = record.direction
+  if (dir === undefined) return null  // not wired
+  if (dir === null) return null       // descriptive — no orientation
+
+  // Below-sample (cohort cliff): scope_avg is null but direction is
+  // set. Render "vs — (below sample)" in muted italic.
+  if (record.scope_avg === null || record.scope_avg === undefined) {
+    return (
+      <span
+        style={{
+          fontFamily: 'var(--serif)', fontStyle: 'italic',
+          fontSize: '0.65rem', color: 'var(--muted)',
+          marginTop: '0.1rem', textAlign: 'center', display: 'block',
+        }}
+      >
+        vs — (below sample)
+      </span>
+    )
+  }
+
+  // delta_pct may be null when scope_avg is 0 (e.g. rare-event cohort
+  // with no occurrences) — fall back to "vs X%" without arrow/delta.
+  const dp = record.delta_pct
+  const baseText = `vs ${fmtPctSmart(record.scope_avg)}`
+  if (dp === null || dp === undefined) {
+    return (
+      <span
+        className="prob-chip-caption"
+        style={{
+          fontFamily: 'var(--serif)', fontStyle: 'italic',
+          fontSize: '0.7rem', color: 'var(--muted)',
+          marginTop: '0.1rem', textAlign: 'center', display: 'block',
+        }}
+      >
+        {baseText}
+      </span>
+    )
+  }
+
+  const polarity = deltaPolarity(dp, dir)
+  const color = polarity === 'good' ? COLOR_GOOD
+    : polarity === 'bad' ? COLOR_BAD
+    : 'var(--muted)'
+
+  return (
+    <span
+      className="prob-chip-caption"
+      style={{
+        fontFamily: 'var(--serif)', fontStyle: 'italic',
+        fontSize: '0.7rem', color,
+        marginTop: '0.1rem', textAlign: 'center', display: 'block',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {baseText} {arrowFor(dp)}{fmtDelta(dp)}
+    </span>
+  )
 }
 
 export default function ProbChip({ label, record, tint, smallNFloor = 10 }: Props) {
   const isNull = record.value === null || record.denom <= 0
   const lowN = !isNull && record.denom < smallNFloor
+  const caption = captionFor(record)
 
-  return (
+  // When the caption renders, wrap the pill + caption in a flex-column
+  // so the caption sits centered under the pill. When no caption (e.g.
+  // chip not wired with cohort fields), the pill renders unchanged —
+  // preserves the pre-PT5 layout for team / compare-grid chips.
+  const pill = (
     <span
       title={tooltipFor(record)}
       style={{
@@ -70,6 +204,18 @@ export default function ProbChip({ label, record, tint, smallNFloor = 10 }: Prop
       <span className="num" style={{
         fontStyle: 'normal', fontWeight: 600, fontSize: '0.82rem',
       }}>{fmtPct(record.value)}</span>
+    </span>
+  )
+
+  if (caption === null) return pill
+
+  return (
+    <span style={{
+      display: 'inline-flex', flexDirection: 'column',
+      alignItems: 'center', verticalAlign: 'top',
+    }}>
+      {pill}
+      {caption}
     </span>
   )
 }
