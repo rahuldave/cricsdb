@@ -5043,7 +5043,7 @@ async def team_fielding_summary(
 
 
 async def _innings_master_sample_team_fielding(
-    team: str, filters: FilterParams, aux: AuxParams,
+    team: Optional[str], filters: FilterParams, aux: AuxParams,
 ) -> list[dict]:
     """Per-innings observation rows of the OPPONENT's batting
     innings; counts fielding events credited to any of the team's
@@ -5053,9 +5053,25 @@ async def _innings_master_sample_team_fielding(
     Scalar-subquery pattern per innings — keeps the SQL parallel
     structure between catches / run_outs / stumpings / sub_catches
     / wickets_total without a multi-CTE assembly.
+
+    `team=None` (spec-prob-baselines-teams.md §4.1) widens the master
+    sample to every batting innings at this scope, counting fielding
+    credits by any matchplayer on the fielding side (i.e. matchplayer
+    whose team is NOT the batting side of this innings). Convention 3
+    (caught + caught_and_bowled inclusive, is_substitute=0) preserved
+    on both sides so chip baselines use the same predicate.
     """
     db = get_db()
     where, params = _team_innings_clause(filters, team, side="fielding", aux=aux)
+    # On the team-detail path the inner scalar subqueries restrict
+    # fielding credits to the path team's matchplayers. On the league
+    # side they restrict to the fielding side (mp.team != i.team) —
+    # which is the SAME population the team-side path would address if
+    # path team were "the fielding side of this innings".
+    if team is None:
+        mp_clause = "mp.team != i.team"
+    else:
+        mp_clause = "mp.team = :team"
     rows = await db.q(
         f"""
         SELECT
@@ -5075,7 +5091,7 @@ async def _innings_master_sample_team_fielding(
                AND COALESCE(fc.is_substitute, 0) = 0
                AND fc.fielder_id IN
                  (SELECT mp.person_id FROM matchplayer mp
-                  WHERE mp.match_id = i.match_id AND mp.team = :team)
+                  WHERE mp.match_id = i.match_id AND {mp_clause})
             ) AS catches,
             (SELECT COUNT(*) FROM fieldingcredit fc
              JOIN delivery d ON d.id = fc.delivery_id
@@ -5084,7 +5100,7 @@ async def _innings_master_sample_team_fielding(
                AND COALESCE(fc.is_substitute, 0) = 0
                AND fc.fielder_id IN
                  (SELECT mp.person_id FROM matchplayer mp
-                  WHERE mp.match_id = i.match_id AND mp.team = :team)
+                  WHERE mp.match_id = i.match_id AND {mp_clause})
             ) AS run_outs,
             (SELECT COUNT(*) FROM fieldingcredit fc
              JOIN delivery d ON d.id = fc.delivery_id
@@ -5092,7 +5108,7 @@ async def _innings_master_sample_team_fielding(
                AND fc.kind = 'stumped'
                AND fc.fielder_id IN
                  (SELECT mp.person_id FROM matchplayer mp
-                  WHERE mp.match_id = i.match_id AND mp.team = :team)
+                  WHERE mp.match_id = i.match_id AND {mp_clause})
             ) AS stumpings,
             (SELECT COUNT(*) FROM fieldingcredit fc
              JOIN delivery d ON d.id = fc.delivery_id
@@ -5284,6 +5300,58 @@ def _form_windows_team_fielding(
     }
 
 
+# spec-prob-baselines-teams.md §5 — direction tags for team-fielding
+# milestone ProbChips. The 4-simple `catches` block follows spec's
+# "Fielding dismissals" polarities; the 3-simple partition blocks
+# (run_outs + stumpings) mirror spec's "Fielding catches" polarities
+# (P(=1) is descriptive — direction=None, no caption rendered).
+_TEAM_FIELDING_CATCHES_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_eq_0":  "lower_better",
+    "p_geq_3": "higher_better",
+    "p_geq_5": "higher_better",
+    "p_geq_7": "higher_better",
+}
+
+_TEAM_FIELDING_COUNT_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_eq_0":  "lower_better",
+    "p_eq_1":  None,
+    "p_geq_2": "higher_better",
+}
+
+
+def _enrich_team_fielding_milestones(team_doss: dict, league_doss: dict) -> None:
+    """Mutate every milestone ProbRecord on the team-side fielding
+    dossier to attach the matching league-side ProbRecord.value as
+    `scope_avg`, plus direction + delta_pct + sample_size. spec-prob-
+    baselines-teams.md §4.1.
+
+    Three blocks — catches (4 simples) + run_outs + stumpings (3-
+    simple partitions). run_outs / stumpings share the
+    _COUNT_PROB_DIRECTIONS table; p_eq_1 stays direction=None (no
+    caption rendered).
+    """
+    for block_key, dir_table in (
+        ("catches",   _TEAM_FIELDING_CATCHES_PROB_DIRECTIONS),
+        ("run_outs",  _TEAM_FIELDING_COUNT_PROB_DIRECTIONS),
+        ("stumpings", _TEAM_FIELDING_COUNT_PROB_DIRECTIONS),
+    ):
+        team_block = team_doss.get(block_key) or {}
+        league_block = league_doss.get(block_key) or {}
+        team_ms = team_block.get("milestones") or {}
+        league_ms = league_block.get("milestones") or {}
+        for chip_key, direction in dir_table.items():
+            pr = team_ms.get(chip_key)
+            if not pr:
+                continue
+            league_pr = league_ms.get(chip_key) or {}
+            enrich_prob_record(
+                pr,
+                league_pr.get("value"),
+                direction,
+                league_pr.get("denom"),
+            )
+
+
 @router.get("/{team}/fielding/distribution")
 async def team_fielding_distribution(
     team: str,
@@ -5316,18 +5384,37 @@ async def team_fielding_distribution(
     fielder-ratio tooltip ("X catches of Y wickets").
 
     Every probability field ships as `{value, num, denom, ci_low,
-    ci_high}` with a Wilson 95% CI.
+    ci_high}` with a Wilson 95% CI. Per spec-prob-baselines-teams.md,
+    every milestone ProbRecord under catches.milestones +
+    run_outs.milestones + stumpings.milestones also carries
+    scope_avg / delta_pct / direction / sample_size from a dual-
+    query league dossier at the same scope. Form windows compute
+    per-window scope_avg independently.
 
     `FilterParams.filter_team` is IGNORED — the team path-param
     dominates. `FilterParams.filter_opponent` works as expected.
 
-    Spec: internal_docs/spec-distribution-stats.md §16.4.
+    Spec: internal_docs/spec-distribution-stats.md §16.4 +
+    internal_docs/spec-prob-baselines-teams.md.
     """
     today = date.fromisoformat(as_of_date) if as_of_date else date.today()
 
-    observations = await _innings_master_sample_team_fielding(team, filters, aux)
+    observations, league_observations = await asyncio.gather(
+        _innings_master_sample_team_fielding(team, filters, aux),
+        _innings_master_sample_team_fielding(None, filters, aux),
+    )
     lifetime = _distribution_dossier_team_fielding(observations)
     form = _form_windows_team_fielding(observations, today)
+
+    league_lifetime = _distribution_dossier_team_fielding(league_observations)
+    league_form = _form_windows_team_fielding(league_observations, today)
+
+    _enrich_team_fielding_milestones(lifetime, league_lifetime)
+    for window_key in ("last_10", "last_60d", "last_6mo", "last_1yr"):
+        team_window = form.get(window_key)
+        league_window = league_form.get(window_key)
+        if team_window and league_window:
+            _enrich_team_fielding_milestones(team_window, league_window)
 
     obs_dates = [o["date"] for o in observations if o.get("date")]
     lifetime["last_match_date"] = max(obs_dates) if obs_dates else None
