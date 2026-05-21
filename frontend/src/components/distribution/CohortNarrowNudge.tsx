@@ -39,21 +39,15 @@ interface Props {
 
 
 export default function CohortNarrowNudge({ window, playerId }: Props) {
+  // CRITICAL: every hook MUST be called unconditionally (Rules of
+  // Hooks). Early returns below must come AFTER every useFoo call,
+  // otherwise React mismatches the hook count between renders when
+  // dist_window or season range toggles and crashes the subtree.
   const filters = useFilters()
   const setUrlParams = useSetUrlParams()
-
-  // No mismatch — window IS scope, so the comparison is already
-  // apples-to-apples by default. Nothing to nudge.
-  if (window === 'scope') return null
-
-  const { season_from, season_to } = filters
-
-  // Single-season scope → already as tight as it gets. Hide.
-  if (season_from && season_to && season_from === season_to) return null
-
-  // Fetch the player's seasons in scope. Excludes scope axes that
-  // can't be honored by /api/v1/seasons but keeps the rough scope
-  // intent. Same shape as ScopeStatusStrip's derived-season fetch.
+  // Fetch the player's seasons in scope. The fetch is cheap +
+  // cached server-side; running it on every render even when the
+  // nudge will hide is the price of staying hook-compliant.
   const seasonsFetch = useFetch(
     () => getSeasons({
       player: playerId,
@@ -72,6 +66,16 @@ export default function CohortNarrowNudge({ window, playerId }: Props) {
       filters.team_class, filters.series_type,
     ],
   )
+
+  // No mismatch — window IS scope, so the comparison is already
+  // apples-to-apples by default. Nothing to nudge.
+  if (window === 'scope') return null
+
+  const { season_from, season_to } = filters
+
+  // Single-season scope → already as tight as it gets. Hide.
+  if (season_from && season_to && season_from === season_to) return null
+
   const allSeasons = seasonsFetch.data?.seasons ?? []
   if (allSeasons.length === 0) return null
 
