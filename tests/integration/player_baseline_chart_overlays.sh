@@ -153,21 +153,26 @@ agent-browser eval --json "(() => {
 })()" > /tmp/chart_probe.json 2>/dev/null
 n_frames=$(python3 -c "import json;print(json.load(open('/tmp/chart_probe.json'))['data']['result']['n_frames'])")
 assert_eq "/batting By Season: 2 stream-xy-frame containers (Runs + SR)" "2" "$n_frames"
-both_series=$(python3 -c "
+# spec-rate-vs-volume-audit C1: Runs by Season is a volume chart →
+# overlay dropped. SR by Season is a rate → overlay kept. Test now
+# asserts asymmetric series counts: SR chart has both series, Runs
+# chart has player only.
+sr_has_both=$(python3 -c "
 import json
 d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-# Vacuous-truth guard — empty list must FAIL the assertion.
-ok = d['legend_texts'] and all('V Kohli' in lbls and 'base' in lbls for lbls in d['legend_texts'])
+# At least one frame (SR chart) must carry both series.
+ok = any('V Kohli' in lbls and 'base' in lbls for lbls in d['legend_texts'])
 print('yes' if ok else 'no')
 ")
-assert_eq "/batting By Season: each chart's legend names both series" "yes" "$both_series"
-both_canvas=$(python3 -c "
+assert_eq "/batting By Season: SR chart legend names both series" "yes" "$sr_has_both"
+runs_no_base=$(python3 -c "
 import json
 d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-ok = d['canvas_counts'] and all(c == 2 for c in d['canvas_counts'])
+# At least one frame (Runs chart) must NOT carry 'base'.
+ok = any('base' not in lbls for lbls in d['legend_texts'])
 print('yes' if ok else 'no')
 ")
-assert_eq "/batting By Season: each chart has primary+ref canvases (2)" "yes" "$both_canvas"
+assert_eq "/batting By Season: Runs chart legend MUST NOT carry 'base' (C1 volume-chart rule)" "yes" "$runs_no_base"
 
 # Test 4 — Cohort baseline shifts on a scope_key axis (season window).
 # Kohli SR cohort at IPL 2016 vs IPL 2018 must differ — both seasons
@@ -225,20 +230,21 @@ agent-browser eval --json "(() => {
 })()" > /tmp/chart_probe.json 2>/dev/null
 n_frames=$(python3 -c "import json;print(json.load(open('/tmp/chart_probe.json'))['data']['result']['n_frames'])")
 assert_eq "/bowling By Season: 2 stream-xy-frame containers (Wickets + SR)" "2" "$n_frames"
-both_series=$(python3 -c "
+# C1: Wickets by Season volume → overlay dropped. SR rate → kept.
+sr_has_both=$(python3 -c "
 import json
 d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-ok = d['legend_texts'] and all('JJ Bumrah' in lbls and 'base' in lbls for lbls in d['legend_texts'])
+ok = any('JJ Bumrah' in lbls and 'base' in lbls for lbls in d['legend_texts'])
 print('yes' if ok else 'no')
 ")
-assert_eq "/bowling By Season: each chart's legend names both series" "yes" "$both_series"
-both_canvas=$(python3 -c "
+assert_eq "/bowling By Season: SR chart legend names both series" "yes" "$sr_has_both"
+wkts_no_base=$(python3 -c "
 import json
 d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-ok = d['canvas_counts'] and all(c == 2 for c in d['canvas_counts'])
+ok = any('base' not in lbls for lbls in d['legend_texts'])
 print('yes' if ok else 'no')
 ")
-assert_eq "/bowling By Season: each chart has primary+ref canvases (2)" "yes" "$both_canvas"
+assert_eq "/bowling By Season: Wickets chart legend MUST NOT carry 'base' (C1)" "yes" "$wkts_no_base"
 
 # Cohort shifts on season-window narrowing — same axis as batting.
 sr_2018=$(cohort_metric_at_season "$cohort_url&season_from=2018&season_to=2018" "strike_rate" "2018")
@@ -258,10 +264,6 @@ echo "=== /fielding — Kohli IPL By Season ==="
 
 ab open "$BASE/fielding?player=$KOHLI&$SCOPE_URL&tab=By%20Season"
 sleep 3
-
-legend=$(chart_legend_texts)
-assert_contains "/fielding By Season: legend names player as primary" "V Kohli" "$legend"
-assert_contains "/fielding By Season: legend names cohort as 'base'" "base" "$legend"
 
 titles=$(ab_eval "
   Array.from(document.querySelectorAll('h2,h3,h4'))
@@ -283,6 +285,9 @@ else
   bad "/fielding cohort by-season rows too few (=$dpm_nonnull)"
 fi
 
+# spec-rate-vs-volume-audit C1: Dismissals by Season is a volume
+# chart — overlay dropped. The C2 follow-up adds a sibling
+# Dis/Match by Season chart with the cohort overlay.
 agent-browser eval --json "(() => {
   const frames = Array.from(document.querySelectorAll('.stream-xy-frame'));
   return {
@@ -296,25 +301,18 @@ agent-browser eval --json "(() => {
 })()" > /tmp/chart_probe.json 2>/dev/null
 n_frames=$(python3 -c "import json;print(json.load(open('/tmp/chart_probe.json'))['data']['result']['n_frames'])")
 assert_eq "/fielding By Season: 1 stream-xy-frame container (Dismissals)" "1" "$n_frames"
-both_series=$(python3 -c "
+dis_no_base=$(python3 -c "
 import json
 d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-ok = d['legend_texts'] and all('V Kohli' in lbls and 'base' in lbls for lbls in d['legend_texts'])
+ok = d['legend_texts'] and all('base' not in lbls for lbls in d['legend_texts'])
 print('yes' if ok else 'no')
 ")
-assert_eq "/fielding By Season: chart legend names both series" "yes" "$both_series"
-both_canvas=$(python3 -c "
-import json
-d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-ok = d['canvas_counts'] and all(c == 2 for c in d['canvas_counts'])
-print('yes' if ok else 'no')
-")
-assert_eq "/fielding By Season: chart has primary+ref canvases (2)" "yes" "$both_canvas"
+assert_eq "/fielding By Season: Dismissals chart legend MUST NOT carry 'base' (C1)" "yes" "$dis_no_base"
 
-# Stat-row chip assertion — Catches and Run Outs (and Dis/Match)
-# must carry a "vs base" subtitle anchored against /fielders/{id}/
-# summary (Phase E gap-fill: backend now serves catches_per_match,
-# stumpings_per_match, run_outs_per_match envelopes per spec §4.4).
+# F4 dropped chips on volume tiles (Catches, Run Outs); their per-
+# match rate siblings (Catches/Match, Run-outs/Match) carry the
+# chip now — covered by player_band_q6_chips.sh. This test keeps
+# the Dis/Match check (rate tile, unchanged behaviour).
 api_summary=$(curl -s "$API/api/v1/fielders/$KOHLI/summary?$SCOPE")
 agent-browser eval --json "(() => {
   return Array.from(document.querySelectorAll('.wisden-statrow .wisden-stat')).map(s => ({
@@ -323,28 +321,20 @@ agent-browser eval --json "(() => {
   }));
 })()" > /tmp/fld_row.json 2>/dev/null
 
-for tile in catches run_outs dismissals; do
-  case "$tile" in
-    catches) label="Catches"; field="catches_per_match" ;;
-    run_outs) label="Run Outs"; field="run_outs_per_match" ;;
-    dismissals) label="Dis/Match"; field="dismissals_per_match" ;;
-  esac
-  api_base=$(echo "$api_summary" | python3 -c "
+api_base=$(echo "$api_summary" | python3 -c "
 import json, sys
-d = json.load(sys.stdin)
-v = d['$field']['scope_avg']
+v = json.load(sys.stdin)['dismissals_per_match']['scope_avg']
 print(f'{v:.3f}' if v is not None else 'NULL')
 ")
-  sub_text=$(python3 -c "
+sub_text=$(python3 -c "
 import json
 rows = json.load(open('/tmp/fld_row.json'))['data']['result']
 for r in rows:
-    if r['label'] == '$label':
+    if r['label'] == 'Dis/Match':
         print(r.get('sub') or '')
         break
 ")
-  assert_contains "/fielding stat-row: $label chip cites API base $api_base" "vs base $api_base" "$sub_text"
-done
+assert_contains "/fielding stat-row: Dis/Match chip cites API base $api_base" "vs base $api_base" "$sub_text"
 
 echo
 echo "─────────────────────────────────────────"

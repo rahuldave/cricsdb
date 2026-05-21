@@ -107,17 +107,19 @@ export default function Fielding() {
   )
   const seasonData = seasonFetch.data?.by_season ?? []
 
-  // Per-season keeper-binary cohort baseline (spec §3.2 + §4.4). Drives
-  // the forest-green referenceData overlay on the Dismissals-by-Season
-  // LineChart. Fielding cohort is keeper-binary, not position-mix-
-  // weighted (cf. batting/bowling) — fielding rates are dimensionally
-  // coupled in a way position-mix-weighting fails.
+  // Per-season keeper-binary cohort baseline (spec §3.2 + §4.4).
+  // C1 dropped the Dismissals-by-Season overlay (was rescaled to
+  // volume — a dimensional shortcut). C2 will introduce a new
+  // Dis/Match by Season chart that consumes this same fetch at its
+  // native per-match dimension. Keep the fetch staged here so the
+  // refactor is local to one commit when C2 ships.
   const seasonBaselineFetch = useFetch<{ by_season: ScopePlayerFieldingSeason[] } | null>(
     () => playerId && activeTab === 'By Season'
       ? getScopePlayersFieldingBySeason(playerId, filters) : Promise.resolve(null),
     [...filterDeps, activeTab],
   )
   const seasonBaseline = seasonBaselineFetch.data?.by_season ?? []
+  void seasonBaseline  // C2 follow-up consumer.
 
   const overFetch = useFetch<{ by_over: { over_number: number; dismissals: number }[] } | null>(
     () => playerId && activeTab === 'By Over'
@@ -374,32 +376,20 @@ export default function Fielding() {
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
                 {!seasonFetch.loading && !seasonFetch.error && seasonData.length > 0 && (
                   <>
-                    {/* Volume chart, cohort baseline rescaled by player's
-                        matches-in-season for dimensional parity (spec
-                        §4.4). Cohort row has dismissals_per_match;
-                        rescaled = cohort.dismissals_per_match ×
-                        player.matches_in_that_season. Q5 → label="base". */}
-                    {(() => {
-                      const dismissalsRef = seasonBaseline
-                        .filter(b => b.dismissals_per_match != null)
-                        .map(b => {
-                          const playerRow = seasonData.find(s => s.season === b.season)
-                          const matchesIn = playerRow?.matches ?? 0
-                          return matchesIn > 0
-                            ? { season: b.season, total: b.dismissals_per_match! * matchesIn }
-                            : null
-                        })
-                        .filter((r): r is { season: string; total: number } => r !== null)
-                      return (
-                        <LineChart data={seasonData}
-                          xAccessor="season" yAccessor="total"
-                          referenceData={dismissalsRef} referenceLabel="base"
-                          primaryLabel={summary?.name ?? 'Player'}
-                          title="Dismissals by Season" xLabel="Season" yLabel="Dismissals"
-                          height={350}
-                          showPoints />
-                      )
-                    })()}
+                    {/* spec-rate-vs-volume-audit C1: Dismissals by
+                        Season is a volume chart — drop the cohort
+                        overlay (was rescaled to volume via *matches,
+                        a dimensional shortcut). The C2 follow-up will
+                        add a sibling Dis/Match by Season chart with
+                        the cohort overlay at its native per-match
+                        dimension. */}
+                    <LineChart data={seasonData}
+                      xAccessor="season" yAccessor="total"
+                      primaryLabel={summary?.name ?? 'Player'}
+                      title="Dismissals by Season" xLabel="Season" yLabel="Dismissals"
+                      height={350}
+                      showPoints />
+                    {}
                     {seasonData.some(s => s.season.includes('/')) && (
                       <p className="wisden-tab-help">
                         Seasons like 2025/26 are Oct–Mar tournaments (BBL, Super Smash, SA20,

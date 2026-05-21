@@ -334,23 +334,12 @@ export default function Bowling() {
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
                 {!seasonFetch.loading && !seasonFetch.error && seasonData.length > 0 && (
                   <>
-                    {/* Cohort baseline overlays (spec §4.3). Wickets is a
-                        volume chart, so the cohort's per-innings wicket
-                        rate is rescaled to the player's per-season
-                        innings count for dimensional parity. SR shares
-                        the field name with player + cohort, no remap
-                        needed. Q5 → label="base". */}
+                    {/* spec-rate-vs-volume-audit C1: Wickets by Season
+                        is a volume chart — drop the cohort overlay
+                        (was rescaled to volume via *innings, which
+                        introduced a dimensional shortcut). SR is a
+                        rate, keep its overlay. Q5 → label="base". */}
                     {(() => {
-                      const wktsRef = seasonBaseline
-                        .filter(b => b.wickets_per_innings != null)
-                        .map(b => {
-                          const playerRow = seasonData.find((s: Record<string, any>) => s.season === b.season)
-                          const innings = playerRow?.innings ?? 0
-                          return innings > 0
-                            ? { season: b.season, wickets: b.wickets_per_innings! * innings }
-                            : null
-                        })
-                        .filter((r): r is { season: string; wickets: number } => r !== null)
                       const srRef = seasonBaseline
                         .filter(b => b.strike_rate != null)
                         .map(b => ({ season: b.season, strike_rate: b.strike_rate! }))
@@ -359,7 +348,6 @@ export default function Bowling() {
                           <LineChart data={seasonData}
                             xAccessor="season"
                             yAccessor={(d: Record<string, any>) => (d.wickets as number) ?? (d.dismissals as number) ?? 0}
-                            referenceData={wktsRef} referenceLabel="base"
                             primaryLabel={summary?.name ?? 'Player'}
                             title="Wickets by Season" xLabel="Season" yLabel="Wickets"
                             height={350} colorScheme={[WISDEN.oxblood]}

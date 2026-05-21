@@ -369,16 +369,16 @@ export default function Batting() {
                         below threshold) drop out so the green line
                         has gaps at those years. Q5 → label="base". */}
                     {(() => {
-                      const runsRef = seasonBaseline
-                        .filter(b => b.total_runs != null)
-                        .map(b => ({ season: b.season, runs: b.total_runs! }))
+                      // spec-rate-vs-volume-audit C1: Runs by Season
+                      // is a volume chart — drop the cohort overlay.
+                      // Strike Rate is a rate — keep the overlay.
                       const srRef = seasonBaseline
                         .filter(b => b.strike_rate != null)
                         .map(b => ({ season: b.season, strike_rate: b.strike_rate! }))
                       return (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <LineChart data={seasonData} xAccessor="season" yAccessor="runs"
-                            referenceData={runsRef} referenceLabel="base" primaryLabel={summary?.name ?? 'Player'}
+                            primaryLabel={summary?.name ?? 'Player'}
                             title="Runs by Season" xLabel="Season" yLabel="Runs" height={350}
                             showPoints />
                           <LineChart data={seasonData.filter(s => s.strike_rate != null)}
