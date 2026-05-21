@@ -71,6 +71,7 @@ class _Acc:
     __slots__ = (
         "innings_set", "runs", "legal_balls", "dots",
         "fours", "sixes", "dismissals",
+        "thirties", "fifties", "hundreds", "ducks",
     )
 
     def __init__(self):
@@ -81,6 +82,13 @@ class _Acc:
         self.fours = 0
         self.sixes = 0
         self.dismissals = 0
+        # Tier 1 of spec-apples-to-apples-baselines.md — per-position
+        # milestone counts. Filled by the post-aggregation pass that
+        # walks per-innings (batter, runs).
+        self.thirties = 0
+        self.fifties = 0
+        self.hundreds = 0
+        self.ducks = 0
 
     def to_row(self, person_id: str, scope_key: str, bucket: int) -> dict:
         return {
@@ -94,6 +102,10 @@ class _Acc:
             "fours": self.fours,
             "sixes": self.sixes,
             "dismissals": self.dismissals,
+            "thirties": self.thirties,
+            "fifties": self.fifties,
+            "hundreds": self.hundreds,
+            "ducks": self.ducks,
         }
 
 
@@ -191,6 +203,15 @@ async def _aggregate_matches(
             accs[key] = acc
         return acc
 
+    # Tier 1 milestone bucketing (apples-to-apples). Stage per-innings
+    # (batter, runs) and dismissed-set during the deliveries + wickets
+    # passes, then drain into _Acc.thirties/fifties/hundreds/ducks at
+    # the end. Mirrors the parent populate's milestone pass but keyed
+    # to the per-position bucket so the cohort baseline can convex-
+    # combine over positions.
+    innings_runs: dict[tuple[str, int], int] = {}     # (batter_id, iid) -> runs this innings
+    innings_dismissed: set[tuple[str, int]] = set()   # (batter_id, iid) — dismissed this innings (excluding retired)
+
     # Pass 1: deliveries — derive positions once per innings, then
     # accumulate batting tallies into the per-bucket _Acc. The
     # positions dict is saved so pass 2 (wickets) can look up the
@@ -222,10 +243,14 @@ async def _aggregate_matches(
             positions = derive_positions(ds)
             positions_by_innings[iid] = positions
 
-            # Innings credit per (person, bucket).
+            # Innings credit per (person, bucket). Also seed per-innings
+            # runs at 0 so non-strikers who never face a legal ball
+            # still get a milestone-bucket row at the end (relevant for
+            # ducks). Mirrors the parent populate's seeding pattern.
             for pid, pos in positions.items():
                 bucket = position_to_bucket(pos)
                 get_acc(pid, scope_key, bucket).innings_set.add(iid)
+                innings_runs.setdefault((pid, iid), 0)
 
             # Per-delivery: only the batter contributes; non_striker
             # already counted via the innings credit above.
@@ -244,6 +269,11 @@ async def _aggregate_matches(
                 acc.legal_balls += 1
                 rb = d["runs_batter"]
                 acc.runs += rb
+                # Track per-innings runs for milestone bucketing (Tier 1).
+                # Counted only on legal balls — matches the runs
+                # numerator above; mirrors parent populate semantics.
+                ir_key = (bid, iid)
+                innings_runs[ir_key] = innings_runs.get(ir_key, 0) + rb
                 # Dot rule matches parent populate: legal AND
                 # runs_batter=0 AND runs_total=0.
                 if rb == 0 and d["runs_total"] == 0:
@@ -279,6 +309,36 @@ async def _aggregate_matches(
             scope_key = match_meta[mid]["scope_key"]
             bucket = position_to_bucket(pos)
             get_acc(pout, scope_key, bucket).dismissals += 1
+            innings_dismissed.add((pout, iid))
+
+    # Tier 1 milestone post-pass — bucket per-innings runs into 30s /
+    # 50s / 100s / ducks per position bucket. Mirrors the parent
+    # populate's milestone pass; bucket attribution uses the batter's
+    # innings-start position (the same value `derive_positions`
+    # produced and that fed dismissal credit above).
+    for (pid, iid), runs in innings_runs.items():
+        positions = positions_by_innings.get(iid)
+        if positions is None:
+            continue
+        pos = positions.get(pid)
+        if pos is None:
+            continue
+        mid = innings_match.get(iid)
+        if mid is None:
+            continue
+        scope_key = match_meta[mid]["scope_key"]
+        bucket = position_to_bucket(pos)
+        acc = accs.get((pid, scope_key, bucket))
+        if acc is None:
+            continue
+        if runs >= 100:
+            acc.hundreds += 1
+        elif runs >= 50:
+            acc.fifties += 1
+        elif runs >= 30:
+            acc.thirties += 1
+        if runs == 0 and (pid, iid) in innings_dismissed:
+            acc.ducks += 1
 
     return accs
 
