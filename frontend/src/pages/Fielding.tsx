@@ -395,7 +395,7 @@ export default function Fielding() {
                             showPoints />
                           <LineChart data={seasonData.filter(s => s.dismissals_per_match != null)}
                             xAccessor="season" yAccessor="dismissals_per_match"
-                            referenceData={dpmRef} referenceLabel="base"
+                            referenceData={dpmRef} referenceLabel="cohort"
                             primaryLabel={summary?.name ?? 'Player'}
                             title="Dis/Match by Season" xLabel="Season" yLabel="Dis/Match"
                             height={350}

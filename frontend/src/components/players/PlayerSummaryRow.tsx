@@ -170,7 +170,7 @@ function compactStatsFor(
 }
 
 /** Render a MetricEnvelope as a StatCard subtitle ready to slot under
- *  the bold value. Tier 2 ("vs base N") + tier 3 (delta chip) auto-
+ *  the bold value. Tier 2 ("vs cohort N") + tier 3 (delta chip) auto-
  *  hide when scope_avg/delta_pct are null. */
 function baselineSub(
   env: MetricEnvelope | undefined | null,

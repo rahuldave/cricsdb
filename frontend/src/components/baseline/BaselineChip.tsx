@@ -1,6 +1,6 @@
 import MetricDelta from '../MetricDelta'
 
-/** Per-tile "vs base N — ↑+M%" subtitle component.
+/** Per-tile "vs cohort N — ↑+M%" subtitle component.
  *
  *  Synthesises a MetricEnvelope from (player value, cohort value,
  *  polarity) and routes through MetricDelta. Used in places where the
@@ -12,7 +12,7 @@ import MetricDelta from '../MetricDelta'
  *  three near-identical copies inside Batting.tsx / Bowling.tsx /
  *  Fielding.tsx (Phase G of spec-player-baseline-parity.md §5.1).
  *
- *  `tooltip` is the optional hover phrase explaining what `base`
+ *  `tooltip` is the optional hover phrase explaining what `cohort`
  *  means at the current scope — typically the cohort's position-mix
  *  / over-mix / keeper-binary description (see
  *  `components/players/cohortTooltip.ts`). When omitted, the chip

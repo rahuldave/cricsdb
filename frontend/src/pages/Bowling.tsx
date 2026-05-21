@@ -377,21 +377,21 @@ export default function Bowling() {
                             showPoints />
                           <LineChart data={seasonData.filter((s: Record<string, any>) => s.wickets_per_innings != null)}
                             xAccessor="season" yAccessor="wickets_per_innings"
-                            referenceData={wpiRef} referenceLabel="base"
+                            referenceData={wpiRef} referenceLabel="cohort"
                             primaryLabel={summary?.name ?? 'Player'}
                             title="Wkts/Inn by Season" xLabel="Season" yLabel="Wkts/Inn"
                             height={350}
                             showPoints />
                           <LineChart data={seasonData.filter((s: Record<string, any>) => s.strike_rate != null)}
                             xAccessor="season" yAccessor="strike_rate"
-                            referenceData={srRef} referenceLabel="base"
+                            referenceData={srRef} referenceLabel="cohort"
                             primaryLabel={summary?.name ?? 'Player'}
                             title="Bowling Strike Rate by Season" xLabel="Season" yLabel="SR"
                             height={350}
                             showPoints />
                           <LineChart data={seasonData.filter((s: Record<string, any>) => s.economy != null)}
                             xAccessor="season" yAccessor="economy"
-                            referenceData={econRef} referenceLabel="base"
+                            referenceData={econRef} referenceLabel="cohort"
                             primaryLabel={summary?.name ?? 'Player'}
                             title="Economy by Season" xLabel="Season" yLabel="Econ"
                             height={350}

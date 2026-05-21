@@ -15,8 +15,8 @@ import type { MetricEnvelope } from '../types'
  *
  *  Used by team-side Compare grids (default label='avg') and by
  *  player-side baseline rendering on /players /batting /bowling /
- *  fielding (callers pass label='base' per spec-player-compare-
- *  average.md §3.1). */
+ *  fielding (callers pass label='cohort' per the unified terminology
+ *  from spec-prob-baselines §11 / 1a425ae). */
 export default function MetricDelta({
   env, withScopeAvg = false, fmt = 1, label = 'avg', scopeAvgTooltip,
 }: {
@@ -29,8 +29,9 @@ export default function MetricDelta({
   /** Decimal places when rendering scope_avg in the subtitle. */
   fmt?: number
   /** Override the cohort-baseline label. Team-side leaves the default
-   *  'avg'; player pages pass 'base' to reflect the position-mix
-   *  weighted cohort (spec §3.1, §11 resolution log #8). */
+   *  'avg'; player pages pass 'cohort' to reflect the position-mix
+   *  / over-mix / keeper-binary weighted cohort (unified terminology
+   *  per spec-prob-baselines §11 / commit 1a425ae). */
   label?: string
   /** Optional tooltip on the "vs <label> N" portion — caller passes
    *  the cohort-mix phrasing per spec §3.4 (e.g. "Position-mix
@@ -68,7 +69,7 @@ export default function MetricDelta({
   // Each part stays on its own logical line (no internal wrapping)
   // but the two parts can stack on narrow screens. The container
   // doesn't pin whiteSpace=nowrap on the outer, so when card width
-  // can't fit both "vs base 29.50" + "↑ +35.7%" inline, the chip
+  // can't fit both "vs cohort 29.50" + "↑ +35.7%" inline, the chip
   // flows to a second line — keeping the three-tier read clean at
   // mobile width.
   // flex wrap so the scope-avg span and delta chip can stack on

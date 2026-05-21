@@ -399,12 +399,12 @@ export default function Batting() {
                             showPoints />
                           <LineChart data={seasonData.filter(s => s.runs_per_innings != null)}
                             xAccessor="season" yAccessor="runs_per_innings"
-                            referenceData={rpiRef} referenceLabel="base" primaryLabel={summary?.name ?? 'Player'}
+                            referenceData={rpiRef} referenceLabel="cohort" primaryLabel={summary?.name ?? 'Player'}
                             title="Runs/Inn by Season" xLabel="Season" yLabel="Runs/Inn" height={350}
                             showPoints />
                           <LineChart data={seasonData.filter(s => s.strike_rate != null)}
                             xAccessor="season" yAccessor="strike_rate"
-                            referenceData={srRef} referenceLabel="base" primaryLabel={summary?.name ?? 'Player'}
+                            referenceData={srRef} referenceLabel="cohort" primaryLabel={summary?.name ?? 'Player'}
                             title="Strike Rate by Season" xLabel="Season" yLabel="Strike Rate" height={350}
                             showPoints />
                         </div>

@@ -1,4 +1,4 @@
-/** Tooltip phrasing for the "vs base N" line on player baseline tiles.
+/** Tooltip phrasing for the "vs cohort N" line on player baseline tiles.
  *
  *  Spec: internal_docs/spec-player-compare-average.md §3.4.
  *
