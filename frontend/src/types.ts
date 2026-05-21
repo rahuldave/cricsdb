@@ -507,6 +507,18 @@ export interface SeasonBattingStats {
   hundreds: number
   dismissals: number
   balls_per_boundary: number | null
+  // spec-rate-vs-volume-audit §2.1 Group B — per-innings rate fields
+  // emitted per /batters/{id}/by-season row.
+  thirties?: number
+  ducks?: number
+  runs_per_innings?: number | null
+  hundreds_per_innings?: number | null
+  fifties_per_innings?: number | null
+  thirties_per_innings?: number | null
+  ducks_per_innings?: number | null
+  fours_per_innings?: number | null
+  sixes_per_innings?: number | null
+  boundaries_per_innings?: number | null
 }
 
 export interface DismissalAnalysis {
@@ -1473,6 +1485,12 @@ export interface FieldingSeason {
    *  the per-match cohort baseline back to per-season volume on the
    *  By Season chart (spec-player-baseline-parity.md §4.4). */
   matches: number
+  // spec-rate-vs-volume-audit §2.1 Group B — per-match rates emitted
+  // per /fielders/{id}/by-season row.
+  dismissals_per_match?: number | null
+  catches_per_match?: number | null
+  stumpings_per_match?: number | null
+  run_outs_per_match?: number | null
 }
 
 export interface FieldingPhase {
@@ -2166,6 +2184,13 @@ export interface ScopePlayerBattingSeason {
   sixes_per_innings: number | null
   fours_per_innings: number | null
   boundaries_per_innings: number | null
+  // spec-rate-vs-volume-audit §2.1 Group C — scope-flat per-season
+  // rates aggregated from the parent playerscopestats table.
+  runs_per_innings: number | null
+  hundreds_per_innings: number | null
+  fifties_per_innings: number | null
+  thirties_per_innings: number | null
+  ducks_per_innings: number | null
 }
 
 export interface ScopePlayerBattingPhase {
@@ -2201,6 +2226,9 @@ export interface ScopePlayerBowlingSeason {
   wickets_per_over: number | null
   wickets_per_innings: number | null
   maidens_per_innings: number | null
+  // spec-rate-vs-volume-audit §2.1 Group C — scope-flat per-season
+  // four-wicket-haul rate.
+  four_wicket_hauls_per_innings: number | null
 }
 
 export interface ScopePlayerBowlingPhase {

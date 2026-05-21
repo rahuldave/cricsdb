@@ -119,7 +119,6 @@ export default function Fielding() {
     [...filterDeps, activeTab],
   )
   const seasonBaseline = seasonBaselineFetch.data?.by_season ?? []
-  void seasonBaseline  // C2 follow-up consumer.
 
   const overFetch = useFetch<{ by_over: { over_number: number; dismissals: number }[] } | null>(
     () => playerId && activeTab === 'By Over'
@@ -376,20 +375,33 @@ export default function Fielding() {
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
                 {!seasonFetch.loading && !seasonFetch.error && seasonData.length > 0 && (
                   <>
-                    {/* spec-rate-vs-volume-audit C1: Dismissals by
-                        Season is a volume chart — drop the cohort
-                        overlay (was rescaled to volume via *matches,
-                        a dimensional shortcut). The C2 follow-up will
-                        add a sibling Dis/Match by Season chart with
-                        the cohort overlay at its native per-match
-                        dimension. */}
-                    <LineChart data={seasonData}
-                      xAccessor="season" yAccessor="total"
-                      primaryLabel={summary?.name ?? 'Player'}
-                      title="Dismissals by Season" xLabel="Season" yLabel="Dismissals"
-                      height={350}
-                      showPoints />
-                    {}
+                    {/* C1: Dismissals by Season volume — no overlay.
+                        C2: add Dis/Match by Season rate chart with
+                        cohort dismissals_per_match overlay (per-match
+                        dimension matches the cohort, no rescaling
+                        needed). */}
+                    {(() => {
+                      const dpmRef = seasonBaseline
+                        .filter(b => b.dismissals_per_match != null)
+                        .map(b => ({ season: b.season, dismissals_per_match: b.dismissals_per_match! }))
+                      return (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <LineChart data={seasonData}
+                            xAccessor="season" yAccessor="total"
+                            primaryLabel={summary?.name ?? 'Player'}
+                            title="Dismissals by Season" xLabel="Season" yLabel="Dismissals"
+                            height={350}
+                            showPoints />
+                          <LineChart data={seasonData.filter(s => s.dismissals_per_match != null)}
+                            xAccessor="season" yAccessor="dismissals_per_match"
+                            referenceData={dpmRef} referenceLabel="base"
+                            primaryLabel={summary?.name ?? 'Player'}
+                            title="Dis/Match by Season" xLabel="Season" yLabel="Dis/Match"
+                            height={350}
+                            showPoints />
+                        </div>
+                      )
+                    })()}
                     {seasonData.some(s => s.season.includes('/')) && (
                       <p className="wisden-tab-help">
                         Seasons like 2025/26 are Oct–Mar tournaments (BBL, Super Smash, SA20,

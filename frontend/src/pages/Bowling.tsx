@@ -334,15 +334,21 @@ export default function Bowling() {
                 <TabState fetch={seasonFetch as FetchState<unknown>} />
                 {!seasonFetch.loading && !seasonFetch.error && seasonData.length > 0 && (
                   <>
-                    {/* spec-rate-vs-volume-audit C1: Wickets by Season
-                        is a volume chart — drop the cohort overlay
-                        (was rescaled to volume via *innings, which
-                        introduced a dimensional shortcut). SR is a
-                        rate, keep its overlay. Q5 → label="base". */}
+                    {/* C1: Wickets by Season volume → no overlay.
+                        C2: add sibling rate-by-season charts —
+                        Wkts/Inn (sibling to Wickets) and Economy
+                        by Season, both with cohort overlays at native
+                        per-rate dimension. */}
                     {(() => {
                       const srRef = seasonBaseline
                         .filter(b => b.strike_rate != null)
                         .map(b => ({ season: b.season, strike_rate: b.strike_rate! }))
+                      const wpiRef = seasonBaseline
+                        .filter(b => b.wickets_per_innings != null)
+                        .map(b => ({ season: b.season, wickets_per_innings: b.wickets_per_innings! }))
+                      const econRef = seasonBaseline
+                        .filter(b => b.economy != null)
+                        .map(b => ({ season: b.season, economy: b.economy! }))
                       return (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <LineChart data={seasonData}
@@ -352,11 +358,25 @@ export default function Bowling() {
                             title="Wickets by Season" xLabel="Season" yLabel="Wickets"
                             height={350} colorScheme={[WISDEN.oxblood]}
                             showPoints />
-                          <LineChart data={seasonData.filter(s => s.strike_rate != null)}
+                          <LineChart data={seasonData.filter((s: Record<string, any>) => s.wickets_per_innings != null)}
+                            xAccessor="season" yAccessor="wickets_per_innings"
+                            referenceData={wpiRef} referenceLabel="base"
+                            primaryLabel={summary?.name ?? 'Player'}
+                            title="Wkts/Inn by Season" xLabel="Season" yLabel="Wkts/Inn"
+                            height={350}
+                            showPoints />
+                          <LineChart data={seasonData.filter((s: Record<string, any>) => s.strike_rate != null)}
                             xAccessor="season" yAccessor="strike_rate"
                             referenceData={srRef} referenceLabel="base"
                             primaryLabel={summary?.name ?? 'Player'}
                             title="Bowling Strike Rate by Season" xLabel="Season" yLabel="SR"
+                            height={350}
+                            showPoints />
+                          <LineChart data={seasonData.filter((s: Record<string, any>) => s.economy != null)}
+                            xAccessor="season" yAccessor="economy"
+                            referenceData={econRef} referenceLabel="base"
+                            primaryLabel={summary?.name ?? 'Player'}
+                            title="Economy by Season" xLabel="Season" yLabel="Econ"
                             height={350}
                             showPoints />
                         </div>

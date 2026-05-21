@@ -152,7 +152,16 @@ agent-browser eval --json "(() => {
   };
 })()" > /tmp/chart_probe.json 2>/dev/null
 n_frames=$(python3 -c "import json;print(json.load(open('/tmp/chart_probe.json'))['data']['result']['n_frames'])")
-assert_eq "/batting By Season: 2 stream-xy-frame containers (Runs + SR)" "2" "$n_frames"
+# C2: Runs/Inn by Season added (sibling rate to Runs volume). 3 charts now.
+assert_eq "/batting By Season: 3 stream-xy-frame containers (Runs + Runs/Inn + SR)" "3" "$n_frames"
+# C2: Runs/Inn by Season chart title present.
+titles2=$(ab_eval "
+  Array.from(document.querySelectorAll('h2,h3,h4'))
+    .map(e => e.textContent?.trim())
+    .filter(Boolean)
+    .join('|')
+")
+assert_contains "/batting By Season: 'Runs/Inn by Season' chart title present (C2)" "Runs/Inn by Season" "$titles2"
 # spec-rate-vs-volume-audit C1: Runs by Season is a volume chart →
 # overlay dropped. SR by Season is a rate → overlay kept. Test now
 # asserts asymmetric series counts: SR chart has both series, Runs
@@ -229,7 +238,16 @@ agent-browser eval --json "(() => {
   };
 })()" > /tmp/chart_probe.json 2>/dev/null
 n_frames=$(python3 -c "import json;print(json.load(open('/tmp/chart_probe.json'))['data']['result']['n_frames'])")
-assert_eq "/bowling By Season: 2 stream-xy-frame containers (Wickets + SR)" "2" "$n_frames"
+# C2: Wkts/Inn + Econ by Season added (4 charts total).
+assert_eq "/bowling By Season: 4 stream-xy-frame containers (Wickets + Wkts/Inn + SR + Econ)" "4" "$n_frames"
+titles2=$(ab_eval "
+  Array.from(document.querySelectorAll('h2,h3,h4'))
+    .map(e => e.textContent?.trim())
+    .filter(Boolean)
+    .join('|')
+")
+assert_contains "/bowling By Season: 'Wkts/Inn by Season' chart title present (C2)" "Wkts/Inn by Season" "$titles2"
+assert_contains "/bowling By Season: 'Economy by Season' chart title present (C2)" "Economy by Season" "$titles2"
 # C1: Wickets by Season volume → overlay dropped. SR rate → kept.
 sr_has_both=$(python3 -c "
 import json
@@ -300,14 +318,33 @@ agent-browser eval --json "(() => {
   };
 })()" > /tmp/chart_probe.json 2>/dev/null
 n_frames=$(python3 -c "import json;print(json.load(open('/tmp/chart_probe.json'))['data']['result']['n_frames'])")
-assert_eq "/fielding By Season: 1 stream-xy-frame container (Dismissals)" "1" "$n_frames"
+# C2: Dis/Match by Season added alongside Dismissals (2 charts).
+assert_eq "/fielding By Season: 2 stream-xy-frame containers (Dismissals + Dis/Match)" "2" "$n_frames"
+titles2=$(ab_eval "
+  Array.from(document.querySelectorAll('h2,h3,h4'))
+    .map(e => e.textContent?.trim())
+    .filter(Boolean)
+    .join('|')
+")
+assert_contains "/fielding By Season: 'Dis/Match by Season' chart title present (C2)" "Dis/Match by Season" "$titles2"
+# C1: Dismissals (volume) MUST NOT carry 'base'.
+# C2: Dis/Match (rate) MUST carry 'base'.
 dis_no_base=$(python3 -c "
 import json
 d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-ok = d['legend_texts'] and all('base' not in lbls for lbls in d['legend_texts'])
+# At least one frame (Dismissals) has no 'base'.
+ok = any('base' not in lbls for lbls in d['legend_texts'])
 print('yes' if ok else 'no')
 ")
 assert_eq "/fielding By Season: Dismissals chart legend MUST NOT carry 'base' (C1)" "yes" "$dis_no_base"
+dpm_has_base=$(python3 -c "
+import json
+d = json.load(open('/tmp/chart_probe.json'))['data']['result']
+# At least one frame (Dis/Match) has both player and 'base'.
+ok = any('V Kohli' in lbls and 'base' in lbls for lbls in d['legend_texts'])
+print('yes' if ok else 'no')
+")
+assert_eq "/fielding By Season: Dis/Match chart legend names both series (C2)" "yes" "$dpm_has_base"
 
 # F4 dropped chips on volume tiles (Catches, Run Outs); their per-
 # match rate siblings (Catches/Match, Run-outs/Match) carry the

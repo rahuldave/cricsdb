@@ -369,17 +369,26 @@ export default function Batting() {
                         below threshold) drop out so the green line
                         has gaps at those years. Q5 → label="base". */}
                     {(() => {
-                      // spec-rate-vs-volume-audit C1: Runs by Season
-                      // is a volume chart — drop the cohort overlay.
-                      // Strike Rate is a rate — keep the overlay.
+                      // C1: Runs by Season is a volume chart — no overlay.
+                      // C2: add Runs/Inn by Season with the cohort overlay
+                      // at the same dimension (sibling rate chart to Runs
+                      // by Season volume).
                       const srRef = seasonBaseline
                         .filter(b => b.strike_rate != null)
                         .map(b => ({ season: b.season, strike_rate: b.strike_rate! }))
+                      const rpiRef = seasonBaseline
+                        .filter(b => b.runs_per_innings != null)
+                        .map(b => ({ season: b.season, runs_per_innings: b.runs_per_innings! }))
                       return (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <LineChart data={seasonData} xAccessor="season" yAccessor="runs"
                             primaryLabel={summary?.name ?? 'Player'}
                             title="Runs by Season" xLabel="Season" yLabel="Runs" height={350}
+                            showPoints />
+                          <LineChart data={seasonData.filter(s => s.runs_per_innings != null)}
+                            xAccessor="season" yAccessor="runs_per_innings"
+                            referenceData={rpiRef} referenceLabel="base" primaryLabel={summary?.name ?? 'Player'}
+                            title="Runs/Inn by Season" xLabel="Season" yLabel="Runs/Inn" height={350}
                             showPoints />
                           <LineChart data={seasonData.filter(s => s.strike_rate != null)}
                             xAccessor="season" yAccessor="strike_rate"
