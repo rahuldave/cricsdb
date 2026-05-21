@@ -266,24 +266,34 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     const f = profile.fielding
     if (!f) return null
     const tt = f.cohort ? fieldingCohortTooltip(f.cohort as FieldingCohortMeta) : undefined
-    // Phase F: Catches/Stumpings/Run-outs tiles gain per-match-rate
-    // chip subtitles surfacing the envelopes Phase E added to
-    // /fielders/{id}/summary. Volume stays bold; rate vs cohort is
-    // the chip context. Stumpings chip is suppressed when value=0
-    // (non-keeper).
+    // spec-rate-vs-volume-audit F2: drop per-match-rate chips from
+    // the Catches/Run-outs/Stumpings volume tiles (Phase E shipped them
+    // there as a dimensional mismatch). Each volume tile now pairs
+    // with a sibling per-match rate tile that carries the chip.
+    // Stumpings/Match tile renders only when stumpings > 0 (non-
+    // keepers shouldn't surface a zero-only rate).
     return (
-      <div className="wisden-statrow cols-5">
-        <StatCard label="Catches"    value={f.catches.value ?? 0}
-          subtitle={baselineSub(f.catches_per_match, tt, 3)} />
-        <StatCard label="Stumpings"  value={f.stumpings.value ?? 0}
-          subtitle={f.stumpings_per_match.value
-            ? baselineSub(f.stumpings_per_match, tt, 3) : undefined} />
-        <StatCard label="Run-outs"   value={f.run_outs.value ?? 0}
-          subtitle={baselineSub(f.run_outs_per_match, tt, 3)} />
-        <StatCard label="Total"      value={f.total_dismissals.value ?? 0} />
-        <StatCard label="Dis/Match"  value={fmt(f.dismissals_per_match.value, 3)}
-          subtitle={baselineSub(f.dismissals_per_match, tt, 3)} />
-      </div>
+      <>
+        <div className="wisden-statrow cols-6">
+          <StatCard label="Catches"        value={f.catches.value ?? 0} />
+          <StatCard label="Catches/Match"  value={fmt(f.catches_per_match.value, 3)}
+            subtitle={baselineSub(f.catches_per_match, tt, 3)} />
+          <StatCard label="Run-outs"       value={f.run_outs.value ?? 0} />
+          <StatCard label="Run-outs/Match" value={fmt(f.run_outs_per_match.value, 3)}
+            subtitle={baselineSub(f.run_outs_per_match, tt, 3)} />
+          <StatCard label="Stumpings"      value={f.stumpings.value ?? 0} />
+          {(f.stumpings.value ?? 0) > 0
+            ? <StatCard label="Stumpings/Match" value={fmt(f.stumpings_per_match.value, 3)}
+                subtitle={baselineSub(f.stumpings_per_match, tt, 3)} />
+            : <div />}
+        </div>
+        <div className="wisden-statrow cols-6">
+          <StatCard label="Total"      value={f.total_dismissals.value ?? 0} />
+          <StatCard label="Dis/Match"  value={fmt(f.dismissals_per_match.value, 3)}
+            subtitle={baselineSub(f.dismissals_per_match, tt, 3)} />
+          <div /><div /><div /><div />
+        </div>
+      </>
     )
   }
 

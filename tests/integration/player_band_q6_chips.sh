@@ -186,26 +186,46 @@ sleep 3
 snapshot_tiles
 fld_url="$API/api/v1/fielders/$KOHLI/summary?$SCOPE"
 
+# spec-rate-vs-volume-audit F2 — volume tiles (Catches, Run-outs,
+# Stumpings) MUST NOT carry per-match-rate chips. The chip lives on
+# the sibling per-match rate tile.
+for label in "Catches" "Run-outs" "Stumpings"; do
+  sub=$(tile_sub "$label")
+  assert_not_contains "Kohli /players Fielding: $label tile MUST NOT carry chip" "vs base" "$sub"
+done
+
+# F2 — new per-match rate tiles must exist + carry the cohort chip.
+# Stumpings/Match suppressed at value=0 (non-keeper), tested below.
 for combo in \
-    "Catches:catches_per_match:%.3f" \
-    "Run-outs:run_outs_per_match:%.3f"; do
+    "Catches/Match:catches_per_match:%.3f" \
+    "Run-outs/Match:run_outs_per_match:%.3f"; do
   label=$(echo "$combo" | cut -d: -f1)
   field=$(echo "$combo" | cut -d: -f2)
   fmt=$(echo "$combo" | cut -d: -f3)
+  assert_tile_present "Kohli /players Fielding: $label tile exists" "$label"
   api_v=$(summary_scope_avg "$fld_url" "$field")
   api_f=$(printf "$fmt" "$api_v")
   sub=$(tile_sub "$label")
   assert_contains "Kohli /players Fielding: $label chip cites base $api_f" "vs base $api_f" "$sub"
 done
 
-# Stumpings tile chip is gated on value > 0; Kohli (non-keeper) has
-# 0 stumpings, so the tile must NOT carry a "vs base" subtitle.
-st_sub=$(tile_sub "Stumpings")
-if [[ "$st_sub" != *"vs base"* ]]; then
-  ok "Kohli /players Fielding: Stumpings tile (value=0) suppresses chip"
+# Kohli has 0 stumpings → Stumpings/Match tile must be absent
+# (non-keeper gate). Use the python tile-list to verify absence.
+if python3 -c "
+import json, sys
+rows = json.load(open('/tmp/tiles.json'))['data']['result']
+sys.exit(0 if not any(r['label'] == 'Stumpings/Match' for r in rows) else 1)
+"; then
+  ok "Kohli /players Fielding: Stumpings/Match tile absent at stumpings=0"
 else
-  bad "Kohli /players Fielding: Stumpings tile shouldn't carry chip at value=0"
+  bad "Kohli /players Fielding: Stumpings/Match tile shouldn't render when stumpings=0"
 fi
+
+# Existing Dis/Match chip — unchanged, still tied to cohort scope_avg.
+dm_v=$(summary_scope_avg "$fld_url" "dismissals_per_match")
+dm_f=$(printf "%.3f" "$dm_v")
+sub=$(tile_sub "Dis/Match")
+assert_contains "Kohli /players Fielding: Dis/Match chip cites base $dm_f" "vs base $dm_f" "$sub"
 
 echo
 echo "─────────────────────────────────────────"
