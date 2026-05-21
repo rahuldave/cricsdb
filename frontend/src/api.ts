@@ -357,6 +357,21 @@ export const getScopePlayersBattingBySeason = (personId: string, filters?: F) =>
 export const getScopePlayersBattingByPhase = (personId: string, filters?: F) =>
   playerScope<{ by_phase: import('./types').ScopePlayerBattingPhase[] }>(
     '/api/v1/scope/averages/players/batting/by-phase', personId, filters)
+// Tier 4 of spec-apples-to-apples-baselines.md — per-over batting
+// cohort. Mirror of bowling's /by-over: takes person_id, derives ball
+// mix server-side, returns a 20-element by_over array.
+export const getScopePlayersBattingByOver = (personId: string, filters?: F) =>
+  playerScope<{
+    by_over: {
+      over: number; n_balls: number; n_players: number; n_innings: number;
+      threshold: number; below_support: boolean;
+      strike_rate: number | null; dot_pct: number | null;
+      boundary_pct: number | null; balls_per_four: number | null;
+      balls_per_boundary: number | null; runs_per_innings: number | null;
+      dismissals: number;
+    }[];
+    cohort: { match_dimension: string; ball_mix: number[]; n_players: number; n_balls_total: number };
+  }>('/api/v1/scope/averages/players/batting/by-over', personId, filters)
 export const getScopePlayersBowlingBySeason = (personId: string, filters?: F) =>
   playerScope<{ by_season: import('./types').ScopePlayerBowlingSeason[] }>(
     '/api/v1/scope/averages/players/bowling/by-season', personId, filters)

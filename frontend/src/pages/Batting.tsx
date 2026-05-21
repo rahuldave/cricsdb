@@ -31,6 +31,7 @@ import {
   getBatterByPhase, getBatterBySeason, getBatterDismissals, getBatterInterWicket,
   getBattingLeaders, getBatterDistribution, getBatterRecords,
   getScopePlayersBattingBySeason, getScopePlayersBattingByPhase,
+  getScopePlayersBattingByOver,
 } from '../api'
 import type {
   PlayerSearchResult, BattingSummary, BattingInnings, BowlerMatchup,
@@ -133,6 +134,16 @@ export default function Batting() {
     [...filterDeps, activeTab],
   )
   const overData = overFetch.data?.by_over ?? []
+
+  // Tier 4 of spec-apples-to-apples-baselines.md — per-over batting
+  // cohort baseline for the SR-by-Over overlay. Fetches when the By
+  // Over tab is active and there's a player.
+  const overBaselineFetch = useFetch(
+    () => playerId && activeTab === 'By Over'
+      ? getScopePlayersBattingByOver(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const overBaseline = overBaselineFetch.data?.by_over ?? []
 
   const phaseFetch = useFetch<{ by_phase: PhaseStats[] } | null>(
     () => playerId && activeTab === 'By Phase'
@@ -424,7 +435,16 @@ export default function Batting() {
                     categoryAccessor="over" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
                     title="Strike Rate by Over" categoryLabel="Over" valueLabel="Strike Rate"
                     colorBy="phase" colorScheme={WISDEN_PHASES}
-                    height={350} />
+                    height={350}
+                    // Tier 4 of spec-apples-to-apples-baselines.md —
+                    // per-over batting cohort SR overlay. Same dashed
+                    // green segment-per-bar treatment as the bowling
+                    // econ-by-over overlay (Tier 5 consumer).
+                    referenceData={overBaseline.length > 0 ? overBaseline.map(b => ({
+                      category: String(b.over),
+                      value: b.strike_rate ?? null,
+                    })) : undefined}
+                    referenceLabel="cohort SR per over (ball-mix-weighted at scope)" />
                 )}
               </>
             )}
