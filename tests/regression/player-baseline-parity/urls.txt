@@ -17,9 +17,9 @@ REG pbsl_bat_by_season_ipl_wankhede     /api/v1/scope/averages/players/batting/b
 
 # ── /scope/averages/players/batting/by-phase ──────────────────
 
-NEW pbsl_bat_by_phase_unfiltered        /api/v1/scope/averages/players/batting/by-phase?person_id=ba607b88&gender=male&team_type=club
-NEW pbsl_bat_by_phase_ipl_2016          /api/v1/scope/averages/players/batting/by-phase?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016
-NEW pbsl_bat_by_phase_ipl_wankhede      /api/v1/scope/averages/players/batting/by-phase?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG pbsl_bat_by_phase_unfiltered        /api/v1/scope/averages/players/batting/by-phase?person_id=ba607b88&gender=male&team_type=club
+REG pbsl_bat_by_phase_ipl_2016          /api/v1/scope/averages/players/batting/by-phase?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016
+REG pbsl_bat_by_phase_ipl_wankhede      /api/v1/scope/averages/players/batting/by-phase?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&filter_venue=Wankhede%20Stadium%2C%20Mumbai
 
 # ── /scope/averages/players/bowling/by-season ──────────────────
 
