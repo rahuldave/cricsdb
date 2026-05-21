@@ -49,6 +49,13 @@ CONSERVED_COLUMNS = [
     ("fours",       "fours"),
     ("sixes",       "sixes"),
     ("dots",        "dots"),
+    # Tier 1 of spec-apples-to-apples-baselines.md — per-position
+    # milestone counts; SUM across position buckets per (person, scope)
+    # must reconcile with the parent table's milestone totals.
+    ("thirties",    "thirties"),
+    ("fifties",     "fifties"),
+    ("hundreds",    "hundreds"),
+    ("ducks",       "ducks"),
 ]
 
 

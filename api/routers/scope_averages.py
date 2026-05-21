@@ -1735,6 +1735,10 @@ async def compute_players_batting_cohort(
                SUM(pssp.fours)        AS fours,
                SUM(pssp.sixes)        AS sixes,
                SUM(pssp.dots)         AS dots,
+               SUM(pssp.thirties)     AS thirties,
+               SUM(pssp.fifties)      AS fifties,
+               SUM(pssp.hundreds)     AS hundreds,
+               SUM(pssp.ducks)        AS ducks,
                COUNT(DISTINCT pssp.person_id) AS n_players
         FROM playerscopestatsposition pssp
         WHERE pssp.scope_key IN (
@@ -1751,53 +1755,13 @@ async def compute_players_batting_cohort(
             SELECT scope_key FROM playerscopestats pss WHERE {where}
         )
     """
-    # Q6 (spec-player-baseline-parity.md §3.3): scope-wide per-innings
-    # milestone + boundary rates. The position child table doesn't
-    # carry milestone counts (only the parent does), so this is a
-    # scope-FLAT baseline shared across all positions — fine for the
-    # /players band tile chips since milestones aren't position-mix-
-    # weighted in the player's data either (a 50 is a 50 regardless of
-    # where the batter came in).
-    pi_sql = f"""
-        SELECT
-            SUM(pss.innings_batted) AS innings_total,
-            SUM(pss.runs)           AS runs_total,
-            SUM(pss.fours)          AS fours_total,
-            SUM(pss.sixes)          AS sixes_total,
-            SUM(pss.fours + pss.sixes) AS boundaries_total,
-            SUM(pss.thirties)       AS thirties_total,
-            SUM(pss.fifties)        AS fifties_total,
-            SUM(pss.hundreds)       AS hundreds_total,
-            SUM(pss.ducks)          AS ducks_total
-        FROM playerscopestats pss
-        WHERE {where}
-    """
-    rows, pool, pi = await asyncio.gather(
+    rows, pool = await asyncio.gather(
         db.q(main_sql, params),
         db.q(pool_sql, params),
-        db.q(pi_sql, params),
     )
     by_bucket = {r["position_bucket"]: r for r in rows}
     n_players_total = (pool[0].get("n_players") if pool else 0) or 0
     n_innings_total = (pool[0].get("n_innings_total") if pool else 0) or 0
-
-    # Per-innings cohort rates (scope-flat).
-    pir = pi[0] if pi else {}
-    _pi_inn = pir.get("innings_total") or 0
-    def _pi_rate(total_key: str) -> Optional[float]:
-        total = pir.get(total_key) or 0
-        return round(total / _pi_inn, 3) if _pi_inn else None
-    cc_boundaries_pi = _pi_rate("boundaries_total")
-    cc_sixes_pi      = _pi_rate("sixes_total")
-    cc_fours_pi      = _pi_rate("fours_total")
-    cc_thirties_pi   = _pi_rate("thirties_total")
-    cc_fifties_pi    = _pi_rate("fifties_total")
-    cc_hundreds_pi   = _pi_rate("hundreds_total")
-    cc_ducks_pi      = _pi_rate("ducks_total")
-    # spec-rate-vs-volume-audit.md §2.1 Group A — sibling rate to the
-    # Runs volume tile. Two decimal places to match the player-side.
-    _runs_total = pir.get("runs_total") or 0
-    cc_runs_pi = round(_runs_total / _pi_inn, 2) if _pi_inn else None
 
     by_position: list[dict] = []
     for b in range(1, 11):
@@ -1813,6 +1777,17 @@ async def compute_players_batting_cohort(
                 "boundary_pct": None, "dot_pct": None,
                 "balls_per_four": None, "balls_per_six": None,
                 "balls_per_boundary": None,
+                # Tier 1 of spec-apples-to-apples-baselines.md —
+                # per-position per-innings rates so the cohort baseline
+                # can convex-combine over the player's position mix.
+                "runs_per_innings": None,
+                "fours_per_innings": None,
+                "sixes_per_innings": None,
+                "boundaries_per_innings": None,
+                "thirties_per_innings": None,
+                "fifties_per_innings": None,
+                "hundreds_per_innings": None,
+                "ducks_per_innings": None,
             })
             continue
         innings = r["innings"] or 0
@@ -1823,6 +1798,10 @@ async def compute_players_batting_cohort(
         sixes = r["sixes"] or 0
         boundaries = fours + sixes
         dots = r["dots"] or 0
+        thirties = r["thirties"] or 0
+        fifties = r["fifties"] or 0
+        hundreds = r["hundreds"] or 0
+        ducks = r["ducks"] or 0
         n_p = r["n_players"] or 0
         by_position.append({
             "bucket": b, "label": batting_bucket_label(b),
@@ -1840,6 +1819,18 @@ async def compute_players_batting_cohort(
             "balls_per_four":      round(balls / fours, 2)      if fours else None,
             "balls_per_six":       round(balls / sixes, 2)      if sixes else None,
             "balls_per_boundary":  round(balls / boundaries, 2) if boundaries else None,
+            # Per-position per-innings rates (Tier 1). Stored on
+            # by_position so the convex-combine helper `cv` below can
+            # mix them by the player's position mix — replaces the
+            # scope-flat parent-table aggregate used pre-Tier 1.
+            "runs_per_innings":       (runs / innings)       if innings else None,
+            "fours_per_innings":      (fours / innings)      if innings else None,
+            "sixes_per_innings":      (sixes / innings)      if innings else None,
+            "boundaries_per_innings": (boundaries / innings) if innings else None,
+            "thirties_per_innings":   (thirties / innings)   if innings else None,
+            "fifties_per_innings":    (fifties / innings)    if innings else None,
+            "hundreds_per_innings":   (hundreds / innings)   if innings else None,
+            "ducks_per_innings":      (ducks / innings)      if innings else None,
         })
 
     # Strict-cliff gate.
@@ -1869,17 +1860,18 @@ async def compute_players_batting_cohort(
             "balls_per_four":     wrap_metric(None, None, "bat_balls_per_four",     sample_size=n_innings_total),
             "balls_per_six":      wrap_metric(None, None, "bat_balls_per_six",      sample_size=n_innings_total),
             "balls_per_boundary": wrap_metric(None, None, "bat_balls_per_boundary", sample_size=n_innings_total),
-            # Q6: scope-flat per-innings rates (still surfaced under
-            # cliff — these are derived from the parent table, not the
-            # per-position one).
-            "boundaries_per_innings": wrap_metric(cc_boundaries_pi, cc_boundaries_pi, "bat_boundaries_per_innings", sample_size=n_innings_total),
-            "sixes_per_innings":      wrap_metric(cc_sixes_pi,      cc_sixes_pi,      "bat_sixes_per_innings",      sample_size=n_innings_total),
-            "fours_per_innings":      wrap_metric(cc_fours_pi,      cc_fours_pi,      "bat_fours_per_innings",      sample_size=n_innings_total),
-            "thirties_per_innings":   wrap_metric(cc_thirties_pi,   cc_thirties_pi,   "bat_thirties_per_innings",   sample_size=n_innings_total),
-            "fifties_per_innings":    wrap_metric(cc_fifties_pi,    cc_fifties_pi,    "bat_fifties_per_innings",    sample_size=n_innings_total),
-            "hundreds_per_innings":   wrap_metric(cc_hundreds_pi,   cc_hundreds_pi,   "bat_hundreds_per_innings",   sample_size=n_innings_total),
-            "ducks_per_innings":      wrap_metric(cc_ducks_pi,      cc_ducks_pi,      "bat_ducks_per_innings",      sample_size=n_innings_total),
-            "runs_per_innings":       wrap_metric(cc_runs_pi,       cc_runs_pi,       "bat_runs_per_innings",       sample_size=n_innings_total),
+            # Tier 1 of spec-apples-to-apples-baselines.md — per-innings
+            # rates are now position-weighted via convex combination on
+            # per-bucket rates. Under cliff, they null out alongside the
+            # other rates (the player has weight on a thin bucket).
+            "boundaries_per_innings": wrap_metric(None, None, "bat_boundaries_per_innings", sample_size=n_innings_total),
+            "sixes_per_innings":      wrap_metric(None, None, "bat_sixes_per_innings",      sample_size=n_innings_total),
+            "fours_per_innings":      wrap_metric(None, None, "bat_fours_per_innings",      sample_size=n_innings_total),
+            "thirties_per_innings":   wrap_metric(None, None, "bat_thirties_per_innings",   sample_size=n_innings_total),
+            "fifties_per_innings":    wrap_metric(None, None, "bat_fifties_per_innings",    sample_size=n_innings_total),
+            "hundreds_per_innings":   wrap_metric(None, None, "bat_hundreds_per_innings",   sample_size=n_innings_total),
+            "ducks_per_innings":      wrap_metric(None, None, "bat_ducks_per_innings",      sample_size=n_innings_total),
+            "runs_per_innings":       wrap_metric(None, None, "bat_runs_per_innings",       sample_size=n_innings_total),
             "by_position": by_position,
         }
 
@@ -1895,6 +1887,17 @@ async def compute_players_batting_cohort(
     cc_bpf     = cv("balls_per_four")
     cc_bps     = cv("balls_per_six")
     cc_bpb     = cv("balls_per_boundary")
+    # Tier 1 of spec-apples-to-apples-baselines.md — position-weighted
+    # per-innings rates. Replaces the prior scope-flat parent-table
+    # aggregate; uses the same cv() helper as the per-balls rates.
+    cc_runs_pi       = cv("runs_per_innings")
+    cc_fours_pi      = cv("fours_per_innings")
+    cc_sixes_pi      = cv("sixes_per_innings")
+    cc_boundaries_pi = cv("boundaries_per_innings")
+    cc_thirties_pi   = cv("thirties_per_innings")
+    cc_fifties_pi    = cv("fifties_per_innings")
+    cc_hundreds_pi   = cv("hundreds_per_innings")
+    cc_ducks_pi      = cv("ducks_per_innings")
 
     def _r(v: Optional[float], ndigits: int) -> Optional[float]:
         return round(v, ndigits) if v is not None else None
@@ -1912,15 +1915,15 @@ async def compute_players_batting_cohort(
         "balls_per_four":     wrap_metric(_r(cc_bpf, 2), _r(cc_bpf, 2), "bat_balls_per_four",     sample_size=n_innings_total),
         "balls_per_six":      wrap_metric(_r(cc_bps, 2), _r(cc_bps, 2), "bat_balls_per_six",      sample_size=n_innings_total),
         "balls_per_boundary": wrap_metric(_r(cc_bpb, 2), _r(cc_bpb, 2), "bat_balls_per_boundary", sample_size=n_innings_total),
-        # Q6: scope-flat per-innings rates from playerscopestats parent.
-        "boundaries_per_innings": wrap_metric(cc_boundaries_pi, cc_boundaries_pi, "bat_boundaries_per_innings", sample_size=n_innings_total),
-        "sixes_per_innings":      wrap_metric(cc_sixes_pi,      cc_sixes_pi,      "bat_sixes_per_innings",      sample_size=n_innings_total),
-        "fours_per_innings":      wrap_metric(cc_fours_pi,      cc_fours_pi,      "bat_fours_per_innings",      sample_size=n_innings_total),
-        "thirties_per_innings":   wrap_metric(cc_thirties_pi,   cc_thirties_pi,   "bat_thirties_per_innings",   sample_size=n_innings_total),
-        "fifties_per_innings":    wrap_metric(cc_fifties_pi,    cc_fifties_pi,    "bat_fifties_per_innings",    sample_size=n_innings_total),
-        "hundreds_per_innings":   wrap_metric(cc_hundreds_pi,   cc_hundreds_pi,   "bat_hundreds_per_innings",   sample_size=n_innings_total),
-        "ducks_per_innings":      wrap_metric(cc_ducks_pi,      cc_ducks_pi,      "bat_ducks_per_innings",      sample_size=n_innings_total),
-        "runs_per_innings":       wrap_metric(cc_runs_pi,       cc_runs_pi,       "bat_runs_per_innings",       sample_size=n_innings_total),
+        # Tier 1: position-weighted per-innings rates.
+        "boundaries_per_innings": wrap_metric(_r(cc_boundaries_pi, 3), _r(cc_boundaries_pi, 3), "bat_boundaries_per_innings", sample_size=n_innings_total),
+        "sixes_per_innings":      wrap_metric(_r(cc_sixes_pi, 3),      _r(cc_sixes_pi, 3),      "bat_sixes_per_innings",      sample_size=n_innings_total),
+        "fours_per_innings":      wrap_metric(_r(cc_fours_pi, 3),      _r(cc_fours_pi, 3),      "bat_fours_per_innings",      sample_size=n_innings_total),
+        "thirties_per_innings":   wrap_metric(_r(cc_thirties_pi, 3),   _r(cc_thirties_pi, 3),   "bat_thirties_per_innings",   sample_size=n_innings_total),
+        "fifties_per_innings":    wrap_metric(_r(cc_fifties_pi, 3),    _r(cc_fifties_pi, 3),    "bat_fifties_per_innings",    sample_size=n_innings_total),
+        "hundreds_per_innings":   wrap_metric(_r(cc_hundreds_pi, 3),   _r(cc_hundreds_pi, 3),   "bat_hundreds_per_innings",   sample_size=n_innings_total),
+        "ducks_per_innings":      wrap_metric(_r(cc_ducks_pi, 3),      _r(cc_ducks_pi, 3),      "bat_ducks_per_innings",      sample_size=n_innings_total),
+        "runs_per_innings":       wrap_metric(_r(cc_runs_pi, 2),       _r(cc_runs_pi, 2),       "bat_runs_per_innings",       sample_size=n_innings_total),
         "by_position": by_position,
     }
 
@@ -2019,6 +2022,10 @@ async def compute_players_batting_by_season(
                SUM(pssp.fours)        AS fours,
                SUM(pssp.sixes)        AS sixes,
                SUM(pssp.dots)         AS dots,
+               SUM(pssp.thirties)     AS thirties,
+               SUM(pssp.fifties)      AS fifties,
+               SUM(pssp.hundreds)     AS hundreds,
+               SUM(pssp.ducks)        AS ducks,
                COUNT(DISTINCT pssp.person_id) AS n_players
         FROM playerscopestatsposition pssp
         JOIN playerscopestats pss
@@ -2042,31 +2049,11 @@ async def compute_players_batting_by_season(
         GROUP BY pss.season
         ORDER BY pss.season
     """
-    # Q4 (spec-rate-vs-volume-audit.md §2.1 Group C): scope-flat per-
-    # season milestone totals. The position child table doesn't carry
-    # milestone counts — milestones live on the parent only — so
-    # hundreds_per_innings / fifties_per_innings / thirties_per_innings
-    # / ducks_per_innings are surfaced per season as scope-flat baselines
-    # (sum across all players at that scope and season). Consistent
-    # with the /summary cohort treatment of the same fields.
-    pi_season_sql = f"""
-        SELECT pss.season,
-               SUM(pss.innings_batted) AS innings_total,
-               SUM(pss.thirties)       AS thirties_total,
-               SUM(pss.fifties)        AS fifties_total,
-               SUM(pss.hundreds)       AS hundreds_total,
-               SUM(pss.ducks)          AS ducks_total
-        FROM playerscopestats pss
-        WHERE {where}
-        GROUP BY pss.season
-        ORDER BY pss.season
-    """
     p_params = {**params, "__pid": person_id}
-    player_rows, cohort_rows, pool_rows, pi_season_rows = await asyncio.gather(
+    player_rows, cohort_rows, pool_rows = await asyncio.gather(
         db.q(player_sql, p_params),
         db.q(cohort_sql, params),
         db.q(pool_sql, params),
-        db.q(pi_season_sql, params),
     )
 
     # Roll cohort aggregates into {season: {bucket: row}}.
@@ -2077,20 +2064,6 @@ async def compute_players_batting_by_season(
 
     # Pool totals per season.
     pool_by_season: dict[str, dict] = {r["season"]: r for r in pool_rows}
-
-    # Per-season scope-flat milestone rates (spec-rate-vs-volume-audit
-    # §2.1 Group C). Keyed by season, each value is a small dict of
-    # {hundreds_per_innings, fifties_per_innings, …} or `None` rates
-    # when the per-season cohort innings_total is zero.
-    pi_season_by_season: dict[str, dict[str, Optional[float]]] = {}
-    for r in pi_season_rows:
-        inn = r["innings_total"] or 0
-        pi_season_by_season[r["season"]] = {
-            "hundreds_per_innings": round((r["hundreds_total"] or 0) / inn, 3) if inn else None,
-            "fifties_per_innings":  round((r["fifties_total"]  or 0) / inn, 3) if inn else None,
-            "thirties_per_innings": round((r["thirties_total"] or 0) / inn, 3) if inn else None,
-            "ducks_per_innings":    round((r["ducks_total"]    or 0) / inn, 3) if inn else None,
-        }
 
     # Player's per-season mix from innings per bucket.
     player_innings: dict[str, dict[int, int]] = {}
@@ -2128,6 +2101,10 @@ async def compute_players_batting_by_season(
             fours = r["fours"] or 0
             sixes = r["sixes"] or 0
             dots = r["dots"] or 0
+            thirties = r["thirties"] or 0
+            fifties = r["fifties"] or 0
+            hundreds = r["hundreds"] or 0
+            ducks = r["ducks"] or 0
             boundaries = fours + sixes
             n_p = r["n_players"] or 0
             below = innings < threshold
@@ -2148,6 +2125,15 @@ async def compute_players_batting_by_season(
                 "fours_per_innings": (fours / innings) if innings else None,
                 "boundaries_per_innings": (boundaries / innings) if innings else None,
                 "runs_per_innings": (runs / innings) if innings else None,
+                # Tier 1 of spec-apples-to-apples-baselines.md —
+                # per-position per-innings milestone rates. Replaces
+                # the prior scope-flat parent-table per-season totals
+                # so the by-season chip values stay comparable to the
+                # position-weighted /summary chip values.
+                "thirties_per_innings": (thirties / innings) if innings else None,
+                "fifties_per_innings":  (fifties / innings)  if innings else None,
+                "hundreds_per_innings": (hundreds / innings) if innings else None,
+                "ducks_per_innings":    (ducks / innings)    if innings else None,
             })
 
         pool = pool_by_season.get(season, {})
@@ -2160,11 +2146,6 @@ async def compute_players_batting_by_season(
             "n_players": n_players_total,
             "n_innings": n_innings_total,
         }
-
-        # Scope-flat per-season milestones (Group C). Always surfaced
-        # regardless of cliff — they're derived from the parent table,
-        # not the per-position child.
-        pi_season = pi_season_by_season.get(season, {})
 
         if cliff_buckets:
             row.update({
@@ -2181,12 +2162,12 @@ async def compute_players_batting_by_season(
                 "fours_per_innings":     None,
                 "boundaries_per_innings": None,
                 "runs_per_innings":      None,
-                # Milestones still surface even under cliff — same
-                # discipline as the /summary cohort.
-                "hundreds_per_innings":  pi_season.get("hundreds_per_innings"),
-                "fifties_per_innings":   pi_season.get("fifties_per_innings"),
-                "thirties_per_innings":  pi_season.get("thirties_per_innings"),
-                "ducks_per_innings":     pi_season.get("ducks_per_innings"),
+                # Tier 1: milestones are now position-weighted too;
+                # under cliff they null out alongside the other rates.
+                "hundreds_per_innings":  None,
+                "fifties_per_innings":   None,
+                "thirties_per_innings":  None,
+                "ducks_per_innings":     None,
             })
             by_season.append(row)
             continue
@@ -2217,15 +2198,12 @@ async def compute_players_batting_by_season(
             "sixes_per_innings":  _r(cv("sixes_per_innings"), 3),
             "fours_per_innings":  _r(cv("fours_per_innings"), 3),
             "boundaries_per_innings": _r(cv("boundaries_per_innings"), 3),
-            # Group C additions (spec-rate-vs-volume-audit §2.1).
-            # runs_per_innings is position-weighted (derivable from
-            # the position child); the four milestone rates are
-            # scope-flat per-season (parent-only data).
             "runs_per_innings":      _r(cv("runs_per_innings"), 2),
-            "hundreds_per_innings":  pi_season.get("hundreds_per_innings"),
-            "fifties_per_innings":   pi_season.get("fifties_per_innings"),
-            "thirties_per_innings":  pi_season.get("thirties_per_innings"),
-            "ducks_per_innings":     pi_season.get("ducks_per_innings"),
+            # Tier 1: position-weighted per-season milestone rates.
+            "hundreds_per_innings":  _r(cv("hundreds_per_innings"), 3),
+            "fifties_per_innings":   _r(cv("fifties_per_innings"), 3),
+            "thirties_per_innings":  _r(cv("thirties_per_innings"), 3),
+            "ducks_per_innings":     _r(cv("ducks_per_innings"), 3),
         })
         by_season.append(row)
 

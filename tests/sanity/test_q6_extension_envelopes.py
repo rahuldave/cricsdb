@@ -119,22 +119,26 @@ def main() -> int:
     print(line); all_passed &= ok
 
     # Cohort cross-check: envelope.scope_avg == cohort /summary.runs_per_innings.value.
+    # Use Kohli's actual position mix — runs_per_innings is now
+    # position-weighted (Tier 1 of spec-apples-to-apples-baselines.md),
+    # so uniform mix would diverge from the chip's top-order-weighted
+    # scope_avg.
+    pos_dist = bat_resp.get("position_distribution") or []
+    total = sum((p.get("innings") or 0) for p in pos_dist)
+    mix_vec = [(p.get("innings") or 0) / total for p in pos_dist] if total else []
+    while len(mix_vec) < 10:
+        mix_vec.append(0.0)
+    mix_str = ",".join(f"{m:.6f}" for m in mix_vec[:10])
     cohort_resp = get(
         args.host, "/api/v1/scope/averages/players/batting/summary",
         gender="male", team_type="club",
         tournament="Indian Premier League",
-        # Use Kohli's actual position mix at this scope to mirror the
-        # cohort fold the /batters endpoint does. Approximation: most of
-        # Kohli's IPL innings come at #3 (bucket 2). The runs_per_innings
-        # field is scope-FLAT on the cohort (derived from the parent
-        # table, not position-weighted) so the mix value doesn't matter
-        # for THIS field — uniform mix is fine.
-        position_mix="0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1",
+        position_mix=mix_str,
     )
     cohort_rpi = cohort_resp.get("runs_per_innings", {}).get("value")
     ok = approx(rpi["scope_avg"], cohort_rpi, tol=0.02)
     _, line = check(
-        "player.scope_avg == cohort.runs_per_innings.value",
+        "player.scope_avg == cohort.runs_per_innings.value (Kohli mix)",
         ok,
         f"cohort={cohort_rpi}, player.scope_avg={rpi['scope_avg']}",
     )
@@ -221,19 +225,46 @@ def main() -> int:
             _, line = check(f"  field {k} present and non-null", ok,
                             f"value={r.get(k)}")
             print(line); all_passed &= ok
-        # Cross-check milestone rate against SQL (scope-flat).
-        row = conn.execute("""
-            SELECT SUM(hundreds)*1.0/SUM(innings_batted) AS hpi
-            FROM playerscopestats
-            WHERE tournament='Indian Premier League' AND season='2016'
-              AND gender='male' AND team_type='club'
-        """).fetchone()
-        sql_hpi = round(row["hpi"], 3) if row["hpi"] is not None else None
-        ok = approx(r["hundreds_per_innings"], sql_hpi, tol=0.001)
+        # Cross-check milestone rate against the position-weighted SQL
+        # formula. Tier 1 of spec-apples-to-apples-baselines.md changed
+        # this from scope-flat to position-weighted (convex-combine on
+        # per-bucket hundreds/innings rates using the player's per-
+        # season position mix). The endpoint derives the mix server-
+        # side; we re-derive it the same way here.
+        mix_rows = conn.execute("""
+            SELECT pssp.position_bucket AS b, pssp.innings AS inn
+            FROM playerscopestatsposition pssp
+            JOIN playerscopestats pss
+              ON pss.scope_key = pssp.scope_key AND pss.person_id = pssp.person_id
+            WHERE pss.person_id='ba607b88'
+              AND pss.tournament='Indian Premier League' AND pss.season='2016'
+              AND pss.gender='male' AND pss.team_type='club'
+        """).fetchall()
+        total = sum(m["inn"] or 0 for m in mix_rows)
+        mix_vec = [0.0] * 10
+        for m in mix_rows:
+            if 1 <= m["b"] <= 10:
+                mix_vec[m["b"] - 1] = (m["inn"] or 0) / total if total else 0.0
+        bucket_rows = conn.execute("""
+            SELECT pssp.position_bucket AS b,
+                   SUM(pssp.hundreds) AS hundreds,
+                   SUM(pssp.innings) AS innings
+            FROM playerscopestatsposition pssp
+            JOIN playerscopestats pss
+              ON pss.scope_key = pssp.scope_key AND pss.person_id = pssp.person_id
+            WHERE pss.tournament='Indian Premier League' AND pss.season='2016'
+              AND pss.gender='male' AND pss.team_type='club'
+            GROUP BY pssp.position_bucket
+        """).fetchall()
+        per_bucket = {row["b"]: (row["hundreds"] or 0) / row["innings"]
+                      for row in bucket_rows if (row["innings"] or 0)}
+        expected = sum(mix_vec[b - 1] * per_bucket.get(b, 0.0) for b in range(1, 11))
+        expected_r = round(expected, 3)
+        ok = approx(r["hundreds_per_innings"], expected_r, tol=0.001)
         _, line = check(
-            "hundreds_per_innings matches sqlite3 scope-flat SQL",
+            "hundreds_per_innings matches position-weighted SQL",
             ok,
-            f"sql={sql_hpi}, api={r['hundreds_per_innings']}",
+            f"sql={expected_r}, api={r['hundreds_per_innings']}",
         )
         print(line); all_passed &= ok
 
