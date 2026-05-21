@@ -218,6 +218,10 @@ class PlayerScopeStats:
     powerplay_overs: float = 0.0
     middle_overs: float = 0.0
     death_overs: float = 0.0
+    # innings in which the bowler took ≥ 4 wickets — sibling volume
+    # field to `wickets`; backs the per-innings four-wicket-haul rate
+    # added in spec-rate-vs-volume-audit.md §2.1 Group A.
+    four_wicket_hauls: int = 0
     # fielding
     catches: int = 0
     runouts: int = 0

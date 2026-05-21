@@ -106,7 +106,8 @@ async def _ensure_tables(db, incremental: bool = False):
     # spec-player-baseline-parity.md). Pre-existing DBs that pre-date
     # this populate version get the new columns appended; new DBs
     # created by `db.create` above already have them in the schema.
-    for col in ("thirties", "fifties", "hundreds", "ducks"):
+    # `four_wicket_hauls` added by spec-rate-vs-volume-audit.md §2.1.
+    for col in ("thirties", "fifties", "hundreds", "ducks", "four_wicket_hauls"):
         try:
             await db.q(
                 f"ALTER TABLE playerscopestats ADD COLUMN {col} "
@@ -139,6 +140,7 @@ class _Acc:
         "catches", "runouts", "stumpings",
         "catches_as_keeper", "matches_as_keeper_set",
         "thirties", "fifties", "hundreds", "ducks",
+        "four_wicket_hauls",
     )
 
     def __init__(self, tournament, season, gender, team_type):
@@ -176,6 +178,9 @@ class _Acc:
         self.fifties = 0
         self.hundreds = 0
         self.ducks = 0
+        # Bowler innings with ≥4 wickets — bucketed by the post-aggregation
+        # pass that walks (bowler, iid) tallies from the wickets pass.
+        self.four_wicket_hauls = 0
 
     def to_row(self, person_id: str, scope_key: str) -> dict:
         if self.position_innings > 0:
@@ -216,6 +221,7 @@ class _Acc:
             "fifties": self.fifties,
             "hundreds": self.hundreds,
             "ducks": self.ducks,
+            "four_wicket_hauls": self.four_wicket_hauls,
         }
 
 
@@ -276,6 +282,10 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
     # ducks at the end of this function.
     innings_runs: dict[tuple[str, int], int] = {}     # (batter_id, iid) -> runs this innings
     innings_dismissed: set[tuple[str, int]] = set()   # (batter_id, iid) — dismissed this innings (excluding retired)
+    # Per-innings bowler wicket counts (excluding the same kinds the
+    # bowler-side wickets totaliser excludes) — drained into
+    # _Acc.four_wicket_hauls (innings with ≥ 4 wickets) at the end.
+    innings_bowler_wkts: dict[tuple[str, int], int] = {}  # (bowler_id, iid) -> wickets this innings
 
     def get_acc(person_id: str, match_id: int) -> _Acc:
         m = match_meta[match_id]
@@ -447,6 +457,8 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
             bow = w["bowler_id"]
             if bow is not None and kind not in BOWLER_WICKET_EXCLUDED:
                 get_acc(bow, mid).wickets += 1
+                ibw_key = (bow, iid)
+                innings_bowler_wkts[ibw_key] = innings_bowler_wkts.get(ibw_key, 0) + 1
 
     # ------------------------------------------------------------
     # Fielding credits (catches, runouts, stumpings, c+b).
@@ -531,6 +543,20 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
             acc.thirties += 1
         if runs == 0 and (pid, iid) in innings_dismissed:
             acc.ducks += 1
+
+    # ------------------------------------------------------------
+    # Four-wicket hauls — bucket per-innings bowler wicket counts.
+    # ------------------------------------------------------------
+    for (bow, iid), wkts in innings_bowler_wkts.items():
+        if wkts < 4:
+            continue
+        mid = innings_match.get(iid)
+        if mid is None:
+            continue
+        acc = accs.get((bow, match_meta[mid]["scope_key"]))
+        if acc is None:
+            continue
+        acc.four_wicket_hauls += 1
 
     return accs
 
