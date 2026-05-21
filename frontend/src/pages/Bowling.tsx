@@ -31,6 +31,7 @@ import {
   getBowlerByPhase, getBowlerBySeason, getBowlerWickets, getBowlerDistribution,
   getBowlingLeaders, getBowlerRecords,
   getScopePlayersBowlingBySeason, getScopePlayersBowlingByPhase,
+  getScopePlayersBowlingSummary,
 } from '../api'
 import type {
   PlayerSearchResult, BowlingSummary, BowlingInnings, BatterMatchup,
@@ -124,6 +125,21 @@ export default function Bowling() {
     [...filterDeps, activeTab],
   )
   const overData = overFetch.data?.by_over ?? []
+
+  // spec-rate-vs-volume-audit C3: cohort econ-by-over overlay on the
+  // By Over tab. The cohort summary endpoint takes the player's
+  // actual over_mix (already shipped on summary.cohort) and returns a
+  // by_over array with per-over rates — economy is the C3 addition.
+  const overMix = (summary?.cohort as { over_mix?: number[] } | undefined)?.over_mix
+  const overBaselineFetch = useFetch<{
+    by_over: { over: number; economy: number | null }[]
+  } | null>(
+    () => playerId && activeTab === 'By Over' && overMix && overMix.length === 20
+      ? getScopePlayersBowlingSummary(overMix, filters)
+      : Promise.resolve(null),
+    [...filterDeps, activeTab, overMix?.join(',')],
+  )
+  const overBaseline = overBaselineFetch.data?.by_over ?? []
 
   const phaseFetch = useFetch<{ by_phase: PhaseStats[] } | null>(
     () => playerId && activeTab === 'By Phase'
@@ -399,16 +415,34 @@ export default function Bowling() {
               <>
                 <TabState fetch={overFetch as FetchState<unknown>} />
                 {!overFetch.loading && !overFetch.error && overData.length > 0 && (
-                  <BarChart
-                    data={overData.map(o => ({
-                      ...o, over: `${o.over_number}`,
-                      phase: o.over_number <= 6 ? 'Powerplay' : o.over_number <= 15 ? 'Middle' : 'Death',
-                    }))}
-                    categoryAccessor="over"
-                    valueAccessor={(d: Record<string, any>) => (d.economy as number) ?? 0}
-                    title="Economy by Over" categoryLabel="Over" valueLabel="Economy"
-                    colorBy="phase" colorScheme={WISDEN_PHASES}
-                    height={350} />
+                  <>
+                    <BarChart
+                      data={overData.map(o => ({
+                        ...o, over: `${o.over_number}`,
+                        phase: o.over_number <= 6 ? 'Powerplay' : o.over_number <= 15 ? 'Middle' : 'Death',
+                      }))}
+                      categoryAccessor="over"
+                      valueAccessor={(d: Record<string, any>) => (d.economy as number) ?? 0}
+                      title="Economy by Over" categoryLabel="Over" valueLabel="Economy"
+                      colorBy="phase" colorScheme={WISDEN_PHASES}
+                      height={350} />
+                    {/* spec-rate-vs-volume-audit C3: cohort econ-by-over
+                        baseline. Rendered as a text strip below the
+                        chart (BarChart doesn't accept referenceData;
+                        adding that prop is a chart-component-level
+                        change outside this audit's scope). Values come
+                        from the over-mix-weighted cohort summary. */}
+                    {overBaseline.length > 0 && (
+                      <p className="wisden-tab-help" style={{ marginTop: '0.5rem' }}>
+                        Cohort Econ by Over (over-mix-weighted at this scope):{' '}
+                        {[1, 6, 15, 20].map(o => {
+                          const r = overBaseline.find(b => b.over === o)
+                          const v = r?.economy
+                          return v != null ? `Over ${o}: ${v.toFixed(2)}` : `Over ${o}: —`
+                        }).join(' · ')}
+                      </p>
+                    )}
+                  </>
                 )}
               </>
             )}

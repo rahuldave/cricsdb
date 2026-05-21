@@ -373,6 +373,41 @@ for r in rows:
 ")
 assert_contains "/fielding stat-row: Dis/Match chip cites API base $api_base" "vs base $api_base" "$sub_text"
 
+# ───────────────────────────────────────────────────────────────────
+# C3 — /bowling By Over cohort econ baseline strip
+# ───────────────────────────────────────────────────────────────────
+
+echo
+echo "=== /bowling — Bumrah IPL By Over (C3 cohort strip) ==="
+ab open "$BASE/bowling?player=$BUMRAH&$SCOPE_URL&tab=By%20Over"
+sleep 3
+
+help_text=$(ab_eval "
+  Array.from(document.querySelectorAll('.wisden-tab-help'))
+    .map(e => e.textContent?.trim()).join('|')
+")
+assert_contains "/bowling By Over: cohort econ-by-over baseline strip present (C3)" "Cohort Econ by Over" "$help_text"
+# Sanity-anchor at one over: cohort Over 1 econ matches the cohort
+# scope_averages by_over[0].economy at Bumrah's over_mix.
+api_v=$(curl -s "$API/api/v1/bowlers/$BUMRAH/summary?$SCOPE" | python3 -c "
+import json, sys, urllib.parse, urllib.request
+s = json.load(sys.stdin)
+mix = s.get('cohort', {}).get('over_mix') or []
+qs = urllib.parse.urlencode({
+  'gender': 'male', 'team_type': 'club',
+  'tournament': 'Indian Premier League',
+  'over_mix': ','.join(f'{m:.6f}' for m in mix),
+})
+url = '$API/api/v1/scope/averages/players/bowling/summary?' + qs
+with urllib.request.urlopen(url) as r:
+    co = json.load(r)
+by_over = co.get('by_over', [])
+o1 = next((b for b in by_over if b['over'] == 1), {})
+v = o1.get('economy')
+print(f'{v:.2f}' if v is not None else 'NULL')
+")
+assert_contains "/bowling By Over: Over 1 cohort econ matches API (=$api_v)" "Over 1: $api_v" "$help_text"
+
 echo
 echo "─────────────────────────────────────────"
 echo "Results: $PASS passed, $FAIL failed"

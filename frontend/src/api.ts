@@ -360,6 +360,17 @@ export const getScopePlayersBattingByPhase = (personId: string, filters?: F) =>
 export const getScopePlayersBowlingBySeason = (personId: string, filters?: F) =>
   playerScope<{ by_season: import('./types').ScopePlayerBowlingSeason[] }>(
     '/api/v1/scope/averages/players/bowling/by-season', personId, filters)
+// spec-rate-vs-volume-audit C3: cohort econ-by-over overlay on the
+// /bowling By Over tab. Takes the player's over_mix (derived from
+// summary.cohort.over_mix) so the cohort baseline is fold-weighted
+// in the same way the /summary chip path is.
+export const getScopePlayersBowlingSummary = (overMix: number[], filters?: F) =>
+  fetchApi<{
+    by_over: { over: number; economy: number | null; strike_rate: number | null; dot_pct: number | null }[]
+  }>('/api/v1/scope/averages/players/bowling/summary', {
+    ...(filters as Record<string, string>),
+    over_mix: overMix.map(m => m.toFixed(6)).join(','),
+  })
 export const getScopePlayersBowlingByPhase = (personId: string, filters?: F) =>
   playerScope<{ by_phase: import('./types').ScopePlayerBowlingPhase[] }>(
     '/api/v1/scope/averages/players/bowling/by-phase', personId, filters)
