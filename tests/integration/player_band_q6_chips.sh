@@ -35,6 +35,27 @@ assert_contains() {
   else bad "$label — '$needle' not found in: $actual"; fi
 }
 
+# Inverse: pass when needle is absent from actual. Used by the rate-
+# vs-volume audit assertions where the volume tile (Runs, 100s, 50s,
+# Ducks) MUST NOT carry a per-innings rate chip (dimensional rule).
+assert_not_contains() {
+  local label="$1" needle="$2" actual="$3"
+  if [[ "$actual" != *"$needle"* ]]; then ok "$label"
+  else bad "$label — '$needle' unexpectedly present in: $actual"; fi
+}
+
+# Pass when the tile exists. Used to confirm a newly-added tile is
+# present on the page.
+assert_tile_present() {
+  local label="$1" expected_label="$2"
+  if python3 -c "
+import json, sys
+rows = json.load(open('/tmp/tiles.json'))['data']['result']
+sys.exit(0 if any(r['label'] == '$expected_label' for r in rows) else 1)
+"; then ok "$label"
+  else bad "$label — tile '$expected_label' not present"; fi
+}
+
 # Snapshot every stat tile (label, value, sub) from the page into JSON.
 snapshot_tiles() {
   agent-browser eval --json "(() => {
@@ -105,13 +126,26 @@ for combo in \
   assert_contains "Kohli /players Batting: $label chip cites base $api_f" "vs base $api_f" "$sub"
 done
 
-# Row 1 — 100s / 50s tiles gain chip subtitles via per-innings rates.
+# spec-rate-vs-volume-audit F1 — volume tiles (Runs, 100s, 50s, Ducks)
+# MUST NOT carry a per-innings rate chip. Each volume tile now has a
+# sibling per-innings rate tile that carries the chip instead.
+for label in "Runs" "100s" "50s" "Ducks"; do
+  sub=$(tile_sub "$label")
+  assert_not_contains "Kohli /players Batting: $label tile MUST NOT carry chip" "vs base" "$sub"
+done
+
+# F1 — new per-innings rate tiles MUST exist and chip-cite the cohort
+# scope_avg from the matching envelope. 100s/Inn, 50s/Inn, Runs/Inn,
+# Ducks/Inn — each is a sibling rate to a volume tile above.
 for combo in \
-    "100s:hundreds_per_innings:%.3f" \
-    "50s:fifties_per_innings:%.3f"; do
+    "Runs/Inn:runs_per_innings:%.2f" \
+    "100s/Inn:hundreds_per_innings:%.3f" \
+    "50s/Inn:fifties_per_innings:%.3f" \
+    "Ducks/Inn:ducks_per_innings:%.3f"; do
   label=$(echo "$combo" | cut -d: -f1)
   field=$(echo "$combo" | cut -d: -f2)
   fmt=$(echo "$combo" | cut -d: -f3)
+  assert_tile_present "Kohli /players Batting: $label tile exists" "$label"
   api_v=$(summary_scope_avg "$bat_url" "$field")
   api_f=$(printf "$fmt" "$api_v")
   sub=$(tile_sub "$label")

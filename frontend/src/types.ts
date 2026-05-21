@@ -418,6 +418,9 @@ export interface BattingSummary {
   fifties_per_innings: MetricEnvelope
   hundreds_per_innings: MetricEnvelope
   ducks_per_innings: MetricEnvelope
+  // spec-rate-vs-volume-audit.md §2.1 Group A — sibling rate to the
+  // Runs volume tile.
+  runs_per_innings: MetricEnvelope
   // Per-bucket position distribution + cohort context (next-spec viz
   // consumes the by-bucket data; this spec uses just the cohort
   // baseline aggregated by the backend).
@@ -1243,6 +1246,9 @@ export interface BowlingSummary {
   // surfaces a low-volume but high-signal economy proxy.
   wickets_per_innings: MetricEnvelope
   maidens_per_innings: MetricEnvelope
+  // spec-rate-vs-volume-audit.md §2.1 Group A — sibling rate to the
+  // 4-fers volume tile.
+  four_wicket_hauls_per_innings: MetricEnvelope
   // Per-over distribution + cohort context.
   over_distribution: BowlingOverDistributionEntry[]
   cohort: BowlingCohortMeta | null

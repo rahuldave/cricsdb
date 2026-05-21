@@ -196,34 +196,47 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     const b = profile.batting
     if (!b) return null
     const tt = b.cohort ? battingCohortTooltip(b.cohort as BattingCohortMeta) : undefined
-    // Two-row layout (Phase F of spec-player-baseline-parity.md §4.1
-    // + Q6 (ii)). Row 1: existing kernel tiles. Row 2: per-innings
-    // rate tiles surfacing the Q6 envelopes shipped session 1 in
-    // commit 55c890a (boundaries/innings, sixes/innings, fours/
-    // innings, milestone-per-innings).
+    // Three-row cols-6 layout (spec-rate-vs-volume-audit §4.1.1).
+    // Phase F shipped chips on Runs/100s/50s volume tiles — that
+    // dimensional mismatch is fixed here: volume tiles render bare,
+    // and each volume gets a sibling per-innings rate tile that
+    // carries the chip. Per CLAUDE.md "Absolute-vs-per-innings
+    // dimensional discipline" rule.
     return (
       <>
         <div className="wisden-statrow cols-6">
-          <StatCard label="Runs"  value={b.runs.value} subtitle={baselineSub(b.runs, tt, 0)} />
+          <StatCard label="Runs"     value={b.runs.value} />
+          <StatCard label="Runs/Inn" value={fmt(b.runs_per_innings.value, 2)}
+            subtitle={baselineSub(b.runs_per_innings, tt, 2)} />
           <StatCard label="Avg"   value={fmt(b.average.value)} subtitle={baselineSub(b.average, tt, 2)} />
           <StatCard label="SR"    value={fmt(b.strike_rate.value)} subtitle={baselineSub(b.strike_rate, tt, 1)} />
-          <StatCard label="100s"  value={b.hundreds.value} subtitle={baselineSub(b.hundreds_per_innings, tt, 3)} />
-          <StatCard label="50s"   value={b.fifties.value} subtitle={baselineSub(b.fifties_per_innings, tt, 3)} />
           <StatCard label="HS"    value={b.highest_score} />
+          <StatCard label="Dot%"  value={b.dot_pct.value != null ? `${b.dot_pct.value}%` : '-'}
+            subtitle={baselineSub(b.dot_pct, tt, 1)} />
         </div>
         <div className="wisden-statrow cols-6">
+          <StatCard label="100s"     value={b.hundreds.value} />
+          <StatCard label="100s/Inn" value={fmt(b.hundreds_per_innings.value, 3)}
+            subtitle={baselineSub(b.hundreds_per_innings, tt, 3)} />
+          <StatCard label="50s"      value={b.fifties.value} />
+          <StatCard label="50s/Inn"  value={fmt(b.fifties_per_innings.value, 3)}
+            subtitle={baselineSub(b.fifties_per_innings, tt, 3)} />
+          <StatCard label="30s/Inn"  value={fmt(b.thirties_per_innings.value, 3)}
+            subtitle={baselineSub(b.thirties_per_innings, tt, 3)} />
+          <StatCard label="B/Bndry"  value={fmt(b.balls_per_boundary.value, 2)}
+            subtitle={baselineSub(b.balls_per_boundary, tt, 2)} />
+        </div>
+        <div className="wisden-statrow cols-6">
+          <StatCard label="Ducks"     value={b.ducks.value} />
+          <StatCard label="Ducks/Inn" value={fmt(b.ducks_per_innings.value, 3)}
+            subtitle={baselineSub(b.ducks_per_innings, tt, 3)} />
           <StatCard label="4s/Inn"   value={fmt(b.fours_per_innings.value, 2)}
             subtitle={baselineSub(b.fours_per_innings, tt, 2)} />
           <StatCard label="6s/Inn"   value={fmt(b.sixes_per_innings.value, 2)}
             subtitle={baselineSub(b.sixes_per_innings, tt, 2)} />
           <StatCard label="Bndr/Inn" value={fmt(b.boundaries_per_innings.value, 2)}
             subtitle={baselineSub(b.boundaries_per_innings, tt, 2)} />
-          <StatCard label="30s/Inn"  value={fmt(b.thirties_per_innings.value, 3)}
-            subtitle={baselineSub(b.thirties_per_innings, tt, 3)} />
-          <StatCard label="Dot%"     value={b.dot_pct.value != null ? `${b.dot_pct.value}%` : '-'}
-            subtitle={baselineSub(b.dot_pct, tt, 1)} />
-          <StatCard label="B/Bndry"  value={fmt(b.balls_per_boundary.value, 2)}
-            subtitle={baselineSub(b.balls_per_boundary, tt, 2)} />
+          <div />
         </div>
       </>
     )
