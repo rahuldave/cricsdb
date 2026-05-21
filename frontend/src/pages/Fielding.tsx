@@ -354,6 +354,7 @@ export default function Fielding() {
           <FielderDistributionPanel
             playerId={playerId}
             distribution={distribution}
+            summary={summary}
             loading={distFetch.loading}
             error={distFetch.error}
           />

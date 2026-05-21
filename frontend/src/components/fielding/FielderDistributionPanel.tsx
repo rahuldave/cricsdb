@@ -27,6 +27,7 @@ import { WISDEN } from '../charts/palette'
 import { KickerHeader } from '../ChartHeader'
 import type {
   FielderDistribution, FielderDossier, FielderObservation, FielderCountBlock,
+  FieldingSummary,
 } from '../../types'
 
 type DistWindow = 'scope' | 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
@@ -78,12 +79,15 @@ const METRIC_LABEL: Record<DistMetric, string> = {
 interface Props {
   playerId: string
   distribution: FielderDistribution | null
+  /** Tier 6 of spec-apples-to-apples-baselines.md — same-scope cohort
+   *  baseline source for the green sparkline reference line. */
+  summary: FieldingSummary | null
   loading: boolean
   error: string | null
 }
 
 export default function FielderDistributionPanel({
-  playerId, distribution, loading, error,
+  playerId, distribution, summary, loading, error,
 }: Props) {
   const [windowParam, setWindowParam] = useUrlParam('dist_window_f')
   const [metricParam, setMetricParam] = useUrlParam('dist_metric_f')
@@ -113,16 +117,51 @@ export default function FielderDistributionPanel({
     return WINDOW_OPTIONS.find(o => o.key === w)?.label ?? 'this window'
   }
 
-  // Sparkline reference line: y=1 for catches/run_outs (the
-  // "did at least one happen this match?" anchor — bars at or
-  // above the line are 1+, bars below are zero stubs); player's
-  // mean for stumpings (keepers' means carry information).
+  // Sparkline reference lines:
+  // - Global gray line: y=1 for catches/run_outs (the "did at least
+  //   one happen this match?" anchor — bars at or above the line are
+  //   1+, bars below are zero stubs); null for stumpings (stumping
+  //   means are well below 1/match).
+  // - Player black line: player's per-match mean for stumpings; null
+  //   for catches/run_outs (the y=1 anchor + green cohort line are the
+  //   primary references on these tabs).
+  // - Tier 6 (spec-apples-to-apples-baselines.md): green league line
+  //   at the active-scope cohort baseline (keeper-binary already
+  //   correct) — sourced from /fielders/{id}/summary's per-match
+  //   envelope scope_avg.
   const lifetimeStumpings = distribution.lifetime.stumpings
-  function sparklineRef(): { player: number | null; global: number | null } {
+  function sparklineRef(): {
+    player: number | null;
+    global: number | null;
+    league: number | null;
+    leagueLegend: string | null;
+  } {
     if (metric === 'stumpings') {
-      return { player: lifetimeStumpings?.mean_per_match ?? null, global: null }
+      const sa = summary?.stumpings_per_match?.scope_avg ?? null
+      return {
+        player: lifetimeStumpings?.mean_per_match ?? null,
+        global: null,
+        league: sa,
+        leagueLegend: sa != null ? `${sa.toFixed(2)} stumpings/match` : null,
+      }
     }
-    return { player: null, global: 1 }
+    if (metric === 'run_outs') {
+      const sa = summary?.run_outs_per_match?.scope_avg ?? null
+      return {
+        player: null,
+        global: 1,
+        league: sa,
+        leagueLegend: sa != null ? `${sa.toFixed(2)} run-outs/match` : null,
+      }
+    }
+    // catches
+    const sa = summary?.catches_per_match?.scope_avg ?? null
+    return {
+      player: null,
+      global: 1,
+      league: sa,
+      leagueLegend: sa != null ? `${sa.toFixed(2)} catches/match` : null,
+    }
   }
 
   function sparklinePoint(o: FielderObservation): SparklinePoint {
@@ -238,6 +277,7 @@ export default function FielderDistributionPanel({
                       points={points}
                       playerReferenceValue={refs.player}
                       globalReferenceValue={refs.global}
+                      leagueReferenceValue={refs.league}
                     />
                     <SeasonTickAxis dates={dossier.observations.map(o => o.date)} />
                   </ScrollableBars>
@@ -253,7 +293,7 @@ export default function FielderDistributionPanel({
                       display: 'inline-flex', alignItems: 'center',
                       columnGap: '0.85rem', rowGap: '0.15rem', flexWrap: 'wrap',
                     }}>
-                      {metric === 'stumpings' && refs.player !== null ? (
+                      {metric === 'stumpings' && refs.player !== null && (
                         <span>
                           <span aria-hidden="true" style={{
                             display: 'inline-block', width: 14, height: 2,
@@ -262,9 +302,22 @@ export default function FielderDistributionPanel({
                             marginRight: '0.3rem',
                             position: 'relative', top: '-0.1em',
                           }} />
-                          mean {refs.player.toFixed(2)}/match
+                          player mean {refs.player.toFixed(2)}/match
                         </span>
-                      ) : (
+                      )}
+                      {refs.league !== null && (
+                        <span>
+                          <span aria-hidden="true" style={{
+                            display: 'inline-block', width: 14, height: 1.5,
+                            background: '#3F7A4D',
+                            verticalAlign: 'middle',
+                            marginRight: '0.3rem',
+                            position: 'relative', top: '-0.1em',
+                          }} />
+                          cohort at scope ({refs.leagueLegend})
+                        </span>
+                      )}
+                      {refs.global !== null && (
                         <span>
                           <span aria-hidden="true" style={{
                             display: 'inline-block', width: 14, height: 1.5,
