@@ -2402,6 +2402,195 @@ async def scope_players_batting_by_phase(
     )
 
 
+# ============================================================
+# /scope/averages/players/batting/by-over — Tier 4 of
+# spec-apples-to-apples-baselines.md. Per-over batting cohort
+# baseline. Mirrors the existing bowling /by-over path: derives
+# the player's per-over ball mix server-side from
+# playerscopestatsbattingover (joined on person_id), then computes
+# per-bucket cohort rates (strike_rate, dot_pct, boundary_pct,
+# balls_per_four, balls_per_boundary, runs_per_innings) at the
+# filtered scope. Closes spec §2.2 A7 + backs the SR-by-Over
+# chart overlay via Tier 5's BarChart referenceData prop.
+# ============================================================
+
+
+# Minimum cohort legal balls per over bucket to count as supported.
+# Mirrors the bowling-side U-shape thresholds in shape (loose at the
+# extremes where samples are thin; tight in the middle).
+def batting_over_threshold(over: int) -> int:
+    if over <= 2 or over >= 19:
+        return 80
+    if over <= 6 or over >= 16:
+        return 60
+    return 40
+
+
+async def compute_players_batting_by_over(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-over batting cohort baseline keyed off the player's per-
+    over BALL mix (legal_balls_faced fraction).
+
+    Returns `{ by_over: [{ over, n_players, n_innings, strike_rate,
+    dot_pct, boundary_pct, balls_per_four, balls_per_boundary,
+    runs_per_innings, below_support }, …] }` over overs 1..20. Spec:
+    spec-apples-to-apples-baselines.md §3 Tier 4.
+    """
+    where, params = build_scope_clauses(filters, drop=drop_set)
+
+    # Q1: player's per-over legal_balls_faced (mix derivation).
+    player_sql = f"""
+        SELECT psbo.over_number,
+               psbo.legal_balls_faced AS legal_balls
+        FROM playerscopestatsbattingover psbo
+        JOIN playerscopestats pss
+          ON pss.scope_key = psbo.scope_key
+         AND pss.person_id = psbo.person_id
+        WHERE {where}
+          AND psbo.person_id = :__pid
+        ORDER BY psbo.over_number
+    """
+    # Q2: cohort aggregates per over_number.
+    cohort_sql = f"""
+        SELECT psbo.over_number,
+               SUM(psbo.runs)              AS runs,
+               SUM(psbo.legal_balls_faced) AS legal_balls,
+               SUM(psbo.dots)              AS dots,
+               SUM(psbo.fours)             AS fours,
+               SUM(psbo.sixes)             AS sixes,
+               SUM(psbo.dismissals)        AS dismissals,
+               SUM(psbo.innings_faced)     AS innings_faced,
+               COUNT(DISTINCT psbo.person_id) AS n_players
+        FROM playerscopestatsbattingover psbo
+        WHERE psbo.scope_key IN (
+            SELECT scope_key FROM playerscopestats pss WHERE {where}
+        )
+        GROUP BY psbo.over_number
+        ORDER BY psbo.over_number
+    """
+    pool_sql = f"""
+        SELECT COUNT(DISTINCT psbo.person_id) AS n_players,
+               SUM(psbo.legal_balls_faced)    AS n_balls_total
+        FROM playerscopestatsbattingover psbo
+        WHERE psbo.scope_key IN (
+            SELECT scope_key FROM playerscopestats pss WHERE {where}
+        )
+    """
+    p_params = {**params, "__pid": person_id}
+    player_rows, cohort_rows, pool_rows = await asyncio.gather(
+        db.q(player_sql, p_params),
+        db.q(cohort_sql, params),
+        db.q(pool_sql, params),
+    )
+
+    by_over_cohort = {r["over_number"]: r for r in cohort_rows}
+    n_players_total = (pool_rows[0].get("n_players") if pool_rows else 0) or 0
+    n_balls_total = (pool_rows[0].get("n_balls_total") if pool_rows else 0) or 0
+
+    # Player's mix vector from per-over legal balls faced.
+    player_balls: dict[int, int] = {r["over_number"]: r["legal_balls"] for r in player_rows}
+    total_player_balls = sum(player_balls.values())
+    mix = [0.0] * 20
+    if total_player_balls > 0:
+        for o, b in player_balls.items():
+            if 1 <= o <= 20:
+                mix[o - 1] = b / total_player_balls
+
+    by_over: list[dict] = []
+    for o in range(1, 21):
+        r = by_over_cohort.get(o)
+        threshold = batting_over_threshold(o)
+        if r is None:
+            by_over.append({
+                "over": o,
+                "n_balls": 0, "n_players": 0,
+                "n_innings": 0,
+                "threshold": threshold,
+                "below_support": True,
+                "strike_rate": None, "dot_pct": None, "boundary_pct": None,
+                "balls_per_four": None, "balls_per_boundary": None,
+                "runs_per_innings": None,
+            })
+            continue
+        balls = r["legal_balls"] or 0
+        runs = r["runs"] or 0
+        dots = r["dots"] or 0
+        fours = r["fours"] or 0
+        sixes = r["sixes"] or 0
+        dismissals = r["dismissals"] or 0
+        innings_faced = r["innings_faced"] or 0
+        boundaries = fours + sixes
+        below = balls < threshold
+        by_over.append({
+            "over": o,
+            "n_balls": balls,
+            "n_players": r["n_players"] or 0,
+            "n_innings": innings_faced,
+            "threshold": threshold,
+            "below_support": below,
+            "strike_rate":       round(runs / balls * 100, 1)       if balls else None,
+            "dot_pct":           round(dots / balls * 100, 1)       if balls else None,
+            "boundary_pct":      round(boundaries / balls * 100, 1) if balls else None,
+            "balls_per_four":    round(balls / fours, 2)            if fours else None,
+            "balls_per_boundary": round(balls / boundaries, 2)      if boundaries else None,
+            # Per-bucket per-innings rates (Tier 4). Sibling unit to the
+            # bowling-side per-bucket per-innings rates added in Tier 2.
+            "runs_per_innings":  round(runs / innings_faced, 2)     if innings_faced else None,
+            # Volume hints — useful for downstream chart axis labels.
+            "dismissals": dismissals,
+        })
+
+    return {
+        "by_over": by_over,
+        "cohort": {
+            "match_dimension": "ball_mix",
+            "ball_mix": mix,
+            "n_players": n_players_total,
+            "n_balls_total": n_balls_total,
+        },
+    }
+
+
+@router.get("/players/batting/by-over")
+async def scope_players_batting_by_over(
+    person_id: str = Query(
+        ...,
+        description=(
+            "Player ID. The endpoint derives the per-over ball mix"
+            " server-side from playerscopestatsbattingover joined on"
+            " this person_id; per-bucket cohort rates are computed"
+            " over the whole population at the filtered scope. Mirror"
+            " of the bowling-side /by-over (which uses bowling balls,"
+            " not faced balls)."
+        ),
+    ),
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+    drop: Optional[str] = Query(None),
+):
+    """Per-over batting cohort baseline (Tier 4)."""
+    db = get_db()
+    try:
+        drop_set = parse_drop(drop)
+        if drop_set is not None:
+            from ..filters import _DROP_AXES
+            unknown = drop_set - _DROP_AXES
+            if unknown:
+                raise ValueError(
+                    f"drop= contains unknown axis name(s): {sorted(unknown)}."
+                )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await compute_players_batting_by_over(
+        db, person_id, filters, aux, drop_set,
+    )
+
+
 async def compute_players_bowling_cohort(
     db,
     filters: FilterParams,
