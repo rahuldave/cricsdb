@@ -16,6 +16,7 @@
  */
 
 import type { TeamBattingRunsBlock, TeamBattingRunRateBlock } from '../../types'
+import AvgRowPrefix from '../distribution/AvgRowPrefix'
 import ProbChip from '../distribution/ProbChip'
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 
@@ -107,6 +108,7 @@ export function RunsChipsRow({ block }: { block: TeamBattingRunsBlock }) {
   // OCHRE — doubling the over-10 score is a strong escalation signal.
   return (
     <ChipRow>
+      <AvgRowPrefix />
       <ProbChip label="P(<100)" record={m.p_lt_100}  tint={T_INDIGO} />
       <ProbChip label="P(≥100)" record={m.p_geq_100} tint={T_SAGE} />
       <ProbChip label="P(≥150)" record={m.p_geq_150} tint={T_SAGE} />
@@ -162,6 +164,7 @@ export function RRChipsRow({ block }: { block: TeamBattingRunRateBlock }) {
   // ladder as bowler economy — only the tints flip.
   return (
     <ChipRow>
+      <AvgRowPrefix />
       <ProbChip label="P(RR ≤7)"  record={m.p_rr_leq_7}  tint={T_INDIGO} />
       <ProbChip label="P(RR ≤8)"  record={m.p_rr_leq_8}  tint={T_INDIGO} />
       <ProbChip label="P(RR ≥9)"  record={m.p_rr_geq_9}  tint={T_OCHRE} />

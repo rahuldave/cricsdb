@@ -19,6 +19,7 @@ import type {
   TeamFieldingCatchesBlock,
   TeamFieldingCountBlock,
 } from '../../types'
+import AvgRowPrefix from '../distribution/AvgRowPrefix'
 import ProbChip from '../distribution/ProbChip'
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 
@@ -118,6 +119,7 @@ export function CatchesChipsRow({ block }: { block: TeamFieldingCatchesBlock }) 
   // P(≥3) SAGE (typical), P(≥5) OCHRE (sharp), P(≥7) OCHRE (elite).
   return (
     <ChipRow>
+      <AvgRowPrefix />
       <ProbChip label="P(=0)" record={m.p_eq_0}  tint={T_INDIGO} />
       <ProbChip label="P(≥3)" record={m.p_geq_3} tint={T_SAGE} />
       <ProbChip label="P(≥5)" record={m.p_geq_5} tint={T_OCHRE} />
@@ -169,6 +171,7 @@ export function CountChipsRow({ block }: { block: TeamFieldingCountBlock }) {
   // Per spec §17.5 chips table: P(=0) INDIGO / P(=1) SAGE / P(≥2) OCHRE.
   return (
     <ChipRow>
+      <AvgRowPrefix />
       <ProbChip label="P(=0)" record={m.p_eq_0}  tint={T_INDIGO} />
       <ProbChip label="P(=1)" record={m.p_eq_1}  tint={T_SAGE} />
       <ProbChip label="P(≥2)" record={m.p_geq_2} tint={T_OCHRE} />

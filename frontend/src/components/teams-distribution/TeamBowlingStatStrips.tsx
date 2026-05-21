@@ -19,6 +19,7 @@ import type {
   TeamBowlingRunsConcededBlock,
   TeamBowlingEconomyBlock,
 } from '../../types'
+import AvgRowPrefix from '../distribution/AvgRowPrefix'
 import ProbChip from '../distribution/ProbChip'
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 
@@ -119,6 +120,7 @@ export function WicketsChipsRow({ block }: { block: TeamBowlingWicketsBlock }) {
   // (both are good outcomes for the bowler).
   return (
     <ChipRow>
+      <AvgRowPrefix />
       <ProbChip label="P(≤3)" record={m.p_leq_3} tint={T_INDIGO} />
       <ProbChip label="P(≥5)" record={m.p_geq_5} tint={T_SAGE} />
       <ProbChip label="P(≥7)" record={m.p_geq_7} tint={T_OCHRE} />
@@ -178,6 +180,7 @@ export function RunsConcededChipsRow({ block }: { block: TeamBowlingRunsConceded
   // INDIGO. Doubling-at-10 is INDIGO (leakage signal).
   return (
     <ChipRow>
+      <AvgRowPrefix />
       <ProbChip label="P(<100)" record={m.p_lt_100} tint={T_OCHRE} />
       <ProbChip label="P(<150)" record={m.p_lt_150} tint={T_SAGE} />
       <ProbChip label="P(≥150)" record={m.p_geq_150} tint={T_SAGE} />
@@ -231,6 +234,7 @@ export function EconomyChipsRow({ block }: { block: TeamBowlingEconomyBlock }) {
   // INDIGO (loose). Same as the per-bowler v1 panel.
   return (
     <ChipRow>
+      <AvgRowPrefix />
       <ProbChip label="P(econ ≤6)"  record={m.p_econ_leq_6}  tint={T_OCHRE} />
       <ProbChip label="P(econ ≤7)"  record={m.p_econ_leq_7}  tint={T_SAGE} />
       <ProbChip label="P(econ ≥9)"  record={m.p_econ_geq_9}  tint={T_INDIGO} />
