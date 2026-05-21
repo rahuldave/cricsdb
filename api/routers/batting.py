@@ -19,7 +19,7 @@ from ..tournament_canonical import (
     variants as canonical_variants,
     event_name_in_clause,
 )
-from ..wilson import prob_record
+from ..wilson import prob_record, enrich_prob_record
 from ..form_windows import scope_anchor
 
 router = APIRouter(prefix="/api/v1/batters", tags=["Batting"])
@@ -1583,6 +1583,32 @@ async def batting_distribution(
     lifetime = _distribution_dossier(observations)
     form = _form_windows(observations, today)
 
+    # PT1 of spec-prob-baselines.md — compute the player's position-mix
+    # from their distribution and fold the cohort baseline into the
+    # milestone ProbRecords on every dossier (lifetime + 4 windows).
+    # Same scope cohort applied uniformly — window-slice cohorts are
+    # deferred (spec §10). Skip the cohort fetch entirely when the
+    # player has no innings in scope: there's nothing to compare.
+    if observations:
+        position_distribution = await _position_distribution(db, person_id, filters)
+        total_pos_innings = sum((p["innings"] or 0) for p in position_distribution)
+        if total_pos_innings > 0:
+            mix = [
+                (p["innings"] or 0) / total_pos_innings
+                for p in position_distribution
+            ]
+            while len(mix) < 10:
+                mix.append(0.0)
+            from .scope_averages import compute_players_batting_cohort
+            cohort = await compute_players_batting_cohort(
+                db, filters, aux, mix[:10], drop_set=None,
+            )
+            _enrich_milestones_with_cohort(lifetime["milestones"], cohort)
+            for window_key in ("last_10", "last_60d", "last_6mo", "last_1yr"):
+                window_doss = form.get(window_key)
+                if window_doss and "milestones" in window_doss:
+                    _enrich_milestones_with_cohort(window_doss["milestones"], cohort)
+
     # last_match_date — the scope's max observation date. Drives the
     # frontend dormancy badge (`(0 in 60d)` etc.) when the gap from
     # today exceeds the threshold. Spec §8 + design-decisions.md
@@ -1599,6 +1625,57 @@ async def batting_distribution(
         "form": form,
         "suggested_splits": splits,
     }
+
+
+# PT1 of spec-prob-baselines.md — direction-tag table for the batting
+# milestone ProbChips. Locked at the endpoint layer (not in
+# metrics_metadata) because ProbRecord direction is a chip-rendering
+# convention, not a metric registry concept — same prob can render with
+# either polarity if mounted on a different chip (e.g. team-grain chips
+# may flip orientation in the deferred teams-side follow-up).
+_BATTING_PROB_DIRECTIONS: dict[str, str | None] = {
+    "p_failure_10":  "lower_better",
+    "p_30_plus":     "higher_better",
+    "p_50_plus":     "higher_better",
+    "p_100_plus":    "higher_better",
+    "p_50_given_30": "higher_better",
+    "p_70_given_50": "higher_better",
+    # p_25_plus is computed but not rendered as a chip — leave the
+    # baseline absent rather than guessing direction.
+}
+
+# Map from ProbRecord key on the dossier → cohort field on the
+# compute_players_batting_cohort response.
+_BATTING_COHORT_PROB_FIELD: dict[str, str] = {
+    "p_failure_10":  "prob_failures_10",
+    "p_30_plus":     "prob_30_plus",
+    "p_50_plus":     "prob_50_plus",
+    "p_100_plus":    "prob_100_plus",
+    "p_50_given_30": "prob_50_given_30",
+    "p_70_given_50": "prob_70_given_50",
+}
+
+
+def _enrich_milestones_with_cohort(milestones: dict, cohort: dict) -> None:
+    """Mutate each ProbRecord in `milestones` to attach cohort baselines.
+
+    Skips chips not in `_BATTING_PROB_DIRECTIONS` (e.g. p_25_plus, which
+    is server-emitted but not chip-rendered today). Under cliff, every
+    cohort prob is None and `enrich_prob_record` writes nulls — the
+    chip caption renders "vs — (below sample)" in that case.
+
+    spec-prob-baselines.md §4.2.
+    """
+    cohort_info = cohort.get("cohort") or {}
+    sample_size = cohort_info.get("n_innings_total")
+    for chip_key, direction in _BATTING_PROB_DIRECTIONS.items():
+        pr = milestones.get(chip_key)
+        if not pr:
+            continue
+        cohort_field = _BATTING_COHORT_PROB_FIELD[chip_key]
+        cohort_envelope = cohort.get(cohort_field) or {}
+        scope_avg = cohort_envelope.get("scope_avg")
+        enrich_prob_record(pr, scope_avg, direction, sample_size)
 
 
 def _row_to_batting_record(r: dict) -> dict:

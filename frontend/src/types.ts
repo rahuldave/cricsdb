@@ -652,6 +652,13 @@ export interface BatterDistribution {
  * field across the distribution dossiers (bowler v1; batter retrofit
  * pending). `value`, `ci_low`, `ci_high` are null when denom == 0
  * (undefined ratio). Backend helper: api/wilson.py::prob_record.
+ *
+ * spec-prob-baselines.md §4.1 — `scope_avg` / `delta_pct` / `direction` /
+ * `sample_size` are the chip-cohort extension. Optional because not
+ * every prob endpoint has been wired through `enrich_prob_record`
+ * (batting milestones landed in PT1.B; bowling / fielding ladders
+ * follow in PT2-PT4). Null fields mean "below sample" — the caption
+ * renders as "vs — (below sample)".
  */
 export interface ProbRecord {
   value: number | null
@@ -659,6 +666,10 @@ export interface ProbRecord {
   denom: number
   ci_low: number | null
   ci_high: number | null
+  scope_avg?: number | null
+  delta_pct?: number | null
+  direction?: 'higher_better' | 'lower_better' | null
+  sample_size?: number | null
 }
 
 export interface BowlerInningsObservation {

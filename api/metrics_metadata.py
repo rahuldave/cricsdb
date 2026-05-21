@@ -132,6 +132,15 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     "bat_ducks_per_innings":      "lower_better",
     # spec-rate-vs-volume-audit.md §2.1 Group A — sibling rate to Runs.
     "bat_runs_per_innings":       "higher_better",
+    # PT1 of spec-prob-baselines.md — batting ProbChip cohort baselines.
+    # Direction mirrors the chip orientation: more 30+/50+/100+/conditional
+    # is better; more sub-10 failures is worse.
+    "bat_prob_failures_10": "lower_better",
+    "bat_prob_30_plus":     "higher_better",
+    "bat_prob_50_plus":     "higher_better",
+    "bat_prob_100_plus":    "higher_better",
+    "bat_prob_50_given_30": "higher_better",
+    "bat_prob_70_given_50": "higher_better",
 
     # ── bowling (per-player) ───────────────────────────────────────
     # `bowl_dot_pct` already defined above (team-side, higher_better,

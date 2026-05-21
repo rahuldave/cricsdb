@@ -51,3 +51,39 @@ def prob_record(num: int, denom: int) -> dict:
         "ci_low": round(lo, 4) if lo is not None else None,
         "ci_high": round(hi, 4) if hi is not None else None,
     }
+
+
+def enrich_prob_record(
+    pr: dict,
+    scope_avg: float | None,
+    direction: str | None,
+    sample_size: int | None = None,
+) -> dict:
+    """Mutate a `prob_record` in place to attach a cohort baseline.
+
+    Adds `scope_avg`, `delta_pct`, `direction`, `sample_size` — the
+    ProbChip cohort-baseline extension from spec-prob-baselines.md §4.1.
+
+    `direction` is the polarity literal ('higher_better' / 'lower_better'
+    / None) — the chip orientation, not a metrics-registry key, because
+    each prob chip's polarity is fixed (no per-chip METRIC_DIRECTIONS
+    lookup needed; see spec §6).
+
+    `delta_pct` matches `wrap_metric` semantics — signed (value - scope_avg)
+    / scope_avg × 100, rounded to 1 dp. Null when either side is null,
+    scope_avg is zero, or direction is None (no polarity → comparison
+    not meaningful, e.g. fielding P(=1)).
+    """
+    value = pr.get("value")
+    delta_pct: float | None = None
+    if (
+        value is not None
+        and scope_avg not in (None, 0)
+        and direction is not None
+    ):
+        delta_pct = round((value - scope_avg) / scope_avg * 100, 1)
+    pr["scope_avg"] = round(scope_avg, 4) if scope_avg is not None else None
+    pr["delta_pct"] = delta_pct
+    pr["direction"] = direction
+    pr["sample_size"] = sample_size
+    return pr

@@ -1739,6 +1739,8 @@ async def compute_players_batting_cohort(
                SUM(pssp.fifties)      AS fifties,
                SUM(pssp.hundreds)     AS hundreds,
                SUM(pssp.ducks)        AS ducks,
+               SUM(pssp.failures_10)  AS failures_10,
+               SUM(pssp.seventies)    AS seventies,
                COUNT(DISTINCT pssp.person_id) AS n_players
         FROM playerscopestatsposition pssp
         WHERE pssp.scope_key IN (
@@ -1788,6 +1790,18 @@ async def compute_players_batting_cohort(
                 "fifties_per_innings": None,
                 "hundreds_per_innings": None,
                 "ducks_per_innings": None,
+                # PT1 of spec-prob-baselines.md — per-bucket prob rates
+                # for the batting ProbChip cohort baselines. Simples
+                # divide milestone count by innings; conditionals divide
+                # the milestone count at the higher threshold by the
+                # count at the lower threshold (NOT cv-of-ratios — see
+                # spec §4.3).
+                "prob_failures_10":  None,
+                "prob_30_plus":      None,
+                "prob_50_plus":      None,
+                "prob_100_plus":     None,
+                "prob_50_given_30":  None,
+                "prob_70_given_50":  None,
             })
             continue
         innings = r["innings"] or 0
@@ -1802,6 +1816,14 @@ async def compute_players_batting_cohort(
         fifties = r["fifties"] or 0
         hundreds = r["hundreds"] or 0
         ducks = r["ducks"] or 0
+        failures_10 = r["failures_10"] or 0
+        seventies = r["seventies"] or 0
+        # PT1 of spec-prob-baselines.md — derived milestone counts for
+        # the prob simples + conditionals. `count_50` and `count_30` are
+        # the conditional denominators ("innings reaching ≥X").
+        count_50 = fifties + hundreds
+        count_30 = thirties + fifties + hundreds
+        count_70 = seventies + hundreds
         n_p = r["n_players"] or 0
         by_position.append({
             "bucket": b, "label": batting_bucket_label(b),
@@ -1831,6 +1853,17 @@ async def compute_players_batting_cohort(
             "fifties_per_innings":    (fifties / innings)    if innings else None,
             "hundreds_per_innings":   (hundreds / innings)   if innings else None,
             "ducks_per_innings":      (ducks / innings)      if innings else None,
+            # PT1 of spec-prob-baselines.md — per-bucket prob rates.
+            # Simples convex-combine cleanly. Conditionals get their
+            # ratio computed AT the bucket grain (NOT as the ratio of
+            # two convex-combines — see spec §4.3); under cliff buckets
+            # the per-bucket prob is None and convex_combine skips it.
+            "prob_failures_10": (failures_10 / innings) if innings else None,
+            "prob_30_plus":     (count_30 / innings)    if innings else None,
+            "prob_50_plus":     (count_50 / innings)    if innings else None,
+            "prob_100_plus":    (hundreds / innings)    if innings else None,
+            "prob_50_given_30": (count_50 / count_30)   if count_30 else None,
+            "prob_70_given_50": (count_70 / count_50)   if count_50 else None,
         })
 
     # Strict-cliff gate.
@@ -1872,6 +1905,14 @@ async def compute_players_batting_cohort(
             "hundreds_per_innings":   wrap_metric(None, None, "bat_hundreds_per_innings",   sample_size=n_innings_total),
             "ducks_per_innings":      wrap_metric(None, None, "bat_ducks_per_innings",      sample_size=n_innings_total),
             "runs_per_innings":       wrap_metric(None, None, "bat_runs_per_innings",       sample_size=n_innings_total),
+            # PT1 of spec-prob-baselines.md — chip probability cohort
+            # baselines null out under cliff alongside the rates.
+            "prob_failures_10": wrap_metric(None, None, "bat_prob_failures_10", sample_size=n_innings_total),
+            "prob_30_plus":     wrap_metric(None, None, "bat_prob_30_plus",     sample_size=n_innings_total),
+            "prob_50_plus":     wrap_metric(None, None, "bat_prob_50_plus",     sample_size=n_innings_total),
+            "prob_100_plus":    wrap_metric(None, None, "bat_prob_100_plus",    sample_size=n_innings_total),
+            "prob_50_given_30": wrap_metric(None, None, "bat_prob_50_given_30", sample_size=n_innings_total),
+            "prob_70_given_50": wrap_metric(None, None, "bat_prob_70_given_50", sample_size=n_innings_total),
             "by_position": by_position,
         }
 
@@ -1898,6 +1939,16 @@ async def compute_players_batting_cohort(
     cc_fifties_pi    = cv("fifties_per_innings")
     cc_hundreds_pi   = cv("hundreds_per_innings")
     cc_ducks_pi      = cv("ducks_per_innings")
+    # PT1 of spec-prob-baselines.md — convex-combine the per-bucket
+    # prob rates. Conditionals use per-bucket (num/denom) so the cv is
+    # the weighted average of bucket conditionals (NOT the ratio of two
+    # cv'd marginals); see spec §4.3.
+    cc_prob_failures_10 = cv("prob_failures_10")
+    cc_prob_30_plus     = cv("prob_30_plus")
+    cc_prob_50_plus     = cv("prob_50_plus")
+    cc_prob_100_plus    = cv("prob_100_plus")
+    cc_prob_50_given_30 = cv("prob_50_given_30")
+    cc_prob_70_given_50 = cv("prob_70_given_50")
 
     def _r(v: Optional[float], ndigits: int) -> Optional[float]:
         return round(v, ndigits) if v is not None else None
@@ -1924,6 +1975,15 @@ async def compute_players_batting_cohort(
         "hundreds_per_innings":   wrap_metric(_r(cc_hundreds_pi, 3),   _r(cc_hundreds_pi, 3),   "bat_hundreds_per_innings",   sample_size=n_innings_total),
         "ducks_per_innings":      wrap_metric(_r(cc_ducks_pi, 3),      _r(cc_ducks_pi, 3),      "bat_ducks_per_innings",      sample_size=n_innings_total),
         "runs_per_innings":       wrap_metric(_r(cc_runs_pi, 2),       _r(cc_runs_pi, 2),       "bat_runs_per_innings",       sample_size=n_innings_total),
+        # PT1 of spec-prob-baselines.md — chip probability cohort
+        # baselines. 4-dp matches the ProbRecord shape (existing `value`
+        # field is also 4-dp via wilson.prob_record).
+        "prob_failures_10": wrap_metric(_r(cc_prob_failures_10, 4), _r(cc_prob_failures_10, 4), "bat_prob_failures_10", sample_size=n_innings_total),
+        "prob_30_plus":     wrap_metric(_r(cc_prob_30_plus, 4),     _r(cc_prob_30_plus, 4),     "bat_prob_30_plus",     sample_size=n_innings_total),
+        "prob_50_plus":     wrap_metric(_r(cc_prob_50_plus, 4),     _r(cc_prob_50_plus, 4),     "bat_prob_50_plus",     sample_size=n_innings_total),
+        "prob_100_plus":    wrap_metric(_r(cc_prob_100_plus, 4),    _r(cc_prob_100_plus, 4),    "bat_prob_100_plus",    sample_size=n_innings_total),
+        "prob_50_given_30": wrap_metric(_r(cc_prob_50_given_30, 4), _r(cc_prob_50_given_30, 4), "bat_prob_50_given_30", sample_size=n_innings_total),
+        "prob_70_given_50": wrap_metric(_r(cc_prob_70_given_50, 4), _r(cc_prob_70_given_50, 4), "bat_prob_70_given_50", sample_size=n_innings_total),
         "by_position": by_position,
     }
 
