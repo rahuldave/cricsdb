@@ -449,8 +449,17 @@ export default function Fielding() {
                         const baseRow = phaseBaseline.find(
                           b => b.phase.toLowerCase() === p.phase.toLowerCase(),
                         )
-                        const matches = summary.matches.value ?? 0
-                        const playerTotalPerMatch = matches > 0 ? p.total / matches : null
+                        // spec-rate-vs-volume-audit F5: drop the per-
+                        // match chip from the Total volume row; add a
+                        // sibling Total/Match row that bolds the rate
+                        // and carries the chip vs cohort
+                        // dismissals_per_match (matched scope, per phase).
+                        // The per-match value comes from the B4c
+                        // backend addition; fallback to derived if not
+                        // yet present.
+                        const matches = p.matches ?? (summary.matches.value ?? 0)
+                        const playerTotalPerMatch = p.total_per_match
+                          ?? (matches > 0 ? p.total / matches : null)
                         return (
                           <div key={p.phase} className="wisden-phaseblock">
                             <h3>{p.phase}</h3>
@@ -461,8 +470,10 @@ export default function Fielding() {
                               <div><span className="lbl">Run Outs</span></div><div className="num">{p.run_outs}</div>
                               <div><span className="lbl">C&B</span></div><div className="num">{p.caught_and_bowled}</div>
                               <div><span className="lbl">Total</span></div>
+                              <div className="num">{p.total}</div>
+                              <div><span className="lbl">Total/Match</span></div>
                               <div className="num">
-                                {p.total}
+                                {playerTotalPerMatch != null ? playerTotalPerMatch.toFixed(3) : '-'}
                                 <BaselineChip v={playerTotalPerMatch}
                                   base={baseRow?.dismissals_per_match}
                                   dir="higher_better" fmt={3} tooltip={phaseTT} />

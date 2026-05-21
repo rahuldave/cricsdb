@@ -213,8 +213,9 @@ sleep 3
 
 cohort_url="$API/api/v1/scope/averages/players/fielding/by-phase?person_id=$KOHLI&$SCOPE"
 
-# Fielding By Phase chip is on Total only (spec §4.4); Catches /
-# Stumpings / Run Outs stay as volume tiles.
+# spec-rate-vs-volume-audit F5: chip moved from the Total (volume)
+# row to a sibling Total/Match (rate) row. Each phase block STILL
+# carries exactly one chip — just on the new row.
 for phase in powerplay middle death; do
   block=$(phase_block_text "$phase")
   if [ -z "$block" ]; then
@@ -223,16 +224,23 @@ for phase in powerplay middle death; do
   fi
   vs_base_count=$(echo "$block" | grep -o "vs base " | wc -l | tr -d ' ')
   if [ "$vs_base_count" -eq 1 ]; then
-    ok "/fielding By Phase: $phase has exactly 1 'vs base' chip (Total)"
+    ok "/fielding By Phase: $phase has exactly 1 'vs base' chip (Total/Match)"
   else
     bad "/fielding By Phase: $phase has $vs_base_count chips, expected exactly 1"
+  fi
+
+  # F5 — block must contain a "Total/Match" label (new row).
+  if echo "$block" | grep -q "Total/Match"; then
+    ok "/fielding By Phase: $phase block has Total/Match row"
+  else
+    bad "/fielding By Phase: $phase block missing Total/Match row"
   fi
 
   api_dpm=$(cohort_phase_metric_fielding "$cohort_url" "$phase" "dismissals_per_match")
   # The cohort API rounds to 4 decimals; the UI re-formats to 3 via
   # MetricDelta's fmt=3. Truncate the API value to 3 decimals.
   api_dpm_3=$(printf '%.3f' "$api_dpm")
-  assert_contains "/fielding By Phase: $phase Total chip cites API base $api_dpm_3" "vs base $api_dpm_3" "$block"
+  assert_contains "/fielding By Phase: $phase Total/Match chip cites API base $api_dpm_3" "vs base $api_dpm_3" "$block"
 done
 
 # ───────────────────────────────────────────────────────────────────

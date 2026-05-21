@@ -1483,6 +1483,14 @@ export interface FieldingPhase {
   run_outs: number
   caught_and_bowled: number
   total: number
+  // spec-rate-vs-volume-audit §2.1 Group D3: per-match rates plus
+  // the matches scalar denominator (constant across phases by design
+  // — fielding is match-grain, not phase-grain).
+  matches?: number
+  total_per_match?: number | null
+  catches_per_match?: number | null
+  stumpings_per_match?: number | null
+  run_outs_per_match?: number | null
 }
 
 export interface FieldingVictim {
