@@ -69,6 +69,22 @@ EXPECTED_DIRECTIONS: dict[str, str] = {
     "p_5_given_2": "higher_better",
 }
 
+# PT3 of spec-prob-baselines.md — economy + runs-conceded direction
+# tables for the secondary milestone blocks on /bowlers/.../distribution.
+EXPECTED_ECON_DIRECTIONS: dict[str, str] = {
+    "p_econ_leq_6":  "higher_better",
+    "p_econ_leq_7":  "higher_better",
+    "p_econ_geq_9":  "lower_better",
+    "p_econ_geq_10": "lower_better",
+}
+
+EXPECTED_RUNS_DIRECTIONS: dict[str, str] = {
+    "p_leq_15": "higher_better",
+    "p_leq_25": "higher_better",
+    "p_geq_40": "lower_better",
+    "p_geq_50": "lower_better",
+}
+
 
 def check(label: str, ok: bool, detail: str = "") -> tuple[bool, str]:
     status = "PASS" if ok else "FAIL"
@@ -237,6 +253,66 @@ def main() -> int:
         _, line = check(f"{chip} sample_size == SQL SUM(legal_balls)", ok,
                         f"sample_size={ss}, sql={sql_balls}")
         print(line); all_passed &= ok
+
+    # ─── Test 6b: economy + runs-conceded blocks ──────────────────
+    print("\n  6b. Economy + runs_conceded chips carry cohort fields:")
+    econ_ms = resp["lifetime"]["economy"]["milestones"]
+    runs_ms = resp["lifetime"]["runs_conceded"]["milestones"]
+    for chip, expected_dir in EXPECTED_ECON_DIRECTIONS.items():
+        pr = econ_ms.get(chip, {})
+        ok = (
+            "scope_avg" in pr and "delta_pct" in pr
+            and pr.get("direction") == expected_dir
+        )
+        _, line = check(
+            f"economy {chip} carries scope_avg + direction={expected_dir}",
+            ok,
+        )
+        print(line); all_passed &= ok
+    for chip, expected_dir in EXPECTED_RUNS_DIRECTIONS.items():
+        pr = runs_ms.get(chip, {})
+        ok = (
+            "scope_avg" in pr and "delta_pct" in pr
+            and pr.get("direction") == expected_dir
+        )
+        _, line = check(
+            f"runs_conceded {chip} carries scope_avg + direction={expected_dir}",
+            ok,
+        )
+        print(line); all_passed &= ok
+
+    # ─── Test 6c: cohort p_econ_leq_6 SQL-anchored ────────────────
+    # cohort.scope_avg.p_econ_leq_6 = Σ mix[o] × innings_econ_leq_6 /
+    # innings_qualifying — direct cv on rates gated by ≥12-ball spells.
+    print("\n  6c. Cohort p_econ_leq_6 matches manual cv:")
+    cohort_econ_rows = conn.execute("""
+        SELECT psso.over_number AS o,
+               SUM(psso.innings_qualifying) AS qual,
+               SUM(psso.innings_econ_leq_6) AS e6
+        FROM playerscopestatsover psso
+        WHERE psso.scope_key IN (
+          SELECT scope_key FROM playerscopestats pss
+          WHERE pss.tournament = 'Indian Premier League'
+        )
+        GROUP BY psso.over_number
+    """).fetchall()
+    cohort_p_e6 = {
+        r["o"]: (r["e6"] / r["qual"]) if r["qual"] else None
+        for r in cohort_econ_rows
+    }
+    expected_p_e6 = sum(
+        bumrah_mix.get(o, 0) * cohort_p_e6[o]
+        for o in cohort_p_e6
+        if cohort_p_e6[o] is not None and bumrah_mix.get(o, 0) > 0
+    )
+    actual_p_e6 = econ_ms["p_econ_leq_6"]["scope_avg"]
+    ok = actual_p_e6 is not None and abs(actual_p_e6 - round(expected_p_e6, 4)) < 1e-3
+    _, line = check(
+        "p_econ_leq_6 scope_avg matches manual cv",
+        ok,
+        f"expected≈{expected_p_e6:.4f}, actual={actual_p_e6}",
+    )
+    print(line); all_passed &= ok
 
     # ─── Test 7: form windows inherit lifetime cohort ──────────────
     print("\n  7. Form windows inherit lifetime cohort scope_avg:")
