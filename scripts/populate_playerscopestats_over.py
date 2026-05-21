@@ -58,6 +58,7 @@ class _Acc:
     __slots__ = (
         "runs_conceded", "legal_balls", "wickets", "dots", "boundaries",
         "maidens",
+        "innings_set", "four_wicket_hauls",
     )
 
     def __init__(self):
@@ -70,6 +71,16 @@ class _Acc:
         # scope. Filled by the post-pass that walks per (innings, over,
         # bowler) tuples and checks legal_balls == 6 AND runs == 0.
         self.maidens = 0
+        # Tier 2 of spec-apples-to-apples-baselines.md.
+        # innings_set — distinct innings where the bowler delivered ≥1
+        # legal ball at this over_number. Used as the per-bucket
+        # denominator for over-weighted per-innings cohort rates
+        # (replaces the prior `wickets_per_over × 4` heuristic).
+        self.innings_set: set[int] = set()
+        # four_wicket_hauls — 4-fers attributed to this over_number by
+        # the over in which the bowler's 4th wicket fell in that innings.
+        # See §7 of the spec for the attribution-choice discussion.
+        self.four_wicket_hauls = 0
 
     def to_row(self, person_id: str, scope_key: str, over_number: int) -> dict:
         return {
@@ -82,6 +93,8 @@ class _Acc:
             "dots": self.dots,
             "boundaries": self.boundaries,
             "maidens": self.maidens,
+            "innings_bowled": len(self.innings_set),
+            "four_wicket_hauls": self.four_wicket_hauls,
         }
 
 
@@ -109,14 +122,17 @@ async def _ensure_tables(db, incremental: bool = False):
     # Idempotent column migration for maidens (Q6 of
     # spec-player-baseline-parity.md). New DBs already have it via the
     # model; pre-existing DBs get it appended.
-    try:
-        await db.q(
-            "ALTER TABLE playerscopestatsover ADD COLUMN maidens "
-            "INTEGER NOT NULL DEFAULT 0"
-        )
-    except Exception as e:
-        if "duplicate column" not in str(e).lower():
-            raise
+    # innings_bowled + four_wicket_hauls added by Tier 2 of
+    # spec-apples-to-apples-baselines.md.
+    for col in ("maidens", "innings_bowled", "four_wicket_hauls"):
+        try:
+            await db.q(
+                f"ALTER TABLE playerscopestatsover ADD COLUMN {col} "
+                f"INTEGER NOT NULL DEFAULT 0"
+            )
+        except Exception as e:
+            if "duplicate column" not in str(e).lower():
+                raise
     return table
 
 
@@ -175,6 +191,17 @@ async def _aggregate_matches(
     # pass, drained into _Acc.maidens at the end.
     over_tally: dict[tuple[int, int, str], dict] = {}
 
+    # Tier 2 of spec-apples-to-apples-baselines.md.
+    # Per (innings, bowler) running wicket count + per-(innings, bowler,
+    # over) attribution slot — when the bowler's wicket count crosses 4,
+    # the over_bucket is recorded as the 4-fer's attribution bucket.
+    # innings_wickets : (iid, bow) -> count
+    # haul_attributed : set of (iid, bow) already credited (one per
+    #                   bowler-innings, in the over the 4th wicket fell).
+    innings_wickets: dict[tuple[int, str], int] = {}
+    haul_attributed: set[tuple[int, str]] = set()
+    haul_credits: list[tuple[str, str, int]] = []  # (bow, scope_key, over_bucket)
+
     def get_acc(person_id: str, scope_key: str, over_number: int) -> _Acc:
         key = (person_id, scope_key, over_number)
         acc = accs.get(key)
@@ -210,6 +237,10 @@ async def _aggregate_matches(
             legal = (d["extras_wides"] == 0 and d["extras_noballs"] == 0)
             if legal:
                 acc.legal_balls += 1
+                # Tier 2: distinct innings where this bowler delivered
+                # ≥1 legal ball at this over_number — per-bucket
+                # innings denominator.
+                acc.innings_set.add(iid)
             rb = d["runs_batter"]
             if rb == 0 and d["runs_total"] == 0:
                 acc.dots += 1
@@ -228,25 +259,41 @@ async def _aggregate_matches(
                 tally["legal"] += 1
             tally["runs"] += d["runs_total"]
 
-    # Pass 2: wickets — credit the bowler's over bucket.
+    # Pass 2: wickets — credit the bowler's over bucket. Walk wickets
+    # in INNINGS / OVER order so the running per-bowler-innings count
+    # can attribute each 4-fer to the over its 4th wicket fell in.
     for start in range(0, len(innings_ids), chunk):
         sub = innings_ids[start:start + chunk]
         sub_list = ",".join(str(i) for i in sub)
         w_rows = await db.q(f"""
-            SELECT w.kind, d.bowler_id, d.over_number, d.innings_id
+            SELECT w.kind, d.bowler_id, d.over_number, d.innings_id, d.delivery_index, d.id AS did
             FROM wicket w
             JOIN delivery d ON d.id = w.delivery_id
             WHERE d.innings_id IN ({sub_list})
+            ORDER BY d.innings_id, d.over_number, d.delivery_index, d.id
         """)
         for w in w_rows:
             bow = w["bowler_id"]
             kind = w["kind"]
             if bow is None or kind in BOWLER_WICKET_EXCLUDED:
                 continue
-            mid = innings_match[w["innings_id"]]
+            iid = w["innings_id"]
+            mid = innings_match[iid]
             scope_key = match_meta[mid]["scope_key"]
             over_bucket = w["over_number"] + 1
             get_acc(bow, scope_key, over_bucket).wickets += 1
+            # Tier 2: 4-fer attribution. Increment the running per-
+            # (innings, bowler) wicket count; on crossing 4 (and only
+            # once per bowler-innings), attribute to the over bucket.
+            ikey = (iid, bow)
+            innings_wickets[ikey] = innings_wickets.get(ikey, 0) + 1
+            if innings_wickets[ikey] == 4 and ikey not in haul_attributed:
+                haul_attributed.add(ikey)
+                haul_credits.append((bow, scope_key, over_bucket))
+
+    # Drain 4-fer attributions into the per-bucket _Acc.
+    for bow, scope_key, over_bucket in haul_credits:
+        get_acc(bow, scope_key, over_bucket).four_wicket_hauls += 1
 
     # Maiden detection — credit a maiden when one bowler bowled all 6
     # legal balls of an over conceding 0 runs (off the bat + extras).

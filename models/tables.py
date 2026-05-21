@@ -282,6 +282,18 @@ class PlayerScopeStatsOver:
     # `spec-player-baseline-parity.md` to back maidens_per_innings cohort
     # baselines.
     maidens: int = 0
+    # Tier 2 of spec-apples-to-apples-baselines.md.
+    # innings_bowled — distinct innings where this person delivered ≥1
+    # legal ball at this over_number in this scope. Per-bucket
+    # denominator for the over-weighted per-innings cohort rates
+    # (wickets/inn, maidens/inn, four_wicket_hauls/inn) — replaces
+    # the prior `wickets_per_over × 4` heuristic.
+    innings_bowled: int = 0
+    # four_wicket_hauls — count of 4-fers attributed to this over_number
+    # by the over in which the bowler's 4th wicket fell in that innings.
+    # Lets the cohort 4-fers/inn rate be convex-combined over the
+    # bowler's over-mix.
+    four_wicket_hauls: int = 0
 
 
 class PlayerScopeStatsFieldingPosition:
