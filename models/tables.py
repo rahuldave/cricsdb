@@ -222,6 +222,14 @@ class PlayerScopeStats:
     # field to `wickets`; backs the per-innings four-wicket-haul rate
     # added in spec-rate-vs-volume-audit.md §2.1 Group A.
     four_wicket_hauls: int = 0
+    # Distinct innings the player bowled in (delivered ≥1 legal ball).
+    # Per-innings bowling denominator analogous to innings_batted on the
+    # batting side. Tier 2 of spec-apples-to-apples-baselines.md surfaces
+    # this on the cohort path so the over-mix-weighted per-innings rates
+    # (wickets_per_innings etc.) can be scaled from the per-attendance
+    # rates the per-over child table yields by the average
+    # attendances-per-unique-innings factor.
+    bowling_innings: int = 0
     # fielding
     catches: int = 0
     runouts: int = 0

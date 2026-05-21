@@ -107,7 +107,9 @@ async def _ensure_tables(db, incremental: bool = False):
     # this populate version get the new columns appended; new DBs
     # created by `db.create` above already have them in the schema.
     # `four_wicket_hauls` added by spec-rate-vs-volume-audit.md §2.1.
-    for col in ("thirties", "fifties", "hundreds", "ducks", "four_wicket_hauls"):
+    # `bowling_innings` added by Tier 2 of spec-apples-to-apples-baselines.md.
+    for col in ("thirties", "fifties", "hundreds", "ducks",
+                "four_wicket_hauls", "bowling_innings"):
         try:
             await db.q(
                 f"ALTER TABLE playerscopestats ADD COLUMN {col} "
@@ -141,6 +143,7 @@ class _Acc:
         "catches_as_keeper", "matches_as_keeper_set",
         "thirties", "fifties", "hundreds", "ducks",
         "four_wicket_hauls",
+        "bowling_innings_set",
     )
 
     def __init__(self, tournament, season, gender, team_type):
@@ -181,6 +184,12 @@ class _Acc:
         # Bowler innings with ≥4 wickets — bucketed by the post-aggregation
         # pass that walks (bowler, iid) tallies from the wickets pass.
         self.four_wicket_hauls = 0
+        # Tier 2 of spec-apples-to-apples-baselines.md — distinct innings
+        # this bowler delivered ≥1 legal ball in. Per-innings bowling
+        # denominator analogous to innings_batted_set for batting; lets
+        # the cohort path scale per-bucket-attendance rates to per-
+        # innings via the cohort-wide avg_attendances_per_innings factor.
+        self.bowling_innings_set: set[int] = set()
 
     def to_row(self, person_id: str, scope_key: str) -> dict:
         if self.position_innings > 0:
@@ -222,6 +231,7 @@ class _Acc:
             "hundreds": self.hundreds,
             "ducks": self.ducks,
             "four_wicket_hauls": self.four_wicket_hauls,
+            "bowling_innings": len(self.bowling_innings_set),
         }
 
 
@@ -409,6 +419,10 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
                     acc = get_acc(bow, mid)
                     if legal:
                         acc.balls_bowled += 1
+                        # Tier 2: distinct innings the bowler delivered
+                        # ≥1 legal ball in — used as the per-innings
+                        # denominator on the cohort path.
+                        acc.bowling_innings_set.add(iid)
                         if phase == "pp":
                             acc.powerplay_legal += 1
                         elif phase == "mid":
