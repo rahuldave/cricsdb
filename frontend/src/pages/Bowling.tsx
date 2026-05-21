@@ -259,10 +259,14 @@ export default function Bowling() {
               : undefined
             return (
               <>
-          <div className="wisden-statrow cols-5">
+          <div className="wisden-statrow cols-6">
             <StatCard label="Matches" value={summary.matches.value ?? 0} />
             <StatCard label="Innings" value={summary.innings.value ?? 0} />
             <StatCard label="Wickets" value={summary.wickets.value ?? 0} />
+            <StatCard label="Wkts/Inn" value={fmt(summary.wickets_per_innings.value, 2)}
+              subtitle={summary.wickets_per_innings.scope_avg != null
+                ? <MetricDelta env={summary.wickets_per_innings} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
+                : undefined} />
             <StatCard label="Average" value={fmt(summary.average.value)}
               subtitle={summary.average.scope_avg != null
                 ? <MetricDelta env={summary.average} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
@@ -295,6 +299,22 @@ export default function Bowling() {
               subtitle={summary.balls_per_boundary.scope_avg != null
                 ? <MetricDelta env={summary.balls_per_boundary} withScopeAvg label="base" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
+          </div>
+          {/* spec-rate-vs-volume-audit F6: row 3 — Maiden Overs and
+              4-fers (volume, bare) paired with their per-innings rate
+              siblings carrying the cohort chip. */}
+          <div className="wisden-statrow cols-5">
+            <StatCard label="Maiden Overs" value={summary.maiden_overs.value ?? 0} />
+            <StatCard label="Maidens/Inn"  value={fmt(summary.maidens_per_innings.value, 3)}
+              subtitle={summary.maidens_per_innings.scope_avg != null
+                ? <MetricDelta env={summary.maidens_per_innings} withScopeAvg label="base" fmt={3} scopeAvgTooltip={cohortTT} />
+                : undefined} />
+            <StatCard label="4-fers"       value={summary.four_wicket_hauls.value ?? 0} />
+            <StatCard label="4-fers/Inn"   value={fmt(summary.four_wicket_hauls_per_innings.value, 4)}
+              subtitle={summary.four_wicket_hauls_per_innings.scope_avg != null
+                ? <MetricDelta env={summary.four_wicket_hauls_per_innings} withScopeAvg label="base" fmt={4} scopeAvgTooltip={cohortTT} />
+                : undefined} />
+            <div />
           </div>
               </>
             )

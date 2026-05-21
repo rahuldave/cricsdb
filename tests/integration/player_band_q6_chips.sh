@@ -282,6 +282,42 @@ else
   bad "Kohli /fielding: Stumpings/Match tile shouldn't render when stumpings=0"
 fi
 
+# ───────────────────────────────────────────────────────────────────
+# Test 5 — Bumrah /bowling deep-dive: F6 new tiles
+# ───────────────────────────────────────────────────────────────────
+
+echo
+echo "=== Bumrah /bowling — Deep-dive new tiles (F6) ==="
+ab open "$BASE/bowling?player=$BUMRAH&$SCOPE_URL"
+sleep 3
+snapshot_tiles
+bowl_url="$API/api/v1/bowlers/$BUMRAH/summary?$SCOPE"
+
+# New tiles must exist.
+for label in "Wkts/Inn" "Maiden Overs" "Maidens/Inn" "4-fers" "4-fers/Inn"; do
+  assert_tile_present "Bumrah /bowling: $label tile exists" "$label"
+done
+
+# Volume tiles (Wickets, Maiden Overs, 4-fers) MUST NOT carry chips.
+for label in "Wickets" "Maiden Overs" "4-fers"; do
+  sub=$(tile_sub "$label")
+  assert_not_contains "Bumrah /bowling: $label tile MUST NOT carry chip" "vs base" "$sub"
+done
+
+# Rate tiles MUST carry chips citing the matching envelope scope_avg.
+for combo in \
+    "Wkts/Inn:wickets_per_innings:%.2f" \
+    "Maidens/Inn:maidens_per_innings:%.3f" \
+    "4-fers/Inn:four_wicket_hauls_per_innings:%.4f"; do
+  label=$(echo "$combo" | cut -d: -f1)
+  field=$(echo "$combo" | cut -d: -f2)
+  fmt=$(echo "$combo" | cut -d: -f3)
+  api_v=$(summary_scope_avg "$bowl_url" "$field")
+  api_f=$(printf "$fmt" "$api_v")
+  sub=$(tile_sub "$label")
+  assert_contains "Bumrah /bowling: $label chip cites base $api_f" "vs base $api_f" "$sub"
+done
+
 echo
 echo "─────────────────────────────────────────"
 echo "Results: $PASS passed, $FAIL failed"
