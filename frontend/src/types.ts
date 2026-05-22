@@ -1223,6 +1223,13 @@ export interface BowlingOverDistributionEntry {
   wickets: number
   dots: number
   boundaries: number
+  // spec-mix-and-performance-charts.md §3.2 — per-bucket cohort
+  // context for the By Over tab's Mix histogram + Performance-vs-
+  // cohort chart. cohort_balls_share sums to 1.0 across the 20
+  // entries. Null on buckets the cohort hasn't touched.
+  cohort_balls_share: number | null
+  cohort_economy: number | null
+  cohort_wickets_per_innings: number | null
 }
 
 export interface BowlingCohortMeta {
