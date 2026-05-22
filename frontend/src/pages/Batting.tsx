@@ -40,6 +40,7 @@ import type {
   ScopePlayerBattingSeason, ScopePlayerBattingPhase,
 } from '../types'
 import BatterDistributionPanel from '../components/batting/BatterDistributionPanel'
+import PositionDistributionTab from '../components/batting/PositionDistributionTab'
 import BatterRecordsPanel from '../components/players/BatterRecordsPanel'
 import { SectionHeader } from '../components/ChartHeader'
 
@@ -50,7 +51,7 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
   return null
 }
 
-const tabs = ['By Season', 'By Over', 'By Phase', 'vs Bowlers', 'Dismissals', 'Inter-Wicket', 'Innings List', 'Records'] as const
+const tabs = ['By Season', 'By Position', 'By Over', 'By Phase', 'vs Bowlers', 'Dismissals', 'Inter-Wicket', 'Innings List', 'Records'] as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
 export default function Batting() {
@@ -424,6 +425,22 @@ export default function Batting() {
                       </p>
                     )}
                   </>
+                )}
+              </>
+            )}
+
+            {activeTab === 'By Position' && (
+              <>
+                {/* spec-mix-and-performance-charts.md §M2 — Mix
+                    histogram + single-panel Strike Rate vs cohort.
+                    Reads summary.position_distribution which already
+                    carries per-bucket cohort fields (single payload,
+                    no extra fetch). 10 buckets: Opener (positions 1+2
+                    merged per derive_positions) + #3..#11. */}
+                {summary.position_distribution && summary.position_distribution.length > 0 ? (
+                  <PositionDistributionTab positionDistribution={summary.position_distribution} />
+                ) : (
+                  <p className="wisden-tab-help">No position data in this scope.</p>
                 )}
               </>
             )}
