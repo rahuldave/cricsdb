@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom'
 import type { FilterParams } from '../types'
 import { abbreviateScope } from './scopeLinks'
 import DormancyBadge from './DormancyBadge'
+import { useDiscipline } from '../hooks/useDiscipline'
 
 
 /** Build a /players?player=X URL that preserves every active filter
@@ -88,8 +89,8 @@ interface Props {
    *  inline small-caps oxblood "scope" marker — visually links the
    *  comparison phrase back to the SCOPE line above. */
   comparison?: { label: string; text: string } | null
-  /** When set, render a small italic "→ all disciplines" link next
-   *  to the title that navigates to /players?player=X at the current
+  /** When set, render a small italic "{Discipline} (all)" tag next to
+   *  the title where "all" links to /players?player=X at the current
    *  filter scope. Set on Batting / Bowling / Fielding when a player
    *  is selected; /players itself never sets it (it IS the
    *  destination). User-asked 2026-05-22. */
@@ -98,10 +99,14 @@ interface Props {
 }
 
 export default function ScopedPageHeader({ filters, omit, hideAbbrev, comparison, playerId, children }: Props) {
+  const discipline = useDiscipline()
   const scoped: FilterParams = omit && omit.length > 0
     ? { ...filters, ...Object.fromEntries(omit.map(k => [k, undefined])) }
     : filters
   const abbrev = hideAbbrev ? '' : abbreviateScope(scoped)
+  const disciplineLabel = discipline
+    ? discipline.charAt(0).toUpperCase() + discipline.slice(1)
+    : null
   return (
     <div style={{
       display: 'flex',
@@ -119,12 +124,14 @@ export default function ScopedPageHeader({ filters, omit, hideAbbrev, comparison
       }}>
         {children}
         <DormancyBadge />
-        {playerId && (
-          <Link to={allDisciplinesHref(playerId, filters)} className="comp-link" style={{
+        {playerId && disciplineLabel && (
+          <span style={{
             fontSize: '0.55em',
             fontStyle: 'italic',
             fontWeight: 'normal',
-          }}>→ all disciplines</Link>
+          }}>
+            {disciplineLabel} (<Link to={allDisciplinesHref(playerId, filters)} className="comp-link">all</Link>)
+          </span>
         )}
       </h2>
       {abbrev && (
