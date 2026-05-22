@@ -13,13 +13,13 @@
 #     A2 — 10 mix bars + 10 bucket labels.
 #     A3 — 10 forest-green cohort ticks.
 #     A4 — Player mix shares sum to ~100%.
-#     A5 — Legend reads "outfielder cohort at scope" (is_keeper=0).
+#     A5 — Cohort explainer mentions "outfielder" (is_keeper=0).
 #     A6 — Cohort tick at opener matches API to the digit.
 #     A7 — Player catches/match at opener matches API c/m =
 #          catches[0] / matches.
 #
 #   PART B — Dhoni @ IPL all-time (KEEPER partition contrast):
-#     B8 — Legend reads "keeper cohort at scope" (is_keeper=1).
+#     B8 — Cohort explainer mentions "keeper" (is_keeper=1).
 #     B9 — Keeper-cohort opener tick > outfielder-cohort opener
 #          tick from PART A (keepers catch openers more often).
 #    B10 — Tooltip includes stumpings (only keepers stump).
@@ -103,9 +103,9 @@ assert_true "A4 · player mix shares sum to ~100%" "$mix_sum_ok"
 
 legend_outfielder=$(ab_eval "(() => {
   const t = document.querySelector('.wisden-dismissed-position-distribution-tab .wisden-perf-cohort');
-  return String((t?.innerText || '').includes('outfielder cohort'));
+  return String((t?.innerText || '').includes('every outfielder'));
 })()")
-assert_true "A5 · legend reads 'outfielder cohort at scope'" "$legend_outfielder"
+assert_true "A5 · cohort explainer mentions 'every outfielder'" "$legend_outfielder"
 
 api_kohli_open_cohort=$(curl -sS "$API_BASE/api/v1/fielders/$KOHLI/summary?$IPL" \
   | python3 -c "import json,sys;d=json.load(sys.stdin);print(f\"{d['dismissal_position_distribution'][0]['cohort_catches_per_match']:.3f}\")")
@@ -137,9 +137,9 @@ sleep 2
 
 legend_keeper=$(ab_eval "(() => {
   const t = document.querySelector('.wisden-dismissed-position-distribution-tab .wisden-perf-cohort');
-  return String((t?.innerText || '').includes('keeper cohort'));
+  return String((t?.innerText || '').includes('every keeper'));
 })()")
-assert_true "B8 · legend reads 'keeper cohort at scope'" "$legend_keeper"
+assert_true "B8 · cohort explainer mentions 'every keeper'" "$legend_keeper"
 
 api_dhoni_open_cohort=$(curl -sS "$API_BASE/api/v1/fielders/$DHONI/summary?$IPL" \
   | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['dismissal_position_distribution'][0]['cohort_catches_per_match'])")
