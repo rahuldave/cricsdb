@@ -368,6 +368,12 @@ export interface BattingPositionDistributionEntry {
   fours: number
   sixes: number
   dots: number
+  // spec-mix-and-performance-charts.md §3.1 — per-bucket cohort
+  // context for the By Position tab's Mix histogram +
+  // Performance-vs-cohort chart. cohort_innings_share sums to 1.0
+  // across the 10 entries. Null on buckets the cohort hasn't touched.
+  cohort_innings_share: number | null
+  cohort_strike_rate: number | null
 }
 
 export interface BattingCohortMeta {
