@@ -40,6 +40,7 @@ import type {
   ScopePlayerFieldingSeason, ScopePlayerFieldingPhase,
 } from '../types'
 import FielderDistributionPanel from '../components/fielding/FielderDistributionPanel'
+import DismissedPositionDistributionTab from '../components/fielding/DismissedPositionDistributionTab'
 import FielderRecordsPanel from '../components/players/FielderRecordsPanel'
 import { SectionHeader } from '../components/ChartHeader'
 
@@ -51,7 +52,7 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
 
 
 // Tabs are filtered at render based on innings_kept (Keeping hidden when 0)
-const BASE_TABS = ['By Season', 'By Over', 'By Phase', 'Dismissal Types', 'Victims', 'Innings List', 'Records'] as const
+const BASE_TABS = ['By Season', 'By Dismissed Position', 'By Over', 'By Phase', 'Dismissal Types', 'Victims', 'Innings List', 'Records'] as const
 const KEEPING_TAB = 'Keeping' as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
@@ -417,6 +418,30 @@ export default function Fielding() {
                       </p>
                     )}
                   </>
+                )}
+              </>
+            )}
+
+            {activeTab === 'By Dismissed Position' && (
+              <>
+                {/* spec-mix-and-performance-charts.md §M3 — Mix
+                    histogram + single-panel catches/match vs cohort.
+                    Reads summary.dismissal_position_distribution
+                    which already carries per-bucket cohort fields
+                    (single payload, no extra fetch). Cohort partition
+                    is keeper-binary, automatic from summary.is_keeper.
+                    10 buckets: Opener (positions 1+2 merged) + #3..#11
+                    of the dismissed batter. */}
+                {summary.dismissal_position_distribution
+                 && summary.dismissal_position_distribution.length > 0
+                 && (summary.matches.value ?? 0) > 0 ? (
+                  <DismissedPositionDistributionTab
+                    dismissalPositionDistribution={summary.dismissal_position_distribution}
+                    isKeeper={summary.is_keeper}
+                    playerMatches={summary.matches.value ?? 0}
+                  />
+                ) : (
+                  <p className="wisden-tab-help">No dismissal-position data in this scope.</p>
                 )}
               </>
             )}
