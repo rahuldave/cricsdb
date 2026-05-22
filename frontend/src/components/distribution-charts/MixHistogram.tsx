@@ -103,10 +103,11 @@ export default function MixHistogram({
             )
           })}
         </div>
+        <div style={{ position: 'relative', flex: 1 }}>
         <svg
           viewBox={`0 0 ${VB_W} ${height}`}
           preserveAspectRatio="none"
-          style={{ width: '100%', height, display: 'block', flex: 1 }}
+          style={{ width: '100%', height, display: 'block' }}
           aria-label={title ?? 'Mix histogram'}
         >
           {/* Phase tint backgrounds — one rect per bucket spanning full
@@ -178,6 +179,37 @@ export default function MixHistogram({
             )
           })()}
         </svg>
+        {/* HTML overlay for the marker caption — SVG <text> would be
+            distorted by preserveAspectRatio="none". Positioned via
+            percentage of the chart area so it tracks the dashed line
+            beneath. */}
+        {verticalMarker != null && (() => {
+          const buckets = entries.map(e => e.bucket)
+          const minBucket = Math.min(...buckets)
+          const maxBucket = Math.max(...buckets)
+          const x = verticalMarker.x
+          if (x < minBucket || x > maxBucket) return null
+          const nBuckets = maxBucket - minBucket + 1
+          const leftPct = (((x - minBucket) + 0.5) / nBuckets) * 100
+          return (
+            <div style={{
+              position: 'absolute',
+              left: `${leftPct}%`,
+              top: -2,
+              transform: 'translateX(-50%)',
+              whiteSpace: 'nowrap',
+              fontFamily: 'var(--serif)',
+              fontStyle: 'italic',
+              fontSize: 10,
+              color: '#7A1F1F',
+              pointerEvents: 'none',
+              background: 'rgba(250,247,240,0.85)',
+              padding: '0 2px',
+              lineHeight: 1.1,
+            }}>{verticalMarker.label}</div>
+          )
+        })()}
+        </div>{/* /relative wrapper */}
       </div>
       {/* Bucket tick labels — kept outside the SVG so font sizing
           doesn't get viewBox-distorted by preserveAspectRatio="none".
