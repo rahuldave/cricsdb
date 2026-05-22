@@ -46,9 +46,9 @@ async def _position_distribution(db, person_id: str, filters: FilterParams) -> l
     against the same scoping, keeping mix-vector and cohort consistent.
 
     Each entry also carries per-bucket cohort fields
-    (`cohort_innings_share` / `cohort_strike_rate`) computed from
-    the same `playerscopestatsposition` rows aggregated over every
-    player at the same scope. Spec:
+    (`cohort_innings_share` / `cohort_strike_rate` / `cohort_average`)
+    computed from the same `playerscopestatsposition` rows aggregated
+    over every player at the same scope. Spec:
     spec-mix-and-performance-charts.md §3.1 — the By Position tab's
     Mix histogram + Performance-vs-cohort chart reads these without
     a second roundtrip.
@@ -107,7 +107,8 @@ async def _position_distribution(db, person_id: str, filters: FilterParams) -> l
         SELECT pssp.position_bucket,
                SUM(pssp.innings)      AS innings,
                SUM(pssp.runs)         AS runs,
-               SUM(pssp.legal_balls)  AS legal_balls
+               SUM(pssp.legal_balls)  AS legal_balls,
+               SUM(pssp.dismissals)   AS dismissals
         FROM playerscopestatsposition pssp
         WHERE pssp.scope_key IN (
             SELECT scope_key FROM playerscopestats pss WHERE {cohort_where}
@@ -146,13 +147,18 @@ async def _position_distribution(db, person_id: str, filters: FilterParams) -> l
         if c is None or cohort_total_innings == 0:
             entry["cohort_innings_share"] = None
             entry["cohort_strike_rate"] = None
+            entry["cohort_average"] = None
         else:
             inn_c = c["innings"] or 0
             runs_c = c["runs"] or 0
             balls_c = c["legal_balls"] or 0
+            dis_c = c["dismissals"] or 0
             entry["cohort_innings_share"] = inn_c / cohort_total_innings
             entry["cohort_strike_rate"] = (
                 round(runs_c * 100 / balls_c, 2) if balls_c else None
+            )
+            entry["cohort_average"] = (
+                round(runs_c / dis_c, 2) if dis_c else None
             )
         out.append(entry)
     return out

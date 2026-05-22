@@ -10,6 +10,9 @@ roundtrip:
     sums to 1.0 across the 10 buckets.
   - `cohort_strike_rate`   — cohort runs × 100 / cohort balls at
     this bucket.
+  - `cohort_average`       — cohort runs / cohort dismissals at this
+    bucket (Batting average by position tab; consumes the same
+    payload).
 
 Invariants:
   1. Length-10 array, one entry per bucket (1=opener, 2=#3, …, 10=#11).
@@ -19,6 +22,10 @@ Invariants:
   4. SR drops at the tail — bucket 10 (#11) SR is strictly less than
      bucket 1 (opener) SR (the universal T20 pattern — tail-enders
      can't time the ball like openers).
+  5. `cohort_average` at the opener bucket matches a direct SQL
+     aggregate.
+  6. Avg drops at the tail — bucket 10 (#11) cohort_average is
+     strictly less than bucket 1 cohort_average (same T20 pattern).
 
 Usage:
   uv run python tests/sanity/test_batter_summary_position_distribution.py
@@ -123,6 +130,39 @@ def main() -> int:
     _, line = check(
         "#11 cohort SR < opener cohort SR",
         ok, f"opener={opener_sr}, #11={tail_sr}",
+    )
+    print(line); all_passed &= ok
+
+    print("\n  5. cohort_average at opener matches SQL:")
+    row = conn.execute("""
+        SELECT SUM(pssp.runs) AS runs,
+               SUM(pssp.dismissals) AS dis
+        FROM playerscopestatsposition pssp
+        WHERE pssp.position_bucket = 1
+          AND pssp.scope_key IN (
+              SELECT scope_key FROM playerscopestats pss
+              WHERE pss.gender = 'male'
+                AND pss.team_type = 'club'
+                AND pss.tournament = 'Indian Premier League'
+          )
+    """).fetchone()
+    expected_avg = round((row["runs"] or 0) / (row["dis"] or 1), 2)
+    actual_avg = pd[0].get("cohort_average")
+    ok = actual_avg is not None and abs(actual_avg - expected_avg) < 0.01
+    _, line = check(
+        "opener cohort_average matches SQL",
+        ok, f"sql={expected_avg}, api={actual_avg}",
+    )
+    print(line); all_passed &= ok
+
+    print("\n  6. Tail Avg < opener Avg (universal T20 pattern):")
+    opener_avg = pd[0].get("cohort_average")
+    tail_avg = pd[9].get("cohort_average")
+    ok = (opener_avg is not None and tail_avg is not None
+          and tail_avg < opener_avg)
+    _, line = check(
+        "#11 cohort_average < opener cohort_average",
+        ok, f"opener={opener_avg}, #11={tail_avg}",
     )
     print(line); all_passed &= ok
 

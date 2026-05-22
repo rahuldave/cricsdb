@@ -10,6 +10,7 @@
  * Layout (top → bottom):
  *   1. Mix histogram   — % player innings batted per position bucket.
  *   2. Performance     — Strike Rate bars + cohort ticks.
+ *   3. Performance     — Batting Average bars + cohort ticks.
  *
  * Bucket axis: 10 (1=Opener merged from positions 1+2, 2..10 = #3..#11)
  * per `api/innings_positions.py::derive_positions`. Phase tint banded
@@ -74,6 +75,24 @@ export default function PositionDistributionTab({ positionDistribution }: Props)
     }
   })
 
+  // Chart C — batting average panel. avg = runs/dismissals at the
+  // bucket; null on buckets the player has never been dismissed at
+  // (e.g. opener slot for a tail-ender who's been not-out every time).
+  const avgEntries: PerfEntry[] = positionDistribution.map(e => {
+    const avg = e.dismissals > 0
+      ? Math.round((e.runs / e.dismissals) * 100) / 100
+      : null
+    return {
+      bucket: e.bucket,
+      playerValue: avg,
+      cohortValue: e.cohort_average,
+      faded: e.innings === 0,
+      tooltip: avg != null && e.cohort_average != null
+        ? `${bucketLabel(e.bucket)}: Avg ${avg.toFixed(2)} · cohort ${e.cohort_average.toFixed(2)}`
+        : `${bucketLabel(e.bucket)}: no innings`,
+    }
+  })
+
   return (
     <section
       className="wisden-position-distribution-tab"
@@ -95,6 +114,16 @@ export default function PositionDistributionTab({ positionDistribution }: Props)
         yLabel="runs / 100 balls"
         yFmt={fmt2}
         cohortExplainer="Green tick = average strike rate at this batting position across every batter in the FilterBar scope."
+        height={110}
+      />
+      <PerformanceVsCohort
+        entries={avgEntries}
+        bucketLabel={bucketLabel}
+        phaseTint={battingPhaseTint}
+        title="Batting average by position"
+        yLabel="runs / dismissal"
+        yFmt={fmt2}
+        cohortExplainer="Green tick = average batting average (runs / dismissals) at this batting position across every batter in the FilterBar scope."
         height={110}
       />
     </section>

@@ -374,6 +374,7 @@ export interface BattingPositionDistributionEntry {
   // across the 10 entries. Null on buckets the cohort hasn't touched.
   cohort_innings_share: number | null
   cohort_strike_rate: number | null
+  cohort_average: number | null
 }
 
 export interface BattingCohortMeta {
