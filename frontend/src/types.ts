@@ -1401,6 +1401,13 @@ export interface FieldingDismissalPositionEntry {
   stumpings: number
   run_outs: number
   dismissals: number
+  // spec-mix-and-performance-charts.md §3.3 — per-bucket cohort
+  // context for the By Dismissed Position tab. cohort partition is
+  // keeper-binary (automatic from the player's is_keeper flag on the
+  // /summary response). cohort_dismissals_share sums to 1.0 across
+  // the 10 entries. Null on buckets the cohort hasn't touched.
+  cohort_dismissals_share: number | null
+  cohort_catches_per_match: number | null
 }
 
 export interface FieldingCohortMeta {
