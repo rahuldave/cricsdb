@@ -172,6 +172,8 @@ export const getBowlerBySeason = (id: string, filters?: F) =>
   fetchApi<{ by_season: any[] }>(`/api/v1/bowlers/${id}/by-season`, filters as Record<string, string>)
 export const getBowlerWickets = (id: string, filters?: F) =>
   fetchApi<WicketAnalysis>(`/api/v1/bowlers/${id}/wickets`, filters as Record<string, string>)
+export const getBowlerVictims = (id: string, filters?: F) =>
+  fetchApi<{ victims: import('./types').BowlingVictim[] }>(`/api/v1/bowlers/${id}/victims`, filters as Record<string, string>)
 export const getBowlerDistribution = (id: string, filters?: F & { min_balls?: number; as_of_date?: string }) =>
   fetchApi<import('./types').BowlerDistribution>(`/api/v1/bowlers/${id}/distribution`, filters as Record<string, string>)
 

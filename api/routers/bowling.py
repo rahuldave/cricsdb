@@ -1111,6 +1111,60 @@ async def bowling_by_season(
     return {"by_season": by_season}
 
 
+@router.get("/{person_id}/victims")
+async def bowling_victims(
+    person_id: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    """Full list of every batter this bowler has dismissed at scope —
+    sortable per-batter aggregate with per-kind breakdown. Mirrors
+    the fielding /victims endpoint. User-asked 2026-05-22.
+
+    Returns batters sorted by total dismissals descending. The
+    /wickets endpoint already returns the top 10 victims for its
+    summary view; this endpoint is uncapped and drives the dedicated
+    Victims tab on /bowling.
+    """
+    db = get_db()
+    wkt_where, wkt_params = _bowling_wicket_filter(filters, person_id, None, aux=aux)
+    rows = await db.q(
+        f"""
+        SELECT w.player_out_id AS batter_id,
+               w.player_out AS batter_name,
+               w.kind,
+               COUNT(*) AS cnt
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE {wkt_where}
+        GROUP BY w.player_out_id, w.kind
+        """,
+        wkt_params,
+    )
+    from collections import defaultdict
+    agg: dict = defaultdict(lambda: {
+        "batter_name": "",
+        "dismissals": 0,
+        "bowled": 0, "caught": 0, "lbw": 0, "stumped": 0,
+        "hit_wicket": 0, "caught_and_bowled": 0,
+    })
+    for r in rows:
+        bid = r["batter_id"]
+        agg[bid]["batter_name"] = r["batter_name"]
+        agg[bid]["dismissals"] += r["cnt"]
+        k = (r["kind"] or "").replace(" ", "_")
+        if k in agg[bid]:
+            agg[bid][k] = r["cnt"]
+    victims = sorted(
+        [{"batter_id": k, **v} for k, v in agg.items()],
+        key=lambda x: x["dismissals"],
+        reverse=True,
+    )
+    return {"victims": victims}
+
+
 @router.get("/{person_id}/wickets")
 async def bowling_wickets(
     person_id: str,

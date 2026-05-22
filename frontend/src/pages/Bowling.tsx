@@ -28,13 +28,14 @@ import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import {
   getBowlerSummary, getBowlerInnings, getBowlerVsBatters,
-  getBowlerByPhase, getBowlerBySeason, getBowlerWickets, getBowlerDistribution,
+  getBowlerByPhase, getBowlerBySeason, getBowlerWickets, getBowlerVictims,
+  getBowlerDistribution,
   getBowlingLeaders, getBowlerRecords,
   getScopePlayersBowlingBySeason, getScopePlayersBowlingByPhase,
 } from '../api'
 import type {
   PlayerSearchResult, BowlingSummary, BowlingInnings, BatterMatchup,
-  PhaseStats, WicketAnalysis,
+  PhaseStats, WicketAnalysis, BowlingVictim,
   BowlingLeaders, BowlingLeaderEntry, FilterParams,
   BowlerDistribution,
   ScopePlayerBowlingSeason, ScopePlayerBowlingPhase,
@@ -52,7 +53,7 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
 }
 
 
-const tabs = ['By Season', 'By Over', 'By Phase', 'vs Batters', 'Wickets', 'Innings List', 'Records'] as const
+const tabs = ['By Season', 'By Over', 'By Phase', 'vs Batters', 'Wickets', 'Victims', 'Innings List', 'Records'] as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
 export default function Bowling() {
@@ -158,6 +159,16 @@ export default function Bowling() {
   )
   const wicketData = wicketsFetch.data
 
+  // Victims tab — full list (uncapped) of batters this bowler has
+  // dismissed at scope. Mirrors the fielding Victims tab. User-asked
+  // 2026-05-22.
+  const victimsFetch = useFetch<{ victims: BowlingVictim[] } | null>(
+    () => playerId && activeTab === 'Victims'
+      ? getBowlerVictims(playerId, filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const victims = victimsFetch.data?.victims ?? []
+
   const inningsFetch = useFetch<{ innings: BowlingInnings[]; total: number } | null>(
     () => playerId && activeTab === 'Innings List'
       ? getBowlerInnings(playerId, { ...filters, limit: 50, offset: inningsOffset })
@@ -212,6 +223,20 @@ export default function Bowling() {
     { key: 'economy', label: 'Econ', sortable: true, format: (v: any) => fmt(v) },
     { key: 'average', label: 'Avg', sortable: true, format: (v: any) => fmt(v) },
     { key: 'balls_per_boundary', label: 'B/Bnd', sortable: true, format: (v: any) => fmt(v) },
+  ]
+
+  const victimColumns: Column<BowlingVictim>[] = [
+    { key: 'batter_name', label: 'Batter', sortable: true, format: (_v: any, r: any) => (
+      <Link to={`/batting?player=${encodeURIComponent(r.batter_id)}`}
+        className="comp-link" onClick={e => e.stopPropagation()}>{r.batter_name}</Link>
+    ) as unknown as string },
+    { key: 'dismissals', label: 'Total', sortable: true },
+    { key: 'bowled', label: 'Bowled', sortable: true },
+    { key: 'caught', label: 'Caught', sortable: true },
+    { key: 'lbw', label: 'LBW', sortable: true },
+    { key: 'stumped', label: 'St', sortable: true },
+    { key: 'caught_and_bowled', label: 'C&B', sortable: true },
+    { key: 'hit_wicket', label: 'HW', sortable: true },
   ]
 
   return (
@@ -638,6 +663,19 @@ export default function Bowling() {
                       title="Wickets by Phase" categoryLabel="Phase" valueLabel="Wickets"
                       height={300} colorScheme={[WISDEN.oxblood]} />
                   </div>
+                )}
+              </>
+            )}
+
+            {activeTab === 'Victims' && (
+              <>
+                <TabState fetch={victimsFetch as FetchState<unknown>} />
+                {!victimsFetch.loading && !victimsFetch.error && victims.length > 0 && (
+                  <DataTable
+                    columns={victimColumns}
+                    data={victims}
+                    rowKey={(r: Record<string, any>) => r.batter_id}
+                  />
                 )}
               </>
             )}

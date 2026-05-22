@@ -1561,6 +1561,21 @@ export interface FieldingVictim {
   total: number
 }
 
+// /bowlers/{id}/victims — full list of batters this bowler dismissed
+// at scope, sorted by total dismissals. Mirrors FieldingVictim with
+// bowling-side dismissal kinds. User-asked 2026-05-22.
+export interface BowlingVictim {
+  batter_id: string
+  batter_name: string
+  dismissals: number
+  bowled: number
+  caught: number
+  lbw: number
+  stumped: number
+  hit_wicket: number
+  caught_and_bowled: number
+}
+
 export interface FieldingInnings {
   match_id: number
   date: string
