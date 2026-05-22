@@ -695,6 +695,13 @@ export default function Batting() {
                   const iwMarker = meanWd != null
                     ? { x: meanWd, label: `mean entry: ${meanWd.toFixed(2)} wkts` }
                     : undefined
+                  // Cohort SR line — drawn alongside the player line
+                  // via LineChart's referenceData. Reads how good the
+                  // batsman is at picking up when a wicket went down,
+                  // vs every batter at the same scope.
+                  const cohortData = interWicket
+                    .filter(iw => iw.cohort_strike_rate != null)
+                    .map(iw => ({ x: iw.wickets_down, y: iw.cohort_strike_rate as number }))
                   return (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <LineChart
@@ -702,7 +709,10 @@ export default function Batting() {
                         xAccessor="x" yAccessor="y"
                         title="Strike Rate by Wickets Down" xLabel="Wickets Down" yLabel="Strike Rate"
                         height={350} showPoints
-                        verticalMarker={iwMarker} />
+                        verticalMarker={iwMarker}
+                        referenceData={cohortData.length > 0 ? cohortData : undefined}
+                        referenceLabel="cohort SR at scope"
+                        primaryLabel="player" />
                       <BarChart
                         data={interWicket} categoryAccessor={(d: Record<string, any>) => String(d.wickets_down)}
                         valueAccessor="runs"

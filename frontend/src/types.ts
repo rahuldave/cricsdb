@@ -551,6 +551,11 @@ export interface InterWicketStats {
   strike_rate: number | null
   dismissals: number
   avg_balls_before_next_wicket: number | null
+  /** Cohort strike rate at this wickets_down — aggregated across
+   *  every legal-ball delivery at the FilterParams scope (no
+   *  batter_id filter). Drives the green reference line on the
+   *  Strike-Rate-by-Wickets-Down chart. User-asked 2026-05-22. */
+  cohort_strike_rate: number | null
 }
 
 // ─── Batter distribution dossier ────────────────────────────────────────

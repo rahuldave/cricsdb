@@ -1213,6 +1213,61 @@ async def batting_dismissals(
     }
 
 
+async def _inter_wicket_cohort_sr(db, filters: FilterParams, aux: AuxParams) -> dict[int, float]:
+    """Cohort strike rate by wickets_down, aggregated across every
+    legal-ball delivery at the FilterParams scope (no batter_id filter
+    — the comparison is "all batters in scope, when N wickets had
+    fallen, how fast were they scoring?").
+
+    Returns {wickets_down: strike_rate} for wickets_down 0..10. Buckets
+    with zero balls are omitted.
+
+    Implementation: window function over the delivery table to compute
+    wickets_down before each delivery (cumulative wicket count minus
+    the one that fell on the current row, excluding retired innings).
+    Spec / context: user-asked 2026-05-22 — extends the existing
+    /inter-wicket endpoint with a cohort SR overlay for the
+    Inter-Wicket SR chart on /batting?tab=Inter-Wicket.
+    """
+    where, params = filters.build(has_innings_join=True, aux=aux)
+    cohort_where = where if where else "1=1"
+    sql = f"""
+        WITH delivery_wd AS (
+            SELECT
+                d.runs_batter,
+                d.extras_wides,
+                d.extras_noballs,
+                (
+                    SUM(CASE WHEN w.id IS NOT NULL
+                                 AND COALESCE(w.kind, '') NOT IN ('retired hurt', 'retired out')
+                            THEN 1 ELSE 0 END)
+                      OVER (PARTITION BY d.innings_id ORDER BY d.id
+                            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+                    - CASE WHEN w.id IS NOT NULL
+                               AND COALESCE(w.kind, '') NOT IN ('retired hurt', 'retired out')
+                          THEN 1 ELSE 0 END
+                ) AS wickets_down
+            FROM delivery d
+            LEFT JOIN wicket w ON w.delivery_id = d.id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {cohort_where}
+        )
+        SELECT wickets_down,
+               SUM(COALESCE(runs_batter, 0)) AS runs,
+               COUNT(*) AS balls
+        FROM delivery_wd
+        WHERE extras_wides = 0 AND extras_noballs = 0
+          AND wickets_down BETWEEN 0 AND 10
+        GROUP BY wickets_down
+    """
+    rows = await db.q(sql, params)
+    return {
+        r["wickets_down"]: round((r["runs"] or 0) * 100 / r["balls"], 2)
+        for r in rows if r["balls"]
+    }
+
+
 @router.get("/{person_id}/inter-wicket")
 async def batting_inter_wicket(
     person_id: str,
@@ -1312,6 +1367,13 @@ async def batting_inter_wicket(
                         buckets[wickets_down]["dismissals"] += 1
                     wickets_down += 1
 
+    # Cohort SR by wickets_down — pulled in parallel with the player
+    # walk in spirit (the walk above is synchronous; the cohort SQL
+    # runs after). For the future, the player walk could move into
+    # SQL too and the two queries run via asyncio.gather. For now,
+    # one extra round-trip after the walk is the lower-risk path.
+    cohort_sr = await _inter_wicket_cohort_sr(db, filters, aux)
+
     inter_wicket = []
     for wd in sorted(buckets.keys()):
         b = buckets[wd]
@@ -1332,6 +1394,10 @@ async def batting_inter_wicket(
             "dismissals": b["dismissals"],
             "dot_pct": _safe_div(b["dots"], balls, 100, 1),
             "balls_per_boundary": _safe_div(balls, boundaries) if boundaries else None,
+            # Cohort SR overlay — user-asked 2026-05-22. Aggregated
+            # across every batter at the same scope (no batter_id
+            # filter); see _inter_wicket_cohort_sr docstring.
+            "cohort_strike_rate": cohort_sr.get(wd),
         })
 
     return {"inter_wicket": inter_wicket}
