@@ -10,6 +10,6 @@ REG bat_vs_bowlers_kohli_bilat                         /api/v1/batters/ba607b88/
 REG bat_by_over_kohli_bilat                            /api/v1/batters/ba607b88/by-over?gender=male&team_type=international&series_type=bilateral_only
 REG bat_by_phase_kohli_bilat                           /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international&series_type=bilateral_only
 REG bat_dismissals_kohli_bilat                         /api/v1/batters/ba607b88/dismissals?gender=male&team_type=international&series_type=bilateral_only
-REG bat_inter_wicket_kohli_bilat                       /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international&series_type=bilateral_only
+NEW bat_inter_wicket_kohli_bilat                       /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international&series_type=bilateral_only
 REG bat_summary_kohli_vs_aus_bilat                     /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
 REG bat_by_innings_kohli_vs_aus_bilat                  /api/v1/batters/ba607b88/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5&series_type=bilateral_only
