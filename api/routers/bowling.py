@@ -43,36 +43,47 @@ async def _over_distribution(db, person_id: str, filters: FilterParams) -> list[
     compose against this same scoping so the mix-vector and the
     cohort track each other.
 
+    Each entry also carries per-bucket cohort fields
+    (`cohort_balls_share` / `cohort_economy` /
+    `cohort_wickets_per_innings`) computed from the same
+    `playerscopestatsover` rows aggregated over every player at the
+    same scope. Spec: spec-mix-and-performance-charts.md §3.2 — the
+    Mix histogram + Performance-vs-cohort charts read these without a
+    second roundtrip.
+
     Returns a length-20 list keyed by `over` (1..20). Missing overs
     render as zero rows so consumers can iterate without index gaps.
     """
-    clauses = ["pss.person_id = :pid"]
-    params: dict = {"pid": person_id}
+    scope_clauses: list[str] = []
+    scope_params: dict = {}
     if filters.gender:
-        clauses.append("pss.gender = :gender")
-        params["gender"] = filters.gender
+        scope_clauses.append("pss.gender = :gender")
+        scope_params["gender"] = filters.gender
     if filters.team_type:
-        clauses.append("pss.team_type = :team_type")
-        params["team_type"] = filters.team_type
+        scope_clauses.append("pss.team_type = :team_type")
+        scope_params["team_type"] = filters.team_type
     if filters.tournament:
         if is_canonical_with_variants(filters.tournament):
-            clauses.append(event_name_in_clause(
+            scope_clauses.append(event_name_in_clause(
                 canonical_variants(filters.tournament),
                 col="pss.tournament",
             ))
         else:
-            clauses.append("pss.tournament = :tournament")
-            params["tournament"] = filters.tournament
+            scope_clauses.append("pss.tournament = :tournament")
+            scope_params["tournament"] = filters.tournament
     if filters.season_from:
-        clauses.append("pss.season >= :season_from")
-        params["season_from"] = filters.season_from
+        scope_clauses.append("pss.season >= :season_from")
+        scope_params["season_from"] = filters.season_from
     if filters.season_to:
-        clauses.append("pss.season <= :season_to")
-        params["season_to"] = filters.season_to
-    where = " AND ".join(clauses)
+        scope_clauses.append("pss.season <= :season_to")
+        scope_params["season_to"] = filters.season_to
 
-    rows = await db.q(
-        f"""
+    player_clauses = ["pss.person_id = :pid"] + scope_clauses
+    player_params: dict = {"pid": person_id, **scope_params}
+    player_where = " AND ".join(player_clauses)
+    cohort_where = " AND ".join(scope_clauses) if scope_clauses else "1=1"
+
+    player_sql = f"""
         SELECT psso.over_number,
                SUM(psso.runs_conceded) AS runs_conceded,
                SUM(psso.legal_balls)   AS legal_balls,
@@ -83,31 +94,66 @@ async def _over_distribution(db, person_id: str, filters: FilterParams) -> list[
         JOIN playerscopestats pss
           ON pss.scope_key = psso.scope_key
          AND pss.person_id = psso.person_id
-        WHERE {where}
+        WHERE {player_where}
         GROUP BY psso.over_number
         ORDER BY psso.over_number
-        """,
-        params,
+    """
+    cohort_sql = f"""
+        SELECT psso.over_number,
+               SUM(psso.runs_conceded)  AS runs_conceded,
+               SUM(psso.legal_balls)    AS legal_balls,
+               SUM(psso.wickets)        AS wickets,
+               SUM(psso.innings_bowled) AS innings_bowled
+        FROM playerscopestatsover psso
+        WHERE psso.scope_key IN (
+            SELECT scope_key FROM playerscopestats pss WHERE {cohort_where}
+        )
+        GROUP BY psso.over_number
+    """
+    player_rows, cohort_rows = await asyncio.gather(
+        db.q(player_sql, player_params),
+        db.q(cohort_sql, scope_params),
     )
 
-    by_over = {r["over_number"]: r for r in rows}
+    by_over = {r["over_number"]: r for r in player_rows}
+    cohort_by_over = {r["over_number"]: r for r in cohort_rows}
+    cohort_total_balls = sum((r["legal_balls"] or 0) for r in cohort_rows)
+
     out: list[dict] = []
     for o in range(1, 21):
         r = by_over.get(o)
         if r is None:
-            out.append({
+            entry = {
                 "over": o, "runs_conceded": 0, "legal_balls": 0,
                 "wickets": 0, "dots": 0, "boundaries": 0,
-            })
+            }
         else:
-            out.append({
+            entry = {
                 "over":          o,
                 "runs_conceded": r["runs_conceded"] or 0,
                 "legal_balls":   r["legal_balls"] or 0,
                 "wickets":       r["wickets"] or 0,
                 "dots":          r["dots"] or 0,
                 "boundaries":    r["boundaries"] or 0,
-            })
+            }
+        c = cohort_by_over.get(o)
+        if c is None or cohort_total_balls == 0:
+            entry["cohort_balls_share"] = None
+            entry["cohort_economy"] = None
+            entry["cohort_wickets_per_innings"] = None
+        else:
+            balls_c = c["legal_balls"] or 0
+            runs_c = c["runs_conceded"] or 0
+            wkts_c = c["wickets"] or 0
+            inn_c = c["innings_bowled"] or 0
+            entry["cohort_balls_share"] = balls_c / cohort_total_balls
+            entry["cohort_economy"] = (
+                round(runs_c * 6 / balls_c, 2) if balls_c else None
+            )
+            entry["cohort_wickets_per_innings"] = (
+                round(wkts_c / inn_c, 3) if inn_c else None
+            )
+        out.append(entry)
     return out
 
 
