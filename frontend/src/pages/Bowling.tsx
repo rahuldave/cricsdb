@@ -238,6 +238,7 @@ export default function Bowling() {
         <>
           <ScopedPageHeader
             filters={filters}
+            playerId={playerId || undefined}
             comparison={summary.cohort
               ? { label: 'cohort', text: bowlingCohortLine(summary.cohort as BowlingCohortMeta) }
               : null}

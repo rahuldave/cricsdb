@@ -69,33 +69,38 @@ export default function PlayerRecordsSummary({
         title="Records"
         subtitle="Top 5 per discipline at the current scope. Drill into the Records subtab on each discipline page for the full lists."
       />
-      {hasBatting && (
-        <BatterRecordsPanel
-          data={battingFetch.data}
-          loading={battingFetch.loading}
-          error={battingFetch.error}
-          refetch={battingFetch.refetch}
-          lists={['highest_scores']}
-        />
-      )}
-      {hasBowling && (
-        <BowlerRecordsPanel
-          data={bowlingFetch.data}
-          loading={bowlingFetch.loading}
-          error={bowlingFetch.error}
-          refetch={bowlingFetch.refetch}
-          lists={['best_figures']}
-        />
-      )}
-      {hasFielding && (
-        <FielderRecordsPanel
-          data={fieldingFetch.data}
-          loading={fieldingFetch.loading}
-          error={fieldingFetch.error}
-          refetch={fieldingFetch.refetch}
-          lists={['most_dismissals_match']}
-        />
-      )}
+      {/* Side-by-side records grid (user-asked 2026-05-22). Drops to
+          one column on mobile via wisden-records-grid class in
+          index.css — see @media (max-width: 720px). */}
+      <div className="wisden-records-grid">
+        {hasBatting && (
+          <BatterRecordsPanel
+            data={battingFetch.data}
+            loading={battingFetch.loading}
+            error={battingFetch.error}
+            refetch={battingFetch.refetch}
+            lists={['highest_scores']}
+          />
+        )}
+        {hasBowling && (
+          <BowlerRecordsPanel
+            data={bowlingFetch.data}
+            loading={bowlingFetch.loading}
+            error={bowlingFetch.error}
+            refetch={bowlingFetch.refetch}
+            lists={['best_figures']}
+          />
+        )}
+        {hasFielding && (
+          <FielderRecordsPanel
+            data={fieldingFetch.data}
+            loading={fieldingFetch.loading}
+            error={fieldingFetch.error}
+            refetch={fieldingFetch.refetch}
+            lists={['most_dismissals_match']}
+          />
+        )}
+      </div>
     </div>
   )
 }

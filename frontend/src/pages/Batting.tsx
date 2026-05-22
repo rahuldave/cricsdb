@@ -275,6 +275,7 @@ export default function Batting() {
         <>
           <ScopedPageHeader
             filters={filters}
+            playerId={playerId || undefined}
             comparison={summary.cohort
               ? { label: 'cohort', text: battingCohortLine(summary.cohort as BattingCohortMeta) }
               : null}

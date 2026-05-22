@@ -3147,3 +3147,19 @@ a { color: inherit; }
     width: 100%;
   }
 }
+
+/* /players?player=X — Records section: three discipline panels side
+   by side at desktop, stacked on mobile. User-asked 2026-05-22. */
+.wisden-records-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.2rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .wisden-records-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}

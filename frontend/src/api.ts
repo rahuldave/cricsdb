@@ -9,6 +9,17 @@ import type {
   VenueInfo, VenuesLanding, VenueSummary,
 } from './types'
 
+// In-flight request dedup. React StrictMode dev replay fires every
+// useFetch effect twice on mount — the second call has identical URL
+// + params and would hit the server again. Collapsing identical
+// in-flight GETs into one shared Promise halves dev-mode API time
+// (HAR-measured 2026-05-22: 6 duplicate /summary calls on /players?
+// player=X each ~1s totalling ~3s). In production StrictMode replay
+// doesn't fire, so this is a no-op for end-user load time. The wider
+// optimisation (slow /summary endpoints themselves) is queued —
+// see memory project_player_summary_perf_followup.md.
+const _inflight = new Map<string, Promise<unknown>>()
+
 async function fetchApi<T>(path: string, params?: Record<string, string | number | undefined | null>): Promise<T> {
   const url = new URL(path, window.location.origin)
   if (params) {
@@ -16,19 +27,30 @@ async function fetchApi<T>(path: string, params?: Record<string, string | number
       if (value != null && value !== '') url.searchParams.set(key, String(value))
     }
   }
-  const res = await fetch(url.toString())
-  if (!res.ok) {
-    // FastAPI HTTPException puts the message under `detail`. Surface it
-    // so the UI can show "Bowler not found: 14ba0d6a" instead of just
-    // "API error: 404".
-    let detail: string | null = null
+  const urlStr = url.toString()
+  const existing = _inflight.get(urlStr)
+  if (existing) return existing as Promise<T>
+  const promise = (async () => {
     try {
-      const body = await res.json()
-      if (body && typeof body.detail === 'string') detail = body.detail
-    } catch { /* ignore — body wasn't JSON */ }
-    throw new Error(detail ?? `API error: ${res.status}`)
-  }
-  return res.json()
+      const res = await fetch(urlStr)
+      if (!res.ok) {
+        // FastAPI HTTPException puts the message under `detail`. Surface
+        // it so the UI can show "Bowler not found: 14ba0d6a" instead of
+        // just "API error: 404".
+        let detail: string | null = null
+        try {
+          const body = await res.json()
+          if (body && typeof body.detail === 'string') detail = body.detail
+        } catch { /* ignore — body wasn't JSON */ }
+        throw new Error(detail ?? `API error: ${res.status}`)
+      }
+      return (await res.json()) as T
+    } finally {
+      _inflight.delete(urlStr)
+    }
+  })()
+  _inflight.set(urlStr, promise)
+  return promise
 }
 
 type F = FilterParams

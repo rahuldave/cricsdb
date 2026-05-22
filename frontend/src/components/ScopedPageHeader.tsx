@@ -17,9 +17,22 @@
 
 import type { ReactNode } from 'react'
 import { Fragment } from 'react'
+import { Link } from 'react-router-dom'
 import type { FilterParams } from '../types'
 import { abbreviateScope } from './scopeLinks'
 import DormancyBadge from './DormancyBadge'
+
+
+/** Build a /players?player=X URL that preserves every active filter
+ *  axis so the cross-discipline link round-trips the user's scope.
+ *  Suppresses the link entirely when playerId is unset. */
+function allDisciplinesHref(playerId: string, filters: FilterParams): string {
+  const qs = new URLSearchParams({ player: playerId })
+  for (const [k, v] of Object.entries(filters)) {
+    if (v != null && v !== '') qs.set(k, String(v))
+  }
+  return `/players?${qs.toString()}`
+}
 
 
 /** Inline small-caps oxblood "SCOPE" marker — same visual style as the
@@ -75,10 +88,16 @@ interface Props {
    *  inline small-caps oxblood "scope" marker — visually links the
    *  comparison phrase back to the SCOPE line above. */
   comparison?: { label: string; text: string } | null
+  /** When set, render a small italic "→ all disciplines" link next
+   *  to the title that navigates to /players?player=X at the current
+   *  filter scope. Set on Batting / Bowling / Fielding when a player
+   *  is selected; /players itself never sets it (it IS the
+   *  destination). User-asked 2026-05-22. */
+  playerId?: string
   children: ReactNode
 }
 
-export default function ScopedPageHeader({ filters, omit, hideAbbrev, comparison, children }: Props) {
+export default function ScopedPageHeader({ filters, omit, hideAbbrev, comparison, playerId, children }: Props) {
   const scoped: FilterParams = omit && omit.length > 0
     ? { ...filters, ...Object.fromEntries(omit.map(k => [k, undefined])) }
     : filters
@@ -100,6 +119,13 @@ export default function ScopedPageHeader({ filters, omit, hideAbbrev, comparison
       }}>
         {children}
         <DormancyBadge />
+        {playerId && (
+          <Link to={allDisciplinesHref(playerId, filters)} className="comp-link" style={{
+            fontSize: '0.55em',
+            fontStyle: 'italic',
+            fontWeight: 'normal',
+          }}>→ all disciplines</Link>
+        )}
       </h2>
       {abbrev && (
         <span style={{

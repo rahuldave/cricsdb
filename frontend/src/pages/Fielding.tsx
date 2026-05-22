@@ -295,6 +295,7 @@ export default function Fielding() {
         <>
           <ScopedPageHeader
             filters={filters}
+            playerId={playerId || undefined}
             comparison={summary.cohort
               ? { label: 'cohort', text: fieldingCohortLine(summary.cohort as FieldingCohortMeta) }
               : null}
