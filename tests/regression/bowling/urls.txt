@@ -15,9 +15,9 @@ REG bow_leaders_ipl_2024              /api/v1/bowlers/leaders?gender=male&team_t
 REG bow_leaders_with_thresholds       /api/v1/bowlers/leaders?gender=male&team_type=international&min_balls=120&min_wickets=5
 
 # ── per-bowler endpoints (all tabs on the bowling page) ──────────
-NEW bow_summary_bumrah_intl           /api/v1/bowlers/462411b3/summary?gender=male&team_type=international
-NEW bow_summary_bumrah_ipl            /api/v1/bowlers/462411b3/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
-NEW bow_summary_bumrah_recent         /api/v1/bowlers/462411b3/summary?gender=male&season_from=2024&season_to=2025
+REG bow_summary_bumrah_intl           /api/v1/bowlers/462411b3/summary?gender=male&team_type=international
+REG bow_summary_bumrah_ipl            /api/v1/bowlers/462411b3/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG bow_summary_bumrah_recent         /api/v1/bowlers/462411b3/summary?gender=male&season_from=2024&season_to=2025
 REG bow_by_innings_bumrah             /api/v1/bowlers/462411b3/by-innings?limit=10
 REG bow_by_innings_bumrah_ipl         /api/v1/bowlers/462411b3/by-innings?tournament=Indian%20Premier%20League&limit=5
 REG bow_vs_batters_bumrah             /api/v1/bowlers/462411b3/vs-batters?gender=male&team_type=international&min_balls=12
@@ -28,11 +28,11 @@ REG bow_by_season_bumrah              /api/v1/bowlers/462411b3/by-season?gender=
 REG bow_wickets_bumrah                /api/v1/bowlers/462411b3/wickets?gender=male&team_type=international
 
 # ── rivalry scope ────────────────────────────────────────────────
-NEW bow_summary_bumrah_vs_aus         /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+REG bow_summary_bumrah_vs_aus         /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
 REG bow_by_innings_bumrah_vs_aus      /api/v1/bowlers/462411b3/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5
 
 # ── venue-scope sanity ───────────────────────────────────────────
-NEW bow_summary_bumrah_wankhede       /api/v1/bowlers/462411b3/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG bow_summary_bumrah_wankhede       /api/v1/bowlers/462411b3/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
 
 # ── search ───────────────────────────────────────────────────────
 REG ref_players_search_bumrah         /api/v1/players?q=Bumrah&limit=5
@@ -43,12 +43,12 @@ REG ref_players_search_bowler_role    /api/v1/players?q=Starc&role=bowler&limit=
 
 REG bow_leaders_men_intl_fm                            /api/v1/bowlers/leaders?gender=male&team_type=international&limit=10&team_class=full_member
 REG bow_leaders_with_thresholds_fm                     /api/v1/bowlers/leaders?gender=male&team_type=international&min_balls=120&min_wickets=5&team_class=full_member
-NEW bow_summary_bumrah_intl_fm                         /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&team_class=full_member
+REG bow_summary_bumrah_intl_fm                         /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&team_class=full_member
 REG bow_vs_batters_bumrah_fm                           /api/v1/bowlers/462411b3/vs-batters?gender=male&team_type=international&min_balls=12&team_class=full_member
 REG bow_by_over_bumrah_fm                              /api/v1/bowlers/462411b3/by-over?gender=male&team_type=international&team_class=full_member
 REG bow_by_phase_bumrah_fm                             /api/v1/bowlers/462411b3/by-phase?gender=male&team_type=international&team_class=full_member
 REG bow_wickets_bumrah_fm                              /api/v1/bowlers/462411b3/wickets?gender=male&team_type=international&team_class=full_member
-NEW bow_summary_bumrah_vs_aus_fm                       /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
+REG bow_summary_bumrah_vs_aus_fm                       /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
 REG bow_by_innings_bumrah_vs_aus_fm                    /api/v1/bowlers/462411b3/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5&team_class=full_member
 # series_type FilterBar — generated REG URLs (one-shot)
 # Source: each row mirrors an intl REG row in urls.txt with &series_type=bilateral_only appended.
@@ -57,12 +57,12 @@ REG bow_by_innings_bumrah_vs_aus_fm                    /api/v1/bowlers/462411b3/
 
 REG bow_leaders_men_intl_bilat                         /api/v1/bowlers/leaders?gender=male&team_type=international&limit=10&series_type=bilateral_only
 REG bow_leaders_with_thresholds_bilat                  /api/v1/bowlers/leaders?gender=male&team_type=international&min_balls=120&min_wickets=5&series_type=bilateral_only
-NEW bow_summary_bumrah_intl_bilat                      /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&series_type=bilateral_only
+REG bow_summary_bumrah_intl_bilat                      /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&series_type=bilateral_only
 REG bow_vs_batters_bumrah_bilat                        /api/v1/bowlers/462411b3/vs-batters?gender=male&team_type=international&min_balls=12&series_type=bilateral_only
 REG bow_by_over_bumrah_bilat                           /api/v1/bowlers/462411b3/by-over?gender=male&team_type=international&series_type=bilateral_only
 REG bow_by_phase_bumrah_bilat                          /api/v1/bowlers/462411b3/by-phase?gender=male&team_type=international&series_type=bilateral_only
 REG bow_wickets_bumrah_bilat                           /api/v1/bowlers/462411b3/wickets?gender=male&team_type=international&series_type=bilateral_only
-NEW bow_summary_bumrah_vs_aus_bilat                    /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
+REG bow_summary_bumrah_vs_aus_bilat                    /api/v1/bowlers/462411b3/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
 REG bow_by_innings_bumrah_vs_aus_bilat                 /api/v1/bowlers/462411b3/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5&series_type=bilateral_only
 
 # club-tier team_class — bowling leaders + dossier narrowing
