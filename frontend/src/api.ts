@@ -137,7 +137,7 @@ export const getBatterRecords = (id: string, filters?: F & { limit?: number }) =
   fetchApi<import('./types').BatterRecords>(`/api/v1/batters/${id}/records`, filters as Record<string, string>)
 export const getBatterInnings = (id: string, filters?: F & { limit?: number; offset?: number; sort?: string }) =>
   fetchApi<{ innings: BattingInnings[]; total: number }>(`/api/v1/batters/${id}/by-innings`, filters as Record<string, string>)
-export const getBatterVsBowlers = (id: string, filters?: F & { bowler_id?: string; min_balls?: number }) =>
+export const getBatterVsBowlers = (id: string, filters?: F & { bowler_id?: string; min_balls?: number; limit?: number }) =>
   fetchApi<{ matchups: BowlerMatchup[] }>(`/api/v1/batters/${id}/vs-bowlers`, filters as Record<string, string>)
 export const getBatterByOver = (id: string, filters?: F) =>
   fetchApi<{ by_over: OverStats[] }>(`/api/v1/batters/${id}/by-over`, filters as Record<string, string>)

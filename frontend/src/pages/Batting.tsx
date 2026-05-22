@@ -63,6 +63,10 @@ export default function Batting() {
 
   const [inningsOffset, setInningsOffset] = useState(0)
   const [selectedBowlerId, setSelectedBowlerId] = useState<string | null>(null)
+  // Free-text filter on the vs-Bowlers table — case-insensitive
+  // substring match against bowler_name. Cleared when leaving the
+  // tab to avoid stale state. User-asked 2026-05-22.
+  const [bowlerQuery, setBowlerQuery] = useState('')
 
   const handleSelect = (p: PlayerSearchResult) => {
     setUrlParams({ player: p.id, tab: 'By Season' })
@@ -165,7 +169,10 @@ export default function Batting() {
 
   const matchupsFetch = useFetch<{ matchups: BowlerMatchup[] } | null>(
     () => playerId && activeTab === 'vs Bowlers'
-      ? getBatterVsBowlers(playerId, { ...filters, min_balls: 6 })
+      // limit=500 so the in-page search can reach any bowler the
+      // batter has faced (Kohli has ~300 with ≥6 balls; default 50
+      // hid the long tail). User-asked 2026-05-22.
+      ? getBatterVsBowlers(playerId, { ...filters, min_balls: 6, limit: 500 })
       : Promise.resolve(null),
     [...filterDeps, activeTab],
   )
@@ -599,6 +606,10 @@ export default function Batting() {
                       color: 'var(--accent)',
                     })
                   }
+                  const q = bowlerQuery.trim().toLowerCase()
+                  const filteredMatchups = q === ''
+                    ? bowlerMatchups
+                    : bowlerMatchups.filter(m => m.bowler_name.toLowerCase().includes(q))
                   return (
                     <div>
                       <p className="wisden-tab-help">
@@ -619,10 +630,25 @@ export default function Batting() {
                         annotations={annotations}
                         pointIdAccessor="bowler_id"
                       />
-                      <div className="mt-4">
+                      <div className="mt-4 wisden-bowler-search">
+                        <input
+                          type="search"
+                          value={bowlerQuery}
+                          onChange={e => setBowlerQuery(e.target.value)}
+                          placeholder={`Search any of the ${bowlerMatchups.length} bowlers faced…`}
+                          aria-label="Search bowlers"
+                          className="wisden-bowler-search-input"
+                        />
+                        {q !== '' && (
+                          <span className="wisden-bowler-search-count">
+                            {filteredMatchups.length} match{filteredMatchups.length === 1 ? '' : 'es'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2">
                         <DataTable
                           columns={bowlerColumns}
-                          data={bowlerMatchups}
+                          data={filteredMatchups}
                           rowKey={(r: Record<string, any>) => r.bowler_id}
                           highlightKey={selectedBowlerId}
                           onRowClick={(r: Record<string, any>) => setSelectedBowlerId(r.bowler_id)}

@@ -710,7 +710,12 @@ async def batting_vs_bowlers(
     aux: AuxParams = Depends(),
     bowler_id: Optional[str] = Query(None),
     min_balls: int = Query(6, ge=1),
-    limit: int = Query(50, ge=1, le=200),
+    # Cap bumped from 200 to 500 (2026-05-22) so the frontend
+    # `vs Bowlers` tab can load every bowler the batter has faced;
+    # the in-page search input then filters that full list rather
+    # than being limited to the default top-50. Existing regression
+    # URLs all use the default limit so no shape drift.
+    limit: int = Query(50, ge=1, le=500),
     sort: str = Query("balls"),
 ):
     db = get_db()
