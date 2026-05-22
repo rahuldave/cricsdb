@@ -41,6 +41,7 @@ import type {
 } from '../types'
 import BowlerDistributionPanel from '../components/bowling/BowlerDistributionPanel'
 import OverDistributionTab from '../components/bowling/OverDistributionTab'
+import BowlingPhaseComparativeCharts from '../components/bowling/PhaseComparativeCharts'
 import BowlerRecordsPanel from '../components/players/BowlerRecordsPanel'
 import { SectionHeader } from '../components/ChartHeader'
 
@@ -487,6 +488,14 @@ export default function Bowling() {
                     </div>
                   )
                 })()}
+                {/* Per-phase comparative charts — mirrors batting's
+                    By Phase tab. Three PerformanceVsCohort panels:
+                    Dot %, Strike Rate, Economy. User-asked 2026-05-22. */}
+                {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (
+                  <BowlingPhaseComparativeCharts
+                    phaseData={phaseData}
+                    phaseBaseline={phaseBaseline} />
+                )}
               </>
             )}
 
