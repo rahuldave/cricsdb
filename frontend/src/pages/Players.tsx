@@ -43,10 +43,7 @@ export default function Players() {
       {playerId && <InningToggle />}
 
       {playerId && !isCompare && (
-        <>
-          <SinglePlayerView playerId={playerId} />
-          <AddComparePicker currentIds={[playerId]} gender={filters.gender} />
-        </>
+        <SinglePlayerView playerId={playerId} />
       )}
 
       {playerId && isCompare && (
@@ -117,6 +114,9 @@ function SinglePlayerView({ playerId }: { playerId: string }) {
       name={name}
       nationalities={nationalities}
       filters={filters}
+      recordsTrailingSlot={
+        <AddComparePicker currentIds={[playerId]} gender={filters.gender} />
+      }
     />
   )
 }

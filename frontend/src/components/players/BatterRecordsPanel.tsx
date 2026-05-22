@@ -92,9 +92,15 @@ export default function BatterRecordsPanel({ data, loading, error, refetch, list
   if (!data) return null
 
   const filtered = lists ? LISTS.filter(l => lists.includes(l.key)) : LISTS
+  // Drop the 2-col split when only one list is rendered (e.g. the
+  // summary embed on /players passes lists=['highest_scores']) —
+  // a 2-col grid with one cell halves the available width.
+  const innerCls = filtered.length === 1
+    ? 'grid grid-cols-1 gap-6 mt-4'
+    : 'grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4'
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+    <div className={innerCls}>
       {filtered.map(list => (
         <div key={list.key}>
           <SectionHeader title={list.title} />

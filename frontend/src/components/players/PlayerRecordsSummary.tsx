@@ -17,6 +17,7 @@
  * Fetches are gated on the discipline being relevant — no fan-out
  * for batting-only or bowling-only specialists.
  */
+import type { ReactNode } from 'react'
 import { useFetch } from '../../hooks/useFetch'
 import { useFilterDeps } from '../../hooks/useFilterDeps'
 import { getBatterRecords, getBowlerRecords, getFielderRecords } from '../../api'
@@ -34,10 +35,14 @@ interface Props {
   hasBatting: boolean
   hasBowling: boolean
   hasFielding: boolean
+  /** Optional trailing cell rendered inside the records grid after
+   *  the discipline panels. Used to slot the "Compare with another
+   *  player" picker into the spare column on the last row. */
+  trailingSlot?: ReactNode
 }
 
 export default function PlayerRecordsSummary({
-  playerId, filters, hasBatting, hasBowling, hasFielding,
+  playerId, filters, hasBatting, hasBowling, hasFielding, trailingSlot,
 }: Props) {
   const filterDeps = [playerId, ...useFilterDeps()]
 
@@ -69,9 +74,6 @@ export default function PlayerRecordsSummary({
         title="Records"
         subtitle="Top 5 per discipline at the current scope. Drill into the Records subtab on each discipline page for the full lists."
       />
-      {/* Side-by-side records grid (user-asked 2026-05-22). Drops to
-          one column on mobile via wisden-records-grid class in
-          index.css — see @media (max-width: 720px). */}
       <div className="wisden-records-grid">
         {hasBatting && (
           <BatterRecordsPanel
@@ -100,6 +102,7 @@ export default function PlayerRecordsSummary({
             lists={['most_dismissals_match']}
           />
         )}
+        {trailingSlot}
       </div>
     </div>
   )

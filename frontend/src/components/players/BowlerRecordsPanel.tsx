@@ -60,8 +60,11 @@ export default function BowlerRecordsPanel({ data, loading, error, refetch, list
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
   if (!data) return null
   const filtered = lists ? LISTS.filter(l => lists.includes(l.key)) : LISTS
+  const innerCls = filtered.length === 1
+    ? 'grid grid-cols-1 gap-6 mt-4'
+    : 'grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4'
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+    <div className={innerCls}>
       {filtered.map(list => (
         <div key={list.key}>
           <SectionHeader title={list.title} />

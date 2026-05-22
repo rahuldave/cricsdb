@@ -3148,11 +3148,13 @@ a { color: inherit; }
   }
 }
 
-/* /players?player=X — Records section: three discipline panels side
-   by side at desktop, stacked on mobile. User-asked 2026-05-22. */
+/* /players?player=X — Records section: two discipline panels per
+   row at desktop, stacked on mobile. The "Compare with another
+   player" picker rides as a trailing cell in the same grid so it
+   slots cleanly into whichever row has the spare column. */
 .wisden-records-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.2rem;
   align-items: start;
 }
@@ -3163,3 +3165,4 @@ a { color: inherit; }
     gap: 1rem;
   }
 }
+

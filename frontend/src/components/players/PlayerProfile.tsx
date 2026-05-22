@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import FlagBadge from '../FlagBadge'
 import ScopeIndicator from '../ScopeIndicator'
 import ScopedPageHeader from '../ScopedPageHeader'
@@ -17,10 +18,15 @@ interface Props {
   /** Hide ScopeIndicator when the column is embedded in a compare
    *  grid (the grid shows the scope pill once, above the columns). */
   suppressScopePill?: boolean
+  /** Optional node rendered as the trailing cell of the records grid.
+   *  Used by single-player view to slot the "Compare with another
+   *  player" picker alongside the discipline records panels. */
+  recordsTrailingSlot?: ReactNode
 }
 
 export default function PlayerProfile({
   profile, playerId, name, nationalities, filters, suppressScopePill = false,
+  recordsTrailingSlot,
 }: Props) {
   const role = classifyRole(profile)
   const matches = matchesInScope(profile)
@@ -68,6 +74,7 @@ export default function PlayerProfile({
             hasBatting={disciplineHasData('batting', profile)}
             hasBowling={disciplineHasData('bowling', profile)}
             hasFielding={disciplineHasData('fielding', profile) || disciplineHasData('keeping', profile)}
+            trailingSlot={recordsTrailingSlot}
           />
         </>
       )}
