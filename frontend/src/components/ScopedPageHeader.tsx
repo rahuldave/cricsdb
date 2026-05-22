@@ -110,9 +110,8 @@ export default function ScopedPageHeader({ filters, omit, hideAbbrev, comparison
   return (
     <div style={{
       display: 'flex',
-      flexWrap: 'wrap',
-      alignItems: 'baseline',
-      columnGap: '1rem',
+      flexDirection: 'column',
+      alignItems: 'flex-start',
       rowGap: '0.25rem',
       marginBottom: '1rem',
     }}>
@@ -158,10 +157,6 @@ export default function ScopedPageHeader({ filters, omit, hideAbbrev, comparison
           fontStyle: 'italic',
           fontSize: '0.95rem',
           color: 'var(--ink-faint)',
-          // Sits inline with the SCOPE pill on wide viewports; the
-          // outer flex container's flex-wrap lets the whole pill
-          // drop to its own row when there isn't horizontal room.
-          // Text inside this pill wraps normally (no nowrap pin).
         }}>
           <span style={{
             fontVariant: 'all-small-caps',
