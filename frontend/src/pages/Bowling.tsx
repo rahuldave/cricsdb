@@ -23,19 +23,18 @@ import BarChart from '../components/charts/BarChart'
 import LineChart from '../components/charts/LineChart'
 import ScatterChart from '../components/charts/ScatterChart'
 import DonutChart from '../components/charts/DonutChart'
-import { WISDEN, WISDEN_PHASES } from '../components/charts/palette'
+import { WISDEN } from '../components/charts/palette'
 import Spinner from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import {
-  getBowlerSummary, getBowlerInnings, getBowlerVsBatters, getBowlerByOver,
+  getBowlerSummary, getBowlerInnings, getBowlerVsBatters,
   getBowlerByPhase, getBowlerBySeason, getBowlerWickets, getBowlerDistribution,
   getBowlingLeaders, getBowlerRecords,
   getScopePlayersBowlingBySeason, getScopePlayersBowlingByPhase,
-  getScopePlayersBowlingSummary,
 } from '../api'
 import type {
   PlayerSearchResult, BowlingSummary, BowlingInnings, BatterMatchup,
-  OverStats, PhaseStats, WicketAnalysis,
+  PhaseStats, WicketAnalysis,
   BowlingLeaders, BowlingLeaderEntry, FilterParams,
   BowlerDistribution,
   ScopePlayerBowlingSeason, ScopePlayerBowlingPhase,
@@ -119,28 +118,6 @@ export default function Bowling() {
     [...filterDeps, activeTab],
   )
   const seasonBaseline = seasonBaselineFetch.data?.by_season ?? []
-
-  const overFetch = useFetch<{ by_over: OverStats[] } | null>(
-    () => playerId && activeTab === 'By Over'
-      ? getBowlerByOver(playerId, filters) : Promise.resolve(null),
-    [...filterDeps, activeTab],
-  )
-  const overData = overFetch.data?.by_over ?? []
-
-  // spec-rate-vs-volume-audit C3: cohort econ-by-over overlay on the
-  // By Over tab. The cohort summary endpoint takes the player's
-  // actual over_mix (already shipped on summary.cohort) and returns a
-  // by_over array with per-over rates — economy is the C3 addition.
-  const overMix = (summary?.cohort as { over_mix?: number[] } | undefined)?.over_mix
-  const overBaselineFetch = useFetch<{
-    by_over: { over: number; economy: number | null }[]
-  } | null>(
-    () => playerId && activeTab === 'By Over' && overMix && overMix.length === 20
-      ? getScopePlayersBowlingSummary(overMix, filters)
-      : Promise.resolve(null),
-    [...filterDeps, activeTab, overMix?.join(',')],
-  )
-  const overBaseline = overBaselineFetch.data?.by_over ?? []
 
   const phaseFetch = useFetch<{ by_phase: PhaseStats[] } | null>(
     () => playerId && activeTab === 'By Phase'
@@ -420,41 +397,18 @@ export default function Bowling() {
 
             {activeTab === 'By Over' && (
               <>
-                <TabState fetch={overFetch as FetchState<unknown>} />
                 {/* spec-mix-and-performance-charts.md §M1 — Mix histogram
                     + stacked Performance-vs-cohort (Econ + Wkts/Inn).
                     Reads summary.over_distribution which already carries
                     per-bucket cohort fields (single payload, no extra
-                    fetch). Sits above the detailed Economy by Over
-                    Semiotic chart, which stays for numeric read-off. */}
+                    fetch). Replaces the earlier detailed Economy by
+                    Over Semiotic chart (which had a stale "over-mix-
+                    weighted at scope" legend) — the new compact view
+                    has y-axis ticks of its own and a clear cohort
+                    explainer, so the detailed view is now redundant.
+                    User flagged 2026-05-22. */}
                 {summary.over_distribution && summary.over_distribution.length > 0 && (
                   <OverDistributionTab overDistribution={summary.over_distribution} />
-                )}
-                {!overFetch.loading && !overFetch.error && overData.length > 0 && (
-                  <>
-                    <BarChart
-                      data={overData.map(o => ({
-                        ...o, over: `${o.over_number}`,
-                        phase: o.over_number <= 6 ? 'Powerplay' : o.over_number <= 15 ? 'Middle' : 'Death',
-                      }))}
-                      categoryAccessor="over"
-                      valueAccessor={(d: Record<string, any>) => (d.economy as number) ?? 0}
-                      title="Economy by Over" categoryLabel="Over" valueLabel="Economy"
-                      colorBy="phase" colorScheme={WISDEN_PHASES}
-                      height={350}
-                      // Tier 5 of spec-apples-to-apples-baselines.md
-                      // upgrades the prior C3 text strip into a native
-                      // BarChart overlay — short dashed forest-green
-                      // segment per over-bucket at the cohort's
-                      // econ-at-this-bucket, over-mix-weighted at the
-                      // active scope. Same `overBaseline` data the text
-                      // strip used to read.
-                      referenceData={overBaseline.length > 0 ? overBaseline.map(b => ({
-                        category: String(b.over),
-                        value: b.economy ?? null,
-                      })) : undefined}
-                      referenceLabel="cohort econ per over (over-mix-weighted at scope)" />
-                  </>
                 )}
               </>
             )}
