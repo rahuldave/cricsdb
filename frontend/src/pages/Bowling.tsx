@@ -286,13 +286,21 @@ export default function Bowling() {
               error={distFetch.error}
             />
           )}
-          <div className="wisden-statrow cols-5">
+          <div className="wisden-statrow cols-6">
             <StatCard label="Overs" value={summary.overs} />
             <StatCard label="Strike Rate" value={fmt(summary.strike_rate.value)}
               subtitle={summary.strike_rate.scope_avg != null
                 ? <MetricDelta env={summary.strike_rate} withScopeAvg label="cohort" fmt={2} scopeAvgTooltip={cohortTT} />
                 : undefined} />
             <StatCard label="Best Figures" value={summary.best_figures || '-'} />
+            {/* Boundaries conceded — raw volume tile (4s + 6s), mirroring
+                the Batting page's "Boundaries" treatment. User-asked
+                2026-05-22: "How come we dont have boundaries conceded
+                anywhere on bowling?" — surface the raw count with the
+                4s / 6s breakdown in the subtitle. */}
+            <StatCard label="Bdys Cnd"
+              value={summary.boundaries_conceded.value ?? 0}
+              subtitle={`${summary.fours_conceded.value ?? 0} 4s, ${summary.sixes_conceded.value ?? 0} 6s`} />
             <StatCard label="Dot %" value={summary.dot_pct.value != null ? `${summary.dot_pct.value}%` : '-'}
               subtitle={summary.dot_pct.scope_avg != null
                 ? <MetricDelta env={summary.dot_pct} withScopeAvg label="cohort" fmt={1} scopeAvgTooltip={cohortTT} />
