@@ -45,37 +45,48 @@ async def _position_distribution(db, person_id: str, filters: FilterParams) -> l
     only scoping — the cohort baselines in Phase 3 will compose
     against the same scoping, keeping mix-vector and cohort consistent.
 
+    Each entry also carries per-bucket cohort fields
+    (`cohort_innings_share` / `cohort_strike_rate`) computed from
+    the same `playerscopestatsposition` rows aggregated over every
+    player at the same scope. Spec:
+    spec-mix-and-performance-charts.md §3.1 — the By Position tab's
+    Mix histogram + Performance-vs-cohort chart reads these without
+    a second roundtrip.
+
     Returns a length-10 list keyed by `bucket` (1=opener, 2=#3, …,
     10=#11). Missing buckets render as zero rows so consumers can
     iterate without index gaps.
     """
-    clauses = ["pss.person_id = :pid"]
-    params: dict = {"pid": person_id}
+    scope_clauses: list[str] = []
+    scope_params: dict = {}
     if filters.gender:
-        clauses.append("pss.gender = :gender")
-        params["gender"] = filters.gender
+        scope_clauses.append("pss.gender = :gender")
+        scope_params["gender"] = filters.gender
     if filters.team_type:
-        clauses.append("pss.team_type = :team_type")
-        params["team_type"] = filters.team_type
+        scope_clauses.append("pss.team_type = :team_type")
+        scope_params["team_type"] = filters.team_type
     if filters.tournament:
         if is_canonical_with_variants(filters.tournament):
-            clauses.append(event_name_in_clause(
+            scope_clauses.append(event_name_in_clause(
                 canonical_variants(filters.tournament),
                 col="pss.tournament",
             ))
         else:
-            clauses.append("pss.tournament = :tournament")
-            params["tournament"] = filters.tournament
+            scope_clauses.append("pss.tournament = :tournament")
+            scope_params["tournament"] = filters.tournament
     if filters.season_from:
-        clauses.append("pss.season >= :season_from")
-        params["season_from"] = filters.season_from
+        scope_clauses.append("pss.season >= :season_from")
+        scope_params["season_from"] = filters.season_from
     if filters.season_to:
-        clauses.append("pss.season <= :season_to")
-        params["season_to"] = filters.season_to
-    where = " AND ".join(clauses)
+        scope_clauses.append("pss.season <= :season_to")
+        scope_params["season_to"] = filters.season_to
 
-    rows = await db.q(
-        f"""
+    player_clauses = ["pss.person_id = :pid"] + scope_clauses
+    player_params: dict = {"pid": person_id, **scope_params}
+    player_where = " AND ".join(player_clauses)
+    cohort_where = " AND ".join(scope_clauses) if scope_clauses else "1=1"
+
+    player_sql = f"""
         SELECT pssp.position_bucket,
                SUM(pssp.innings)      AS innings,
                SUM(pssp.runs)         AS runs,
@@ -88,24 +99,40 @@ async def _position_distribution(db, person_id: str, filters: FilterParams) -> l
         JOIN playerscopestats pss
           ON pss.scope_key = pssp.scope_key
          AND pss.person_id = pssp.person_id
-        WHERE {where}
+        WHERE {player_where}
         GROUP BY pssp.position_bucket
         ORDER BY pssp.position_bucket
-        """,
-        params,
+    """
+    cohort_sql = f"""
+        SELECT pssp.position_bucket,
+               SUM(pssp.innings)      AS innings,
+               SUM(pssp.runs)         AS runs,
+               SUM(pssp.legal_balls)  AS legal_balls
+        FROM playerscopestatsposition pssp
+        WHERE pssp.scope_key IN (
+            SELECT scope_key FROM playerscopestats pss WHERE {cohort_where}
+        )
+        GROUP BY pssp.position_bucket
+    """
+    player_rows, cohort_rows = await asyncio.gather(
+        db.q(player_sql, player_params),
+        db.q(cohort_sql, scope_params),
     )
 
-    by_bucket = {r["position_bucket"]: r for r in rows}
+    by_bucket = {r["position_bucket"]: r for r in player_rows}
+    cohort_by_bucket = {r["position_bucket"]: r for r in cohort_rows}
+    cohort_total_innings = sum((r["innings"] or 0) for r in cohort_rows)
+
     out: list[dict] = []
     for b in range(1, 11):
         r = by_bucket.get(b)
         if r is None:
-            out.append({
+            entry = {
                 "bucket": b, "innings": 0, "runs": 0, "legal_balls": 0,
                 "dismissals": 0, "fours": 0, "sixes": 0, "dots": 0,
-            })
+            }
         else:
-            out.append({
+            entry = {
                 "bucket": b,
                 "innings":     r["innings"] or 0,
                 "runs":        r["runs"] or 0,
@@ -114,7 +141,20 @@ async def _position_distribution(db, person_id: str, filters: FilterParams) -> l
                 "fours":       r["fours"] or 0,
                 "sixes":       r["sixes"] or 0,
                 "dots":        r["dots"] or 0,
-            })
+            }
+        c = cohort_by_bucket.get(b)
+        if c is None or cohort_total_innings == 0:
+            entry["cohort_innings_share"] = None
+            entry["cohort_strike_rate"] = None
+        else:
+            inn_c = c["innings"] or 0
+            runs_c = c["runs"] or 0
+            balls_c = c["legal_balls"] or 0
+            entry["cohort_innings_share"] = inn_c / cohort_total_innings
+            entry["cohort_strike_rate"] = (
+                round(runs_c * 100 / balls_c, 2) if balls_c else None
+            )
+        out.append(entry)
     return out
 
 
