@@ -32,6 +32,12 @@ interface Props {
   /** Italic caption under the title — typically the unit hint. */
   subtitle?: string
   height?: number
+  /** Optional vertical reference line at a fractional bucket value
+   *  (1..N, not array index). Used on /batting?tab=By+Position to
+   *  mark the player's mean batting bucket so the reader sees where
+   *  this player typically operates. `label` renders as a small
+   *  italic caption just above the line. */
+  verticalMarker?: { x: number; label: string }
 }
 
 const BAR_COLOR = '#3C5B7A'  // WISDEN.slate
@@ -41,6 +47,7 @@ const VB_W = 100
 export default function MixHistogram({
   entries, bucketLabel, phaseTint,
   title, subtitle, height = 80,
+  verticalMarker,
 }: Props) {
   if (entries.length === 0) return null
 
@@ -148,6 +155,28 @@ export default function MixHistogram({
           {/* baseline */}
           <line x1={0} x2={VB_W} y1={height} y2={height}
                 stroke="#1A1714" strokeWidth={0.3} opacity={0.35} />
+          {/* Vertical reference marker — bucket positions map to
+              centers at (i + 0.5) * barW where i = bucket - 1 (entry
+              0 = bucket 1). The marker accepts a fractional bucket so
+              callers can mark a mean position (e.g. 2.4 for a #3-ish
+              player who occasionally opens). */}
+          {verticalMarker != null && (() => {
+            const buckets = entries.map(e => e.bucket)
+            const minBucket = Math.min(...buckets)
+            const maxBucket = Math.max(...buckets)
+            const x = verticalMarker.x
+            if (x < minBucket || x > maxBucket) return null
+            const xPx = ((x - minBucket) + 0.5) * barW
+            return (
+              <g>
+                <title>{verticalMarker.label}</title>
+                <line x1={xPx} x2={xPx} y1={0} y2={height}
+                      stroke="#7A1F1F" strokeWidth={0.6}
+                      strokeDasharray="0.8 0.6" opacity={0.9}
+                      data-testid="wisden-vertical-marker" />
+              </g>
+            )
+          })()}
         </svg>
       </div>
       {/* Bucket tick labels — kept outside the SVG so font sizing

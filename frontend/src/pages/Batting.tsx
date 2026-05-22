@@ -42,6 +42,7 @@ import type {
 import BatterDistributionPanel from '../components/batting/BatterDistributionPanel'
 import PositionDistributionTab from '../components/batting/PositionDistributionTab'
 import PhaseComparativeCharts from '../components/batting/PhaseComparativeCharts'
+import { meanWicketsDown } from '../utils/playerPosition'
 import BatterRecordsPanel from '../components/players/BatterRecordsPanel'
 import { SectionHeader } from '../components/ChartHeader'
 
@@ -683,20 +684,33 @@ export default function Batting() {
             {activeTab === 'Inter-Wicket' && (
               <>
                 <TabState fetch={interWicketFetch as FetchState<unknown>} />
-                {!interWicketFetch.loading && !interWicketFetch.error && interWicket.length > 0 && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <LineChart
-                      data={interWicket.map(iw => ({ x: iw.wickets_down, y: iw.strike_rate ?? 0 }))}
-                      xAccessor="x" yAccessor="y"
-                      title="Strike Rate by Wickets Down" xLabel="Wickets Down" yLabel="Strike Rate"
-                      height={350} showPoints />
-                    <BarChart
-                      data={interWicket} categoryAccessor={(d: Record<string, any>) => String(d.wickets_down)}
-                      valueAccessor="runs"
-                      title="Total Runs by Wickets Down" categoryLabel="Wickets Down" valueLabel="Runs"
-                      height={350} />
-                  </div>
-                )}
+                {!interWicketFetch.loading && !interWicketFetch.error && interWicket.length > 0 && (() => {
+                  // Vertical marker at the player's mean wickets-down
+                  // at entry. Wickets BEFORE this x include the player
+                  // walking in (the run-rate there is partly his
+                  // arrival behaviour); wickets AFTER measure how
+                  // quickly he picks up after a wicket falls.
+                  // User-asked 2026-05-22.
+                  const meanWd = meanWicketsDown(summary.position_distribution)
+                  const iwMarker = meanWd != null
+                    ? { x: meanWd, label: `mean entry: ${meanWd.toFixed(2)} wkts` }
+                    : undefined
+                  return (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <LineChart
+                        data={interWicket.map(iw => ({ x: iw.wickets_down, y: iw.strike_rate ?? 0 }))}
+                        xAccessor="x" yAccessor="y"
+                        title="Strike Rate by Wickets Down" xLabel="Wickets Down" yLabel="Strike Rate"
+                        height={350} showPoints
+                        verticalMarker={iwMarker} />
+                      <BarChart
+                        data={interWicket} categoryAccessor={(d: Record<string, any>) => String(d.wickets_down)}
+                        valueAccessor="runs"
+                        title="Total Runs by Wickets Down" categoryLabel="Wickets Down" valueLabel="Runs"
+                        height={350} />
+                    </div>
+                  )
+                })()}
               </>
             )}
 

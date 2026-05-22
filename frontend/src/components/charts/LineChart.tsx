@@ -50,6 +50,13 @@ interface LineChartProps<T extends Record<string, any>> {
   /** Legend label for the primary `data` series — default "Team". Only
    *  meaningful when `referenceData` is provided. */
   primaryLabel?: string
+  /** Optional vertical reference line at a specific x value (in the
+   *  same units as the data's xAccessor). Rendered as an oxblood
+   *  dashed line spanning the chart area. Used on the Inter-Wicket
+   *  tab to mark the player's mean entry-point wickets-down so the
+   *  reader can split the chart into "before entry" vs "picking up
+   *  after a wicket". User-asked 2026-05-22. */
+  verticalMarker?: { x: number; label: string }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,6 +66,7 @@ export default function LineChart<T extends Record<string, any>>({
   width, height = 400, xLabel, yLabel, showPoints, curve,
   annotations, tooltip,
   referenceData, referenceLabel, primaryLabel = 'Team',
+  verticalMarker,
 }: LineChartProps<T>) {
   const [ref, measuredWidth] = useContainerWidth()
   const effectiveWidth = width ?? measuredWidth
@@ -93,6 +101,24 @@ export default function LineChart<T extends Record<string, any>>({
     ? [colorScheme[0] ?? WISDEN_PALETTE[0], '#3F7A4D']
     : colorScheme
 
+  // Vertical-marker overlay needs pinned margins so the HTML overlay
+  // math (left + (x-min)/(max-min) * inner_width) matches what
+  // Semiotic actually rendered. Match BarChart's PINNED_NORMAL_MARGIN.
+  const PINNED_MARGIN = { top: 30, right: 20, bottom: 50, left: 60 }
+  const innerWidth = effectiveWidth - PINNED_MARGIN.left - PINNED_MARGIN.right
+  // Compute x-range from the data when a marker is set. Supports both
+  // string-accessor ('x') and function-accessor cases.
+  function getX(d: T): number {
+    if (typeof xAccessor === 'function') return xAccessor(d)
+    const v = (d as Record<string, unknown>)[xAccessor as string]
+    return typeof v === 'number' ? v : Number(v)
+  }
+  let xMin = 0, xMax = 0
+  if (verticalMarker && data.length > 0) {
+    xMin = Math.min(...data.map(getX))
+    xMax = Math.max(...data.map(getX))
+  }
+
   return (
     <ChartContainer
       outerRef={ref}
@@ -114,6 +140,8 @@ export default function LineChart<T extends Record<string, any>>({
           curve={curve}
           annotations={annotations}
           tooltip={tooltip}
+          /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+          frameProps={(verticalMarker ? { margin: PINNED_MARGIN } : undefined) as any}
           // Default the legend below the chart so long category labels
           // (e.g. team names like "Sunrisers Hyderabad") don't get
           // clipped by the chart card on narrow screens.
@@ -122,6 +150,42 @@ export default function LineChart<T extends Record<string, any>>({
           showGrid
         />
       )}
+      {/* Vertical reference marker — HTML overlay so the line is
+          legible (Semiotic's `type:'x'` annotation didn't render in
+          v3 against the chart's xAccessor). The line spans the chart
+          area between the pinned top + bottom margins; a faint
+          italic caption sits just above the chart area at the same
+          x position. */}
+      {verticalMarker && effectiveWidth > 0 && xMax > xMin && (() => {
+        const x = verticalMarker.x
+        const xPx = PINNED_MARGIN.left + ((x - xMin) / (xMax - xMin)) * innerWidth
+        const yTop = PINNED_MARGIN.top
+        const yBot = height - PINNED_MARGIN.bottom
+        return (
+          <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height, pointerEvents: 'none' }}>
+            <div style={{
+              position: 'absolute',
+              left: xPx,
+              top: yTop,
+              width: 0,
+              height: yBot - yTop,
+              borderLeft: '1.5px dashed #7A1F1F',
+              opacity: 0.85,
+            }} />
+            <div style={{
+              position: 'absolute',
+              left: xPx,
+              top: yTop - 14,
+              transform: 'translateX(-50%)',
+              whiteSpace: 'nowrap',
+              fontFamily: 'var(--serif)',
+              fontStyle: 'italic',
+              fontSize: 11,
+              color: '#7A1F1F',
+            }}>{verticalMarker.label}</div>
+          </div>
+        )
+      })()}
     </ChartContainer>
   )
 }

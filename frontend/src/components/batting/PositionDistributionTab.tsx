@@ -21,6 +21,7 @@ import MixHistogram, { type MixEntry } from '../distribution-charts/MixHistogram
 import PerformanceVsCohort, { type PerfEntry } from '../distribution-charts/PerformanceVsCohort'
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 import type { BattingPositionDistributionEntry } from '../../types'
+import { meanPositionBucket } from '../../utils/playerPosition'
 
 interface Props {
   positionDistribution: BattingPositionDistributionEntry[]
@@ -105,6 +106,15 @@ export default function PositionDistributionTab({ positionDistribution }: Props)
         title="Position mix"
         subtitle="% of player's innings batted at each position (top-order · middle · lower)"
         height={70}
+        verticalMarker={(() => {
+          // Oxblood dashed line at the player's mean batting bucket so
+          // the reader can read the rest of the chart relative to it.
+          // User-asked 2026-05-22.
+          const mean = meanPositionBucket(positionDistribution)
+          return mean != null
+            ? { x: mean, label: `Mean position: bucket ${mean.toFixed(2)}` }
+            : undefined
+        })()}
       />
       <PerformanceVsCohort
         entries={srEntries}
