@@ -354,13 +354,21 @@ a { color: inherit; }
   font: inherit;
   color: var(--ink-soft);
   cursor: pointer;
-  border-bottom: 1px solid transparent;
+  /* Persistent dotted underline at rest so these read as clickable
+     (user feedback 2026-05-22: the Distribution-panel form-window
+     chips — Last 10 / Last 60d / Last 6mo / Last 1y — didn't present
+     as links). Active state still gets a solid accent underline so it
+     remains the strongest signal. */
+  border-bottom: 1px dotted var(--ink-faint);
   transition: color 120ms, border-color 120ms;
 }
-.wisden-seg:hover { color: var(--ink); }
+.wisden-seg:hover {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
 .wisden-seg.is-active {
   color: var(--accent);
-  border-bottom-color: var(--accent);
+  border-bottom: 1px solid var(--accent);
 }
 .wisden-select {
   background: transparent;
