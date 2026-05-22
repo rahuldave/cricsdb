@@ -41,6 +41,7 @@ import type {
   ScopePlayerBowlingSeason, ScopePlayerBowlingPhase,
 } from '../types'
 import BowlerDistributionPanel from '../components/bowling/BowlerDistributionPanel'
+import OverDistributionTab from '../components/bowling/OverDistributionTab'
 import BowlerRecordsPanel from '../components/players/BowlerRecordsPanel'
 import { SectionHeader } from '../components/ChartHeader'
 
@@ -420,6 +421,15 @@ export default function Bowling() {
             {activeTab === 'By Over' && (
               <>
                 <TabState fetch={overFetch as FetchState<unknown>} />
+                {/* spec-mix-and-performance-charts.md §M1 — Mix histogram
+                    + stacked Performance-vs-cohort (Econ + Wkts/Inn).
+                    Reads summary.over_distribution which already carries
+                    per-bucket cohort fields (single payload, no extra
+                    fetch). Sits above the detailed Economy by Over
+                    Semiotic chart, which stays for numeric read-off. */}
+                {summary.over_distribution && summary.over_distribution.length > 0 && (
+                  <OverDistributionTab overDistribution={summary.over_distribution} />
+                )}
                 {!overFetch.loading && !overFetch.error && overData.length > 0 && (
                   <>
                     <BarChart
