@@ -704,7 +704,11 @@ async def bowling_vs_batters(
     aux: AuxParams = Depends(),
     batter_id: Optional[str] = Query(None),
     min_balls: int = Query(6, ge=1),
-    limit: int = Query(50, ge=1, le=200),
+    # Cap bumped from 200 to 500 (2026-05-22) to mirror the batting
+    # /vs-bowlers change — lets the frontend's in-page search reach
+    # any batter the bowler has faced. Default stays 50 so existing
+    # regression URLs are unchanged.
+    limit: int = Query(50, ge=1, le=500),
     sort: str = Query("balls"),
 ):
     db = get_db()
