@@ -85,11 +85,12 @@ async def _over_distribution(db, person_id: str, filters: FilterParams) -> list[
 
     player_sql = f"""
         SELECT psso.over_number,
-               SUM(psso.runs_conceded) AS runs_conceded,
-               SUM(psso.legal_balls)   AS legal_balls,
-               SUM(psso.wickets)       AS wickets,
-               SUM(psso.dots)          AS dots,
-               SUM(psso.boundaries)    AS boundaries
+               SUM(psso.runs_conceded)  AS runs_conceded,
+               SUM(psso.legal_balls)    AS legal_balls,
+               SUM(psso.wickets)        AS wickets,
+               SUM(psso.dots)           AS dots,
+               SUM(psso.boundaries)     AS boundaries,
+               SUM(psso.innings_bowled) AS innings_bowled
         FROM playerscopestatsover psso
         JOIN playerscopestats pss
           ON pss.scope_key = psso.scope_key
@@ -126,15 +127,17 @@ async def _over_distribution(db, person_id: str, filters: FilterParams) -> list[
             entry = {
                 "over": o, "runs_conceded": 0, "legal_balls": 0,
                 "wickets": 0, "dots": 0, "boundaries": 0,
+                "innings_bowled": 0,
             }
         else:
             entry = {
-                "over":          o,
-                "runs_conceded": r["runs_conceded"] or 0,
-                "legal_balls":   r["legal_balls"] or 0,
-                "wickets":       r["wickets"] or 0,
-                "dots":          r["dots"] or 0,
-                "boundaries":    r["boundaries"] or 0,
+                "over":           o,
+                "runs_conceded":  r["runs_conceded"] or 0,
+                "legal_balls":    r["legal_balls"] or 0,
+                "wickets":        r["wickets"] or 0,
+                "dots":           r["dots"] or 0,
+                "boundaries":     r["boundaries"] or 0,
+                "innings_bowled": r["innings_bowled"] or 0,
             }
         c = cohort_by_over.get(o)
         if c is None or cohort_total_balls == 0:

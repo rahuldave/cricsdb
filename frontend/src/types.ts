@@ -1223,6 +1223,10 @@ export interface BowlingOverDistributionEntry {
   wickets: number
   dots: number
   boundaries: number
+  /** Player's distinct innings-bowled count that touched this over
+   *  (per playerscopestatsover.innings_bowled). Denominator for the
+   *  player-side wickets-per-innings rate on the By Over chart. */
+  innings_bowled: number
   // spec-mix-and-performance-charts.md §3.2 — per-bucket cohort
   // context for the By Over tab's Mix histogram + Performance-vs-
   // cohort chart. cohort_balls_share sums to 1.0 across the 20
