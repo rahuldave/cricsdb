@@ -41,6 +41,7 @@ import type {
 } from '../types'
 import BatterDistributionPanel from '../components/batting/BatterDistributionPanel'
 import PositionDistributionTab from '../components/batting/PositionDistributionTab'
+import PhaseComparativeCharts from '../components/batting/PhaseComparativeCharts'
 import BatterRecordsPanel from '../components/players/BatterRecordsPanel'
 import { SectionHeader } from '../components/ChartHeader'
 
@@ -515,7 +516,7 @@ export default function Batting() {
                               </div>
                               <div><span className="lbl">4s</span></div><div className="num">{p.fours}</div>
                               <div><span className="lbl">6s</span></div><div className="num">{p.sixes}</div>
-                              <div><span className="lbl">B/4</span></div>
+                              <div><span className="lbl" title="Legal balls between fours — how often the player finds the rope">Balls/4</span></div>
                               <div className="num">
                                 {fmt(p.fours > 0 ? p.balls / p.fours : null)}
                                 <BaselineChip
@@ -530,6 +531,17 @@ export default function Batting() {
                     </div>
                   )
                 })()}
+                {/* Per-phase comparative charts. Same PerformanceVsCohort
+                    primitive as the By Position tab, with 3 buckets:
+                    1=powerplay, 2=middle, 3=death. The user reads the
+                    three small panels left-to-right to see SR, dot %,
+                    and boundary frequency vs the position-flat cohort
+                    at the same scope. User-asked 2026-05-22. */}
+                {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (
+                  <PhaseComparativeCharts
+                    phaseData={phaseData}
+                    phaseBaseline={phaseBaseline} />
+                )}
               </>
             )}
 
