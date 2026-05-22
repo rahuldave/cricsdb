@@ -1,6 +1,9 @@
 # Player Baseline Parity Spec
 
-**Status:** Draft for review, 2026-05-20.
+**Status:** SHIPPED 2026-05-20 across two sessions:
+- Session 1 (12 commits `0e7e7eb → 8cc7572`): backend §1-§4 + §6 — 2 new phase child tables (112K + 72K rows), 6 new cohort endpoints (by-season + by-phase × 3 disciplines, all take person_id), Q6 envelope extensions on /batters and /bowlers /summary + cohort mirrors. Memory: `project_player_baseline_parity_session1.md`.
+- Session 2 (13 commits `9784a49 → dcf061e`): frontend Phases C-H. 116 integration assertions across 5 baseline test suites all green. Backend gap-fill in 508b2f5 added 3 per-match envelopes to /fielders/{id}/summary. Memory: `project_player_baseline_parity_session2.md`.
+
 **Sibling specs:** `spec-player-compare-average.md` (Phase 1, shipped 2026-05-20 — three child tables + four cohort `/summary` endpoints + three-tier inline visual on `/players` + `/batting` + `/bowling` + `/fielding`), `spec-team-compare-average.md`, `spec-team-bucket-baseline.md`, `spec-team-compare-scoped-slots.md` (the reference model on the Teams side).
 
 ## 1. Context

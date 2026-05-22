@@ -1,5 +1,5 @@
 # Probability-Chip Baselines for Teams Spec
-**Status:** Reviewed + locked, 2026-05-21. **Triggered by:** `spec-prob-baselines.md` §10 (deferred team-grain follow-up) + 2026-05-21 user ask for the same Option C chip + comparison-anchor treatment on team Distribution panels.
+**Status:** SHIPPED + DEPLOYED 2026-05-21 (15 commits `08a6035 → a0434ae`). TT0.F / TT1-3.B / TT4.F all landed. Pushed alongside the COHORT/AVG header lines + Distribution-panel window-vs-cohort UX overhaul + hook-rules fix. Memory: `project_prob_baselines_teams_shipped.md`. **Originally triggered by:** `spec-prob-baselines.md` §10 (deferred team-grain follow-up) + 2026-05-21 user ask for the same Option C chip + comparison-anchor treatment on team Distribution panels.
 
 **Review pass 2026-05-21:** decisions §8 c1/c2/c3/c7 confirmed; per-window scope_avg pulled INTO scope (was incorrectly deferred — see §8.4 reply); audit per §11.1 completed and findings landed in §4.1; CohortRowPrefix component decision flipped (don't rename, add a sibling — see §6 + §11.2 reply).
 

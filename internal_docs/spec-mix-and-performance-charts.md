@@ -1,6 +1,6 @@
 # Mix-and-Performance Charts (Player Distribution Panels)
 
-**Status:** Locked, 2026-05-21. Triggered by user follow-up after the COHORT-line UX shipped (`d9a7bc0`) — the cohort line says "weighted to this player's position mix / over mix" but the mix itself was invisible. This spec surfaces it.
+**Status:** SHIPPED + DEPLOYED 2026-05-21 (17 commits `0de8510 → 03ffea4`). M1 Bowling (/bowling By Over: Mix + Econ + Wkts/Inn) + M2 Batting (new /batting By Position tab: Mix + SR) + M3 Fielding (new /fielding By Dismissed Position tab: Mix + Catches/match, keeper-binary cohort partition). Generic `MixHistogram` + `PerformanceVsCohort` primitives in `frontend/src/components/distribution-charts/` reused across all three disciplines. Memory: `project_mix_perf_charts_m1_shipped.md`. **Originally triggered by:** user follow-up after the COHORT-line UX shipped (`d9a7bc0`) — the cohort line said "weighted to this player's position mix / over mix" but the mix itself was invisible. This spec surfaced it.
 
 Three deferred follow-up specs from `spec-player-compare-average.md §"Follow-up specs"` consolidated into one. The visual + interaction patterns are identical across batting / bowling / fielding (different bucket axes only).
 

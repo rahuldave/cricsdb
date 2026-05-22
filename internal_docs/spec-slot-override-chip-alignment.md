@@ -1,7 +1,8 @@
 # Spec — Slot override expressiveness + chip alignment
 
-> **Status:** build-ready. Architectural fix; affects every
-> overridable axis on the Compare tab.
+> **Status:** SHIPPED. Generalised override mechanism live in
+> `TeamCompareGrid.tsx:93` (cites this spec). Cross-cutting lock at
+> `tests/integration/dom/cross_cutting_slot_override_chip_align.sh`.
 
 The Compare-tab per-slot override system has two real but
 parked limitations from the v3 audit (2026-04-28). Both apply

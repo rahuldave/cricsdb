@@ -1,5 +1,10 @@
 # Spec — agent-browser eval pattern: Series + Teams end-to-end
 
+> **Status:** SHIPPED. Batch 2 wrap commit `4ace499`; tests live under
+> `tests/integration/dom/series_*` and `tests/integration/dom/teams_*`.
+> Pre-condition `team_class=full_member` on the FilterBar shipped via
+> `spec-filterbar-team-class-v3.md` (5 commits 2026-04-28).
+
 End-to-end DOM-grounded test inventory for the Series and Teams
 tabs (and their sub-tabs). Companion to
 `spec-dom-grounded-tests.md` (the umbrella) and

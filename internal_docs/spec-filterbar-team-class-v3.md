@@ -1,7 +1,10 @@
 # Spec v3 — `team_class` on the FilterBar
 
 > **Supersedes** `spec-filterbar-team-class.md` (v2, 2026-04-27 / 2026-04-28).
-> **Status:** build-ready. Not yet implemented.
+> **Status:** SHIPPED 2026-04-28 (5 commits `a0773e5 … 87ad937`). 9th
+> FilterBar key live; `team_class` plumbing in `FilterBar.tsx:195-213` +
+> `api/filters.py:70`. Ship report in `enhancements-roadmap.md`
+> "Shipped 2026-04-28".
 
 Promote `team_class=full_member` from a per-slot Compare-tab override to
 the **9th FilterBar key**, behaving as the next overridable axis

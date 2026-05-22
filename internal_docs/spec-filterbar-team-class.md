@@ -1,5 +1,9 @@
 # Spec — `team_class` on the FilterBar
 
+> **Status:** SUPERSEDED by `spec-filterbar-team-class-v3.md` (shipped
+> 2026-04-28). This v2 draft is retained only for the design discussion;
+> the v3 spec is the canonical record of what shipped.
+
 Promote `team_class=full_member` from a per-slot avg-picker control on
 the Compare tab to the **9th FilterBar key** — a global filter that
 applies on every tab. Today (post-2026-04-27 work) it's an opt-in

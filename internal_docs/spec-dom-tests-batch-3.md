@@ -1,9 +1,10 @@
 # Spec — DOM-tests Batch 3 (3a / 3b / 3c)
 
-> **Status:** build-ready 2026-04-28. Picks up after Batch 2 ship
+> **Status:** SHIPPED. Batch 3 wrap commit `d7984e1` ("Batch 3c
+> commit 4 … + Batch 3 wrap"). Picked up after Batch 2 ship
 > (commit `b57b63a`). 23 scripts + 1 cross-cutting test + 2 small
 > harness extensions, split into 3 sub-batches at natural commit
-> boundaries.
+> boundaries — all landed.
 
 Total dom/ suite at start of Batch 3: 18 scripts, 353 assertions.
 Target at end of Batch 3: ~41 scripts, ~750 assertions, every

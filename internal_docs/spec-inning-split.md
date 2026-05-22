@@ -1,10 +1,11 @@
 # Spec — Inning split (1st innings / 2nd innings) on team + player stats
 
-> **Status:** build-ready. New page-local filter dimension touching
-> team + player Batting / Bowling / Fielding / Partnerships and the
-> Compare-tab slot grammar. No DB migration. Architectural cost
-> mostly mechanical — one new clause, one new aux field, one new
-> set of by-inning band endpoints, one new frontend toggle component.
+> **Status:** SHIPPED. InningToggle + useDiscipline + ScopeStatusStrip
+> wired across the app (POV-aware pill labels per commit `ca2ccd6`).
+> 13 mount sites locked by `tests/integration/inning_toggle_pov_labels.sh`.
+> Aux field + by-inning band endpoints + frontend toggle component all
+> live. See CLAUDE.md "Inning-toggle labels — POV-aware" + memory
+> `project_inning_pov_conventions.md`.
 
 ---
 

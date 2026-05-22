@@ -1,7 +1,10 @@
 ---
 spec: filterbar-team-class-club
 extends: spec-filterbar-team-class-v3.md
-status: build-ready, anchors derived, not yet implemented
+status: SHIPPED. Club tiers wired (`api/club_tiers.py`
+  exports `PRIMARY_CLUB_LEAGUES` / `SECONDARY_CLUB_LEAGUES`, commit `2d1a18b`).
+  `team_type='club'` gate lifted; `team_class` honours `primary_club` /
+  `secondary_club` values across leaders + dossier endpoints.
 authored: 2026-04-30
 anchors-derived: 2026-04-30 (DB snapshot)
 ---

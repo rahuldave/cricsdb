@@ -1,6 +1,8 @@
 # Spec: Tournaments tab (enhancement M)
 
-Status: build-ready.
+Status: SHIPPED 2026-04-15. `frontend/src/pages/Tournaments.tsx` +
+`TournamentDossier` + `api/routers/tournaments.py` all live; roadmap
+M marked done.
 Depends on: existing `match`, `innings`, `delivery`, `wicket`,
 `fielding_credit`, `keeper_assignment`, `partnership` tables.
 No new tables required.

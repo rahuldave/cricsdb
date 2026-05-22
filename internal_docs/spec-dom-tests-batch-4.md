@@ -1,8 +1,9 @@
 # Spec — DOM-tests Batch 4 (Players / Venues / Matches scorecard / charts)
 
-> **Status:** build-ready 2026-04-29. Picks up after Batch 3 ship
+> **Status:** SHIPPED. Batch 4 wrap commit `cf8bd77` ("Batch 4d commit
+> 2 … + Batch 4d wrap + Batch 4 wrap"). Picked up after Batch 3 ship
 > (`d7984e1`). Out-of-scope of `spec-dom-tests-series-teams.md` —
-> covers the surfaces deferred PAST that spec.
+> covered the surfaces deferred PAST that spec.
 
 Total dom/ suite at start of Batch 4: 41 scripts, ~720 assertions.
 Target at end of Batch 4: ~63 scripts, ~1100 assertions, every

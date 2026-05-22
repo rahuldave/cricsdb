@@ -1,6 +1,10 @@
 # Spec: Teams Compare — Average-Team Column, Phase Bands, Season-by-Season
 
-Status: build-ready.
+Status: SHIPPED. `TeamCompareGrid.tsx` carries league-avg slot
+("Remove league average" string at line 459); `AvgSummaryRow.tsx`
+live; `playerscopestats` parent + child tables populated under
+Path A; per-team transform for results metrics follow-up shipped
+(see `spec-avg-col-per-team-transform.md`).
 Depends on: nothing new in the data layer for the user-visible feature.
 Parallel workstream (not consumed by this spec): `player_scope_stats`
 table and its populate script — landed alongside this spec under Path A

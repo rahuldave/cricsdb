@@ -1,6 +1,6 @@
 # Absolute vs Per-Innings Audit + Fix Spec
 
-**Status:** Draft, 2026-05-20.
+**Status:** SHIPPED 2026-05-20 (21 commits). Fixes 8 ⚠️ tiles + 3 wrong chart overlays + adds 12 new tiles + 5 new charts across the player pages. Memory: `spec_rate_vs_volume_audit.md`.
 **Triggered by:** Kohli IPL profile after `spec-player-baseline-parity.md` Phase F — tiles like "100s 9 — vs base 0.006 ↑+450%" pair an absolute count (9) with a per-innings rate chip (0.006), which makes no sense to a reader.
 
 ## 1. The rule

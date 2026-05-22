@@ -1,6 +1,9 @@
 # Spec: Wicketkeeper Identification (Fielding Tier 2)
 
-Status: build-ready.
+Status: SHIPPED. `keeper_assignment` table populated;
+`api/routers/keeping.py` exposes `/{person_id}/keeping/summary` and
+siblings; `is_keeper` derived per (person, scope) via
+`matches_as_keeper > 0` (used by every fielding cohort partition).
 Depends on: Tier 1 (`fielding_credit` table, already shipped).
 
 ## Overview

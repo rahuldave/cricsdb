@@ -1,6 +1,8 @@
 # Spec: Team Statistics — Batting, Bowling, Fielding, Partnerships
 
-Status: build-ready.
+Status: SHIPPED 2026-04-14. `partnership` table populated; 20+
+`/teams/{team}/{batting,bowling,fielding}/*` endpoints live in
+`api/routers/teams.py`; roadmap entry marked done.
 Depends on: `fielding_credit` (shipped), `keeper_assignment` (shipped).
 
 ## Overview

@@ -1,6 +1,12 @@
 # Apples-to-Apples Baseline Audit + Fix Spec
 
-**Status:** Draft, 2026-05-20.
+**Status:** SHIPPED + DEPLOYED 2026-05-21 (21 commits
+`f68a7dc → 9119fe7`). All 6 tiers landed. New tables: bowling_innings
+on parent + 4 milestones on position child + innings_bowled/4fers on
+over child + new batting_over + new batting_phase_position. T2
+dimensional fix uses per_innings_scale = cohort_attendances /
+cohort_unique_innings. 0 REG drift across 6 families. Memory:
+`project_apples_to_apples_shipped.md`.
 **Triggered by:** user feedback on Kohli IPL 100s/Inn 0.033 vs scope-flat
 baseline 0.006 → +450%. The dimensional-discipline spec
 (`spec-rate-vs-volume-audit.md`) fixed the unit mismatch but did NOT

@@ -1,10 +1,12 @@
 # Spec — `series_type` on the FilterBar
 
-> **Status:** build-ready. Mirrors `spec-filterbar-team-class-v3.md`
-> structurally — this spec is shorter because most of the per-slot
-> plumbing already exists (`useCompareSlots.inheritedScope` already
-> reads `primary.series_type`; `OVERRIDABLE_SLOT_KEYS` already
-> includes `'series_type'`).
+> **Status:** SHIPPED. `series_type` is the 10th FilterBar key
+> (`api/filters.py:70-71`, `FilterBar.tsx:271`); typeahead respects it
+> per commit `fbcd953` ("list_teams typeahead — apply series_type
+> clause"). Mirrors `spec-filterbar-team-class-v3.md` structurally —
+> this spec was shorter because most per-slot plumbing
+> (`useCompareSlots.inheritedScope`, `OVERRIDABLE_SLOT_KEYS`) already
+> existed at spec-write time.
 
 Promote `series_type` from `AuxParams` to `FilterBarParams` so it
 becomes the **10th FilterBar key** alongside `team_class` (the

@@ -1,7 +1,11 @@
 # Spec — Per-team transform for the avg column's RESULTS metrics
 
-> **Status:** build-ready. Targeted at the same session that wrote it
-> (2026-04-28).
+> **Status:** PARTIAL. Backend shipped 2026-04-28 (`236eaf7` "backend:
+> avg col returns per-team averages for results metrics") —
+> `_per_team_one` / `_per_team_two` helpers live in
+> `api/routers/teams.py:680-686`. **Verify whether frontend consumes
+> the new per-team transform** before treating this as fully done — no
+> dedicated frontend follow-up commit was visible in the audit.
 
 The Compare-tab avg column displays pool totals where it should
 display per-team averages for RESULTS metrics (matches, wins, losses,

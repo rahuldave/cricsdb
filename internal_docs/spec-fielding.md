@@ -1,5 +1,10 @@
 # Spec: Fielding Analytics (Tier 1)
 
+> **Status:** SHIPPED. `fieldingcredit` table populated;
+> `api/routers/fielding.py` exposes /fielders/* (10 endpoints);
+> `/fielding` page live. Tier 2 (keeper identification) shipped
+> separately per `spec-fielding-tier2.md`.
+
 ## Overview
 
 Add a Fielding page at `/fielding` at the same level as Batting and

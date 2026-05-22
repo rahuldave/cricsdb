@@ -1,5 +1,10 @@
 # Spec — DOM-grounded numeric tests across all tabs
 
+> **Status:** SHIPPED. Umbrella roadmap whose Batches 1-4 all landed
+> (`27dec39` Batch 1, `b57b63a` Batch 2, `d7984e1` Batch 3 wrap,
+> `cf8bd77` Batch 4 wrap). `tests/integration/dom/` houses ~63 scripts
+> with ~1100 assertions across every top-level page and major sub-tab.
+
 Companion roadmap to `tests/integration/compare_avg_chips.sh`. The
 pattern there (Playwright/CDP DOM extraction → independent
 sqlite-derived ground truth → cell-by-cell numeric agreement) is the

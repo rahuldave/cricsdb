@@ -1,6 +1,11 @@
 # Spec: Players — Position-Adaptive Scope-Average Baselines (Surface 1)
 
-Status: build-ready.
+Status: SHIPPED 2026-05-20 (25 commits `8869f6a → 35b323c`). Three
+child tables populated (97K + 282K + 94K rows), four cohort endpoints
+live, four envelope-migrated /summary endpoints, inline three-tier
+visual on /players + /batting + /bowling + /fielding (11 tiles).
+Also fixed the 4.2% non-striker dismissals bug. Memory:
+`project_player_baselines_spec.md`.
 Depends on: `playerscopestats` table + populate scripts (shipped under
 `spec-team-compare-average.md` Path A as a parallel workstream — present
 and incrementally maintained, never yet read from).

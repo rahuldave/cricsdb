@@ -1,6 +1,8 @@
 # Spec: League pages — above-tournament scope dossiers
 
-Status: build-ready (decisions locked in §Decisions).
+Status: SHIPPED + DEPLOYED 2026-05-13. /league route + 4 endpoints +
+prose-scope H2 ("Men's primary-tier club cricket, …") + By-tier cards
+on /series. 10 commits per memory `project_league_pages_shipped.md`.
 Depends on: `/api/v1/scope/averages/{batting,bowling,fielding}/{summary,by-season,by-phase}` (shipped), `Series*TileRow` / `Series*ChartStrip` components shipped in `spec-series-trend-charts.md` (today). Three small new endpoints (§API).
 Related: `spec-series-trend-charts.md` (the tile/chart strip pattern this page reuses), `spec-team-compare-average.md` (the `/scope/averages/*` pool-weighted-baseline pattern), `internal_docs/series-type-anchor-numbers.md` (tier definitions).
 

@@ -1,6 +1,9 @@
 # Spec: Series — Trend charts on Batting/Bowling/Fielding subtabs, Teams pages get tournament-baseline overlay
 
-Status: build-ready (decisions locked in §Decisions).
+Status: PARTIAL — main rollout SHIPPED (Teams overlay landed,
+`/scope/averages/.../by-season` endpoints live, tile/chart strip
+components in use). **D3 (phase × season heatmaps on Series) explicitly
+DEFERRED** — needs two new endpoints + a heatmap component.
 Depends on: `/api/v1/scope/averages/{batting,bowling,fielding}/{summary,by-season,by-phase}` (already shipped — `scope_averages.py`). One small API addition: a `boundaries_conceded` MetricEnvelope on `/teams/{t}/bowling/summary` and its `/scope/averages` sibling (§API). One new endpoint pair deferred for D3 phase × season heatmaps.
 Related: `spec-team-compare-average.md` (established the `/scope/averages/*` pool-weighted-baseline pattern that this spec consumes), `spec-team-stats.md`.
 
