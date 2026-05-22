@@ -13,9 +13,9 @@ REG bat_leaders_ipl_2024              /api/v1/batters/leaders?gender=male&team_t
 REG bat_leaders_with_thresholds       /api/v1/batters/leaders?gender=male&team_type=international&min_balls=200&min_dismissals=5
 
 # ── per-batter endpoints (all tabs on the batting page) ──────────
-REG bat_summary_kohli_intl            /api/v1/batters/ba607b88/summary?gender=male&team_type=international
-REG bat_summary_kohli_ipl             /api/v1/batters/ba607b88/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
-REG bat_summary_kohli_recent          /api/v1/batters/ba607b88/summary?gender=male&season_from=2024&season_to=2025
+NEW bat_summary_kohli_intl            /api/v1/batters/ba607b88/summary?gender=male&team_type=international
+NEW bat_summary_kohli_ipl             /api/v1/batters/ba607b88/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
+NEW bat_summary_kohli_recent          /api/v1/batters/ba607b88/summary?gender=male&season_from=2024&season_to=2025
 REG bat_by_innings_kohli              /api/v1/batters/ba607b88/by-innings?limit=10
 REG bat_by_innings_kohli_ipl          /api/v1/batters/ba607b88/by-innings?tournament=Indian%20Premier%20League&limit=5
 REG bat_vs_bowlers_kohli              /api/v1/batters/ba607b88/vs-bowlers?gender=male&team_type=international&min_balls=12
@@ -27,12 +27,12 @@ REG bat_dismissals_kohli              /api/v1/batters/ba607b88/dismissals?gender
 REG bat_inter_wicket_kohli            /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international
 
 # ── rivalry scope (filter_team / filter_opponent) ────────────────
-REG bat_summary_kohli_vs_aus          /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
+NEW bat_summary_kohli_vs_aus          /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
 REG bat_by_innings_kohli_vs_aus       /api/v1/batters/ba607b88/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5
 REG bat_by_season_kohli_ipl_rcb       /api/v1/batters/ba607b88/by-season?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_team=Royal%20Challengers%20Bangalore
 
 # ── venue-scope sanity ───────────────────────────────────────────
-REG bat_summary_kohli_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+NEW bat_summary_kohli_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
 
 # ── search (landing → player picker) ─────────────────────────────
 REG ref_players_search_kohli          /api/v1/players?q=Kohli&limit=10
@@ -43,13 +43,13 @@ REG ref_players_search_batter_role    /api/v1/players?q=Samson&role=batter&limit
 
 REG bat_leaders_men_intl_fm                            /api/v1/batters/leaders?gender=male&team_type=international&limit=10&team_class=full_member
 REG bat_leaders_with_thresholds_fm                     /api/v1/batters/leaders?gender=male&team_type=international&min_balls=200&min_dismissals=5&team_class=full_member
-REG bat_summary_kohli_intl_fm                          /api/v1/batters/ba607b88/summary?gender=male&team_type=international&team_class=full_member
+NEW bat_summary_kohli_intl_fm                          /api/v1/batters/ba607b88/summary?gender=male&team_type=international&team_class=full_member
 REG bat_vs_bowlers_kohli_fm                            /api/v1/batters/ba607b88/vs-bowlers?gender=male&team_type=international&min_balls=12&team_class=full_member
 REG bat_by_over_kohli_fm                               /api/v1/batters/ba607b88/by-over?gender=male&team_type=international&team_class=full_member
 REG bat_by_phase_kohli_fm                              /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international&team_class=full_member
 REG bat_dismissals_kohli_fm                            /api/v1/batters/ba607b88/dismissals?gender=male&team_type=international&team_class=full_member
 REG bat_inter_wicket_kohli_fm                          /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international&team_class=full_member
-REG bat_summary_kohli_vs_aus_fm                        /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
+NEW bat_summary_kohli_vs_aus_fm                        /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&team_class=full_member
 REG bat_by_innings_kohli_vs_aus_fm                     /api/v1/batters/ba607b88/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5&team_class=full_member
 # series_type FilterBar — generated REG URLs (one-shot)
 # Source: each row mirrors an intl REG row in urls.txt with &series_type=bilateral_only appended.
@@ -58,13 +58,13 @@ REG bat_by_innings_kohli_vs_aus_fm                     /api/v1/batters/ba607b88/
 
 REG bat_leaders_men_intl_bilat                         /api/v1/batters/leaders?gender=male&team_type=international&limit=10&series_type=bilateral_only
 REG bat_leaders_with_thresholds_bilat                  /api/v1/batters/leaders?gender=male&team_type=international&min_balls=200&min_dismissals=5&series_type=bilateral_only
-REG bat_summary_kohli_intl_bilat                       /api/v1/batters/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
+NEW bat_summary_kohli_intl_bilat                       /api/v1/batters/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
 REG bat_vs_bowlers_kohli_bilat                         /api/v1/batters/ba607b88/vs-bowlers?gender=male&team_type=international&min_balls=12&series_type=bilateral_only
 REG bat_by_over_kohli_bilat                            /api/v1/batters/ba607b88/by-over?gender=male&team_type=international&series_type=bilateral_only
 REG bat_by_phase_kohli_bilat                           /api/v1/batters/ba607b88/by-phase?gender=male&team_type=international&series_type=bilateral_only
 REG bat_dismissals_kohli_bilat                         /api/v1/batters/ba607b88/dismissals?gender=male&team_type=international&series_type=bilateral_only
 REG bat_inter_wicket_kohli_bilat                       /api/v1/batters/ba607b88/inter-wicket?gender=male&team_type=international&series_type=bilateral_only
-REG bat_summary_kohli_vs_aus_bilat                     /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
+NEW bat_summary_kohli_vs_aus_bilat                     /api/v1/batters/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&series_type=bilateral_only
 REG bat_by_innings_kohli_vs_aus_bilat                  /api/v1/batters/ba607b88/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5&series_type=bilateral_only
 
 # club-tier team_class — batting leaders + dossier narrowing
