@@ -32,7 +32,7 @@ def _safe_div(a, b, mul=1, ndigits=2):
 
 
 async def _dismissal_position_distribution(
-    db, person_id: str, filters: FilterParams
+    db, person_id: str, filters: FilterParams, is_keeper: int = 0,
 ) -> list[dict]:
     """Return the fielder's per-(dismissed batter position) aggregates.
 
@@ -46,34 +46,55 @@ async def _dismissal_position_distribution(
     Joined from playerscopestats_fielding_position → playerscopestats;
     honours scope_key axes only (tournament/season/gender/team_type)
     per the precomputed-table-only contract this rollout uses.
+
+    Each entry also carries per-bucket cohort fields
+    (`cohort_dismissals_share` / `cohort_catches_per_match`)
+    computed from the same `playerscopestatsfieldingposition` rows
+    aggregated over every player at the same scope, partitioned by
+    `is_keeper` (matches_as_keeper > 0 → keeper partition; = 0 →
+    outfielder). Spec:
+    spec-mix-and-performance-charts.md §3.3 — the By Dismissed
+    Position tab's Mix histogram + Performance-vs-cohort chart
+    reads these without a second roundtrip. cohort denominator for
+    catches/match is SUM(playerscopestats.matches) across the
+    partition (same for every bucket — bucket grain is the
+    NUMERATOR; the cohort's total matches played is the
+    DENOMINATOR).
     """
-    clauses = ["pss.person_id = :pid"]
-    params: dict = {"pid": person_id}
+    scope_clauses: list[str] = []
+    scope_params: dict = {}
     if filters.gender:
-        clauses.append("pss.gender = :gender")
-        params["gender"] = filters.gender
+        scope_clauses.append("pss.gender = :gender")
+        scope_params["gender"] = filters.gender
     if filters.team_type:
-        clauses.append("pss.team_type = :team_type")
-        params["team_type"] = filters.team_type
+        scope_clauses.append("pss.team_type = :team_type")
+        scope_params["team_type"] = filters.team_type
     if filters.tournament:
         if is_canonical_with_variants(filters.tournament):
-            clauses.append(event_name_in_clause(
+            scope_clauses.append(event_name_in_clause(
                 canonical_variants(filters.tournament),
                 col="pss.tournament",
             ))
         else:
-            clauses.append("pss.tournament = :tournament")
-            params["tournament"] = filters.tournament
+            scope_clauses.append("pss.tournament = :tournament")
+            scope_params["tournament"] = filters.tournament
     if filters.season_from:
-        clauses.append("pss.season >= :season_from")
-        params["season_from"] = filters.season_from
+        scope_clauses.append("pss.season >= :season_from")
+        scope_params["season_from"] = filters.season_from
     if filters.season_to:
-        clauses.append("pss.season <= :season_to")
-        params["season_to"] = filters.season_to
-    where = " AND ".join(clauses)
+        scope_clauses.append("pss.season <= :season_to")
+        scope_params["season_to"] = filters.season_to
 
-    rows = await db.q(
-        f"""
+    player_clauses = ["pss.person_id = :pid"] + scope_clauses
+    player_params: dict = {"pid": person_id, **scope_params}
+    player_where = " AND ".join(player_clauses)
+    cohort_where = " AND ".join(scope_clauses) if scope_clauses else "1=1"
+    # Keeper-binary partition for the cohort — same predicate as
+    # compute_players_fielding_cohort. is_keeper=1 → keepers (>0);
+    # is_keeper=0 → outfielders (=0).
+    keeper_pred = ">" if is_keeper else "="
+
+    player_sql = f"""
         SELECT pssfp.position_bucket,
                SUM(pssfp.catches)    AS catches,
                SUM(pssfp.stumpings)  AS stumpings,
@@ -83,30 +104,69 @@ async def _dismissal_position_distribution(
         JOIN playerscopestats pss
           ON pss.scope_key = pssfp.scope_key
          AND pss.person_id = pssfp.person_id
-        WHERE {where}
+        WHERE {player_where}
         GROUP BY pssfp.position_bucket
         ORDER BY pssfp.position_bucket
-        """,
-        params,
+    """
+    cohort_sql = f"""
+        SELECT pssfp.position_bucket,
+               SUM(pssfp.catches)    AS catches,
+               SUM(pssfp.dismissals) AS dismissals
+        FROM playerscopestatsfieldingposition pssfp
+        JOIN playerscopestats pss
+          ON pss.scope_key = pssfp.scope_key
+         AND pss.person_id = pssfp.person_id
+        WHERE pss.matches_as_keeper {keeper_pred} 0
+          AND {cohort_where}
+        GROUP BY pssfp.position_bucket
+    """
+    # The catches/match denominator is the SAME across all buckets:
+    # SUM(playerscopestats.matches) for the cohort partition. Run it
+    # in parallel with the bucket aggregates so the helper stays a
+    # single roundtrip in user time.
+    cohort_pool_sql = f"""
+        SELECT SUM(pss.matches) AS n_matches_total
+        FROM playerscopestats pss
+        WHERE pss.matches_as_keeper {keeper_pred} 0
+          AND {cohort_where}
+    """
+    player_rows, cohort_rows, cohort_pool = await asyncio.gather(
+        db.q(player_sql, player_params),
+        db.q(cohort_sql, scope_params),
+        db.q(cohort_pool_sql, scope_params),
     )
 
-    by_bucket = {r["position_bucket"]: r for r in rows}
+    by_bucket = {r["position_bucket"]: r for r in player_rows}
+    cohort_by_bucket = {r["position_bucket"]: r for r in cohort_rows}
+    cohort_total_dismissals = sum((r["dismissals"] or 0) for r in cohort_rows)
+    cohort_n_matches = (cohort_pool[0].get("n_matches_total") if cohort_pool else 0) or 0
+
     out: list[dict] = []
     for b in range(1, 11):
         r = by_bucket.get(b)
         if r is None:
-            out.append({
+            entry = {
                 "bucket": b, "catches": 0, "stumpings": 0,
                 "run_outs": 0, "dismissals": 0,
-            })
+            }
         else:
-            out.append({
+            entry = {
                 "bucket":     b,
                 "catches":    r["catches"] or 0,
                 "stumpings":  r["stumpings"] or 0,
                 "run_outs":   r["run_outs"] or 0,
                 "dismissals": r["dismissals"] or 0,
-            })
+            }
+        c = cohort_by_bucket.get(b)
+        if c is None or cohort_total_dismissals == 0:
+            entry["cohort_dismissals_share"] = None
+        else:
+            entry["cohort_dismissals_share"] = (c["dismissals"] or 0) / cohort_total_dismissals
+        if c is None or cohort_n_matches == 0:
+            entry["cohort_catches_per_match"] = None
+        else:
+            entry["cohort_catches_per_match"] = round((c["catches"] or 0) / cohort_n_matches, 4)
+        out.append(entry)
     return out
 
 
@@ -360,13 +420,17 @@ async def fielding_summary(
     innings_kept = keeping_rows[0]["c"] if keeping_rows else 0
 
     nationalities = await player_nationalities(db, person_id)
-    dismissal_position_distribution = await _dismissal_position_distribution(
-        db, person_id, filters,
-    )
 
     # Cohort baseline: partition by is_keeper (innings_kept > 0).
-    # Phase 4 spec — fold the cohort response into the envelope.
+    # Phase 4 spec — fold the cohort response into the envelope. The
+    # per-bucket cohort fields on dismissal_position_distribution
+    # (spec-mix-and-performance-charts.md §3.3) also need the
+    # partition flag, so compute it BEFORE the helper call.
     is_keeper_val = 1 if innings_kept > 0 else 0
+    dismissal_position_distribution = await _dismissal_position_distribution(
+        db, person_id, filters, is_keeper_val,
+    )
+
     cohort: Optional[dict] = None
     if matches > 0:
         from .scope_averages import compute_players_fielding_cohort
