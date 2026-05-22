@@ -104,7 +104,8 @@ export default function DismissedPositionDistributionTab({
     }
   })
 
-  const cohortLabel = isKeeper ? 'keeper cohort at scope' : 'outfielder cohort at scope'
+  const cohortLabel = isKeeper ? 'keepers' : 'outfielders'
+  const cohortExplainer = `Green tick = average catches per match against batters at this position across every ${cohortLabel.slice(0, -1)} in the FilterBar scope.`
 
   return (
     <section
@@ -124,10 +125,10 @@ export default function DismissedPositionDistributionTab({
         bucketLabel={bucketLabel}
         phaseTint={dismissedPositionPhaseTint}
         title="Catches per match by dismissed-batter position"
-        subtitle={`player vs ${cohortLabel} (forest-green tick)`}
         yLabel="catches / match"
         yFmt={fmt3}
-        height={90}
+        cohortExplainer={cohortExplainer}
+        height={110}
       />
     </section>
   )

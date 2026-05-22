@@ -45,6 +45,10 @@ export default function MixHistogram({
   const max = Math.max(...entries.map(e => e.share), 0.0001)
   const barW = VB_W / entries.length
   const barInset = Math.min(barW * 0.15, 0.4)
+  // Mix shares are 0-1; y-axis ticks render as percentages. Three
+  // marks (max, mid, 0) so the reader can read off bar heights.
+  const yTicks: number[] = [max, max / 2, 0]
+  const fmtPct = (v: number) => `${(v * 100).toFixed(0)}%`
 
   return (
     <div className="wisden-mix-histogram" style={{ width: '100%' }}>
@@ -67,54 +71,91 @@ export default function MixHistogram({
           )}
         </div>
       )}
-      <svg
-        viewBox={`0 0 ${VB_W} ${height}`}
-        preserveAspectRatio="none"
-        style={{ width: '100%', height, display: 'block' }}
-        aria-label={title ?? 'Mix histogram'}
-      >
-        {/* Phase tint backgrounds — one rect per bucket spanning full
-            height when phaseTint returns a colour. */}
-        {phaseTint && entries.map((e, i) => {
-          const fill = phaseTint(e.bucket)
-          if (!fill) return null
-          return (
-            <rect
-              key={`tint-${i}`}
-              x={i * barW} y={0}
-              width={barW} height={height}
-              fill={fill}
-              opacity={0.55}
-            />
-          )
-        })}
-        {/* Share bars */}
-        {entries.map((e, i) => {
-          const value_h = (e.share / max) * height
-          return (
-            <g key={i}>
-              <title>{e.tooltip}</title>
+      {/* Layout: small left column for y-axis labels + SVG chart
+          stretching to fill. The labels live outside the SVG because
+          preserveAspectRatio="none" would distort text inside. */}
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 4 }}>
+        <div style={{
+          position: 'relative', width: 28, height,
+          fontFamily: 'var(--serif)', fontSize: '0.6rem',
+          color: 'var(--ink-faint)', flexShrink: 0,
+        }}>
+          {yTicks.map((v, i) => {
+            const y = (v / max) * height
+            return (
+              <div key={`yt-${i}`} style={{
+                position: 'absolute',
+                right: 2,
+                top: height - y,
+                transform: 'translateY(-50%)',
+                lineHeight: 1,
+                whiteSpace: 'nowrap',
+              }}>{fmtPct(v)}</div>
+            )
+          })}
+        </div>
+        <svg
+          viewBox={`0 0 ${VB_W} ${height}`}
+          preserveAspectRatio="none"
+          style={{ width: '100%', height, display: 'block', flex: 1 }}
+          aria-label={title ?? 'Mix histogram'}
+        >
+          {/* Phase tint backgrounds — one rect per bucket spanning full
+              height when phaseTint returns a colour. */}
+          {phaseTint && entries.map((e, i) => {
+            const fill = phaseTint(e.bucket)
+            if (!fill) return null
+            return (
               <rect
-                x={i * barW + barInset}
-                y={height - value_h}
-                width={Math.max(barW - 2 * barInset, 0.3)}
-                height={value_h}
-                fill={BAR_COLOR}
-                opacity={BAR_OPACITY}
+                key={`tint-${i}`}
+                x={i * barW} y={0}
+                width={barW} height={height}
+                fill={fill}
+                opacity={0.55}
               />
-            </g>
-          )
-        })}
-        {/* baseline */}
-        <line x1={0} x2={VB_W} y1={height} y2={height}
-              stroke="#1A1714" strokeWidth={0.3} opacity={0.35} />
-      </svg>
+            )
+          })}
+          {/* Y-axis gridlines — faint horizontal rules at each tick. */}
+          {yTicks.map((v, i) => {
+            if (v === 0) return null
+            const y = height - (v / max) * height
+            return (
+              <line key={`gl-${i}`}
+                x1={0} x2={VB_W} y1={y} y2={y}
+                stroke="#1A1714" strokeWidth={0.2} opacity={0.18}
+                strokeDasharray="0.6 0.6" />
+            )
+          })}
+          {/* Share bars */}
+          {entries.map((e, i) => {
+            const value_h = (e.share / max) * height
+            return (
+              <g key={i}>
+                <title>{e.tooltip}</title>
+                <rect
+                  x={i * barW + barInset}
+                  y={height - value_h}
+                  width={Math.max(barW - 2 * barInset, 0.3)}
+                  height={value_h}
+                  fill={BAR_COLOR}
+                  opacity={BAR_OPACITY}
+                />
+              </g>
+            )
+          })}
+          {/* baseline */}
+          <line x1={0} x2={VB_W} y1={height} y2={height}
+                stroke="#1A1714" strokeWidth={0.3} opacity={0.35} />
+        </svg>
+      </div>
       {/* Bucket tick labels — kept outside the SVG so font sizing
-          doesn't get viewBox-distorted by preserveAspectRatio="none". */}
+          doesn't get viewBox-distorted by preserveAspectRatio="none".
+          Padded left by the y-axis label column width + gap. */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${entries.length}, 1fr)`,
         marginTop: 2,
+        marginLeft: 32,
         fontFamily: 'var(--serif)',
         fontSize: '0.6rem',
         color: 'var(--ink-faint)',

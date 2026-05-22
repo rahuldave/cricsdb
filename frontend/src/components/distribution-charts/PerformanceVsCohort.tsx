@@ -15,11 +15,19 @@
 
 const COHORT_COLOR = '#3F7A4D'  // WISDEN.forest — reference-line convention
 const PLAYER_COLOR = '#3C5B7A'  // WISDEN.slate
-const PLAYER_OPACITY_ACTIVE = 0.8
-const PLAYER_OPACITY_FADED  = 0.4
+// Bars dropped to 0.5 (was 0.8) so the green cohort tick reads
+// cleanly THROUGH the player bar — user feedback 2026-05-22 that
+// the tick was invisible behind the opaque bars.
+const PLAYER_OPACITY_ACTIVE = 0.5
+const PLAYER_OPACITY_FADED  = 0.3
 const VB_W = 100
+// Cohort tick — slim 1px line with 10% bar-width overhang on each
+// side. Originally bumped to 2.5/18% but user feedback 2026-05-22:
+// "the green lines look like the story, not the backstory." With
+// the bars dropped to 0.5 opacity the slim tick reads cleanly
+// through without overpowering the player bars.
 const TICK_HEIGHT_PX = 1.0
-const TICK_OVERHANG_FRAC = 0.10  // 10% of bar width on each side
+const TICK_OVERHANG_FRAC = 0.10
 
 export interface PerfEntry {
   bucket: number
@@ -39,17 +47,21 @@ interface Props {
   subtitle?: string
   /** Y-axis caption rendered as a small italic note above-left. */
   yLabel?: string
-  /** Format tick value labels (e.g. (v)=>v.toFixed(1)). Used for
-   *  the legend-anchor display only — the chart itself doesn't draw
-   *  numeric y-ticks because the goal is comparison shape, not
-   *  precise read-off. */
+  /** Format tick value labels (e.g. (v)=>v.toFixed(1)). Used both
+   *  by the new on-chart y-axis labels (max / mid / 0) and by the
+   *  legend's cohort value range. */
   yFmt?: (v: number) => string
   height?: number
+  /** Sentence-form explanation of what the green cohort tick
+   *  represents at this scope — rendered above the chart so the
+   *  reader doesn't have to infer the comparison anchor. */
+  cohortExplainer?: string
 }
 
 export default function PerformanceVsCohort({
   entries, bucketLabel, phaseTint,
   title, subtitle, yLabel, yFmt,
+  cohortExplainer,
   height = 80,
 }: Props) {
   if (entries.length === 0) return null
@@ -64,6 +76,10 @@ export default function PerformanceVsCohort({
   const barW = VB_W / entries.length
   const barInset = Math.min(barW * 0.15, 0.4)
   const tickW = barW + 2 * barW * TICK_OVERHANG_FRAC
+  // Three numeric y-ticks: max / mid / 0. yFmt formats the unit;
+  // fallback is two-decimal numeric if caller didn't pass one.
+  const yTicks: number[] = [max, max / 2, 0]
+  const fmt = yFmt ?? ((v: number) => v.toFixed(2))
 
   return (
     <div className="wisden-perf-cohort" style={{ width: '100%' }}>
@@ -99,70 +115,122 @@ export default function PerformanceVsCohort({
           )}
         </div>
       )}
-      <svg
-        viewBox={`0 0 ${VB_W} ${height}`}
-        preserveAspectRatio="none"
-        style={{ width: '100%', height, display: 'block' }}
-        aria-label={title ?? 'Performance vs cohort'}
-      >
-        {phaseTint && entries.map((e, i) => {
-          const fill = phaseTint(e.bucket)
-          if (!fill) return null
-          return (
-            <rect
-              key={`tint-${i}`}
-              x={i * barW} y={0}
-              width={barW} height={height}
-              fill={fill}
-              opacity={0.55}
-            />
-          )
-        })}
-        {entries.map((e, i) => {
-          const op = e.faded ? PLAYER_OPACITY_FADED : PLAYER_OPACITY_ACTIVE
-          const v = e.playerValue
-          if (v == null || v <= 0) return null
-          const value_h = (v / max) * height
-          return (
-            <g key={`bar-${i}`}>
-              {e.tooltip && <title>{e.tooltip}</title>}
+      {/* Sentence-form cohort explainer — user-feedback 2026-05-22:
+          the legend swatch alone didn't explain WHAT the green mark
+          represents. This one-line caption disambiguates. */}
+      {cohortExplainer && (
+        <div style={{
+          marginTop: 2, marginBottom: 6,
+          fontFamily: 'var(--serif)',
+          fontSize: '0.7rem',
+          color: 'var(--ink-soft)',
+          display: 'flex', alignItems: 'center', gap: '0.4rem',
+        }}>
+          <span aria-hidden="true" style={{
+            display: 'inline-block', width: 16, height: 3,
+            background: COHORT_COLOR, borderRadius: 1,
+          }} />
+          {cohortExplainer}
+        </div>
+      )}
+      {/* Layout: y-axis label column + stretched SVG. */}
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 4 }}>
+        <div style={{
+          position: 'relative', width: 28, height,
+          fontFamily: 'var(--serif)', fontSize: '0.6rem',
+          color: 'var(--ink-faint)', flexShrink: 0,
+        }}>
+          {yTicks.map((v, i) => {
+            const y = (v / max) * height
+            return (
+              <div key={`yt-${i}`} style={{
+                position: 'absolute',
+                right: 2,
+                top: height - y,
+                transform: 'translateY(-50%)',
+                lineHeight: 1,
+                whiteSpace: 'nowrap',
+              }}>{fmt(v)}</div>
+            )
+          })}
+        </div>
+        <svg
+          viewBox={`0 0 ${VB_W} ${height}`}
+          preserveAspectRatio="none"
+          style={{ width: '100%', height, display: 'block', flex: 1 }}
+          aria-label={title ?? 'Performance vs cohort'}
+        >
+          {phaseTint && entries.map((e, i) => {
+            const fill = phaseTint(e.bucket)
+            if (!fill) return null
+            return (
               <rect
-                x={i * barW + barInset}
-                y={height - value_h}
-                width={Math.max(barW - 2 * barInset, 0.3)}
-                height={value_h}
-                fill={PLAYER_COLOR}
-                opacity={op}
+                key={`tint-${i}`}
+                x={i * barW} y={0}
+                width={barW} height={height}
+                fill={fill}
+                opacity={0.55}
               />
-            </g>
-          )
-        })}
-        {/* Cohort ticks last so they paint on top of the bars. */}
-        {entries.map((e, i) => {
-          const cv = e.cohortValue
-          if (cv == null) return null
-          const cy = height - (cv / max) * height
-          const cx = i * barW + (barW - tickW) / 2
-          return (
-            <rect
-              key={`tick-${i}`}
-              x={cx}
-              y={cy - TICK_HEIGHT_PX / 2}
-              width={tickW}
-              height={TICK_HEIGHT_PX}
-              fill={COHORT_COLOR}
-              opacity={0.95}
-            />
-          )
-        })}
-        {/* baseline */}
-        <line x1={0} x2={VB_W} y1={height} y2={height}
-              stroke="#1A1714" strokeWidth={0.3} opacity={0.35} />
-      </svg>
+            )
+          })}
+          {/* Y-axis gridlines so the reader can read off bar height. */}
+          {yTicks.map((v, i) => {
+            if (v === 0) return null
+            const y = height - (v / max) * height
+            return (
+              <line key={`gl-${i}`}
+                x1={0} x2={VB_W} y1={y} y2={y}
+                stroke="#1A1714" strokeWidth={0.2} opacity={0.18}
+                strokeDasharray="0.6 0.6" />
+            )
+          })}
+          {entries.map((e, i) => {
+            const op = e.faded ? PLAYER_OPACITY_FADED : PLAYER_OPACITY_ACTIVE
+            const v = e.playerValue
+            if (v == null || v <= 0) return null
+            const value_h = (v / max) * height
+            return (
+              <g key={`bar-${i}`}>
+                {e.tooltip && <title>{e.tooltip}</title>}
+                <rect
+                  x={i * barW + barInset}
+                  y={height - value_h}
+                  width={Math.max(barW - 2 * barInset, 0.3)}
+                  height={value_h}
+                  fill={PLAYER_COLOR}
+                  opacity={op}
+                />
+              </g>
+            )
+          })}
+          {/* Cohort ticks last so they paint on top of the bars. */}
+          {entries.map((e, i) => {
+            const cv = e.cohortValue
+            if (cv == null) return null
+            const cy = height - (cv / max) * height
+            const cx = i * barW + (barW - tickW) / 2
+            return (
+              <rect
+                key={`tick-${i}`}
+                x={cx}
+                y={cy - TICK_HEIGHT_PX / 2}
+                width={tickW}
+                height={TICK_HEIGHT_PX}
+                fill={COHORT_COLOR}
+                opacity={0.95}
+              />
+            )
+          })}
+          {/* baseline */}
+          <line x1={0} x2={VB_W} y1={height} y2={height}
+                stroke="#1A1714" strokeWidth={0.3} opacity={0.35} />
+        </svg>
+      </div>
       <div style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${entries.length}, 1fr)`,
         marginTop: 2,
+        marginLeft: 32,
         fontFamily: 'var(--serif)',
         fontSize: '0.6rem',
         color: 'var(--ink-faint)',

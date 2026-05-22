@@ -92,10 +92,10 @@ export default function PositionDistributionTab({ positionDistribution }: Props)
         bucketLabel={bucketLabel}
         phaseTint={battingPhaseTint}
         title="Strike rate by position"
-        subtitle="player SR vs cohort (forest-green tick)"
         yLabel="runs / 100 balls"
         yFmt={fmt2}
-        height={90}
+        cohortExplainer="Green tick = average strike rate at this batting position across every batter in the FilterBar scope."
+        height={110}
       />
     </section>
   )

@@ -104,20 +104,20 @@ export default function OverDistributionTab({ overDistribution }: Props) {
         bucketLabel={bucketLabel}
         phaseTint={bowlingPhaseTint}
         title="Economy by over"
-        subtitle="player econ vs cohort (forest-green tick)"
         yLabel="runs / over"
         yFmt={fmt2}
-        height={90}
+        cohortExplainer="Green tick = average economy at this over across every bowler in the FilterBar scope."
+        height={110}
       />
       <PerformanceVsCohort
         entries={wpiEntries}
         bucketLabel={bucketLabel}
         phaseTint={bowlingPhaseTint}
         title="Wickets / innings by over"
-        subtitle="player wkts ÷ innings-touching vs cohort"
         yLabel="wkts / inn"
         yFmt={fmt3}
-        height={90}
+        cohortExplainer="Green tick = average wickets per innings-touching at this over across every bowler in the FilterBar scope."
+        height={110}
       />
     </section>
   )
