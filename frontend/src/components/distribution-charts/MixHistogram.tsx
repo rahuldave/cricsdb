@@ -11,6 +11,8 @@
  * supplies the bucket axis via `entries` + `bucketLabel`.
  */
 
+import { niceYAxis } from './niceAxis'
+
 export interface MixEntry {
   bucket: number
   share: number          // 0-1, sums to 1 across entries (or less if cohort has gaps)
@@ -42,13 +44,13 @@ export default function MixHistogram({
 }: Props) {
   if (entries.length === 0) return null
 
-  const max = Math.max(...entries.map(e => e.share), 0.0001)
+  const rawMax = Math.max(...entries.map(e => e.share), 0.0001)
   const barW = VB_W / entries.length
   const barInset = Math.min(barW * 0.15, 0.4)
-  // Mix shares are 0-1; y-axis ticks render as percentages. Three
-  // marks (max, mid, 0) so the reader can read off bar heights.
-  const yTicks: number[] = [max, max / 2, 0]
-  const fmtPct = (v: number) => `${(v * 100).toFixed(0)}%`
+  // Nice y-axis: round step (5%/10%/20% etc.) instead of rawMax/2.
+  // User-flagged 2026-05-22 — see niceAxis.ts header.
+  const { ticks: yTicks, niceMax } = niceYAxis(rawMax)
+  const fmtPct = (v: number) => `${Math.round(v * 100)}%`
 
   return (
     <div className="wisden-mix-histogram" style={{ width: '100%' }}>
@@ -81,7 +83,7 @@ export default function MixHistogram({
           color: 'var(--ink-faint)', flexShrink: 0,
         }}>
           {yTicks.map((v, i) => {
-            const y = (v / max) * height
+            const y = (v / niceMax) * height
             return (
               <div key={`yt-${i}`} style={{
                 position: 'absolute',
@@ -118,7 +120,7 @@ export default function MixHistogram({
           {/* Y-axis gridlines — faint horizontal rules at each tick. */}
           {yTicks.map((v, i) => {
             if (v === 0) return null
-            const y = height - (v / max) * height
+            const y = height - (v / niceMax) * height
             return (
               <line key={`gl-${i}`}
                 x1={0} x2={VB_W} y1={y} y2={y}
@@ -128,7 +130,7 @@ export default function MixHistogram({
           })}
           {/* Share bars */}
           {entries.map((e, i) => {
-            const value_h = (e.share / max) * height
+            const value_h = (e.share / niceMax) * height
             return (
               <g key={i}>
                 <title>{e.tooltip}</title>

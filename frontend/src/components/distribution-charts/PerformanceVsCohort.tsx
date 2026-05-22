@@ -13,6 +13,8 @@
  * No min-N threshold gating per spec §1.
  */
 
+import { niceYAxis } from './niceAxis'
+
 const COHORT_COLOR = '#3F7A4D'  // WISDEN.forest — reference-line convention
 const PLAYER_COLOR = '#3C5B7A'  // WISDEN.slate
 // Bars dropped to 0.5 (was 0.8) so the green cohort tick reads
@@ -71,15 +73,22 @@ export default function PerformanceVsCohort({
     if (e.playerValue != null) allValues.push(e.playerValue)
     if (e.cohortValue != null) allValues.push(e.cohortValue)
   }
-  const max = Math.max(...allValues, 0.0001)
+  const rawMax = Math.max(...allValues, 0.0001)
 
   const barW = VB_W / entries.length
   const barInset = Math.min(barW * 0.15, 0.4)
   const tickW = barW + 2 * barW * TICK_OVERHANG_FRAC
-  // Three numeric y-ticks: max / mid / 0. yFmt formats the unit;
-  // fallback is two-decimal numeric if caller didn't pass one.
-  const yTicks: number[] = [max, max / 2, 0]
-  const fmt = yFmt ?? ((v: number) => v.toFixed(2))
+  // Nice y-axis: round step in the metric's natural unit (5 / 10 /
+  // 15 for econ; 0.2 / 0.4 / 0.6 for wkts-per-innings; 50 / 100 /
+  // 150 for SR). User-flagged 2026-05-22 — see niceAxis.ts header.
+  const { ticks: yTicks, niceMax, step } = niceYAxis(rawMax)
+  // For y-axis labels we want "150" not "150.00" — derive decimal
+  // count from the step magnitude (step=0.05 → 2 decimals; step=5
+  // → 0 decimals). Falls back to the caller-supplied yFmt for the
+  // legend cohort-range display, where the original 2-decimal
+  // precision is fine.
+  const stepDecimals = step >= 1 ? 0 : Math.max(0, -Math.floor(Math.log10(step)))
+  const fmtAxis = (v: number) => v.toFixed(stepDecimals)
 
   return (
     <div className="wisden-perf-cohort" style={{ width: '100%' }}>
@@ -141,7 +150,7 @@ export default function PerformanceVsCohort({
           color: 'var(--ink-faint)', flexShrink: 0,
         }}>
           {yTicks.map((v, i) => {
-            const y = (v / max) * height
+            const y = (v / niceMax) * height
             return (
               <div key={`yt-${i}`} style={{
                 position: 'absolute',
@@ -150,7 +159,7 @@ export default function PerformanceVsCohort({
                 transform: 'translateY(-50%)',
                 lineHeight: 1,
                 whiteSpace: 'nowrap',
-              }}>{fmt(v)}</div>
+              }}>{fmtAxis(v)}</div>
             )
           })}
         </div>
@@ -176,7 +185,7 @@ export default function PerformanceVsCohort({
           {/* Y-axis gridlines so the reader can read off bar height. */}
           {yTicks.map((v, i) => {
             if (v === 0) return null
-            const y = height - (v / max) * height
+            const y = height - (v / niceMax) * height
             return (
               <line key={`gl-${i}`}
                 x1={0} x2={VB_W} y1={y} y2={y}
@@ -188,7 +197,7 @@ export default function PerformanceVsCohort({
             const op = e.faded ? PLAYER_OPACITY_FADED : PLAYER_OPACITY_ACTIVE
             const v = e.playerValue
             if (v == null || v <= 0) return null
-            const value_h = (v / max) * height
+            const value_h = (v / niceMax) * height
             return (
               <g key={`bar-${i}`}>
                 {e.tooltip && <title>{e.tooltip}</title>}
@@ -207,7 +216,7 @@ export default function PerformanceVsCohort({
           {entries.map((e, i) => {
             const cv = e.cohortValue
             if (cv == null) return null
-            const cy = height - (cv / max) * height
+            const cy = height - (cv / niceMax) * height
             const cx = i * barW + (barW - tickW) / 2
             return (
               <rect
