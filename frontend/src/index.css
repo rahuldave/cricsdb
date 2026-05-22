@@ -3148,6 +3148,15 @@ a { color: inherit; }
   }
 }
 
+/* Translucent BarChart bars — opt-in via `barOpacity` prop on
+   `<BarChart>`. The prop sets `--wisden-bar-opacity` on the chart's
+   outer block and toggles the `wisden-bar-translucent` class; this
+   rule fades Semiotic's default opacity="0.8" rects so a
+   referenceData dashed overlay (cohort line) stays legible. */
+.wisden-bar-translucent svg rect[fill] {
+  opacity: var(--wisden-bar-opacity, 0.5);
+}
+
 /* /players?player=X — Records section: two discipline panels per
    row at desktop, stacked on mobile. The "Compare with another
    player" picker rides as a trailing cell in the same grid so it

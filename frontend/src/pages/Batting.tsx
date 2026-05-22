@@ -467,7 +467,8 @@ export default function Batting() {
                       category: String(b.over),
                       value: b.strike_rate ?? null,
                     })) : undefined}
-                    referenceLabel="cohort SR per over (ball-mix-weighted at scope)" />
+                    referenceLabel="cohort SR per over (ball-mix-weighted at scope)"
+                    barOpacity={0.8} />
                 )}
               </>
             )}
@@ -635,7 +636,7 @@ export default function Batting() {
                       categoryAccessor={(d: Record<string, any>) => String(d.over_number)}
                       valueAccessor="dismissals"
                       title="Dismissals by Over" categoryLabel="Over" valueLabel="Dismissals"
-                      height={300} colorScheme={[WISDEN.oxblood]} />
+                      height={300} colorScheme={[WISDEN.oxblood]} barOpacity={0.8} />
                   </div>
                 )}
               </>

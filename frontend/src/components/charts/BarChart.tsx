@@ -52,6 +52,10 @@ interface BarChartProps<T extends Record<string, any>> {
   /** Legend label for the dashed reference line series ("League avg"
    *  / "Cohort econ" etc). When omitted, no legend hint renders. */
   referenceLabel?: string
+  /** Make the bars translucent so a referenceData overlay (cohort
+   *  dashed line) and the gridlines beneath remain legible. Number
+   *  between 0 and 1; Semiotic's default is 0.8. */
+  barOpacity?: number
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,6 +66,7 @@ export default function BarChart<T extends Record<string, any>>({
   topLabelFormat,
   referenceData,
   referenceLabel,
+  barOpacity,
 }: BarChartProps<T>) {
   const [ref, measuredWidth] = useContainerWidth()
   const effectiveWidth = width ?? measuredWidth
@@ -166,10 +171,25 @@ export default function BarChart<T extends Record<string, any>>({
     : 0
   const refScaleMax = Math.max(maxValue, refMax)
 
+  // Semiotic stamps each bar `<rect>` with opacity="0.8" by default.
+  // When barOpacity is set, ride a CSS variable on the chart root +
+  // a global rule in index.css (`.wisden-bar-translucent svg rect[fill]
+  // { opacity: var(--wisden-bar-opacity) }`) to override without
+  // touching Semiotic internals. The reference-overlay div sits
+  // OUTSIDE the SVG so it stays opaque.
+  const containerClassName = barOpacity != null
+    ? 'w-full wisden-bar-translucent'
+    : 'w-full'
+  const containerStyle = barOpacity != null
+    ? ({ '--wisden-bar-opacity': String(barOpacity) } as React.CSSProperties)
+    : undefined
+
   return (
     <ChartContainer
       outerRef={ref}
       header={<ChartHeader title={title} subtitle={effectiveSubtitle} />}
+      className={containerClassName}
+      style={containerStyle}
     >
       {effectiveWidth > 0 && (
         <SemioticBarChart

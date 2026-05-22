@@ -59,6 +59,10 @@ interface ChartContainerProps {
   header?: ReactNode
   /** Layout className on the outer block. Defaults to "w-full". */
   className?: string
+  /** Inline style on the outer block. Lets the caller set CSS custom
+   *  properties (e.g. `--wisden-bar-opacity`) consumed by global
+   *  scoped rules in index.css without forking the component. */
+  style?: React.CSSProperties
   /** Forwarded as a ref to the outer block (for ResizeObserver-based
    *  width measurement). NB: the chart area itself is a child, so its
    *  width matches the outer block's width.
@@ -74,11 +78,12 @@ interface ChartContainerProps {
 export default function ChartContainer({
   header,
   className = 'w-full',
+  style,
   outerRef,
   children,
 }: ChartContainerProps) {
   return (
-    <div ref={outerRef} className={className}>
+    <div ref={outerRef} className={className} style={style}>
       {header}
       <div style={{ position: 'relative' }}>
         {children}
