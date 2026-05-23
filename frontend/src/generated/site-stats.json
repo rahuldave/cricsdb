@@ -1,8 +1,8 @@
 {
   "totals": {
-    "matches": 13201,
-    "deliveries": 3013653,
-    "wickets": 163730
+    "matches": 13206,
+    "deliveries": 3014838,
+    "wickets": 163793
   },
   "featured_teams": [
     {
@@ -13,7 +13,7 @@
     {
       "name": "Chennai Super Kings",
       "blurb": "IPL",
-      "matches": 265
+      "matches": 266
     },
     {
       "name": "India",
@@ -39,7 +39,7 @@
       "name": "JJ Bumrah",
       "role": "bowler",
       "gender": "male",
-      "stat": "321 wkts"
+      "stat": "322 wkts"
     },
     {
       "id": "5d2eda89",

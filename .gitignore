@@ -52,3 +52,6 @@ frontend/dist/
 .claude/
 .agents/
 skills-lock.json
+
+# Local DB backup snapshots (~5GB each — not source)
+backups/
