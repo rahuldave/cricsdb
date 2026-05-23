@@ -541,6 +541,20 @@ export interface DismissalAnalysis {
   }[]
 }
 
+// Per-over fielding rollup — drives the By Over tab charts.
+// User-asked 2026-05-23: catches / run_outs / stumpings broken out
+// per over + cohort dismissals-per-match for a rate-vs-cohort chart.
+export interface FieldingByOverEntry {
+  over_number: number
+  dismissals: number
+  catches: number
+  run_outs: number
+  stumpings: number
+  /** Cohort dismissals per match at this over, partitioned by the
+   *  player's keeper-binary (matches_as_keeper > 0). */
+  cohort_dismissals_per_match: number | null
+}
+
 export interface InterWicketStats {
   wickets_down: number
   innings_count: number

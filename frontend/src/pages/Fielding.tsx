@@ -122,7 +122,7 @@ export default function Fielding() {
   )
   const seasonBaseline = seasonBaselineFetch.data?.by_season ?? []
 
-  const overFetch = useFetch<{ by_over: { over_number: number; dismissals: number }[] } | null>(
+  const overFetch = useFetch<{ by_over: import('../types').FieldingByOverEntry[] } | null>(
     () => playerId && activeTab === 'By Over'
       ? getFielderByOver(playerId, filters) : Promise.resolve(null),
     [...filterDeps, activeTab],
@@ -451,17 +451,55 @@ export default function Fielding() {
             {activeTab === 'By Over' && (
               <>
                 <TabState fetch={overFetch as FetchState<unknown>} />
-                {!overFetch.loading && !overFetch.error && overData.length > 0 && (
-                  <BarChart
-                    data={overData.map(o => ({
-                      ...o, over: `${o.over_number}`,
-                      phase: o.over_number <= 6 ? 'Powerplay' : o.over_number <= 15 ? 'Middle' : 'Death',
-                    }))}
-                    categoryAccessor="over" valueAccessor="dismissals"
-                    title="Dismissals by Over" categoryLabel="Over" valueLabel="Dismissals"
-                    colorBy="phase" colorScheme={WISDEN_PHASES}
-                    height={350} />
-                )}
+                {!overFetch.loading && !overFetch.error && overData.length > 0 && (() => {
+                  const totalMatches = summary.matches.value ?? 0
+                  const overChartData = overData.map(o => ({
+                    ...o,
+                    over: `${o.over_number}`,
+                    phase: o.over_number <= 6 ? 'Powerplay'
+                         : o.over_number <= 15 ? 'Middle' : 'Death',
+                    dismissals_per_match: totalMatches > 0
+                      ? o.dismissals / totalMatches : null,
+                  }))
+                  return (
+                    <>
+                      <BarChart
+                        data={overChartData}
+                        categoryAccessor="over" valueAccessor="dismissals"
+                        title="Dismissals by Over" categoryLabel="Over" valueLabel="Dismissals"
+                        colorBy="phase" colorScheme={WISDEN_PHASES}
+                        height={350} />
+                      {/* User-asked 2026-05-23 — three new charts mirroring
+                          the By Phase per-kind layout: catches volume,
+                          run-outs volume, and dismissals per match (rate
+                          vs cohort). */}
+                      <BarChart
+                        data={overChartData}
+                        categoryAccessor="over" valueAccessor="catches"
+                        title="Catches by Over" categoryLabel="Over" valueLabel="Catches"
+                        colorBy="phase" colorScheme={WISDEN_PHASES}
+                        height={350} barOpacity={0.8} />
+                      <BarChart
+                        data={overChartData}
+                        categoryAccessor="over" valueAccessor="run_outs"
+                        title="Run-outs by Over" categoryLabel="Over" valueLabel="Run-outs"
+                        colorBy="phase" colorScheme={WISDEN_PHASES}
+                        height={350} barOpacity={0.8} />
+                      <BarChart
+                        data={overChartData}
+                        categoryAccessor="over"
+                        valueAccessor={(d: Record<string, any>) => (d.dismissals_per_match as number) ?? 0}
+                        title="Dismissals per Match by Over" categoryLabel="Over" valueLabel="dis / match"
+                        colorBy="phase" colorScheme={WISDEN_PHASES}
+                        height={350} barOpacity={0.8}
+                        referenceData={overChartData.map(o => ({
+                          category: String(o.over_number),
+                          value: o.cohort_dismissals_per_match ?? null,
+                        }))}
+                        referenceLabel="cohort dismissals per match (keeper / outfielder partition at scope)" />
+                    </>
+                  )
+                })()}
               </>
             )}
 

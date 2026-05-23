@@ -189,7 +189,7 @@ export const getFielderBySeason = (id: string, filters?: F) =>
 export const getFielderByPhase = (id: string, filters?: F) =>
   fetchApi<{ by_phase: import('./types').FieldingPhase[] }>(`/api/v1/fielders/${id}/by-phase`, filters as Record<string, string>)
 export const getFielderByOver = (id: string, filters?: F) =>
-  fetchApi<{ by_over: { over_number: number; dismissals: number }[] }>(`/api/v1/fielders/${id}/by-over`, filters as Record<string, string>)
+  fetchApi<{ by_over: import('./types').FieldingByOverEntry[] }>(`/api/v1/fielders/${id}/by-over`, filters as Record<string, string>)
 export const getFielderDismissalTypes = (id: string, filters?: F) =>
   fetchApi<{ total: number; by_kind: Record<string, number> }>(`/api/v1/fielders/${id}/dismissal-types`, filters as Record<string, string>)
 export const getFielderVictims = (id: string, filters?: F & { limit?: number }) =>
