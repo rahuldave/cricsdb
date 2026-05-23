@@ -44,7 +44,7 @@ ab wait --load networkidle
 ab wait --text "Catches by phase"
 ab wait 2000
 
-for title in "Catches by phase" "Catches per match by phase"; do
+for title in "Catches by phase" "Catches per match by phase" "Run-outs by phase" "Run-outs per match by phase"; do
   has=$(ab_eval "document.body.innerText.includes('${title}')")
   if [ "$has" = "true" ]; then
     ok "title present — \"${title}\""

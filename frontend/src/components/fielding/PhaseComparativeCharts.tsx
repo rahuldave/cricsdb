@@ -1,16 +1,18 @@
 /**
- * Fielding "By Phase" — per-phase catches (volume) + catches-per-match
- * (rate) charts. User-asked 2026-05-22.
- *
- * Two charts stacked vertically:
- *   1. Catches by phase — raw counts, no cohort comparison (volume).
- *   2. Catches per match by phase — player rate vs cohort tick.
+ * Fielding "By Phase" — per-phase catches and run-outs charts.
+ * Four PerformanceVsCohort panels stacked vertically:
+ *   1. Catches by phase            — raw counts, no cohort.
+ *   2. Catches per match by phase  — rate vs cohort tick.
+ *   3. Run-outs by phase           — raw counts, no cohort.
+ *   4. Run-outs per match by phase — rate vs cohort tick.
  *
  * Cohort comes from the existing
  * /scope/averages/players/fielding/by-phase endpoint that already
  * powers the per-tile chip strip above (no new fetch). The keeper /
  * outfielder partition is automatic on the cohort side via the
  * baseline rows.
+ *
+ * User-asked 2026-05-22 (catches charts) + follow-up (run-outs).
  */
 
 import PerformanceVsCohort, { type PerfEntry } from '../distribution-charts/PerformanceVsCohort'
@@ -55,40 +57,55 @@ export default function PhaseComparativeCharts({ phaseData, phaseBaseline }: Pro
     .filter(p => PHASE_BUCKET[p.phase] !== undefined)
     .sort((a, b) => (PHASE_BUCKET[a.phase] ?? 99) - (PHASE_BUCKET[b.phase] ?? 99))
 
-  // Chart 1 — Catches by phase (volume). cohortValue null on every
-  // entry so PerformanceVsCohort renders just the player bars; no
-  // cohort tick is meaningful for a raw count.
-  const volEntries: PerfEntry[] = orderedPhases.map(p => {
-    const bucket = PHASE_BUCKET[p.phase] ?? 0
-    return {
-      bucket,
-      playerValue: p.catches ?? 0,
-      cohortValue: null,
-      faded: false,
-      tooltip: `${bucketLabel(bucket)}: ${p.catches} catches`,
-    }
-  })
+  // Per-metric volume + rate builders to keep the four chart series
+  // declarations symmetric below.
+  function volEntries(getCount: (p: FieldingPhase) => number, label: string): PerfEntry[] {
+    return orderedPhases.map(p => {
+      const bucket = PHASE_BUCKET[p.phase] ?? 0
+      const v = getCount(p)
+      return {
+        bucket,
+        playerValue: v,
+        cohortValue: null,
+        faded: false,
+        tooltip: `${bucketLabel(bucket)}: ${v} ${label}`,
+      }
+    })
+  }
+  function rateEntries(
+    getPlayerRate: (p: FieldingPhase) => number | null,
+    getCohortRate: (b: ScopePlayerFieldingPhase) => number | null,
+    label: string,
+  ): PerfEntry[] {
+    return orderedPhases.map(p => {
+      const bucket = PHASE_BUCKET[p.phase] ?? 0
+      const playerRate = getPlayerRate(p)
+      const base = baseByBucket.get(bucket)
+      const cohortRate = base ? getCohortRate(base) : null
+      return {
+        bucket,
+        playerValue: playerRate,
+        cohortValue: cohortRate,
+        faded: !p.matches || p.matches === 0,
+        tooltip: playerRate != null && cohortRate != null
+          ? `${bucketLabel(bucket)}: ${playerRate.toFixed(3)} ${label} · cohort ${cohortRate.toFixed(3)}`
+          : `${bucketLabel(bucket)}: ${playerRate != null ? playerRate.toFixed(3) + ' ' + label : 'no data'}`,
+      }
+    })
+  }
 
-  // Chart 2 — Catches per match by phase (rate vs cohort).
-  // Player.catches_per_match optional on the row; fall back to
-  // catches / matches if needed.
-  const rateEntries: PerfEntry[] = orderedPhases.map(p => {
-    const bucket = PHASE_BUCKET[p.phase] ?? 0
-    const playerRate = p.catches_per_match != null
-      ? p.catches_per_match
-      : (p.matches && p.matches > 0 ? p.catches / p.matches : null)
-    const base = baseByBucket.get(bucket)
-    const cohortRate = base?.catches_per_match ?? null
-    return {
-      bucket,
-      playerValue: playerRate,
-      cohortValue: cohortRate,
-      faded: !p.matches || p.matches === 0,
-      tooltip: playerRate != null && cohortRate != null
-        ? `${bucketLabel(bucket)}: ${playerRate.toFixed(3)} c/match · cohort ${cohortRate.toFixed(3)}`
-        : `${bucketLabel(bucket)}: ${playerRate != null ? playerRate.toFixed(3) + ' c/match' : 'no data'}`,
-    }
-  })
+  const catchVol  = volEntries(p => p.catches ?? 0, 'catches')
+  const catchRate = rateEntries(
+    p => p.catches_per_match ?? (p.matches && p.matches > 0 ? p.catches / p.matches : null),
+    b => b.catches_per_match ?? null,
+    'c/match',
+  )
+  const roVol  = volEntries(p => p.run_outs ?? 0, 'run-outs')
+  const roRate = rateEntries(
+    p => p.run_outs_per_match ?? (p.matches && p.matches > 0 ? p.run_outs / p.matches : null),
+    b => b.run_outs_per_match ?? null,
+    'ro/match',
+  )
 
   return (
     <section
@@ -96,7 +113,7 @@ export default function PhaseComparativeCharts({ phaseData, phaseBaseline }: Pro
       style={{ display: 'flex', flexDirection: 'column', gap: '1.4rem', marginTop: '1.6rem' }}
     >
       <PerformanceVsCohort
-        entries={volEntries}
+        entries={catchVol}
         bucketLabel={bucketLabel}
         phaseTint={phaseTint}
         title="Catches by phase"
@@ -105,13 +122,32 @@ export default function PhaseComparativeCharts({ phaseData, phaseBaseline }: Pro
         height={110}
       />
       <PerformanceVsCohort
-        entries={rateEntries}
+        entries={catchRate}
         bucketLabel={bucketLabel}
         phaseTint={phaseTint}
         title="Catches per match by phase"
         yLabel="catches / match"
         yFmt={fmt3}
         cohortExplainer="Green tick = average catches per match in this phase across the keeper / outfielder partition the player belongs to."
+        height={110}
+      />
+      <PerformanceVsCohort
+        entries={roVol}
+        bucketLabel={bucketLabel}
+        phaseTint={phaseTint}
+        title="Run-outs by phase"
+        yLabel="run-outs"
+        yFmt={fmt0}
+        height={110}
+      />
+      <PerformanceVsCohort
+        entries={roRate}
+        bucketLabel={bucketLabel}
+        phaseTint={phaseTint}
+        title="Run-outs per match by phase"
+        yLabel="run-outs / match"
+        yFmt={fmt3}
+        cohortExplainer="Green tick = average run-outs per match in this phase across the keeper / outfielder partition the player belongs to."
         height={110}
       />
     </section>
