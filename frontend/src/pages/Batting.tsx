@@ -458,27 +458,65 @@ export default function Batting() {
             {activeTab === 'By Over' && (
               <>
                 <TabState fetch={overFetch as FetchState<unknown>} />
-                {!overFetch.loading && !overFetch.error && overData.length > 0 && (
-                  <BarChart
-                    data={overData.map(o => ({
-                      ...o, over: `${o.over_number}`,
-                      phase: o.over_number <= 6 ? 'Powerplay' : o.over_number <= 15 ? 'Middle' : 'Death',
-                    }))}
-                    categoryAccessor="over" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
-                    title="Strike Rate by Over" categoryLabel="Over" valueLabel="Strike Rate"
-                    colorBy="phase" colorScheme={WISDEN_PHASES}
-                    height={350}
-                    // Tier 4 of spec-apples-to-apples-baselines.md —
-                    // per-over batting cohort SR overlay. Same dashed
-                    // green segment-per-bar treatment as the bowling
-                    // econ-by-over overlay (Tier 5 consumer).
-                    referenceData={overBaseline.length > 0 ? overBaseline.map(b => ({
-                      category: String(b.over),
-                      value: b.strike_rate ?? null,
-                    })) : undefined}
-                    referenceLabel="cohort SR per over (ball-mix-weighted at scope)"
-                    barOpacity={0.8} />
-                )}
+                {!overFetch.loading && !overFetch.error && overData.length > 0 && (() => {
+                  // Shared `data` array — annotate each over row with
+                  // its phase + a "boundaries per over" derived field
+                  // (boundary_pct × 6 / 100, denominate by legal balls).
+                  const overChartData = overData.map(o => ({
+                    ...o,
+                    over: `${o.over_number}`,
+                    phase: o.over_number <= 6 ? 'Powerplay' : o.over_number <= 15 ? 'Middle' : 'Death',
+                    boundaries_per_over: o.boundary_pct != null
+                      ? (o.boundary_pct * 6) / 100 : null,
+                  }))
+                  return (
+                    <>
+                      <BarChart
+                        data={overChartData}
+                        categoryAccessor="over" valueAccessor={(d: Record<string, any>) => (d.strike_rate as number) ?? 0}
+                        title="Strike Rate by Over" categoryLabel="Over" valueLabel="Strike Rate"
+                        colorBy="phase" colorScheme={WISDEN_PHASES}
+                        height={350}
+                        referenceData={overBaseline.length > 0 ? overBaseline.map(b => ({
+                          category: String(b.over),
+                          value: b.strike_rate ?? null,
+                        })) : undefined}
+                        referenceLabel="cohort SR per over (ball-mix-weighted at scope)"
+                        barOpacity={0.8} />
+                      {/* Dot % by Over + Boundaries-per-Over by Over —
+                          user-asked 2026-05-22. Same per-bar cohort
+                          dashed-segment treatment as the SR chart
+                          above, sourced from the existing
+                          /scope/averages/players/batting/by-over
+                          response. */}
+                      <BarChart
+                        data={overChartData}
+                        categoryAccessor="over" valueAccessor={(d: Record<string, any>) => (d.dot_pct as number) ?? 0}
+                        title="Dot % by Over" categoryLabel="Over" valueLabel="Dot %"
+                        colorBy="phase" colorScheme={WISDEN_PHASES}
+                        height={350}
+                        referenceData={overBaseline.length > 0 ? overBaseline.map(b => ({
+                          category: String(b.over),
+                          value: b.dot_pct ?? null,
+                        })) : undefined}
+                        referenceLabel="cohort dot % per over (ball-mix-weighted at scope)"
+                        barOpacity={0.8} />
+                      <BarChart
+                        data={overChartData}
+                        categoryAccessor="over"
+                        valueAccessor={(d: Record<string, any>) => (d.boundaries_per_over as number) ?? 0}
+                        title="Boundaries per Over" categoryLabel="Over" valueLabel="(4s + 6s) / over"
+                        colorBy="phase" colorScheme={WISDEN_PHASES}
+                        height={350}
+                        referenceData={overBaseline.length > 0 ? overBaseline.map(b => ({
+                          category: String(b.over),
+                          value: b.boundary_pct != null ? (b.boundary_pct * 6) / 100 : null,
+                        })) : undefined}
+                        referenceLabel="cohort boundaries per over (ball-mix-weighted at scope)"
+                        barOpacity={0.8} />
+                    </>
+                  )
+                })()}
               </>
             )}
 
