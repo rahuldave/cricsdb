@@ -1246,6 +1246,10 @@ export interface BowlingOverDistributionEntry {
   cohort_balls_share: number | null
   cohort_economy: number | null
   cohort_wickets_per_innings: number | null
+  /** Cohort boundaries (4s + 6s) conceded per over at this over,
+   *  aggregated across every bowler at scope. Drives the new
+   *  Boundaries/over panel on the By Over tab. User-asked 2026-05-22. */
+  cohort_boundaries_per_over: number | null
 }
 
 export interface BowlingCohortMeta {

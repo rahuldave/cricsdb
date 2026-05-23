@@ -86,6 +86,25 @@ export default function OverDistributionTab({ overDistribution }: Props) {
     }
   })
 
+  // Chart C — boundaries-conceded-per-over panel. User-asked
+  // 2026-05-22. Player: e.boundaries / (e.legal_balls / 6). Cohort:
+  // backend-computed cohort_boundaries_per_over.
+  const bpoEntries: PerfEntry[] = overDistribution.map(e => {
+    const bpo = e.legal_balls > 0
+      ? Math.round((e.boundaries * 6 / e.legal_balls) * 1000) / 1000
+      : null
+    return {
+      bucket: e.over,
+      playerValue: bpo,
+      cohortValue: e.cohort_boundaries_per_over,
+      faded: e.legal_balls === 0,
+      tooltip: bpo != null && e.cohort_boundaries_per_over != null
+        ? `Over ${e.over}: ${e.boundaries} boundaries in ${e.legal_balls} balls` +
+          ` = ${bpo.toFixed(3)}/over · cohort ${e.cohort_boundaries_per_over.toFixed(3)}/over`
+        : `Over ${e.over}: no balls`,
+    }
+  })
+
   return (
     <section
       className="wisden-over-distribution-tab"
@@ -117,6 +136,16 @@ export default function OverDistributionTab({ overDistribution }: Props) {
         yLabel="wkts / inn"
         yFmt={fmt3}
         cohortExplainer="Green tick = average wickets per innings-touching at this over across every bowler in the FilterBar scope."
+        height={110}
+      />
+      <PerformanceVsCohort
+        entries={bpoEntries}
+        bucketLabel={bucketLabel}
+        phaseTint={bowlingPhaseTint}
+        title="Boundaries conceded per over"
+        yLabel="(4s + 6s) / over"
+        yFmt={fmt3}
+        cohortExplainer="Green tick = average boundaries conceded per over at this over across every bowler in the FilterBar scope. Lower is better."
         height={110}
       />
     </section>

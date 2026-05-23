@@ -104,7 +104,8 @@ async def _over_distribution(db, person_id: str, filters: FilterParams) -> list[
                SUM(psso.runs_conceded)  AS runs_conceded,
                SUM(psso.legal_balls)    AS legal_balls,
                SUM(psso.wickets)        AS wickets,
-               SUM(psso.innings_bowled) AS innings_bowled
+               SUM(psso.innings_bowled) AS innings_bowled,
+               SUM(psso.boundaries)     AS boundaries
         FROM playerscopestatsover psso
         WHERE psso.scope_key IN (
             SELECT scope_key FROM playerscopestats pss WHERE {cohort_where}
@@ -144,17 +145,26 @@ async def _over_distribution(db, person_id: str, filters: FilterParams) -> list[
             entry["cohort_balls_share"] = None
             entry["cohort_economy"] = None
             entry["cohort_wickets_per_innings"] = None
+            entry["cohort_boundaries_per_over"] = None
         else:
             balls_c = c["legal_balls"] or 0
             runs_c = c["runs_conceded"] or 0
             wkts_c = c["wickets"] or 0
             inn_c = c["innings_bowled"] or 0
+            bdys_c = c["boundaries"] or 0
             entry["cohort_balls_share"] = balls_c / cohort_total_balls
             entry["cohort_economy"] = (
                 round(runs_c * 6 / balls_c, 2) if balls_c else None
             )
             entry["cohort_wickets_per_innings"] = (
                 round(wkts_c / inn_c, 3) if inn_c else None
+            )
+            # Boundaries conceded per over — user-asked 2026-05-22.
+            # Mirrors cohort_economy: aggregate sum of boundaries
+            # across the cohort at this over, divided by the cohort's
+            # total overs at this over (balls / 6).
+            entry["cohort_boundaries_per_over"] = (
+                round(bdys_c * 6 / balls_c, 3) if balls_c else None
             )
         out.append(entry)
     return out
