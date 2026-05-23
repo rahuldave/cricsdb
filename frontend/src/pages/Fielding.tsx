@@ -41,6 +41,7 @@ import type {
 } from '../types'
 import FielderDistributionPanel from '../components/fielding/FielderDistributionPanel'
 import DismissedPositionDistributionTab from '../components/fielding/DismissedPositionDistributionTab'
+import FieldingPhaseComparativeCharts from '../components/fielding/PhaseComparativeCharts'
 import FielderRecordsPanel from '../components/players/FielderRecordsPanel'
 import { SectionHeader } from '../components/ChartHeader'
 
@@ -519,6 +520,15 @@ export default function Fielding() {
                     </div>
                   )
                 })()}
+                {/* Per-phase comparative charts — user-asked 2026-05-22.
+                    Catches by phase (volume, no cohort) + Catches per
+                    match by phase (rate vs cohort tick). Mirrors the
+                    batting / bowling By Phase comparative panels. */}
+                {!phaseFetch.loading && !phaseFetch.error && phaseData.length > 0 && (
+                  <FieldingPhaseComparativeCharts
+                    phaseData={phaseData}
+                    phaseBaseline={phaseBaseline} />
+                )}
               </>
             )}
 
