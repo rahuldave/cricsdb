@@ -116,12 +116,16 @@ function captionFor(record: ProbRecord): React.ReactNode | null {
   // Only render captions for chips whose backend has actually wired
   // the cohort fields. Bowler/batter/fielder distribution chips do;
   // team / compare-grid chips don't (deferred to follow-up spec).
-  // Detect by checking direction — a wired-and-directional chip has
-  // 'higher_better' | 'lower_better'. direction === null is wired-
-  // and-descriptive (e.g. fielding P(=1)) — no caption.
+  // Detect by checking whether `direction` is present on the record.
+  // direction === 'higher_better' | 'lower_better' → polarised, render
+  // delta with good/bad coloring. direction === null → descriptive
+  // (e.g. fielding P(=1)), the cohort baseline still renders as a
+  // neutral "vs X%" so the reader can compare to cohort — user-asked
+  // 2026-05-22 ("no cohort comparison for that probability pill").
+  // direction === undefined → backend not wired with cohort fields,
+  // skip the caption entirely.
   const dir = record.direction
   if (dir === undefined) return null  // not wired
-  if (dir === null) return null       // descriptive — no orientation
 
   // Below-sample (cohort cliff): scope_avg is null but direction is
   // set. Render "vs — (below sample)" in muted italic.
@@ -161,7 +165,10 @@ function captionFor(record: ProbRecord): React.ReactNode | null {
     )
   }
 
-  const polarity = deltaPolarity(dp, dir)
+  // Descriptive chips (dir === null) get a neutral delta color —
+  // arrow direction reads as "higher / lower than cohort" without
+  // a good/bad verdict. Only polarised chips colour the delta.
+  const polarity = dir === null ? 'neutral' : deltaPolarity(dp, dir)
   const deltaColor = polarity === 'good' ? COLOR_GOOD
     : polarity === 'bad' ? COLOR_BAD
     : 'var(--ink-faint)'

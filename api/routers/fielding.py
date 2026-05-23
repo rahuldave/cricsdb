@@ -1238,11 +1238,13 @@ async def fielding_distribution(
 
 # PT4 of spec-prob-baselines.md — fielding catches chip direction +
 # cohort field map. P(=0) lower_better (more 0-catch matches is bad);
-# P(=1) descriptive (None — single-catch matches don't have an
-# orientation); P(≥2) higher_better.
+# P(=1) higher_better (revised 2026-05-22 per user feedback — more
+# single-catch matches IS a positive signal: it lifts mass off the
+# 0-catch tail, even when it doesn't convert to a 2+ haul); P(≥2)
+# higher_better.
 _FIELDING_CATCHES_PROB_DIRECTIONS: dict[str, str | None] = {
     "p_zero":  "lower_better",
-    "p_one":   None,
+    "p_one":   "higher_better",
     "p_geq_2": "higher_better",
 }
 
