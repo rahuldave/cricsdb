@@ -116,7 +116,12 @@ export function FielderChipsRow({
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: '0.35rem',
         marginTop: '0.85rem',
-        alignItems: 'flex-end',
+        // flex-start aligns the pill tops so the descriptive
+        // P(=1) chip (no cohort caption — direction === null) stays
+        // level with the P(=0) / P(≥2) chips that DO render a
+        // caption beneath. flex-end aligned bottoms which dropped
+        // the lone pill below its peers — user-flagged 2026-05-22.
+        alignItems: 'flex-start',
       }}>
         <CohortRowPrefix />
         <ProbChip label="P(=0)"  record={m.p_zero}  tint={T_INDIGO} />
