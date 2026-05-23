@@ -20,9 +20,9 @@ REG bat_summary_venue_wankhede        /api/v1/batters/ba607b88/summary?filter_ve
 REG bat_byinn_venue_wankhede          /api/v1/batters/ba607b88/by-innings?filter_venue=Wankhede%20Stadium&limit=5
 
 # ── bowling ──────────────────────────────────────────────────────
-REG bow_summary_plain                 /api/v1/bowlers/462411b3/summary
-REG bow_summary_ipl                   /api/v1/bowlers/462411b3/summary?tournament=Indian%20Premier%20League
-REG bow_summary_venue_wankhede        /api/v1/bowlers/462411b3/summary?filter_venue=Wankhede%20Stadium
+NEW bow_summary_plain                 /api/v1/bowlers/462411b3/summary
+NEW bow_summary_ipl                   /api/v1/bowlers/462411b3/summary?tournament=Indian%20Premier%20League
+NEW bow_summary_venue_wankhede        /api/v1/bowlers/462411b3/summary?filter_venue=Wankhede%20Stadium
 
 # ── fielding ─────────────────────────────────────────────────────
 REG field_summary_plain               /api/v1/fielders/ba607b88/summary
