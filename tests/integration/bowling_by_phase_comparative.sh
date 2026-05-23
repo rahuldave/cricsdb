@@ -27,7 +27,7 @@ ab wait --load networkidle
 ab wait --text "Dot % by phase"
 ab wait 1500
 
-for title in "Dot % by phase" "Strike rate by phase" "Economy by phase"; do
+for title in "Dot % by phase" "Strike rate by phase" "Economy by phase" "Boundaries conceded per over by phase"; do
   has=$(ab_eval "document.body.innerText.includes('${title}')")
   if [ "$has" = "true" ]; then
     ok "title present — \"${title}\""

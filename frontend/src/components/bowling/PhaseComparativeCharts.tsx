@@ -97,6 +97,15 @@ export default function PhaseComparativeCharts({ phaseData, phaseBaseline }: Pro
     b => b.economy ?? null,
     'Econ', fmt2,
   )
+  // Boundaries conceded per over. Player: (fours + sixes) / (balls/6).
+  // Cohort: boundary_pct × 6 / 100 (boundary_pct = boundaries/balls × 100).
+  // Both denominate by legal balls so DLS-truncated innings stay
+  // symmetric. User-asked 2026-05-22 follow-up.
+  const bpoEntries = buildEntries(
+    p => (p.balls && p.balls > 0 ? ((p.fours ?? 0) + (p.sixes ?? 0)) / (p.balls / 6) : null),
+    b => (b.boundary_pct != null ? (b.boundary_pct * 6) / 100 : null),
+    'Bdys/over', fmt2,
+  )
 
   return (
     <section
@@ -131,6 +140,16 @@ export default function PhaseComparativeCharts({ phaseData, phaseBaseline }: Pro
         yLabel="runs / over"
         yFmt={fmt2}
         cohortExplainer="Green tick = average economy rate in this phase across every bowler in the FilterBar scope. Lower is better."
+        height={110}
+      />
+      <PerformanceVsCohort
+        entries={bpoEntries}
+        bucketLabel={bucketLabel}
+        phaseTint={phaseTint}
+        title="Boundaries conceded per over by phase"
+        yLabel="(4s + 6s) / over"
+        yFmt={fmt2}
+        cohortExplainer="Green tick = average boundaries conceded per over in this phase across every bowler in the FilterBar scope. Lower is better — cheaper bowlers concede fewer."
         height={110}
       />
     </section>
