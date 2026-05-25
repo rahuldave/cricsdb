@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams, AuxParams
+from ..filters import FilterParams, AuxParams, player_result_clause, player_inning_match_clause
 from ..aux_clauses import splice_aux_join_clauses
 from ..metrics_metadata import wrap_metric
 from ..player_nationality import player_nationalities
@@ -177,11 +177,17 @@ def _fielding_filter(filters: FilterParams, person_id: str, aux: AuxParams | Non
     match level — fielders' credits live in opponent-batting innings,
     so the default `i.team = :team` would return zero.
     """
-    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
+    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux, apply_inning=False)
     params["person_id"] = person_id
     parts = ["fc.fielder_id = :person_id"]
     if where:
         parts.append(where)
+    rc = player_result_clause(aux, person_id, params)
+    if rc:
+        parts.append(rc)
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        parts.append(ri)
     return " AND ".join(parts), params
 
 
@@ -386,6 +392,19 @@ async def fielding_summary(
     match_parts = ["mp.person_id = :person_id"]
     if match_where:
         match_parts.append(match_where)
+    # Player-POV result narrowing (matches the player's own side
+    # won/lost/tied). mp + m are already joined here, but route through
+    # the shared helper for one definition of the result semantics.
+    rc = player_result_clause(aux, person_id, match_params, match_id_expr="mp.match_id")
+    if rc:
+        match_parts.append(rc)
+    # Option-B inning: matches where the player's team batted in
+    # innings N (match subset). This count is match-level (no innings
+    # join) so it never saw the per-event clause — add the subset here
+    # so fielding `matches` narrows consistently with the catches.
+    ri = player_inning_match_clause(aux, person_id, match_params, match_id_expr="mp.match_id")
+    if ri:
+        match_parts.append(ri)
     match_clause = " AND ".join(match_parts)
 
     match_rows = await db.q(

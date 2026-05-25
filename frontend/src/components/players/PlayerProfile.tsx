@@ -51,7 +51,6 @@ export default function PlayerProfile({
       {!suppressScopePill && <ScopeIndicator filters={filters} />}
       <div className="wisden-player-identity">
         <em>{role}</em>
-        {matches > 0 && <> · <span className="num">{matches}</span> matches</>}
       </div>
 
       {noData ? (
@@ -61,6 +60,12 @@ export default function PlayerProfile({
       ) : (
         <>
           <PlayerTeamsStrip playerId={playerId} filters={filters} />
+          {matches > 0 && (
+            <div className="wisden-overall-matches">
+              <span className="wisden-overall-matches-label">Matches in scope</span>
+              <span className="wisden-overall-matches-value num">{matches.toLocaleString()}</span>
+            </div>
+          )}
           {disciplineHasData('batting',  profile) &&
             <PlayerSummaryRow discipline="batting"  profile={profile} playerId={playerId} filters={filters} />}
           {disciplineHasData('bowling',  profile) &&

@@ -14,7 +14,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, Query
 
 from ..dependencies import get_db
-from ..filters import FilterParams, AuxParams
+from ..filters import FilterParams, AuxParams, player_result_clause, player_inning_match_clause
 from ..metrics_metadata import wrap_metric
 
 router = APIRouter(prefix="/api/v1/fielders", tags=["Keeping"])
@@ -51,11 +51,17 @@ def _keeping_filter(filters: FilterParams, person_id: str, aux: AuxParams | None
     innings (keeper is in the field while opponent bats), so we can't
     use FilterParams' default `i.team = :team`.
     """
-    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
+    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux, apply_inning=False)
     params["person_id"] = person_id
     parts = ["ka.keeper_id = :person_id"]
     if where:
         parts.append(where)
+    rc = player_result_clause(aux, person_id, params)
+    if rc:
+        parts.append(rc)
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        parts.append(ri)
     return " AND ".join(parts), params
 
 

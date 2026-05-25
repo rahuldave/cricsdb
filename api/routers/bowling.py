@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams, AuxParams
+from ..filters import FilterParams, AuxParams, player_result_clause, player_inning_match_clause
 from ..aux_clauses import splice_aux_join_clauses
 from ..metrics_metadata import wrap_metric
 from ..player_nationality import player_nationalities
@@ -172,7 +172,7 @@ async def _over_distribution(db, person_id: str, filters: FilterParams) -> list[
 
 def _bowling_legal_filter(filters: FilterParams, person_id: str, batter_id: str | None = None, aux: AuxParams | None = None):
     """WHERE clause for legal-ball bowling queries — side-neutral team filter."""
-    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
+    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux, apply_inning=False)
     params["person_id"] = person_id
     parts = ["d.bowler_id = :person_id", "d.extras_wides = 0", "d.extras_noballs = 0"]
     if where:
@@ -180,6 +180,12 @@ def _bowling_legal_filter(filters: FilterParams, person_id: str, batter_id: str 
     if batter_id:
         parts.append("d.batter_id = :batter_id")
         params["batter_id"] = batter_id
+    rc = player_result_clause(aux, person_id, params)
+    if rc:
+        parts.append(rc)
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        parts.append(ri)
     return " AND ".join(parts), params
 
 
@@ -320,7 +326,7 @@ def _bowling_all_filter(filters: FilterParams, person_id: str, batter_id: str | 
 
     side-neutral: a bowler's deliveries live in opponent-batting innings.
     """
-    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
+    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux, apply_inning=False)
     params["person_id"] = person_id
     parts = ["d.bowler_id = :person_id"]
     if where:
@@ -328,12 +334,18 @@ def _bowling_all_filter(filters: FilterParams, person_id: str, batter_id: str | 
     if batter_id:
         parts.append("d.batter_id = :batter_id")
         params["batter_id"] = batter_id
+    rc = player_result_clause(aux, person_id, params)
+    if rc:
+        parts.append(rc)
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        parts.append(ri)
     return " AND ".join(parts), params
 
 
 def _bowling_wicket_filter(filters: FilterParams, person_id: str, batter_id: str | None = None, aux: AuxParams | None = None):
     """WHERE clause for bowler wicket queries — side-neutral team filter."""
-    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
+    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux, apply_inning=False)
     params["person_id"] = person_id
     parts = [
         "d.bowler_id = :person_id",
@@ -344,6 +356,12 @@ def _bowling_wicket_filter(filters: FilterParams, person_id: str, batter_id: str
     if batter_id:
         parts.append("w.player_out_id = :batter_id")
         params["batter_id"] = batter_id
+    rc = player_result_clause(aux, person_id, params)
+    if rc:
+        parts.append(rc)
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        parts.append(ri)
     return " AND ".join(parts), params
 
 

@@ -67,6 +67,17 @@ export function disciplineHasData(
   return hasKeeping(profile)
 }
 
+/** Per-discipline match count for the section header — filter-specific
+ *  (reflects the active FilterBar + result/inning aux), so it reads as
+ *  "how many matches the current filters narrowed this discipline to".
+ *  Keeping shows innings-kept in its cards instead, so no head count. */
+function matchesFor(discipline: Discipline, profile: PlayerProfile): number | null {
+  if (discipline === 'batting')  return profile.batting?.matches.value ?? null
+  if (discipline === 'bowling')  return profile.bowling?.matches.value ?? null
+  if (discipline === 'fielding') return profile.fielding?.matches.value ?? null
+  return null
+}
+
 export default function PlayerSummaryRow({
   discipline, profile, playerId, filters, placeholder = false, compact = false,
 }: Props) {
@@ -204,7 +215,8 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     // dimensional discipline" rule.
     return (
       <>
-        <div className="wisden-statrow cols-6">
+        <div className="wisden-statrow cols-7">
+          <StatCard label="Matches"  value={matchesFor('batting', profile)} />
           <StatCard label="Runs"     value={b.runs.value} />
           <StatCard label="Runs/Inn" value={fmt(b.runs_per_innings.value, 2)}
             subtitle={baselineSub(b.runs_per_innings, tt, 2)} />
@@ -252,7 +264,8 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     // had no chip — that was correct; left unchanged.
     return (
       <>
-        <div className="wisden-statrow cols-6">
+        <div className="wisden-statrow cols-7">
+          <StatCard label="Matches" value={matchesFor('bowling', profile)} />
           <StatCard label="Wickets" value={b.wickets.value ?? 0} />
           <StatCard label="Avg"     value={fmt(b.average.value)} subtitle={baselineSub(b.average, tt, 2)} />
           <StatCard label="Econ"    value={fmt(b.economy.value)} subtitle={baselineSub(b.economy, tt, 2)} />
@@ -285,7 +298,8 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     // keepers shouldn't surface a zero-only rate).
     return (
       <>
-        <div className="wisden-statrow cols-6">
+        <div className="wisden-statrow cols-7">
+          <StatCard label="Matches"        value={matchesFor('fielding', profile)} />
           <StatCard label="Catches"        value={f.catches.value ?? 0} />
           <StatCard label="Catches/Match"  value={fmt(f.catches_per_match.value, 3)}
             subtitle={baselineSub(f.catches_per_match, tt, 3)} />

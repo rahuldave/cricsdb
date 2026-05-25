@@ -135,13 +135,16 @@ function buildSegments(
   // Page-local 1st/2nd-innings narrowing — AuxParams aux field, NOT
   // a FilterBar key, but surfaces here so the user sees that the page
   // is partitioned. Spec: spec-inning-split.md §6.6.
-  // POV-aware: bowling/fielding discipline flips to "bowled first/second".
-  // See project_inning_pov_conventions for the decision history.
+  // Option-B unified semantics (spec-inning-unify-option-b.md): inning
+  // is ALWAYS the team's batting innings. inning=0 = batted first;
+  // for bowling/fielding POV that's "bowled second" (they batted
+  // first, so they bowled in the 2nd innings). inning=1 = batted
+  // second = "bowled first". The bowl labels are flipped vs the value.
   const bowlPov = discipline === 'bowling' || discipline === 'fielding'
   if (filters.inning === '0') {
-    segs.push({ label: 'Innings', value: bowlPov ? 'bowled first' : 'batted first' })
+    segs.push({ label: 'Innings', value: bowlPov ? 'bowled second' : 'batted first' })
   } else if (filters.inning === '1') {
-    segs.push({ label: 'Innings', value: bowlPov ? 'bowled second' : 'batted second' })
+    segs.push({ label: 'Innings', value: bowlPov ? 'bowled first' : 'batted second' })
   }
 
   // Splits Mosaic aux — toss_outcome + result narrowings from the

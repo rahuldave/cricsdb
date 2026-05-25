@@ -339,6 +339,17 @@ a { color: inherit; }
   flex-wrap: wrap;
   row-gap: 0.3rem;
 }
+/* Player-page aux-filter row: InningToggle + PlayerResultFilter side
+   by side on desktop; the result widget flex-wraps below the innings
+   toggle on narrow screens (each child is itself a .wisden-filter-group
+   flex row). */
+.wisden-aux-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 2rem;
+}
+
 .wisden-filter-label {
   font-family: var(--serif);
   font-style: italic;
@@ -859,6 +870,28 @@ a { color: inherit; }
   color: var(--ink-soft);
   margin: 0;
 }
+/* Overall matches in scope — prominent filter-reflecting count above
+   the three discipline sections. */
+.wisden-overall-matches {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0.2rem 0 1.4rem;
+}
+.wisden-overall-matches-label {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.wisden-overall-matches-value {
+  font-family: var(--serif);
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--ink);
+}
 .wisden-player-section-link {
   font-family: var(--serif);
   font-style: italic;
@@ -1189,6 +1222,13 @@ a { color: inherit; }
 .wisden-statrow.cols-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (min-width: 1024px) {
   .wisden-statrow.cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+/* 7-card variant — discipline summary first row with a leading
+   Matches tile. 3-up on mobile (parity with the cols-6 rows that
+   follow it), 7-up at lg. */
+.wisden-statrow.cols-7 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 1024px) {
+  .wisden-statrow.cols-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 }
 
 /* Team Players-tab roster grid — 2-up on mobile so each cell has

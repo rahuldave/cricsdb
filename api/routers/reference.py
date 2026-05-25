@@ -590,3 +590,56 @@ async def player_teams(
         for r in team_rows
     ]
     return {"teams": teams}
+
+
+@router.get("/players/{person_id}/result-counts")
+async def player_result_counts(
+    person_id: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    """Match counts by the player's own-team result, for the player-page
+    ResultFilter pills. Player-POV (outcome_winner vs matchplayer.team),
+    aux-stripped (does NOT apply aux.result) so the breakdown stays
+    stable as the user clicks the pills — mirrors the ResultFilter
+    counts convention. Scope = FilterBar (gender/season/venue); team
+    narrowing re-applied at mp.team like /players/{id}/teams.
+
+    `tied` collapses true ties + no-results (outcome_winner IS NULL).
+    """
+    db = get_db()
+    where, params = filters.build(
+        has_innings_join=False, aux=aux, drop={"filter_team", "filter_opponent"}
+    )
+    params["pid"] = person_id
+    clause = f" AND {where}" if where else ""
+    team_filter = ""
+    if _is_set(filters.team):
+        team_filter = " AND mp.team = :ftteam"
+        params["ftteam"] = filters.team
+
+    rows = await db.q(
+        f"""
+        SELECT
+          COUNT(DISTINCT mp.match_id) AS matches,
+          COUNT(DISTINCT CASE WHEN m.outcome_winner = mp.team
+                              THEN mp.match_id END) AS wins,
+          COUNT(DISTINCT CASE WHEN m.outcome_winner IS NOT NULL
+                               AND m.outcome_winner != mp.team
+                              THEN mp.match_id END) AS losses,
+          COUNT(DISTINCT CASE WHEN m.outcome_winner IS NULL
+                              THEN mp.match_id END) AS tied
+        FROM matchplayer mp
+        JOIN match m ON m.id = mp.match_id
+        WHERE mp.person_id = :pid{clause}{team_filter}
+        """,
+        params,
+    )
+    r = rows[0] if rows else {}
+    return {
+        "matches": r.get("matches") or 0,
+        "wins": r.get("wins") or 0,
+        "losses": r.get("losses") or 0,
+        "ties": r.get("tied") or 0,
+        "no_results": 0,
+    }

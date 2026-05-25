@@ -226,6 +226,12 @@ export const getPlayerProfile = async (id: string, filters?: F) => {
 export const getPlayerTeams = (id: string, filters?: F) =>
   fetchApi<{ teams: import('./types').PlayerTeamTotals[] }>(`/api/v1/players/${id}/teams`, filters as Record<string, string>)
 
+// Player-POV match-result counts (own-team won/lost/tied) for the
+// player-page ResultFilter pills. Aux-stripped breakdown at scope.
+export const getPlayerResultCounts = (id: string, filters?: F) =>
+  fetchApi<{ matches: number; wins: number; losses: number; ties: number; no_results: number }>(
+    `/api/v1/players/${id}/result-counts`, filters as Record<string, string>)
+
 // Keeping (Tier 2 fielding)
 export const getFielderKeepingSummary = (id: string, filters?: F) =>
   fetchApi<import('./types').KeepingSummary>(`/api/v1/fielders/${id}/keeping/summary`, filters as Record<string, string>)

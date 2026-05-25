@@ -6,6 +6,7 @@ import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import PlayerSearch from '../components/PlayerSearch'
 import InningToggle from '../components/InningToggle'
+import PlayerResultFilter from '../components/players/PlayerResultFilter'
 import PlayerProfile from '../components/players/PlayerProfile'
 import PlayersLanding from '../components/players/PlayersLanding'
 import PlayerCompareGrid from '../components/players/PlayerCompareGrid'
@@ -38,9 +39,15 @@ export default function Players() {
 
       {!playerId && <PlayersLanding filters={filters} />}
 
-      {/* Page-local 1st/2nd-innings toggle. Mounts only when a player
-          is selected (single-player or compare). Spec §6.1. */}
-      {playerId && <InningToggle />}
+      {/* Page-local aux filters: 1st/2nd-innings toggle + (single-
+          player only) the standalone match-result filter. Same line on
+          desktop; the result widget flex-wraps below on mobile. */}
+      {playerId && (
+        <div className="wisden-aux-filter-row">
+          <InningToggle />
+          {!isCompare && <PlayerResultFilter playerId={playerId} filters={filters} />}
+        </div>
+      )}
 
       {playerId && !isCompare && (
         <SinglePlayerView playerId={playerId} />

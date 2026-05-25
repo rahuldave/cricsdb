@@ -230,9 +230,13 @@ export function abbreviateScope(
   // fielding discipline flips the verb to "bowled first/second" so the
   // subtitle matches the side of the ball the user is reading. See
   // project_inning_pov_conventions for the decision history.
+  // Option-B unified semantics (spec-inning-unify-option-b.md): inning
+  // is ALWAYS the team's batting innings. inning=0 = batted first =
+  // (for bowling/fielding) "bowled second"; inning=1 = batted second =
+  // "bowled first". The bowl verb is flipped relative to the value.
   const bowlPov = opts?.discipline === 'bowling' || opts?.discipline === 'fielding'
-  if (scope.inning === '0') parts.push(bowlPov ? 'bowled first' : 'batted first')
-  else if (scope.inning === '1') parts.push(bowlPov ? 'bowled second' : 'batted second')
+  if (scope.inning === '0') parts.push(bowlPov ? 'bowled second' : 'batted first')
+  else if (scope.inning === '1') parts.push(bowlPov ? 'bowled first' : 'batted second')
 
   // Splits Mosaic aux — match-outcome (result) and toss-outcome
   // narrowings from the path team's POV. Same AuxParam treatment

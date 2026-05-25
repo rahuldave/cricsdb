@@ -34,8 +34,23 @@ export default function InningToggle() {
 
   const isBatting = discipline === 'batting'
   const isBowlOrField = discipline === 'bowling' || discipline === 'fielding'
+  // Option-B unified semantics (spec-inning-unify-option-b.md): inning
+  // is ALWAYS the team's batting innings. `inning=0` = batted first,
+  // `inning=1` = batted second. Batting/neutral surfaces map the
+  // "first" pill → inning=0 directly. Bowling/fielding surfaces label
+  // by their own POV ("Bowled first/second") so the VALUE flips:
+  // "Bowled first" = the team batted SECOND = inning=1; "Bowled
+  // second" = batted first = inning=0.
   const firstLabel  = isBatting ? 'Batting first'  : isBowlOrField ? 'Bowling first'  : '1st innings'
   const secondLabel = isBatting ? 'Batting second' : isBowlOrField ? 'Bowling second' : '2nd innings'
+  const firstValue  = isBowlOrField ? '1' : '0'
+  const secondValue = isBowlOrField ? '0' : '1'
+  const firstTitle  = isBowlOrField
+    ? "Bowled first — the team bowled in the match's 1st innings (they batted second). URL inning=1."
+    : "Batted first — the team batted in the match's 1st innings. URL inning=0."
+  const secondTitle = isBowlOrField
+    ? "Bowled second — the team bowled in the match's 2nd innings (they batted first). URL inning=0."
+    : "Batted second — the team batted in the match's 2nd innings (chasing). URL inning=1."
 
   const segBtn = (active: boolean) => `wisden-seg${active ? ' is-active' : ''}`
   return (
@@ -51,17 +66,17 @@ export default function InningToggle() {
       </button>
       <button
         type="button"
-        className={segBtn(inning === '0')}
-        onClick={() => setInning('0')}
-        title="Restrict to innings_number=0 — the match's 1st innings half. Batting stats reflect batting-first; bowling/fielding stats reflect bowling-first."
+        className={segBtn(inning === firstValue)}
+        onClick={() => setInning(firstValue)}
+        title={firstTitle}
       >
         {firstLabel}
       </button>
       <button
         type="button"
-        className={segBtn(inning === '1')}
-        onClick={() => setInning('1')}
-        title="Restrict to innings_number=1 — the match's 2nd innings half. Batting stats reflect chasing; bowling/fielding stats reflect defending."
+        className={segBtn(inning === secondValue)}
+        onClick={() => setInning(secondValue)}
+        title={secondTitle}
       >
         {secondLabel}
       </button>

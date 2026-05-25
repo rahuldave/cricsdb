@@ -269,6 +269,7 @@ class FilterBarParams:
         innings_alias: str = "i",
         aux: Optional[AuxParams] = None,
         drop: Optional[set[str]] = None,
+        apply_inning: bool = True,
     ) -> tuple[str, dict]:
         """Build WHERE clause fragments and params dict.
 
@@ -402,7 +403,14 @@ class FilterBarParams:
         # alias; match-level endpoints honour inning via
         # _inning_match_filter in api/routers/teams.py instead. Spec:
         # internal_docs/spec-inning-split.md.
-        if has_innings_join and aux is not None and aux.inning is not None:
+        # Per-event innings_number narrowing. `apply_inning=False` lets
+        # player/team discipline callers suppress this in favour of the
+        # match-subset clause (player_inning_match_clause /
+        # _inning_match_filter) — the Option-B "batted-first" unification
+        # (internal_docs/spec-inning-unify-option-b.md). Match-level
+        # endpoints already route inning through the match filter, so
+        # they pass apply_inning=False too.
+        if apply_inning and has_innings_join and aux is not None and aux.inning is not None:
             clauses.append(f"{innings_alias}.innings_number = :inning")
             params["inning"] = aux.inning
 
@@ -415,6 +423,7 @@ class FilterBarParams:
         table_alias: str = "m",
         innings_alias: str = "i",
         aux: Optional[AuxParams] = None,
+        apply_inning: bool = True,
     ) -> tuple[str, dict]:
         """Like build(), but filter_team / filter_opponent are applied
         at MATCH level instead of innings level.
@@ -438,6 +447,7 @@ class FilterBarParams:
         try:
             where, params = self.build(
                 has_innings_join, table_alias, innings_alias, aux=aux,
+                apply_inning=apply_inning,
             )
         finally:
             self.team = saved_team
@@ -466,3 +476,84 @@ class FilterBarParams:
 # Backward-compat alias — existing code imports FilterParams everywhere.
 # Gradual rename over time.
 FilterParams = FilterBarParams
+
+
+def player_result_clause(
+    aux: Optional[AuxParams],
+    person_id: str,
+    params: dict,
+    match_id_expr: str = "m.id",
+    key: str = "prc_pid",
+) -> str:
+    """Player-POV `result` aux narrowing — the player-page sibling of
+    the team-POV `_result_match_filter` in api/routers/teams.py.
+
+    The subject team is the player's OWN side per match
+    (`matchplayer.team`), so this works across every team a player has
+    turned out for (India, RCB, …) using each match's actual team —
+    unlike the team-POV clause which compares a single fixed `:team`.
+
+      'won'  → the player's team is the match's outcome_winner
+      'lost' → there is a winner and it is NOT the player's team
+      'tied' → outcome_winner IS NULL (collapses true ties + no-results,
+               mirroring the team-POV + Mosaic convention)
+
+    Returns a BARE clause (no leading AND) for splicing into a parts
+    list, binding :<key>; "" when aux.result is unset. `match_id_expr`
+    is the outer query's match-id column (the consuming query must have
+    the relevant table in scope, e.g. `m.id` or `i.match_id`).
+    """
+    if aux is None or not getattr(aux, "result", None):
+        return ""
+    r = aux.result
+    if r == "won":
+        cond = "mm.outcome_winner = mp.team"
+    elif r == "lost":
+        cond = "mm.outcome_winner IS NOT NULL AND mm.outcome_winner != mp.team"
+    elif r == "tied":
+        cond = "mm.outcome_winner IS NULL"
+    else:
+        return ""
+    params[key] = person_id
+    return (
+        f"{match_id_expr} IN ("
+        f"SELECT mp.match_id FROM matchplayer mp "
+        f"JOIN match mm ON mm.id = mp.match_id "
+        f"WHERE mp.person_id = :{key} AND {cond})"
+    )
+
+
+def player_inning_match_clause(
+    aux: Optional[AuxParams],
+    person_id: str,
+    params: dict,
+    match_id_expr: str = "m.id",
+    key: str = "pim_pid",
+) -> str:
+    """Player-POV `inning` narrowing — Option-B "batted-first" semantics
+    (internal_docs/spec-inning-unify-option-b.md). Restricts to matches
+    where the player's OWN team (matchplayer.team) batted in
+    innings_number = aux.inning:
+
+      inning=0 → matches the player's team batted first
+      inning=1 → matches the player's team batted second
+
+    Unlike the per-event `i.innings_number = :inning` clause, this is a
+    match SUBSET, so it means the same thing for every discipline: a
+    bowler's `inning=0` becomes "his bowling in matches his team batted
+    first" (= his 2nd-innings bowling), NOT "bowled first". Callers must
+    suppress the central clause (`build(..., apply_inning=False)`) and
+    add this instead. Returns a BARE clause (no leading AND); ""
+    when aux.inning is unset.
+    """
+    if aux is None or aux.inning is None:
+        return ""
+    params[key] = person_id
+    params["pim_inn"] = aux.inning
+    return (
+        f"{match_id_expr} IN ("
+        f"SELECT i2.match_id FROM innings i2 "
+        f"JOIN matchplayer mp2 ON mp2.match_id = i2.match_id "
+        f"AND mp2.person_id = :{key} AND mp2.team = i2.team "
+        f"WHERE i2.innings_number = :pim_inn AND i2.super_over = 0)"
+    )

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams, AuxParams
+from ..filters import FilterParams, AuxParams, player_result_clause, player_inning_match_clause
 from ..aux_clauses import splice_aux_join_clauses
 from ..metrics_metadata import wrap_metric
 from ..player_nationality import player_nationalities
@@ -175,7 +175,7 @@ def _batting_filter(filters: FilterParams, person_id: str, bowler_id: str | None
     occasional obstruction / handled-ball off a delivery the player
     wasn't facing), use `_batting_innings_filter` instead.
     """
-    where, params = filters.build(has_innings_join=True, aux=aux)
+    where, params = filters.build(has_innings_join=True, aux=aux, apply_inning=False)
     params["person_id"] = person_id
     parts = ["d.batter_id = :person_id", "d.extras_wides = 0", "d.extras_noballs = 0"]
     if where:
@@ -183,6 +183,12 @@ def _batting_filter(filters: FilterParams, person_id: str, bowler_id: str | None
     if bowler_id:
         parts.append("d.bowler_id = :bowler_id")
         params["bowler_id"] = bowler_id
+    rc = player_result_clause(aux, person_id, params)
+    if rc:
+        parts.append(rc)
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        parts.append(ri)
     return " AND ".join(parts), params
 
 
@@ -210,11 +216,17 @@ def _batting_innings_filter(filters: FilterParams, person_id: str, aux: AuxParam
     /distribution. See `_batting_filter` for the striker-side
     variant.
     """
-    where, params = filters.build(has_innings_join=True, aux=aux)
+    where, params = filters.build(has_innings_join=True, aux=aux, apply_inning=False)
     params["person_id"] = person_id
     parts = ["(d.batter_id = :person_id OR d.non_striker_id = :person_id)"]
     if where:
         parts.append(where)
+    rc = player_result_clause(aux, person_id, params)
+    if rc:
+        parts.append(rc)
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        parts.append(ri)
     return " AND ".join(parts), params
 
 
@@ -1107,7 +1119,7 @@ async def batting_dismissals(
     bowler_id: Optional[str] = Query(None),
 ):
     db = get_db()
-    filt_where, filt_params = filters.build(has_innings_join=True, aux=aux)
+    filt_where, filt_params = filters.build(has_innings_join=True, aux=aux, apply_inning=False)
     filt_params["person_id"] = person_id
     base_parts = [
         "w.player_out_id = :person_id",
@@ -1118,6 +1130,9 @@ async def batting_dismissals(
     if bowler_id:
         base_parts.append("d.bowler_id = :bowler_id")
         filt_params["bowler_id"] = bowler_id
+    ri = player_inning_match_clause(aux, person_id, filt_params)
+    if ri:
+        base_parts.append(ri)
     base_clause = " AND ".join(base_parts)
 
     # Total + by_kind
