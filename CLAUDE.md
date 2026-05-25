@@ -28,6 +28,7 @@ CLAUDE.md is the **inviolable-rules file**. Everything describing what the codeb
 - Visual identity / Wisden styles: `internal_docs/visual-identity.md`
 - Color discipline (palettes, reference lines, swatch alignment): `internal_docs/colors.md`
 - Local dev prerequisites + REPL: `internal_docs/local-development.md`
+- **Semiotic v3 gotchas (canvas vs SVG, opacity props, `pieceStyle` replace-not-merge trap, lookup workflow): `internal_docs/semiotic-notes.md`** — read BEFORE writing any Semiotic chart code
 
 **Rules detail (subordinate to this file)**
 - Code patterns (router imports, ChartContainer, extend-don't-fork, ScopedPageHeader, URL-clean, chip↔chart, rate-vs-volume, cascade-clear, no-hacks): `internal_docs/code-patterns.md`
