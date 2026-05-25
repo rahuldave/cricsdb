@@ -5697,7 +5697,9 @@ def _partnership_filter(
     counts toward the league average regardless of which side faced it).
     """
     filters.team = None
-    where, params = filters.build(has_innings_join=True, aux=aux)
+    # Option-B inning is a match subset, not the event's innings_number;
+    # suppress the central per-event clause and re-add per-side below.
+    where, params = filters.build(has_innings_join=True, apply_inning=False, aux=aux)
     parts: list[str] = []
     if team is not None:
         params["team"] = team
@@ -5707,6 +5709,14 @@ def _partnership_filter(
             parts.extend(["i.team != :team", "(m.team1 = :team OR m.team2 = :team)"])
     if where:
         parts.append(where)
+    # Option-B inning: batting-side partnerships in matches :team batted in
+    # N (unchanged); bowling-side (partnerships conceded by :team's bowling)
+    # in those same matches = their (1-N)th innings. Mirrors the
+    # fielding-side flip in _team_innings_clause.
+    inn_clause, inn_params = _option_b_team_inning(team, side, aux)
+    if inn_clause:
+        parts.append(inn_clause)
+        params.update(inn_params)
     # Match-level aux filters (result / toss_outcome) need a path team
     # to evaluate; only apply on team-detail (mirror of
     # _team_innings_clause). Spec: spec-splits-mosaic.md §1.2.

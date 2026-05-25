@@ -68,6 +68,24 @@ else
   bad "cohort scope_avg frozen/empty across inning ($sa0/$sa1) — chip↔baseline asymmetry"
 fi
 
+# 5. Partnerships (U9): batting-side partitions cleanly across inning
+#    (unchanged meaning); bowling-side (partnerships conceded by :team's
+#    bowling) FLIPS like fielding — inning=0 = matches :team batted first.
+pt(){ curl -s "$API/api/v1/teams/$TE/partnerships/summary?gender=male&side=$1&inning=$2" \
+  | python3 -c "import sys,json;d=json.load(sys.stdin);v=d.get('total');print(v.get('value') if isinstance(v,dict) else v)" 2>/dev/null; }
+ptn(){ curl -s "$API/api/v1/teams/$TE/partnerships/summary?gender=male&side=$1" \
+  | python3 -c "import sys,json;d=json.load(sys.stdin);v=d.get('total');print(v.get('value') if isinstance(v,dict) else v)" 2>/dev/null; }
+pb0=$(pt batting 0); pb1=$(pt batting 1); pbn=$(ptn batting)
+pw0=$(pt bowling 0); pw1=$(pt bowling 1)
+echo "  partnerships batting $pb0/$pb1 (none $pbn)   bowling $pw0/$pw1"
+[ $((pb0+pb1)) = "$pbn" ] && ok "batting-side partnerships partition cleanly ($pb0+$pb1=$pbn) — unchanged" \
+  || bad "batting-side partnerships don't partition ($pb0+$pb1 != $pbn)"
+if [ "$pw0" -ne "$pw1" ] && [ "$pw0" -ne "$pb0" ]; then
+  ok "bowling-side partnerships flip with inning ($pw0/$pw1) + distinct from batting ($pb0)"
+else
+  bad "bowling-side partnerships not flipped / not distinct ($pw0/$pw1 vs batting $pb0)"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"
