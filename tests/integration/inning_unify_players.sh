@@ -56,6 +56,48 @@ wk1=$(m bowlers "inning=1" wickets)
 echo "  bowling wickets inning=1 (bowled first) = $wk1 | SQL innings_number-0 bowling = $sql_bowl1"
 [ "$wk1" = "$sql_bowl1" ] && ok "bowling inning=1 == bowled-first wickets ($wk1)" || bad "bowling inning=1 $wk1 != bowled-first SQL $sql_bowl1"
 
+# --- Phase 1b: remaining per-event sites now routed through the
+#     match-subset clause (batting records + inter-wicket + keeping). ---
+
+# 5. Records highest_score == SQL max over the batted-first/second match
+#    subset (batting meaning unchanged, but now via the unified clause).
+for inn in 0 1; do
+  rsql=$(sqlite3 "$DB" "SELECT MAX(ib.runs) FROM inningsbatterperf ib
+    JOIN innings i ON i.id=ib.innings_id JOIN match m ON m.id=i.match_id
+    JOIN matchplayer mp ON mp.match_id=m.id AND mp.person_id=ib.batter_id
+    WHERE ib.batter_id='$P' AND m.gender='male' AND i.super_over=0
+      AND m.id IN (SELECT i2.match_id FROM innings i2 JOIN matchplayer mp2 ON mp2.match_id=i2.match_id AND mp2.person_id='$P' AND mp2.team=i2.team WHERE i2.innings_number=$inn AND i2.super_over=0);")
+  rapi=$(curl -s "$API/api/v1/batters/$P/records?gender=male&inning=$inn" | python3 -c "import sys,json;hs=json.load(sys.stdin).get('highest_scores',[]);print(hs[0]['runs'] if hs else '')" 2>/dev/null)
+  [ -n "$rapi" ] && [ "$rapi" = "$rsql" ] && ok "records highest_score inning=$inn == SQL subset max ($rapi)" \
+    || bad "records highest_score inning=$inn: api=$rapi sql=$rsql"
+done
+
+# 6. inter-wicket: non-empty under both innings and the player SR at
+#    wickets_down=0 differs across innings (proves inning narrows).
+iw0=$(curl -s "$API/api/v1/batters/$P/inter-wicket?gender=male&inning=0" | python3 -c "import sys,json;d=json.load(sys.stdin).get('inter_wicket',[]);print(d[0]['strike_rate'] if d else '')" 2>/dev/null)
+iw1=$(curl -s "$API/api/v1/batters/$P/inter-wicket?gender=male&inning=1" | python3 -c "import sys,json;d=json.load(sys.stdin).get('inter_wicket',[]);print(d[0]['strike_rate'] if d else '')" 2>/dev/null)
+[ -n "$iw0" ] && [ -n "$iw1" ] && [ "$iw0" != "$iw1" ] \
+  && ok "inter-wicket non-empty + inning narrows (wd0 SR $iw0 vs $iw1)" \
+  || bad "inter-wicket degenerate or unchanged across inning ($iw0/$iw1)"
+
+# 7. Keeping (subject = MS Dhoni — Kohli has no keeping data):
+#    fielding innings_kept + keeping/ambiguous now route through the
+#    match-subset clause. Anchor each against SQL re-derivation.
+K2=4a8a2e3b
+for inn in 0 1; do
+  ksql=$(sqlite3 "$DB" "SELECT COUNT(*) FROM keeperassignment ka
+    JOIN innings i ON i.id=ka.innings_id JOIN match m ON m.id=i.match_id
+    WHERE ka.keeper_id='$K2' AND m.gender='male'
+      AND m.id IN (SELECT i2.match_id FROM innings i2 JOIN matchplayer mp2 ON mp2.match_id=i2.match_id AND mp2.person_id='$K2' AND mp2.team=i2.team WHERE i2.innings_number=$inn AND i2.super_over=0);")
+  kapi=$(curl -s "$API/api/v1/fielders/$K2/summary?gender=male&inning=$inn" | python3 -c "import sys,json;print(json.load(sys.stdin)['innings_kept']['value'])" 2>/dev/null)
+  [ -n "$kapi" ] && [ "$kapi" = "$ksql" ] && ok "fielding innings_kept inning=$inn == SQL subset ($kapi)" \
+    || bad "fielding innings_kept inning=$inn: api=$kapi sql=$ksql"
+  alen=$(curl -s "$API/api/v1/fielders/$K2/keeping/ambiguous?gender=male&inning=$inn&limit=500" | python3 -c "import sys,json;print(len(json.load(sys.stdin)['innings']))" 2>/dev/null)
+  ascl=$(curl -s "$API/api/v1/fielders/$K2/keeping/summary?gender=male&inning=$inn" | python3 -c "import sys,json;print(json.load(sys.stdin)['ambiguous_innings']['value'])" 2>/dev/null)
+  [ -n "$alen" ] && [ "$alen" = "$ascl" ] && ok "keeping ambiguous list==scalar inning=$inn ($alen)" \
+    || bad "keeping ambiguous inning=$inn: list=$alen scalar=$ascl"
+done
+
 # 4. DOM value-flip + scope-strip POV on /bowling.
 ab open "$BASE/bowling?player=$P&gender=male&inning=1"
 ab wait --text "Bowling first"; ab wait 800

@@ -90,13 +90,22 @@ Status legend: ☐ todo · ◑ code done · ✓ code+test green.
 > discipline filter helpers, fielding `matches`, batting dismissals,
 > the toggle value-flip (U1–U4), ScopeStatusStrip + abbreviateScope POV
 > (U16/U17) — all DONE + green (`inning_unify_players.sh` 5/5).
-> **Phase 1b (players remainder, still per-event):** batting
-> dismiss-overlay subqueries (by-over/phase/season), vs-Bowlers
-> (1274), Inter-Wicket (1327), Distribution (1875); fielding Victims +
-> keeping sub-stats (fielding 424); keeping endpoints (140/394); the
-> cohort dismissals endpoint (A8). These show old per-event inning
-> under the flipped toggle until wired. Phases 3–5 (teams/series/
-> venues) untouched.
+> **Phase 1b (players remainder) — DONE 2026-05-25:** the 5 person-scoped
+> sites are routed through the match-subset clause — batting
+> inter-wicket (1339) + records (1887); fielding keeping sub-stats
+> (424); keeping summary-ambiguous (140) + ambiguous list (394).
+> `inning_unify_players.sh` 12/12 green (records SQL-anchored 113/108;
+> fielding innings_kept 166/152; keeping ambiguous 32/18; inter-wicket
+> non-degenerate + narrows). Still per-event / out of Phase 1b:
+> `_inter_wicket_cohort_sr` (batting 1286 — COHORT, no person_id → A8 /
+> §8.5, NOT this recipe).
+> **GAP FOUND while auditing siblings:** `bowlers/{id}/records` (1945) +
+> `fielders/{id}/records` (1434) are inning-BLIND today
+> (`build(has_innings_join=False)`, no clause — never honored inning,
+> pre-Option-B). Now asymmetric with the just-wired `batters/{id}/records`.
+> Per U2/U3 "all tabs" they should carry `player_inning_match_clause`
+> too (one-line add each, `m.id` in scope). NOT yet done — pending
+> scope confirmation. Phases 3–5 (teams/series/venues) untouched.
 | U5 | `/teams?team` Batting | SplitsMosaic + scope strip | batted 1st | batted 1st | none | `inning_unify_teams_batting.sh` | ☐ |
 | U6 | `/teams?team` Bowling | SplitsMosaic + scope strip | bowled 1st | **batted 1st** | scope strip + mosaic + chart all "batted first" | `inning_unify_teams_bowling.sh` | ☐ |
 | U7 | `/teams?team` Fielding | SplitsMosaic + scope strip | bowled/fielded 1st | **batted 1st** | unify labels | `inning_unify_teams_fielding.sh` | ☐ |
@@ -224,6 +233,14 @@ Import is already added to all 4 player routers.
 | `batting.py` ~1286 | `_inter_wicket_cohort_sr` | **COHORT, no person_id** | NOT this recipe → see §8.5 (A8 cohort) |
 Re-grep before editing: `grep -n "build(has_innings_join=True, aux=aux)\|build_side_neutral(has_innings_join=True, aux=aux)" api/routers/{batting,bowling,fielding,keeping}.py | grep -v apply_inning`
 Then add `inning_unify_players.sh` assertions for inter-wicket + keeping; re-run green.
+
+**DONE 2026-05-25** — the 5 person-scoped sites wired + `inning_unify_players.sh`
+12/12 green. Only `_inter_wicket_cohort_sr` (1286) remains in the
+`has_innings_join=True` set (cohort → §8.5). NOTE the records-sibling gap
+in the §3 progress box: `bowlers/{id}/records` (1945) + `fielders/{id}/records`
+(1434) use `has_innings_join=False` and are inning-blind — not in this
+table's grep, surfaced by an exhaustive sweep of ALL `build(...,aux=aux)`
+calls. They need the clause too (pending scope confirmation).
 
 ### 8.3 Phase 2 — TEAMS (the next big one)
 Teams `/summary`, By Season, vs Opponent, Match List already use `_inning_match_filter`

@@ -137,7 +137,7 @@ async def keeping_summary(
     # Ambiguous innings where this person is a candidate
     # (filters apply through the innings→match join). side-neutral
     # because keeper-side innings live in opponent-batting rows.
-    amb_where, amb_params = filters.build_side_neutral(has_innings_join=True, aux=aux)
+    amb_where, amb_params = filters.build_side_neutral(has_innings_join=True, apply_inning=False, aux=aux)
     amb_params["person_id"] = person_id
     amb_parts = [
         "ka.keeper_id IS NULL",
@@ -145,6 +145,9 @@ async def keeping_summary(
     ]
     if amb_where:
         amb_parts.append(amb_where)
+    ri = player_inning_match_clause(aux, person_id, amb_params)
+    if ri:
+        amb_parts.append(ri)
     amb_clause = " AND ".join(amb_parts)
     amb_rows = await db.q(
         f"""
@@ -391,7 +394,7 @@ async def keeping_ambiguous(
 ):
     db = get_db()
     # side-neutral: ambiguous-keeper innings are opponent-batting.
-    where, params = filters.build_side_neutral(has_innings_join=True, aux=aux)
+    where, params = filters.build_side_neutral(has_innings_join=True, apply_inning=False, aux=aux)
     params["person_id"] = person_id
     params["limit"] = limit
     parts = [
@@ -400,6 +403,9 @@ async def keeping_ambiguous(
     ]
     if where:
         parts.append(where)
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        parts.append(ri)
     clause = " AND ".join(parts)
 
     rows = await db.q(

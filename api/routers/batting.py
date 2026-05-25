@@ -1336,8 +1336,11 @@ async def batting_inter_wicket(
     The cohort SR query runs in parallel via asyncio.gather.
     """
     db = get_db()
-    where, params = filters.build(has_innings_join=True, aux=aux)
+    where, params = filters.build(has_innings_join=True, apply_inning=False, aux=aux)
     params["person_id"] = person_id
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        where = f"{where} AND {ri}" if where else ri
     scope_where = where if where else "1=1"
 
     # Single window-function query: build the set of innings the
@@ -1884,9 +1887,12 @@ async def batting_records(
     spec-driven 2026-05-16 player-records request.
     """
     db = get_db()
-    where, params = filters.build(has_innings_join=True, aux=aux)
+    where, params = filters.build(has_innings_join=True, apply_inning=False, aux=aux)
     params["person_id"] = person_id
     params["lim"] = limit
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        where = f"{where} AND {ri}" if where else ri
 
     # Common SELECT + JOIN + WHERE fragment. The WHERE pins:
     #   ib.batter_id = :person_id  — the subject player

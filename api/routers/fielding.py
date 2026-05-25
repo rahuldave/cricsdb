@@ -421,11 +421,14 @@ async def fielding_summary(
     # Tier 2: innings where this person was identified as the keeper.
     # Used by the frontend to decide whether to render the "Keeping" tab.
     # side-neutral: keeper's innings live in opponent-batting innings.
-    keeping_where, keeping_params = filters.build_side_neutral(has_innings_join=True, aux=aux)
+    keeping_where, keeping_params = filters.build_side_neutral(has_innings_join=True, apply_inning=False, aux=aux)
     keeping_params["person_id"] = person_id
     keeping_parts = ["ka.keeper_id = :person_id"]
     if keeping_where:
         keeping_parts.append(keeping_where)
+    ri = player_inning_match_clause(aux, person_id, keeping_params)
+    if ri:
+        keeping_parts.append(ri)
     keeping_clause = " AND ".join(keeping_parts)
     keeping_rows = await db.q(
         f"""
