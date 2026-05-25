@@ -47,8 +47,8 @@ REG dist_aus_men_all_time         /api/v1/teams/Australia/bowling/distribution?g
 REG dist_aus_vs_ind_men           /api/v1/teams/Australia/bowling/distribution?gender=male&team_type=international&filter_opponent=India&as_of_date=2025-01-01
 
 # ── inning-aux narrowing (page-local AuxParam) ───────────────────
-REG dist_mi_ipl_inning0           /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=0&as_of_date=2025-01-01
-REG dist_mi_ipl_inning1           /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=1&as_of_date=2025-01-01
+NEW dist_mi_ipl_inning0           /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=0&as_of_date=2025-01-01
+NEW dist_mi_ipl_inning1           /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=1&as_of_date=2025-01-01
 
 # ── empty scope (no matches) — regression marker for empty handling
 REG dist_mi_at_nonexistent_venue  /api/v1/teams/Mumbai%20Indians/bowling/distribution?filter_venue=Nonexistent%20Ground&as_of_date=2025-01-01
