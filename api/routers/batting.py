@@ -768,7 +768,7 @@ async def batting_vs_bowlers(
     )
 
     # Dismissals by bowler
-    dismiss_where, dismiss_params = filters.build(has_innings_join=True, aux=aux)
+    dismiss_where, dismiss_params = filters.build(has_innings_join=True, aux=aux, apply_inning=False)
     dismiss_params["person_id"] = person_id
     dismiss_parts = [
         "w.player_out_id = :person_id",
@@ -779,6 +779,9 @@ async def batting_vs_bowlers(
     if bowler_id:
         dismiss_parts.append("d.bowler_id = :bowler_id")
         dismiss_params["bowler_id"] = bowler_id
+    _ri = player_inning_match_clause(aux, person_id, dismiss_params)
+    if _ri:
+        dismiss_parts.append(_ri)
     dismiss_clause = " AND ".join(dismiss_parts)
 
     dismiss_rows = await db.q(
@@ -839,7 +842,7 @@ async def batting_by_over(
     )
 
     # Dismissals per over
-    dismiss_where, dismiss_params = filters.build(has_innings_join=True, aux=aux)
+    dismiss_where, dismiss_params = filters.build(has_innings_join=True, aux=aux, apply_inning=False)
     dismiss_params["person_id"] = person_id
     dismiss_parts = [
         "w.player_out_id = :person_id",
@@ -850,6 +853,9 @@ async def batting_by_over(
     if bowler_id:
         dismiss_parts.append("d.bowler_id = :bowler_id")
         dismiss_params["bowler_id"] = bowler_id
+    _ri = player_inning_match_clause(aux, person_id, dismiss_params)
+    if _ri:
+        dismiss_parts.append(_ri)
     dismiss_clause = " AND ".join(dismiss_parts)
 
     dismiss_rows = await db.q(
@@ -911,7 +917,7 @@ async def batting_by_phase(
     )
 
     # Dismissals per phase
-    dismiss_where, dismiss_params = filters.build(has_innings_join=True, aux=aux)
+    dismiss_where, dismiss_params = filters.build(has_innings_join=True, aux=aux, apply_inning=False)
     dismiss_params["person_id"] = person_id
     dismiss_parts = [
         "w.player_out_id = :person_id",
@@ -922,6 +928,9 @@ async def batting_by_phase(
     if bowler_id:
         dismiss_parts.append("d.bowler_id = :bowler_id")
         dismiss_params["bowler_id"] = bowler_id
+    _ri = player_inning_match_clause(aux, person_id, dismiss_params)
+    if _ri:
+        dismiss_parts.append(_ri)
     dismiss_clause = " AND ".join(dismiss_parts)
 
     dismiss_rows = await db.q(
