@@ -113,6 +113,55 @@ def _inning_match_filter(
     )
 
 
+def _option_b_team_inning(
+    team: str | None, side: str, aux: AuxParams | None,
+) -> tuple[str, dict]:
+    """Option-B inning narrowing for team innings-grain queries — the
+    replacement for the central per-event `i.innings_number = :inning`
+    clause (callers must pass `build(..., apply_inning=False)`).
+
+    Option B (internal_docs/spec-inning-unify-option-b.md §2): inning=N
+    means the matches where :team BATTED in innings N — the SAME match
+    subset for every discipline. The side discriminator already in the
+    caller's WHERE (`i.team = :team` for batting, `i.team != :team` for
+    fielding/bowling) routes to the right EVENTS; this clause only
+    narrows WHICH matches. So a team's bowling at inning=0 becomes its
+    bowling in matches it batted first (= its 2nd-innings bowling), NOT
+    "bowled first" — fixing the CSK three-labels-one-wrong bug.
+
+      team set  → i.match_id IN (matches :team batted in N). Exact, and
+                  keyed on i.match_id so every innings-grain query works
+                  without a match-table join. Identical for both sides —
+                  the i.team discriminator picks batting vs fielding rows.
+      team None → the /scope/averages cohort has no subject team, so fall
+                  to the live per-event equivalent: batting-side stats
+                  live in innings_number N; fielding/bowling-side stats
+                  live in innings_number (1-N) — a team fielding in
+                  innings 1-N batted in N. Aggregated over all teams this
+                  equals "every team's <side> work in matches it batted
+                  in N", keeping the cohort apples-to-apples with the
+                  team value above (chip↔baseline symmetry).
+
+    `side` follows the caller's convention; only the batting side keeps
+    N, everything else (fielding / bowling) flips. Returns ('', {}) when
+    aux.inning is unset.
+    """
+    if aux is None or aux.inning is None:
+        return "", {}
+    if team is not None:
+        return (
+            "i.match_id IN ("
+            " SELECT i2.match_id FROM innings i2"
+            " WHERE i2.team = :ob_team"
+            "   AND i2.innings_number = :ob_inn"
+            "   AND i2.super_over = 0"
+            ")",
+            {"ob_team": team, "ob_inn": aux.inning},
+        )
+    eff = aux.inning if side == "batting" else (1 - aux.inning)
+    return "i.innings_number = :ob_inn", {"ob_inn": eff}
+
+
 def _result_match_filter(
     team_value: str | None,
     aux: AuxParams | None,
@@ -724,7 +773,7 @@ async def team_summary(
     # Tier 2 — keepers used by this team (fielding innings where
     # keeper_assignment picked someone, grouped by that someone).
     # Match-level filters apply via params (already include :team).
-    k_filt, k_params = filters.build(has_innings_join=True, aux=aux)
+    k_filt, k_params = filters.build(has_innings_join=True, apply_inning=False, aux=aux)
     k_params["team"] = team
     # The FIELDING team = NOT the batting team; team_filt ensures the
     # match involves this side, and i.team != :team means we're looking
@@ -735,6 +784,12 @@ async def team_summary(
     ]
     if k_filt:
         k_parts.append(k_filt)
+    # Option-B inning: keepers in matches :team BATTED in N (its fielding
+    # work in those matches), not the per-event bowled-first innings.
+    k_inn_clause, k_inn_params = _option_b_team_inning(team, "fielding", aux)
+    if k_inn_clause:
+        k_parts.append(k_inn_clause)
+        k_params.update(k_inn_params)
     # filters.build emits the inning clause but not result/toss_outcome
     # (those need :team binding). Add them explicitly per the same
     # pattern as _team_filter_clause. Spec: spec-splits-mosaic.md §1.2.
@@ -1741,7 +1796,9 @@ def _team_innings_clause(
     # Null out filter_team so our :team bind isn't clobbered. Each request
     # gets a fresh FilterParams via Depends() so this mutation is safe.
     filters.team = None
-    where, params = filters.build(has_innings_join=True, aux=aux)
+    # Option-B inning is a match subset, not the event's innings_number;
+    # suppress the central per-event clause and re-add per-side below.
+    where, params = filters.build(has_innings_join=True, apply_inning=False, aux=aux)
     parts: list[str] = []
     if team is not None:
         params["team"] = team
@@ -1751,6 +1808,10 @@ def _team_innings_clause(
             parts.extend(["i.team != :team", "(m.team1 = :team OR m.team2 = :team)"])
     if where:
         parts.append(where)
+    inn_clause, inn_params = _option_b_team_inning(team, side, aux)
+    if inn_clause:
+        parts.append(inn_clause)
+        params.update(inn_params)
     # Match-level aux filters (result / toss_outcome) need a path team
     # to evaluate. They only apply on team-detail (team is not None);
     # on the scope-averages path (team is None) they're silently
