@@ -257,6 +257,39 @@ table's grep, surfaced by an exhaustive sweep of ALL `build(...,aux=aux)`
 calls. They need the clause too (pending scope confirmation).
 
 ### 8.3 Phase 2 — TEAMS (the next big one)
+
+> **Phase 2 BACKEND DONE 2026-05-25** (commits 719cd0b flip · c4e62fb core ·
+> 43310ec partnerships; main, unpushed). A5 audit + A6 reroute + A8 cohort +
+> A11/A12 all landed:
+> - New `api/routers/teams.py::_option_b_team_inning(team, side, aux)` — the
+>   replacement for the central per-event clause. team-set → `i.match_id IN
+>   (matches :team batted in N)` (one clause, both sides — the `i.team`/`!=`
+>   discriminator routes events); cohort (team None) → live per-event
+>   `innings_number N` (batting) / `1-N` (fielding|bowling).
+> - Wired into `_team_innings_clause` (~25 call sites: batting/bowling/
+>   fielding summary·by-season·by-phase·top-*·**distribution** + 2 scope-avg
+>   cohort calls), the inline `team_summary` keepers subquery, and
+>   `_partnership_filter`. All take `build(..., apply_inning=False)`.
+> - **CSK bug fixed at the data layer:** bowling inning=0 flips 702/122
+>   (bowled-first) → 814/144 (batted-first); scope_avg flips 8.05→7.91 in
+>   lockstep (team + cohort share the helper ⇒ no chip↔baseline asymmetry).
+>   Batting byte-identical. A12: precompute bypassed under inning
+>   (`is_precomputed_scope=False`) so NO recompute needed.
+> - Tests: `tests/integration/inning_unify_teams.sh` 7/7 (red 3→green;
+>   bowling/fielding matches 122/144→144/121 == batted-in-N subset; batting
+>   + batting-partnership partition unchanged; bowling-partnership flips;
+>   cohort scope_avg flips). Filter matrix SQL-anchored (inn0+Wankhede=12,
+>   inn1=15, inn0+toss_won=61). Regression: 0 REG drift across teams /
+>   team_batting_distribution / team_splits / scope-averages; the 4 bowling/
+>   fielding distribution inning URLs flipped REG→NEW in preceding 719cd0b
+>   (verified correct: MI bowling-dist n_innings 140→150 = batted-first).
+> - **STILL OPEN (Phase 2 FRONTEND + A7):** the data is now batted-first but
+>   the teams Bowling/Fielding **mosaic + chart labels still say "bowled
+>   first"** → now WRONG (the CSK three-labels bug has moved: scope strip is
+>   accidentally right, mosaic/chart are stale). Needs SplitsMosaic labels +
+>   cell→aux mapping, teams ScopeStatusStrip POV, Compare dual-meaning drop
+>   (U5–U11), A7 band-label audit, docs. NONE of this shipped — see below.
+
 Teams `/summary`, By Season, vs Opponent, Match List already use `_inning_match_filter`
 (batted-first) — correct, audit only. The work:
 - **Per-discipline team endpoints** route inning through the central per-event clause
