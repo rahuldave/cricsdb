@@ -545,6 +545,17 @@ export interface DismissalAnalysis {
   not_outs: number
 }
 
+// Per-team career volume for the "teams played for" strip at the top
+// of the player profile. /api/v1/players/{id}/teams. Totals partition
+// the team-filtered discipline /summary pages exactly.
+export interface PlayerTeamTotals {
+  team: string
+  matches: number
+  runs: number
+  wickets: number
+  catches: number
+}
+
 // Pooled-scope cohort dismissal distribution — /scope/averages/
 // batting/dismissals. Same shape as the player's, minus top_bowlers.
 export interface ScopeDismissals {

@@ -220,6 +220,12 @@ export const getPlayerProfile = async (id: string, filters?: F) => {
   return { batting, bowling, fielding, keeping } as import('./types').PlayerProfile
 }
 
+// Teams the player has appeared for at the active scope, with per-team
+// matches / runs / wickets / catches. Backs the "teams played for"
+// strip at the top of the player profile.
+export const getPlayerTeams = (id: string, filters?: F) =>
+  fetchApi<{ teams: import('./types').PlayerTeamTotals[] }>(`/api/v1/players/${id}/teams`, filters as Record<string, string>)
+
 // Keeping (Tier 2 fielding)
 export const getFielderKeepingSummary = (id: string, filters?: F) =>
   fetchApi<import('./types').KeepingSummary>(`/api/v1/fielders/${id}/keeping/summary`, filters as Record<string, string>)

@@ -5,6 +5,7 @@ import ScopedPageHeader from '../ScopedPageHeader'
 import PlayerSummaryRow, { disciplineHasData } from './PlayerSummaryRow'
 import { classifyRole, matchesInScope } from './roleUtils'
 import PlayerRecordsSummary from './PlayerRecordsSummary'
+import PlayerTeamsStrip from './PlayerTeamsStrip'
 import type { PlayerProfile as PlayerProfileT, FilterParams } from '../../types'
 
 interface Props {
@@ -59,6 +60,7 @@ export default function PlayerProfile({
         </div>
       ) : (
         <>
+          <PlayerTeamsStrip playerId={playerId} filters={filters} />
           {disciplineHasData('batting',  profile) &&
             <PlayerSummaryRow discipline="batting"  profile={profile} playerId={playerId} filters={filters} />}
           {disciplineHasData('bowling',  profile) &&

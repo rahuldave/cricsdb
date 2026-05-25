@@ -477,3 +477,116 @@ async def search_players(
             params,
         )
     return {"players": rows}
+
+
+@router.get("/players/{person_id}/teams")
+async def player_teams(
+    person_id: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    """Every team the player has appeared for at the active scope, with
+    headline cross-discipline volume per team: matches, runs, wickets,
+    catches. Powers the "teams played for" strip at the top of the
+    player profile — a navigational aid (links to the team-filtered
+    Batting / Bowling / Fielding pages); detailed averages live there.
+
+    Team attribution is by `matchplayer.team` (the player's actual side
+    in each match), which is POV-correct for all three disciplines —
+    unlike the generic `filter_team` innings clause (batting-side only).
+    So `filter_team` / `filter_opponent` are dropped from the scope
+    build and the team narrowing is re-applied at `mp.team`. Every
+    per-team total partitions the matching discipline /summary exactly:
+    the same predicates (runs exclude wides/no-balls + super-overs;
+    wickets exclude run-out/retired/obstructing; catches are
+    Convention-3 — caught + caught_and_bowled, non-substitute — and the
+    shared `super_over = 0` rides in via has_innings_join).
+    """
+    db = get_db()
+    drop = {"filter_team", "filter_opponent"}
+
+    # Innings-level scope (gender / season / venue / tournament / inning
+    # + super_over=0) for the delivery-grain aggregates.
+    iw, iparams = filters.build(has_innings_join=True, aux=aux, drop=drop)
+    iparams = {**iparams, "pid": person_id}
+    iclause = f" AND {iw}" if iw else ""
+    # Match-level scope for the team roster + match counts.
+    mw, mparams = filters.build(has_innings_join=False, aux=aux, drop=drop)
+    mparams = {**mparams, "pid": person_id}
+    mclause = f" AND {mw}" if mw else ""
+
+    # Team narrowing re-applied at the player's actual side.
+    team_filter = ""
+    if _is_set(filters.team):
+        team_filter = " AND mp.team = :ftteam"
+        iparams["ftteam"] = filters.team
+        mparams["ftteam"] = filters.team
+
+    team_rows = await db.q(
+        f"""
+        SELECT mp.team, COUNT(DISTINCT mp.match_id) AS matches
+        FROM matchplayer mp
+        JOIN match m ON m.id = mp.match_id
+        WHERE mp.person_id = :pid{mclause}{team_filter}
+        GROUP BY mp.team
+        ORDER BY matches DESC
+        """,
+        mparams,
+    )
+
+    runs_rows = await db.q(
+        f"""
+        SELECT mp.team, SUM(d.runs_batter) AS runs
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        JOIN matchplayer mp ON mp.match_id = m.id AND mp.person_id = d.batter_id
+        WHERE d.batter_id = :pid AND d.extras_wides = 0 AND d.extras_noballs = 0{iclause}{team_filter}
+        GROUP BY mp.team
+        """,
+        iparams,
+    )
+    wkts_rows = await db.q(
+        f"""
+        SELECT mp.team, COUNT(*) AS wickets
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        JOIN matchplayer mp ON mp.match_id = m.id AND mp.person_id = d.bowler_id
+        WHERE d.bowler_id = :pid
+          AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field'){iclause}{team_filter}
+        GROUP BY mp.team
+        """,
+        iparams,
+    )
+    catch_rows = await db.q(
+        f"""
+        SELECT mp.team, COUNT(*) AS catches
+        FROM fieldingcredit fc
+        JOIN delivery d ON d.id = fc.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match m ON m.id = i.match_id
+        JOIN matchplayer mp ON mp.match_id = m.id AND mp.person_id = fc.fielder_id
+        WHERE fc.fielder_id = :pid
+          AND fc.kind IN ('caught', 'caught_and_bowled') AND COALESCE(fc.is_substitute, 0) = 0{iclause}{team_filter}
+        GROUP BY mp.team
+        """,
+        iparams,
+    )
+
+    runs = {r["team"]: r["runs"] or 0 for r in runs_rows}
+    wkts = {r["team"]: r["wickets"] or 0 for r in wkts_rows}
+    catches = {r["team"]: r["catches"] or 0 for r in catch_rows}
+
+    teams = [
+        {
+            "team": r["team"],
+            "matches": r["matches"],
+            "runs": runs.get(r["team"], 0),
+            "wickets": wkts.get(r["team"], 0),
+            "catches": catches.get(r["team"], 0),
+        }
+        for r in team_rows
+    ]
+    return {"teams": teams}
