@@ -31,17 +31,18 @@ import {
   getBatterByPhase, getBatterBySeason, getBatterDismissals, getBatterInterWicket,
   getBattingLeaders, getBatterDistribution, getBatterRecords,
   getScopePlayersBattingBySeason, getScopePlayersBattingByPhase,
-  getScopePlayersBattingByOver,
+  getScopePlayersBattingByOver, getScopeDismissals,
 } from '../api'
 import type {
   PlayerSearchResult, BattingSummary, BattingInnings, BowlerMatchup,
   OverStats, PhaseStats, SeasonBattingStats, DismissalAnalysis, InterWicketStats,
   BattingLeaders, BattingLeaderEntry, FilterParams, BatterDistribution,
-  ScopePlayerBattingSeason, ScopePlayerBattingPhase,
+  ScopePlayerBattingSeason, ScopePlayerBattingPhase, ScopeDismissals,
 } from '../types'
 import BatterDistributionPanel from '../components/batting/BatterDistributionPanel'
 import PositionDistributionTab from '../components/batting/PositionDistributionTab'
 import PhaseComparativeCharts from '../components/batting/PhaseComparativeCharts'
+import DismissalCohortCharts from '../components/batting/DismissalCohortCharts'
 import { meanWicketsDown } from '../utils/playerPosition'
 import BatterRecordsPanel from '../components/players/BatterRecordsPanel'
 import { SectionHeader } from '../components/ChartHeader'
@@ -185,6 +186,16 @@ export default function Batting() {
     [...filterDeps, activeTab],
   )
   const dismissals = dismissalsFetch.data
+
+  // Pooled-scope cohort for the 3 normalized dismissal charts. No
+  // person_id — it's the league-wide pool at the FilterBar scope,
+  // same cohort the By Over / By Phase tabs compare against.
+  const dismissalCohortFetch = useFetch<ScopeDismissals | null>(
+    () => playerId && activeTab === 'Dismissals'
+      ? getScopeDismissals(filters) : Promise.resolve(null),
+    [...filterDeps, activeTab],
+  )
+  const dismissalCohort = dismissalCohortFetch.data
 
   const interWicketFetch = useFetch<{ inter_wicket: InterWicketStats[] } | null>(
     () => playerId && activeTab === 'Inter-Wicket'
@@ -703,18 +714,24 @@ export default function Batting() {
               <>
                 <TabState fetch={dismissalsFetch as FetchState<unknown>} />
                 {!dismissalsFetch.loading && !dismissalsFetch.error && dismissals && (
-                  <div className="grid grid-cols-1 lg:grid-cols-[350px_minmax(0,1fr)] gap-6 items-start">
-                    <DonutChart
-                      data={Object.entries(dismissals.by_kind).map(([label, value]) => ({ label, value }))}
-                      categoryAccessor="label" valueAccessor="value"
-                      title={`Dismissals (${dismissals.total_dismissals})`} width={350} height={350} />
-                    <BarChart
-                      data={dismissals.by_over.filter(o => o.dismissals > 0)}
-                      categoryAccessor={(d: Record<string, any>) => String(d.over_number)}
-                      valueAccessor="dismissals"
-                      title="Dismissals by Over" categoryLabel="Over" valueLabel="Dismissals"
-                      height={300} colorScheme={[WISDEN.oxblood]} barOpacity={0.8} />
-                  </div>
+                  <>
+                    <div className="grid grid-cols-1 lg:grid-cols-[350px_minmax(0,1fr)] gap-6 items-start">
+                      <DonutChart
+                        data={Object.entries(dismissals.by_kind).map(([label, value]) => ({ label, value }))}
+                        categoryAccessor="label" valueAccessor="value"
+                        title={`Dismissals (${dismissals.total_dismissals})`} width={350} height={350} />
+                      <BarChart
+                        data={dismissals.by_over.filter(o => o.dismissals > 0)}
+                        categoryAccessor={(d: Record<string, any>) => String(d.over_number)}
+                        valueAccessor="dismissals"
+                        title="Dismissals by Over" categoryLabel="Over" valueLabel="Dismissals"
+                        height={300} colorScheme={[WISDEN.oxblood]} barOpacity={0.8} />
+                    </div>
+                    {/* Normalized player-vs-cohort distributions — mode
+                        of dismissal (÷ innings, not-out as a modality),
+                        by over + by phase (÷ out-innings). */}
+                    <DismissalCohortCharts player={dismissals} cohort={dismissalCohort} />
+                  </>
                 )}
               </>
             )}

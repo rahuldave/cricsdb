@@ -539,6 +539,21 @@ export interface DismissalAnalysis {
     dismissals: number
     kinds: Record<string, number>
   }[]
+  // Innings + not-outs power the per-innings normalization on the
+  // mode-of-dismissal cohort chart (not-out is its own modality).
+  innings: number
+  not_outs: number
+}
+
+// Pooled-scope cohort dismissal distribution — /scope/averages/
+// batting/dismissals. Same shape as the player's, minus top_bowlers.
+export interface ScopeDismissals {
+  total_dismissals: number
+  by_kind: Record<string, number>
+  by_phase: Record<string, number>
+  by_over: { over_number: number; dismissals: number }[]
+  innings: number
+  not_outs: number
 }
 
 // Per-over fielding rollup — drives the By Over tab charts.

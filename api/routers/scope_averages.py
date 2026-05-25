@@ -432,6 +432,116 @@ async def scope_batting_by_phase(
     return await _batting_by_phase_live(filters, aux)
 
 
+@router.get("/batting/dismissals")
+async def scope_batting_dismissals(
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    """Pooled-scope dismissal distribution — the cohort baseline for
+    the player Dismissals tab's three normalized charts. Mirrors the
+    player /batters/{id}/dismissals queries minus the player_out_id
+    filter, so player and cohort are scope-aligned by construction.
+
+    Returns pooled counts across every batter at scope:
+      - by_kind:  {kind: count}      (mode-of-dismissal, ÷ innings)
+      - by_over:  [{over_number, dismissals}]  (÷ out-innings)
+      - by_phase: {phase: count}     (÷ out-innings)
+      - total_dismissals, innings, not_outs (innings = batting innings
+        at scope; not_outs = innings − total_dismissals).
+    """
+    db = get_db()
+    # Same batting-side innings clause used by every other scope
+    # endpoint. With team=None this is the league-wide pool — "all
+    # batters at scope" — matching the cohort convention on the By
+    # Over / By Phase tabs.
+    where, params = _team_innings_clause(filters, None, side="batting", aux=aux)
+    # Exclude the same non-dismissal wicket kinds the player endpoint
+    # excludes, so the two distributions count identically.
+    kind_excl = "w.kind NOT IN ('retired hurt', 'retired out')"
+
+    kind_rows, over_rows, phase_rows = await asyncio.gather(
+        db.q(
+            f"""
+            SELECT w.kind, COUNT(*) AS cnt
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {where} AND {kind_excl}
+            GROUP BY w.kind
+            ORDER BY cnt DESC
+            """,
+            params,
+        ),
+        db.q(
+            f"""
+            SELECT d.over_number, COUNT(*) AS dismissals
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {where} AND {kind_excl} AND d.over_number BETWEEN 0 AND 19
+            GROUP BY d.over_number
+            ORDER BY d.over_number
+            """,
+            params,
+        ),
+        db.q(
+            f"""
+            SELECT
+                CASE
+                    WHEN d.over_number BETWEEN 0 AND 5 THEN 'powerplay'
+                    WHEN d.over_number BETWEEN 6 AND 14 THEN 'middle'
+                    WHEN d.over_number BETWEEN 15 AND 19 THEN 'death'
+                END AS phase,
+                COUNT(*) AS dismissals
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {where} AND {kind_excl} AND d.over_number BETWEEN 0 AND 19
+            GROUP BY phase
+            """,
+            params,
+        ),
+    )
+
+    by_kind = {r["kind"]: r["cnt"] for r in kind_rows}
+    total = sum(by_kind.values())
+    for r in over_rows:
+        r["over_number"] = r["over_number"] + 1  # display as 1-20
+    by_phase = {r["phase"]: r["dismissals"] for r in phase_rows if r["phase"]}
+
+    # Cohort denominator = total BATTER-innings at scope (distinct
+    # (batter, innings) appearances), NOT team-innings — each team
+    # innings fields ~11 batters who each play one innings. Counted
+    # under the SAME scope clause as the dismissal numerators so the
+    # mode distribution (kinds + not-out) is internally consistent.
+    inn_rows = await db.q(
+        f"""
+        SELECT COUNT(*) AS batter_innings FROM (
+            SELECT DISTINCT d.batter_id, d.innings_id
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE {where}
+        )
+        """,
+        params,
+    )
+    innings = (inn_rows[0].get("batter_innings") if inn_rows else 0) or 0
+    not_outs = max(innings - total, 0)
+
+    return {
+        "total_dismissals": total,
+        "by_kind": by_kind,
+        "by_phase": by_phase,
+        "by_over": over_rows,
+        "innings": innings,
+        "not_outs": not_outs,
+    }
+
+
 OVER_RANGES = [
     ("powerplay", [1, 6]),
     ("middle",    [7, 15]),

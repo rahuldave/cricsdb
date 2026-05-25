@@ -1204,12 +1204,42 @@ async def batting_dismissals(
     for r in over_rows:
         r["over_number"] = r["over_number"] + 1  # display as 1-20
 
+    # Innings + not-outs for the per-innings normalization on the
+    # mode-of-dismissal chart (each innings ends in exactly one
+    # outcome: a dismissal kind, or not-out). Uses the same innings-
+    # inclusive filter as /summary so non-striker dismissals are
+    # counted consistently. Skipped under a bowler_id matchup slice
+    # (a per-bowler not-out count is meaningless).
+    innings_count = 0
+    not_outs = 0
+    if not bowler_id:
+        inn_where, inn_params = _batting_innings_filter(filters, person_id, aux=aux)
+        innings_rows = await db.q(
+            f"""
+            SELECT i.match_id, i.innings_number,
+                   MAX(CASE WHEN w.id IS NOT NULL THEN 1 ELSE 0 END) as was_dismissed
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            LEFT JOIN wicket w ON w.delivery_id = d.id
+                AND w.player_out_id = :person_id
+                AND w.kind NOT IN ('retired hurt', 'retired out')
+            WHERE {inn_where}
+            GROUP BY i.match_id, i.innings_number
+            """,
+            inn_params,
+        )
+        innings_count = len(innings_rows)
+        not_outs = sum(1 for r in innings_rows if not r["was_dismissed"])
+
     return {
         "total_dismissals": total,
         "by_kind": by_kind,
         "by_phase": by_phase,
         "by_over": over_rows,
         "top_bowlers": top_bowlers,
+        "innings": innings_count,
+        "not_outs": not_outs,
     }
 
 

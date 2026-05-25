@@ -147,6 +147,12 @@ export const getBatterBySeason = (id: string, filters?: F) =>
   fetchApi<{ by_season: SeasonBattingStats[] }>(`/api/v1/batters/${id}/by-season`, filters as Record<string, string>)
 export const getBatterDismissals = (id: string, filters?: F) =>
   fetchApi<DismissalAnalysis>(`/api/v1/batters/${id}/dismissals`, filters as Record<string, string>)
+// Pooled-scope cohort dismissal distribution — backs the 3 normalized
+// cohort charts on the Dismissals tab. No person_id: it's the league-
+// wide pool at the FilterBar scope (same cohort the By Over / By Phase
+// tabs compare against).
+export const getScopeDismissals = (filters?: F) =>
+  fetchApi<import('./types').ScopeDismissals>('/api/v1/scope/averages/batting/dismissals', filters as Record<string, string>)
 export const getBatterInterWicket = (id: string, filters?: F) =>
   fetchApi<{ inter_wicket: InterWicketStats[] }>(`/api/v1/batters/${id}/inter-wicket`, filters as Record<string, string>)
 export const getBatterDistribution = (id: string, filters?: F) =>
