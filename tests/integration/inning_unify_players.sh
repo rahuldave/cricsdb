@@ -98,6 +98,29 @@ for inn in 0 1; do
     || bad "keeping ambiguous inning=$inn: list=$alen scalar=$ascl"
 done
 
+# 8. bowling + fielding records — were inning-BLIND (has_innings_join=False,
+#    no clause, frozen across inning); now route through the match-subset
+#    clause like batting records. Subject: JJ Bumrah for bowling, Kohli for
+#    fielding. Option-B inning is a MATCH filter so it composes with the
+#    per-match precomp grain (matchbowlerperf / matchfielderperf).
+BOW=462411b3
+for inn in 0 1; do
+  bsql=$(sqlite3 "$DB" "SELECT MAX(mb.wickets) FROM matchbowlerperf mb
+    JOIN match m ON m.id=mb.match_id JOIN matchplayer mp ON mp.match_id=m.id AND mp.person_id=mb.bowler_id
+    WHERE mb.bowler_id='$BOW' AND m.gender='male' AND mb.wickets>=2
+      AND m.id IN (SELECT i2.match_id FROM innings i2 JOIN matchplayer mp2 ON mp2.match_id=i2.match_id AND mp2.person_id='$BOW' AND mp2.team=i2.team WHERE i2.innings_number=$inn AND i2.super_over=0);")
+  bapi=$(curl -s "$API/api/v1/bowlers/$BOW/records?gender=male&inning=$inn" | python3 -c "import sys,json;d=json.load(sys.stdin)['best_figures'];print(d[0]['wickets'] if d else '')" 2>/dev/null)
+  [ -n "$bapi" ] && [ "$bapi" = "$bsql" ] && ok "bowling records best_figures inning=$inn == SQL subset ($bapi)" \
+    || bad "bowling records inning=$inn: api=$bapi sql=$bsql"
+  fsql=$(sqlite3 "$DB" "SELECT MAX(mf.catches) FROM matchfielderperf mf
+    JOIN match m ON m.id=mf.match_id JOIN matchplayer mp ON mp.match_id=m.id AND mp.person_id=mf.fielder_id
+    WHERE mf.fielder_id='$P' AND m.gender='male' AND mf.catches>0
+      AND m.id IN (SELECT i2.match_id FROM innings i2 JOIN matchplayer mp2 ON mp2.match_id=i2.match_id AND mp2.person_id='$P' AND mp2.team=i2.team WHERE i2.innings_number=$inn AND i2.super_over=0);")
+  fapi=$(curl -s "$API/api/v1/fielders/$P/records?gender=male&inning=$inn" | python3 -c "import sys,json;d=json.load(sys.stdin)['most_catches_match'];print(d[0]['catches'] if d else '')" 2>/dev/null)
+  [ -n "$fapi" ] && [ "$fapi" = "$fsql" ] && ok "fielding records most_catches inning=$inn == SQL subset ($fapi)" \
+    || bad "fielding records inning=$inn: api=$fapi sql=$fsql"
+done
+
 # 4. DOM value-flip + scope-strip POV on /bowling.
 ab open "$BASE/bowling?player=$P&gender=male&inning=1"
 ab wait --text "Bowling first"; ab wait 800

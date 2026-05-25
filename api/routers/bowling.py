@@ -1933,11 +1933,13 @@ async def bowling_records(
       - most_economical: min 18 balls (3 overs) gate, ORDER BY
         economy ASC. Cameo 6-ball spells with 0 runs are filtered out.
 
-    Honours FilterParams scope. Inning aux narrowing is NOT applied
-    here — matchbowlerperf is per-match grain and collapses the
-    inning the bowler bowled in (per the bb_q comment in /series/
-    records). If inning aux is required, a per-(bowler, innings)
-    table is the right primitive.
+    Honours FilterParams scope + Option-B inning. Option-B inning is a
+    MATCH subset (the matches where the bowler's team batted in innings
+    N — internal_docs/spec-inning-unify-option-b.md), so it composes
+    cleanly with matchbowlerperf's per-match grain via a match-id
+    filter. NOTE this is deliberately NOT per-event inning ("which
+    innings he bowled in") — that would still need a per-(bowler,
+    innings) primitive; the match-subset clause keys on m.id only.
 
     Reads from matchbowlerperf (precomputed).
     """
@@ -1945,6 +1947,9 @@ async def bowling_records(
     where, params = filters.build(has_innings_join=False, aux=aux)
     params["person_id"] = person_id
     params["lim"] = limit
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        where = f"{where} AND {ri}" if where else ri
 
     base_filt = "mb.bowler_id = :person_id"
     if where:

@@ -1425,15 +1425,21 @@ async def fielding_records(
     semantic for catches, NOT the /distribution master-sample
     semantic).
 
-    Reads from matchfielderperf (precomputed). Inning aux is not
-    applied — fielding dismissals are tracked per-match in the
-    precomp table (a fielder can field across both innings but the
-    grain is per-match for record framing).
+    Reads from matchfielderperf (precomputed). Option-B inning IS
+    applied as a MATCH subset (matches where the fielder's team batted
+    in innings N — internal_docs/spec-inning-unify-option-b.md), which
+    composes cleanly with the per-match precomp grain via a match-id
+    filter. This is NOT per-event inning ("which innings he fielded
+    in") — Option B's inning is a match filter, so the clause keys on
+    m.id only.
     """
     db = get_db()
     where, params = filters.build(has_innings_join=False, aux=aux)
     params["person_id"] = person_id
     params["lim"] = limit
+    ri = player_inning_match_clause(aux, person_id, params)
+    if ri:
+        where = f"{where} AND {ri}" if where else ri
 
     base_filt = "mf.fielder_id = :person_id"
     if where:

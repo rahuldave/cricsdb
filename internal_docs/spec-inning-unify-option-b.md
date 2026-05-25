@@ -99,13 +99,27 @@ Status legend: ☐ todo · ◑ code done · ✓ code+test green.
 > non-degenerate + narrows). Still per-event / out of Phase 1b:
 > `_inter_wicket_cohort_sr` (batting 1286 — COHORT, no person_id → A8 /
 > §8.5, NOT this recipe).
-> **GAP FOUND while auditing siblings:** `bowlers/{id}/records` (1945) +
-> `fielders/{id}/records` (1434) are inning-BLIND today
-> (`build(has_innings_join=False)`, no clause — never honored inning,
-> pre-Option-B). Now asymmetric with the just-wired `batters/{id}/records`.
-> Per U2/U3 "all tabs" they should carry `player_inning_match_clause`
-> too (one-line add each, `m.id` in scope). NOT yet done — pending
-> scope confirmation. Phases 3–5 (teams/series/venues) untouched.
+> **Sibling gap FIXED 2026-05-25** (user-approved, folded into 1b):
+> `bowlers/{id}/records` (1945) + `fielders/{id}/records` (1434) were
+> inning-BLIND (`build(has_innings_join=False)`, no clause — never
+> honored inning, pre-Option-B; byte-identical across inning=0/1/none).
+> Now carry `player_inning_match_clause` (`m.id` in scope): Option-B
+> inning is a MATCH subset so it composes with the matchbowlerperf /
+> matchfielderperf per-match precomp grain. Docstrings updated — the old
+> "inning not applicable" note referred to per-EVENT inning, which
+> Option B does not use. Harness 16/16 (bowling best-figs 4/5, fielding
+> most-catches 3/2, both SQL-anchored). Records subtab now consistent
+> across all 3 discipline profiles (U2/U3 "all tabs").
+> **STILL OPEN → A8/§8.5 (NOT Phase 1b):** `fielders/{id}/distribution`
+> is inning-blind (`_match_master_sample_fielder`, 1026 — docstring
+> claims "inning no-op for fielder per §13.1", which is the stale
+> per-EVENT rationale). Batting + bowling distribution already honor
+> inning; fielding is the lone holdout, now inconsistent with fielding
+> `matches` (206/190) on the SAME page. NOT a quick mechanical fix: the
+> panel carries `scope_avg` baselines, so per chip↔baseline-symmetry the
+> player master sample and its baseline must move TOGETHER — and the
+> baseline is the deferred cohort/scope_averages concern. Do it WITH A8.
+> Phases 3–5 (teams/series/venues) untouched.
 | U5 | `/teams?team` Batting | SplitsMosaic + scope strip | batted 1st | batted 1st | none | `inning_unify_teams_batting.sh` | ☐ |
 | U6 | `/teams?team` Bowling | SplitsMosaic + scope strip | bowled 1st | **batted 1st** | scope strip + mosaic + chart all "batted first" | `inning_unify_teams_bowling.sh` | ☐ |
 | U7 | `/teams?team` Fielding | SplitsMosaic + scope strip | bowled/fielded 1st | **batted 1st** | unify labels | `inning_unify_teams_fielding.sh` | ☐ |
@@ -283,6 +297,15 @@ cohort player's team batted in N". The player ProbChip/cohort comparisons (Dismi
 charts, position/phase cohorts) need this to stay apples-to-apples. Precompute may need
 re-running (user OK'd — §5.2); fall to live where it can't express the subset. The
 `_inter_wicket_cohort_sr` site (§8.2) is part of this.
+**Also part of A8 (found 2026-05-25):** `fielders/{id}/distribution` is inning-blind
+(`_match_master_sample_fielder`, fielding.py:1026 — `build_side_neutral(has_innings_join=
+False)`, no clause; docstring's "inning no-op for fielder per §13.1" is the stale
+per-EVENT rationale). Batting + bowling distribution already honor inning. The fix is NOT
+just adding `player_inning_match_clause(...,match_id_expr="mp.match_id")` to the
+`player_matches` CTE — the panel surfaces `scope_avg` baselines, so the player master
+sample AND its baseline must move together (chip↔baseline symmetry) or the histogram
+shifts under inning while its reference line doesn't. Wire the master sample + the
+scope_avg baseline in the same change.
 
 ### 8.6 Docs to rewrite when the code is done
 - `internal_docs/spec-inning-split.md` §1, §3.4, §7 — supersede with Option B.
