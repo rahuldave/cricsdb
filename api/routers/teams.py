@@ -84,32 +84,37 @@ def _inning_match_filter(
 ) -> tuple[str, dict]:
     """Match-level WHERE fragment restricting to matches where :team had
     a role in the chosen inning. Empty when aux.inning is None or team
-    is unknown.
+    is unknown. Used by the match-level endpoints (/summary header tiles,
+    /by-season, /vs-opponent, /match-list).
 
-    Semantics: aux.inning=0 → matches where :team batted in
-    innings_number=0 (= matches where :team batted first).
-    aux.inning=1 → matches where :team batted second.
+    A match-level count is about the MATCH, not a discipline — so a match
+    the team played counts even if they batted OR bowled but not both
+    (e.g. a rain-abandoned game they fielded first in and never batted).
+    The match's inning slice = the team's role:
 
-    NOT the same as the Compare-slot dual-meaning of §3.4 — this helper
-    is for match-level endpoints (/summary, /by-season, /vs-opponent,
-    /match-list) where there's a single match subset. Bat-side framing
-    is the natural reading for results-style metrics ("RCB's record
-    batting first"). For Compare-slot dual-meaning on bowling/fielding
-    rows, the central innings clause in FilterBarParams.build() handles
-    it via the i.team discriminator already present in those queries.
+      inning=N  ⟺  the team BATTED in innings N  OR  FIELDED in (1-N)
 
-    Spec: internal_docs/spec-inning-split.md §3.1a.
+    For a normal match both hold (batted N ⇒ fielded 1-N) → one bucket.
+    For an abandoned game where the team only fielded (innings 0 = bowled
+    first), only the FIELDED clause fires → it lands in inning=1, so the
+    header tile agrees with the Bowling tab's per-event count (CSK
+    inning=1: 122 matches, incl. the bowled-but-never-batted game) rather
+    than the batting-only 121. The two clauses partition cleanly (a match
+    can't be batted-N and fielded-N at once).
+
+    Spec: internal_docs/spec-inning-unify-option-b.md §2 (per-event) +
+    spec-inning-split.md §3.1a.
     """
     if aux is None or aux.inning is None or not team_value:
         return "", {}
     return (
         "m.id IN ("
         " SELECT i2.match_id FROM innings i2"
-        " WHERE i2.team = :im_team"
-        "   AND i2.innings_number = :im_inn"
-        "   AND i2.super_over = 0"
+        " WHERE i2.super_over = 0"
+        "   AND ((i2.team = :im_team AND i2.innings_number = :im_inn)"
+        "     OR (i2.team != :im_team AND i2.innings_number = :im_flip))"
         ")",
-        {"im_team": team_value, "im_inn": aux.inning},
+        {"im_team": team_value, "im_inn": aux.inning, "im_flip": 1 - aux.inning},
     )
 
 

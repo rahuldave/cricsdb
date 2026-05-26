@@ -73,6 +73,21 @@ echo "  batting innings_batted $ib0/$ib1"
 [ "$ib0" = "$bf" ] && [ "$ib1" = "$bs" ] && ok "batting innings_batted == batted-in-N ($ib0/$ib1) — unchanged" \
   || bad "batting innings_batted $ib0/$ib1 != batted-in-N $bf/$bs"
 
+# 2c. Header /summary `matches` is MATCH-level: a match counts even if the
+#     team only bowled (never batted). Slice = batted-in-N OR fielded-in-(1-N).
+#     So header inning=1 == bowling matches (122), NOT batting innings (121).
+hm(){ curl -s "$API/api/v1/teams/$TE/summary?gender=male&inning=$1" \
+  | python3 -c "import sys,json;d=json.load(sys.stdin);v=d.get('matches');print(v.get('value') if isinstance(v,dict) else v)" 2>/dev/null; }
+read -r u0 u1 <<<"$(sqlite3 "$DB" "SELECT
+ (SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN match m ON m.id=i.match_id WHERE (m.team1='$T' OR m.team2='$T') AND m.gender='male' AND i.super_over=0 AND ((i.team='$T' AND i.innings_number=0) OR (i.team!='$T' AND i.innings_number=1))),
+ (SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN match m ON m.id=i.match_id WHERE (m.team1='$T' OR m.team2='$T') AND m.gender='male' AND i.super_over=0 AND ((i.team='$T' AND i.innings_number=1) OR (i.team!='$T' AND i.innings_number=0)));" | tr '|' ' ')"
+h0=$(hm 0); h1=$(hm 1)
+echo "  header matches $h0/$h1 | SQL union(batted-N | fielded-(1-N)) = $u0/$u1"
+[ "$h0" = "$u0" ] && [ "$h1" = "$u1" ] && ok "header matches == match-level union ($h0/$h1)" \
+  || bad "header matches $h0/$h1 != union $u0/$u1"
+[ "$h1" = "$bw1" ] && ok "header inning=1 ($h1) == bowling matches ($bw1) — match counted though team didn't bat" \
+  || bad "header inning=1 ($h1) != bowling matches ($bw1) — match dropped from header"
+
 # 4. Cohort scope_avg (bowling econ) present + differs across inning.
 sa0=$(fsa bowling 0 economy); sa1=$(fsa bowling 1 economy)
 echo "  bowling econ scope_avg inning0/1 = $sa0 / $sa1"
