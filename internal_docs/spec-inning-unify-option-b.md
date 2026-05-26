@@ -145,7 +145,7 @@ Status legend: ☐ todo · ◑ code done · ✓ code+test green.
 | U8 | `/teams?team` By Season / vs Opp / Match List | (match-level union) | batted 1st | union batted-N OR fielded-(1-N) | none | covered by `inning_unify_teams.sh` header | ✓ (fc8a502) |
 | U9 | `/teams?team` Partnerships | SplitsMosaic | batted 1st | batted 1st (bat side) / flip (bowl side) | none (bat) | `inning_unify_teams.sh` | ✓ (43310ec/71b0b59) |
 | U10 | `/teams?team` Players | SplitsMosaic | per-row inning | per-event via shared mosaic | none | (same harness) | ◑ mosaic code done; subtab not browser-verified |
-| U11 | `/teams?team` Compare | SlotScopeEditor | dual-meaning (§3.4) | single batted-1st subset per slot | drop dual-meaning tooltip | `inning_unify_compare.sh` | ☐ |
+| U11 | `/teams?team` Compare | SlotScopeEditor | dual-meaning (§3.4) | single batted-1st subset per slot | drop dual-meaning tooltip | `inning_unify_compare.sh` | ✓ (fda37c1) — also fixed primarySlotOf dropping inning (primary col ignored carried-over inning while slots inherited it); toss/result deliberately NOT carried (cohort can't express them) |
 | U12 | `/series?tournament` Bowling/Fielding | InningToggle | bowled 1st | bat-1st @inn0 (bowl/field flip to 1-N) | flip value (toggle done; backend A9 TODO) | `inning_unify_series.sh` | ☐ backend |
 | U13 | `/series?tournament` Batting/Pship/Records | InningToggle | batted 1st | batted 1st | none | (same harness) | ☐ |
 | U14 | `/venues?venue` Bowlers/Fielders | InningToggle | bowled 1st | bat-1st @inn0 (flip to 1-N) | flip value (toggle done; backend A10 TODO) | `inning_unify_venues.sh` | ☐ backend |
