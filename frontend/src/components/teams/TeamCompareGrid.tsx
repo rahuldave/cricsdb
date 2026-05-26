@@ -60,6 +60,17 @@ function primarySlotOf(team: string, filters: FilterParams): SlotState {
       filter_venue: filters.filter_venue,
       series_type: filters.series_type,
       team_class: filters.team_class,
+      // inning is the one aux the primary column carries — so the
+      // left/primary column honors a carried-over ?inning= identically
+      // to how the peer slots inherit it (useCompareSlots.inheritedScope).
+      // Without this the primary showed ALL innings while a 1st-innings
+      // slot sat beside it — an unfair comparison + disagreeing scope
+      // strips. Under Option B inning=0 = batted first for ALL rows
+      // (the backend resolves it per-event). toss_outcome/result are
+      // deliberately NOT carried: the league-average baseline can't
+      // express them (≈50% by construction), so narrowing the team
+      // columns by them would break chip↔baseline symmetry.
+      inning: filters.inning,
     },
     overrides: {},
   }

@@ -205,10 +205,10 @@ export default function SlotScopeEditor({
           value={inning}
           onChange={e => setInning(e.target.value)}
           title={
-            "1st innings = matches' inning_number=0; 2nd innings = inning_number=1.\n\n" +
-            "On Compare slots this is dual-meaning: BATTING row reads matches where this team BATTED FIRST (= they batted in inning 0); " +
-            "BOWLING and FIELDING rows read matches where this team BOWLED FIRST (= opposition batted in inning 0). " +
-            "Two complementary subsets of the team's match log, surfaced together as 'first-up activity across roles'."
+            "1st innings = this team BATTED FIRST (innings 0); 2nd innings = batted second.\n\n" +
+            "One neutral toggle governs the whole column: batting rows show the team's first-innings batting, " +
+            "while bowling and fielding rows show the bowling in those same matches — which is therefore bowled second. " +
+            "To compare 1st-innings vs 2nd-innings work, set the two slots to opposite innings."
           }
         >
           <option value="">— inherit —</option>

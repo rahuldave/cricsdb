@@ -57,7 +57,12 @@ function inheritedScope(primary: FilterParams): ResolvedSlotScope {
     // inning is an AuxParams aux field (not a FilterBar key). Slots
     // inherit primary's URL `?inning=` (the page-level InningToggle's
     // value, when set on team Batting/Bowling/Fielding tabs) and may
-    // override via `compareN_inning=`. Spec: spec-inning-split.md §6.2.
+    // override via `compareN_inning=`. Under Option B (one neutral
+    // toggle per column) inning=0 = the team batted first for ALL its
+    // rows; bowling/fielding rows draw the bowling in those matches
+    // (bowled second). The backend resolves it per-event — the slot
+    // sends the raw value, no frontend flip. Spec:
+    // spec-inning-unify-option-b.md §5 (governing rule).
     inning: primary.inning,
   }
 }
