@@ -23,7 +23,9 @@ Mosaic excluded (per request).
 
 1. **Teams = fully fair.** Every team per-discipline tile, band, and chart
    narrows BOTH the number and its baseline for all 3 aux. ✅
-   - One exception: the **Team header Win% tile** — value narrows, baseline frozen.
+   - ~~One exception: the Team header Win% tile — baseline frozen.~~ **FIXED
+     2026-05-26** (commit 3d802a2): the Win% "vs average" now narrows too
+     (recomputed from the Mosaic's per-team-view split under the aux).
 2. **Players = broken.** The player's own numbers narrow for **inning** and
    **result**, but:
    - the **"typical player" baseline never narrows** for ANY aux (every
@@ -63,7 +65,7 @@ no comparison baseline on this surface. `—` = filter intentionally absent.
 
 | Subtab | Number / graph | inning | toss | result | URL (if broken) |
 |---|---|:-:|:-:|:-:|---|
-| Header | Win % tile (vs avg) | ✗ baseline frozen | ✗ | ✗ | `/teams?team=Chennai+Super+Kings&gender=male&inning=0` |
+| Header | Win % tile (vs avg) | ✓ (fixed 3d802a2) | ✓ | ✓ | — (was frozen; now narrows from the per-team-view split) |
 | Batting | Run-rate / Boundary% tiles | ✓ | ✓ | ✓ | — |
 | Batting | By-season chart (+ cohort line) | ✓ | ✓ | ✓ | — |
 | Batting | By-phase bands | ✓ | ✓ | ✓ | — |
@@ -116,7 +118,7 @@ no comparison baseline on this surface. `—` = filter intentionally absent.
 
 | Endpoint | value: inn/toss/res | baseline: inn/toss/res | inning fn | toss/result fn |
 |---|---|---|---|---|
-| `teams/{t}/summary` (win%) | ✓/✓/✓ | ✗/✗/✗ | `_inning_match_filter` | `_result/_toss_match_filter` |
+| `teams/{t}/summary` (win%) | ✓/✓/✓ | ✓/✓/✓ (fixed 3d802a2) | `_inning_match_filter` | `_splits_cells` + `_cell_label_for_aux` (baseline) |
 | `teams/{t}/{bat,bowl,field,pship}/summary` | ✓/✓/✓ | ✓/✓/✓ | `_option_b_team_inning` | `_result/_toss_match_filter` + `_cohort_outcome_clause` |
 | `teams/{t}/{…}/by-season,by-phase` | ✓/✓/✓ | ✓/✓/✓ | `_option_b_team_inning` | same |
 | `scope/averages/{bat,bowl,field,pship}/*` (team cohort) | ✓/✓/✓ | (is baseline) | `_option_b_team_inning` (cohort path) | `_cohort_outcome_clause` |
@@ -223,8 +225,8 @@ Decided 2026-05-26: implement the player-side fixes next session. Scope:
    cohort lines, and the distribution-panel cohort chips, ×3 disciplines.
 2. **Wire toss for player values** — a `player_toss_clause` peer to
    `player_result_clause` (player values currently ignore toss entirely).
-3. **Team header Win% tile baseline** — small, isolated; make its
-   `scope_avg` narrow like the other team tiles.
+3. ~~**Team header Win% tile baseline**~~ — **DONE 2026-05-26 (3d802a2).**
+   Recomputed from the Mosaic per-team-view split under the aux.
 4. **(Optional / product call)** opponent-only entry point on player pages
    (§D gap) so "Ashwin vs RCB across all teams" is reachable.
 
