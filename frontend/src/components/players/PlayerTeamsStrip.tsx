@@ -3,7 +3,10 @@
  *
  * Lists every team the player has appeared for at the active scope
  * with headline cross-discipline volume (matches · runs · wickets ·
- * catches) and a link into each discipline page filtered to that team.
+ * catches). The "N matches @" lead-in links to this player's combined
+ * profile narrowed to that team; the team name links to the team's own
+ * all-time dossier; and Batting/Bowling/Fielding link into each single
+ * discipline page filtered to that team.
  * Detailed averages live on those linked pages — this strip is the
  * navigational index of a player's clubs + countries (e.g. Kohli →
  * India + RCB; an overseas franchise journeyman → many).
@@ -28,13 +31,16 @@ interface Props {
 }
 
 function disciplineHref(
-  base: '/batting' | '/bowling' | '/fielding',
+  base: '/players' | '/batting' | '/bowling' | '/fielding',
   playerId: string,
   filters: FilterParams,
   team: string,
 ): string {
   // Carry the active scope, then pin filter_team to THIS team (the
   // override wins over any filter_team already in carryFilters).
+  // base '/players' lands on the combined all-disciplines profile
+  // narrowed to this team; the discipline bases land on the single-
+  // discipline page (same filter_team pin).
   const qs = new URLSearchParams({
     player: playerId,
     ...carryFilters(filters),
@@ -58,10 +64,16 @@ export default function PlayerTeamsStrip({ playerId, filters }: Props) {
       {teams.map(t => (
         <div className="wisden-team-row" key={t.team}>
           <div className="wisden-team-id">
+            {/* "279 matches @" links to this player narrowed to THIS
+                team (combined profile); the team name links to the
+                team's own all-time dossier (TeamLink invariant). */}
+            <Link
+              className="comp-link wisden-team-matches"
+              to={disciplineHref('/players', playerId, filters, t.team)}
+            >
+              <span className="num">{t.matches}</span> {t.matches === 1 ? 'match' : 'matches'} @
+            </Link>
             <TeamLink teamName={t.team} gender={filters.gender} compact />
-            <span className="wisden-team-matches">
-              <span className="num">{t.matches}</span> {t.matches === 1 ? 'match' : 'matches'}
-            </span>
           </div>
           <div className="wisden-team-totals">
             <span>Runs <b className="num">{t.runs.toLocaleString()}</b></span>
