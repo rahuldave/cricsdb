@@ -34,11 +34,23 @@ Mosaic excluded (per request).
 
 **Root cause of the player gap (single point):** every player cohort number
 comes from `scope_averages.compute_players_*_cohort` / the
-`/scope/averages/players/*` endpoints, which all call
-`build_scope_clauses(filters)` — FilterBar fields only, NO aux — and read the
-precomputed `playerscopestats*` tables, which have **no innings / toss /
-result dimension**. Teams instead compute live via `_option_b_team_inning` +
-`_cohort_outcome_clause`, which is why teams are fair.
+`/scope/averages/players/*` endpoints, which read the precomputed
+`playerscopestats*` tables. Those tables are keyed ONLY by
+gender / team_type / tournament / season / team_class / series_type. So the
+player "typical" comparison **narrows for those six, but is FROZEN for any
+filter not in that key — `filter_venue`, `filter_opponent`/`filter_team`,
+AND all three aux (`inning`, `toss_outcome`, `result`)** (verified
+2026-05-26: venue/opponent/aux all leave the cohort unchanged; tournament/
+season/type do change it). There is no live fallback. Teams DO narrow for
+venue/opponent/aux because `is_precomputed_scope` sends those to a live path
+(`_option_b_team_inning` + `_cohort_outcome_clause`). That live fallback is
+exactly what the player cohort lacks.
+
+> **CORRECTION (2026-05-26):** an earlier draft said the player cohort is
+> "frozen for the 3 aux." That UNDERSTATED it — it's frozen for **venue +
+> opponent + the 3 aux** (5 filters), and narrows only for the 6
+> precompute-scope-key filters. The §A "broken" rows below apply to those 5
+> frozen filters, not just aux.
 
 ---
 
@@ -135,11 +147,14 @@ mechanisms**, with inconsistent aux coverage. Inventory:
 | 10 | `scope_averages.build_scope_clauses(filters)` | FilterBar-only scope on `playerscopestats*` | **NONE of the 3 aux** | **ALL player cohorts** (summary chip + by-season/phase/over + distribution) |
 
 ### The gaps, ranked
-1. **Player cohorts honor zero aux** (#10) — biggest. Every "typical player"
-   number (chip baselines, chart cohort lines, distribution chips) reads
-   precomputed `playerscopestats*` which has no innings/toss/result split.
-   Fix: a live per-event player-cohort path when any aux is set (mirror the
-   team `_cohort_outcome_clause` + `_option_b_team_inning` cohort approach).
+1. **Player cohorts honor only the 6 precompute-scope-key filters** (#10) —
+   biggest. Every "typical player" number (chip baselines, chart cohort
+   lines, distribution chips) reads precomputed `playerscopestats*`, keyed
+   only by gender/type/tournament/season/tier/series. So it's **frozen for
+   `filter_venue`, `filter_opponent`/`filter_team`, AND all three aux**
+   (5 filters). Fix: a live player-cohort path when any off-key filter is
+   set (mirror the team `is_precomputed_scope` → live fallback via
+   `_cohort_outcome_clause` + `_option_b_team_inning`).
 2. **Toss is not wired for players at all** (#4) — player values ignore
    `toss_outcome` entirely. Fix: a `player_toss_clause` peer to
    `player_result_clause` (only if toss-by-player is wanted).
