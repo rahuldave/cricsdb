@@ -221,7 +221,10 @@ async def fielding_leaders(
     # `aux_extra` is " AND <clause>..." with leading AND; we strip
     # for the AND-joined fc_parts list below.
     match_where, params = filters.build(has_innings_join=False, aux=aux)
-    aux_extra = splice_aux_join_clauses(aux, params)
+    # Option B: fielding is fielding-POV — flip to the innings the team
+    # did NOT bat in (1-N). Serves /fielding landing + Venue Fielders tab.
+    # Spec spec-inning-unify-option-b.md A10.
+    aux_extra = splice_aux_join_clauses(aux, params, side="fielding")
     has_filters = bool(match_where) or bool(aux_extra)
 
     # --- List 1: top fielders by total dismissals ------------------

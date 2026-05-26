@@ -220,7 +220,11 @@ async def bowling_leaders(
     # See batting_leaders for the rationale + the `aux_clauses`
     # module for the JoinClause registry mechanism.
     match_where, params = filters.build(has_innings_join=False, aux=aux)
-    aux_extra = splice_aux_join_clauses(aux, params)
+    # Option B: a bowling leaderboard's inning toggle is bowling-POV — the
+    # team bowls in the innings it did NOT bat, so flip to (1-N). Spec
+    # spec-inning-unify-option-b.md A10. Serves the /bowling landing AND
+    # the Venue dossier Bowlers tab (filter_venue).
+    aux_extra = splice_aux_join_clauses(aux, params, side="bowling")
     has_filters = bool(match_where) or bool(aux_extra)
 
     if has_filters:

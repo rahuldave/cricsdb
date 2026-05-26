@@ -25,8 +25,8 @@ NEW bow_summary_ipl                   /api/v1/bowlers/462411b3/summary?tournamen
 NEW bow_summary_venue_wankhede        /api/v1/bowlers/462411b3/summary?filter_venue=Wankhede%20Stadium
 # Option B (A10): the Venue dossier Bowlers tab reuses /bowlers/leaders with
 # filter_venue; inning flips to (1-N). MUST drift NEW, then flip REG.
-NEW bow_leaders_wankhede_inn0         /api/v1/bowlers/leaders?filter_venue=Wankhede%20Stadium&gender=male&team_type=club&inning=0&limit=5
-NEW bow_leaders_wankhede_inn1         /api/v1/bowlers/leaders?filter_venue=Wankhede%20Stadium&gender=male&team_type=club&inning=1&limit=5
+REG bow_leaders_wankhede_inn0         /api/v1/bowlers/leaders?filter_venue=Wankhede%20Stadium&gender=male&team_type=club&inning=0&limit=5
+REG bow_leaders_wankhede_inn1         /api/v1/bowlers/leaders?filter_venue=Wankhede%20Stadium&gender=male&team_type=club&inning=1&limit=5
 
 # ── fielding ─────────────────────────────────────────────────────
 REG field_summary_plain               /api/v1/fielders/ba607b88/summary

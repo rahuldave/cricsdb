@@ -52,21 +52,40 @@ class JoinClause(Protocol):
     Implementations should be stateless — the registry holds one
     instance per class.
     """
-    def splice(self, aux: "AuxParams | None", params: dict) -> str: ...
+    def splice(self, aux: "AuxParams | None", params: dict, side: str = "batting") -> str: ...
 
 
 class InningClause:
-    """`aux.inning` → ' AND i.innings_number = :inning'.
+    """`aux.inning` → ' AND i.innings_number = :inning' (or the flipped
+    bind for bowling/fielding).
 
-    Spec: spec-inning-split.md §3.1a. Splices into innings-joined
-    SQL only — match-level callers (no innings alias) honour
-    inning via `_inning_match_filter` in api/routers/teams.py.
+    Option B (spec-inning-unify-option-b.md §2): the `inning=N` toggle
+    means "the subject's team batted in innings N", but the FILTER is
+    per-event and discipline-aware:
+
+      batting / match  → innings_number = N        (bind :inning)
+      bowling / fielding → innings_number = (1 - N) (bind :inning_flip)
+
+    A team that bats in innings N bowls in the OTHER innings, so a
+    bowling/fielding leaderboard at the toggle's "bowled first" (= the
+    team batted second = inning=1) must read innings_number 0. The
+    flipped side uses a DISTINCT bind (`:inning_flip`) so a mixed
+    endpoint can splice a batting (`:inning`) and a bowling
+    (`:inning_flip`) clause into different sub-queries without the two
+    binds colliding. batting/match path is byte-identical to pre-Option-B.
+
+    Splices into innings-joined SQL only — match-level callers (no
+    innings alias) honour inning via `_inning_match_filter` in
+    api/routers/teams.py / the per-event team helper.
     """
-    def splice(self, aux, params: dict) -> str:
+    def splice(self, aux, params: dict, side: str = "batting") -> str:
         if aux is None or aux.inning is None:
             return ""
-        params["inning"] = aux.inning
-        return " AND i.innings_number = :inning"
+        if side in ("batting", "match"):
+            params["inning"] = aux.inning
+            return " AND i.innings_number = :inning"
+        params["inning_flip"] = 1 - aux.inning
+        return " AND i.innings_number = :inning_flip"
 
 
 # Order-stable registry. Append here when a new aux narrowing lands.
@@ -77,10 +96,15 @@ JOIN_CLAUSES: list[JoinClause] = [
 ]
 
 
-def splice_aux_join_clauses(aux: "AuxParams | None", params: dict) -> str:
+def splice_aux_join_clauses(aux: "AuxParams | None", params: dict, side: str = "batting") -> str:
     """Concatenate every registered `JoinClause` splice into a single
     AND-prefixed string. Mutates `params` to bind. Empty string when
     no aux narrowing is set on this request — caller can use that as
     a sniff signal alongside `bool(match_where)` to gate fast paths.
+
+    `side` is the discipline POV for Option-B inning narrowing
+    (batting / match → innings_number=N; bowling / fielding → the
+    flipped (1-N) innings; see `InningClause`). Defaults to 'batting'
+    so existing batting/match callers are byte-identical.
     """
-    return "".join(c.splice(aux, params) for c in JOIN_CLAUSES)
+    return "".join(c.splice(aux, params, side) for c in JOIN_CLAUSES)

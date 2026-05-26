@@ -637,9 +637,16 @@ async def _rivalries_top_and_other_count(
 # ─── Per-tournament endpoints ─────────────────────────────────────────
 
 
-def _inning_extras(aux: AuxParams | None) -> tuple[str, dict]:
+def _inning_extras(aux: AuxParams | None, side: str = "batting") -> tuple[str, dict]:
     """Per-innings narrowing fragment + bind params, formatted for
     the unified-WHERE pattern this module uses.
+
+    `side` is the Option-B discipline POV: 'batting'/'match' →
+    innings_number=N (bind :inning, the default — byte-identical to
+    pre-Option-B); 'bowling'/'fielding' → the flipped (1-N) innings
+    (bind :inning_flip). A bowling/fielding leaderboard at the toggle's
+    "bowled first" reads the innings the team did NOT bat in. Spec:
+    spec-inning-unify-option-b.md §2 + A9/A10.
 
     Two callers shapes:
 
@@ -660,7 +667,7 @@ def _inning_extras(aux: AuxParams | None) -> tuple[str, dict]:
     Spec: spec-inning-split.md §3.1a + §5.3.
     """
     fresh: dict = {}
-    clause = splice_aux_join_clauses(aux, fresh)
+    clause = splice_aux_join_clauses(aux, fresh, side)
     return clause, fresh
 
 
@@ -2449,7 +2456,7 @@ async def tournament_bowlers_leaders(
 ):
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
-    inn_clause, inn_params = _inning_extras(aux)
+    inn_clause, inn_params = _inning_extras(aux, side="bowling")
     params.update(inn_params)
 
     # In tier-mode + precomputed regime, wickets / runs_conceded /
@@ -2620,7 +2627,7 @@ async def tournament_bowler_scope_stats(
     """
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
-    inn_clause, inn_params = _inning_extras(aux)
+    inn_clause, inn_params = _inning_extras(aux, side="bowling")
     params.update(inn_params)
     params["person_id"] = person_id
 
@@ -2704,7 +2711,7 @@ async def tournament_fielders_leaders(
 ):
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
-    inn_clause, inn_params = _inning_extras(aux)
+    inn_clause, inn_params = _inning_extras(aux, side="fielding")
     params.update(inn_params)
     params["lim"] = limit
 
@@ -2956,7 +2963,7 @@ async def tournament_fielder_scope_stats(
     """
     db = get_db()
     where, params = _tournament_scope_where(filters, tournament, series_type=series_type)
-    inn_clause, inn_params = _inning_extras(aux)
+    inn_clause, inn_params = _inning_extras(aux, side="fielding")
     params.update(inn_params)
     params["person_id"] = person_id
 
