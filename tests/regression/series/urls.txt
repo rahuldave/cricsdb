@@ -39,6 +39,12 @@ NEW series_records_ipl                /api/v1/series/records?tournament=Indian%2
 NEW series_batters_leaders_ipl        /api/v1/series/batters-leaders?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
 NEW series_bowlers_leaders_ipl        /api/v1/series/bowlers-leaders?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
 NEW series_fielders_leaders_ipl       /api/v1/series/fielders-leaders?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
+# Option B (A9): series Bowling/Fielding leaderboards + scope-stats flip to
+# the (1-N) innings. MUST drift NEW vs HEAD, then flip REG once locked.
+NEW series_bowlers_ipl24_inn0         /api/v1/series/bowlers-leaders?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&gender=male&team_type=club&inning=0&limit=5
+NEW series_bowlers_ipl24_inn1         /api/v1/series/bowlers-leaders?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&gender=male&team_type=club&inning=1&limit=5
+NEW series_fielders_ipl24_inn0        /api/v1/series/fielders-leaders?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&gender=male&team_type=club&inning=0&limit=5
+NEW series_fielders_ipl24_inn1        /api/v1/series/fielders-leaders?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&gender=male&team_type=club&inning=1&limit=5
 REG series_partnerships_by_wkt_ipl    /api/v1/series/partnerships/by-wicket?tournament=Indian%20Premier%20League&gender=male&team_type=club
 REG series_partnerships_top_ipl       /api/v1/series/partnerships/top?tournament=Indian%20Premier%20League&gender=male&team_type=club&limit=5
 REG series_partnerships_top_by_wkt_ipl /api/v1/series/partnerships/top-by-wicket?tournament=Indian%20Premier%20League&gender=male&team_type=club&per_wicket=5

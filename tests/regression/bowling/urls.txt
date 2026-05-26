@@ -12,6 +12,11 @@
 REG bow_leaders_all                   /api/v1/bowlers/leaders
 REG bow_leaders_men_intl              /api/v1/bowlers/leaders?gender=male&team_type=international&limit=10
 REG bow_leaders_ipl_2024              /api/v1/bowlers/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=10
+# Option B (spec-inning-unify-option-b.md A10): bowling leaders flip to the
+# (1-N) innings — inning=0 reads innings_number=1 (team batted first → bowled
+# second). MUST drift NEW vs HEAD, then flip REG once locked.
+NEW bow_leaders_ipl24_inn0            /api/v1/bowlers/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&inning=0&limit=10
+NEW bow_leaders_ipl24_inn1            /api/v1/bowlers/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&inning=1&limit=10
 REG bow_leaders_with_thresholds       /api/v1/bowlers/leaders?gender=male&team_type=international&min_balls=120&min_wickets=5
 
 # ── per-bowler endpoints (all tabs on the bowling page) ──────────
