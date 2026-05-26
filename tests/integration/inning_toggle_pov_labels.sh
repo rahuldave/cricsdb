@@ -98,17 +98,19 @@ probe_site "12. Series/Partnerships"       "$BASE/series?tournament=Indian%20Pre
 probe_site "13. Series/Records (ambig)"    "$BASE/series?tournament=Indian%20Premier%20League&tab=Records"               "$NEUTRAL_PILLS"
 
 # ─────────────────────────────────────────────────────────────────
-# PART B — Ambiguous-page polysemy lock.
+# PART B — Ambiguous-page Option-B coherence lock.
 #
-# On the 3 ambiguous pages, a single `?inning=0` URL simultaneously
-# scopes batting stats to the 1st innings (batted first), bowling
-# stats to the 1st innings (bowled first), and fielding stats to the
-# 1st innings (fielded first). We hit the discipline-specific API
-# endpoints that the page consumes under the same ?inning=0 and
-# verify each matches an independent SQL count.
+# UPDATED 2026-05-26 for Option B (spec-inning-unify-option-b.md): the
+# old "polysemy" is GONE. On the neutral Players profile a single
+# `?inning=0` means the player's team BATTED FIRST for every discipline.
+# So batting reads the player's 1st-innings batting (innings_number=0),
+# while bowling + fielding read the bowling/fielding that FOLLOWED in
+# those same (batted-first) matches — i.e. bowled/fielded SECOND, which
+# is innings_number=1. We hit the discipline endpoints under the same
+# ?inning=0 and verify each matches the per-event SQL count.
 # ─────────────────────────────────────────────────────────────────
 echo
-echo "PART B · Polysemy lock — same ?inning=0 == three POVs simultaneously"
+echo "PART B · Option-B coherence — same ?inning=0 = batted first; bowl/field = the 2nd-innings work"
 
 # Site 11 (Test 4 above): Players.tsx — Kohli profile under ?inning=0
 echo
@@ -119,15 +121,17 @@ sql_bat=$(sql "SELECT COUNT(DISTINCT i.match_id) FROM delivery d JOIN innings i 
 api_bat=$(curl -s "$API/api/v1/batters/$KOHLI_ID/summary?inning=0" | python3 -c "import json,sys; r=json.load(sys.stdin); v=r.get('matches'); print(v.get('value') if isinstance(v,dict) else v)")
 assert_eq "Players · batting matches @ inning=0 = batted-first matches" "$sql_bat" "$api_bat"
 
-# bowling axis — matches bowled-first
-sql_bowl=$(sql "SELECT COUNT(DISTINCT i.match_id) FROM delivery d JOIN innings i ON i.id=d.innings_id WHERE d.bowler_id='$KOHLI_ID' AND i.innings_number=0 AND i.super_over=0")
+# bowling axis — Option B: inning=0 = batted first → bowled SECOND, so the
+# player's bowling is in innings_number=1 (the OTHER innings).
+sql_bowl=$(sql "SELECT COUNT(DISTINCT i.match_id) FROM delivery d JOIN innings i ON i.id=d.innings_id WHERE d.bowler_id='$KOHLI_ID' AND i.innings_number=1 AND i.super_over=0")
 api_bowl=$(curl -s "$API/api/v1/bowlers/$KOHLI_ID/summary?inning=0" | python3 -c "import json,sys; r=json.load(sys.stdin); v=r.get('matches'); print(v.get('value') if isinstance(v,dict) else v)")
-assert_eq "Players · bowling matches @ inning=0 = bowled-first matches" "$sql_bowl" "$api_bowl"
+assert_eq "Players · bowling matches @ inning=0 = bowled-SECOND matches (Option B)" "$sql_bowl" "$api_bowl"
 
-# fielding axis — catches in fielded-first innings (inclusive of C&B per Convention 3)
-sql_field=$(sql "SELECT SUM(CASE WHEN fc.kind IN ('caught','caught_and_bowled') AND COALESCE(fc.is_substitute,0)=0 THEN 1 ELSE 0 END) FROM fieldingcredit fc JOIN delivery d ON d.id=fc.delivery_id JOIN innings i ON i.id=d.innings_id WHERE fc.fielder_id='$KOHLI_ID' AND i.innings_number=0 AND i.super_over=0")
+# fielding axis — Option B: inning=0 = batted first → fielded SECOND, so
+# catches are in innings_number=1 (inclusive of C&B per Convention 3).
+sql_field=$(sql "SELECT SUM(CASE WHEN fc.kind IN ('caught','caught_and_bowled') AND COALESCE(fc.is_substitute,0)=0 THEN 1 ELSE 0 END) FROM fieldingcredit fc JOIN delivery d ON d.id=fc.delivery_id JOIN innings i ON i.id=d.innings_id WHERE fc.fielder_id='$KOHLI_ID' AND i.innings_number=1 AND i.super_over=0")
 api_field=$(curl -s "$API/api/v1/fielders/$KOHLI_ID/summary?inning=0" | python3 -c "import json,sys; r=json.load(sys.stdin); v=r.get('catches'); print(v.get('value') if isinstance(v,dict) else v)")
-assert_eq "Players · fielding catches @ inning=0 = fielded-first catches" "$sql_field" "$api_field"
+assert_eq "Players · fielding catches @ inning=0 = fielded-SECOND catches (Option B)" "$sql_field" "$api_field"
 
 # Sites 8 + 13: Records subtabs.
 # /series/records aggregates best_individual_batting + best_bowling_figures
@@ -144,10 +148,15 @@ records_pov_block() {
   inn=$(sql "SELECT i.innings_number FROM delivery d JOIN innings i ON i.id=d.innings_id WHERE d.batter_id='$pid' AND i.match_id=$mid GROUP BY i.innings_number ORDER BY SUM(d.runs_batter) DESC LIMIT 1")
   assert_eq "$label · best_individual_batting in innings_number=0 (batted first)" "0" "$inn"
 
-  # best_bowling_figures (bowling axis) — should be in innings_number=0
-  read -r pid mid <<< "$(curl -s "$API/api/v1/series/records?$qstr&inning=0&limit=3" | python3 -c "import json,sys; r=json.load(sys.stdin); e=r['best_bowling_figures'][0]; print(e['person_id'], e['match_id'])")"
-  inn=$(sql "SELECT i.innings_number FROM delivery d JOIN innings i ON i.id=d.innings_id WHERE d.bowler_id='$pid' AND i.match_id=$mid GROUP BY i.innings_number ORDER BY COUNT(*) DESC LIMIT 1")
-  assert_eq "$label · best_bowling_figures in innings_number=0 (bowled first)" "0" "$inn"
+  # best_bowling_figures — INTENTIONALLY inning-blind: it reads
+  # matchbowlerperf, which has no per-(bowler, innings) grain (a bowler
+  # bowls in exactly one innings of a non-super-over match), so the
+  # inning aux is dropped from this one record's WHERE (see the NOTE in
+  # tournaments.py::tournament_records). Records is neutral/batted-POV
+  # under Option B (U13 — no flip); the batting + partnership records
+  # above DO honor inning (innings_number=0 at inning=0). No assertion
+  # here — asserting an innings_number on an inning-blind record is
+  # meaningless. Was a stale pre-Option-B assertion (removed 2026-05-26).
 
   # largest_partnerships (batting-side axis) — innings_number=0 of the batting team
   read -r mid team <<< "$(curl -s "$API/api/v1/series/records?$qstr&inning=0&limit=3" | python3 -c "import json,sys; r=json.load(sys.stdin); e=r['largest_partnerships'][0]; print(e['match_id'], e['batting_team'])")"
