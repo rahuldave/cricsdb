@@ -49,31 +49,51 @@ NOT bat. Everywhere else the value matches the ordinal.
 
 ## 2. Backend mechanism
 
-One shared idea: **inning narrows to the match subset where the
-subject's team batted in innings_number = N**, never to the event's
-own innings_number.
+> **CORRECTED 2026-05-25 (per-event, NOT match-subset).** The original
+> "narrow to the match subset where the team BATTED in N" idea below was
+> wrong for bowling/fielding: it silently DROPS matches the team bowled
+> in but never batted (e.g. a rain-abandoned game where the team fielded
+> first and the chase never started — real wickets/balls that MUST count
+> toward the bowling average and its denominator). The implemented (and
+> correct) rule is **per-event + discipline-aware**:
+>
+> - **batting**: `i.innings_number = N` (the team batted in N).
+> - **bowling / fielding / keeping / bowling-partnerships**:
+>   `i.innings_number = (1 - N)` (the team FIELDED in the OTHER innings;
+>   bowled-first = innings 0 = `inning=1`). The `i.team` / `i.team != :team`
+>   side discriminator already in each query routes batting vs fielding
+>   EVENTS; this clause just picks the innings number.
+>
+> Consequence: batting and bowling legitimately span DIFFERENT match
+> counts at the same inning value (CSK `inning=1`: batted-second 121 vs
+> bowled-first 122 — the +1 is a bowled-but-didn't-bat game). Tested:
+> teams `_option_b_team_inning` (per-event for team-set AND cohort,
+> commit d9d8c66); players `player_inning_match_clause(..., side=…)` keys
+> on the FIELDING innings for non-batting sides (commit 9de5863).
+>
+> EXCEPTION — match-level team endpoints (`/teams/{team}/summary`,
+> by-season, vs-opponent, match-list) keep the **batted-in-N** match
+> subset via `_inning_match_filter` (a match RECORD is batting-POV; a
+> game the team never batted has no batting-first/second record). So the
+> team header tiles (121 at inning=1) and the Bowling tab (122) differ by
+> that one game — by design.
+>
+> The struck-through text below is the original (match-subset) plan, kept
+> for history.
 
-- **Teams** (subject = path team): already correct via
-  `_inning_match_filter` (`api/routers/teams.py`). Audit that EVERY
-  team discipline endpoint routes inning through it, not through the
-  central `i.innings_number` clause.
-- **Players** (subject = `matchplayer.team` per match): NEW
-  `player_inning_match_clause(aux, person_id, params, match_id_expr)`
-  in `api/filters.py`, sibling to `player_result_clause`:
-  ```sql
-  <match_id_expr> IN (
-    SELECT i2.match_id FROM innings i2
-    JOIN matchplayer mp2 ON mp2.match_id = i2.match_id
-                        AND mp2.person_id = :pid AND mp2.team = i2.team
-    WHERE i2.innings_number = :inn AND i2.super_over = 0)
-  ```
-  Inject into the 5 discipline filter helpers; REMOVE reliance on the
-  central `i.innings_number = :inning` clause for player endpoints.
+~~One shared idea: **inning narrows to the match subset where the
+subject's team batted in innings_number = N**, never to the event's
+own innings_number.~~
+
+- ~~**Teams**: via `_inning_match_filter`.~~
+- ~~**Players**: `player_inning_match_clause` keyed on `mp2.team = i2.team`
+  / `innings_number = N` (match subset). REPLACED by the side-aware
+  per-event form above.~~
 - **Central clause** (`FilterBarParams.build`) + `aux_clauses.InningClause`:
-  must STOP emitting `i.innings_number = :inning` for these surfaces.
-  Decide: gate it off for player/team discipline queries (they now use
-  the match-subset clause) — keep only if a surface genuinely wants
-  raw innings_number (none after this change; confirm none remain).
+  discipline callers pass `apply_inning=False` and add the per-event
+  clause themselves (teams `_option_b_team_inning`, players
+  `player_inning_match_clause(side=…)`). Confirmed no surface still wants
+  the raw central `i.innings_number = :inning`.
 
 ## 3. Call-site / tab table (USER-FACING — one integration test each)
 
@@ -213,9 +233,17 @@ Written 2026-05-25 for a fresh context. Read §1 (the contract) + §8.
   `player_result_filter.sh` (8/8).
 
 ### 8.1 The mechanism (already built — reuse, don't reinvent)
-- `api/filters.py::player_inning_match_clause(aux, person_id, params, match_id_expr="m.id", key="pim_pid")`
-  → bare clause: matches where the player's team batted in `innings_number = aux.inning`
-  (`mp2.team = i2.team`, `super_over=0`). Returns "" when inning unset.
+> **CORRECTED 2026-05-25 — read §2's correction box first.** The clause is now
+> DISCIPLINE-AWARE per-event, NOT a batted-in-N match subset (the subset dropped
+> bowled-but-didn't-bat games from bowling averages). batting → innings_number=N;
+> bowling/fielding/keeping → innings_number=(1-N) via the fielding-innings form.
+- `api/filters.py::player_inning_match_clause(aux, person_id, params, match_id_expr="m.id", key="pim_pid", side="batting")`
+  → side='batting' (default): matches the player's team BATTED in N
+  (`mp2.team = i2.team`, `innings_number=N`). side bowling/fielding/keeping:
+  matches the player's team FIELDED in (1-N) (`mp2.team != i2.team`,
+  `innings_number=1-N`) — retains bowled-but-didn't-bat games. Returns "" when
+  inning unset. Teams use `_option_b_team_inning(team, side, aux)` (per-event,
+  same rule, for team-set AND cohort).
 - `api/filters.py::build(..., apply_inning=False)` + `build_side_neutral(..., apply_inning=False)`
   → suppress the per-event `i.innings_number=:inning` central clause.
 - Teams already have `api/routers/teams.py::_inning_match_filter(team, aux)` = the
