@@ -287,21 +287,14 @@ export default function Teams() {
   // internal_docs/spec-splits-mosaic.md §2.9.
   //
   // Inning POV translation: the URL's `?inning=` follows the active
-  // tab's convention (bowling-POV on Bowling/Fielding tabs per
-  // spec-inning-split.md §3.4). The /splits API always interprets
-  // `?inning=` in batting POV (team_inning in the CASE WHEN). On
-  // bowling tabs, flip the value before sending so the API returns
-  // the cells the user expects (clicking "1st innings" on Bowling
-  // tab → user wants bowled-first matches → API needs inning=1 to
-  // return team_inning=1 = bowled-first cells).
-  const splitsFilters = (() => {
-    const out = { ...filters }
-    const SPLITS_BOWLING_TABS = new Set(['Bowling', 'Fielding'])
-    if (SPLITS_BOWLING_TABS.has(activeTab) && (out.inning === '0' || out.inning === '1')) {
-      out.inning = out.inning === '0' ? '1' : '0'
-    }
-    return out
-  })()
+  // Option-B (spec-inning-unify-option-b.md): `?inning=` is UNIFIED to
+  // batting POV on every tab — inning=0 = the team batted first. The
+  // /splits API already interprets it in batting POV (team_inning), and
+  // SplitsMosaic reads/labels it without flipping (the bowling-POV flip
+  // now lives only in the LABEL). So NO per-tab value flip here — send
+  // the URL inning straight through. (Previously this flipped on
+  // Bowling/Fielding tabs to match the old per-event mosaic semantics.)
+  const splitsFilters = filters
   const splitsFetch = useFetch<import('../types').TeamSplits | null>(
     () => getTeamSplits({ ...splitsFilters, team: selected || undefined }),
     [...filterDeps, activeTab],

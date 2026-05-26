@@ -34,19 +34,14 @@ interface Props {
   data: TeamSplits | null
   loading: boolean
   filters: FilterParams
-  /** Active discipline tab on the page — determines how `?inning=` is
-   *  interpreted. Match-level filters (`_inning_match_filter`,
-   *  `/summary`) treat `inning=0` as "team batted first" (batting POV).
-   *  Innings-joined widgets on Bowling / Fielding tabs treat
-   *  `inning=0` as "team bowled in match-innings 0" = "team bowled
-   *  first" (= team batted SECOND).
-   *
-   *  The mosaic IS a match-level widget but lives on the page above
-   *  every tab — when the user has flipped to a bowling-side tab,
-   *  the mosaic must read the URL with bowling-side semantics so the
-   *  same `?inning=` produces a coherent reading across all widgets
-   *  on the page. Spec: spec-splits-mosaic.md §3.2, see also
-   *  spec-inning-split.md §3.4 dual-meaning. */
+  /** Active discipline tab on the page — used ONLY to flip the inning
+   *  LABEL into bowling-POV phrasing on Bowling/Fielding tabs. Under
+   *  Option B (spec-inning-unify-option-b.md) `?inning=` is unified:
+   *  inning=0 = the team batted first on EVERY tab. The value no longer
+   *  flips by tab — only the wording does (batted first → "bowled
+   *  second" on a bowling tab). So the mosaic reads/writes the URL
+   *  inning directly as the batting-POV cell `team_inning`; bowlingCtx
+   *  drives the label map (INNING_LABEL_BOWL) and the strip verbs. */
   activeTab?: string
   /** Team's `matches` envelope from `/teams/{team}/summary` — kept
    *  for API symmetry but currently unused: matches direction is null
@@ -73,7 +68,10 @@ type Outcome = 'won' | 'lost' | 'tied'
 // ─── Vocabulary (spec §3.10) ────────────────────────────────────────
 const TOSS_LABEL = { won: 'Won toss', lost: 'Lost toss' } as const
 const INNING_LABEL_BAT = { '0': 'Batted first', '1': 'Batted second' } as const
-const INNING_LABEL_BOWL = { '0': 'Bowled first', '1': 'Bowled second' } as const
+// Option-B (spec-inning-unify-option-b.md): URL inning is ALWAYS the team's
+// batting innings. inning=0 = batted first = bowled SECOND; inning=1 = batted
+// second = bowled FIRST. So the bowling-POV labels are flipped vs the value.
+const INNING_LABEL_BOWL = { '0': 'Bowled second', '1': 'Bowled first' } as const
 const RESULT_LABEL = {
   won:  'Won the game',
   lost: 'Lost the game',
@@ -83,20 +81,20 @@ const RESULT_LEGEND = { won: 'Won', lost: 'Lost', tied: 'Tied' } as const
 
 const BOWLING_TABS = new Set(['Bowling', 'Fielding'])
 
-/** When on Bowling/Fielding tabs, ?inning= refers to the match's
- *  innings_number the team BOWLED in. Mosaic cell `team_inning` is
- *  always batting-POV (team batted in inning 0 vs 1). So when the
- *  user picks "Bowled first" (URL ?inning=0) on a bowling tab, we
- *  filter mosaic cells to team_inning=1 (team batted second).
- *
- *  Conversion: in bowling context, inning_user XOR 1 = team_inning_in_mosaic.
+/** Option-B (spec-inning-unify-option-b.md): the URL `?inning=` is ALWAYS
+ *  the team's batting innings (inning=0 = batted first) on EVERY tab — the
+ *  bowling/fielding value-flip lives only in the LABEL, not the value. The
+ *  mosaic cell `team_inning` is also batting-POV, so URL inning == team_inning
+ *  identically on all tabs. These conversions are therefore identity now;
+ *  kept as named no-ops so the call sites and the `bowlingCtx` label paths
+ *  read clearly (and to localise any future re-divergence).
  */
-function userInningToTeamInning(userInning: 0 | 1, bowlingCtx: boolean): 0 | 1 {
-  return bowlingCtx ? ((1 - userInning) as 0 | 1) : userInning
+function userInningToTeamInning(userInning: 0 | 1, _bowlingCtx: boolean): 0 | 1 {
+  return userInning
 }
 
-function teamInningToUserInning(teamInning: 0 | 1, bowlingCtx: boolean): 0 | 1 {
-  return bowlingCtx ? ((1 - teamInning) as 0 | 1) : teamInning
+function teamInningToUserInning(teamInning: 0 | 1, _bowlingCtx: boolean): 0 | 1 {
+  return teamInning
 }
 
 const OUTCOME_COLOR: Record<Outcome, string> = {
@@ -138,11 +136,12 @@ function strip(
   const teamPrefix = subjectTeam ? `${subjectTeam}: ` : ''
   const inningLabels = bowlingCtx ? INNING_LABEL_BOWL : INNING_LABEL_BAT
   // Strip-fragment verbs for inning narrowing (lower-case, embedded).
+  // Option-B: inning=0 = batted first = bowled SECOND (bowl verbs flipped).
   const inningVerb = (v: string) => bowlingCtx
-    ? (v === '0' ? 'bowling first' : 'bowling second')
+    ? (v === '0' ? 'bowling second' : 'bowling first')
     : (v === '0' ? 'batting first' : 'batting second')
   const inningNounPhrase = (v: string) => bowlingCtx
-    ? (v === '0' ? 'matches bowling first' : 'matches bowling second')
+    ? (v === '0' ? 'matches bowling second' : 'matches bowling first')
     : (v === '0' ? 'matches batting first' : 'matches batting second')
 
   // 3 filters set → verbose middot summary
