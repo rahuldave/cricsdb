@@ -137,7 +137,11 @@ export default function ScopedPageHeader({ filters, omit, hideAbbrev, comparison
         <span style={{
           fontFamily: 'var(--serif)',
           fontStyle: 'italic',
-          fontSize: '0.95rem',
+          // Bumped ~4px over the comparison line so the active scope
+          // reads as a subtitle under the title. The small-caps
+          // "scope" word stays pinned at 0.95rem (below) to match the
+          // COHORT/AVG label on the comparison line.
+          fontSize: '1.2rem',
           color: 'var(--ink-faint)',
         }}>
           <span style={{
@@ -145,6 +149,7 @@ export default function ScopedPageHeader({ filters, omit, hideAbbrev, comparison
             letterSpacing: '0.08em',
             fontWeight: 700,
             fontStyle: 'normal',
+            fontSize: '0.95rem',
             color: 'var(--accent)',
             marginRight: '0.4rem',
           }}>scope</span>
