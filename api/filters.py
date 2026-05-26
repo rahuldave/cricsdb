@@ -543,6 +543,11 @@ def player_inning_match_clause(
       side bowling/fielding/keeping   → matches the player's team FIELDED
                                         in innings_number = (1 - N)
                                         (mp2.team != i2.team, inn = 1-N)
+      side='match'                    → matches the player PLAYED in this
+                                        slice — batted in N OR fielded in
+                                        (1-N). The match-level union, for
+                                        overall match-count / result tiles
+                                        (mirror of teams._inning_match_filter).
 
     The fielding-side form is deliberately keyed on the FIELDING innings,
     not "matches the team batted in N": a match the player BOWLED in but
@@ -550,7 +555,8 @@ def player_inning_match_clause(
     and the chase never started) carries real wickets/balls that MUST
     count toward the bowling average and its denominator. A batting-keyed
     subset would silently drop it. So batting and bowling can legitimately
-    span different match counts at the same inning value.
+    span different match counts at the same inning value; the 'match' union
+    is the superset that counts the game by whichever role was played.
 
     Works at any grain (match_id_expr defaults to m.id) — innings-grain
     summaries AND per-match precomp records alike. Callers must suppress
@@ -559,8 +565,20 @@ def player_inning_match_clause(
     """
     if aux is None or aux.inning is None:
         return ""
-    bat = side == "batting"
     params[key] = person_id
+    if side == "match":
+        params["pim_inn"] = aux.inning
+        params["pim_flip"] = 1 - aux.inning
+        return (
+            f"{match_id_expr} IN ("
+            f"SELECT i2.match_id FROM innings i2 "
+            f"JOIN matchplayer mp2 ON mp2.match_id = i2.match_id "
+            f"AND mp2.person_id = :{key} "
+            f"WHERE i2.super_over = 0 AND ("
+            f"(mp2.team = i2.team AND i2.innings_number = :pim_inn) OR "
+            f"(mp2.team != i2.team AND i2.innings_number = :pim_flip)))"
+        )
+    bat = side == "batting"
     params["pim_inn"] = aux.inning if bat else (1 - aux.inning)
     team_rel = "=" if bat else "!="
     return (

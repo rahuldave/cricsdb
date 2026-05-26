@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams, AuxParams, _is_set
+from ..filters import FilterParams, AuxParams, _is_set, player_inning_match_clause
 from ..tournament_canonical import (
     canonicalize, variants as canonical_variants,
     is_canonical_with_variants, event_name_in_clause,
@@ -613,6 +613,13 @@ async def player_result_counts(
     )
     params["pid"] = person_id
     clause = f" AND {where}" if where else ""
+    # Option-B inning (match-level union): count a match if the player
+    # batted in N OR fielded in (1-N) — matches are matches, same as the
+    # team header (_inning_match_filter). build(has_innings_join=False)
+    # emits no central inning clause, so add it explicitly here.
+    ri = player_inning_match_clause(aux, person_id, params, match_id_expr="mp.match_id", side="match")
+    if ri:
+        clause = f"{clause} AND {ri}"
     team_filter = ""
     if _is_set(filters.team):
         team_filter = " AND mp.team = :ftteam"

@@ -62,6 +62,20 @@ echo "  Chahar bowled-first matches: api=$ch_api sql=$ch_sql (bowled $ch_5845 ba
   && ok "bowled-but-didn't-bat game retained in bowled-first ($ch_api matches incl. 5845)" \
   || bad "Chahar bowled-first api=$ch_api sql=$ch_sql (match 5845 dropped?)"
 
+# 2d. Player overall match-count tile (/result-counts) — MATCH-level, same
+#     as the team header: counts a match if the player batted in N OR fielded
+#     in (1-N). Was inning-blind (145 at every inning). Subject: Chahar.
+read -r pr0 pr1 <<<"$(sqlite3 "$DB" "SELECT
+ (SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN match m ON m.id=i.match_id JOIN matchplayer mp ON mp.match_id=i.match_id AND mp.person_id='$CH' WHERE m.gender='male' AND i.super_over=0 AND ((mp.team=i.team AND i.innings_number=0) OR (mp.team!=i.team AND i.innings_number=1))),
+ (SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN match m ON m.id=i.match_id JOIN matchplayer mp ON mp.match_id=i.match_id AND mp.person_id='$CH' WHERE m.gender='male' AND i.super_over=0 AND ((mp.team=i.team AND i.innings_number=1) OR (mp.team!=i.team AND i.innings_number=0)));" | tr '|' ' ')"
+rc(){ curl -s "$API/api/v1/players/$CH/result-counts?gender=male&inning=$1" | python3 -c "import sys,json;print(json.load(sys.stdin)['matches'])" 2>/dev/null; }
+rc0=$(rc 0); rc1=$(rc 1)
+echo "  Chahar result-counts matches $rc0/$rc1 | SQL union = $pr0/$pr1"
+[ "$rc0" = "$pr0" ] && [ "$rc1" = "$pr1" ] && ok "player matches tile == match-level union ($rc0/$rc1) — was inning-blind" \
+  || bad "player result-counts $rc0/$rc1 != union $pr0/$pr1"
+[ "$rc1" = "$ch_api" ] && ok "player matches inning=1 ($rc1) == Chahar bowling matches ($ch_api) — header agrees with discipline" \
+  || bad "player matches inning=1 ($rc1) != bowling matches ($ch_api)"
+
 # 3. Bowling wickets flip: inning=1 (bowled first) should equal the old
 #    bowled-first value (raw innings_number=1 bowling).
 sql_bowl1=$(sqlite3 "$DB" "SELECT COUNT(*) FROM wicket w JOIN delivery d ON d.id=w.delivery_id JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id WHERE d.bowler_id='$P' AND m.gender='male' AND i.innings_number=0 AND i.super_over=0 AND w.kind NOT IN ('run out','retired hurt','retired out','obstructing the field');")
