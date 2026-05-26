@@ -200,6 +200,32 @@ in the in-page scope context so child links inherit it).
 | `filter_team` + `filter_opponent` (rivalry pair) | `SeriesLink` rivalry; **Head-to-Head → Teams mode**; `PlayerLink` (`keepRivalry=true`) riding through from a rivalry page | `/series` rivalry dossier; player page | `/series?filter_team=India&filter_opponent=Australia`; drill a player → `/batting?player=ba607b88&...&filter_team=India&filter_opponent=Australia` |
 | `filter_opponent` alone | **NOT LINKED ANYWHERE** | — | (only reachable by hand-editing the URL) |
 
+### Path convergence / duplication check (2026-05-26)
+Where "Kohli vs Australia" is linked from, and whether team-vs-team paths
+duplicate:
+- **Kohli vs Australia entry point** = the player leaderboards on the
+  **rivalry dossier** (`TournamentDossier` in rivalry mode). Its `PlayerLink`s
+  default `keepRivalry=true`, so clicking a player carries
+  `filter_team`+`filter_opponent` onto the player page →
+  `/batting?player=ba607b88&...&filter_team=India&filter_opponent=Australia`.
+  Reached via EITHER `/series?filter_team=India&filter_opponent=Australia`
+  OR Head-to-Head → Teams mode (both render the same dossier).
+- **No dossier duplication.** Head-to-Head Teams mode is a thin team-picker
+  wrapper that renders the SAME `TournamentDossier(filterTeam, filterOpponent)`
+  (HeadToHead.tsx:432-437), pinning the pair in `ScopeContext`. `/series`
+  rivalry and `/head-to-head` Teams mode therefore CONVERGE on one component
+  + one filter mechanism (`filter_team`/`filter_opponent`). Good — they're
+  effectively already merged; no action needed.
+- **The one separate surface:** the Teams **"vs Opponent"** subtab uses a
+  distinct endpoint `getTeamVs` → `/api/v1/teams/{team}/vs/{opponent}` (a
+  lighter in-page head-to-head summary, not the dossier). It does NOT use
+  `filter_opponent`. If we ever unify team-vs-team surfaces, this is the one
+  to reconcile — but it's a smaller/different view, arguably fine as-is.
+- **Future player-vs-team head-to-head should REUSE `filter_opponent`** (the
+  same substrate H2H Teams mode reuses for the dossier) — i.e. a control
+  that wraps the player page with `filter_opponent`, NOT a new endpoint. That
+  keeps player-vs-team on the one filter mechanism, no duplicate data path.
+
 ### Gap worth building: opponent-only on a player
 "Ashwin (any team) vs RCB" = `filter_opponent=RCB` with no `filter_team` —
 his record against RCB across all five franchises. Genuinely useful and
