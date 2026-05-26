@@ -36,28 +36,42 @@ fsa(){ curl -s "$API/api/v1/teams/$TE/$1/summary?gender=male&inning=$2" \
 
 echo "=== /teams · inning unification (Option B) — CSK ==="
 
-# SQL: matches where CSK batted in innings 0 / 1 (the unified subset).
+# Per-event, discipline-aware (Option B): batting inning=N counts the team's
+# batting innings_number=N; bowling/fielding inning=N counts the team's
+# FIELDING innings_number=(1-N) (bowled-first = innings 0 = inning=1). The two
+# can differ by abandoned matches the team bowled in but never batted.
+# SQL: BATTING batted-in-0 / batted-in-1.
 read -r bf bs <<<"$(sqlite3 "$DB" "SELECT
  (SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN match m ON m.id=i.match_id WHERE i.team='$T' AND i.super_over=0 AND m.gender='male' AND i.innings_number=0),
  (SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN match m ON m.id=i.match_id WHERE i.team='$T' AND i.super_over=0 AND m.gender='male' AND i.innings_number=1);" | tr '|' ' ')"
-echo "  SQL batted-in-0 / batted-in-1 subset = $bf / $bs"
+# SQL: BOWLING/FIELDING — team fielded in innings (1-N). inning=0 (bowled 2nd)
+# = fielded innings 1; inning=1 (bowled 1st) = fielded innings 0.
+read -r bw0sql bw1sql <<<"$(sqlite3 "$DB" "SELECT
+ (SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN match m ON m.id=i.match_id WHERE i.team!='$T' AND (m.team1='$T' OR m.team2='$T') AND i.super_over=0 AND m.gender='male' AND i.innings_number=1),
+ (SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN match m ON m.id=i.match_id WHERE i.team!='$T' AND (m.team1='$T' OR m.team2='$T') AND i.super_over=0 AND m.gender='male' AND i.innings_number=0);" | tr '|' ' ')"
+echo "  SQL batting batted-in-0/1 = $bf/$bs ; bowling fielded-in-(1-N) inn0/inn1 = $bw0sql/$bw1sql"
 
-# 1+3. bowling + fielding matches == subset (the flip + cross-discipline agreement).
+# 1+3. bowling + fielding matches == per-event bowled-(1-N) count (NOT the
+#      batting subset — must include matches the team bowled-but-didn't-bat).
 bw0=$(fv bowling 0 matches); bw1=$(fv bowling 1 matches)
 fd0=$(fv fielding 0 matches); fd1=$(fv fielding 1 matches)
 echo "  bowling matches $bw0/$bw1   fielding matches $fd0/$fd1"
-[ "$bw0" = "$bf" ] && [ "$bw1" = "$bs" ] && ok "bowling matches == batted-in-N subset ($bw0/$bw1) — flipped off bowled-first" \
-  || bad "bowling matches $bw0/$bw1 != subset $bf/$bs (still bowled-first?)"
-[ "$fd0" = "$bf" ] && [ "$fd1" = "$bs" ] && ok "fielding matches == batted-in-N subset ($fd0/$fd1)" \
-  || bad "fielding matches $fd0/$fd1 != subset $bf/$bs"
-[ "$bw0" = "$fd0" ] && [ "$bw1" = "$fd1" ] && ok "bowling matches == fielding matches (disciplines agree on the subset)" \
-  || bad "bowling vs fielding match counts disagree ($bw0/$bw1 vs $fd0/$fd1) — inning not unified"
+[ "$bw0" = "$bw0sql" ] && [ "$bw1" = "$bw1sql" ] && ok "bowling matches == bowled-(1-N) per-event ($bw0/$bw1) — incl. bowled-but-didn't-bat games" \
+  || bad "bowling matches $bw0/$bw1 != per-event $bw0sql/$bw1sql (still match-subset / dropping bowling games?)"
+[ "$fd0" = "$bw0sql" ] && [ "$fd1" = "$bw1sql" ] && ok "fielding matches == bowled-(1-N) per-event ($fd0/$fd1)" \
+  || bad "fielding matches $fd0/$fd1 != per-event $bw0sql/$bw1sql"
+[ "$bw0" = "$fd0" ] && [ "$bw1" = "$fd1" ] && ok "bowling matches == fielding matches (disciplines agree)" \
+  || bad "bowling vs fielding match counts disagree ($bw0/$bw1 vs $fd0/$fd1)"
+# The whole point: bowling inning=1 (122) > batting inning=1 (121) by the
+# abandoned bowled-but-never-batted game — they must NOT be forced equal.
+[ "$bw1" -ge "$bs" ] && ok "bowling inning=1 ($bw1) >= batting inning=1 ($bs) — bowled-but-didn't-bat games retained" \
+  || bad "bowling inning=1 ($bw1) < batting ($bs) — bowling games wrongly dropped"
 
-# 2. batting innings_batted == subset (unchanged meaning).
+# 2. batting innings_batted == batted-in-N (unchanged meaning).
 ib0=$(fv batting 0 innings_batted); ib1=$(fv batting 1 innings_batted)
 echo "  batting innings_batted $ib0/$ib1"
-[ "$ib0" = "$bf" ] && [ "$ib1" = "$bs" ] && ok "batting innings_batted == subset ($ib0/$ib1) — unchanged" \
-  || bad "batting innings_batted $ib0/$ib1 != subset $bf/$bs"
+[ "$ib0" = "$bf" ] && [ "$ib1" = "$bs" ] && ok "batting innings_batted == batted-in-N ($ib0/$ib1) — unchanged" \
+  || bad "batting innings_batted $ib0/$ib1 != batted-in-N $bf/$bs"
 
 # 4. Cohort scope_avg (bowling econ) present + differs across inning.
 sa0=$(fsa bowling 0 economy); sa1=$(fsa bowling 1 economy)

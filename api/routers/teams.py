@@ -120,44 +120,36 @@ def _option_b_team_inning(
     replacement for the central per-event `i.innings_number = :inning`
     clause (callers must pass `build(..., apply_inning=False)`).
 
-    Option B (internal_docs/spec-inning-unify-option-b.md §2): inning=N
-    means the matches where :team BATTED in innings N — the SAME match
-    subset for every discipline. The side discriminator already in the
-    caller's WHERE (`i.team = :team` for batting, `i.team != :team` for
-    fielding/bowling) routes to the right EVENTS; this clause only
-    narrows WHICH matches. So a team's bowling at inning=0 becomes its
-    bowling in matches it batted first (= its 2nd-innings bowling), NOT
-    "bowled first" — fixing the CSK three-labels-one-wrong bug.
+    Option B (internal_docs/spec-inning-unify-option-b.md §2): the toggle
+    label `inning=N` means "the team batted in innings N" — but the FILTER
+    is per-EVENT and DISCIPLINE-AWARE, narrowing to the innings where that
+    discipline actually happened:
 
-      team set  → i.match_id IN (matches :team batted in N). Exact, and
-                  keyed on i.match_id so every innings-grain query works
-                  without a match-table join. Identical for both sides —
-                  the i.team discriminator picks batting vs fielding rows.
-      team None → the /scope/averages cohort has no subject team, so fall
-                  to the live per-event equivalent: batting-side stats
-                  live in innings_number N; fielding/bowling-side stats
-                  live in innings_number (1-N) — a team fielding in
-                  innings 1-N batted in N. Aggregated over all teams this
-                  equals "every team's <side> work in matches it batted
-                  in N", keeping the cohort apples-to-apples with the
-                  team value above (chip↔baseline symmetry).
+      batting        → innings_number = N        (the team batted in N)
+      fielding/bowl  → innings_number = (1 - N)   (a team that bats N bowls
+                                                   in the OTHER innings; so
+                                                   bowled-first = innings 0 =
+                                                   inning=1)
 
-    `side` follows the caller's convention; only the batting side keeps
-    N, everything else (fielding / bowling) flips. Returns ('', {}) when
-    aux.inning is unset.
+    Per-event (NOT a "matches the team batted in N" subset) is deliberate:
+    a match the team BOWLED in but never BATTED — e.g. a rain-abandoned game
+    where they fielded first and the chase never started — carries real
+    wickets/balls that MUST count toward the bowling average. A match subset
+    keyed on batting would silently drop that bowling work (and its
+    denominator), skewing economy/strike-rate. So batting and bowling can
+    legitimately span DIFFERENT match counts at the same inning value
+    (e.g. CSK inning=1: batted-second 121 vs bowled-first 122).
+
+    The side discriminator already in the caller's WHERE (`i.team = :team`
+    for batting, `i.team != :team` for fielding/bowling) selects the right
+    EVENTS; this clause picks the innings number. Identical logic for the
+    team-detail (`team` set) and the /scope/averages cohort (`team` None) —
+    so the cohort baseline stays apples-to-apples with the team value
+    (chip↔baseline symmetry). `team` is unused here but kept for a stable
+    signature. Returns ('', {}) when aux.inning is unset.
     """
     if aux is None or aux.inning is None:
         return "", {}
-    if team is not None:
-        return (
-            "i.match_id IN ("
-            " SELECT i2.match_id FROM innings i2"
-            " WHERE i2.team = :ob_team"
-            "   AND i2.innings_number = :ob_inn"
-            "   AND i2.super_over = 0"
-            ")",
-            {"ob_team": team, "ob_inn": aux.inning},
-        )
     eff = aux.inning if side == "batting" else (1 - aux.inning)
     return "i.innings_number = :ob_inn", {"ob_inn": eff}
 
