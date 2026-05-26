@@ -6,6 +6,19 @@ Specs: `spec-splits-mosaic.md` (Teams-only — implemented 2026-05-11), `splits-
 
 This doc captures the **inviolable rules**. The spec captures the **design**.
 
+> **⚠️ KNOWN ISSUE — confusing summary wording (flagged 2026-05-26, TO FIX).**
+> When a filter is active, the summary line reads "Of **144** matches
+> batting first:" then shows "Won **148** · Tied 2 · Lost **116**" — which
+> total **266** (the full scope), not 144. The header is built from the
+> aux-narrowed count; the W/T/L summary + the All-toss/Both-innings chips
+> are driven by the aux-STRIPPED full-scope fetch (intentional, so the
+> reference doesn't rescale on filter-click), but nothing signals the shown
+> counts are the full-scope reference rather than the 144. On screen it
+> reads as a contradiction. User wants it fixed — reword as an explicit
+> reference, OR make the summary reflect the filtered slice, OR drop the
+> "Of N matches <filter>" header when the counts are full-scope. Sites:
+> `SplitsMosaic.tsx` summary strip + `Teams.tsx` unaux* fetches.
+
 ---
 
 ## Dimensionality is URL-derived
