@@ -23,8 +23,8 @@ NEW dist_dhoni_all_time                /api/v1/fielders/4a8a2e3b/distribution?as
 # to the per-event fielding subset (matches the fielder FIELDED in 1-N) —
 # was inning-blind. MUST drift NEW vs HEAD, then flip REG once locked.
 # inning=0 → fielded in innings 1 (batted first); inning=1 → fielded in 0.
-NEW dist_dhoni_inn0                    /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=international&inning=0&as_of_date=2025-01-01
-NEW dist_dhoni_inn1                    /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=international&inning=1&as_of_date=2025-01-01
+REG dist_dhoni_inn0                    /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=international&inning=0&as_of_date=2025-01-01
+REG dist_dhoni_inn1                    /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=international&inning=1&as_of_date=2025-01-01
 NEW dist_dhoni_men_intl                /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=international&as_of_date=2025-01-01
 NEW dist_dhoni_ipl                     /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
 NEW dist_dhoni_ipl_2018                /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2018&season_to=2018&as_of_date=2025-01-01

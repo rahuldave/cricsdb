@@ -1044,6 +1044,20 @@ async def _match_master_sample_fielder(
     where, params = filters.build_side_neutral(has_innings_join=False, aux=aux)
     params["person_id"] = person_id
     match_where = where if where else "1=1"
+    # Option B (spec-inning-unify-option-b.md A8 / §8.5): narrow the
+    # per-match master sample to the per-event fielding subset — matches
+    # where the player FIELDED in innings (1-N). This makes /distribution
+    # consistent with the fielding `matches` tile (206/190) on the same
+    # page AND with batting/bowling distribution (which already honor
+    # inning). The keeper-binary cohort baseline reads playerscopestats
+    # (no innings dimension) so it stays full-scope under inning — the
+    # SAME accepted cross-panel behavior as batting/bowling distribution,
+    # whose milestone baselines also don't narrow by inning. `m.id` is the
+    # match-id column both the player_matches CTE and the substitute
+    # subquery share.
+    ri = player_inning_match_clause(aux, person_id, params, match_id_expr="m.id", side="fielding")
+    if ri:
+        match_where = f"{match_where} AND {ri}"
 
     # Single CTE-based query. player_matches is the scope-filtered
     # match list; fielding_per_match and keeping_per_match are
