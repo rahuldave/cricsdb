@@ -4,13 +4,18 @@
 
 **Purpose:** A single place to look up where the inning-narrowing affordance — `InningToggle` (the 3-pill row) or `SplitsMosaic` (the 4-quadrant chart) — currently mounts on each route × subtab, so future redesign / rollout decisions don't depend on recall.
 
+**Value/label semantics (Option B, 2026-05-26):** `?inning=0` ≡ the subject's team **batted first** at EVERY mount site; the filter is per-event + discipline-aware (batting `innings_number=N`; bowling/fielding `1-N`). The InningToggle **value-flips** on bowling/fielding POV — the "Bowling first" pill writes `inning=1` (bowled-first = batted-second). Neutral mounts (Players profile, Records, Compare slots) read "1st/2nd innings" = batted-first. Backend leaderboards flip per-discipline via `splice_aux_join_clauses(side=…)`; team `/by-inning` band rows are POV-labelled in `InningBandsRow`. Full contract + per-site status: `spec-inning-unify-option-b.md` §1 + §3 (A/U tables) + §8.
+
 Companion docs:
+- `spec-inning-unify-option-b.md` — **the current inning meaning** (Option B; supersedes spec-inning-split.md §1/§3.4/§7)
 - `spec-splits-mosaic.md` — the shipped Teams Mosaic spec
 - `splits-mosaic-discipline.md` — Mosaic rules (palette, share-denominator-follows-filter, aux gating)
 - `splits-mosaic-cross-page.md` — DESIGN doc for the cross-page rollout
-- `spec-inning-split.md` — the original inning-toggle spec (§3.3 + §6.1 govern where the toggle mounts; §3.3 also notes the toggle is deferred for deprecation on pages where the Mosaic takes over)
+- `spec-inning-split.md` — the original inning-toggle spec (mount/aux/band mechanics still accurate; its value-meaning + Compare dual-meaning superseded by Option B)
 
-CLAUDE.md "Page conventions → Inning-toggle labels — POV-aware via `useDiscipline()`" is the rule about pill *labels*; this doc tracks *mount locations*.
+CLAUDE.md "Page conventions → Inning filter — Option B" is the rule about value semantics + pill *labels*; this doc tracks *mount locations*.
+
+**Compare-tab aux coverage (2026-05-26):** the Teams Compare columns now honor `inning` (every column, primary + slots + league-avg) AND `toss_outcome` / `result` (inherited from the page; the league-avg column narrows per-row on `i.team`). The page-level Splits Mosaic above the tabs is the control. See `spec-compare-toss-result.md`.
 
 ---
 

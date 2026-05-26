@@ -303,37 +303,43 @@ A second row of pills sits below the filter bar on the player and
 team Batting / Bowling / Fielding / Partnerships pages, the Series
 dossier's stat subtabs, and the Venues stat subtabs:
 
-> **Innings:** [ All innings | 1st innings | 2nd innings ]
+> **Innings:** [ All innings | Batting first | Batting second ]   (a batting page)
+> **Innings:** [ All innings | Bowling first | Bowling second ]   (a bowling/fielding page)
 
-Pick "1st innings" to restrict every number on the page to deliveries
-from the match's first innings; "2nd innings" for the chase / second
-innings. "All innings" (default) clears the narrowing.
+**One meaning everywhere: the subject's team batted first or second.**
+"Batting first" / "Bowling first" both restrict to the same set of
+matches — the ones where the team batted in the match's 1st innings.
+The pill labels are phrased from the page's point of view, but they
+describe the *same* matches:
 
-Reading convention: the label refers to the **match's** innings_number,
-regardless of which side of the ball the page focuses on.
+- "RCB, Batting first" = RCB's batting in matches they batted first.
+- "RCB, Bowling first" = RCB's bowling in matches they bowled first —
+  which means they **batted second** (you bowl in the innings you
+  didn't bat). So "Bowling first" and "Batting second" pick the same
+  matches; the page just shows the relevant side of the ball.
+- On a neutral page (a player's combined profile, Records) the pills
+  read "1st innings / 2nd innings" and mean the team batted first /
+  second, with bowling and fielding drawn from those same games.
 
-- "Bumrah, 1st innings" = his deliveries when the opposition was
-  batting first.
-- "RCB batting, 1st innings" = their batting in matches where they
-  batted first (= 8 RCB matches in IPL 2025).
-- "RCB bowling, 1st innings" = their bowling in matches where they
-  bowled first (= 7 RCB matches in IPL 2025; the OPPOSITION batted
-  in inning 0).
-
-Why this framing: "bowled first" / "fielded first" are ambiguous in
-casual cricket parlance and mean the OPPOSITE of what readers
-typically assume. Sticking to "1st innings" / "2nd innings"
-(matching the scorecard convention) avoids the trap.
+This is the **batted-first** convention: `?inning=0` always means the
+team batted first, on every page and every tab — so a number never
+flips meaning as you move between Batting and Bowling. (Earlier the
+app used the match's raw innings number, which made "1st innings"
+mean batted-first for batting but bowled-first for bowling — the same
+toggle, two meanings. That's gone.)
 
 The toggle is **page-local** and **not** part of the filter bar —
 the share URL carries `?inning=0` or `?inning=1` so a copied link
 reproduces exactly what you see, but it doesn't follow you to a
-new tab the way Gender / Type / Tournament do.
+new tab the way Gender / Type / Tournament do. On the Teams page the
+**Splits Mosaic** (above the tabs) is the control — click a cell to
+set it.
 
-On the team Compare tab, the inning narrowing lives **per slot**
-(click ✎ on a column header → "Innings" dropdown). That lets you
-compare e.g. "RCB all innings" vs "RCB chasing only" vs "IPL
-1st-innings average" in three columns.
+On the team Compare tab a carried-over innings filter applies to
+**every** column (and the league-average column), so the comparison
+stays like-for-like; each column can also override it per slot
+(click ✎ on a header → "Innings" dropdown) to compare e.g. "RCB
+batting first" vs "RCB batting second" side by side.
 
 ## Reading the landings
 

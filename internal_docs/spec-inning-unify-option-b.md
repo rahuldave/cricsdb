@@ -144,7 +144,7 @@ Status legend: ☐ todo · ◑ code done · ✓ code+test green.
 | U7 | `/teams?team` Fielding | SplitsMosaic + scope strip | bowled/fielded 1st | bat-1st = "bowled second" | unify labels (bowling POV) | `inning_unify_teams.sh` | ✓ (71b0b59) |
 | U8 | `/teams?team` By Season / vs Opp / Match List | (match-level union) | batted 1st | union batted-N OR fielded-(1-N) | none | covered by `inning_unify_teams.sh` header | ✓ (fc8a502) |
 | U9 | `/teams?team` Partnerships | SplitsMosaic | batted 1st | batted 1st (bat side) / flip (bowl side) | none (bat) | `inning_unify_teams.sh` | ✓ (43310ec/71b0b59) |
-| U10 | `/teams?team` Players | SplitsMosaic | per-row inning | per-event via shared mosaic | none | (same harness) | ◑ mosaic code done; subtab not browser-verified |
+| U10 | `/teams?team` Players | SplitsMosaic | per-row inning | per-event via shared mosaic | none | (same harness) | ✓ browser-verified 2026-05-26 — Players mosaic identical to Batting tab (neutral "batting first" POV); cells/marginals consistent across Bowling("bowling second")/Batting/Players at inning=0. Pre-existing quirk noted: result marginal is full-scope (266) while header says "Of 144" — by-design aux-stripped marginal, mosaic-wide, out of scope |
 | U11 | `/teams?team` Compare | SlotScopeEditor | dual-meaning (§3.4) | single batted-1st subset per slot | drop dual-meaning tooltip | `inning_unify_compare.sh` | ✓ (fda37c1) — also fixed primarySlotOf dropping inning (primary col ignored carried-over inning while slots inherited it); toss/result deliberately NOT carried (cohort can't express them) |
 | U12 | `/series?tournament` Bowling/Fielding | InningToggle | bowled 1st | bat-1st @inn0 (bowl/field flip to 1-N) | flip value (toggle done; backend A9) | `inning_unify_series.sh` | ✓ (a1dfa09/c9bd5d9) — toggle "Bowling first/second" + active pill ↔ inning agree; DOM flips & matches flipped API |
 | U13 | `/series?tournament` Batting/Pship/Records | InningToggle | batted 1st | batted 1st | none | (same harness) | ✓ (no backend change; batters/records left at innings_number=N) |
@@ -152,7 +152,7 @@ Status legend: ☐ todo · ◑ code done · ✓ code+test green.
 | U15 | `/venues?venue` Batters/Records | InningToggle | batted 1st | batted 1st | none | (same harness) | ✓ (batters leaders unchanged) |
 | U16 | ScopeStatusStrip (every tab) | label only | POV mislabel (CSK bug) | matches the toggle's POV phrase | fix POV derivation | asserted in `inning_unify_*` harnesses | ✓ (Phase 1) |
 | U17 | abbreviateScope (chart subtitles) | label only | POV "bowled first" | POV consistent w/ toggle | align | asserted in harnesses | ✓ (Phase 1) |
-| U18 | user-help.md "Innings toggle" | docs | bowled-first examples | batted-first examples | rewrite §Innings toggle | n/a (content) | ☐ |
+| U18 | user-help.md "Innings toggle" | docs | bowled-first examples | batted-first examples | rewrite §Innings toggle | n/a (content) | ✓ — user-help.md §Innings toggle rewritten to batted-first (verified at /help/usage); CLAUDE.md inning rule replaced; spec-inning-split.md §1/§3.4/§7.2 superseding banners; inning-controls-mount-sites.md value/label + Compare-aux notes |
 
 ## 4. API table (endpoint consistency — one regression test each)
 

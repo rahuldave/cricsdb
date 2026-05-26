@@ -1,11 +1,23 @@
 # Spec — Inning split (1st innings / 2nd innings) on team + player stats
 
+> **⚠️ SUPERSEDED IN PART by `spec-inning-unify-option-b.md` (2026-05-26).**
+> §1 (the per-event "match's innings_number" framing) and §3.4 + §7.2 (the
+> Compare "dual-meaning" slot semantics) are REPLACED by **Option B**:
+> `?inning=0` ≡ the subject's team **batted first** on EVERY page/
+> discipline; the filter is per-event + discipline-aware (batting
+> `innings_number=N`; bowling/fielding `(1-N)`), never the raw match
+> innings_number. Compare's dual-meaning is dropped (one slot = one
+> batted-first/second subset across all rows; toss/result carry too). The
+> mount-site inventory, the aux field, and the by-inning band endpoints
+> below remain accurate; only the *meaning of the value* changed. Read
+> `spec-inning-unify-option-b.md` §1 + §8 first.
+>
 > **Status:** SHIPPED. InningToggle + useDiscipline + ScopeStatusStrip
 > wired across the app (POV-aware pill labels per commit `ca2ccd6`).
 > 13 mount sites locked by `tests/integration/inning_toggle_pov_labels.sh`.
 > Aux field + by-inning band endpoints + frontend toggle component all
-> live. See CLAUDE.md "Inning-toggle labels — POV-aware" + memory
-> `project_inning_pov_conventions.md`.
+> live. See CLAUDE.md "Inning filter — Option B" + memory
+> `project_inning_pov_conventions.md` + `project_inning_unify_option_b.md`.
 
 ---
 
@@ -393,6 +405,14 @@ override grammar but defers to the H2H comparison-filters work
 (§9).
 
 ### 3.4 Compare-tab semantic — slot inning=0 is dual-meaning
+
+> **❌ RETIRED by Option B (`spec-inning-unify-option-b.md` U11, shipped
+> `fda37c1`).** The dual-meaning below is GONE. A Compare slot's
+> `inning=0` now = that team **batted first** for ALL its rows (batting
+> AND bowling); the page-level inning carries to every column + the
+> league-average column; toss/result carry too. To compare 1st vs 2nd
+> innings, set two slots to `inning=0` vs `inning=1`. Section kept for
+> history only.
 
 A slot with `compareN_inning=0` shows **two different match
 subsets** on two different sides of the ball:
@@ -795,6 +815,9 @@ under Page conventions; cross-codebase consistency comes from
 the single hook (no per-component POV resolution).
 
 ### 7.2 Slot-level inning=0 is dual-meaning (Compare tab)
+
+> **❌ RETIRED by Option B (U11).** See the §3.4 banner — a slot's
+> `inning=0` is now batted-first for all rows, not dual-meaning.
 
 §3.4 covered the SQL semantic; the user-facing convention:
 
