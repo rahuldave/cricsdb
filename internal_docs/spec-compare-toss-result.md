@@ -1,6 +1,8 @@
 # Spec — toss_outcome + result on the Teams Compare tab
 
-**Status:** BUILD-READY. Decision date 2026-05-26. Emerged from the U11
+**Status:** SHIPPED 2026-05-26 (commits 4482d9f regression · 2c4f2d0
+backend cohort · 90733d6 frontend · docs). Not pushed/deployed.
+Decision date 2026-05-26. Emerged from the U11
 inning-unify work (`spec-inning-unify-option-b.md`): fixing the Compare
 primary column to honor `inning` surfaced that `toss_outcome`/`result`
 are dropped on Compare entirely, AND that the league-average column
@@ -77,10 +79,11 @@ A12-equivalent: no precompute recompute — live path only.
 - `ResolvedSlotScope`: add `'toss_outcome' | 'result'` to the Pick.
 - `inheritedScope`: add `toss_outcome` + `result` from primary.
 - NOT added to `OVERRIDABLE_SLOT_KEYS` — inherited-only (no per-slot
-  override; the SlotScopeEditor has no toss/result row and the Compare
-  tab has no toss/result control of its own — they only arrive via
-  carryover from a Mosaic-driven tab). Per-slot toss/result = possible
-  future editor addition, out of scope here.
+  override; the SlotScopeEditor has no toss/result row). The Splits
+  Mosaic is page-level (above the tab bar) and renders on the Compare
+  subtab too, so clicking won-toss / won-match there sets the page
+  `?toss_outcome=`/`?result=` and the whole comparison narrows. Per-slot
+  toss/result = possible future editor addition, out of scope here.
 
 `components/teams/TeamCompareGrid.tsx::primarySlotOf`: add `toss_outcome`
 + `result` from filters (the primary column was already fixed to carry

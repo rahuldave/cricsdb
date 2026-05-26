@@ -59,7 +59,16 @@ data…" note until you clear or pick someone else.
     current scope" to add the league baseline.
   - To override a column's scope after adding it, click the **✎**
     pencil on its header — opens an inline editor with tournament,
-    season range, venue, and series-type fields.
+    season range, venue, series-type, and 1st/2nd-innings fields.
+  - The **Splits Mosaic** above the tabs works here too: click **won the
+    toss**, **batted first**, or **won the match** and the whole
+    comparison narrows — **every** column (and the league-average column)
+    obeys it, so a "won the toss" or "1st innings" comparison stays
+    like-for-like across all teams. The league baseline narrows in step
+    (e.g. "league bowling economy among match-winners" is a real, distinct
+    number — winners concede fewer runs), so the ↑/↓ chips stay honest.
+    Innings can also be set per-column in the ✎ editor; toss/match-result
+    apply uniformly across the comparison.
   - Comparison is single-gender and single-type (international vs
     international; club vs club) — enforced automatically via the
     filter bar.
