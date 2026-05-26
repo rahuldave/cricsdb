@@ -75,13 +75,13 @@ ind_6s_2nd=$(sql "
     AND i.team='India' AND i.innings_number=1;
 ")
 
-actual=$(unq "$(inning_cell '1st innings' 'Wkts')")
+actual=$(unq "$(inning_cell 'Batted first' 'Wkts')")
 if [ "$actual" = "$ind_wkts_1st" ]; then ok "India batting 1st innings · Wkts (=$ind_wkts_1st)"; else bad "India batting 1st · Wkts — expected '$ind_wkts_1st', got '$actual'"; fi
 
-actual=$(unq "$(inning_cell '1st innings' '4s')")
+actual=$(unq "$(inning_cell 'Batted first' '4s')")
 if [ "$actual" = "$ind_4s_1st" ]; then ok "India batting 1st innings · 4s (=$ind_4s_1st)"; else bad "India batting 1st · 4s — expected '$ind_4s_1st', got '$actual'"; fi
 
-actual=$(unq "$(inning_cell '2nd innings' '6s')")
+actual=$(unq "$(inning_cell 'Batted second' '6s')")
 if [ "$actual" = "$ind_6s_2nd" ]; then ok "India batting 2nd innings · 6s (=$ind_6s_2nd)"; else bad "India batting 2nd · 6s — expected '$ind_6s_2nd', got '$actual'"; fi
 
 # ── Scope 2 · India men's international bowling (bucket path) ─────
@@ -111,10 +111,10 @@ ind_bowl_4s_1st=$(sql "
     AND i.team != 'India' AND i.innings_number=0;
 ")
 
-actual=$(unq "$(inning_cell '2nd innings' 'Wickets')")
+actual=$(unq "$(inning_cell 'Bowled second' 'Wickets')")
 if [ "$actual" = "$ind_bowl_wkts_2nd" ]; then ok "India bowling 2nd innings · Wickets (=$ind_bowl_wkts_2nd)"; else bad "India bowling 2nd · Wickets — expected '$ind_bowl_wkts_2nd', got '$actual'"; fi
 
-actual=$(unq "$(inning_cell '1st innings' '4s')")
+actual=$(unq "$(inning_cell 'Bowled first' '4s')")
 if [ "$actual" = "$ind_bowl_4s_1st" ]; then ok "India bowling 1st innings · 4s (=$ind_bowl_4s_1st)"; else bad "India bowling 1st · 4s — expected '$ind_bowl_4s_1st', got '$actual'"; fi
 
 # ── Scope 3 · India batting + filter_venue (live path) ────────────
@@ -136,7 +136,7 @@ ind_wkts_1st_eden=$(sql "
     AND i.team='India' AND i.innings_number=0
     AND w.kind NOT IN ('retired hurt','retired not out');
 ")
-actual=$(unq "$(inning_cell '1st innings' 'Wkts')")
+actual=$(unq "$(inning_cell 'Batted first' 'Wkts')")
 if [ "$actual" = "$ind_wkts_1st_eden" ]; then ok "India batting 1st @ Eden · Wkts (=$ind_wkts_1st_eden, live path)"; else bad "India batting 1st @ Eden · Wkts — expected '$ind_wkts_1st_eden', got '$actual'"; fi
 
 # ── Scope 4 · India bowling + filter_venue (live path) ────────────
@@ -162,7 +162,7 @@ ind_bowl_wkts_1st_eden=$(sql "
     AND i.team != 'India' AND i.innings_number=0
     AND w.kind NOT IN ('run out','retired hurt','retired out','obstructing the field','retired not out');
 ")
-actual=$(unq "$(inning_cell '1st innings' 'Wickets')")
+actual=$(unq "$(inning_cell 'Bowled first' 'Wickets')")
 if [ "$actual" = "$ind_bowl_wkts_1st_eden" ]; then
   ok "India bowling 1st @ Eden · Wickets (=$ind_bowl_wkts_1st_eden, live path)"
 else
@@ -181,7 +181,7 @@ ind_bowl_4s_2nd_eden=$(sql "
     AND m.venue='Eden Gardens'
     AND i.team != 'India' AND i.innings_number=1;
 ")
-actual=$(unq "$(inning_cell '2nd innings' '4s')")
+actual=$(unq "$(inning_cell 'Bowled second' '4s')")
 if [ "$actual" = "$ind_bowl_4s_2nd_eden" ]; then
   ok "India bowling 2nd @ Eden · 4s (=$ind_bowl_4s_2nd_eden, live path)"
 else

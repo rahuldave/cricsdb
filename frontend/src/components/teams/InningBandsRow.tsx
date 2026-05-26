@@ -55,6 +55,20 @@ type Props = BattingProps | BowlingProps | FieldingProps | PartnershipsProps
 const fmt2 = (v: number | null | undefined) => v == null ? '-' : v.toFixed(2)
 const fmt1 = (v: number | null | undefined) => v == null ? '-' : v.toFixed(1)
 
+// Option-B POV-aware band label (spec-inning-unify-option-b.md §5.1 / A7).
+// The /by-inning band shows BOTH halves (not toggle-driven), so it isn't a
+// value-flip — just a discipline-correct label on each innings_number row:
+//   inning_no=0 = the match's 1st innings, =1 = the 2nd.
+//   bowling/fielding → "Bowled first/second" (fielding inherits bowling
+//   terminology — never "Fielded first"); batting/partnerships → "Batted
+//   first/second". The backend's neutral "1st/2nd innings" label is
+//   overridden here so a Bowling-tab band reads in bowling POV.
+function bandLabel(discipline: Discipline, inningNo: number): string {
+  const ord = inningNo === 0 ? 'first' : 'second'
+  if (discipline === 'bowling' || discipline === 'fielding') return `Bowled ${ord}`
+  return `Batted ${ord}` // batting + partnerships (a partnership is a batting concept)
+}
+
 /** Read either a flat number or a `.value` off an envelope. */
 function rv(x: number | MetricEnvelope | null | undefined): number | null {
   if (x == null) return null
@@ -91,7 +105,7 @@ function buildBattingRows(s: TeamBattingSummary, bands: TeamBattingInning[]): { 
     ],
   }
   const inningRows: Row[] = (bands ?? []).map(b => ({
-    label: b.label,
+    label: bandLabel('batting', b.inning_no),
     cells: [
       { text: fmt2(rv(b.run_rate)),     env: env(b.run_rate),     fmt: 2 },
       { text: fmt1(rv(b.boundary_pct)), env: env(b.boundary_pct), fmt: 1 },
@@ -118,7 +132,7 @@ function buildBowlingRows(s: TeamBowlingSummary, bands: TeamBowlingInning[]): { 
     ],
   }
   const inningRows: Row[] = (bands ?? []).map(b => ({
-    label: b.label,
+    label: bandLabel('bowling', b.inning_no),
     cells: [
       { text: fmt2(rv(b.economy)),      env: env(b.economy),      fmt: 2 },
       { text: String(b.wickets) },
@@ -145,7 +159,7 @@ function buildFieldingRows(s: TeamFieldingSummary, bands: TeamFieldingInning[]):
     ],
   }
   const inningRows: Row[] = (bands ?? []).map(b => ({
-    label: b.label,
+    label: bandLabel('fielding', b.inning_no),
     cells: [
       { text: String(b.matches) },
       { text: String(b.catches) },
@@ -169,7 +183,7 @@ function buildPartnershipsRows(s: TeamPartnershipsSummary, bands: TeamPartnershi
     ],
   }
   const inningRows: Row[] = (bands ?? []).map(b => ({
-    label: b.label,
+    label: bandLabel('partnerships', b.inning_no),
     cells: [
       { text: String(rv(b.n) ?? '-'),    env: env(b.n) },
       { text: fmt1(rv(b.avg_runs)),       env: env(b.avg_runs), fmt: 1 },
