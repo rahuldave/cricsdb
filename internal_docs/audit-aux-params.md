@@ -47,7 +47,7 @@ no comparison baseline on this surface. `—` = filter intentionally absent.
 | Batting | Run-rate / Boundary% tiles | ✓ | ✓ | ✓ | — |
 | Batting | By-season chart (+ cohort line) | ✓ | ✓ | ✓ | — |
 | Batting | By-phase bands | ✓ | ✓ | ✓ | — |
-| Batting | By-inning bands | n/a (shows both halves by design) | — | — | — |
+| Batting | By-inning bands | ✓ | ✓ | ✓ | — (re-filters to the matching innings when a filter is on; shows both as a summary otherwise — verified in browser) |
 | Bowling | Economy / Dot% tiles | ✓ | ✓ | ✓ | — |
 | Bowling | By-season chart, By-phase bands | ✓ | ✓ | ✓ | — |
 | Fielding | Catches/match tile, By-season chart | ✓ | ✓ | ✓ | — |
