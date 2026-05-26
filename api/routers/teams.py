@@ -218,6 +218,60 @@ def _toss_outcome_match_filter(
     return "", {}
 
 
+def _cohort_outcome_clause(
+    side: str,
+    aux: AuxParams | None,
+) -> tuple[str, dict]:
+    """Per-row toss/result narrowing for the LEAGUE-side (cohort) path of
+    `_team_innings_clause` / `_partnership_filter` (called with team=None).
+
+    On the cohort there's no single subject team, but each innings row HAS
+    one: `i.team` is the batting team. The subject for outcome filtering is
+    discipline-aware (mirror of `_option_b_team_inning`):
+
+      batting        → subject = i.team (the batting team)
+      fielding/bowl  → subject = the OTHER match team (the bowling side):
+                       outcome / toss winner is NOT i.team.
+
+    This keeps the league baseline apples-to-apples with a team column
+    under the same toss/result filter (chip↔baseline symmetry). The COUNT
+    of toss-winners is ~50% (and match-winners ~50%) but their STATS
+    differ — won-toss teams pick favourable conditions; match-winners
+    concede fewer runs — so the narrowed baseline is a real, distinct
+    number, NOT tautological. (The team-detail path uses the subject-team
+    forms `_result_match_filter` / `_toss_outcome_match_filter` keyed on
+    `:team`; this is their cohort twin keyed on `i.team`.)
+
+    Returns ('', {}) when neither aux is set. No binds — all literal
+    column comparisons. Spec: internal_docs/spec-compare-toss-result.md §2.
+    """
+    if aux is None:
+        return "", {}
+    is_bat = side == "batting"
+    parts: list[str] = []
+    if aux.result is not None:
+        if aux.result == "tied":
+            parts.append("m.outcome_winner IS NULL")
+        else:
+            # The batting team (i.team) won iff the subject is the batting
+            # side and asked for 'won', or the subject is the bowling side
+            # and asked for 'lost'. `i.team won` ⇒ outcome_winner = i.team.
+            bat_team_won = (aux.result == "won") == is_bat
+            parts.append(
+                "m.outcome_winner = i.team" if bat_team_won
+                else "(m.outcome_winner IS NOT NULL AND m.outcome_winner != i.team)"
+            )
+    if aux.toss_outcome is not None:
+        bat_team_toss = (aux.toss_outcome == "won") == is_bat
+        parts.append(
+            "(m.toss_winner IS NOT NULL AND m.toss_winner = i.team)" if bat_team_toss
+            else "(m.toss_winner IS NOT NULL AND m.toss_winner != i.team)"
+        )
+    if not parts:
+        return "", {}
+    return " AND ".join(parts), {}
+
+
 def _team_filter_clause(
     filters: FilterParams,
     team_param: str = ":team",
@@ -1809,11 +1863,12 @@ def _team_innings_clause(
     if inn_clause:
         parts.append(inn_clause)
         params.update(inn_params)
-    # Match-level aux filters (result / toss_outcome) need a path team
-    # to evaluate. They only apply on team-detail (team is not None);
-    # on the scope-averages path (team is None) they're silently
-    # ignored — the league baseline can't meaningfully filter on
-    # outcome-vs-self when there's no self.
+    # Match-level aux filters (result / toss_outcome). Team-detail
+    # (team is not None) uses the subject-team forms keyed on :team. The
+    # scope-averages cohort (team is None) uses the per-row twin keyed on
+    # i.team — the league baseline DOES narrow meaningfully (won-toss /
+    # match-winner stats differ from the rest), keeping it apples-to-apples
+    # with a team column under the same filter. Spec: spec-compare-toss-result.md.
     if team is not None:
         res_clause, res_params = _result_match_filter(team, aux)
         if res_clause:
@@ -1823,6 +1878,11 @@ def _team_innings_clause(
         if toss_clause:
             parts.append(toss_clause)
             params.update(toss_params)
+    else:
+        coh_clause, coh_params = _cohort_outcome_clause(side, aux)
+        if coh_clause:
+            parts.append(coh_clause)
+            params.update(coh_params)
     # Auto-scope: only meaningful for the scope-averages path (team is None).
     if team is None:
         st_clause, st_params = _scope_to_team_clause(aux, filters)
@@ -5714,9 +5774,10 @@ def _partnership_filter(
     if inn_clause:
         parts.append(inn_clause)
         params.update(inn_params)
-    # Match-level aux filters (result / toss_outcome) need a path team
-    # to evaluate; only apply on team-detail (mirror of
-    # _team_innings_clause). Spec: spec-splits-mosaic.md §1.2.
+    # Match-level aux filters (result / toss_outcome). Team-detail keys on
+    # :team; the cohort (team is None) keys on i.team (the partnership's
+    # batting team) via the per-row twin. Mirror of _team_innings_clause.
+    # Spec: spec-compare-toss-result.md §2 + spec-splits-mosaic.md §1.2.
     if team is not None:
         res_clause, res_params = _result_match_filter(team, aux)
         if res_clause:
@@ -5726,6 +5787,11 @@ def _partnership_filter(
         if toss_clause:
             parts.append(toss_clause)
             params.update(toss_params)
+    else:
+        coh_clause, coh_params = _cohort_outcome_clause(side, aux)
+        if coh_clause:
+            parts.append(coh_clause)
+            params.update(coh_params)
     if team is None:
         st_clause, st_params = _scope_to_team_clause(aux, filters)
         if st_clause:

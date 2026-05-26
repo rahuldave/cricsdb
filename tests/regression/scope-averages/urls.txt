@@ -37,9 +37,9 @@ REG scope_partnerships_by_season_ipl        /api/v1/scope/averages/partnerships/
 # MUST drift vs HEAD (NEW), then flip to REG once locked. Direction:
 # bowling econ in wins << overall (winners concede less); won-toss
 # shifts modestly.
-NEW scope_bowling_summary_ipl_result_won    /api/v1/scope/averages/bowling/summary?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024&result=won
-NEW scope_bowling_summary_ipl_toss_won      /api/v1/scope/averages/bowling/summary?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024&toss_outcome=won
-NEW scope_batting_summary_ipl_result_won    /api/v1/scope/averages/batting/summary?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024&result=won
+REG scope_bowling_summary_ipl_result_won    /api/v1/scope/averages/bowling/summary?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024&result=won
+REG scope_bowling_summary_ipl_toss_won      /api/v1/scope/averages/bowling/summary?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024&toss_outcome=won
+REG scope_batting_summary_ipl_result_won    /api/v1/scope/averages/batting/summary?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024&result=won
 
 # ── team-side flat-by-season (no chip envelopes — untouched) ─────
 REG team_partnerships_by_season_mi_ipl      /api/v1/teams/Mumbai%20Indians/partnerships/by-season?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024
