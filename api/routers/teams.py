@@ -797,6 +797,26 @@ async def team_summary(
         round(pool_decided * 100 / (pool_matches * 2), 2)
         if pool_matches > 0 else None
     )
+    # When an aux filter (inning / toss / result) is set, the match-level
+    # pool above ignores it (build() doesn't carry aux, and the per-team
+    # _inning/_toss/_result helpers key on :team so don't apply to the
+    # league pool) — so the win_pct baseline was FROZEN while the team's
+    # own win_pct narrowed. Recompute the league win_pct from the SAME
+    # per-team-view split the Mosaic uses (`_splits_cells`), narrowed by
+    # the aux via `_cell_label_for_aux` — so the baseline narrows in
+    # lockstep with the team value (chip↔baseline symmetry). No-aux path
+    # is untouched (byte-identical). Spec: internal_docs/audit-aux-params.md §E.
+    if aux is not None and (
+        aux.inning is not None or aux.toss_outcome is not None or aux.result is not None
+    ):
+        league_cells, _lc_total = await _splits_cells(scope_filt, scope_params, None)
+        _aux_match = [
+            c for c in league_cells
+            if _cell_label_for_aux(c["toss_outcome"], c["inning"], c["result"], aux)
+        ]
+        _pool_tv = sum(c["n"] for c in _aux_match)
+        _pool_wins = sum(c["n"] for c in _aux_match if c["result"] == "won")
+        s_win_pct = round(_pool_wins * 100 / _pool_tv, 2) if _pool_tv else None
 
     # Gender breakdown — only when no gender filter is active. Lets the
     # frontend warn the user when a team has matches in both men's and
