@@ -170,3 +170,65 @@ mechanisms**, with inconsistent aux coverage. Inventory:
   live aux-aware path so the baseline narrows like the team cohort does.
   After that, the per-discipline cohort math is the same shape team-side and
   player-side — fewer moving parts.
+
+---
+
+## §D — `filter_team` vs `filter_opponent` (semantics + where the UI sets them)
+
+Verified 2026-05-26 (frontend grep + live hrefs). These two FilterBar
+fields are distinct, and `team=` (the Teams page identity) is a THIRD,
+different thing people conflate.
+
+### What each means (from `api/filters.py::build`)
+| Param | Meaning | SQL (match-level) | Example |
+|---|---|---|---|
+| `team=` (path, Teams page only) | **subject** of the page | n/a — it's the page identity | `/teams?team=RCB` = "this page is about RCB" |
+| `filter_team=X` | games **team X was in** (X on either side) — absolute | `m.team1=X OR m.team2=X` | Ashwin pinned to CSK: 217 IPL → 115 |
+| `filter_opponent=Y` | games **against Y**, relative to the subject (player/team) | `m.team1=Y OR m.team2=Y` + (innings: subject is the non-Y side) | Kohli vs Australia: 112 → 22 |
+
+`team=RCB` ≠ `filter_team=RCB`: the first makes RCB the subject; the second
+narrows a *player's* games to their RCB spell. The Teams page uses `team=`
+and never carries `filter_team` in its own URL (it sets `filter_team` only
+in the in-page scope context so child links inherit it).
+
+### Where the UI actually SETS them (the only entry points)
+| Filter combo | Set from | Lands on | Example URL |
+|---|---|---|---|
+| `filter_team` alone | Team → **Players** subtab (squad list); player's **"teams played for" strip** | player page | `/bowling?player=495d42a5&...&filter_team=Chennai+Super+Kings` (Ashwin's CSK-only line) |
+| `filter_team` + `filter_opponent` (rivalry pair) | `SeriesLink` rivalry; **Head-to-Head → Teams mode**; `PlayerLink` (`keepRivalry=true`) riding through from a rivalry page | `/series` rivalry dossier; player page | `/series?filter_team=India&filter_opponent=Australia`; drill a player → `/batting?player=ba607b88&...&filter_team=India&filter_opponent=Australia` |
+| `filter_opponent` alone | **NOT LINKED ANYWHERE** | — | (only reachable by hand-editing the URL) |
+
+### Gap worth building: opponent-only on a player
+"Ashwin (any team) vs RCB" = `filter_opponent=RCB` with no `filter_team` —
+his record against RCB across all five franchises. Genuinely useful and
+DISTINCT from the rivalry pair (which locks his team too). The site has no
+link that sets opponent-only on a player today; the only opponent path is
+the rivalry pair, which also pins the team. Candidate: a "vs opponents"
+breakdown on player pages, or an opponent control in the FilterBar.
+
+---
+
+## §E — Plan (NEXT SESSION) — make player comparisons fair
+
+Decided 2026-05-26: implement the player-side fixes next session. Scope:
+
+1. **Player "typical" cohort must narrow by the off-key filters** (the big
+   one). Today the cohort reads precomputed `playerscopestats*` keyed only
+   by gender/type/tournament/season/tier/series, so it's frozen for
+   `filter_venue`, `filter_opponent`, `filter_team`, `inning`,
+   `toss_outcome`, `result`. Give it a LIVE fallback when any off-key
+   filter is set — same shape as the team side (`is_precomputed_scope` →
+   live via `_option_b_team_inning` + `_cohort_outcome_clause`). Covers
+   the summary chip baselines, the by-season / by-phase / by-over chart
+   cohort lines, and the distribution-panel cohort chips, ×3 disciplines.
+2. **Wire toss for player values** — a `player_toss_clause` peer to
+   `player_result_clause` (player values currently ignore toss entirely).
+3. **Team header Win% tile baseline** — small, isolated; make its
+   `scope_avg` narrow like the other team tiles.
+4. **(Optional / product call)** opponent-only entry point on player pages
+   (§D gap) so "Ashwin vs RCB across all teams" is reachable.
+
+Spec/test ref: `spec-player-baseline-parity.md` §108 already REQUIRED the
+cohort to narrow by every aux "identical to Teams" — this is closing the
+gap between that spec and the shipped implementation. Reproduce current
+state with `python3 tests/aux_param_audit.py`.
