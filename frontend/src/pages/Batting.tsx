@@ -45,6 +45,7 @@ import PhaseComparativeCharts from '../components/batting/PhaseComparativeCharts
 import DismissalCohortCharts from '../components/batting/DismissalCohortCharts'
 import { meanWicketsDown } from '../utils/playerPosition'
 import BatterRecordsPanel from '../components/players/BatterRecordsPanel'
+import PlayerTeamsStrip from '../components/players/PlayerTeamsStrip'
 import { SectionHeader } from '../components/ChartHeader'
 
 // Small helper for the consistent loading/error pattern in each tab.
@@ -310,6 +311,7 @@ export default function Batting() {
             )}
           </ScopedPageHeader>
           <ScopeIndicator filters={filters} />
+          <PlayerTeamsStrip playerId={playerId} filters={filters} hideDisciplineLinks />
           {(() => {
             const cohortTT = summary.cohort
               ? battingCohortTooltip(summary.cohort as BattingCohortMeta)

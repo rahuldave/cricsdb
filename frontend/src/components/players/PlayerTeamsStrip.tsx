@@ -19,6 +19,7 @@
 import { Link } from 'react-router-dom'
 import { useFetch } from '../../hooks/useFetch'
 import { useFilterDeps } from '../../hooks/useFilterDeps'
+import { useDiscipline } from '../../hooks/useDiscipline'
 import { getPlayerTeams } from '../../api'
 import { carryFilters } from './roleUtils'
 import TeamLink from '../TeamLink'
@@ -28,6 +29,12 @@ import type { FilterParams, PlayerTeamTotals } from '../../types'
 interface Props {
   playerId: string
   filters: FilterParams
+  /** Drop the trailing Batting/Bowling/Fielding per-discipline links.
+   *  Set on the single-discipline pages (/batting, /bowling, /fielding)
+   *  where the strip is a team index, not a discipline launcher — the
+   *  reader is already inside a discipline. The /players profile keeps
+   *  them (its whole job is to fan out into the disciplines). */
+  hideDisciplineLinks?: boolean
 }
 
 function disciplineHref(
@@ -49,7 +56,17 @@ function disciplineHref(
   return `${base}?${qs}`
 }
 
-export default function PlayerTeamsStrip({ playerId, filters }: Props) {
+export default function PlayerTeamsStrip({ playerId, filters, hideDisciplineLinks = false }: Props) {
+  // The "N matches @" lead-in stays on the page the reader is already
+  // on, scoped to that team: on /batting it lands on this player's
+  // batting-at-team page, etc. Only the discipline-agnostic /players
+  // profile (useDiscipline() === null) points at the combined profile.
+  const discipline = useDiscipline()
+  const leadBase: '/players' | '/batting' | '/bowling' | '/fielding' =
+    discipline === 'batting'  ? '/batting'
+    : discipline === 'bowling'  ? '/bowling'
+    : discipline === 'fielding' ? '/fielding'
+    : '/players'
   const filterDeps = [playerId, ...useFilterDeps()]
   const fetchState = useFetch<{ teams: PlayerTeamTotals[] } | null>(
     () => getPlayerTeams(playerId, filters),
@@ -65,11 +82,12 @@ export default function PlayerTeamsStrip({ playerId, filters }: Props) {
         <div className="wisden-team-row" key={t.team}>
           <div className="wisden-team-id">
             {/* "279 matches @" links to this player narrowed to THIS
-                team (combined profile); the team name links to the
-                team's own all-time dossier (TeamLink invariant). */}
+                team, on the current page's discipline (combined profile
+                on /players); the team name links to the team's own
+                all-time dossier (TeamLink invariant). */}
             <Link
               className="comp-link wisden-team-matches"
-              to={disciplineHref('/players', playerId, filters, t.team)}
+              to={disciplineHref(leadBase, playerId, filters, t.team)}
             >
               <span className="num">{t.matches}</span> {t.matches === 1 ? 'match' : 'matches'} @
             </Link>
@@ -80,11 +98,13 @@ export default function PlayerTeamsStrip({ playerId, filters }: Props) {
             <span>Wkts <b className="num">{t.wickets}</b></span>
             <span>Catches <b className="num">{t.catches}</b></span>
           </div>
-          <div className="wisden-team-links">
-            <Link className="comp-link" to={disciplineHref('/batting', playerId, filters, t.team)}>Batting</Link>
-            <Link className="comp-link" to={disciplineHref('/bowling', playerId, filters, t.team)}>Bowling</Link>
-            <Link className="comp-link" to={disciplineHref('/fielding', playerId, filters, t.team)}>Fielding</Link>
-          </div>
+          {!hideDisciplineLinks && (
+            <div className="wisden-team-links">
+              <Link className="comp-link" to={disciplineHref('/batting', playerId, filters, t.team)}>Batting</Link>
+              <Link className="comp-link" to={disciplineHref('/bowling', playerId, filters, t.team)}>Bowling</Link>
+              <Link className="comp-link" to={disciplineHref('/fielding', playerId, filters, t.team)}>Fielding</Link>
+            </div>
+          )}
         </div>
       ))}
     </section>

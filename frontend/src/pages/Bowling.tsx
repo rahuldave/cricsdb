@@ -44,6 +44,7 @@ import BowlerDistributionPanel from '../components/bowling/BowlerDistributionPan
 import OverDistributionTab from '../components/bowling/OverDistributionTab'
 import BowlingPhaseComparativeCharts from '../components/bowling/PhaseComparativeCharts'
 import BowlerRecordsPanel from '../components/players/BowlerRecordsPanel'
+import PlayerTeamsStrip from '../components/players/PlayerTeamsStrip'
 import { SectionHeader } from '../components/ChartHeader'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
@@ -284,6 +285,7 @@ export default function Bowling() {
             )}
           </ScopedPageHeader>
           <ScopeIndicator filters={filters} />
+          <PlayerTeamsStrip playerId={playerId} filters={filters} hideDisciplineLinks />
           {(() => {
             const cohortTT = summary.cohort
               ? bowlingCohortTooltip(summary.cohort as BowlingCohortMeta)

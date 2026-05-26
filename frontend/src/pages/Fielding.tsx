@@ -43,6 +43,7 @@ import FielderDistributionPanel from '../components/fielding/FielderDistribution
 import DismissedPositionDistributionTab from '../components/fielding/DismissedPositionDistributionTab'
 import FieldingPhaseComparativeCharts from '../components/fielding/PhaseComparativeCharts'
 import FielderRecordsPanel from '../components/players/FielderRecordsPanel'
+import PlayerTeamsStrip from '../components/players/PlayerTeamsStrip'
 import { SectionHeader } from '../components/ChartHeader'
 
 function TabState({ fetch }: { fetch: FetchState<unknown> }) {
@@ -311,6 +312,7 @@ export default function Fielding() {
             )}
           </ScopedPageHeader>
           <ScopeIndicator filters={filters} />
+          <PlayerTeamsStrip playerId={playerId} filters={filters} hideDisciplineLinks />
           {(() => {
             const cohortTT = summary.cohort
               ? fieldingCohortTooltip(summary.cohort as FieldingCohortMeta)

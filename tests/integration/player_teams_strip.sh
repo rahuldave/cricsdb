@@ -15,10 +15,18 @@
 #   4. Scope-respecting: narrowing to one closed season returns a
 #      smaller, internally-consistent payload (no 5xx).
 #   5. DOM: the strip renders "Teams played for", the team name, and a
-#      Batting link whose href carries filter_team=<team>.
+#      Batting link whose href carries filter_team=<team>; the lead
+#      "N matches @" link on /players points at the combined profile
+#      scoped to that team.
+#   6. DOM: the strip also mounts on /batting, /bowling, /fielding —
+#      WITHOUT the per-discipline links — and its lead "N matches @"
+#      link there points at THAT discipline scoped to the team (e.g. on
+#      /batting it lands on /batting?...&filter_team=<team>, not back on
+#      /players).
 #
 # Red-before-green (HEAD): the endpoint 404s (1,2,3 fail) and the strip
-# is absent from the profile (5 fails).
+# is absent from the profile (5 fails). Section 6 is red until the strip
+# is mounted on the discipline pages (strip-present assertions fail).
 
 set -u
 
@@ -111,6 +119,28 @@ for needle in "Teams played for" "$TOP_TEAM_SQL"; do
 done
 href_ok=$(ab_eval "[...document.querySelectorAll('.wisden-team-links a')].some(a => a.getAttribute('href').includes('/batting') && a.getAttribute('href').includes('filter_team='))")
 [ "$href_ok" = "true" ] && ok "Batting link carries filter_team in href" || bad "Batting link missing filter_team href"
+
+lead_players=$(ab_eval "(()=>{const a=document.querySelector('.wisden-teams-strip a.wisden-team-matches'); if(!a) return 'NONE'; const h=a.getAttribute('href'); return (h.startsWith('/players?') && h.includes('filter_team='))})()")
+[ "$lead_players" = "true" ] && ok "/players lead link → combined profile scoped to team" \
+  || bad "/players lead link wrong (got: $lead_players)"
+
+# --- 6. Strip mounts on the discipline pages, no discipline links,
+#        discipline-scoped lead link ---
+for disc in batting bowling fielding; do
+  ab open "$BASE/$disc?player=$PLAYER&gender=male"
+  ab wait --load networkidle
+  ab wait --text "Teams played for"
+  ab wait 800
+  strip_present=$(ab_eval "(!!document.querySelector('.wisden-teams-strip') && document.body.innerText.includes('${TOP_TEAM_SQL}'))")
+  [ "$strip_present" = "true" ] && ok "/$disc renders Teams strip ($TOP_TEAM_SQL)" \
+    || bad "/$disc missing Teams strip"
+  no_disc_links=$(ab_eval "document.querySelectorAll('.wisden-teams-strip .wisden-team-links').length === 0")
+  [ "$no_disc_links" = "true" ] && ok "/$disc strip drops per-discipline links" \
+    || bad "/$disc strip still shows per-discipline links"
+  lead_ok=$(ab_eval "(()=>{const a=document.querySelector('.wisden-teams-strip a.wisden-team-matches'); if(!a) return 'NONE'; const h=a.getAttribute('href'); return (h.startsWith('/$disc?') && h.includes('filter_team='))})()")
+  [ "$lead_ok" = "true" ] && ok "/$disc lead link → /$disc scoped to team" \
+    || bad "/$disc lead link wrong (got: $lead_ok)"
+done
 
 echo
 echo "=========================================="
