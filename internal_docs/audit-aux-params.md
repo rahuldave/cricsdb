@@ -226,13 +226,22 @@ duplicate:
   that wraps the player page with `filter_opponent`, NOT a new endpoint. That
   keeps player-vs-team on the one filter mechanism, no duplicate data path.
 
-### Gap worth building: opponent-only on a player
+### Gap worth building: opponent-only on a player — SHIPPED 2026-05-26
 "Ashwin (any team) vs RCB" = `filter_opponent=RCB` with no `filter_team` —
 his record against RCB across all five franchises. Genuinely useful and
-DISTINCT from the rivalry pair (which locks his team too). The site has no
-link that sets opponent-only on a player today; the only opponent path is
-the rivalry pair, which also pins the team. Candidate: a "vs opponents"
-breakdown on player pages, or an opponent control in the FilterBar.
+DISTINCT from the rivalry pair (which locks his team too).
+
+**Built (commit 45c58b7):** a "Versus" typeahead on /players + /batting +
+/bowling + /fielding (after a player is chosen), under the teams strip.
+Backed by `GET /players/{id}/opponents` (opponent = other side of each
+match by `matchplayer.team`, with counts). Drops `filter_opponent` from
+its own build so the active pick doesn't collapse the menu; re-applies
+`filter_team` at `mp.team` so pinning a team shrinks the menu to that
+spell (Kohli@RCB → IPL franchises only). Picking sets `filter_opponent`;
+the player value endpoints already honor it. Test:
+`tests/integration/player_vs_team.sh`. NOTE: the player "typical" baseline
+still does NOT narrow by `filter_opponent` (the §E item-1 frozen-cohort
+gap) — the own-numbers narrow, the comparison doesn't yet.
 
 ---
 
@@ -253,8 +262,10 @@ Decided 2026-05-26: implement the player-side fixes next session. Scope:
    `player_result_clause` (player values currently ignore toss entirely).
 3. ~~**Team header Win% tile baseline**~~ — **DONE 2026-05-26 (3d802a2).**
    Recomputed from the Mosaic per-team-view split under the aux.
-4. **(Optional / product call)** opponent-only entry point on player pages
-   (§D gap) so "Ashwin vs RCB across all teams" is reachable.
+4. ~~**(Optional / product call)** opponent-only entry point on player
+   pages (§D gap)~~ — **SHIPPED 2026-05-26 (45c58b7).** "Versus" typeahead
+   on the 4 player pages → `filter_opponent`. The value narrows; the
+   "typical player" baseline does NOT yet (that's item 1 above).
 
 Spec/test ref: `spec-player-baseline-parity.md` §108 already REQUIRED the
 cohort to narrow by every aux "identical to Teams" — this is closing the
