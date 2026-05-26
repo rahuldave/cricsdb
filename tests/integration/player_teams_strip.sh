@@ -117,6 +117,12 @@ for needle in "Teams played for" "$TOP_TEAM_SQL"; do
   has=$(ab_eval "document.body.innerText.includes('${needle}')")
   [ "$has" = "true" ] && ok "rendered — \"${needle}\"" || bad "missing — \"${needle}\""
 done
+# No redundant scope-echo subtitle under the "Teams played for" heading
+# (SectionHeader's auto abbreviateScope subtitle is suppressed — the
+# page SCOPE line + clearable scope box already carry it).
+no_sub=$(ab_eval "!document.querySelector('.wisden-teams-strip .wisden-section-sub')")
+[ "$no_sub" = "true" ] && ok "no redundant scope subtitle under heading" \
+  || bad "scope-echo subtitle present under Teams-played-for heading"
 href_ok=$(ab_eval "[...document.querySelectorAll('.wisden-team-links a')].some(a => a.getAttribute('href').includes('/batting') && a.getAttribute('href').includes('filter_team='))")
 [ "$href_ok" = "true" ] && ok "Batting link carries filter_team in href" || bad "Batting link missing filter_team href"
 

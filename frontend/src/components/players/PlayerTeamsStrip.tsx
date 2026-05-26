@@ -77,7 +77,10 @@ export default function PlayerTeamsStrip({ playerId, filters, hideDisciplineLink
 
   return (
     <section className="wisden-teams-strip">
-      <SectionHeader title="Teams played for" />
+      {/* Explicit empty subtitle: SectionHeader otherwise auto-fills it
+          with abbreviateScope(filters), which just echoes the page
+          SCOPE line + clearable scope box right above. Redundant here. */}
+      <SectionHeader title="Teams played for" subtitle="" />
       {teams.map(t => (
         <div className="wisden-team-row" key={t.team}>
           <div className="wisden-team-id">
