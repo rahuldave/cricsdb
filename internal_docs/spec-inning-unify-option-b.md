@@ -123,13 +123,12 @@ Status legend: ☐ todo · ◑ code done · ✓ code+test green.
 > `bowlers/{id}/records` (1945) + `fielders/{id}/records` (1434) were
 > inning-BLIND (`build(has_innings_join=False)`, no clause — never
 > honored inning, pre-Option-B; byte-identical across inning=0/1/none).
-> Now carry `player_inning_match_clause` (`m.id` in scope): Option-B
-> inning is a MATCH subset so it composes with the matchbowlerperf /
-> matchfielderperf per-match precomp grain. Docstrings updated — the old
-> "inning not applicable" note referred to per-EVENT inning, which
-> Option B does not use. Harness 16/16 (bowling best-figs 4/5, fielding
-> most-catches 3/2, both SQL-anchored). Records subtab now consistent
-> across all 3 discipline profiles (U2/U3 "all tabs").
+> Now carry `player_inning_match_clause(side='bowling'/'fielding')` — the
+> fielded-in-(1-N) per-event form (CORRECTED 2026-05-25 from the initial
+> batted-in-N subset, which dropped bowled-but-didn't-bat games). Composes
+> with the matchbowlerperf / matchfielderperf per-match grain. Harness
+> green; records subtab consistent across all 3 discipline profiles
+> (U2/U3 "all tabs").
 > **STILL OPEN → A8/§8.5 (NOT Phase 1b):** `fielders/{id}/distribution`
 > is inning-blind (`_match_master_sample_fielder`, 1026 — docstring
 > claims "inning no-op for fielder per §13.1", which is the stale
@@ -140,40 +139,53 @@ Status legend: ☐ todo · ◑ code done · ✓ code+test green.
 > player master sample and its baseline must move TOGETHER — and the
 > baseline is the deferred cohort/scope_averages concern. Do it WITH A8.
 > Phases 3–5 (teams/series/venues) untouched.
-| U5 | `/teams?team` Batting | SplitsMosaic + scope strip | batted 1st | batted 1st | none | `inning_unify_teams_batting.sh` | ☐ |
-| U6 | `/teams?team` Bowling | SplitsMosaic + scope strip | bowled 1st | **batted 1st** | scope strip + mosaic + chart all "batted first" | `inning_unify_teams_bowling.sh` | ☐ |
-| U7 | `/teams?team` Fielding | SplitsMosaic + scope strip | bowled/fielded 1st | **batted 1st** | unify labels | `inning_unify_teams_fielding.sh` | ☐ |
-| U8 | `/teams?team` By Season / vs Opp / Match List | (match-level) | batted 1st | batted 1st | none | covered by U5 harness | ☐ |
-| U9 | `/teams?team` Partnerships | SplitsMosaic | batted 1st | batted 1st | none | `inning_unify_teams_pship.sh` | ☐ |
-| U10 | `/teams?team` Players | SplitsMosaic | per-row inning | batted 1st (each row's team subset) | none | `inning_unify_teams_players.sh` | ☐ |
+| U5 | `/teams?team` Batting | SplitsMosaic + scope strip | batted 1st | batted 1st (inning=0) | none | `inning_unify_teams.sh` | ✓ (71b0b59) |
+| U6 | `/teams?team` Bowling | SplitsMosaic + scope strip | bowled 1st @inn0 | bat-1st @inn0 = "bowled second" | mosaic+header+strip all agree (POV bowled second @inn0) | `inning_unify_teams.sh` | ✓ (71b0b59) |
+| U7 | `/teams?team` Fielding | SplitsMosaic + scope strip | bowled/fielded 1st | bat-1st = "bowled second" | unify labels (bowling POV) | `inning_unify_teams.sh` | ✓ (71b0b59) |
+| U8 | `/teams?team` By Season / vs Opp / Match List | (match-level union) | batted 1st | union batted-N OR fielded-(1-N) | none | covered by `inning_unify_teams.sh` header | ✓ (fc8a502) |
+| U9 | `/teams?team` Partnerships | SplitsMosaic | batted 1st | batted 1st (bat side) / flip (bowl side) | none (bat) | `inning_unify_teams.sh` | ✓ (43310ec/71b0b59) |
+| U10 | `/teams?team` Players | SplitsMosaic | per-row inning | per-event via shared mosaic | none | (same harness) | ◑ mosaic code done; subtab not browser-verified |
 | U11 | `/teams?team` Compare | SlotScopeEditor | dual-meaning (§3.4) | single batted-1st subset per slot | drop dual-meaning tooltip | `inning_unify_compare.sh` | ☐ |
-| U12 | `/series?tournament` Bowling/Fielding | InningToggle | bowled 1st | batted 1st | flip value | `inning_unify_series.sh` | ☐ |
+| U12 | `/series?tournament` Bowling/Fielding | InningToggle | bowled 1st | bat-1st @inn0 (bowl/field flip to 1-N) | flip value (toggle done; backend A9 TODO) | `inning_unify_series.sh` | ☐ backend |
 | U13 | `/series?tournament` Batting/Pship/Records | InningToggle | batted 1st | batted 1st | none | (same harness) | ☐ |
-| U14 | `/venues?venue` Bowlers/Fielders | InningToggle | bowled 1st | batted 1st | flip value | `inning_unify_venues.sh` | ☐ |
+| U14 | `/venues?venue` Bowlers/Fielders | InningToggle | bowled 1st | bat-1st @inn0 (flip to 1-N) | flip value (toggle done; backend A10 TODO) | `inning_unify_venues.sh` | ☐ backend |
 | U15 | `/venues?venue` Batters/Records | InningToggle | batted 1st | batted 1st | none | (same harness) | ☐ |
-| U16 | ScopeStatusStrip (every tab) | label only | POV mislabel (CSK bug) | matches the toggle's POV phrase | fix POV derivation | asserted in each U* harness | ☐ |
-| U17 | abbreviateScope (chart subtitles) | label only | POV "bowled first" | POV consistent w/ toggle | align | asserted in U2/U6 harnesses | ☐ |
+| U16 | ScopeStatusStrip (every tab) | label only | POV mislabel (CSK bug) | matches the toggle's POV phrase | fix POV derivation | asserted in `inning_unify_*` harnesses | ✓ (Phase 1) |
+| U17 | abbreviateScope (chart subtitles) | label only | POV "bowled first" | POV consistent w/ toggle | align | asserted in harnesses | ✓ (Phase 1) |
 | U18 | user-help.md "Innings toggle" | docs | bowled-first examples | batted-first examples | rewrite §Innings toggle | n/a (content) | ☐ |
 
 ## 4. API table (endpoint consistency — one regression test each)
 
-Regression = `tests/regression/` URL list; DB-anchored = a sanity test
-that re-derives the expected match subset from sqlite at runtime.
+> **CORRECTED 2026-05-25 — the "match subset" target below is SUPERSEDED by
+> per-event discipline-aware (see the §2 correction box).** A batting-keyed
+> "matches the team batted in N" subset wrongly drops matches the team
+> BOWLED in but never batted, dropping real wickets/balls from the bowling
+> average. The implemented rule:
+> - **innings-grain discipline stats**: batting `innings_number = N`;
+>   bowling / fielding / keeping `innings_number = (1 - N)`.
+> - **match-level / overall-count surfaces** (team header, player
+>   result-counts): the **union** "batted in N OR fielded in (1-N)" — count
+>   the match by whichever role was played.
+> Status marks updated to current.
 
-| # | Endpoint(s) | inning today | inning target | Change | Test | Status |
+Regression = `tests/regression/` URL list; DB-anchored = a sanity test
+that re-derives the expected slice from sqlite at runtime.
+
+| # | Endpoint(s) | inning today | inning target (per-event) | Change | Test | Status |
 |---|---|---|---|---|---|---|
-| A1 | `filters.player_inning_match_clause` (NEW) + `build(apply_inning=…)` flag | — | match subset (player team batted in N) | add helper + flag | `test_inning_clause.py` (DB-anchored) | ◑ inert (added, unwired) |
-| A2 | `/batters/{id}/summary` (+ by-season/over/phase/innings/dismissals) | innings_number | match subset | inject A1, drop central inning | `regression/batting` + `inning_unify_batting.sh` | ☐ |
-| A3 | `/bowlers/{id}/*` | innings_number (bowled 1st) | match subset | inject A1 | `regression/bowling` | ☐ |
-| A4 | `/fielders/{id}/*` (+ keeping) | innings_number | match subset | inject A1 | `regression/fielding` | ☐ |
-| A5 | `/teams/{team}/summary,by-season,vs,match-list` | batted 1st (`_inning_match_filter`) | unchanged | audit only | `regression/teams` | ☐ |
-| A6 | `/teams/{team}/{batting,bowling,fielding,partnerships}/{summary,by-phase,by-season,top-*}` | innings_number | `_inning_match_filter` subset | route through match filter | `regression/teams` | ☐ |
-| A7 | `/teams/{team}/{...}/by-inning` band endpoints | innings_number band | RE-FRAME: band keyed by team-batting-innings | redefine band axis | `inning_band.sh` | ☐ |
-| A8 | `/scope/averages/...` cohort (inning-aware) | innings_number | match subset (cohort weighting) | audit + align | `regression/scope` | ☐ |
-| A9 | `/tournaments/*` (series dossier leaderboards) | innings_number | match subset | inject | `regression/series` | ☐ |
-| A10 | `/venues/*` leaderboards | innings_number | match subset | inject | `regression/venues` | ☐ |
-| A11 | `aux_clauses.InningClause` | `i.innings_number=:inning` | remove/repurpose | retire for these surfaces | covered by A2-A10 | ☐ |
-| A12 | `bucket_baseline_dispatch.py` | innings_number gate | match subset / live fallback | audit precompute path | `regression/*` drift | ☐ |
+| A1 | `filters.player_inning_match_clause` (now `side=`-aware) + `build(apply_inning=…)` | — | side='batting' → batted-in-N; bowling/fielding/keeping → fielded-in-(1-N); 'match' → union | helper + flag | `inning_unify_players.sh` | ✓ (9de5863, 771ca34) |
+| A2 | `/batters/{id}/*` | innings_number | batted-in-N (unchanged) | side='batting' | `inning_unify_players.sh` | ✓ |
+| A3 | `/bowlers/{id}/*` | innings_number (bowled 1st) | fielded-in-(1-N) — incl. bowled-but-didn't-bat games | side='bowling' | `inning_unify_players.sh` | ✓ (9de5863) |
+| A4 | `/fielders/{id}/*` (+ keeping) | innings_number | fielded-in-(1-N) | side='fielding'/'keeping' | `inning_unify_players.sh` | ✓ |
+| A4b | `/players/{id}/result-counts` (overall matches tile) | inning-blind | union (batted-N OR fielded-(1-N)) | side='match' | `inning_unify_players.sh` | ✓ (771ca34) |
+| A5 | `/teams/{team}/summary,by-season,vs,match-list` | batted-in-N | **union** batted-in-N OR fielded-in-(1-N) (count the match by role) | `_inning_match_filter` → union | `inning_unify_teams.sh` | ✓ (fc8a502) |
+| A6 | `/teams/{team}/{batting,bowling,fielding,partnerships}/{summary,by-phase,by-season,top-*,distribution}` | innings_number | per-event (`_option_b_team_inning`): bat N, bowl/field 1-N | apply_inning=False + helper | `inning_unify_teams.sh` + `regression/teams,team_*_distribution` | ✓ (c4e62fb, 43310ec, d9d8c66) |
+| A7 | `/teams/{team}/{...}/by-inning` band endpoints | innings_number band | label-audit only (bowling band = "Bowled first/second") | audit bar labels/order | `inning_band.sh` | ☐ |
+| A8 | `/scope/averages/...` cohort (inning-aware) | innings_number | per-event by side (same as A6 cohort path) | done for teams via `_option_b_team_inning`; **player fielding-distribution cohort still TODO** (§8.5) | `regression/scope*` | ◑ teams done; player dist TODO |
+| A9 | `/tournaments/*` (series dossier leaderboards) | innings_number | per-event: bowling/fielding leaderboards `innings_number=(1-N)`, batting `N` | per-discipline flip in `_inning_extras` call sites | `regression/series` + `inning_unify_series.sh` | ☐ |
+| A10 | `/venues/*` leaderboards | innings_number | per-event: bowlers/fielders `(1-N)`, batters `N` | per-discipline flip | `regression/venues` + `inning_unify_venues.sh` | ☐ |
+| A11 | `aux_clauses.InningClause` / central `i.innings_number=:inning` | central clause | discipline callers pass `apply_inning=False` + own per-event clause | retired for player/team disc surfaces | covered by A2-A6 | ✓ |
+| A12 | `bucket_baseline_dispatch.py` | innings_number gate | n/a — `is_precomputed_scope=False` when inning set ⇒ always live path | audit only (no recompute) | `regression/*` 0 drift | ✓ |
 
 ## 5. Resolved decisions (2026-05-25)
 
@@ -246,9 +258,10 @@ Written 2026-05-25 for a fresh context. Read §1 (the contract) + §8.
   same rule, for team-set AND cohort).
 - `api/filters.py::build(..., apply_inning=False)` + `build_side_neutral(..., apply_inning=False)`
   → suppress the per-event `i.innings_number=:inning` central clause.
-- Teams already have `api/routers/teams.py::_inning_match_filter(team, aux)` = the
-  team-POV equivalent (batted-first match subset). It's correct; the job is to ROUTE
-  the per-discipline teams endpoints through it instead of the central clause.
+- Teams (DONE): per-discipline endpoints use `teams.py::_option_b_team_inning(team, side, aux)`
+  (per-event: bat N, bowl/field 1-N — team-set AND cohort). Match-level endpoints use
+  `_inning_match_filter` (now the batted-N OR fielded-(1-N) **union**, so the header counts a
+  match by role). Both via `build(..., apply_inning=False)`.
 - **Frontend value-flip contract (DONE for the global InningToggle):** in
   `InningToggle.tsx`, bowling/fielding POV → "first" pill writes `inning=1`,
   "second" writes `inning=0`; batting/neutral unchanged. `ScopeStatusStrip.tsx` +
@@ -335,28 +348,44 @@ Teams `/summary`, By Season, vs Opponent, Match List already use `_inning_match_
   `hooks/useCompareSlots.ts` — a slot's `inning=0` = that team batted first for ALL its
   rows. Remove the "batting row batted-first / bowling row bowled-first" split + its
   tooltip. To compare 1st vs 2nd innings, set the two slots to `inning=0` vs `inning=1`.
-- Tests: `inning_unify_teams_{batting,bowling,fielding}.sh` + `inning_unify_compare.sh`,
-  SQL-anchored against `_inning_match_filter` subsets; assert scope-strip/mosaic/chart
-  labels AGREE (CSK regression guard: data=bowled-first ⇒ all labels say so).
+- Tests: consolidated `inning_unify_teams.sh` (DONE — batting/bowling/fielding +
+  partnerships + header, per-event SQL-anchored, 10/10) + `inning_unify_compare.sh`
+  (TODO, U11). Assert scope-strip/mosaic/header all AGREE (CSK regression guard:
+  Bowling inning=0 → 144 "bowling second" everywhere; inning=1 → 122 "bowling first").
 
-### 8.4 Phase 3 — series + venues
-`/series` (TournamentDossier Bowling/Fielding toggle) + `/venues` (VenueDossier
-Bowlers/Fielders toggle) leaderboards apply inning via the central clause /
-`splice_aux_join_clauses`. These leaderboards are scope-wide (not single-person), so they
-need a **scope-POV** inning = "innings where the listed players' team batted in N". Decide:
-(a) for a leaderboard the natural reading is per-event innings_number of the discipline
-(bowled-first) — which CONTRADICTS Option B; or (b) reframe to batted-first. RESOLVE with
-the user before coding (leaderboards have no single subject team). Frontend toggles
-(`TournamentDossier.tsx`, `VenueDossier.tsx`) reuse `InningToggle` (already value-flipped).
+### 8.4 Phase 3 — series + venues  (A9/A10, U12–U15) — NOT YET DONE
+> **POV decision RESOLVED 2026-05-25 by the per-event correction (§2 box).**
+> The old framing below asked whether a leaderboard should read per-event
+> bowled-first ("contradicts Option B") or reframe to batted-first. Under
+> per-event discipline-aware that dissolves: a leaderboard's discipline is
+> known (a Bowling leaderboard is bowling), so it uses the SAME rule as
+> players/teams — bowling/fielding leaderboards filter `innings_number=(1-N)`,
+> batting leaderboards `innings_number=N`. The InningToggle already
+> value-flips per `useDiscipline()` (tab-based), so the toggle is correct;
+> the job is the BACKEND per-discipline flip. No new user decision needed.
+
+`/series` (TournamentDossier) + `/venues` (VenueDossier) leaderboards apply inning via
+`_inning_extras` → `splice_aux_join_clauses` (un-flipped `i.innings_number=:inning`).
+**Currently MISMATCHED**: the toggle writes inning=1 for "Bowling first" but the backend
+returns innings_number=1 = bowled second. Fix = the per-event `(1-N)` flip applied
+PER-DISCIPLINE across the leaderboard query sites (enumerate each `_inning_extras` call
+in `tournaments.py` (~9 sites) + `venues.py` and pass the discipline; batting queries
+stay N, bowling/fielding flip to 1-N — do NOT regex; audit each site). Then add
+`inning_unify_series.sh` / `inning_unify_venues.sh` (SQL-anchored: bowling leaderboard
+inning=1 == bowled-first / innings_number-0; incl. bowled-but-didn't-bat games) and flip
+any REG-locked series/venues inning URLs REG→NEW in a preceding commit.
 Files: `api/routers/tournaments.py`, `api/routers/venues.py`,
-`api/routers/bucket_baseline_dispatch.py`, `api/aux_clauses.py::InningClause`.
+`api/routers/aux_clauses.py` (or a discipline-aware `_inning_extras`). Frontend toggles
+(`TournamentDossier.tsx`, `VenueDossier.tsx`) already reuse the flipped `InningToggle`.
 
 ### 8.5 Cohort baselines (A8) — cross-cutting, do alongside whichever phase
 `api/routers/scope_averages.py` has `inning_active` branches at ~1223/1268/1336/1379 that
-filter the cohort by innings_number. Under Option B a cohort's inning = "matches where each
-cohort player's team batted in N". The player ProbChip/cohort comparisons (DismissalCohort
-charts, position/phase cohorts) need this to stay apples-to-apples. Precompute may need
-re-running (user OK'd — §5.2); fall to live where it can't express the subset. The
+filter the cohort by innings_number. Under Option B (per-event, §2 box) a cohort's inning =
+the discipline's own innings: batting cohort `innings_number=N`, bowling/fielding cohort
+`innings_number=(1-N)` — same rule as the teams `_option_b_team_inning` cohort path (which
+is DONE). The player ProbChip/cohort comparisons (DismissalCohort charts, position/phase
+cohorts) need this to stay apples-to-apples with the (now per-event) player value. No
+precompute recompute needed — `is_precomputed_scope=False` under inning ⇒ live path. The
 `_inter_wicket_cohort_sr` site (§8.2) is part of this.
 **Also part of A8 (found 2026-05-25):** `fielders/{id}/distribution` is inning-blind
 (`_match_master_sample_fielder`, fielding.py:1026 — `build_side_neutral(has_innings_join=
@@ -375,19 +404,29 @@ scope_avg baseline in the same change.
 - `frontend/src/content/user-help.md` §"Innings toggle" (currently bowled-first examples).
 - Update the U/A status boxes in §3/§4 here as rows land.
 
-### 8.7 Verification cheatsheet (DB-anchored)
-Kohli match subsets (male): batted-first=206, batted-second=190 (super_over=0).
+### 8.7 Verification cheatsheet (DB-anchored, PER-EVENT)
+Per-event, discipline-aware (the implemented rule). For a player `:pid`:
 ```sql
-SELECT COUNT(DISTINCT mp.match_id) FROM matchplayer mp
- JOIN innings i ON i.match_id=mp.match_id AND i.team=mp.team
- JOIN match m ON m.id=mp.match_id
- WHERE mp.person_id='ba607b88' AND m.gender='male'
-   AND i.innings_number=:N AND i.super_over=0;   -- N=0 →206, N=1 →190
+-- BATTING matches (batted in N): mp2.team = i2.team, innings_number = N
+SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN matchplayer mp ON mp.match_id=i.match_id
+ JOIN match m ON m.id=i.match_id
+ WHERE mp.person_id=:pid AND mp.team=i.team AND m.gender='male'
+   AND i.innings_number=:N AND i.super_over=0;
+-- BOWLING/FIELDING matches (fielded in 1-N): mp2.team != i2.team, innings_number = 1-N
+SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN matchplayer mp ON mp.match_id=i.match_id
+ JOIN match m ON m.id=i.match_id
+ WHERE mp.person_id=:pid AND mp.team!=i.team AND m.gender='male'
+   AND i.innings_number=(1-:N) AND i.super_over=0;
+-- OVERALL match-count tile / team header (union): the two above OR'd together.
 ```
-Coherence invariant: for ANY player, fielding `matches` at inning=N == that subset count;
-batting & bowling `matches` ≤ fielding (they're sub-events of the same matches). Bowling
-wickets at `inning=1` == raw innings_number-0 bowling (bowled-first). Every per-discipline
-total at inning=0 + inning=1 == the unfiltered total (complement check).
+Worked numbers — Kohli (`ba607b88`, male): batting 206/178 (N=0/1); fielding 205/191.
+CSK teams: batting innings 144/121; bowling/fielding matches 144/122 (incl. 1 bowled-but-
+never-batted game, match 5845, +7 wkts at inning=1); header/union 144/122. DL Chahar
+bowling 65/80 (inning=0/1). Coherence: bowling matches and batting matches DIFFER by
+bowled-but-didn't-bat (or batted-but-didn't-field) games — they are NOT forced equal, and
+inning0+inning1 need NOT sum to the unfiltered total (abandoned games belong to one slice
+of one discipline only). The old "complement check" no longer holds — that was the
+match-subset assumption.
 
 ### 8.8 Gotchas
 - The toggle value-flip is **POV-driven** (`useDiscipline()`): batting/neutral don't flip,
