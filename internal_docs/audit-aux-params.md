@@ -4,7 +4,15 @@
 no-filter / `inning=0` / `toss_outcome=won` / `result=won`; recorded whether
 the **number (value)** and its **comparison baseline** ("vs typical/league/
 cohort") each change. A comparison is **fair** only if BOTH narrow together.
-Scripts: `/tmp/aux_matrix.py`. Mosaic excluded (per request).
+Mosaic excluded (per request).
+
+> **RE-VERIFIED 2026-05-26 with a robust method** — reproducible script
+> `tests/aux_param_audit.py`. The first pass read array rows by POSITION,
+> which mis-graded the by-inning band (a row-reorder artifact). The
+> re-audit reads tile values/baselines as scalars and compares whole
+> season/phase/innings-**keyed maps** for charts, so reordering/dropping
+> rows can't fool it. Every cell below matches the re-audit output. Run
+> `python3 tests/aux_param_audit.py` to reproduce against a live backend.
 
 **Aux params:** `inning` (1st/2nd innings, Option B = batted-first),
 `toss_outcome` (won/lost toss), `result` (won/lost match).
