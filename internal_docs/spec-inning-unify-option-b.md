@@ -146,10 +146,10 @@ Status legend: ☐ todo · ◑ code done · ✓ code+test green.
 | U9 | `/teams?team` Partnerships | SplitsMosaic | batted 1st | batted 1st (bat side) / flip (bowl side) | none (bat) | `inning_unify_teams.sh` | ✓ (43310ec/71b0b59) |
 | U10 | `/teams?team` Players | SplitsMosaic | per-row inning | per-event via shared mosaic | none | (same harness) | ◑ mosaic code done; subtab not browser-verified |
 | U11 | `/teams?team` Compare | SlotScopeEditor | dual-meaning (§3.4) | single batted-1st subset per slot | drop dual-meaning tooltip | `inning_unify_compare.sh` | ✓ (fda37c1) — also fixed primarySlotOf dropping inning (primary col ignored carried-over inning while slots inherited it); toss/result deliberately NOT carried (cohort can't express them) |
-| U12 | `/series?tournament` Bowling/Fielding | InningToggle | bowled 1st | bat-1st @inn0 (bowl/field flip to 1-N) | flip value (toggle done; backend A9 TODO) | `inning_unify_series.sh` | ☐ backend |
-| U13 | `/series?tournament` Batting/Pship/Records | InningToggle | batted 1st | batted 1st | none | (same harness) | ☐ |
-| U14 | `/venues?venue` Bowlers/Fielders | InningToggle | bowled 1st | bat-1st @inn0 (flip to 1-N) | flip value (toggle done; backend A10 TODO) | `inning_unify_venues.sh` | ☐ backend |
-| U15 | `/venues?venue` Batters/Records | InningToggle | batted 1st | batted 1st | none | (same harness) | ☐ |
+| U12 | `/series?tournament` Bowling/Fielding | InningToggle | bowled 1st | bat-1st @inn0 (bowl/field flip to 1-N) | flip value (toggle done; backend A9) | `inning_unify_series.sh` | ✓ (a1dfa09/c9bd5d9) — toggle "Bowling first/second" + active pill ↔ inning agree; DOM flips & matches flipped API |
+| U13 | `/series?tournament` Batting/Pship/Records | InningToggle | batted 1st | batted 1st | none | (same harness) | ✓ (no backend change; batters/records left at innings_number=N) |
+| U14 | `/venues?venue` Bowlers/Fielders | InningToggle | bowled 1st | bat-1st @inn0 (flip to 1-N) | flip value (toggle done; backend A10) | `inning_unify_venues.sh` | ✓ (a1dfa09/c9bd5d9) |
+| U15 | `/venues?venue` Batters/Records | InningToggle | batted 1st | batted 1st | none | (same harness) | ✓ (batters leaders unchanged) |
 | U16 | ScopeStatusStrip (every tab) | label only | POV mislabel (CSK bug) | matches the toggle's POV phrase | fix POV derivation | asserted in `inning_unify_*` harnesses | ✓ (Phase 1) |
 | U17 | abbreviateScope (chart subtitles) | label only | POV "bowled first" | POV consistent w/ toggle | align | asserted in harnesses | ✓ (Phase 1) |
 | U18 | user-help.md "Innings toggle" | docs | bowled-first examples | batted-first examples | rewrite §Innings toggle | n/a (content) | ☐ |
@@ -182,8 +182,8 @@ that re-derives the expected slice from sqlite at runtime.
 | A6 | `/teams/{team}/{batting,bowling,fielding,partnerships}/{summary,by-phase,by-season,top-*,distribution}` | innings_number | per-event (`_option_b_team_inning`): bat N, bowl/field 1-N | apply_inning=False + helper | `inning_unify_teams.sh` + `regression/teams,team_*_distribution` | ✓ (c4e62fb, 43310ec, d9d8c66) |
 | A7 | `/teams/{team}/{...}/by-inning` band endpoints | innings_number band | label-audit only (bowling band = "Bowled first/second") | audit bar labels/order | `inning_band.sh` | ☐ |
 | A8 | `/scope/averages/...` cohort (inning-aware) | innings_number | per-event by side (same as A6 cohort path) | done for teams via `_option_b_team_inning`; **player fielding-distribution cohort still TODO** (§8.5) | `regression/scope*` | ◑ teams done; player dist TODO |
-| A9 | `/tournaments/*` (series dossier leaderboards) | innings_number | per-event: bowling/fielding leaderboards `innings_number=(1-N)`, batting `N` | per-discipline flip in `_inning_extras` call sites | `regression/series` + `inning_unify_series.sh` | ☐ |
-| A10 | `/venues/*` leaderboards | innings_number | per-event: bowlers/fielders `(1-N)`, batters `N` | per-discipline flip | `regression/venues` + `inning_unify_venues.sh` | ☐ |
+| A9 | `/tournaments/*` (series dossier leaderboards) | innings_number | per-event: bowling/fielding leaderboards `innings_number=(1-N)`, batting `N` | per-discipline flip in `_inning_extras` call sites | `regression/series` + `inning_unify_series.sh` | ✓ (a1dfa09) — `_inning_extras(side=)` + 4 series sites (bowlers/fielders leaders+scope-stats) flip; batters/records/summary/by_season/rivalry unchanged |
+| A10 | `/venues/*` leaderboards | innings_number | per-event: bowlers/fielders `(1-N)`, batters `N` | per-discipline flip | `regression/venues` + `inning_unify_venues.sh` | ✓ (a1dfa09) — venues reuse standalone `/bowlers,/fielders/leaders`; flipped via `splice_aux_join_clauses(side=)`. No venues.py change needed |
 | A11 | `aux_clauses.InningClause` / central `i.innings_number=:inning` | central clause | discipline callers pass `apply_inning=False` + own per-event clause | retired for player/team disc surfaces | covered by A2-A6 | ✓ |
 | A12 | `bucket_baseline_dispatch.py` | innings_number gate | n/a — `is_precomputed_scope=False` when inning set ⇒ always live path | audit only (no recompute) | `regression/*` 0 drift | ✓ |
 
