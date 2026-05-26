@@ -6,6 +6,7 @@ import PlayerSummaryRow, { disciplineHasData } from './PlayerSummaryRow'
 import { classifyRole, matchesInScope } from './roleUtils'
 import PlayerRecordsSummary from './PlayerRecordsSummary'
 import PlayerTeamsStrip from './PlayerTeamsStrip'
+import PlayerOpponentFilter from './PlayerOpponentFilter'
 import type { PlayerProfile as PlayerProfileT, FilterParams } from '../../types'
 
 interface Props {
@@ -60,6 +61,7 @@ export default function PlayerProfile({
       ) : (
         <>
           <PlayerTeamsStrip playerId={playerId} filters={filters} />
+          <PlayerOpponentFilter playerId={playerId} filters={filters} />
           {matches > 0 && (
             <div className="wisden-overall-matches">
               <span className="wisden-overall-matches-label">Matches in scope</span>

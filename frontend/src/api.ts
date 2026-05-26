@@ -226,6 +226,13 @@ export const getPlayerProfile = async (id: string, filters?: F) => {
 export const getPlayerTeams = (id: string, filters?: F) =>
   fetchApi<{ teams: import('./types').PlayerTeamTotals[] }>(`/api/v1/players/${id}/teams`, filters as Record<string, string>)
 
+// Teams the player has faced (with match counts) — the menu for the
+// player-page "Versus" opponent filter. Narrows to the player's spell
+// when filter_team is pinned; drops filter_opponent so the active
+// selection doesn't collapse its own menu.
+export const getPlayerOpponents = (id: string, filters?: F) =>
+  fetchApi<{ opponents: import('./types').PlayerOpponentTotals[] }>(`/api/v1/players/${id}/opponents`, filters as Record<string, string>)
+
 // Player-POV match-result counts (own-team won/lost/tied) for the
 // player-page ResultFilter pills. Aux-stripped breakdown at scope.
 export const getPlayerResultCounts = (id: string, filters?: F) =>

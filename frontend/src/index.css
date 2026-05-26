@@ -746,6 +746,20 @@ a { color: inherit; }
 .wisden-venue-chip-clear:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .wisden-playersearch-error { border-color: var(--accent); color: var(--accent); }
 
+/* Player-page "Versus" opponent filter — label + typeahead/chip on one
+   line; the dropdown is bounded (the player's faced opponents). */
+.wisden-vsteam {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.2rem 0 1.4rem;
+}
+.wisden-vsteam-search { width: 100%; max-width: 18rem; }
+@media (max-width: 720px) {
+  .wisden-vsteam { flex-wrap: wrap; gap: 0.3rem 0.6rem; }
+  .wisden-vsteam-search { max-width: none; }
+}
+
 /* ─────────────────────────────────────────────────────────────
    Page primitives — title, tabs, generic input
    ───────────────────────────────────────────────────────────── */

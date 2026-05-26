@@ -556,6 +556,14 @@ export interface PlayerTeamTotals {
   catches: number
 }
 
+// Opponent menu for the player-page "Versus" filter —
+// /players/{id}/opponents. Teams the player has faced (with match
+// counts), narrowed to the player's spell when filter_team is pinned.
+export interface PlayerOpponentTotals {
+  opponent: string
+  matches: number
+}
+
 // Pooled-scope cohort dismissal distribution — /scope/averages/
 // batting/dismissals. Same shape as the player's, minus top_bowlers.
 export interface ScopeDismissals {

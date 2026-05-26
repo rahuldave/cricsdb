@@ -592,6 +592,58 @@ async def player_teams(
     return {"teams": teams}
 
 
+@router.get("/players/{person_id}/opponents")
+async def player_opponents(
+    person_id: str,
+    filters: FilterParams = Depends(),
+    aux: AuxParams = Depends(),
+):
+    """Every team the player has played AGAINST at the active scope, with
+    a match count per opponent — the menu for the player-page "Versus"
+    filter (sets `filter_opponent`). The opponent is the OTHER side of
+    each match the player appeared in (by `matchplayer.team`), so for a
+    multi-team career it spans every competition: Kohli → the IPL
+    franchises (faced for RCB) AND the international sides (faced for
+    India).
+
+    `filter_opponent` is dropped from the scope build so the active
+    selection never collapses its own menu; `filter_team` IS re-applied
+    at `mp.team` (the player's own side), so once a team is pinned the
+    menu shrinks to the opponents faced during that spell (Kohli pinned
+    to RCB → IPL franchises only, no international sides). Scope
+    otherwise mirrors /players/{id}/teams (gender/season/venue/
+    tournament + inning aux, match-level).
+    """
+    db = get_db()
+    drop = {"filter_team", "filter_opponent"}
+    mw, mparams = filters.build(has_innings_join=False, aux=aux, drop=drop)
+    mparams = {**mparams, "pid": person_id}
+    mclause = f" AND {mw}" if mw else ""
+
+    # Team narrowing re-applied at the player's actual side (NOT the
+    # opponent), so pinning filter_team narrows the menu to that spell.
+    team_filter = ""
+    if _is_set(filters.team):
+        team_filter = " AND mp.team = :ftteam"
+        mparams["ftteam"] = filters.team
+
+    rows = await db.q(
+        f"""
+        SELECT CASE WHEN mp.team = m.team1 THEN m.team2 ELSE m.team1 END AS opponent,
+               COUNT(DISTINCT mp.match_id) AS matches
+        FROM matchplayer mp
+        JOIN match m ON m.id = mp.match_id
+        WHERE mp.person_id = :pid{mclause}{team_filter}
+        GROUP BY opponent
+        HAVING opponent IS NOT NULL
+        ORDER BY matches DESC, opponent ASC
+        """,
+        mparams,
+    )
+    opponents = [{"opponent": r["opponent"], "matches": r["matches"]} for r in rows]
+    return {"opponents": opponents}
+
+
 @router.get("/players/{person_id}/result-counts")
 async def player_result_counts(
     person_id: str,
