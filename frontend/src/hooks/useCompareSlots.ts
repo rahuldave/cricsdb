@@ -15,7 +15,11 @@ export type OverridableSlotKey = typeof OVERRIDABLE_SLOT_KEYS[number]
 
 export type ResolvedSlotScope = Pick<FilterParams,
   'gender' | 'team_type' | 'tournament' | 'season_from' | 'season_to'
-  | 'filter_venue' | 'series_type' | 'team_class' | 'inning'>
+  | 'filter_venue' | 'series_type' | 'team_class' | 'inning'
+  // toss_outcome + result are inherited-only aux (NOT in
+  // OVERRIDABLE_SLOT_KEYS): every column honors the page-carried value,
+  // but there's no per-slot editor row. See inheritedScope.
+  | 'toss_outcome' | 'result'>
 
 // Override entries hold either a real value (narrowing) or
 // ANY_SENTINEL ('__any__') meaning "explicit empty / do not inherit
@@ -64,6 +68,13 @@ function inheritedScope(primary: FilterParams): ResolvedSlotScope {
     // sends the raw value, no frontend flip. Spec:
     // spec-inning-unify-option-b.md §5 (governing rule).
     inning: primary.inning,
+    // toss_outcome + result: inherited from the page (carried over from a
+    // Mosaic-driven tab) so every Compare column honors them identically.
+    // The league-average column narrows per-row server-side (cohort subject
+    // = i.team), keeping chip↔baseline symmetry. Inherited-only — no
+    // per-slot override. Spec: spec-compare-toss-result.md §3.
+    toss_outcome: primary.toss_outcome,
+    result: primary.result,
   }
 }
 

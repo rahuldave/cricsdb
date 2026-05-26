@@ -127,6 +127,23 @@ export function buildSlotSegments(
     segs.push({ label: 'Innings', value: 'any', overridden: true })
   }
 
+  // toss_outcome + result are inherited-only aux (never per-slot
+  // overridden), so they're never flagged ✎ — but they must surface so
+  // the columns' scope strips agree on what's filtered. Spec:
+  // spec-compare-toss-result.md §3.
+  if (scope.toss_outcome === 'won') {
+    segs.push({ label: 'Toss', value: 'won', overridden: false })
+  } else if (scope.toss_outcome === 'lost') {
+    segs.push({ label: 'Toss', value: 'lost', overridden: false })
+  }
+  if (scope.result === 'won') {
+    segs.push({ label: 'Result', value: 'won', overridden: false })
+  } else if (scope.result === 'lost') {
+    segs.push({ label: 'Result', value: 'lost', overridden: false })
+  } else if (scope.result === 'tied') {
+    segs.push({ label: 'Result', value: 'tied/NR', overridden: false })
+  }
+
   return segs
 }
 
