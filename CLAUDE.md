@@ -101,6 +101,32 @@ Prereqs, REPL, troubleshooting: `internal_docs/local-development.md`. Deploy det
 
 ## Methodology rules
 
+### Plain language — explain to the user without jargon
+
+When **talking to the user** (summaries, explanations, status updates, bug
+diagnoses, question prompts), use plain English. The user is sharp but is
+NOT here to decode internal shorthand. This is a hard rule — flagged
+repeatedly (2026-05-26: "Your language is so complicated that I can't
+understand at all"; "I have zero clue what you mean").
+
+- **No code/DB identifiers as nouns.** Don't say "playerscopestats", "the
+  cohort baseline", "primarySlotOf", "`_inning_extras`", "scope_avg",
+  "per-event clause" in prose meant for the user. Name the thing by what
+  the user SEES ("the grey 'typical player' comparison number", "the left
+  column of the comparison", "the innings filter").
+- **No unexplained stat/cricket shorthand or project coinages** —
+  "per-event", "cohort", "POV-flip", "match-subset", "envelope",
+  "marginal". If a precise term is genuinely needed, define it in the same
+  sentence in everyday words.
+- **Lead with the plain-English point**, then the detail. If you catch
+  yourself writing a noun pile-up ("distribution cohort baselines stay
+  full-scope under inning"), stop and rewrite it as a sentence a cricket
+  fan who doesn't code would understand.
+- Applies to prose only — code, code comments, commit messages, and the
+  internal `spec-*.md` / memory files keep their precise vocabulary.
+- Tell: you're about to send a sentence with 2+ snake_case/camelCase
+  tokens or a chain of 3+ abstract nouns. Rewrite before sending.
+
 ### Commit cadence — one feature, one commit, immediately
 
 **Commit as soon as a feature looks complete — don't batch.** One logical change per commit, committed at the moment it reaches a runnable state (type-check passing, feature working in the browser, tests still green). If you just finished X and X works, commit X before starting Y. Even if Y is the obvious next step — the atomicity is the point.
