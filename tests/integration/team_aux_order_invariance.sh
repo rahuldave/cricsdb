@@ -8,17 +8,20 @@
 # Two trajectories to the same final state (inning=0 AND toss=won):
 #   A: base -> +inning=0 -> +toss=won   (inning first)
 #   B: base -> +toss=won -> +inning=0   (toss first; param order swapped)
-# Assert A_final ~ B_final (approx) for value AND baseline on 3 metrics
+# Assert A_final == B_final (to 2dp) for value AND baseline on 3 metrics
 # (win%, bowling economy, batting run-rate); and that each step narrowed
 # (value + baseline moved off base — not frozen).
 #
-# Approx equality (rounding-tolerant): |a-b| <= TOL. No associative arrays
-# (macOS bash 3.2). Prereqs: FastAPI dev (8000).
+# Equality is to 2 decimal places (the precision the API returns). Order
+# invariance compares the SAME logical query (params reordered), so it must
+# match exactly at 2dp — no fuzzy tolerance. "narrowed" is proven by the
+# team's sample-size strictly shrinking (an integer count — rounding can't
+# hide it), not by a rate moving. No associative arrays / non-ASCII (macOS
+# bash 3.2 + C-locale safe). Prereqs: FastAPI dev (8000).
 set -u
 API="${API:-http://localhost:8000}"
 TE=$(python3 -c "import urllib.parse;print(urllib.parse.quote('Chennai Super Kings'))")
 BASE="gender=male&team_type=club&season_from=2024&season_to=2026"
-TOL=0.15
 PASS=0; FAIL=0; FAILS=""
 ok(){ PASS=$((PASS+1)); echo "  PASS: $1"; }
 bad(){ FAIL=$((FAIL+1)); FAILS="$FAILS\n  - $1"; echo "  FAIL: $1"; }
@@ -29,8 +32,10 @@ fetch(){ curl -s "$API/api/v1/teams/$TE/$1?$BASE&$4" \
 d=json.load(sys.stdin); f=d.get('$2')
 v=(f.get('$3') if isinstance(f,dict) else (f if '$3'=='value' else None))
 print(v if v is not None else 'null')" 2>/dev/null; }
-aeq(){ python3 -c "a,b='$1','$2';print('Y' if a not in('null','') and b not in('null','') and abs(float(a)-float(b))<=$TOL else 'N')"; }
-amoved(){ python3 -c "a,b='$1','$2';print('Y' if a not in('null','') and b not in('null','') and abs(float(a)-float(b))>$TOL else 'N')"; }
+# equal to 2dp (order-invariance: same query → must match exactly at 2dp)
+aeq(){ python3 -c "a,b='$1','$2';print('Y' if a not in('null','') and b not in('null','') and round(float(a),2)==round(float(b),2) else 'N')"; }
+# differs at 2dp (a real change the chip would show)
+amoved(){ python3 -c "a,b='$1','$2';print('Y' if a not in('null','') and b not in('null','') and round(float(a),2)!=round(float(b),2) else 'N')"; }
 
 Q_INN="inning=0"
 Q_TOSS="toss_outcome=won"
@@ -62,8 +67,8 @@ check_metric(){
   echo "    sample base=$sbase inn=$sinn toss=$stoss | A=$sA B=$sB"
 
   # 1. ORDER INVARIANCE — reach the same place regardless of order (value AND baseline)
-  [ "$(aeq "$vA" "$vB")" = Y ] && ok "$lbl value order-invariant (A=$vA ~ B=$vB)" || bad "$lbl value ORDER-DEPENDENT (A=$vA vs B=$vB)"
-  [ "$(aeq "$bA" "$bB")" = Y ] && ok "$lbl baseline order-invariant (A=$bA ~ B=$bB)" || bad "$lbl baseline ORDER-DEPENDENT (A=$bA vs B=$bB)"
+  [ "$(aeq "$vA" "$vB")" = Y ] && ok "$lbl value order-invariant (A=$vA == B=$vB)" || bad "$lbl value ORDER-DEPENDENT (A=$vA vs B=$vB)"
+  [ "$(aeq "$bA" "$bB")" = Y ] && ok "$lbl baseline order-invariant (A=$bA == B=$bB)" || bad "$lbl baseline ORDER-DEPENDENT (A=$bA vs B=$bB)"
 
   # 2. NARROWS in BOTH trajectories — the team's subset strictly shrinks at each step
   [ "$(ilt "$sinn" "$sbase")" = Y ]  && ok "$lbl narrows base->inning (sample $sbase->$sinn)" || bad "$lbl sample did NOT shrink base->inning ($sbase->$sinn)"
