@@ -31,6 +31,16 @@ REG scope_partnerships_summary_ipl_2024     /api/v1/scope/averages/partnerships/
 REG scope_partnerships_by_wicket_ipl_2024   /api/v1/scope/averages/partnerships/by-wicket?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024
 REG scope_partnerships_by_season_ipl        /api/v1/scope/averages/partnerships/by-season?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024
 
+# ── cohort toss/result narrowing (spec-compare-toss-result.md) ────
+# The league baseline now narrows by toss_outcome/result per-row
+# (i.team is the row's batting team). Was a silent no-op before; these
+# MUST drift vs HEAD (NEW), then flip to REG once locked. Direction:
+# bowling econ in wins << overall (winners concede less); won-toss
+# shifts modestly.
+NEW scope_bowling_summary_ipl_result_won    /api/v1/scope/averages/bowling/summary?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024&result=won
+NEW scope_bowling_summary_ipl_toss_won      /api/v1/scope/averages/bowling/summary?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024&toss_outcome=won
+NEW scope_batting_summary_ipl_result_won    /api/v1/scope/averages/batting/summary?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024&result=won
+
 # ── team-side flat-by-season (no chip envelopes — untouched) ─────
 REG team_partnerships_by_season_mi_ipl      /api/v1/teams/Mumbai%20Indians/partnerships/by-season?tournament=Indian%20Premier%20League&season_from=2020&season_to=2024
 REG team_partnerships_by_season_india       /api/v1/teams/India/partnerships/by-season?gender=male&team_type=international&season_from=2022&season_to=2024
