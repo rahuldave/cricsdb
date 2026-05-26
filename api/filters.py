@@ -529,31 +529,44 @@ def player_inning_match_clause(
     params: dict,
     match_id_expr: str = "m.id",
     key: str = "pim_pid",
+    side: str = "batting",
 ) -> str:
-    """Player-POV `inning` narrowing — Option-B "batted-first" semantics
-    (internal_docs/spec-inning-unify-option-b.md). Restricts to matches
-    where the player's OWN team (matchplayer.team) batted in
-    innings_number = aux.inning:
+    """Player-POV `inning` narrowing — Option-B, DISCIPLINE-AWARE
+    (internal_docs/spec-inning-unify-option-b.md). The toggle label
+    `inning=N` means "the player's team batted in innings N", but the
+    underlying filter follows the innings the discipline actually
+    happened in:
 
-      inning=0 → matches the player's team batted first
-      inning=1 → matches the player's team batted second
+      side='batting'                  → matches the player's team BATTED
+                                        in innings_number = N
+                                        (mp2.team = i2.team, inn = N)
+      side bowling/fielding/keeping   → matches the player's team FIELDED
+                                        in innings_number = (1 - N)
+                                        (mp2.team != i2.team, inn = 1-N)
 
-    Unlike the per-event `i.innings_number = :inning` clause, this is a
-    match SUBSET, so it means the same thing for every discipline: a
-    bowler's `inning=0` becomes "his bowling in matches his team batted
-    first" (= his 2nd-innings bowling), NOT "bowled first". Callers must
-    suppress the central clause (`build(..., apply_inning=False)`) and
-    add this instead. Returns a BARE clause (no leading AND); ""
-    when aux.inning is unset.
+    The fielding-side form is deliberately keyed on the FIELDING innings,
+    not "matches the team batted in N": a match the player BOWLED in but
+    his team never BATTED (e.g. a rain-abandoned game they fielded first
+    and the chase never started) carries real wickets/balls that MUST
+    count toward the bowling average and its denominator. A batting-keyed
+    subset would silently drop it. So batting and bowling can legitimately
+    span different match counts at the same inning value.
+
+    Works at any grain (match_id_expr defaults to m.id) — innings-grain
+    summaries AND per-match precomp records alike. Callers must suppress
+    the central clause (`build(..., apply_inning=False)`). Returns a BARE
+    clause (no leading AND); "" when aux.inning is unset.
     """
     if aux is None or aux.inning is None:
         return ""
+    bat = side == "batting"
     params[key] = person_id
-    params["pim_inn"] = aux.inning
+    params["pim_inn"] = aux.inning if bat else (1 - aux.inning)
+    team_rel = "=" if bat else "!="
     return (
         f"{match_id_expr} IN ("
         f"SELECT i2.match_id FROM innings i2 "
         f"JOIN matchplayer mp2 ON mp2.match_id = i2.match_id "
-        f"AND mp2.person_id = :{key} AND mp2.team = i2.team "
+        f"AND mp2.person_id = :{key} AND mp2.team {team_rel} i2.team "
         f"WHERE i2.innings_number = :pim_inn AND i2.super_over = 0)"
     )

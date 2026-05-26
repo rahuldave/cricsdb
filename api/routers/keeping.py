@@ -59,7 +59,7 @@ def _keeping_filter(filters: FilterParams, person_id: str, aux: AuxParams | None
     rc = player_result_clause(aux, person_id, params)
     if rc:
         parts.append(rc)
-    ri = player_inning_match_clause(aux, person_id, params)
+    ri = player_inning_match_clause(aux, person_id, params, side="keeping")
     if ri:
         parts.append(ri)
     return " AND ".join(parts), params
@@ -145,7 +145,7 @@ async def keeping_summary(
     ]
     if amb_where:
         amb_parts.append(amb_where)
-    ri = player_inning_match_clause(aux, person_id, amb_params)
+    ri = player_inning_match_clause(aux, person_id, amb_params, side="keeping")
     if ri:
         amb_parts.append(ri)
     amb_clause = " AND ".join(amb_parts)
@@ -403,7 +403,7 @@ async def keeping_ambiguous(
     ]
     if where:
         parts.append(where)
-    ri = player_inning_match_clause(aux, person_id, params)
+    ri = player_inning_match_clause(aux, person_id, params, side="keeping")
     if ri:
         parts.append(ri)
     clause = " AND ".join(parts)

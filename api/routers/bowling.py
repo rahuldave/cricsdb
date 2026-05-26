@@ -183,7 +183,7 @@ def _bowling_legal_filter(filters: FilterParams, person_id: str, batter_id: str 
     rc = player_result_clause(aux, person_id, params)
     if rc:
         parts.append(rc)
-    ri = player_inning_match_clause(aux, person_id, params)
+    ri = player_inning_match_clause(aux, person_id, params, side="bowling")
     if ri:
         parts.append(ri)
     return " AND ".join(parts), params
@@ -337,7 +337,7 @@ def _bowling_all_filter(filters: FilterParams, person_id: str, batter_id: str | 
     rc = player_result_clause(aux, person_id, params)
     if rc:
         parts.append(rc)
-    ri = player_inning_match_clause(aux, person_id, params)
+    ri = player_inning_match_clause(aux, person_id, params, side="bowling")
     if ri:
         parts.append(ri)
     return " AND ".join(parts), params
@@ -359,7 +359,7 @@ def _bowling_wicket_filter(filters: FilterParams, person_id: str, batter_id: str
     rc = player_result_clause(aux, person_id, params)
     if rc:
         parts.append(rc)
-    ri = player_inning_match_clause(aux, person_id, params)
+    ri = player_inning_match_clause(aux, person_id, params, side="bowling")
     if ri:
         parts.append(ri)
     return " AND ".join(parts), params
@@ -1947,7 +1947,7 @@ async def bowling_records(
     where, params = filters.build(has_innings_join=False, aux=aux)
     params["person_id"] = person_id
     params["lim"] = limit
-    ri = player_inning_match_clause(aux, person_id, params)
+    ri = player_inning_match_clause(aux, person_id, params, side="bowling")
     if ri:
         where = f"{where} AND {ri}" if where else ri
 

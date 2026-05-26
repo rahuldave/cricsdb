@@ -185,7 +185,7 @@ def _fielding_filter(filters: FilterParams, person_id: str, aux: AuxParams | Non
     rc = player_result_clause(aux, person_id, params)
     if rc:
         parts.append(rc)
-    ri = player_inning_match_clause(aux, person_id, params)
+    ri = player_inning_match_clause(aux, person_id, params, side="fielding")
     if ri:
         parts.append(ri)
     return " AND ".join(parts), params
@@ -402,7 +402,7 @@ async def fielding_summary(
     # innings N (match subset). This count is match-level (no innings
     # join) so it never saw the per-event clause — add the subset here
     # so fielding `matches` narrows consistently with the catches.
-    ri = player_inning_match_clause(aux, person_id, match_params, match_id_expr="mp.match_id")
+    ri = player_inning_match_clause(aux, person_id, match_params, match_id_expr="mp.match_id", side="fielding")
     if ri:
         match_parts.append(ri)
     match_clause = " AND ".join(match_parts)
@@ -426,7 +426,7 @@ async def fielding_summary(
     keeping_parts = ["ka.keeper_id = :person_id"]
     if keeping_where:
         keeping_parts.append(keeping_where)
-    ri = player_inning_match_clause(aux, person_id, keeping_params)
+    ri = player_inning_match_clause(aux, person_id, keeping_params, side="keeping")
     if ri:
         keeping_parts.append(ri)
     keeping_clause = " AND ".join(keeping_parts)
@@ -1437,7 +1437,7 @@ async def fielding_records(
     where, params = filters.build(has_innings_join=False, aux=aux)
     params["person_id"] = person_id
     params["lim"] = limit
-    ri = player_inning_match_clause(aux, person_id, params)
+    ri = player_inning_match_clause(aux, person_id, params, side="fielding")
     if ri:
         where = f"{where} AND {ri}" if where else ri
 

@@ -28,26 +28,39 @@ m(){ curl -s "$API/api/v1/$1/$P/summary?gender=male&$2" | python3 -c "import sys
 
 echo "=== /players · inning unification (Option B) ==="
 
-# SQL: matches where Kohli's team batted in innings 0 / 1.
-read -r sql_bf sql_bs <<<"$(sqlite3 "$DB" "SELECT
- (SELECT COUNT(DISTINCT mp.match_id) FROM matchplayer mp JOIN innings i ON i.match_id=mp.match_id AND i.team=mp.team JOIN match m ON m.id=mp.match_id WHERE mp.person_id='$P' AND m.gender='male' AND i.innings_number=0 AND i.super_over=0),
- (SELECT COUNT(DISTINCT mp.match_id) FROM matchplayer mp JOIN innings i ON i.match_id=mp.match_id AND i.team=mp.team JOIN match m ON m.id=mp.match_id WHERE mp.person_id='$P' AND m.gender='male' AND i.innings_number=1 AND i.super_over=0);" | tr '|' ' ')"
+# Option B is per-event + discipline-aware: batting inning=N counts where
+# Kohli batted in innings_number=N; fielding/bowling inning=N count where he
+# FIELDED in innings_number=(1-N) (bowled-first = innings 0 = inning=1).
+# SQL: Kohli FIELDED in innings (1-N) — fielding matches per-event.
+read -r f_ev0 f_ev1 <<<"$(sqlite3 "$DB" "SELECT
+ (SELECT COUNT(DISTINCT mp.match_id) FROM matchplayer mp JOIN innings i ON i.match_id=mp.match_id AND i.team!=mp.team JOIN match m ON m.id=mp.match_id WHERE mp.person_id='$P' AND m.gender='male' AND i.innings_number=1 AND i.super_over=0),
+ (SELECT COUNT(DISTINCT mp.match_id) FROM matchplayer mp JOIN innings i ON i.match_id=mp.match_id AND i.team!=mp.team JOIN match m ON m.id=mp.match_id WHERE mp.person_id='$P' AND m.gender='male' AND i.innings_number=0 AND i.super_over=0);" | tr '|' ' ')"
 
-# 1. Fielding matches == match-subset.
+# 1. Fielding matches == per-event "fielded in (1-N)".
 f0=$(m fielders "inning=0" matches); f1=$(m fielders "inning=1" matches)
-echo "  fielding matches inning0/1 = $f0/$f1 | SQL batted-first/second = $sql_bf/$sql_bs"
-[ "$f0" = "$sql_bf" ] && [ "$f1" = "$sql_bs" ] && ok "fielding matches == batted-first/second subset ($f0/$f1)" \
-  || bad "fielding matches $f0/$f1 != SQL $sql_bf/$sql_bs (inning ignored?)"
+echo "  fielding matches inning0/1 = $f0/$f1 | SQL fielded-in-(1-N) = $f_ev0/$f_ev1"
+[ "$f0" = "$f_ev0" ] && [ "$f1" = "$f_ev1" ] && ok "fielding matches == fielded-in-(1-N) per-event ($f0/$f1)" \
+  || bad "fielding matches $f0/$f1 != per-event $f_ev0/$f_ev1"
 
-# 2. Batting/bowling matches are subsets (<= fielding) + non-degenerate.
+# 2. Batting + bowling honor inning (differ across 0/1) — per-discipline
+#    counts no longer share a subset relationship under per-event.
 b0=$(m batters "inning=0" matches); b1=$(m batters "inning=1" matches)
 w0=$(m bowlers "inning=0" matches); w1=$(m bowlers "inning=1" matches)
-echo "  batting $b0/$b1  bowling $w0/$w1  (both must be <= fielding $f0/$f1)"
-if [ "$b0" -le "$f0" ] && [ "$b1" -le "$f1" ] && [ "$w0" -le "$f0" ] && [ "$w1" -le "$f1" ]; then
-  ok "batting + bowling matches are subsets of the same match sets"
-else
-  bad "a discipline's matches exceed the fielding (whole-match) subset — inning not unified"
-fi
+echo "  batting $b0/$b1  bowling $w0/$w1"
+[ "$b0" != "$b1" ] && [ "$w0" != "$w1" ] && ok "batting + bowling matches honor inning (differ across 0/1)" \
+  || bad "batting ($b0/$b1) or bowling ($w0/$w1) flat across inning — not filtering"
+
+# 2b. THE FIX (red-green): a player who bowled in a match his team never
+#     batted (DL Chahar, CSK vs LSG abandoned game 5845 — bowled, no bat)
+#     must still count in bowled-first (inning=1). Match-subset dropped it.
+CH=23eeb873
+ch_sql=$(sqlite3 "$DB" "SELECT COUNT(DISTINCT i.match_id) FROM delivery d JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id WHERE d.bowler_id='$CH' AND m.gender='male' AND i.super_over=0 AND i.innings_number=0;")
+ch_api=$(curl -s "$API/api/v1/bowlers/$CH/summary?gender=male&inning=1" | python3 -c "import sys,json;d=json.load(sys.stdin);v=d.get('matches');print(v.get('value') if isinstance(v,dict) else v)" 2>/dev/null)
+ch_5845=$(sqlite3 "$DB" "SELECT COUNT(*) FROM delivery d JOIN innings i ON i.id=d.innings_id WHERE d.bowler_id='$CH' AND i.match_id=5845;")
+echo "  Chahar bowled-first matches: api=$ch_api sql=$ch_sql (bowled $ch_5845 balls in abandoned 5845)"
+[ -n "$ch_api" ] && [ "$ch_api" = "$ch_sql" ] && [ "$ch_5845" -gt 0 ] \
+  && ok "bowled-but-didn't-bat game retained in bowled-first ($ch_api matches incl. 5845)" \
+  || bad "Chahar bowled-first api=$ch_api sql=$ch_sql (match 5845 dropped?)"
 
 # 3. Bowling wickets flip: inning=1 (bowled first) should equal the old
 #    bowled-first value (raw innings_number=1 bowling).
@@ -80,17 +93,17 @@ iw1=$(curl -s "$API/api/v1/batters/$P/inter-wicket?gender=male&inning=1" | pytho
   && ok "inter-wicket non-empty + inning narrows (wd0 SR $iw0 vs $iw1)" \
   || bad "inter-wicket degenerate or unchanged across inning ($iw0/$iw1)"
 
-# 7. Keeping (subject = MS Dhoni — Kohli has no keeping data):
-#    fielding innings_kept + keeping/ambiguous now route through the
-#    match-subset clause. Anchor each against SQL re-derivation.
+# 7. Keeping (subject = MS Dhoni — Kohli has no keeping data): per-event,
+#    keeper-side = FIELDED in innings (1-N). Anchor against SQL.
 K2=4a8a2e3b
 for inn in 0 1; do
+  eff=$((1-inn))
   ksql=$(sqlite3 "$DB" "SELECT COUNT(*) FROM keeperassignment ka
     JOIN innings i ON i.id=ka.innings_id JOIN match m ON m.id=i.match_id
     WHERE ka.keeper_id='$K2' AND m.gender='male'
-      AND m.id IN (SELECT i2.match_id FROM innings i2 JOIN matchplayer mp2 ON mp2.match_id=i2.match_id AND mp2.person_id='$K2' AND mp2.team=i2.team WHERE i2.innings_number=$inn AND i2.super_over=0);")
+      AND m.id IN (SELECT i2.match_id FROM innings i2 JOIN matchplayer mp2 ON mp2.match_id=i2.match_id AND mp2.person_id='$K2' AND mp2.team!=i2.team WHERE i2.innings_number=$eff AND i2.super_over=0);")
   kapi=$(curl -s "$API/api/v1/fielders/$K2/summary?gender=male&inning=$inn" | python3 -c "import sys,json;print(json.load(sys.stdin)['innings_kept']['value'])" 2>/dev/null)
-  [ -n "$kapi" ] && [ "$kapi" = "$ksql" ] && ok "fielding innings_kept inning=$inn == SQL subset ($kapi)" \
+  [ -n "$kapi" ] && [ "$kapi" = "$ksql" ] && ok "fielding innings_kept inning=$inn == per-event fielded-in-(1-N) ($kapi)" \
     || bad "fielding innings_kept inning=$inn: api=$kapi sql=$ksql"
   alen=$(curl -s "$API/api/v1/fielders/$K2/keeping/ambiguous?gender=male&inning=$inn&limit=500" | python3 -c "import sys,json;print(len(json.load(sys.stdin)['innings']))" 2>/dev/null)
   ascl=$(curl -s "$API/api/v1/fielders/$K2/keeping/summary?gender=male&inning=$inn" | python3 -c "import sys,json;print(json.load(sys.stdin)['ambiguous_innings']['value'])" 2>/dev/null)
@@ -98,26 +111,25 @@ for inn in 0 1; do
     || bad "keeping ambiguous inning=$inn: list=$alen scalar=$ascl"
 done
 
-# 8. bowling + fielding records — were inning-BLIND (has_innings_join=False,
-#    no clause, frozen across inning); now route through the match-subset
-#    clause like batting records. Subject: JJ Bumrah for bowling, Kohli for
-#    fielding. Option-B inning is a MATCH filter so it composes with the
-#    per-match precomp grain (matchbowlerperf / matchfielderperf).
+# 8. bowling + fielding records (per-match precomp). Per-event: keyed on the
+#    FIELDING innings (1-N), so a bowled-but-didn't-bat game stays eligible.
+#    Subject: JJ Bumrah for bowling, Kohli for fielding.
 BOW=462411b3
 for inn in 0 1; do
+  eff=$((1-inn))
   bsql=$(sqlite3 "$DB" "SELECT MAX(mb.wickets) FROM matchbowlerperf mb
     JOIN match m ON m.id=mb.match_id JOIN matchplayer mp ON mp.match_id=m.id AND mp.person_id=mb.bowler_id
     WHERE mb.bowler_id='$BOW' AND m.gender='male' AND mb.wickets>=2
-      AND m.id IN (SELECT i2.match_id FROM innings i2 JOIN matchplayer mp2 ON mp2.match_id=i2.match_id AND mp2.person_id='$BOW' AND mp2.team=i2.team WHERE i2.innings_number=$inn AND i2.super_over=0);")
+      AND m.id IN (SELECT i2.match_id FROM innings i2 JOIN matchplayer mp2 ON mp2.match_id=i2.match_id AND mp2.person_id='$BOW' AND mp2.team!=i2.team WHERE i2.innings_number=$eff AND i2.super_over=0);")
   bapi=$(curl -s "$API/api/v1/bowlers/$BOW/records?gender=male&inning=$inn" | python3 -c "import sys,json;d=json.load(sys.stdin)['best_figures'];print(d[0]['wickets'] if d else '')" 2>/dev/null)
-  [ -n "$bapi" ] && [ "$bapi" = "$bsql" ] && ok "bowling records best_figures inning=$inn == SQL subset ($bapi)" \
+  [ -n "$bapi" ] && [ "$bapi" = "$bsql" ] && ok "bowling records best_figures inning=$inn == per-event ($bapi)" \
     || bad "bowling records inning=$inn: api=$bapi sql=$bsql"
   fsql=$(sqlite3 "$DB" "SELECT MAX(mf.catches) FROM matchfielderperf mf
     JOIN match m ON m.id=mf.match_id JOIN matchplayer mp ON mp.match_id=m.id AND mp.person_id=mf.fielder_id
     WHERE mf.fielder_id='$P' AND m.gender='male' AND mf.catches>0
-      AND m.id IN (SELECT i2.match_id FROM innings i2 JOIN matchplayer mp2 ON mp2.match_id=i2.match_id AND mp2.person_id='$P' AND mp2.team=i2.team WHERE i2.innings_number=$inn AND i2.super_over=0);")
+      AND m.id IN (SELECT i2.match_id FROM innings i2 JOIN matchplayer mp2 ON mp2.match_id=i2.match_id AND mp2.person_id='$P' AND mp2.team!=i2.team WHERE i2.innings_number=$eff AND i2.super_over=0);")
   fapi=$(curl -s "$API/api/v1/fielders/$P/records?gender=male&inning=$inn" | python3 -c "import sys,json;d=json.load(sys.stdin)['most_catches_match'];print(d[0]['catches'] if d else '')" 2>/dev/null)
-  [ -n "$fapi" ] && [ "$fapi" = "$fsql" ] && ok "fielding records most_catches inning=$inn == SQL subset ($fapi)" \
+  [ -n "$fapi" ] && [ "$fapi" = "$fsql" ] && ok "fielding records most_catches inning=$inn == per-event ($fapi)" \
     || bad "fielding records inning=$inn: api=$fapi sql=$fsql"
 done
 
