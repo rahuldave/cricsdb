@@ -97,9 +97,23 @@ populates four denormalized tables:
    `scripts/populate_playerscopestats_position.py:populate_full()`.
    Per-bucket batting aggregates; backs the per-position cohort
    baseline endpoint + the per-player position-distribution
-   histogram. Sanity:
-   `tests/sanity/test_playerscopestats_position.py` (pool
-   conservation against the parent player_scope_stats row).
+   histogram. **As of `spec-batting-allball-runs-single-source.md`
+   (D2) this is a pure rollup of the records table `inningsbatterperf`
+   — a `GROUP BY` on person × position_bucket × scope fields — NOT a
+   delivery rescan, so the records-aggregates populate
+   (`populate_records_aggregates`, which builds `inningsbatterperf`)
+   is moved to run BEFORE this step in both `import_data.py` and
+   `update_recent.py`. Runs are all-ball + the cohort includes
+   non-striker innings by construction, identical to the live (3b)
+   aggregation over the same table.** Sanity:
+   `tests/sanity/test_playerscopestats_position.py` (pool conservation
+   against the parent) + `test_playerscopestatsposition_rollup.py`
+   (exact-integer parity against the inningsbatterperf rollup).
+   Batting runs everywhere on the player side now follow the all-ball
+   convention via `api/batting_convention.batting_delivery_contrib`
+   (the parent + per-over/phase children) and `inningsbatterperf` (the
+   records source) — see `how-stats-calculated.md` "All-ball batting-
+   runs convention".
 6. `playerscopestats_over` (~282K rows, one per (person, scope_key,
    over_number) — 20 buckets, 1-indexed overs 1..20) via
    `scripts/populate_playerscopestats_over.py:populate_full()`.

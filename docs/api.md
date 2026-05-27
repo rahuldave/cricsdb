@@ -1523,6 +1523,14 @@ contextual ones.
 Career totals scoped to filters. Drives the StatCard row on a
 player's batting page (and the Batting band on `/players`).
 
+**Runs are all-ball.** `runs` (and `fours`/`sixes`) sum the batter's
+off-bat runs over **all** his deliveries — a four hit off a no-ball is
+his. `balls`/`dots` count legal balls only, so `strike_rate` = all-ball
+runs / legal balls. This is the single convention across every batting
+endpoint + the cohort baselines (`spec-batting-allball-runs-single-
+source.md`); it raised e.g. V Kohli's career runs from 13117 (the old
+legal-only number) to 13166.
+
 **Response shape — Phase 4 envelope migration (2026-05-20).** Each
 numeric field is a `MetricEnvelope` object (`{value, scope_avg,
 delta_pct, direction, sample_size}`) carrying the player's value
@@ -1662,8 +1670,12 @@ Per-player batting record lists — six top-N lists capped at `limit`
   floor filters out 1-ball-6-runs cameos.
 
 Reads from `inningsbatterperf` (precomputed per-(batter,innings)
-aggregate populated by `scripts/populate_inningsbatterperf.py`).
-Honours all FilterBar narrowings + `aux.inning`.
+aggregate populated by `scripts/populate_records_aggregates.py`).
+Honours all FilterBar narrowings + `aux.inning`. Runs are **all-ball**
+(off-bat runs off no-balls included); balls faced are legal-only. The
+table carries a 0-runs/0-balls row for each pure non-striker innings (a
+batter who never faced a ball as striker still batted), so its innings
+count matches the summary's. Not-out excludes retired hurt/out.
 
 ```bash
 curl "http://localhost:8000/api/v1/batters/ba607b88/records?tournament=Indian%20Premier%20League&limit=3"

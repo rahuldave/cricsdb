@@ -91,6 +91,16 @@ CLAUDE.md "Scope-anchored form-window cutoffs."
 
 ### §1.3 Batter metrics — `api/routers/batting.py`
 
+**All-ball runs convention** (`spec-batting-allball-runs-single-source.md`):
+in every batter metric below, `runs` (and `fours`/`sixes`) are summed
+over **all** the batter's deliveries — including off-bat runs/boundaries
+off no-balls — while `balls` (the rate denominator) and `dots` count
+**legal balls only**. `_batting_filter` no longer carries the legal gate
+in its WHERE; the per-aggregate `balls`/`dots`/SR-denominator gate on
+`_LEGAL` (`extras_wides=0 AND extras_noballs=0`) instead. Same convention
+on `/head-to-head`. So "legal balls" in the Predicates column qualifies
+the **denominator**, not the runs numerator.
+
 | Metric | Endpoint | Formula | File:line | Predicates |
 |---|---|---|---|---|
 | `average` | `/leaders` | `runs / dismissals` | `batting.py:147` | dismissals > 0; legal balls (extras_wides=0 AND extras_noballs=0); super_over=0 (auto via filters) |

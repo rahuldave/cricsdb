@@ -84,21 +84,42 @@ honest.
 Same formula at every level (innings, match, season, scope), just
 the SUM range changes.
 
+### All-ball batting-runs convention
+
+A batsman's **runs** are `SUM(runs_batter)` over **all** his deliveries
+— a four off a no-ball is his four, the off-bat run off a no-ball is
+his run. **Balls faced** are **legal balls only** (`extras_wides = 0 AND
+extras_noballs = 0`); a no-ball is never a ball faced even when scored
+off. The no-ball penalty and the wide run belong to the bowler/team,
+not the batter. So in every batting rate below, the numerator
+(`runs_batter` / boundaries) is summed over all balls and the
+denominator (balls faced) counts legal balls only.
+
+This is the single convention across the whole player batting side —
+the profile summary, the by-season / by-phase / by-over / vs-bowlers /
+distribution tabs, head-to-head, the records table `inningsbatterperf`,
+and the cohort tables (`playerscopestats*`). It matches the team side
+and the official scorecard. Enforced for the populates by the shared
+helper `api/batting_convention.batting_delivery_contrib`; for the read
+queries by the `_LEGAL` CASE-gated balls/dots in `batting.py`. Spec:
+`spec-batting-allball-runs-single-source.md`.
+
 ### Strike rate (batter)
 
 ```
-strike_rate = SUM(runs_batter on legal balls) × 100 / COUNT(legal balls)
+strike_rate = SUM(runs_batter over all balls) × 100 / COUNT(legal balls)
 ```
 
 The 100 is the conventional scaling. `runs_batter` is the runs
-attributed to the batter on the strike (excludes byes/leg byes).
-Identical to a single-innings SR averaged across all the batter's
-innings, weighted by balls faced — the concatenated-rate property.
+attributed to the batter on the strike (excludes byes/leg byes),
+counted over all his deliveries (all-ball). Identical to a
+single-innings SR averaged across all the batter's innings, weighted by
+balls faced — the concatenated-rate property.
 
 ### Batting average
 
 ```
-average = SUM(runs_batter on legal balls) ÷ dismissals
+average = SUM(runs_batter over all balls) ÷ dismissals
 ```
 
 `dismissals` = wickets where this person is in `wicket.player_out_id`,

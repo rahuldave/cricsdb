@@ -5,29 +5,37 @@
 
 ## NEXT SESSION — top of queue (2026-05-27)
 
-**`spec-batting-allball-runs-single-source.md` — fix the all-ball
-batting-runs convention + make `inningsbatterperf` the single per-innings
-source.** Build-ready spec committed df62afc; Roughdraft review pending
-(re-open at session start in case the user wants to annotate — CLI hits
-the Node 25 / undici timeout but the window opens). THIS BLOCKS 3b.
+**Resume `spec-player-baseline-aux-fallback.md` at Phase 3b — now
+UNBLOCKED.** The all-ball convention prereq SHIPPED locally this session
+(see below); `inningsbatterperf` is now all-ball + complete and the
+position cohort is a rollup of it, so 3b's live aggregation over that
+table matches the precomputed path by construction.
 
-Why it exists: building Phase-3a's parity cross-check surfaced that the
-player batting analytics drop a batsman's **no-ball off-bat runs**
-(legal-only — Kohli summary 13117 vs true 13166) and `inningsbatterperf`
-misses **pure non-striker innings**. Team side + records are correct;
-only the player batting side is wrong. Decision (option A + option 2):
-fix the convention to all-ball everywhere + single source of truth.
+### SHIPPED this session — `spec-batting-allball-runs-single-source.md` (local, unpushed)
 
-Start at the spec's **§7 sequencing**, step 1 = enumerate + classify the
-`batting.py` `runs_batter` sites (runs-sums to convert vs legitimate
-balls/dots legal-filters). Then: complete `inningsbatterperf` with
-non-striker innings (rebuild, NOT ALTER — back up to `tmp/` first; records
-audit per §6.2); re-derive `playerscopestatsposition` as a rollup of
-`inningsbatterperf` (exact-integer parity); convention-fix the read
-queries + parent + phase/over batting cohort populates so the own number
-and cohort move together; re-baseline + REG→NEW flips + docs (incl.
-`docs/api.md`). Local DB was already rebuilt once for 3a; this rebuilds
-it again. Backup: `tmp/cricket.db.bak-phase3a` (gitignored).
+All-ball batting-runs convention + single per-innings source. Commits
+a60dfd9 (enumerate sites) → 8f86314 (inningsbatterperf non-striker
+completion + not_out excl. retired) → fa2cff3 (position cohort = rollup
+of inningsbatterperf + parent all-ball via shared helper
+`api/batting_convention.batting_delivery_contrib`; reorder records ahead
+of position in both `import_data.py` + `update_recent.py`) → e798acd
+(batting.py read queries all-ball: 9 Pattern-X + 5 Pattern-Y sites per
+`internal_docs/allball-batting-sites.md`; phase/over populates via the
+helper) → f8f2ef2 (head_to_head batter-vs-bowler, extended per scope
+decision) → [Commit 5] (docs). Headline: V Kohli career runs 13117 →
+13166 (the 49 no-ball off-bat runs), balls unchanged (legal), SR
+recomputed. Local DB rebuilt (records + all cohorts). New tests:
+`test_playerscopestatsposition_rollup.py` (exact-integer parity),
+`test_batting_allball_runs.py` (own number + cross-tab + H2H, SQL-
+anchored). Backup before rebuild: `tmp/cricket.db.bak-allball`.
+
+**Deploy note:** held local until 3b lands — read queries fix on a code
+deploy, but the cohort tables + `inningsbatterperf` need a prod DB
+rebuild; one deploy + one rebuild covers both. The regression harness is
+diff-on-demand (no checked-in goldens), so the committed change leaves no
+stored baseline red; the red-then-green is the direct SQL-anchored
+sanity test, not a REG→NEW flip (the flip window is pre-change-commit,
+which a committed change can't retro-fill — feedback_regression_before_shape).
 
 **THEN resume `spec-player-baseline-aux-fallback.md` at Phase 3b** (its §3
 has a ⏸ PAUSED banner). Once the convention fix lands, `inningsbatterperf`

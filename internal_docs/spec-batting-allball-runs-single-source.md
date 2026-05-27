@@ -1,6 +1,6 @@
 # Spec — all-ball batting-runs convention + single per-innings source of truth
 
-**Status:** DRAFT for review (Roughdraft). **Date:** 2026-05-27. **Prereq for:** `internal_docs/spec-player-baseline-aux-fallback.md` Phase 3b (the live cohort fallback is PAUSED until this lands — see that spec §3). **Why it exists:** the cross-check requested while building 3a surfaced a latent batting-runs convention bug + a two-tables-two-conventions divergence that would make 3b's "typical player" comparison jump at the gate boundary.
+**Status:** SHIPPED locally 2026-05-27 (commits a60dfd9→[Commit 5], unpushed/undeployed — held local until 3b lands, then one deploy + prod DB rebuild covers both). **Date:** 2026-05-27. **Prereq for:** `internal_docs/spec-player-baseline-aux-fallback.md` Phase 3b — now UNBLOCKED: `inningsbatterperf` is all-ball + complete (non-striker innings) and the position cohort is a rollup of it, so 3b's live aggregation over that table matches the precomputed path by construction. **Why it exists:** the cross-check requested while building 3a surfaced a latent batting-runs convention bug + a two-tables-two-conventions divergence that would make 3b's "typical player" comparison jump at the gate boundary.
 
 * * *
 
