@@ -658,6 +658,12 @@ async def player_result_counts(
     narrowing re-applied at mp.team like /players/{id}/teams.
 
     `tied` collapses true ties + no-results (outcome_winner IS NULL).
+
+    Also returns toss-outcome counts (`toss_won` / `toss_lost`) for the
+    TossFilter pills — player-POV on `m.toss_winner` vs `mp.team`. There
+    is no `tied` toss bucket (a toss always has a winner); matches with
+    no recorded toss (`m.toss_winner IS NULL`) fall into neither, so
+    `toss_won + toss_lost` may be < `matches`. Same aux-stripped scope.
     """
     db = get_db()
     where, params = filters.build(
@@ -687,7 +693,12 @@ async def player_result_counts(
                                AND m.outcome_winner != mp.team
                               THEN mp.match_id END) AS losses,
           COUNT(DISTINCT CASE WHEN m.outcome_winner IS NULL
-                              THEN mp.match_id END) AS tied
+                              THEN mp.match_id END) AS tied,
+          COUNT(DISTINCT CASE WHEN m.toss_winner = mp.team
+                              THEN mp.match_id END) AS toss_won,
+          COUNT(DISTINCT CASE WHEN m.toss_winner IS NOT NULL
+                               AND m.toss_winner != mp.team
+                              THEN mp.match_id END) AS toss_lost
         FROM matchplayer mp
         JOIN match m ON m.id = mp.match_id
         WHERE mp.person_id = :pid{clause}{team_filter}
@@ -701,4 +712,6 @@ async def player_result_counts(
         "losses": r.get("losses") or 0,
         "ties": r.get("tied") or 0,
         "no_results": 0,
+        "toss_won": r.get("toss_won") or 0,
+        "toss_lost": r.get("toss_lost") or 0,
     }

@@ -234,9 +234,14 @@ export const getPlayerOpponents = (id: string, filters?: F) =>
   fetchApi<{ opponents: import('./types').PlayerOpponentTotals[] }>(`/api/v1/players/${id}/opponents`, filters as Record<string, string>)
 
 // Player-POV match-result counts (own-team won/lost/tied) for the
-// player-page ResultFilter pills. Aux-stripped breakdown at scope.
+// player-page ResultFilter pills, plus toss-outcome counts (toss_won /
+// toss_lost, no tied bucket) for the TossFilter pills. Aux-stripped
+// breakdown at scope.
 export const getPlayerResultCounts = (id: string, filters?: F) =>
-  fetchApi<{ matches: number; wins: number; losses: number; ties: number; no_results: number }>(
+  fetchApi<{
+    matches: number; wins: number; losses: number; ties: number; no_results: number
+    toss_won: number; toss_lost: number
+  }>(
     `/api/v1/players/${id}/result-counts`, filters as Record<string, string>)
 
 // Keeping (Tier 2 fielding)

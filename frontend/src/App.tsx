@@ -14,6 +14,7 @@ import Players from './pages/Players'
 import Venues from './pages/Venues'
 import Help from './pages/Help'
 import HelpUsage from './pages/HelpUsage'
+import DevTossFilter from './pages/DevTossFilter'
 
 /** Old /tournaments URLs redirect to /series, preserving query params.
  *  Keeps shared links + bookmarks alive across the rename. */
@@ -52,6 +53,11 @@ export default function App() {
           <Route path="/matches/:matchId" element={<MatchScorecard />} />
           <Route path="/help" element={<Help />} />
           <Route path="/help/usage" element={<HelpUsage />} />
+          {/* Unlisted dev/test surface for the TossFilter control
+              (spec-player-baseline-aux-fallback.md §6.1, decision D2 —
+              built now, real mount TBD). Exercised by
+              tests/integration/toss_filter.sh. */}
+          <Route path="/dev/toss-filter" element={<DevTossFilter />} />
         </Route>
       </Routes>
       </DormancyProvider>
