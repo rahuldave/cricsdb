@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams, AuxParams, player_result_clause, player_inning_match_clause
+from ..filters import FilterParams, AuxParams, player_result_clause, player_toss_clause, player_inning_match_clause
 from ..aux_clauses import splice_aux_join_clauses
 from ..metrics_metadata import wrap_metric
 from ..player_nationality import player_nationalities
@@ -185,6 +185,9 @@ def _fielding_filter(filters: FilterParams, person_id: str, aux: AuxParams | Non
     rc = player_result_clause(aux, person_id, params)
     if rc:
         parts.append(rc)
+    tc = player_toss_clause(aux, person_id, params)
+    if tc:
+        parts.append(tc)
     ri = player_inning_match_clause(aux, person_id, params, side="fielding")
     if ri:
         parts.append(ri)
@@ -401,6 +404,9 @@ async def fielding_summary(
     rc = player_result_clause(aux, person_id, match_params, match_id_expr="mp.match_id")
     if rc:
         match_parts.append(rc)
+    tc = player_toss_clause(aux, person_id, match_params, match_id_expr="mp.match_id")
+    if tc:
+        match_parts.append(tc)
     # Option-B inning: matches where the player's team batted in
     # innings N (match subset). This count is match-level (no innings
     # join) so it never saw the per-event clause — add the subset here

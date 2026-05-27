@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
 from ..dependencies import get_db
-from ..filters import FilterParams, AuxParams, player_result_clause, player_inning_match_clause
+from ..filters import FilterParams, AuxParams, player_result_clause, player_toss_clause, player_inning_match_clause
 from ..aux_clauses import splice_aux_join_clauses
 from ..metrics_metadata import wrap_metric
 from ..player_nationality import player_nationalities
@@ -183,6 +183,9 @@ def _bowling_legal_filter(filters: FilterParams, person_id: str, batter_id: str 
     rc = player_result_clause(aux, person_id, params)
     if rc:
         parts.append(rc)
+    tc = player_toss_clause(aux, person_id, params)
+    if tc:
+        parts.append(tc)
     ri = player_inning_match_clause(aux, person_id, params, side="bowling")
     if ri:
         parts.append(ri)
@@ -341,6 +344,9 @@ def _bowling_all_filter(filters: FilterParams, person_id: str, batter_id: str | 
     rc = player_result_clause(aux, person_id, params)
     if rc:
         parts.append(rc)
+    tc = player_toss_clause(aux, person_id, params)
+    if tc:
+        parts.append(tc)
     ri = player_inning_match_clause(aux, person_id, params, side="bowling")
     if ri:
         parts.append(ri)
@@ -363,6 +369,9 @@ def _bowling_wicket_filter(filters: FilterParams, person_id: str, batter_id: str
     rc = player_result_clause(aux, person_id, params)
     if rc:
         parts.append(rc)
+    tc = player_toss_clause(aux, person_id, params)
+    if tc:
+        parts.append(tc)
     ri = player_inning_match_clause(aux, person_id, params, side="bowling")
     if ri:
         parts.append(ri)

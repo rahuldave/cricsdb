@@ -14,7 +14,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, Query
 
 from ..dependencies import get_db
-from ..filters import FilterParams, AuxParams, player_result_clause, player_inning_match_clause
+from ..filters import FilterParams, AuxParams, player_result_clause, player_toss_clause, player_inning_match_clause
 from ..metrics_metadata import wrap_metric
 
 router = APIRouter(prefix="/api/v1/fielders", tags=["Keeping"])
@@ -59,6 +59,9 @@ def _keeping_filter(filters: FilterParams, person_id: str, aux: AuxParams | None
     rc = player_result_clause(aux, person_id, params)
     if rc:
         parts.append(rc)
+    tc = player_toss_clause(aux, person_id, params)
+    if tc:
+        parts.append(tc)
     ri = player_inning_match_clause(aux, person_id, params, side="keeping")
     if ri:
         parts.append(ri)

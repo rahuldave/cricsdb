@@ -523,6 +523,50 @@ def player_result_clause(
     )
 
 
+def player_toss_clause(
+    aux: Optional[AuxParams],
+    person_id: str,
+    params: dict,
+    match_id_expr: str = "m.id",
+    key: str = "ptc_pid",
+) -> str:
+    """Player-POV `toss_outcome` aux narrowing — the toss sibling of
+    `player_result_clause`. The subject team is the player's OWN side
+    per match (`matchplayer.team`), so this works across every team a
+    player has turned out for, using each match's actual team.
+
+      'won'  → the player's team won the toss (m.toss_winner = mp.team)
+      'lost' → there is a recorded toss and the player's team did NOT
+               win it (toss_winner IS NOT NULL AND != mp.team)
+
+    There is NO 'tied' bucket — a toss always has a winner — and matches
+    with no recorded toss (`toss_winner IS NULL`) fall into neither
+    bucket. (Contrast `player_result_clause`, where 'tied' collapses
+    true ties + no-results via `outcome_winner IS NULL`.)
+
+    Returns a BARE clause (no leading AND), binding :<key>; "" when
+    aux.toss_outcome is unset. Distinct default key from
+    player_result_clause so both can be spliced into one query.
+    `match_id_expr` is the outer query's match-id column.
+    """
+    if aux is None or not getattr(aux, "toss_outcome", None):
+        return ""
+    t = aux.toss_outcome
+    if t == "won":
+        cond = "mm.toss_winner = mp.team"
+    elif t == "lost":
+        cond = "mm.toss_winner IS NOT NULL AND mm.toss_winner != mp.team"
+    else:
+        return ""
+    params[key] = person_id
+    return (
+        f"{match_id_expr} IN ("
+        f"SELECT mp.match_id FROM matchplayer mp "
+        f"JOIN match mm ON mm.id = mp.match_id "
+        f"WHERE mp.person_id = :{key} AND {cond})"
+    )
+
+
 def player_inning_match_clause(
     aux: Optional[AuxParams],
     person_id: str,
