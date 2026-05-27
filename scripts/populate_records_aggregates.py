@@ -35,6 +35,7 @@ import asyncio
 import os
 import sys
 import time
+from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -43,6 +44,11 @@ from models import (
     Person, Match, Innings, Delivery, Wicket, FieldingCredit,
     InningsTotal, InningsBatterPerf, MatchBowlerPerf, MatchFielderPerf,
 )
+from api.innings_positions import derive_positions
+# Reuse the cohort's exact merged-opener bucket convention (1+2 → 1, …)
+# so the per-innings table aggregates to the same buckets as the
+# precomputed playerscopestatsposition (spec §8.4, Phase 3a).
+from scripts.populate_playerscopestats_position import position_to_bucket
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(PROJECT_ROOT, "cricket.db")
@@ -71,9 +77,17 @@ async def _ensure_tables(db, incremental: bool = False):
     # InningsBatterPerf: composite PK (batter_id, innings_id). Need a
     # secondary index on innings_id alone for join-from-match scope
     # filters, and an index on runs DESC for the unfiltered best-
-    # batting query.
+    # batting query. The wide composite covers the live cohort-fallback
+    # group-by (spec §8.4) — find pool innings by innings_id, then
+    # GROUP BY position_bucket summing the measures straight from the
+    # index without a table lookup. (Index set to be re-measured in 3b
+    # per the CLAUDE.md perf rule; the join + best-batting indexes stay.)
     ib_idx = {} if incremental else {
-        "indexes": ["innings_id", "runs"],
+        "indexes": [
+            "innings_id", "runs",
+            ("innings_id", "position_bucket", "runs", "balls",
+             "fours", "sixes", "dots", "not_out"),
+        ],
     }
     await db.create(
         InningsBatterPerf, pk=["batter_id", "innings_id"],
@@ -170,7 +184,16 @@ async def _populate_innings_total(db, scope_clause: str = ""):
 
 async def _populate_innings_batter_perf(db, scope_clause: str = ""):
     """Per-(batter, innings) perf. Live SQL filters super_over=0 in the
-    records query, but we store everything and let the read filter."""
+    records query, but we store everything and let the read filter.
+
+    runs/balls/fours/sixes/dots/not_out are a single GROUP BY over
+    delivery. position_bucket needs delivery ORDER (order of appearance,
+    merged-opener convention), which a GROUP BY can't express, so it is
+    derived in a second Python pass (_fill_position_buckets) — the same
+    derive_positions() scan populate_playerscopestats_position does. Both
+    the full and incremental paths funnel through here, so the new
+    columns are filled on incremental ingest too (spec §8.4, Phase 3a).
+    """
     if scope_clause:
         inn_ids = await db.q(
             f"SELECT id FROM innings WHERE {scope_clause.replace('i.', '')}"
@@ -183,9 +206,13 @@ async def _populate_innings_batter_perf(db, scope_clause: str = ""):
     else:
         scope_d = ""
 
+    # position_bucket is seeded 0 here and overwritten by the Python pass
+    # below; dots matches the playerscopestats dot rule (legal ball, no
+    # run off the bat AND no run total — a leg-bye/bye is not a dot).
     sql = f"""
         INSERT INTO inningsbatterperf
-            (batter_id, innings_id, runs, balls, fours, sixes, not_out)
+            (batter_id, innings_id, runs, balls, fours, sixes, not_out,
+             position_bucket, dots)
         SELECT
             d.batter_id,
             d.innings_id,
@@ -199,7 +226,11 @@ async def _populate_innings_batter_perf(db, scope_clause: str = ""):
                 JOIN delivery d2 ON d2.id = w.delivery_id
                 WHERE d2.innings_id = d.innings_id
                   AND w.player_out_id = d.batter_id
-            ) THEN 0 ELSE 1 END AS not_out
+            ) THEN 0 ELSE 1 END AS not_out,
+            0 AS position_bucket,
+            SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
+                          AND d.runs_batter = 0 AND d.runs_total = 0
+                     THEN 1 ELSE 0 END) AS dots
         FROM delivery d
         WHERE d.batter_id IS NOT NULL {scope_d}
         GROUP BY d.batter_id, d.innings_id
@@ -207,7 +238,62 @@ async def _populate_innings_batter_perf(db, scope_clause: str = ""):
     async with db._engine.begin() as conn:
         from sqlalchemy import text
         result = await conn.execute(text(sql))
-        return result.rowcount
+        rowcount = result.rowcount
+
+    await _fill_position_buckets(db, scope_clause)
+    return rowcount
+
+
+async def _fill_position_buckets(db, scope_clause: str = ""):
+    """Second pass for _populate_innings_batter_perf: derive each row's
+    merged-opener position_bucket from delivery order and write it back.
+
+    Reuses derive_positions() + position_to_bucket() (the cohort
+    convention) so the per-innings table buckets identically to
+    playerscopestatsposition. derive_positions() yields positions for the
+    striker AND the non-striker of every innings; only striker rows exist
+    in inningsbatterperf, so non-striker-only ids simply match no row.
+    Batched 500 innings at a time (mirrors the position populate)."""
+    from sqlalchemy import text
+    if scope_clause:
+        inn_rows = await db.q(
+            f"SELECT id FROM innings WHERE {scope_clause.replace('i.', '')}"
+        )
+    else:
+        inn_rows = await db.q("SELECT id FROM innings")
+    innings_ids = [r["id"] for r in inn_rows]
+    if not innings_ids:
+        return
+
+    chunk = 500
+    for start in range(0, len(innings_ids), chunk):
+        sub = innings_ids[start:start + chunk]
+        sub_list = ",".join(str(i) for i in sub)
+        d_rows = await db.q(f"""
+            SELECT innings_id, over_number, delivery_index, id,
+                   batter_id, non_striker_id
+            FROM delivery
+            WHERE innings_id IN ({sub_list})
+            ORDER BY innings_id, over_number, delivery_index, id
+        """)
+        by_inn: dict[int, list[dict]] = defaultdict(list)
+        for d in d_rows:
+            by_inn[d["innings_id"]].append(d)
+        updates = []
+        for iid, ds in by_inn.items():
+            for pid, pos in derive_positions(ds).items():
+                updates.append(
+                    {"b": position_to_bucket(pos), "i": iid, "p": pid}
+                )
+        if updates:
+            async with db._engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "UPDATE inningsbatterperf SET position_bucket = :b "
+                        "WHERE innings_id = :i AND batter_id = :p"
+                    ),
+                    updates,
+                )
 
 
 async def _populate_match_bowler_perf(db, scope_clause: str = ""):

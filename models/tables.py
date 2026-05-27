@@ -960,7 +960,18 @@ class InningsBatterPerf:
     """Per-(batter, innings) batting performance — feeds best-individual
     -batting and any per-innings batting record list. not_out is denormal-
     ized from the EXISTS(wicket WHERE player_out_id = batter) check the
-    live query does inline."""
+    live query does inline.
+
+    position_bucket + dots were added for the live cohort fallback
+    (spec-player-baseline-aux-fallback.md §8.4, Phase 3a) so the filtered
+    "typical player" comparison groups each pool innings by the batter's
+    merged-opener position bucket without re-deriving batting order over
+    ~3M deliveries per request. position_bucket follows the cohort
+    convention exactly: 1 = opener (innings positions 1+2 merged), 2 = #3,
+    … 10 = #11 (api.innings_positions.derive_positions →
+    populate_playerscopestats_position.position_to_bucket). dots = legal
+    balls faced for no run off the bat AND no run total (matches the
+    playerscopestats dot rule)."""
     batter_id: ForeignKey[str, "person"]
     innings_id: ForeignKey[int, "innings"]
     runs: int
@@ -968,6 +979,8 @@ class InningsBatterPerf:
     fours: int
     sixes: int
     not_out: bool
+    position_bucket: int  # 1..10, merged-opener convention (see docstring)
+    dots: int  # legal balls faced for 0 runs_batter AND 0 runs_total
 
 
 class MatchBowlerPerf:
