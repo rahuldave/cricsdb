@@ -1,46 +1,53 @@
-# Next-session ideas — DOM-test rollout, then series_type FilterBar promotion
+# Next-session ideas — all-ball batting-runs convention + single source (then resume 3b)
 
 > **NO DEPLOYS gate is OFF** as of 2026-04-21. Resume normal deploy
 > cadence.
 
-## NEXT SESSION — top of queue (2026-05-26)
+## NEXT SESSION — top of queue (2026-05-27)
 
-**`spec-player-baseline-aux-fallback.md` — make the player "typical"
-comparison follow the six filters it ignores + the aux controls.**
-Build-ready spec committed 4d324bb; design fully agreed in conversation
-2026-05-26 (formal Roughdraft markup pending — re-open the spec at the
-start of next session in case the user wants to annotate; the CLI hits
-the known Node 25 / undici 60s timeout but the browser window opens).
+**`spec-batting-allball-runs-single-source.md` — fix the all-ball
+batting-runs convention + make `inningsbatterperf` the single per-innings
+source.** Build-ready spec committed df62afc; Roughdraft review pending
+(re-open at session start in case the user wants to annotate — CLI hits
+the Node 25 / undici timeout but the window opens). THIS BLOCKS 3b.
 
-Closes `audit-aux-params.md` §E items 1+2. Three phases (spec §3):
+Why it exists: building Phase-3a's parity cross-check surfaced that the
+player batting analytics drop a batsman's **no-ball off-bat runs**
+(legal-only — Kohli summary 13117 vs true 13166) and `inningsbatterperf`
+misses **pure non-striker innings**. Team side + records are correct;
+only the player batting side is wrong. Decision (option A + option 2):
+fix the convention to all-ball everywhere + single source of truth.
 
-1. **Phase 1 — controls (independent of the populate work, start here).**
-   (a) Build a reusable **toss** control patterned on the win/loss
-   control (`PlayerResultFilter` → shared `ResultFilter`); writes
-   `toss_outcome`. **Mount surface is TBD and NOT player pages** — build
-   it, test it by mounting on a throwaway surface in an integration test,
-   mount for real later. (b) Mount the existing **win/loss** control on
-   `/batting`, `/bowling`, `/fielding` (today it's only on `/players`;
-   backend already wired → immediately functional).
-2. **Phase 2 — `player_toss_clause`** in `api/filters.py` (peer of
-   `player_result_clause`), wired at EVERY player value call site
-   (batting ×3 / bowling ×4 / fielding ×3 / keeping ×2). URL-settable, no
-   widget on player pages yet.
-3. **Phase 3 — per-innings table + live cohort fallback** (the big one).
-   3a: extend `inningsbatterperf` with `position_bucket` + `dots`
-   (rebuild, NOT ALTER — back up the DB first; fill via
-   `innings_positions.derive_positions()`; the incremental path in
-   `populate_records_aggregates.py` + `update_recent.py` must fill them;
-   add the covering index; parity-test table == precompute). 3b–3e: route
-   each cohort compute fn through `is_precomputed_scope` → a live
-   aggregation that reads the extended table and reuses the team-side
-   `_cohort_outcome_clause` / `_option_b_team_inning` for narrowing.
+Start at the spec's **§7 sequencing**, step 1 = enumerate + classify the
+`batting.py` `runs_batter` sites (runs-sums to convert vs legitimate
+balls/dots legal-filters). Then: complete `inningsbatterperf` with
+non-striker innings (rebuild, NOT ALTER — back up to `tmp/` first; records
+audit per §6.2); re-derive `playerscopestatsposition` as a rollup of
+`inningsbatterperf` (exact-integer parity); convention-fix the read
+queries + parent + phase/over batting cohort populates so the own number
+and cohort move together; re-baseline + REG→NEW flips + docs (incl.
+`docs/api.md`). Local DB was already rebuilt once for 3a; this rebuilds
+it again. Backup: `tmp/cricket.db.bak-phase3a` (gitignored).
 
-Key decisions locked (spec §2): no CIs now (later, cross-cutting player +
-team); team-side support cliff later; fielding stays keeper-binary;
-sample size reported in the existing comparison-chip tooltip only (no new
-own-number tooltip — own sample is already the Matches/Innings tiles);
-fairness rule = both own number AND comparison narrow together.
+**THEN resume `spec-player-baseline-aux-fallback.md` at Phase 3b** (its §3
+has a ⏸ PAUSED banner). Once the convention fix lands, `inningsbatterperf`
+is convention-correct + complete, so 3b's live aggregation reading it
+will match the precomputed path by construction. 3b–3e: route each cohort
+compute fn through `is_precomputed_scope` → a live aggregation that reads
+the per-innings table and reuses the team-side `_cohort_outcome_clause` /
+`_option_b_team_inning` for the six-filter narrowing.
+
+SHIPPED this session (commits eb52569→df62afc, unpushed/undeployed):
+Phase 1 (Won/Lost filter on /batting,/bowling,/fielding + reusable
+TossFilter on an unlisted /dev/toss-filter route + toss counts on
+result-counts), Phase 2 (`player_toss_clause` at all 8 sites), Phase 3a
+(`inningsbatterperf` + `position_bucket`/`dots`, rebuilt 206429 rows,
+parity + incremental tests).
+
+Key decisions locked for 3b (aux-fallback spec §2): no CIs now (later,
+cross-cutting player + team); team-side support cliff later; fielding
+stays keeper-binary; sample size in the existing comparison-chip tooltip
+only; fairness rule = both own number AND comparison narrow together.
 
 This session's shipped work (pushed, NOT deployed) — commits
 3f744c6→04390c9: player "Teams played for" strip restructured to "N
