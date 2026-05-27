@@ -15,6 +15,11 @@
 #   3. Fielding /summary catches also drop under ?result=won.
 #   4. DOM: a "Result" pill row renders next to "Innings"; clicking Won
 #      sets ?result=won in the URL.
+#   5. The same Result row is mounted on the three discipline pages
+#      (/batting, /bowling, /fielding) beside their InningToggle, but
+#      ONLY for a selected player — the landing leaderboard view must
+#      show Innings alone (RED at HEAD: discipline pages had no Result
+#      row at all). Clicking Won writes ?result=won on each.
 #
 # Red-before-green via an isolated old-code worktree at HEAD.
 
@@ -94,9 +99,12 @@ ab open "$BASE/players?player=$PLAYER&gender=male"
 ab wait --load networkidle
 ab wait --text "Result"
 ab wait 1200
-# Per-discipline match count renders in the section head.
-headmatch=$(ab_eval "[...document.querySelectorAll('.wisden-player-section-matches')].some(e=>/match/.test(e.textContent))")
-[ "$headmatch" = "true" ] && ok "discipline heads show a 'matches' count" || bad "no 'matches' count on discipline heads"
+# The player profile surfaces a match count in the "Matches in scope"
+# block (per-discipline section heads dropped their own count in an
+# earlier redesign — class wisden-player-section-matches no longer
+# exists; this assertion tracks the current realization).
+headmatch=$(ab_eval "(()=>{const e=document.querySelector('.wisden-overall-matches-value');return !!e&&/[0-9]/.test(e.textContent)})()")
+[ "$headmatch" = "true" ] && ok "player profile shows a 'Matches in scope' count" || bad "no 'Matches in scope' count on player profile"
 labels=$(ab_eval "JSON.stringify([...document.querySelectorAll('.wisden-aux-filter-row .wisden-filter-label')].map(e=>e.textContent))")
 echo "  aux-row labels: $labels"
 case "$labels" in
@@ -110,6 +118,40 @@ case "$url_now" in
   *result=won*) ok "clicking Won sets ?result=won (url: $url_now)" ;;
   *) bad "Won click did not set result=won (url: $url_now)" ;;
 esac
+
+# --- 5. Result row mounted on the 3 discipline pages (spec §6.2) ---
+# Profile view: Result beside Innings + clicking Won writes the URL.
+# Landing view (no player): Innings alone — the result filter needs a
+# subject player and must NOT leak onto the leaderboard.
+for page in batting bowling fielding; do
+  ab open "$BASE/$page?player=$PLAYER&gender=male"
+  ab wait --load networkidle
+  ab wait --text "Result"
+  ab wait 1000
+  dlabels=$(ab_eval "JSON.stringify([...document.querySelectorAll('.wisden-aux-filter-row .wisden-filter-label')].map(e=>e.textContent))")
+  echo "  /$page aux labels (profile): $dlabels"
+  case "$dlabels" in
+    *Innings*Result*) ok "/$page: Result row renders next to Innings" ;;
+    *) bad "/$page: Result row not adjacent to Innings (got: $dlabels)" ;;
+  esac
+  ab_eval "(()=>{const b=[...document.querySelectorAll('.wisden-aux-filter-row button')].find(x=>x.textContent.trim().startsWith('Won'));b&&b.click();return 1})()" >/dev/null
+  ab wait 500
+  durl=$(ab_eval "location.search")
+  case "$durl" in
+    *result=won*) ok "/$page: clicking Won sets ?result=won" ;;
+    *) bad "/$page: Won click did not set result=won (url: $durl)" ;;
+  esac
+
+  ab open "$BASE/$page?gender=male"
+  ab wait --load networkidle
+  ab wait 800
+  llabels=$(ab_eval "JSON.stringify([...document.querySelectorAll('.wisden-aux-filter-row .wisden-filter-label')].map(e=>e.textContent))")
+  echo "  /$page aux labels (landing): $llabels"
+  case "$llabels" in
+    *Result*) bad "/$page landing: Result row leaked onto leaderboard (got: $llabels)" ;;
+    *) ok "/$page landing: Innings only, no Result row ($llabels)" ;;
+  esac
+done
 
 echo
 echo "=========================================="

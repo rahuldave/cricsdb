@@ -13,6 +13,7 @@ import ScopeIndicator from '../components/ScopeIndicator'
 import ScopedPageHeader from '../components/ScopedPageHeader'
 import { useDormancy } from '../components/DormancyContext'
 import InningToggle from '../components/InningToggle'
+import PlayerResultFilter from '../components/players/PlayerResultFilter'
 import StatCard from '../components/StatCard'
 import MetricDelta from '../components/MetricDelta'
 import BaselineChip from '../components/baseline/BaselineChip'
@@ -277,11 +278,15 @@ export default function Fielding() {
         {!playerId && <PlayerQuickStart discipline="fielding" basePath="/fielding" />}
       </div>
 
-      {/* InningToggle visible on BOTH the landing leaderboards
-          (top fielders + top keepers by_keeper_dismissals) and the
-          per-fielder profile. /fielders/leaders honours ?inning=
-          via commit 1's central clause. Spec §6.1. */}
-      <InningToggle />
+      {/* Page-local aux filters. InningToggle stays visible on BOTH the
+          landing leaderboards (top fielders + top keepers) and the per-
+          fielder profile — /fielders/leaders honours ?inning= (spec
+          §6.1). The won/lost result filter is profile-only (needs a
+          subject player) and wraps below on mobile. */}
+      <div className="wisden-aux-filter-row">
+        <InningToggle />
+        {playerId && <PlayerResultFilter playerId={playerId} filters={filters} />}
+      </div>
 
       {!playerId && <FieldingLandingBoard filters={filters} filterDeps={filterDeps} />}
 

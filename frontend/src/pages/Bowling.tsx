@@ -13,6 +13,7 @@ import ScopeIndicator from '../components/ScopeIndicator'
 import ScopedPageHeader from '../components/ScopedPageHeader'
 import { useDormancy } from '../components/DormancyContext'
 import InningToggle from '../components/InningToggle'
+import PlayerResultFilter from '../components/players/PlayerResultFilter'
 import StatCard from '../components/StatCard'
 import MetricDelta from '../components/MetricDelta'
 import BaselineChip from '../components/baseline/BaselineChip'
@@ -251,10 +252,15 @@ export default function Bowling() {
         {!playerId && <PlayerQuickStart discipline="bowling" basePath="/bowling" />}
       </div>
 
-      {/* InningToggle visible on BOTH the landing leaderboards and
-          the per-bowler profile — backend's /bowlers/leaders + the
-          per-bowler endpoints both honour ?inning=. Spec §6.1. */}
-      <InningToggle />
+      {/* Page-local aux filters. InningToggle stays visible on BOTH the
+          landing leaderboards and the per-bowler profile — backend's
+          /bowlers/leaders + the per-bowler endpoints both honour
+          ?inning= (spec §6.1). The won/lost result filter is profile-
+          only (needs a subject player) and wraps below on mobile. */}
+      <div className="wisden-aux-filter-row">
+        <InningToggle />
+        {playerId && <PlayerResultFilter playerId={playerId} filters={filters} />}
+      </div>
 
       {!playerId && <BowlingLandingBoard filters={filters} filterDeps={filterDeps} />}
 

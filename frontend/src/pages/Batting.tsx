@@ -13,6 +13,7 @@ import SeriesLink from '../components/SeriesLink'
 import FlagBadge from '../components/FlagBadge'
 import ScopeIndicator from '../components/ScopeIndicator'
 import InningToggle from '../components/InningToggle'
+import PlayerResultFilter from '../components/players/PlayerResultFilter'
 import StatCard from '../components/StatCard'
 import MetricDelta from '../components/MetricDelta'
 import BaselineChip from '../components/baseline/BaselineChip'
@@ -275,12 +276,17 @@ export default function Batting() {
         {!playerId && <PlayerQuickStart discipline="batting" basePath="/batting" />}
       </div>
 
-      {/* InningToggle visible on BOTH the landing leaderboards and the
-          per-player profile — backend's /batters/leaders + the per-
-          player endpoints both honour ?inning=. Mounted once here so
-          flipping the pill on the landing carries into the profile
-          view if the user clicks a leaderboard row. Spec §6.1. */}
-      <InningToggle />
+      {/* Page-local aux filters. InningToggle stays visible on BOTH the
+          landing leaderboards and the per-player profile — backend's
+          /batters/leaders + the per-player endpoints both honour
+          ?inning=, so flipping the pill on the landing carries into the
+          profile view if the user clicks a leaderboard row (spec §6.1).
+          The won/lost result filter is profile-only (needs a subject
+          player) and wraps below on mobile via wisden-aux-filter-row. */}
+      <div className="wisden-aux-filter-row">
+        <InningToggle />
+        {playerId && <PlayerResultFilter playerId={playerId} filters={filters} />}
+      </div>
 
       {!playerId && <BattingLandingBoard filters={filters} filterDeps={filterDeps} />}
 
