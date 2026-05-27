@@ -52,9 +52,12 @@ KOHLI=ba607b88
 SCOPE='tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&gender=male&team_type=club'
 # WHERE clause shared by every SQL anchor below — keep the API +
 # integration aligned by reading the same clauses at test runtime.
+# Runs are all-ball (spec-batting-allball-runs-single-source.md §2): no
+# legal gate. For this closed scope Kohli faced ≥1 legal ball every
+# innings, so the per-innings-runs sums go all-ball while the distinct-
+# innings count is unchanged.
 KOHLI_IPL_2024_WHERE="
 d.batter_id = '$KOHLI'
-AND d.extras_wides = 0 AND d.extras_noballs = 0
 AND m.event_name = 'Indian Premier League'
 AND m.season = '2024'
 AND i.super_over = 0

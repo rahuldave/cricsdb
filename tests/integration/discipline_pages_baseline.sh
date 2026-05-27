@@ -81,8 +81,9 @@ echo "Test 1: /batting Kohli IPL 2016 (stable historical scope)"
 ab open "$BASE/batting?player=$KOHLI&tournament=$IPL_URL&season_from=2016&season_to=2016"
 sleep 3
 
-# SQL-anchored expected average: SUM(runs_batter on legal balls) /
-# COUNT(wicket rows where player_out_id=Kohli, not retired-hurt).
+# SQL-anchored expected average: SUM(runs_batter over ALL balls — all-ball
+# convention §2) / COUNT(wicket rows where player_out_id=Kohli, not
+# retired-hurt).
 sql_runs=$(sql "
   SELECT SUM(d.runs_batter) FROM delivery d
   JOIN innings i ON i.id = d.innings_id
@@ -90,7 +91,6 @@ sql_runs=$(sql "
   WHERE d.batter_id = '$KOHLI' AND i.super_over = 0
     AND m.event_name = 'Indian Premier League'
     AND m.season = '2016'
-    AND d.extras_wides = 0 AND d.extras_noballs = 0
 ")
 sql_dismissals=$(sql "
   SELECT COUNT(*) FROM wicket w

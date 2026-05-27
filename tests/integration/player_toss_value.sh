@@ -44,15 +44,17 @@ echo "=== player OWN values · toss_outcome ==="
 all_runs=$(val "$API/api/v1/batters/$P/summary?gender=male" runs)
 won_runs=$(val "$API/api/v1/batters/$P/summary?gender=male&toss_outcome=won" runs)
 lost_runs=$(val "$API/api/v1/batters/$P/summary?gender=male&toss_outcome=lost" runs)
+# All-ball runs (spec-batting-allball-runs-single-source.md §2): no legal
+# gate on the runs sum — off-bat runs off no-balls count.
 sql_won=$(sqlite3 "$DB" "
 SELECT SUM(d.runs_batter) FROM delivery d JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id
 JOIN matchplayer mp ON mp.match_id=m.id AND mp.person_id='$P'
-WHERE d.batter_id='$P' AND m.gender='male' AND d.extras_wides=0 AND d.extras_noballs=0
+WHERE d.batter_id='$P' AND m.gender='male'
   AND i.super_over=0 AND m.toss_winner=mp.team;")
 sql_lost=$(sqlite3 "$DB" "
 SELECT SUM(d.runs_batter) FROM delivery d JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id
 JOIN matchplayer mp ON mp.match_id=m.id AND mp.person_id='$P'
-WHERE d.batter_id='$P' AND m.gender='male' AND d.extras_wides=0 AND d.extras_noballs=0
+WHERE d.batter_id='$P' AND m.gender='male'
   AND i.super_over=0 AND m.toss_winner IS NOT NULL AND m.toss_winner!=mp.team;")
 echo "  batting runs all=$all_runs won=$won_runs lost=$lost_runs (SQL won=$sql_won lost=$sql_lost)"
 [ "$won_runs" = "$sql_won" ]  && ok "batting won-toss runs match SQL ($won_runs)"  || bad "won-toss runs $won_runs != SQL $sql_won"

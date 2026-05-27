@@ -66,11 +66,12 @@ TOP_TEAM_SQL="${TOP_TEAM//\~/ }"
 echo "  top team: $TOP_TEAM_SQL  (API runs=$api_runs wkts=$api_wkts catches=$api_catches)"
 
 # --- 2. SQL-anchored per-team totals (canonical predicates) ---
+# All-ball runs (spec-batting-allball-runs-single-source.md §2): no legal gate on the runs sum.
 sql_runs=$(sqlite3 "$DB" "
 SELECT COALESCE(SUM(d.runs_batter),0)
 FROM delivery d JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id
 JOIN matchplayer mp ON mp.match_id=m.id AND mp.person_id=d.batter_id
-WHERE d.batter_id='$PLAYER' AND m.gender='male' AND d.extras_wides=0 AND d.extras_noballs=0
+WHERE d.batter_id='$PLAYER' AND m.gender='male'
   AND i.super_over=0 AND mp.team='$TOP_TEAM_SQL';")
 sql_wkts=$(sqlite3 "$DB" "
 SELECT COUNT(*)

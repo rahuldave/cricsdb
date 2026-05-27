@@ -50,6 +50,9 @@ fi
 
 # 2. SQL anchor at wd=0 — same window-function aggregate the endpoint
 # uses, against the same scope (gender=male, team_type=international).
+# All-ball convention (spec-batting-allball-runs-single-source.md §X9):
+# runs summed over ALL deliveries at this wickets-down state, balls the
+# legal-only count — matching _inter_wicket_cohort_sr after the fix.
 sql_csr_wd0=$(sqlite3 "$DB" <<'SQL'
 WITH delivery_wd AS (
   SELECT
@@ -73,10 +76,11 @@ WITH delivery_wd AS (
   WHERE m.gender = 'male' AND m.team_type = 'international'
     AND i.super_over = 0
 )
-SELECT ROUND(SUM(COALESCE(runs_batter,0)) * 100.0 / COUNT(*), 2)
+SELECT ROUND(
+         SUM(COALESCE(runs_batter,0)) * 100.0
+         / SUM(CASE WHEN extras_wides = 0 AND extras_noballs = 0 THEN 1 ELSE 0 END), 2)
 FROM delivery_wd
-WHERE extras_wides = 0 AND extras_noballs = 0
-  AND wickets_down = 0;
+WHERE wickets_down = 0;
 SQL
 )
 echo "  SQL cohort_strike_rate at wd=0: $sql_csr_wd0"

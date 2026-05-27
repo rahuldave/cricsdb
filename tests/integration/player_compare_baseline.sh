@@ -58,16 +58,16 @@ echo "Test 1: Kohli /players?player=ba607b88&tournament=Indian+Premier+League"
 ab open "$BASE/players?player=ba607b88&tournament=Indian+Premier+League"
 sleep 3
 
-# Bold value for Avg = 40.03 (9126 runs / 228 dismissals post-
-# non-striker-fix; SQL truth derived at runtime).
+# Bold value for Avg = all-ball IPL runs / dismissals (SQL truth derived
+# at runtime). Runs are all-ball (spec-batting-allball-runs-single-source
+# §2) — no legal gate on the numerator.
 sql_avg=$(sqlite3 "$DB" "
   SELECT printf('%.2f',
     1.0 * (SELECT SUM(d.runs_batter) FROM delivery d
            JOIN innings i ON i.id = d.innings_id
            JOIN match m ON m.id = i.match_id
            WHERE d.batter_id = 'ba607b88' AND i.super_over = 0
-             AND m.event_name = 'Indian Premier League'
-             AND d.extras_wides = 0 AND d.extras_noballs = 0)
+             AND m.event_name = 'Indian Premier League')
     /
     (SELECT COUNT(*) FROM wicket w
      JOIN delivery d ON d.id = w.delivery_id

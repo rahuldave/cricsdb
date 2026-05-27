@@ -63,10 +63,11 @@ fi
 # --- 2. batting summary respects ?result=won ---
 all_runs=$(val "$API/api/v1/batters/$PLAYER/summary?gender=male" runs)
 won_runs=$(val "$API/api/v1/batters/$PLAYER/summary?gender=male&result=won" runs)
+# All-ball runs (spec-batting-allball-runs-single-source.md §2): no legal gate on the runs sum.
 sql_won=$(sqlite3 "$DB" "
 SELECT SUM(d.runs_batter) FROM delivery d JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id
 JOIN matchplayer mp ON mp.match_id=m.id AND mp.person_id='$PLAYER'
-WHERE d.batter_id='$PLAYER' AND m.gender='male' AND d.extras_wides=0 AND d.extras_noballs=0
+WHERE d.batter_id='$PLAYER' AND m.gender='male'
   AND i.super_over=0 AND m.outcome_winner=mp.team;")
 echo "  batting runs all=$all_runs won=$won_runs (SQL won=$sql_won)"
 [ "$won_runs" = "$sql_won" ] && ok "batting won-runs match SQL ($won_runs)" || bad "won-runs $won_runs != SQL $sql_won"

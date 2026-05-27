@@ -210,15 +210,14 @@ assert_eq "Player Fielding · click All"           "$sql_smc_ctc_all" "$(catches
 echo
 echo "Test 4 · Players multi-tab dossier (Players.tsx → SinglePlayerView)"
 # The dossier landing renders PlayerProfile (no Matches stat-card)
-# — anchor on the Runs counter instead. SQL mirrors api/routers/
-# batting.py's _batting_filter (extras_wides=0, extras_noballs=0).
+# — anchor on the Runs counter instead. Runs are all-ball
+# (spec-batting-allball-runs-single-source.md §2): no legal gate.
 SMC_RUNS="
   SELECT SUM(d.runs_batter) FROM delivery d
   JOIN innings i ON i.id = d.innings_id
   JOIN match m ON m.id = i.match_id
   WHERE d.batter_id='e94915e6' AND m.gender='male'
     AND m.team_type='club' AND i.super_over=0
-    AND d.extras_wides=0 AND d.extras_noballs=0
 "
 sql_smc_runs_all=$(sql "$SMC_RUNS")
 sql_smc_runs_in0=$(sql "$SMC_RUNS AND i.innings_number=0")
