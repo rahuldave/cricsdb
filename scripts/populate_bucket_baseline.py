@@ -1298,9 +1298,10 @@ async def _populate_moments(db, cells=None):
             JOIN innings i ON i.id = d.innings_id
             JOIN match m ON m.id = i.match_id
             LEFT JOIN person p ON p.id = d.batter_id
+            -- All-ball highest individual innings (spec-batting-allball-
+            -- runs-single-source.md §2): no legal gate on the runs sum.
             WHERE i.super_over = 0 AND m.match_type IN ('T20', 'IT20')
               AND d.batter_id IS NOT NULL
-              AND d.extras_wides = 0 AND d.extras_noballs = 0
               {cf}
             GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season,
                      d.batter_id, m.id

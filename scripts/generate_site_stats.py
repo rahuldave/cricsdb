@@ -83,7 +83,7 @@ def main() -> None:
                 """
                 SELECT COALESCE(SUM(runs_batter), 0) as runs
                 FROM delivery
-                WHERE batter_id = ? AND extras_wides = 0 AND extras_noballs = 0
+                WHERE batter_id = ?
                 """,
                 (pid,),
             ).fetchone()
@@ -115,11 +115,10 @@ def main() -> None:
         row = c.execute(
             """
             SELECT
-                COUNT(*) as balls,
+                SUM(CASE WHEN extras_wides = 0 AND extras_noballs = 0 THEN 1 ELSE 0 END) as balls,
                 COALESCE(SUM(runs_batter), 0) as runs
             FROM delivery
             WHERE batter_id = ? AND bowler_id = ?
-              AND extras_wides = 0 AND extras_noballs = 0
             """,
             (bat_id, bowl_id),
         ).fetchone()
