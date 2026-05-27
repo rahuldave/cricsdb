@@ -206,9 +206,16 @@ async def _populate_innings_batter_perf(db, scope_clause: str = ""):
     else:
         scope_d = ""
 
+    # runs/fours/sixes are summed over ALL the batter's deliveries
+    # (no-ball off-bat runs + boundaries are the batter's — all-ball
+    # convention, spec-batting-allball-runs-single-source.md §2). balls
+    # + dots stay legal-only (a no-ball is never a ball faced).
     # position_bucket is seeded 0 here and overwritten by the Python pass
     # below; dots matches the playerscopestats dot rule (legal ball, no
     # run off the bat AND no run total — a leg-bye/bye is not a dot).
+    # not_out EXCLUDES retired hurt/out — a retired batter is not out, so
+    # the rollup's dismissals = SUM(NOT not_out) matches the cohort's
+    # BATTER_DISMISSAL_EXCLUDED convention exactly (§5).
     sql = f"""
         INSERT INTO inningsbatterperf
             (batter_id, innings_id, runs, balls, fours, sixes, not_out,
@@ -226,6 +233,7 @@ async def _populate_innings_batter_perf(db, scope_clause: str = ""):
                 JOIN delivery d2 ON d2.id = w.delivery_id
                 WHERE d2.innings_id = d.innings_id
                   AND w.player_out_id = d.batter_id
+                  AND w.kind NOT IN ('retired hurt', 'retired out')
             ) THEN 0 ELSE 1 END AS not_out,
             0 AS position_bucket,
             SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
@@ -235,10 +243,48 @@ async def _populate_innings_batter_perf(db, scope_clause: str = ""):
         WHERE d.batter_id IS NOT NULL {scope_d}
         GROUP BY d.batter_id, d.innings_id
     """
+
+    # Pure non-striker innings: a player who was only ever at the
+    # non-striker's end (never faced a ball as striker) still batted in
+    # that innings (spec §4.3). The striker GROUP BY above produces no
+    # row for them, so insert a 0-runs/0-balls row per (non_striker,
+    # innings) with no existing striker row. position_bucket seeded 0 →
+    # filled by _fill_position_buckets (which already derives non-striker
+    # positions). not_out reflects a non-striker run-out (excl. retired).
+    ns_sql = f"""
+        INSERT INTO inningsbatterperf
+            (batter_id, innings_id, runs, balls, fours, sixes, not_out,
+             position_bucket, dots)
+        SELECT
+            ns.non_striker_id AS batter_id,
+            ns.innings_id,
+            0 AS runs, 0 AS balls, 0 AS fours, 0 AS sixes,
+            CASE WHEN EXISTS (
+                SELECT 1 FROM wicket w
+                JOIN delivery d2 ON d2.id = w.delivery_id
+                WHERE d2.innings_id = ns.innings_id
+                  AND w.player_out_id = ns.non_striker_id
+                  AND w.kind NOT IN ('retired hurt', 'retired out')
+            ) THEN 0 ELSE 1 END AS not_out,
+            0 AS position_bucket,
+            0 AS dots
+        FROM (
+            SELECT DISTINCT d.non_striker_id, d.innings_id
+            FROM delivery d
+            WHERE d.non_striker_id IS NOT NULL {scope_d}
+        ) ns
+        WHERE NOT EXISTS (
+            SELECT 1 FROM inningsbatterperf ib
+            WHERE ib.innings_id = ns.innings_id
+              AND ib.batter_id = ns.non_striker_id
+        )
+    """
     async with db._engine.begin() as conn:
         from sqlalchemy import text
         result = await conn.execute(text(sql))
         rowcount = result.rowcount
+        ns_result = await conn.execute(text(ns_sql))
+        rowcount += ns_result.rowcount
 
     await _fill_position_buckets(db, scope_clause)
     return rowcount

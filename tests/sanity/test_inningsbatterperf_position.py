@@ -97,10 +97,12 @@ def scope_parity(conn, gender: str, tourn: str, season: str):
             (iid,),
         ).fetchall()
         positions = derive_positions(ds)
+        striker_pids: set = set()
         for d in ds:
             b = d["batter_id"]
             if b is None:
                 continue
+            striker_pids.add(b)
             legal = d["extras_wides"] == 0 and d["extras_noballs"] == 0
             m = ref_metrics[(b, iid)]
             m[0] += d["runs_batter"]
@@ -112,8 +114,17 @@ def scope_parity(conn, gender: str, tourn: str, season: str):
                 m[3] += 1
             if d["runs_batter"] == 6:
                 m[4] += 1
-        for b in {d["batter_id"] for d in ds if d["batter_id"] is not None}:
-            ref_bucket[(b, iid)] = position_to_bucket(positions[b])
+        # Bucket every player who batted — striker OR non-striker —
+        # since inningsbatterperf now carries a row for pure non-striker
+        # innings too (spec §4.3). derive_positions yields both ends.
+        for pid in positions:
+            ref_bucket[(pid, iid)] = position_to_bucket(positions[pid])
+        # Pure non-striker rows: 0 runs/balls/dots/fours/sixes, mirroring
+        # the populate's non-striker INSERT. Touch the defaultdict to
+        # materialise the 0-row so the per-bucket COUNT(*) matches side A.
+        for pid in positions:
+            if pid not in striker_pids:
+                _ = ref_metrics[(pid, iid)]
 
     ref_by_bucket: dict[int, list[int]] = defaultdict(lambda: [0, 0, 0, 0, 0, 0])  # rows,runs,balls,dots,fours,sixes
     for key, metr in ref_metrics.items():
@@ -217,6 +228,74 @@ def main() -> int:
             n_inn > 0 and not mismatches,
             "; ".join(mismatches[:8]) or "0 innings — scope drifted?",
         )
+
+    # 2b. Non-striker completion (spec §4.3): inningsbatterperf must now
+    #     carry a row per (batter OR non-striker, innings) so the row
+    #     count equals the summary's _batting_innings_filter innings count
+    #     — and pure non-striker rows (0 runs, 0 balls) must exist.
+    print("\n  2b. Non-striker innings completion:")
+    for gender, tourn, season in PARITY_SCOPES:
+        tbl_rows = conn.execute(
+            """SELECT COUNT(*) AS c FROM inningsbatterperf ib
+               JOIN innings i ON i.id = ib.innings_id
+               JOIN match m ON m.id = i.match_id
+               WHERE m.gender=? AND m.event_name=? AND m.season=? AND i.super_over=0""",
+            (gender, tourn, season),
+        ).fetchone()["c"]
+        true_inn = conn.execute(
+            """SELECT COUNT(*) AS c FROM (
+                 SELECT DISTINCT pid, innings_id FROM (
+                   SELECT batter_id AS pid, innings_id FROM delivery WHERE batter_id IS NOT NULL
+                   UNION
+                   SELECT non_striker_id AS pid, innings_id FROM delivery WHERE non_striker_id IS NOT NULL
+                 ) u
+                 JOIN innings i ON i.id = u.innings_id
+                 JOIN match m ON m.id = i.match_id
+                 WHERE m.gender=? AND m.event_name=? AND m.season=? AND i.super_over=0
+               )""",
+            (gender, tourn, season),
+        ).fetchone()["c"]
+        all_passed &= check(
+            f"{tourn} {season} ({gender}): rows == (batter OR non-striker) innings",
+            tbl_rows == true_inn, f"table={tbl_rows} true={true_inn}",
+        )
+    ns_rows = conn.execute(
+        """SELECT COUNT(*) AS c FROM inningsbatterperf ib
+           WHERE ib.balls = 0 AND ib.runs = 0
+             AND NOT EXISTS (
+               SELECT 1 FROM delivery d
+               WHERE d.innings_id = ib.innings_id AND d.batter_id = ib.batter_id)"""
+    ).fetchone()["c"]
+    all_passed &= check(
+        "pure non-striker rows present (0 balls, never faced as striker)",
+        ns_rows > 0, f"count={ns_rows}",
+    )
+
+    # 2c. not_out semantics (records audit §6.2): not_out's complement is
+    #     a NON-RETIRED dismissal, matching the cohort's
+    #     BATTER_DISMISSAL_EXCLUDED. This locks the records `*` and the
+    #     Commit-3 rollup's dismissals = SUM(NOT not_out).
+    print("\n  2c. not_out excludes retired (records audit):")
+    bad = conn.execute("""
+        SELECT
+          SUM(CASE WHEN ib.not_out = 0 AND NOT EXISTS (
+                SELECT 1 FROM wicket w JOIN delivery d ON d.id = w.delivery_id
+                WHERE d.innings_id = ib.innings_id AND w.player_out_id = ib.batter_id
+                  AND w.kind NOT IN ('retired hurt','retired out'))
+               THEN 1 ELSE 0 END) AS out_without_dismissal,
+          SUM(CASE WHEN ib.not_out = 1 AND EXISTS (
+                SELECT 1 FROM wicket w JOIN delivery d ON d.id = w.delivery_id
+                WHERE d.innings_id = ib.innings_id AND w.player_out_id = ib.batter_id
+                  AND w.kind NOT IN ('retired hurt','retired out'))
+               THEN 1 ELSE 0 END) AS notout_with_dismissal
+        FROM inningsbatterperf ib
+    """).fetchone()
+    all_passed &= check(
+        "not_out=0 iff a non-retired dismissal exists (no leaks either way)",
+        bad["out_without_dismissal"] == 0 and bad["notout_with_dismissal"] == 0,
+        f"out_without_dismissal={bad['out_without_dismissal']} "
+        f"notout_with_dismissal={bad['notout_with_dismissal']}",
+    )
 
     # 3. Spot-check: the biggest innings in the first scope sits in the
     #    bucket derive_positions assigns it (ties a concrete row to the rule).
