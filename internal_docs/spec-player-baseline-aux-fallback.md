@@ -51,17 +51,19 @@ Each filter answers a real question (pools in §4): _"Is Kohli the best top-orde
   
 3. **Per-innings table + live comparison** (§8), commit-sliced:
   
-  - 3a. Extend `inningsbatterperf` (+`position_bucket`,+`dots`); rebuild populate + incremental + indexes + backup (§8.4). Parity-tested.
-    
-  - 3b. Batting live comparison (summary chip + distribution) reading the extended table.
-    
-  - 3c. Batting by-season / by-phase / by-over live.
-    
-  - 3d. Bowling live (raw deliveries grouped by over — no new table).
-    
-  - 3e. Fielding / keeping live (keeper-binary).
-    
-4. **Docs** — flip audit §A player rows ✗→✓; `server-vs-client-calcs.md`, `how-stats-calculated.md`, `data-pipeline.md` (new columns).
+
+- 3a. Extend `inningsbatterperf` (+`position_bucket`,+`dots`); rebuild populate + incremental + indexes + backup (§8.4). Parity-tested.
+  
+- 3b. Batting live comparison (summary chip + distribution) reading the extended table.
+  
+- 3c. Batting by-season / by-phase / by-over live.
+  
+- 3d. Bowling live (raw deliveries grouped by over — no new table).
+  
+- 3e. Fielding / keeping live (keeper-binary).
+  
+
+4. **Docs** — flip audit §A player rows ✗→✓; `server-vs-client-calcs.md`, `how-stats-calculated.md`, `data-pipeline.md` (new columns). **API docs (**`docs/api.md`**) — carry the Phase 1+2 additions that have no entry yet:** the `toss_won`/`toss_lost` fields on `/players/{id}/result-counts` (Phase 1), and the `toss_outcome` aux param now narrowing every player VALUE endpoint via `player_toss_clause` (Phase 2 — document alongside the existing `result`/`inning` aux rows). Note `/players/{id}/result-counts` itself is currently undocumented in `docs/api.md`; add the endpoint while there. Plus `user-help.md` for any user-visible control once the toss control is actually mounted.
   
 ## 4. The six filters and what the pool becomes
 Each pool is then weighted by the player's position mix (batting) / over mix (bowling); fielding uses keeper/outfielder, no weighting (D5).
