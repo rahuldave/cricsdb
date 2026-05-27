@@ -50,7 +50,9 @@ Each filter answers a real question (pools in §4): _"Is Kohli the best top-orde
 2. **Player's own toss.** `player_toss_clause` wired at every player value call site (§7). Own numbers narrow by toss (URL-settable).
   
 3. **Per-innings table + live comparison** (§8), commit-sliced:
-  
+
+  > **⏸ PAUSED after 3a (2026-05-27).** 3a (extend `inningsbatterperf` with `position_bucket` + `dots`) SHIPPED (commits 56b2a0e + 61ad94d). Building 3a's parity cross-check revealed that `inningsbatterperf` does **not** match the precomputed batting cohort (`playerscopestatsposition`): the player batting analytics drop a batsman's no-ball off-bat runs (legal-only convention) and `inningsbatterperf` misses pure non-striker innings. Using it for 3b as-is would make the "typical player" comparison jump at the gate boundary. **3b is paused pending the convention + single-source fix specced in `internal_docs/spec-batting-allball-runs-single-source.md`** (all-ball batting runs everywhere + complete `inningsbatterperf` with non-striker innings + re-derive `playerscopestatsposition` as a rollup of it). Once that lands, the per-innings table 3b reads is convention-correct and 3b's gate-parity holds by construction. Resume at 3b below.
+
 
 - 3a. Extend `inningsbatterperf` (+`position_bucket`,+`dots`); rebuild populate + incremental + indexes + backup (§8.4). Parity-tested.
   
