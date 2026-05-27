@@ -50,10 +50,16 @@ DEFAULT_DB = os.path.join(PROJECT_ROOT, "cricket.db")
 from api.innings_positions import derive_positions
 from scripts.populate_playerscopestats_position import position_to_bucket
 
-# Closed, stable scope (won't drift) per feedback_stable_historical_test_scopes.
-SCOPE_TOURNAMENT = "Indian Premier League"
-SCOPE_SEASON = "2016"
-SCOPE_GENDER = "male"
+# Closed, stable scopes (won't drift) per feedback_stable_historical_test_scopes.
+# Two scopes so the exact per-bucket parity isn't confined to men's franchise
+# T20 — the derivation is gender/format-agnostic, but the data shapes differ,
+# so a women's scope is a real second exercise. (gender, event_name, season)
+PARITY_SCOPES = [
+    ("male", "Indian Premier League", "2016"),
+    ("female", "Women's Big Bash League", "2018/19"),
+]
+
+NAMES = ["rows", "runs", "balls", "dots", "fours", "sixes"]
 
 
 def check(label: str, ok: bool, detail: str = "") -> bool:
@@ -65,56 +71,19 @@ def check(label: str, ok: bool, detail: str = "") -> bool:
     return ok
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--db", default=DEFAULT_DB)
-    args = parser.parse_args()
-    if not os.path.exists(args.db):
-        print(f"ERROR: {args.db} not found", file=sys.stderr)
-        return 1
-
-    print(f"Sanity: inningsbatterperf position_bucket + dots ({args.db})")
-    conn = sqlite3.connect(args.db)
-    conn.row_factory = sqlite3.Row
-    all_passed = True
-
-    # 1. Range integrity — no NULL, no 0-leak (0 is the populate seed),
-    #    1..10, dots in [0, balls].
-    print("\n  1. Range integrity:")
-    row = conn.execute("""
-        SELECT
-          COUNT(*) AS total,
-          SUM(CASE WHEN position_bucket IS NULL THEN 1 ELSE 0 END) AS pb_null,
-          SUM(CASE WHEN position_bucket = 0 THEN 1 ELSE 0 END) AS pb_zero,
-          SUM(CASE WHEN position_bucket < 1 OR position_bucket > 10 THEN 1 ELSE 0 END) AS pb_oor,
-          SUM(CASE WHEN dots IS NULL THEN 1 ELSE 0 END) AS dots_null,
-          SUM(CASE WHEN dots < 0 OR dots > balls THEN 1 ELSE 0 END) AS dots_bad
-        FROM inningsbatterperf
-    """).fetchone()
-    all_passed &= check(
-        "position_bucket NOT NULL, no 0-leak, BETWEEN 1 AND 10",
-        row["pb_null"] == 0 and row["pb_zero"] == 0 and row["pb_oor"] == 0,
-        f"null={row['pb_null']} zero={row['pb_zero']} oor={row['pb_oor']} total={row['total']}",
-    )
-    all_passed &= check(
-        "dots NOT NULL and within [0, balls]",
-        row["dots_null"] == 0 and row["dots_bad"] == 0,
-        f"null={row['dots_null']} bad={row['dots_bad']}",
-    )
-
-    # 2. From-deliveries parity for the fixed scope.
-    print(f"\n  2. From-deliveries parity ({SCOPE_TOURNAMENT} {SCOPE_SEASON} {SCOPE_GENDER}):")
+def scope_parity(conn, gender: str, tourn: str, season: str):
+    """Aggregate inningsbatterperf by position_bucket for one scope and
+    compare to a from-deliveries derivation. Returns
+    (n_innings, mismatches, ref_bucket) — mismatches empty = pass;
+    ref_bucket maps (batter_id, innings_id) -> bucket for the spot-check."""
     inn_ids = [r["id"] for r in conn.execute(
         """SELECT i.id FROM innings i JOIN match m ON m.id = i.match_id
            WHERE m.gender = ? AND m.event_name = ? AND m.season = ?
              AND i.super_over = 0""",
-        (SCOPE_GENDER, SCOPE_TOURNAMENT, SCOPE_SEASON),
+        (gender, tourn, season),
     ).fetchall()]
     if not inn_ids:
-        all_passed &= check("scope has innings", False, "0 innings — scope drifted?")
-        conn.close()
-        return 0 if all_passed else 1
-    print(f"       scope innings = {len(inn_ids)}")
+        return 0, ["0 innings — scope drifted?"], {}
 
     # (B) reference from raw deliveries.
     ref_metrics: dict[tuple, list[int]] = defaultdict(lambda: [0, 0, 0, 0, 0])  # runs,balls,dots,fours,sixes
@@ -166,30 +135,93 @@ def main() -> int:
            WHERE m.gender = ? AND m.event_name = ? AND m.season = ?
              AND i.super_over = 0
            GROUP BY ibp.position_bucket""",
-        (SCOPE_GENDER, SCOPE_TOURNAMENT, SCOPE_SEASON),
+        (gender, tourn, season),
     ).fetchall():
         tbl_by_bucket[r["bk"]] = [
             r["rows"], r["runs"], r["balls"], r["dots"], r["fours"], r["sixes"],
         ]
 
-    names = ["rows", "runs", "balls", "dots", "fours", "sixes"]
-    buckets = sorted(set(ref_by_bucket) | set(tbl_by_bucket))
     mismatches = []
-    for bk in buckets:
+    for bk in sorted(set(ref_by_bucket) | set(tbl_by_bucket)):
         ref = ref_by_bucket.get(bk, [0] * 6)
         tbl = tbl_by_bucket.get(bk, [0] * 6)
-        for j, nm in enumerate(names):
+        for j, nm in enumerate(NAMES):
             if ref[j] != tbl[j]:
                 mismatches.append(f"bucket {bk} {nm}: table={tbl[j]} deliveries={ref[j]}")
+    return len(inn_ids), mismatches, ref_bucket
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--db", default=DEFAULT_DB)
+    args = parser.parse_args()
+    if not os.path.exists(args.db):
+        print(f"ERROR: {args.db} not found", file=sys.stderr)
+        return 1
+
+    print(f"Sanity: inningsbatterperf position_bucket + dots ({args.db})")
+    conn = sqlite3.connect(args.db)
+    conn.row_factory = sqlite3.Row
+    all_passed = True
+
+    # 1. Range integrity — no NULL, no 0-leak (0 is the populate seed),
+    #    1..10, dots in [0, balls].
+    print("\n  1. Range integrity:")
+    row = conn.execute("""
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN position_bucket IS NULL THEN 1 ELSE 0 END) AS pb_null,
+          SUM(CASE WHEN position_bucket = 0 THEN 1 ELSE 0 END) AS pb_zero,
+          SUM(CASE WHEN position_bucket < 1 OR position_bucket > 10 THEN 1 ELSE 0 END) AS pb_oor,
+          SUM(CASE WHEN dots IS NULL THEN 1 ELSE 0 END) AS dots_null,
+          SUM(CASE WHEN dots < 0 OR dots > balls THEN 1 ELSE 0 END) AS dots_bad
+        FROM inningsbatterperf
+    """).fetchone()
     all_passed &= check(
-        f"per-bucket {names} match deliveries across {len(buckets)} buckets",
-        not mismatches,
-        "; ".join(mismatches[:8]),
+        "position_bucket NOT NULL, no 0-leak, BETWEEN 1 AND 10",
+        row["pb_null"] == 0 and row["pb_zero"] == 0 and row["pb_oor"] == 0,
+        f"null={row['pb_null']} zero={row['pb_zero']} oor={row['pb_oor']} total={row['total']}",
+    )
+    all_passed &= check(
+        "dots NOT NULL and within [0, balls]",
+        row["dots_null"] == 0 and row["dots_bad"] == 0,
+        f"null={row['dots_null']} bad={row['dots_bad']}",
     )
 
-    # 3. Spot-check: the biggest IPL-2016 innings sits in the bucket
-    #    derive_positions assigns it (ties a concrete row to the convention).
-    print("\n  3. Spot-check — top-scoring IPL 2016 innings:")
+    # Global exact dots reconciliation — every row's dots summed equals the
+    # raw count of legal no-run deliveries (one striker faces each such
+    # ball), proving dots correct across ALL rows, not just the sampled
+    # parity scopes below.
+    gd = conn.execute("SELECT COALESCE(SUM(dots), 0) AS s FROM inningsbatterperf").fetchone()["s"]
+    raw = conn.execute(
+        """SELECT COUNT(*) AS c FROM delivery
+           WHERE batter_id IS NOT NULL AND extras_wides = 0 AND extras_noballs = 0
+             AND runs_batter = 0 AND runs_total = 0"""
+    ).fetchone()["c"]
+    all_passed &= check(
+        "SUM(dots) == raw legal no-run deliveries (global, exact)",
+        gd == raw, f"table={gd} raw={raw}",
+    )
+
+    # 2. From-deliveries parity per scope (both genders/formats).
+    print("\n  2. From-deliveries per-bucket parity:")
+    first_scope_ref: dict[tuple, int] = {}
+    for idx, (gender, tourn, season) in enumerate(PARITY_SCOPES):
+        n_inn, mismatches, ref_bucket = scope_parity(conn, gender, tourn, season)
+        if idx == 0:
+            first_scope_ref = ref_bucket
+            first_scope = (gender, tourn, season)
+        all_passed &= check(
+            f"{tourn} {season} ({gender}, {n_inn} innings): per-bucket "
+            f"{NAMES} match deliveries",
+            n_inn > 0 and not mismatches,
+            "; ".join(mismatches[:8]) or "0 innings — scope drifted?",
+        )
+
+    # 3. Spot-check: the biggest innings in the first scope sits in the
+    #    bucket derive_positions assigns it (ties a concrete row to the rule).
+    g, t, s = first_scope
+    print(f"\n  3. Spot-check — top-scoring {t} {s} innings:")
     top = conn.execute(
         """SELECT ibp.batter_id, ibp.innings_id, ibp.runs, ibp.position_bucket
            FROM inningsbatterperf ibp
@@ -198,9 +230,9 @@ def main() -> int:
            WHERE m.gender = ? AND m.event_name = ? AND m.season = ?
              AND i.super_over = 0
            ORDER BY ibp.runs DESC LIMIT 1""",
-        (SCOPE_GENDER, SCOPE_TOURNAMENT, SCOPE_SEASON),
+        (g, t, s),
     ).fetchone()
-    expected_bucket = ref_bucket.get((top["batter_id"], top["innings_id"]))
+    expected_bucket = first_scope_ref.get((top["batter_id"], top["innings_id"]))
     all_passed &= check(
         f"row (runs={top['runs']}) position_bucket matches derive_positions",
         top["position_bucket"] == expected_bucket,
