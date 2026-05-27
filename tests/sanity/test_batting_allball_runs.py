@@ -140,6 +140,37 @@ def main() -> int:
     ok &= check(f"sum(by-over runs) == summary runs ({alltime_runs})",
                 over_runs == alltime_runs, f"by_over={over_runs} summary={alltime_runs}")
 
+    # 4. Head-to-head batter-vs-bowler: same all-ball convention. Pick the
+    #    pair with the most no-ball off-bat deliveries so all-ball strictly
+    #    exceeds legal-only.
+    print("\n  4. Head-to-head (batter vs bowler):")
+    pair = conn.execute(
+        """SELECT d.batter_id AS bat, d.bowler_id AS bowl
+           FROM delivery d
+           WHERE d.extras_noballs > 0 AND d.runs_batter > 0
+             AND d.batter_id IS NOT NULL AND d.bowler_id IS NOT NULL
+           GROUP BY d.batter_id, d.bowler_id ORDER BY COUNT(*) DESC LIMIT 1""",
+    ).fetchone()
+    bat, bowl = pair
+    h2h = get(args.host, f"/api/v1/head-to-head/{bat}/{bowl}")["summary"]
+    pair_scope = " AND d.bowler_id = ?"
+    allball = conn.execute(
+        """SELECT COALESCE(SUM(d.runs_batter),0) FROM delivery d JOIN innings i ON i.id=d.innings_id
+           WHERE d.batter_id=? AND d.bowler_id=? AND i.super_over=0""", (bat, bowl)).fetchone()[0]
+    legalonly = conn.execute(
+        """SELECT COALESCE(SUM(d.runs_batter),0) FROM delivery d JOIN innings i ON i.id=d.innings_id
+           WHERE d.batter_id=? AND d.bowler_id=? AND i.super_over=0
+             AND d.extras_wides=0 AND d.extras_noballs=0""", (bat, bowl)).fetchone()[0]
+    legalballs = conn.execute(
+        """SELECT COUNT(*) FROM delivery d JOIN innings i ON i.id=d.innings_id
+           WHERE d.batter_id=? AND d.bowler_id=? AND i.super_over=0
+             AND d.extras_wides=0 AND d.extras_noballs=0""", (bat, bowl)).fetchone()[0]
+    ok &= check(f"H2H {bat} vs {bowl}: runs == all-ball SQL ({allball}) > legal-only ({legalonly})",
+                h2h["runs"] == allball and allball > legalonly,
+                f"api={h2h['runs']} allball={allball} legalonly={legalonly}")
+    ok &= check(f"H2H balls == legal-ball SQL ({legalballs})",
+                h2h["balls"] == legalballs, f"api={h2h['balls']} sql={legalballs}")
+
     conn.close()
     print("\n" + ("ALL PASS" if ok else "SOME FAILURES — see above"))
     return 0 if ok else 1

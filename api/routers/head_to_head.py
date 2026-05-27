@@ -19,6 +19,14 @@ def _safe_div(a, b, mul=1, ndigits=2):
     return round(a * mul / b, ndigits)
 
 
+# All-ball convention (spec-batting-allball-runs-single-source.md §2):
+# the batter-vs-bowler matchup counts the batter's runs/fours/sixes over
+# ALL his deliveries vs this bowler (no-ball off-bat runs included), so
+# base_clause no longer excludes wides/no-balls. Balls faced stay
+# legal-only via this CASE.
+_BALLS_LEGAL = "SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END)"
+
+
 @router.get("/{batter_id}/{bowler_id}")
 async def head_to_head(
     batter_id: str,
@@ -41,8 +49,6 @@ async def head_to_head(
     base_parts = [
         "d.batter_id = :batter_id",
         "d.bowler_id = :bowler_id",
-        "d.extras_wides = 0",
-        "d.extras_noballs = 0",
     ]
     if where:
         base_parts.append(where)
@@ -73,7 +79,7 @@ async def head_to_head(
         f"""
         SELECT
             COUNT(DISTINCT i.match_id) as matches,
-            COUNT(*) as balls,
+            {_BALLS_LEGAL} as balls,
             SUM(d.runs_batter) as runs,
             SUM(CASE WHEN d.runs_batter = 4
                      AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
@@ -143,7 +149,7 @@ async def head_to_head(
         f"""
         SELECT
             d.over_number,
-            COUNT(*) as balls,
+            {_BALLS_LEGAL} as balls,
             SUM(d.runs_batter) as runs
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
@@ -184,7 +190,7 @@ async def head_to_head(
                 WHEN d.over_number BETWEEN 6 AND 14 THEN 'middle'
                 WHEN d.over_number BETWEEN 15 AND 19 THEN 'death'
             END as phase,
-            COUNT(*) as balls,
+            {_BALLS_LEGAL} as balls,
             SUM(d.runs_batter) as runs
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
@@ -226,7 +232,7 @@ async def head_to_head(
         f"""
         SELECT
             m.season,
-            COUNT(*) as balls,
+            {_BALLS_LEGAL} as balls,
             SUM(d.runs_batter) as runs
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
@@ -266,7 +272,7 @@ async def head_to_head(
              ORDER BY md.date LIMIT 1) as date,
             m.event_name as tournament,
             m.venue,
-            COUNT(*) as balls,
+            {_BALLS_LEGAL} as balls,
             SUM(d.runs_batter) as runs,
             SUM(CASE WHEN d.runs_batter = 4
                      AND COALESCE(d.runs_non_boundary, 0) = 0 THEN 1 ELSE 0 END) as fours,
