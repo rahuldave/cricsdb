@@ -48,6 +48,12 @@ Tell for a wrong site: `SUM(runs_batter)` (or a `runs_batter = 4/6` count) sitti
 | D5 | **Schema change as a rebuild, not ALTER** (CLAUDE.md / `feedback_no_alter_drop_create`): back up first, edit model, DROP+CREATE on full populate, fill on incremental, re-baseline. |
 | D6 | **The own number and the cohort must move together.** A commit that shifts the summary's runs without the cohort (or vice-versa) leaves the comparison chip transiently apples-to-oranges; sequence/test so each shipped step is self-consistent (§7). |
 
+### Build deltas locked at implementation start (2026-05-27)
+- **D3 form:** the "shared rule" is a **shared helper** — `batting_delivery_contrib(d)` returning `(runs, is_four, is_six, legal_ball, dot)` — called by the parent + `batting_over` / `batting_phase` / `batting_phase_position` populates. One definition, can't drift.
+- **Populate ordering (augments §6.1):** the position cohort is currently built **before** `inningsbatterperf` in both `import_data.py` (position :528, records :592) and `update_recent.py` (position :349, records :405). The §5 rollup inverts that dependency, so records-aggregates must move **ahead of** the position populate in both chains.
+- **Deploy:** **held local until 3b lands** — read queries fix on a code deploy alone, but the cohort tables + `inningsbatterperf` need a prod DB rebuild; one deploy + one rebuild covers both. (D6 sequencing: separate commits within one session; the own↔cohort consistency test is asserted after the read-query fix.)
+- **Site enumeration (§7.1 output):** `internal_docs/allball-batting-sites.md`.
+
 ## 4. Scope — every surface that drops no-ball batting runs
 
 ### 4.1 Read queries (`api/routers/batting.py`)
