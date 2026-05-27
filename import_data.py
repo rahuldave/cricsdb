@@ -517,9 +517,21 @@ async def main():
     from scripts.populate_player_scope_stats import populate_full as pss_full
     await pss_full(db)
 
+    # Records aggregates run HERE (ahead of playerscopestats_position):
+    # the position child is now a rollup of inningsbatterperf
+    # (spec-batting-allball-runs-single-source.md §5/D2), so the per-
+    # innings batting table must exist before the rollup reads it. The
+    # other records tables (inningstotal / matchbowlerperf /
+    # matchfielderperf) come along for the ride — they depend only on
+    # raw deliveries/wickets, so position is the sole new dependency.
+    print("\nPopulating records aggregates (inningstotal + inningsbatterperf + matchbowlerperf)…")
+    from scripts.populate_records_aggregates import populate_full as records_full
+    await records_full(db)
+
     # Populate playerscopestats_position — per-position batting child
-    # of player_scope_stats. Drives the position-mix cohort baseline
-    # endpoints and the per-player position-distribution histograms.
+    # of player_scope_stats, now a rollup of inningsbatterperf (above).
+    # Drives the position-mix cohort baseline endpoints and the per-
+    # player position-distribution histograms.
     # Spec: internal_docs/spec-player-compare-average.md §4.2.
     print("\nPopulating playerscopestats_position…")
     from scripts.populate_playerscopestats_position import (
@@ -582,14 +594,9 @@ async def main():
     from scripts.populate_bucket_baseline import populate_full as bb_full
     await bb_full(db)
 
-    # Records-page precomputed aggregates — innings_total +
-    # innings_batter_perf + match_bowler_perf. Back the /series/records
-    # and /teams/{team}/records endpoints. Sub-second at all-cricket
-    # scope; without these the records request runs 5 full delivery
-    # scans (~13s).
-    print("\nPopulating records aggregates (inningstotal + inningsbatterperf + matchbowlerperf)…")
-    from scripts.populate_records_aggregates import populate_full as records_full
-    await records_full(db)
+    # (records aggregates moved up — see right after player_scope_stats;
+    # playerscopestats_position is now a rollup of inningsbatterperf and
+    # must run after it.)
 
     # Composite covering indexes + analyze for the leaderboard queries
     # on the Batting/Bowling landing pages. Without these, an unfiltered

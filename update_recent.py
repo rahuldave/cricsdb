@@ -342,9 +342,19 @@ async def main():
                 )
                 await pss_incr(db, new_match_ids)
 
+                # Records aggregates run HERE (ahead of position): the
+                # position child is now a rollup of inningsbatterperf
+                # (spec-batting-allball-runs-single-source.md §5/D2), so
+                # the per-innings table must be current for the touched
+                # matches before the rollup reads it.
+                from scripts.populate_records_aggregates import (
+                    populate_incremental as records_incr,
+                )
+                await records_incr(db, new_match_ids)
+
                 # playerscopestats_position — per-position batting
-                # child of player_scope_stats. Same touched-scope
-                # recompute strategy.
+                # child, now a rollup of inningsbatterperf (above).
+                # Same touched-scope recompute strategy.
                 from scripts.populate_playerscopestats_position import (
                     populate_incremental as pssp_incr,
                 )
@@ -398,13 +408,9 @@ async def main():
                 )
                 await bb_incr(db, new_match_ids)
 
-                # Records-page precomputed aggregates — innings_total +
-                # innings_batter_perf + match_bowler_perf. Deletes the
-                # touched-match rows and reinserts.
-                from scripts.populate_records_aggregates import (
-                    populate_incremental as records_incr,
-                )
-                await records_incr(db, new_match_ids)
+                # (records aggregates moved up — see right after
+                # player_scope_stats; the position rollup depends on
+                # inningsbatterperf being current first.)
 
                 # Refresh query planner stats and ensure leaderboard
                 # indexes exist. Index CREATE is a no-op if already

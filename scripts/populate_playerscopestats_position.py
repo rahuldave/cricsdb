@@ -24,14 +24,13 @@ Modes:
 Auto-called by import_data.py (full) and update_recent.py
 (incremental) immediately after the parent PlayerScopeStats populate.
 
-Position derivation is delegated to api.innings_positions —
-the same helper drives PlayerScopeStats, this child table, and (later)
-the fielding dismissed-batter-position child table; computing the
-vector once per innings and reusing is the contract.
-
-Aggregation excluded-kinds match the parent:
-  - Batter dismissals exclude 'retired hurt' / 'retired out'
-    (BATTER_DISMISSAL_EXCLUDED).
+D2 single source of truth (spec-batting-allball-runs-single-source.md
+§5): this table is a pure rollup of inningsbatterperf, grouped on
+person × position_bucket × scope fields. position_bucket already lives
+on each inningsbatterperf row (filled by derive_positions in the records
+populate), and not_out already excludes 'retired hurt' / 'retired out',
+so the cohort is all-ball + dismissal-convention-correct by construction
+and identical to the live (3b) aggregation reading the same table.
 """
 
 from __future__ import annotations
@@ -41,7 +40,6 @@ import asyncio
 import os
 import sys
 import time
-from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -50,13 +48,10 @@ from models import (
     Person, Match, MatchPlayer, Innings, Delivery, Wicket,
     PlayerScopeStatsPosition,
 )
-from api.innings_positions import derive_positions
 from scripts.populate_player_scope_stats import make_scope_key
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(PROJECT_ROOT, "cricket.db")
-
-BATTER_DISMISSAL_EXCLUDED = {"retired hurt", "retired out"}
 
 
 def position_to_bucket(pos: int) -> int:
@@ -68,40 +63,58 @@ def position_to_bucket(pos: int) -> int:
 
 
 class _Acc:
+    """One (person, scope_key, position_bucket) cell. Filled by summing
+    pre-aggregated inningsbatterperf GROUP BY rows (D2 rollup) — runs/
+    fours/sixes are all-ball, legal_balls/dots legal-only, by construction
+    of inningsbatterperf, so live (3b) and precomputed paths are identical.
+    """
     __slots__ = (
-        "innings_set", "runs", "legal_balls", "dots",
+        "innings", "runs", "legal_balls", "dots",
         "fours", "sixes", "dismissals",
         "thirties", "fifties", "hundreds", "ducks",
         "failures_10", "seventies",
     )
 
     def __init__(self):
-        self.innings_set: set[int] = set()
+        self.innings = 0
         self.runs = 0
         self.legal_balls = 0
         self.dots = 0
         self.fours = 0
         self.sixes = 0
         self.dismissals = 0
-        # Tier 1 of spec-apples-to-apples-baselines.md — per-position
-        # milestone counts. Filled by the post-aggregation pass that
-        # walks per-innings (batter, runs).
+        # Tier 1 (apples-to-apples) per-position milestone counts +
+        # PT1 (prob-baselines) failures_10 / seventies — all derived from
+        # each inningsbatterperf row's all-ball runs + not_out below.
         self.thirties = 0
         self.fifties = 0
         self.hundreds = 0
         self.ducks = 0
-        # PT1 of spec-prob-baselines.md — extra per-position milestone
-        # buckets for the batting ProbChip cohort baselines (failures
-        # threshold matches the P(≤10) chip predicate).
         self.failures_10 = 0
         self.seventies = 0
+
+    def add_group(self, r: dict) -> None:
+        """Accumulate one inningsbatterperf GROUP BY row into this cell."""
+        self.innings += r["innings"]
+        self.runs += r["runs"]
+        self.legal_balls += r["legal_balls"]
+        self.dots += r["dots"]
+        self.fours += r["fours"]
+        self.sixes += r["sixes"]
+        self.dismissals += r["dismissals"]
+        self.thirties += r["thirties"]
+        self.fifties += r["fifties"]
+        self.hundreds += r["hundreds"]
+        self.ducks += r["ducks"]
+        self.failures_10 += r["failures_10"]
+        self.seventies += r["seventies"]
 
     def to_row(self, person_id: str, scope_key: str, bucket: int) -> dict:
         return {
             "person_id": person_id,
             "scope_key": scope_key,
             "position_bucket": bucket,
-            "innings": len(self.innings_set),
+            "innings": self.innings,
             "runs": self.runs,
             "legal_balls": self.legal_balls,
             "dots": self.dots,
@@ -167,207 +180,78 @@ async def _ensure_tables(db, incremental: bool = False):
 async def _aggregate_matches(
     db, match_ids: list[int] | None
 ) -> dict[tuple[str, str, int], _Acc]:
-    """Aggregate per (person_id, scope_key, position_bucket) over the given matches.
+    """Roll up inningsbatterperf into per (person, scope_key, bucket) cells.
 
-    If match_ids is None, aggregates over every regular match.
+    D2 single-source-of-truth: every column is a GROUP BY of the per-
+    innings batting table (already all-ball runs + legal balls + the
+    non-striker rows from Commit 2), grouped on person × position_bucket
+    × the four scope fields that make_scope_key hashes. So this cohort is
+    convention-correct by construction and identical to the live (3b)
+    aggregation that reads the same table — no delivery rescan, no
+    re-derivation of batting order.
+
+    Milestones derive from each row's all-ball runs + not_out exactly as
+    the apples-to-apples / prob-baselines specs define them:
+    thirties/fifties/hundreds are the mutually-exclusive 30-49 / 50-99 /
+    100+ bands; seventies overlaps fifties (70-99); failures_10 = runs≤10;
+    ducks = dismissed for 0 (not_out already excludes retired).
+
+    If match_ids is None, rolls up every regular innings.
     """
     if match_ids is not None and not match_ids:
         return {}
 
-    # Match metadata keyed by id.
     if match_ids is None:
-        match_rows = await db.q("""
-            SELECT id, event_name AS tournament, season, gender, team_type
-            FROM match
-        """)
+        scope = ""
+        params: dict = {}
     else:
         id_list = ",".join(str(m) for m in match_ids)
-        match_rows = await db.q(f"""
-            SELECT id, event_name AS tournament, season, gender, team_type
-            FROM match
-            WHERE id IN ({id_list})
-        """)
-    match_meta: dict[int, dict] = {}
-    for r in match_rows:
-        match_meta[r["id"]] = {
-            "scope_key": make_scope_key(
-                r["tournament"], r["season"] or "",
-                r["gender"] or "", r["team_type"] or "",
-            ),
-        }
-    if not match_meta:
-        return {}
+        scope = f"AND i.match_id IN ({id_list})"
+        params = {}
 
-    # Innings list (regular only).
-    mid_list = ",".join(str(i) for i in match_meta.keys())
-    innings_rows = await db.q(f"""
-        SELECT id, match_id
-        FROM innings
-        WHERE super_over = 0
-          AND match_id IN ({mid_list})
-    """)
-    innings_match: dict[int, int] = {r["id"]: r["match_id"] for r in innings_rows}
-    innings_ids = list(innings_match.keys())
-    if not innings_ids:
-        return {}
+    group_rows = await db.q(f"""
+        SELECT
+            ib.batter_id AS pid,
+            ib.position_bucket AS bucket,
+            m.event_name AS tournament, m.season AS season,
+            m.gender AS gender, m.team_type AS team_type,
+            COUNT(*) AS innings,
+            SUM(ib.runs) AS runs,
+            SUM(ib.balls) AS legal_balls,
+            SUM(ib.dots) AS dots,
+            SUM(ib.fours) AS fours,
+            SUM(ib.sixes) AS sixes,
+            SUM(CASE WHEN ib.not_out = 0 THEN 1 ELSE 0 END) AS dismissals,
+            SUM(CASE WHEN ib.runs >= 30 AND ib.runs < 50 THEN 1 ELSE 0 END) AS thirties,
+            SUM(CASE WHEN ib.runs >= 50 AND ib.runs < 100 THEN 1 ELSE 0 END) AS fifties,
+            SUM(CASE WHEN ib.runs >= 100 THEN 1 ELSE 0 END) AS hundreds,
+            SUM(CASE WHEN ib.runs >= 70 AND ib.runs < 100 THEN 1 ELSE 0 END) AS seventies,
+            SUM(CASE WHEN ib.runs <= 10 THEN 1 ELSE 0 END) AS failures_10,
+            SUM(CASE WHEN ib.runs = 0 AND ib.not_out = 0 THEN 1 ELSE 0 END) AS ducks
+        FROM inningsbatterperf ib
+        JOIN innings i ON i.id = ib.innings_id
+        JOIN match m ON m.id = i.match_id
+        WHERE i.super_over = 0 {scope}
+        GROUP BY ib.batter_id, ib.position_bucket,
+                 m.event_name, m.season, m.gender, m.team_type
+    """, params)
 
+    # (event_name, season, gender, team_type) → scope_key is effectively
+    # injective, so each GROUP BY row maps to one cell; accumulate via a
+    # dict so any hash collision merges cleanly (and matches the parent
+    # populate's scope_key grouping).
     accs: dict[tuple[str, str, int], _Acc] = {}
-
-    def get_acc(person_id: str, scope_key: str, bucket: int) -> _Acc:
-        key = (person_id, scope_key, bucket)
+    for r in group_rows:
+        scope_key = make_scope_key(
+            r["tournament"], r["season"] or "",
+            r["gender"] or "", r["team_type"] or "",
+        )
+        key = (r["pid"], scope_key, r["bucket"])
         acc = accs.get(key)
         if acc is None:
             acc = _Acc()
             accs[key] = acc
-        return acc
-
-    # Tier 1 milestone bucketing (apples-to-apples). Stage per-innings
-    # (batter, runs) and dismissed-set during the deliveries + wickets
-    # passes, then drain into _Acc.thirties/fifties/hundreds/ducks at
-    # the end. Mirrors the parent populate's milestone pass but keyed
-    # to the per-position bucket so the cohort baseline can convex-
-    # combine over positions.
-    innings_runs: dict[tuple[str, int], int] = {}     # (batter_id, iid) -> runs this innings
-    innings_dismissed: set[tuple[str, int]] = set()   # (batter_id, iid) — dismissed this innings (excluding retired)
-
-    # Pass 1: deliveries — derive positions once per innings, then
-    # accumulate batting tallies into the per-bucket _Acc. The
-    # positions dict is saved so pass 2 (wickets) can look up the
-    # dismissed batter's bucket without re-fetching deliveries.
-    positions_by_innings: dict[int, dict[str, int]] = {}
-    chunk = 500
-    for start in range(0, len(innings_ids), chunk):
-        sub = innings_ids[start:start + chunk]
-        sub_list = ",".join(str(i) for i in sub)
-        d_rows = await db.q(f"""
-            SELECT id, innings_id, over_number, delivery_index,
-                   batter_id, non_striker_id,
-                   runs_batter, runs_total,
-                   extras_wides, extras_noballs
-            FROM delivery
-            WHERE innings_id IN ({sub_list})
-            ORDER BY innings_id, over_number, delivery_index, id
-        """)
-        deliveries_by_innings: dict[int, list[dict]] = defaultdict(list)
-        for d in d_rows:
-            deliveries_by_innings[d["innings_id"]].append(d)
-
-        for iid in sub:
-            ds = deliveries_by_innings.get(iid, [])
-            if not ds:
-                continue
-            mid = innings_match[iid]
-            scope_key = match_meta[mid]["scope_key"]
-            positions = derive_positions(ds)
-            positions_by_innings[iid] = positions
-
-            # Innings credit per (person, bucket). Also seed per-innings
-            # runs at 0 so non-strikers who never face a legal ball
-            # still get a milestone-bucket row at the end (relevant for
-            # ducks). Mirrors the parent populate's seeding pattern.
-            for pid, pos in positions.items():
-                bucket = position_to_bucket(pos)
-                get_acc(pid, scope_key, bucket).innings_set.add(iid)
-                innings_runs.setdefault((pid, iid), 0)
-
-            # Per-delivery: only the batter contributes; non_striker
-            # already counted via the innings credit above.
-            for d in ds:
-                bid = d["batter_id"]
-                if bid is None:
-                    continue
-                pos = positions.get(bid)
-                if pos is None:
-                    continue
-                bucket = position_to_bucket(pos)
-                legal = (d["extras_wides"] == 0 and d["extras_noballs"] == 0)
-                if not legal:
-                    continue
-                acc = get_acc(bid, scope_key, bucket)
-                acc.legal_balls += 1
-                rb = d["runs_batter"]
-                acc.runs += rb
-                # Track per-innings runs for milestone bucketing (Tier 1).
-                # Counted only on legal balls — matches the runs
-                # numerator above; mirrors parent populate semantics.
-                ir_key = (bid, iid)
-                innings_runs[ir_key] = innings_runs.get(ir_key, 0) + rb
-                # Dot rule matches parent populate: legal AND
-                # runs_batter=0 AND runs_total=0.
-                if rb == 0 and d["runs_total"] == 0:
-                    acc.dots += 1
-                if rb == 4:
-                    acc.fours += 1
-                elif rb == 6:
-                    acc.sixes += 1
-
-    # Pass 2: wickets — credit the dismissed batter's bucket.
-    for start in range(0, len(innings_ids), chunk):
-        sub = innings_ids[start:start + chunk]
-        sub_list = ",".join(str(i) for i in sub)
-        w_rows = await db.q(f"""
-            SELECT w.kind, w.player_out_id, d.innings_id
-            FROM wicket w
-            JOIN delivery d ON d.id = w.delivery_id
-            WHERE d.innings_id IN ({sub_list})
-        """)
-        for w in w_rows:
-            iid = w["innings_id"]
-            kind = w["kind"]
-            pout = w["player_out_id"]
-            if pout is None or kind in BATTER_DISMISSAL_EXCLUDED:
-                continue
-            positions = positions_by_innings.get(iid)
-            if positions is None:
-                continue
-            pos = positions.get(pout)
-            if pos is None:
-                continue
-            mid = innings_match[iid]
-            scope_key = match_meta[mid]["scope_key"]
-            bucket = position_to_bucket(pos)
-            get_acc(pout, scope_key, bucket).dismissals += 1
-            innings_dismissed.add((pout, iid))
-
-    # Tier 1 milestone post-pass — bucket per-innings runs into 30s /
-    # 50s / 100s / ducks per position bucket. Mirrors the parent
-    # populate's milestone pass; bucket attribution uses the batter's
-    # innings-start position (the same value `derive_positions`
-    # produced and that fed dismissal credit above).
-    for (pid, iid), runs in innings_runs.items():
-        positions = positions_by_innings.get(iid)
-        if positions is None:
-            continue
-        pos = positions.get(pid)
-        if pos is None:
-            continue
-        mid = innings_match.get(iid)
-        if mid is None:
-            continue
-        scope_key = match_meta[mid]["scope_key"]
-        bucket = position_to_bucket(pos)
-        acc = accs.get((pid, scope_key, bucket))
-        if acc is None:
-            continue
-        if runs >= 100:
-            acc.hundreds += 1
-        elif runs >= 50:
-            acc.fifties += 1
-        elif runs >= 30:
-            acc.thirties += 1
-        # PT1 of spec-prob-baselines.md — non-elif counters layered on
-        # top of the elif chain above. `seventies` overlaps `fifties`
-        # (both count 70 ≤ runs < 100) so `fifties` keeps the
-        # conventional "50-99" cricket meaning that Tier 1 (apples-to-
-        # apples) baselines and existing API consumers depend on.
-        # `failures_10` is independent of the chain; ducks (runs == 0)
-        # are a subset.
-        if 70 <= runs < 100:
-            acc.seventies += 1
-        if runs <= 10:
-            acc.failures_10 += 1
-        if runs == 0 and (pid, iid) in innings_dismissed:
-            acc.ducks += 1
+        acc.add_group(r)
 
     return accs
 

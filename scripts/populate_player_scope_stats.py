@@ -53,6 +53,7 @@ from models import (
     FieldingCredit, KeeperAssignment, Partnership, PlayerScopeStats,
 )
 from api.innings_positions import derive_positions
+from api.batting_convention import batting_delivery_contrib
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(PROJECT_ROOT, "cricket.db")
@@ -390,28 +391,28 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
                 legal = (d["extras_wides"] == 0 and d["extras_noballs"] == 0)
                 phase = _phase(d["over_number"])
 
-                # Batter side. Only legal balls count as faced.
+                # Batter side. All-ball convention (spec-batting-allball-
+                # runs-single-source.md §2): runs/fours/sixes over ALL the
+                # batter's deliveries; legal_balls/dots legal-only. Routed
+                # through the shared helper so it can't drift from the
+                # records table + the per-over/phase children (D3).
                 bid = d["batter_id"]
-                if bid is not None and legal:
+                if bid is not None:
                     acc = get_acc(bid, mid)
-                    acc.legal_balls += 1
-                    rb = d["runs_batter"]
-                    acc.runs += rb
-                    # Track per-innings runs for milestone bucketing (Q6).
-                    # Counted only on legal balls — matches the runs
-                    # numerator above.
+                    rb_runs, is4, is6, legal_ball, dot = batting_delivery_contrib(
+                        d["runs_batter"], d["runs_total"],
+                        d["extras_wides"], d["extras_noballs"],
+                    )
+                    acc.runs += rb_runs
+                    acc.legal_balls += legal_ball
+                    acc.dots += dot
+                    acc.fours += is4
+                    acc.sixes += is6
+                    # Per-innings runs for milestone bucketing (Q6) — now
+                    # all-ball, matching the runs numerator above and the
+                    # inningsbatterperf-based child milestones.
                     ir_key = (bid, iid)
-                    innings_runs[ir_key] = innings_runs.get(ir_key, 0) + rb
-                    # Dot rule mirrors api/routers/batting.py: legal AND
-                    # runs_batter=0 AND no extras. On a legal ball, no
-                    # wides/noballs, so runs_total=0 implies runs_batter,
-                    # byes, legbyes, penalty are all 0 — equivalent.
-                    if rb == 0 and d["runs_total"] == 0:
-                        acc.dots += 1
-                    if rb == 4:
-                        acc.fours += 1
-                    elif rb == 6:
-                        acc.sixes += 1
+                    innings_runs[ir_key] = innings_runs.get(ir_key, 0) + rb_runs
 
                 # Bowler side.
                 bow = d["bowler_id"]
