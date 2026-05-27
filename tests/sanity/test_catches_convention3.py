@@ -123,10 +123,15 @@ async def assert_summary_distribution_agree(
         person_id=person_id, filters=f, aux=a, as_of_date=AS_OF,
     )
 
-    s_catches = summary["catches"]
-    s_cb = summary["caught_and_bowled"]
-    d_total = dist["lifetime"]["catches"]["total"]
-    d_subs = dist["lifetime"]["substitute_catches"]
+    # /summary numeric fields are MetricEnvelope dicts ({value, scope_avg,
+    # …}) since the Phase-4 envelope migration — unwrap to the scalar.
+    def _val(x):
+        return x["value"] if isinstance(x, dict) else x
+
+    s_catches = _val(summary["catches"])
+    s_cb = _val(summary["caught_and_bowled"])
+    d_total = _val(dist["lifetime"]["catches"]["total"])
+    d_subs = _val(dist["lifetime"]["substitute_catches"])
 
     lhs = s_catches - d_subs
     out.append(check(
@@ -153,21 +158,21 @@ async def assert_summary_distribution_agree(
     # different SQL path.)
     out.append(check(
         f"{label}: summary.substitute_catches == distribution.substitute_catches",
-        summary["substitute_catches"] == d_subs,
-        f"summary={summary['substitute_catches']} distribution={d_subs}",
+        _val(summary["substitute_catches"]) == d_subs,
+        f"summary={_val(summary['substitute_catches'])} distribution={d_subs}",
     ))
 
     # Also cross-check stumpings + run_outs (no C&B subtlety here, but
     # a lock-down assertion against future divergence).
     out.append(check(
         f"{label}: summary.stumpings == sum(observations.stumpings) on dist",
-        summary["stumpings"] == sum(o.get("stumpings", 0) for o in dist["lifetime"]["observations"]),
-        f"summary={summary['stumpings']}",
+        _val(summary["stumpings"]) == sum(o.get("stumpings", 0) for o in dist["lifetime"]["observations"]),
+        f"summary={_val(summary['stumpings'])}",
     ))
     out.append(check(
         f"{label}: summary.run_outs == sum(observations.run_outs) on dist",
-        summary["run_outs"] == sum(o.get("run_outs", 0) for o in dist["lifetime"]["observations"]),
-        f"summary={summary['run_outs']}",
+        _val(summary["run_outs"]) == sum(o.get("run_outs", 0) for o in dist["lifetime"]["observations"]),
+        f"summary={_val(summary['run_outs'])}",
     ))
 
     return out

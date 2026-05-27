@@ -75,8 +75,9 @@ ANCHORS: dict[str, int] = {
     "P8": 30, "P9": 0, "P10": 30,
     "P11": 2, "P12": 2,
 
-    # INV-series — whole-DB partition
-    "INV1": 7573, "INV2": 4578, "INV3": 2995, "INV4": 0,
+    # INV-series — whole-DB partition (snapshot anchors; refreshed to the
+    # current club-T20 match count — the DB grew since these were last set)
+    "INV1": 7607, "INV2": 4612, "INV3": 2995, "INV4": 0,
 
     # G-series — cross-type silent-no-op (these MUST equal each other —
     # we assert the API returns the unbounded count, not zero)

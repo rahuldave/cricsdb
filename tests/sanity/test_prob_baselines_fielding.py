@@ -46,9 +46,12 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 DEFAULT_DB = os.path.join(PROJECT_ROOT, "cricket.db")
 DEFAULT_HOST = "http://localhost:8000"
 
+# P(=1) is higher_better (user override 2026-05-22, feedback_p_one_higher_better:
+# a match with at least one catch is intrinsically positive) — applied across
+# count distributions including fielding.
 EXPECTED_DIRECTIONS: dict[str, str | None] = {
     "p_zero":  "lower_better",
-    "p_one":   None,
+    "p_one":   "higher_better",
     "p_geq_2": "higher_better",
 }
 
@@ -111,11 +114,11 @@ def main() -> int:
         )
         print(line); all_passed &= ok
 
-    # ─── Test 3: delta_pct — p_one is null (descriptive) ───────────
-    print("\n  3. delta_pct null for p_one (descriptive):")
+    # ─── Test 3: delta_pct — p_one is directional (higher_better) ──
+    print("\n  3. delta_pct populated for p_one (higher_better):")
     p_one_delta = lifetime_ms["p_one"].get("delta_pct")
-    ok = p_one_delta is None
-    _, line = check("p_one delta_pct is None (no orientation)",
+    ok = p_one_delta is not None
+    _, line = check("p_one delta_pct populated (directional)",
                     ok, f"actual={p_one_delta}")
     print(line); all_passed &= ok
 

@@ -152,10 +152,13 @@ def assert_dossier_invariants(label: str, doss: dict) -> list[tuple[bool, str]]:
         runs_list = [o["runs"] for o in obs]
 
         def _check_pr(pr: dict, ctx: str) -> None:
+            # Required milestone-ProbRecord keys must be present. The record
+            # also carries cohort/CI fields (scope_avg, delta_pct, direction,
+            # sample_size) added by prob-baselines — allow them (superset).
             keys = {"value", "num", "denom", "ci_low", "ci_high"}
             results.append(check(
                 f"{label} · {ctx} ProbRecord shape",
-                set(pr.keys()) == keys,
+                keys.issubset(set(pr.keys())),
                 f"got {set(pr.keys())}",
             ))
             if pr["denom"] > 0:
@@ -305,9 +308,10 @@ async def assert_sql_anchor(
     """Invariant 10 — lifetime totals match a direct SQL aggregation."""
     results: list[tuple[bool, str]] = []
 
+    # Runs are all-ball (spec-batting-allball-runs-single-source.md §2): no
+    # legal gate on the WHERE; balls gates on legal in its CASE below.
     clauses = [
         "d.batter_id = :pid",
-        "d.extras_wides = 0", "d.extras_noballs = 0",
         "i.super_over = 0",
     ]
     params: dict = {"pid": person_id}
@@ -333,7 +337,8 @@ async def assert_sql_anchor(
         f"""
         SELECT COUNT(DISTINCT i.id) AS innings,
                SUM(d.runs_batter) AS runs,
-               COUNT(*) AS balls
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0
+                        THEN 1 ELSE 0 END) AS balls
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id

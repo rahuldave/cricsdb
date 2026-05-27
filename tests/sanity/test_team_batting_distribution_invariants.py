@@ -94,9 +94,11 @@ def check(label: str, ok: bool, detail: str = "") -> tuple[bool, str]:
 def assert_prob_record(label: str, pr: dict) -> list[tuple[bool, str]]:
     """Validate {value, num, denom, ci_low, ci_high} shape + bounds."""
     out = []
+    # Required keys present; cohort/CI fields (scope_avg, delta_pct,
+    # direction, sample_size) from prob-baselines are allowed (superset).
     keys = {"value", "num", "denom", "ci_low", "ci_high"}
     out.append(check(f"{label}: prob_record keys",
-                     set(pr.keys()) == keys,
+                     keys.issubset(set(pr.keys())),
                      f"got {set(pr.keys())}"))
 
     if pr["denom"] == 0:

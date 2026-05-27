@@ -81,7 +81,9 @@ def make_aux(*, scope_to_team=None, chip_team_class=None,
         scope_to_team=scope_to_team,
         chip_team_class=chip_team_class,
         chip_baseline_scope_json=chip_baseline_scope_json,
-        inning=inning,
+        # Real requests arrive with inning int-coerced by FastAPI; direct
+        # construction here must coerce too (the inning-flip does 1 - inning).
+        inning=int(inning) if inning is not None else None,
     )
 
 
