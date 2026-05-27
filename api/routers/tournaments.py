@@ -903,7 +903,6 @@ async def tournament_summary(
                 LEFT JOIN person p ON p.id = d.batter_id
                 WHERE i.super_over = 0 AND {where}{inn_clause}
                   AND d.batter_id IS NOT NULL
-                  AND d.extras_wides = 0 AND d.extras_noballs = 0
                 GROUP BY d.batter_id
                 ORDER BY runs DESC LIMIT 1""",
             params,
@@ -1042,7 +1041,6 @@ async def tournament_summary(
                 LEFT JOIN person p ON p.id = d.batter_id
                 WHERE i.super_over = 0 AND {where}{inn_clause}
                   AND d.batter_id IS NOT NULL
-                  AND d.extras_wides = 0 AND d.extras_noballs = 0
                 GROUP BY d.batter_id, m.id
                 ORDER BY runs DESC LIMIT 1""",
             params,
@@ -1450,7 +1448,6 @@ async def _summary_by_team(
             WHERE i.super_over = 0 AND {where}{inn_clause}
               AND i.team = :by_team
               AND d.batter_id IS NOT NULL
-              AND d.extras_wides = 0 AND d.extras_noballs = 0
             GROUP BY d.batter_id ORDER BY runs DESC LIMIT 1
             """,
             team_params,
@@ -1487,7 +1484,6 @@ async def _summary_by_team(
             WHERE i.super_over = 0 AND {where}{inn_clause}
               AND i.team = :by_team
               AND d.batter_id IS NOT NULL
-              AND d.extras_wides = 0 AND d.extras_noballs = 0
             GROUP BY d.batter_id, m.id ORDER BY runs DESC LIMIT 1
             """,
             team_params,
@@ -1645,7 +1641,6 @@ async def tournament_by_season(
           JOIN match m ON m.id = i.match_id
           WHERE i.super_over = 0 AND {where}{inn_clause}
             AND d.batter_id IS NOT NULL
-            AND d.extras_wides = 0 AND d.extras_noballs = 0
           GROUP BY m.season, d.batter_id
         )
         SELECT b.season AS season, b.batter_id AS person_id, p.name, b.runs AS runs
@@ -2239,15 +2234,14 @@ async def tournament_batters_leaders(
             f"""
             SELECT d.batter_id AS person_id,
                    SUM(d.runs_batter) AS runs,
-                   COUNT(*) AS balls
+                   SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS balls
             FROM delivery d
             JOIN innings i ON i.id = d.innings_id
             JOIN match m ON m.id = i.match_id
             WHERE d.batter_id IS NOT NULL
-              AND d.extras_wides = 0 AND d.extras_noballs = 0
               AND i.super_over = 0 AND {where}{inn_clause}
             GROUP BY d.batter_id
-            HAVING COUNT(*) >= :min_balls
+            HAVING SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) >= :min_balls
             """,
             {**params, "min_balls": min_balls},
         )
@@ -2374,12 +2368,12 @@ async def tournament_batter_scope_stats(
 
     agg_rows = await db.q(
         f"""
-        SELECT SUM(d.runs_batter) AS runs, COUNT(*) AS balls
+        SELECT SUM(d.runs_batter) AS runs,
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS balls
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE d.batter_id = :person_id
-          AND d.extras_wides = 0 AND d.extras_noballs = 0
           AND i.super_over = 0 AND {where}{inn_clause}
         """,
         params,
@@ -3653,7 +3647,6 @@ async def rivalry_summary(
         LEFT JOIN person p ON p.id = d.batter_id
         WHERE i.super_over = 0 AND {where}{inn_clause}
           AND d.batter_id IS NOT NULL
-          AND d.extras_wides = 0 AND d.extras_noballs = 0
         GROUP BY d.batter_id
         ORDER BY runs DESC LIMIT 1
         """,
@@ -3699,7 +3692,6 @@ async def rivalry_summary(
         LEFT JOIN person p ON p.id = d.batter_id
         WHERE i.super_over = 0 AND {where}{inn_clause}
           AND d.batter_id IS NOT NULL
-          AND d.extras_wides = 0 AND d.extras_noballs = 0
         GROUP BY d.batter_id, m.id
         ORDER BY runs DESC LIMIT 1
         """,

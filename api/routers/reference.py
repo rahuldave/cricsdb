@@ -541,7 +541,7 @@ async def player_teams(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         JOIN matchplayer mp ON mp.match_id = m.id AND mp.person_id = d.batter_id
-        WHERE d.batter_id = :pid AND d.extras_wides = 0 AND d.extras_noballs = 0{iclause}{team_filter}
+        WHERE d.batter_id = :pid{iclause}{team_filter}
         GROUP BY mp.team
         """,
         iparams,
