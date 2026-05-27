@@ -230,14 +230,14 @@ only numbers; add a rivalry lens (click a context link like "· vs
 Australia ›" elsewhere in the app) and the whole comparison is
 scoped to that rivalry.
 
-**Inline baseline (`vs base N`).** Every numeric stat on a player
+**Inline baseline (`vs cohort N`).** Every numeric stat on a player
 band carries a small subtitle showing how it compares to a *position-
 matched cohort* in the same scope. So Kohli's IPL Avg of `40.03`
-sits above `vs base 29.50 ↑ +35.7%` — meaning the average batter
+sits above `vs cohort 29.50 ↑ +35.7%` — meaning the average batter
 weighted to Kohli's position mix at IPL averaged 29.50, and Kohli
 beat that by 35.7%. The arrow is coloured green when better, red
-when worse. Hover the `vs base N` text to see exactly how the
-cohort was chosen — a one-line summary like *"Position-mix baseline
+when worse. Hover the `vs cohort N` text to see exactly how the
+cohort was chosen — a one-line summary like *"Position-mix cohort
 — Opener 51.7%, #3 34.3%, …; cohort: 735 players, 18,852
 innings."*
 

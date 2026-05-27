@@ -7,7 +7,7 @@
 # Phase H of the spec — exercises the FilterParams matrix on each
 # of /batting, /bowling, /fielding to confirm:
 #   - By Season LineChart still renders bi-series at every combo
-#   - At least one summary tile still carries a "vs base" chip
+#   - At least one summary tile still carries a "vs cohort" chip
 #
 # Plus a click-after-mount probe on each page: deep-link an
 # unnarrowed scope, then click a FilterBar control (venue typeahead
@@ -43,11 +43,11 @@ probe_chart() {
   })()" 2>/dev/null > /tmp/chart_probe.json
 }
 
-# Count "vs base" subtitles in the stat rows.
+# Count "vs cohort" subtitles in the stat rows.
 count_vs_base() {
   agent-browser eval --json "(() => {
     return Array.from(document.querySelectorAll('.wisden-statrow .wisden-stat-sub'))
-      .filter(s => s.textContent && s.textContent.includes('vs base')).length;
+      .filter(s => s.textContent && s.textContent.includes('vs cohort')).length;
   })()" 2>/dev/null > /tmp/chips.json
   python3 -c "import json; print(json.load(open('/tmp/chips.json'))['data']['result'])"
 }
@@ -88,9 +88,9 @@ print('yes' if ok else 'no')
   fi
   chips=$(count_vs_base)
   if [ "$chips" -ge 1 ]; then
-    ok "$label: ≥1 'vs base' chip on stat rows (=$chips)"
+    ok "$label: ≥1 'vs cohort' chip on stat rows (=$chips)"
   else
-    bad "$label: no 'vs base' chips found on stat rows"
+    bad "$label: no 'vs cohort' chips found on stat rows"
   fi
 }
 

@@ -5,7 +5,7 @@
 # + §6.3.
 #
 # Phase C ships /batting By Phase chips on SR, Dots, B/4 — each
-# phase block renders a "vs base N.NN" subtitle anchored against
+# phase block renders a "vs cohort N.NN" subtitle anchored against
 # /api/v1/scope/averages/players/batting/by-phase. Phase D extends
 # to /bowling (Economy, SR, Dots); Phase E extends to /fielding
 # (dismissals_per_match). Structure mirrors that order — each
@@ -87,12 +87,12 @@ for phase in powerplay middle death; do
     bad "/batting By Phase: $phase block not found"
     continue
   fi
-  # Each block must show "vs base N.NN" three times (SR, Dots, B/4)
-  vs_base_count=$(echo "$block" | grep -o "vs base " | wc -l | tr -d ' ')
+  # Each block must show "vs cohort N.NN" three times (SR, Dots, B/4)
+  vs_base_count=$(echo "$block" | grep -o "vs cohort " | wc -l | tr -d ' ')
   if [ "$vs_base_count" -ge 3 ]; then
-    ok "/batting By Phase: $phase has ≥3 'vs base' chips (=$vs_base_count)"
+    ok "/batting By Phase: $phase has ≥3 'vs cohort' chips (=$vs_base_count)"
   else
-    bad "/batting By Phase: $phase has only $vs_base_count 'vs base' chips, expected ≥3"
+    bad "/batting By Phase: $phase has only $vs_base_count 'vs cohort' chips, expected ≥3"
   fi
 
   # Confirm the chip's scope_avg value matches the API response. The
@@ -100,15 +100,15 @@ for phase in powerplay middle death; do
   # (B/4). API returns one decimal precision for SR/Dots already.
   api_sr=$(cohort_phase_metric "$cohort_url" "$phase" "strike_rate")
   api_sr_1=$(printf '%.1f' "$api_sr")
-  assert_contains "/batting By Phase: $phase SR chip cites API base $api_sr_1" "vs base $api_sr_1" "$block"
+  assert_contains "/batting By Phase: $phase SR chip cites API base $api_sr_1" "vs cohort $api_sr_1" "$block"
 
   api_dot=$(cohort_phase_metric "$cohort_url" "$phase" "dot_pct")
   api_dot_1=$(printf '%.1f' "$api_dot")
-  assert_contains "/batting By Phase: $phase Dots chip cites API base $api_dot_1" "vs base $api_dot_1" "$block"
+  assert_contains "/batting By Phase: $phase Dots chip cites API base $api_dot_1" "vs cohort $api_dot_1" "$block"
 
   api_b4=$(cohort_phase_metric "$cohort_url" "$phase" "balls_per_four")
   api_b4_2=$(printf '%.2f' "$api_b4")
-  assert_contains "/batting By Phase: $phase B/4 chip cites API base $api_b4_2" "vs base $api_b4_2" "$block"
+  assert_contains "/batting By Phase: $phase B/4 chip cites API base $api_b4_2" "vs cohort $api_b4_2" "$block"
 done
 
 # Helper for cohort by-phase metrics on the bowling endpoint.
@@ -148,25 +148,25 @@ for phase in powerplay middle death; do
     bad "/bowling By Phase: $phase block not found"
     continue
   fi
-  vs_base_count=$(echo "$block" | grep -o "vs base " | wc -l | tr -d ' ')
+  vs_base_count=$(echo "$block" | grep -o "vs cohort " | wc -l | tr -d ' ')
   if [ "$vs_base_count" -ge 3 ]; then
-    ok "/bowling By Phase: $phase has ≥3 'vs base' chips (=$vs_base_count)"
+    ok "/bowling By Phase: $phase has ≥3 'vs cohort' chips (=$vs_base_count)"
   else
-    bad "/bowling By Phase: $phase has only $vs_base_count 'vs base' chips, expected ≥3"
+    bad "/bowling By Phase: $phase has only $vs_base_count 'vs cohort' chips, expected ≥3"
   fi
 
   # Econ + SR are 2-decimal places (lower-is-better), Dots is 1.
   api_econ=$(cohort_phase_metric_bowling "$cohort_url" "$phase" "economy")
   api_econ_2=$(printf '%.2f' "$api_econ")
-  assert_contains "/bowling By Phase: $phase Econ chip cites API base $api_econ_2" "vs base $api_econ_2" "$block"
+  assert_contains "/bowling By Phase: $phase Econ chip cites API base $api_econ_2" "vs cohort $api_econ_2" "$block"
 
   api_sr=$(cohort_phase_metric_bowling "$cohort_url" "$phase" "strike_rate")
   api_sr_2=$(printf '%.2f' "$api_sr")
-  assert_contains "/bowling By Phase: $phase SR chip cites API base $api_sr_2" "vs base $api_sr_2" "$block"
+  assert_contains "/bowling By Phase: $phase SR chip cites API base $api_sr_2" "vs cohort $api_sr_2" "$block"
 
   api_dot=$(cohort_phase_metric_bowling "$cohort_url" "$phase" "dot_pct")
   api_dot_1=$(printf '%.1f' "$api_dot")
-  assert_contains "/bowling By Phase: $phase Dots chip cites API base $api_dot_1" "vs base $api_dot_1" "$block"
+  assert_contains "/bowling By Phase: $phase Dots chip cites API base $api_dot_1" "vs cohort $api_dot_1" "$block"
 done
 
 # Sanity — sub-phase blocks ("1–3", "4–6") must NOT carry chips,
@@ -178,7 +178,7 @@ for sub in "1–3" "4–6"; do
     bad "/bowling By Phase: sub-phase '$sub' block not found"
     continue
   fi
-  vs_base_count=$(echo "$block" | grep -o "vs base " | wc -l | tr -d ' ')
+  vs_base_count=$(echo "$block" | grep -o "vs cohort " | wc -l | tr -d ' ')
   if [ "$vs_base_count" -eq 0 ]; then
     ok "/bowling By Phase: sub-phase '$sub' has no chips (=0)"
   else
@@ -222,9 +222,9 @@ for phase in powerplay middle death; do
     bad "/fielding By Phase: $phase block not found"
     continue
   fi
-  vs_base_count=$(echo "$block" | grep -o "vs base " | wc -l | tr -d ' ')
+  vs_base_count=$(echo "$block" | grep -o "vs cohort " | wc -l | tr -d ' ')
   if [ "$vs_base_count" -eq 1 ]; then
-    ok "/fielding By Phase: $phase has exactly 1 'vs base' chip (Total/Match)"
+    ok "/fielding By Phase: $phase has exactly 1 'vs cohort' chip (Total/Match)"
   else
     bad "/fielding By Phase: $phase has $vs_base_count chips, expected exactly 1"
   fi
@@ -240,7 +240,7 @@ for phase in powerplay middle death; do
   # The cohort API rounds to 4 decimals; the UI re-formats to 3 via
   # MetricDelta's fmt=3. Truncate the API value to 3 decimals.
   api_dpm_3=$(printf '%.3f' "$api_dpm")
-  assert_contains "/fielding By Phase: $phase Total/Match chip cites API base $api_dpm_3" "vs base $api_dpm_3" "$block"
+  assert_contains "/fielding By Phase: $phase Total/Match chip cites API base $api_dpm_3" "vs cohort $api_dpm_3" "$block"
 done
 
 # ───────────────────────────────────────────────────────────────────
@@ -270,7 +270,7 @@ tt = json.load(open('/tmp/tt.json'))['data']['result']
 print(len([t for t in tt if t and 'Position-mix' in t]))
 ")
 if [ "$n" -ge 3 ]; then
-  ok "/batting By Phase: ≥3 chips carry 'Position-mix baseline' tooltip (=$n)"
+  ok "/batting By Phase: ≥3 chips carry 'Position-mix cohort' tooltip (=$n)"
 else
   bad "/batting By Phase: only $n chips have Position-mix tooltip, expected ≥3"
 fi

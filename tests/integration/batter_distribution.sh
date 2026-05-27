@@ -411,7 +411,9 @@ while IFS=$'\t' read -r label ci_low ci_high denom; do
     expected="95% CI [${fmt_lo}%–${fmt_hi}%], n=${denom}"
   fi
   dom_title=$(unq "$(ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] [title]')].find(el => el.innerText.startsWith('$label'))?.getAttribute('title') || ''")")
-  assert_eq "$label tooltip = API Wilson CI" "$expected" "$dom_title"
+  # The tooltip now appends a cohort comparison ("… · cohort N% (n=…)")
+  # from prob-baselines, so assert the CI substring is present (not eq).
+  assert_contains "$label tooltip = API Wilson CI" "$expected" "$dom_title"
 done <<< "$api_raw"
 
 # ─────────────────────────────────────────────────────────────────
@@ -431,9 +433,10 @@ settle 4
 ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button')].find(b => b.innerText.trim() === 'Strike Rate')?.click()" >/dev/null
 settle 1
 
-# Server SR — fetch from /summary
+# Server SR — fetch from /summary. strike_rate is a MetricEnvelope dict
+# ({value, scope_avg, …}) since the Phase-4 migration; unwrap to the scalar.
 api_summary_sr=$(curl -s "http://localhost:8000/api/v1/batters/$KOHLI/summary?$SCOPE" \
-  | python3 -c "import json, sys; print(json.load(sys.stdin)['strike_rate'])")
+  | python3 -c "import json, sys; sr=json.load(sys.stdin)['strike_rate']; print(sr['value'] if isinstance(sr, dict) else sr)")
 # Server runs + balls — fetch from /distribution
 api_dist_runs=$(curl -s "http://localhost:8000/api/v1/batters/$KOHLI/distribution?$SCOPE" \
   | python3 -c "import json, sys; d=json.load(sys.stdin)['lifetime']['runs']; print(d['total'])")

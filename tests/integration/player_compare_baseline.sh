@@ -7,7 +7,7 @@
 #
 #     Avg
 #     40.03                     ← bold value (existing)
-#     vs base 29.50  ↑ +35.7%   ← subtitle: MetricDelta with label="base"
+#     vs cohort 29.50  ↑ +35.7%   ← subtitle: MetricDelta with label="cohort"
 #
 # Pre-Phase 5 only the bold value rendered. This test locks the
 # three-tier rendering at known scopes (Kohli/Bumrah/Dhoni at IPL)
@@ -84,13 +84,13 @@ dom_avg=$(ab_eval "
 " | sed 's/"//g')
 assert_eq "Kohli IPL Avg bold value matches SQL" "$sql_avg" "$dom_avg"
 
-# Subtitle present: "vs base <num>"
+# Subtitle present: "vs cohort <num>"
 avg_sub=$(ab_eval "
   Array.from(document.querySelectorAll('.wisden-stat'))
     .find(s => s.querySelector('.wisden-stat-label')?.textContent?.trim() === 'Avg')
     ?.querySelector('.wisden-stat-sub')?.textContent?.trim()
 " | sed 's/"//g')
-assert_contains "Kohli IPL Avg subtitle has 'vs base'" "vs base " "$avg_sub"
+assert_contains "Kohli IPL Avg subtitle has 'vs cohort'" "vs cohort " "$avg_sub"
 assert_contains "Kohli IPL Avg subtitle has delta chip" "%" "$avg_sub"
 
 # scope_avg.value matches the API endpoint's scope_avg.
@@ -113,7 +113,7 @@ econ_sub=$(ab_eval "
     .pop()
     ?.querySelector('.wisden-stat-sub')?.textContent?.trim()
 " | sed 's/"//g')
-assert_contains "Bumrah IPL Econ subtitle has 'vs base'" "vs base " "$econ_sub"
+assert_contains "Bumrah IPL Econ subtitle has 'vs cohort'" "vs cohort " "$econ_sub"
 # Bumrah is significantly below cohort (he's elite). The delta is
 # negative (lower=better aligned) → green arrow ↓.
 assert_contains "Bumrah IPL Econ subtitle shows ↓ delta" "↓" "$econ_sub"
@@ -131,7 +131,7 @@ tooltip=$(ab_eval "
     .find(s => s.querySelector('.wisden-stat-label')?.textContent?.trim() === 'Avg')
     ?.querySelector('.wisden-stat-sub span[title]')?.getAttribute('title')
 " | sed 's/^"//; s/"$//')
-assert_contains "Tooltip names Position-mix baseline" "Position-mix baseline" "$tooltip"
+assert_contains "Tooltip names Position-mix cohort" "Position-mix cohort" "$tooltip"
 assert_contains "Tooltip names Opener bucket" "Opener" "$tooltip"
 assert_contains "Tooltip cites cohort player count" "players" "$tooltip"
 
@@ -169,7 +169,7 @@ dis_per_match=$(ab_eval "
     .find(s => s.querySelector('.wisden-stat-label')?.textContent?.trim() === 'Dis/Match')
     ?.querySelector('.wisden-stat-sub')?.textContent?.trim()
 " | sed 's/"//g')
-assert_contains "Dhoni Dis/Match subtitle present (keeper cohort active)" "vs base " "$dis_per_match"
+assert_contains "Dhoni Dis/Match subtitle present (keeper cohort active)" "vs cohort " "$dis_per_match"
 # Dhoni's keeper cohort baseline at IPL ≈ 0.9 (vs outfielder ≈ 0.36).
 # The presence of a value ≥0.5 in the subtitle indicates keeper cohort.
 assert_contains "Keeper cohort baseline visible in Dhoni subtitle (≥0.5)" "0." "$dis_per_match"

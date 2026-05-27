@@ -371,7 +371,7 @@ for r in rows:
         print(r.get('sub') or '')
         break
 ")
-assert_contains "/fielding stat-row: Dis/Match chip cites API base $api_base" "vs base $api_base" "$sub_text"
+assert_contains "/fielding stat-row: Dis/Match chip cites API base $api_base" "vs cohort $api_base" "$sub_text"
 
 # ───────────────────────────────────────────────────────────────────
 # C3 — /bowling By Over cohort econ baseline strip

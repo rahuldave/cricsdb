@@ -8,7 +8,7 @@
 # (commit 55c890a) on PlayerSummaryRow.tsx:
 #
 # - Batting band gains a second row of cols-6 tiles: 4s/Inn, 6s/Inn,
-#   Bndr/Inn, 30s/Inn, Dot%, B/Bndry — each with a "vs base N.NN" chip
+#   Bndr/Inn, 30s/Inn, Dot%, B/Bndry — each with a "vs cohort N.NN" chip
 #   anchored against /batters/{id}/summary's envelope scope_avg.
 # - 100s and 50s tiles (existing kernels in row 1) gain chip subtitles
 #   citing hundreds_per_innings + fifties_per_innings scope_avg.
@@ -108,7 +108,7 @@ sleep 3
 snapshot_tiles
 bat_url="$API/api/v1/batters/$KOHLI/summary?$SCOPE"
 
-# Row 2 — new per-innings rate tiles. Each must carry "vs base N"
+# Row 2 — new per-innings rate tiles. Each must carry "vs cohort N"
 # where N matches /batters/{id}/summary's envelope scope_avg.
 for combo in \
     "4s/Inn:fours_per_innings:%.2f" \
@@ -123,7 +123,7 @@ for combo in \
   api_v=$(summary_scope_avg "$bat_url" "$field")
   api_f=$(printf "$fmt" "$api_v")
   sub=$(tile_sub "$label")
-  assert_contains "Kohli /players Batting: $label chip cites base $api_f" "vs base $api_f" "$sub"
+  assert_contains "Kohli /players Batting: $label chip cites base $api_f" "vs cohort $api_f" "$sub"
 done
 
 # spec-rate-vs-volume-audit F1 — volume tiles (Runs, 100s, 50s, Ducks)
@@ -131,7 +131,7 @@ done
 # sibling per-innings rate tile that carries the chip instead.
 for label in "Runs" "100s" "50s" "Ducks"; do
   sub=$(tile_sub "$label")
-  assert_not_contains "Kohli /players Batting: $label tile MUST NOT carry chip" "vs base" "$sub"
+  assert_not_contains "Kohli /players Batting: $label tile MUST NOT carry chip" "vs cohort" "$sub"
 done
 
 # F1 — new per-innings rate tiles MUST exist and chip-cite the cohort
@@ -149,7 +149,7 @@ for combo in \
   api_v=$(summary_scope_avg "$bat_url" "$field")
   api_f=$(printf "$fmt" "$api_v")
   sub=$(tile_sub "$label")
-  assert_contains "Kohli /players Batting: $label chip cites base $api_f" "vs base $api_f" "$sub"
+  assert_contains "Kohli /players Batting: $label chip cites base $api_f" "vs cohort $api_f" "$sub"
 done
 
 # ───────────────────────────────────────────────────────────────────
@@ -172,7 +172,7 @@ for combo in \
   api_v=$(summary_scope_avg "$bowl_url" "$field")
   api_f=$(printf "$fmt" "$api_v")
   sub=$(tile_sub "$label")
-  assert_contains "Bumrah /players Bowling: $label chip cites base $api_f" "vs base $api_f" "$sub"
+  assert_contains "Bumrah /players Bowling: $label chip cites base $api_f" "vs cohort $api_f" "$sub"
 done
 
 # spec-rate-vs-volume-audit F3 — new volume tiles (Maiden Overs,
@@ -181,13 +181,13 @@ done
 for label in "Maiden Overs" "4-fers"; do
   assert_tile_present "Bumrah /players Bowling: $label tile exists" "$label"
   sub=$(tile_sub "$label")
-  assert_not_contains "Bumrah /players Bowling: $label tile MUST NOT carry chip" "vs base" "$sub"
+  assert_not_contains "Bumrah /players Bowling: $label tile MUST NOT carry chip" "vs cohort" "$sub"
 done
 assert_tile_present "Bumrah /players Bowling: 4-fers/Inn tile exists" "4-fers/Inn"
 fwh_v=$(summary_scope_avg "$bowl_url" "four_wicket_hauls_per_innings")
 fwh_f=$(printf "%.4f" "$fwh_v")
 sub=$(tile_sub "4-fers/Inn")
-assert_contains "Bumrah /players Bowling: 4-fers/Inn chip cites base $fwh_f" "vs base $fwh_f" "$sub"
+assert_contains "Bumrah /players Bowling: 4-fers/Inn chip cites base $fwh_f" "vs cohort $fwh_f" "$sub"
 
 # ───────────────────────────────────────────────────────────────────
 # Test 3 — Kohli /players: Fielding band per-match chips (Phase F)
@@ -205,7 +205,7 @@ fld_url="$API/api/v1/fielders/$KOHLI/summary?$SCOPE"
 # the sibling per-match rate tile.
 for label in "Catches" "Run-outs" "Stumpings"; do
   sub=$(tile_sub "$label")
-  assert_not_contains "Kohli /players Fielding: $label tile MUST NOT carry chip" "vs base" "$sub"
+  assert_not_contains "Kohli /players Fielding: $label tile MUST NOT carry chip" "vs cohort" "$sub"
 done
 
 # F2 — new per-match rate tiles must exist + carry the cohort chip.
@@ -220,7 +220,7 @@ for combo in \
   api_v=$(summary_scope_avg "$fld_url" "$field")
   api_f=$(printf "$fmt" "$api_v")
   sub=$(tile_sub "$label")
-  assert_contains "Kohli /players Fielding: $label chip cites base $api_f" "vs base $api_f" "$sub"
+  assert_contains "Kohli /players Fielding: $label chip cites base $api_f" "vs cohort $api_f" "$sub"
 done
 
 # Kohli has 0 stumpings → Stumpings/Match tile must be absent
@@ -239,7 +239,7 @@ fi
 dm_v=$(summary_scope_avg "$fld_url" "dismissals_per_match")
 dm_f=$(printf "%.3f" "$dm_v")
 sub=$(tile_sub "Dis/Match")
-assert_contains "Kohli /players Fielding: Dis/Match chip cites base $dm_f" "vs base $dm_f" "$sub"
+assert_contains "Kohli /players Fielding: Dis/Match chip cites base $dm_f" "vs cohort $dm_f" "$sub"
 
 # ───────────────────────────────────────────────────────────────────
 # Test 4 — Kohli /fielding deep-dive: F4 stat-row mirror
@@ -254,7 +254,7 @@ snapshot_tiles
 # Volume tiles MUST NOT carry chips (mirror of F2 on the deep-dive).
 for label in "Catches" "Run Outs" "Stumpings"; do
   sub=$(tile_sub "$label")
-  assert_not_contains "Kohli /fielding: $label tile MUST NOT carry chip" "vs base" "$sub"
+  assert_not_contains "Kohli /fielding: $label tile MUST NOT carry chip" "vs cohort" "$sub"
 done
 
 # New per-match rate tiles must exist + carry cohort chip.
@@ -268,7 +268,7 @@ for combo in \
   api_v=$(summary_scope_avg "$fld_url" "$field")
   api_f=$(printf "$fmt" "$api_v")
   sub=$(tile_sub "$label")
-  assert_contains "Kohli /fielding: $label chip cites base $api_f" "vs base $api_f" "$sub"
+  assert_contains "Kohli /fielding: $label chip cites base $api_f" "vs cohort $api_f" "$sub"
 done
 
 # Stumpings/Match absent at stumpings=0.
@@ -301,7 +301,7 @@ done
 # Volume tiles (Wickets, Maiden Overs, 4-fers) MUST NOT carry chips.
 for label in "Wickets" "Maiden Overs" "4-fers"; do
   sub=$(tile_sub "$label")
-  assert_not_contains "Bumrah /bowling: $label tile MUST NOT carry chip" "vs base" "$sub"
+  assert_not_contains "Bumrah /bowling: $label tile MUST NOT carry chip" "vs cohort" "$sub"
 done
 
 # Rate tiles MUST carry chips citing the matching envelope scope_avg.
@@ -315,7 +315,7 @@ for combo in \
   api_v=$(summary_scope_avg "$bowl_url" "$field")
   api_f=$(printf "$fmt" "$api_v")
   sub=$(tile_sub "$label")
-  assert_contains "Bumrah /bowling: $label chip cites base $api_f" "vs base $api_f" "$sub"
+  assert_contains "Bumrah /bowling: $label chip cites base $api_f" "vs cohort $api_f" "$sub"
 done
 
 # ───────────────────────────────────────────────────────────────────
@@ -336,21 +336,21 @@ done
 
 # Volume tiles MUST NOT carry chips.
 sub=$(tile_sub "Runs")
-assert_not_contains "Kohli /batting: Runs tile MUST NOT carry chip" "vs base" "$sub"
+assert_not_contains "Kohli /batting: Runs tile MUST NOT carry chip" "vs cohort" "$sub"
 sub=$(tile_sub "30s / 50s / 100s")
-assert_not_contains "Kohli /batting: 30s/50s/100s combined volume tile MUST NOT carry chip" "vs base" "$sub"
+assert_not_contains "Kohli /batting: 30s/50s/100s combined volume tile MUST NOT carry chip" "vs cohort" "$sub"
 
 # Runs/Inn chip cites the cohort.
 api_v=$(summary_scope_avg "$bat_url" "runs_per_innings")
 api_f=$(printf "%.2f" "$api_v")
 sub=$(tile_sub "Runs/Inn")
-assert_contains "Kohli /batting: Runs/Inn chip cites base $api_f" "vs base $api_f" "$sub"
+assert_contains "Kohli /batting: Runs/Inn chip cites base $api_f" "vs cohort $api_f" "$sub"
 
 # Bndr/Inn chip cites the cohort.
 api_v=$(summary_scope_avg "$bat_url" "boundaries_per_innings")
 api_f=$(printf "%.2f" "$api_v")
 sub=$(tile_sub "Bndr/Inn")
-assert_contains "Kohli /batting: Bndr/Inn chip cites base $api_f" "vs base $api_f" "$sub"
+assert_contains "Kohli /batting: Bndr/Inn chip cites base $api_f" "vs cohort $api_f" "$sub"
 
 # Combined milestone per-Inn tile shows all 3 base values in subtitle.
 hpi=$(summary_scope_avg "$bat_url" "hundreds_per_innings")

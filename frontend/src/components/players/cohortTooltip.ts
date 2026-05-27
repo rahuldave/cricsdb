@@ -4,10 +4,10 @@
  *
  *  Two phrasings depending on mix concentration:
  *    - Concentrated (one bucket ≥ 0.70):
- *        "Position-mix baseline — Opener (54% of innings); 287
+ *        "Position-mix cohort — Opener (54% of innings); 287
  *         players in cohort"
  *    - Spread (no bucket ≥ 0.70):
- *        "Position-mix baseline — Opener 54%, #3 28%, #4 12%, #5 6%;
+ *        "Position-mix cohort — Opener 54%, #3 28%, #4 12%, #5 6%;
  *         cohort: 412 players, 8,917 innings"
  *
  *  Fielding (keeper/outfielder binary) uses a different phrasing

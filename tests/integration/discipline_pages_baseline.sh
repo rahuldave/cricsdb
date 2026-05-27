@@ -2,7 +2,7 @@
 # Three-tier inline baseline visual on /batting, /bowling, /fielding.
 #
 # The dedicated discipline pages got the same per-tile baseline
-# rendering as /players (Phase 5) — value / vs base N / coloured
+# rendering as /players (Phase 5) — value / vs cohort N / coloured
 # delta chip. This test locks the visual + plumbing per page.
 #
 # SQL-anchoring discipline (CLAUDE.md "Integration tests must
@@ -107,9 +107,9 @@ sql_avg=$(python3 -c "print(f'{$sql_runs/$sql_dismissals:.2f}')")
 dom_avg=$(tile_value "Average")
 assert_eq "Kohli IPL 2016 Avg DOM ↔ SQL" "$sql_avg" "$dom_avg"
 
-# Subtitle present with "vs base" + delta chip.
+# Subtitle present with "vs cohort" + delta chip.
 avg_sub=$(tile_sub "Average")
-assert_contains "Avg subtitle has 'vs base'" "vs base " "$avg_sub"
+assert_contains "Avg subtitle has 'vs cohort'" "vs cohort " "$avg_sub"
 assert_contains "Avg subtitle has %" "%" "$avg_sub"
 
 # API scope_avg matches DOM subtitle scope_avg.
@@ -119,17 +119,17 @@ assert_contains "Avg subtitle scope_avg ↔ API" "$api_avg_scope" "$avg_sub"
 
 # Strike Rate, Dot % both have baselines.
 sr_sub=$(tile_sub "Strike Rate")
-assert_contains "SR subtitle has 'vs base'" "vs base " "$sr_sub"
+assert_contains "SR subtitle has 'vs cohort'" "vs cohort " "$sr_sub"
 dp_sub=$(tile_sub "Dot %")
-assert_contains "Dot % subtitle has 'vs base'" "vs base " "$dp_sub"
+assert_contains "Dot % subtitle has 'vs cohort'" "vs cohort " "$dp_sub"
 
 # B/Four + B/Boundary baselines (added 2026-05-20 — cohort endpoint
 # now derives balls_per_{four,six,boundary} per bucket as the
 # inverse of fours/balls × 100, then convex-combines).
 bf_sub=$(tile_sub "B/Four")
-assert_contains "B/Four subtitle has 'vs base'" "vs base " "$bf_sub"
+assert_contains "B/Four subtitle has 'vs cohort'" "vs cohort " "$bf_sub"
 bb_sub=$(tile_sub "B/Boundary")
-assert_contains "B/Boundary subtitle has 'vs base'" "vs base " "$bb_sub"
+assert_contains "B/Boundary subtitle has 'vs cohort'" "vs cohort " "$bb_sub"
 
 # Counts that don't have a cohort baseline should NOT have subtitles
 # (Matches, Innings, Runs).
@@ -169,20 +169,20 @@ dom_econ=$(tile_value "Economy")
 assert_eq "Bumrah IPL 2016 Econ DOM ↔ SQL" "$sql_econ" "$dom_econ"
 
 econ_sub=$(tile_sub "Economy")
-assert_contains "Econ subtitle has 'vs base'" "vs base " "$econ_sub"
+assert_contains "Econ subtitle has 'vs cohort'" "vs cohort " "$econ_sub"
 # Bumrah's bowling stats should be BELOW cohort (he's elite) → ↓ green.
 assert_contains "Econ subtitle has ↓ arrow (lower=better aligned)" "↓" "$econ_sub"
 
 # Average + SR also have baselines.
 avg_sub=$(tile_sub "Average")
-assert_contains "Bowling Avg subtitle has 'vs base'" "vs base " "$avg_sub"
+assert_contains "Bowling Avg subtitle has 'vs cohort'" "vs cohort " "$avg_sub"
 sr_sub=$(tile_sub "Strike Rate")
-assert_contains "Bowling SR subtitle has 'vs base'" "vs base " "$sr_sub"
+assert_contains "Bowling SR subtitle has 'vs cohort'" "vs cohort " "$sr_sub"
 
 # B/Boundary baseline (added 2026-05-20 — bowling cohort derives
 # balls_per_boundary from the combined boundaries column).
 bb_sub=$(tile_sub "B/Boundary")
-assert_contains "Bowling B/Boundary subtitle has 'vs base'" "vs base " "$bb_sub"
+assert_contains "Bowling B/Boundary subtitle has 'vs cohort'" "vs cohort " "$bb_sub"
 # Higher = better for bowler; Bumrah elite → ↑ arrow.
 assert_contains "Bowling B/Boundary subtitle has ↑ (higher=better aligned)" "↑" "$bb_sub"
 
@@ -231,7 +231,7 @@ dom_dis_match=$(tile_value "Dis/Match")
 assert_eq "Kohli IPL 2016 Dis/Match DOM ↔ SQL" "$sql_dis_per_match" "$dom_dis_match"
 
 dm_sub=$(tile_sub "Dis/Match")
-assert_contains "Dis/Match subtitle has 'vs base'" "vs base " "$dm_sub"
+assert_contains "Dis/Match subtitle has 'vs cohort'" "vs cohort " "$dm_sub"
 assert_contains "Dis/Match subtitle has delta chip" "%" "$dm_sub"
 
 # Counts shouldn't have baseline subtitles.
