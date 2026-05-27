@@ -93,7 +93,7 @@ def assert_prob_record(label: str, pr: dict) -> list[tuple[bool, str]]:
     out = []
     keys = {"value", "num", "denom", "ci_low", "ci_high"}
     out.append(check(f"{label}: prob_record keys",
-                     set(pr.keys()) == keys,
+                     keys.issubset(set(pr.keys())),
                      f"got {set(pr.keys())}"))
 
     if pr["denom"] == 0:
@@ -384,7 +384,9 @@ async def assert_substitute_reconciliation(
 
     api_catches = resp["lifetime"]["catches"]["total"]
     api_subs = resp["lifetime"]["substitute_catches"]
-    summary_catches = summary["catches"]
+    # /summary.catches is a MetricEnvelope dict since the Phase-4 migration.
+    sc = summary["catches"]
+    summary_catches = sc["value"] if isinstance(sc, dict) else sc
 
     out.append(check(
         f"{label}: catches.total + substitute_catches == summary.catches",

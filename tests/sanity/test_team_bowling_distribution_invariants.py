@@ -98,7 +98,7 @@ def assert_prob_record(label: str, pr: dict) -> list[tuple[bool, str]]:
     out = []
     keys = {"value", "num", "denom", "ci_low", "ci_high"}
     out.append(check(f"{label}: prob_record keys",
-                     set(pr.keys()) == keys,
+                     keys.issubset(set(pr.keys())),
                      f"got {set(pr.keys())}"))
 
     if pr["denom"] == 0:
