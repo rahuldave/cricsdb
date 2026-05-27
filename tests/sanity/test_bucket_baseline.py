@@ -280,11 +280,12 @@ async def check_identity_cols(db, gender, team_type, tournament, season, team) -
     live_fh = await db.q(
         """
         WITH bi AS (
+            -- All-ball per-innings score (spec-batting-allball-runs-single-
+            -- source.md §2): no legal gate, matching bucket fifties/hundreds.
             SELECT d.batter_id, i.id AS inn_id, SUM(d.runs_batter) AS r
             FROM delivery d JOIN innings i ON i.id = d.innings_id
             JOIN match m ON m.id = i.match_id
             WHERE i.super_over = 0
-              AND d.extras_wides = 0 AND d.extras_noballs = 0
               AND m.gender = :g AND m.team_type = :tt
               AND COALESCE(m.event_name, '') = :t AND m.season = :s AND i.team = :team
             GROUP BY d.batter_id, i.id

@@ -510,8 +510,10 @@ async def _populate_batting(db, cells=None):
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
+        -- All-ball runs (spec-batting-allball-runs-single-source.md §2):
+        -- the per-innings score for fifties/hundreds counts no-ball
+        -- off-bat runs, matching the live team 50s/100s + the player side.
         WHERE i.super_over = 0
-          AND d.extras_wides = 0 AND d.extras_noballs = 0
           {cf}
         GROUP BY m.gender, m.team_type, COALESCE(m.event_name, ''), m.season,
                  i.team, d.batter_id, i.id
