@@ -42,6 +42,7 @@ from models import (
     PlayerScopeStatsBattingOver,
 )
 from scripts.populate_player_scope_stats import make_scope_key
+from api.batting_convention import batting_delivery_contrib
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(PROJECT_ROOT, "cricket.db")
@@ -180,20 +181,25 @@ async def _aggregate_matches(
             mid = innings_match[iid]
             scope_key = match_meta[mid]["scope_key"]
             over_bucket = d["over_number"] + 1
-            legal = (d["extras_wides"] == 0 and d["extras_noballs"] == 0)
-            if not legal:
+            # All-ball convention (spec §2/D3 via the shared helper):
+            # runs/fours/sixes over all the batter's deliveries in this
+            # over; legal_balls_faced/dots/innings legal-only. Skip
+            # deliveries that contribute nothing to the over (wides, and
+            # no-balls with 0 off the bat) so no empty over-cell is made.
+            rb_runs, is4, is6, legal_ball, dot = batting_delivery_contrib(
+                d["runs_batter"], d["runs_total"],
+                d["extras_wides"], d["extras_noballs"],
+            )
+            if not legal_ball and rb_runs == 0:
                 continue
             acc = get_acc(bid, scope_key, over_bucket)
-            acc.legal_balls_faced += 1
-            acc.innings_set.add(iid)
-            rb = d["runs_batter"]
-            acc.runs += rb
-            if rb == 0 and d["runs_total"] == 0:
-                acc.dots += 1
-            if rb == 4:
-                acc.fours += 1
-            elif rb == 6:
-                acc.sixes += 1
+            acc.runs += rb_runs
+            acc.fours += is4
+            acc.sixes += is6
+            if legal_ball:
+                acc.legal_balls_faced += 1
+                acc.innings_set.add(iid)
+                acc.dots += dot
 
     # Pass 2: wickets — credit the batter's over bucket. Batter
     # dismissals join through delivery so we know which over bucket the

@@ -49,6 +49,7 @@ from models import (
 )
 from api.innings_positions import derive_positions
 from scripts.populate_player_scope_stats import make_scope_key
+from api.batting_convention import batting_delivery_contrib
 from scripts.populate_playerscopestats_position import position_to_bucket
 from scripts.populate_playerscopestats_batting_phase import phase_bucket
 
@@ -204,22 +205,27 @@ async def _aggregate_matches(
                 pos = positions.get(bid)
                 if pos is None:
                     continue
-                legal = (d["extras_wides"] == 0 and d["extras_noballs"] == 0)
-                if not legal:
-                    continue
                 pos_b = position_to_bucket(pos)
                 phase_b = phase_bucket(d["over_number"])
+                # All-ball convention (spec §2/D3 via the shared helper):
+                # runs/fours/sixes over all the batter's deliveries in this
+                # (phase, position); balls/dots/innings legal-only. Skip
+                # deliveries contributing nothing (wides / 0-off-bat
+                # no-balls).
+                rb_runs, is4, is6, legal_ball, dot = batting_delivery_contrib(
+                    d["runs_batter"], d["runs_total"],
+                    d["extras_wides"], d["extras_noballs"],
+                )
+                if not legal_ball and rb_runs == 0:
+                    continue
                 acc = get_acc(bid, scope_key, phase_b, pos_b)
-                acc.innings_set.add(iid)
-                acc.balls += 1
-                rb = d["runs_batter"]
-                acc.runs += rb
-                if rb == 0 and d["runs_total"] == 0:
-                    acc.dots += 1
-                if rb == 4:
-                    acc.fours += 1
-                elif rb == 6:
-                    acc.sixes += 1
+                acc.runs += rb_runs
+                acc.fours += is4
+                acc.sixes += is6
+                if legal_ball:
+                    acc.innings_set.add(iid)
+                    acc.balls += 1
+                    acc.dots += dot
 
     # Pass 2: wickets — credit the dismissed batter's (phase, position)
     # bucket.

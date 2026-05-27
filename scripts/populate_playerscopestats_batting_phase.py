@@ -45,6 +45,7 @@ from models import (
 )
 from api.innings_positions import derive_positions
 from scripts.populate_player_scope_stats import make_scope_key
+from api.batting_convention import batting_delivery_contrib
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(PROJECT_ROOT, "cricket.db")
@@ -191,26 +192,28 @@ async def _aggregate_matches(
             bid = d["batter_id"]
             if bid is None:
                 continue
-            legal = (d["extras_wides"] == 0 and d["extras_noballs"] == 0)
-            if not legal:
-                continue
             iid = d["innings_id"]
             mid = innings_match[iid]
             scope_key = match_meta[mid]["scope_key"]
             bucket = phase_bucket(d["over_number"])
+            # All-ball convention (spec §2/D3 via the shared helper):
+            # runs/fours/sixes over all the batter's deliveries in this
+            # phase; balls/dots/innings legal-only. Skip deliveries that
+            # contribute nothing (wides, no-balls with 0 off the bat).
+            rb_runs, is4, is6, legal_ball, dot = batting_delivery_contrib(
+                d["runs_batter"], d["runs_total"],
+                d["extras_wides"], d["extras_noballs"],
+            )
+            if not legal_ball and rb_runs == 0:
+                continue
             acc = get_acc(bid, scope_key, bucket)
-            acc.innings_set.add(iid)
-            acc.balls += 1
-            rb = d["runs_batter"]
-            acc.runs += rb
-            # Dot rule matches parent populate: legal AND
-            # runs_batter=0 AND runs_total=0.
-            if rb == 0 and d["runs_total"] == 0:
-                acc.dots += 1
-            if rb == 4:
-                acc.fours += 1
-            elif rb == 6:
-                acc.sixes += 1
+            acc.runs += rb_runs
+            acc.fours += is4
+            acc.sixes += is6
+            if legal_ball:
+                acc.innings_set.add(iid)
+                acc.balls += 1
+                acc.dots += dot
 
     # Pass 2: wickets — credit the dismissed batter's phase bucket.
     for start in range(0, len(innings_ids), chunk):
