@@ -2122,6 +2122,7 @@ async def _batting_aggregates_live(
         JOIN innings i ON i.id = d.innings_id
         JOIN match m ON m.id = i.match_id
         WHERE {where}
+          AND d.extras_wides = 0 AND d.extras_noballs = 0
         GROUP BY d.batter_id, i.id
         """,
         params,

@@ -50,14 +50,15 @@ async def check_pool_conservation(db) -> bool:
     print("=== Pool conservation ===")
     ok = True
 
-    # batting runs
+    # batting runs — all-ball (spec-batting-allball-runs-single-source.md
+    # §2): the parent playerscopestats.runs sums runs_batter over ALL the
+    # batter's deliveries, so the delivery anchor must not gate on legal.
     a = (await db.q("SELECT SUM(runs) AS r FROM playerscopestats"))[0]["r"]
     b = (await db.q("""
         SELECT SUM(d.runs_batter) AS r
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
         WHERE d.batter_id IS NOT NULL
-          AND d.extras_wides = 0 AND d.extras_noballs = 0
           AND i.super_over = 0
     """))[0]["r"]
     print(f"  batting runs:    PSS={a}  delivery={b}  {PASS if a == b else FAIL}")

@@ -443,7 +443,8 @@ async def check_top_scorer_wicket_taker(
     print(f"=== /series top scorer + top wicket-taker: {scope_desc} ===")
     ok = True
 
-    # Top scorer (live ts_q shape).
+    # Top scorer (live ts_q shape). Runs are all-ball (spec-batting-allball-
+    # runs-single-source.md §2) to match playerscopestats — no legal gate.
     live = await db.q(
         f"""SELECT d.batter_id AS person_id, SUM(d.runs_batter) AS runs
             FROM delivery d
@@ -451,7 +452,6 @@ async def check_top_scorer_wicket_taker(
             JOIN match m ON m.id = i.match_id
             WHERE i.super_over = 0 AND m.match_type IN ('T20','IT20')
               AND d.batter_id IS NOT NULL
-              AND d.extras_wides = 0 AND d.extras_noballs = 0
               {(' AND ' + live_where) if live_where else ''}
             GROUP BY d.batter_id
             ORDER BY runs DESC, d.batter_id ASC LIMIT 1""",
