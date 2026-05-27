@@ -63,7 +63,7 @@ CLAUDE.md is the **inviolable-rules file**. Everything describing what the codeb
 **Active work**
 - Next-session agenda + NO-DEPLOYS gate: `internal_docs/next-session-ideas.md`
 - A–Q lettered roadmap, dated session logs, deferred queue: `internal_docs/enhancements-roadmap.md`
-- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md`, `internal_docs/spec-splits-mosaic.md`, `internal_docs/splits-mosaic-cross-page.md`, `internal_docs/spec-rate-vs-volume-audit.md` (next-up Phase I — absolute-vs-per-innings tile/chart hygiene; backend extensions front of doc)
+- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md`, `internal_docs/spec-splits-mosaic.md`, `internal_docs/splits-mosaic-cross-page.md`, `internal_docs/spec-rate-vs-volume-audit.md`, **`internal_docs/spec-player-baseline-aux-fallback.md` (NEXT SESSION — Phase 1 = aux controls; then per-innings table + live cohort fallback so the "typical player" comparison follows venue/opponent/team/innings/toss/result. Drafted 2026-05-26, Roughdraft markup pending)**
 - Club-tier classification: `internal_docs/club-tier-classification.md` + anchor numbers `internal_docs/club-tier-anchor-numbers.md`
 
 ---

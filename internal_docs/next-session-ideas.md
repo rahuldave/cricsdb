@@ -3,7 +3,55 @@
 > **NO DEPLOYS gate is OFF** as of 2026-04-21. Resume normal deploy
 > cadence.
 
-## NEXT SESSION — top of queue (2026-05-19)
+## NEXT SESSION — top of queue (2026-05-26)
+
+**`spec-player-baseline-aux-fallback.md` — make the player "typical"
+comparison follow the six filters it ignores + the aux controls.**
+Build-ready spec committed 4d324bb; design fully agreed in conversation
+2026-05-26 (formal Roughdraft markup pending — re-open the spec at the
+start of next session in case the user wants to annotate; the CLI hits
+the known Node 25 / undici 60s timeout but the browser window opens).
+
+Closes `audit-aux-params.md` §E items 1+2. Three phases (spec §3):
+
+1. **Phase 1 — controls (independent of the populate work, start here).**
+   (a) Build a reusable **toss** control patterned on the win/loss
+   control (`PlayerResultFilter` → shared `ResultFilter`); writes
+   `toss_outcome`. **Mount surface is TBD and NOT player pages** — build
+   it, test it by mounting on a throwaway surface in an integration test,
+   mount for real later. (b) Mount the existing **win/loss** control on
+   `/batting`, `/bowling`, `/fielding` (today it's only on `/players`;
+   backend already wired → immediately functional).
+2. **Phase 2 — `player_toss_clause`** in `api/filters.py` (peer of
+   `player_result_clause`), wired at EVERY player value call site
+   (batting ×3 / bowling ×4 / fielding ×3 / keeping ×2). URL-settable, no
+   widget on player pages yet.
+3. **Phase 3 — per-innings table + live cohort fallback** (the big one).
+   3a: extend `inningsbatterperf` with `position_bucket` + `dots`
+   (rebuild, NOT ALTER — back up the DB first; fill via
+   `innings_positions.derive_positions()`; the incremental path in
+   `populate_records_aggregates.py` + `update_recent.py` must fill them;
+   add the covering index; parity-test table == precompute). 3b–3e: route
+   each cohort compute fn through `is_precomputed_scope` → a live
+   aggregation that reads the extended table and reuses the team-side
+   `_cohort_outcome_clause` / `_option_b_team_inning` for narrowing.
+
+Key decisions locked (spec §2): no CIs now (later, cross-cutting player +
+team); team-side support cliff later; fielding stays keeper-binary;
+sample size reported in the existing comparison-chip tooltip only (no new
+own-number tooltip — own sample is already the Matches/Innings tiles);
+fairness rule = both own number AND comparison narrow together.
+
+This session's shipped work (pushed, NOT deployed) — commits
+3f744c6→04390c9: player "Teams played for" strip restructured to "N
+matches @ Team" + mounted on the 3 discipline pages with a discipline-
+scoped lead link; SCOPE subtitle enlarged; redundant scope-echo subtitle
+dropped; **"Versus" opponent filter** on all 4 player pages backed by a
+new `/players/{id}/opponents` endpoint.
+
+---
+
+### Superseded — was top of queue (2026-05-19, SHIPPED)
 
 **`spec-player-compare-average.md` Phase 1 — `METRIC_DIRECTIONS`
 audit + `drop=` plumbing.** Build-ready spec drafted 2026-05-19; 17-
