@@ -268,12 +268,12 @@ spark_first_title=$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-spa
 assert_contains "Sparkline tooltip contains a date" "20" "$spark_first_title"
 assert_contains "Sparkline tooltip on Wickets tab mentions wkt" "wkt" "$spark_first_title"
 
-# Two reference lines: player (black #1A1714 thicker) + global (gray
-# #8A7D70). Revised 2026-05-06 — green clashed with the histogram
-# fifty/threefer sage tier; red is reserved for the rolling-mean
-# overlay.
+# Three reference lines now: player (black #1A1714), league (the
+# cohort-at-scope baseline added with the prob-baselines work, forest
+# green), and global (gray #8A7D70 gender-global). Revised 2026-05-06
+# original 2-line version; league line added later.
 ref_count=$(ab_eval "document.querySelectorAll('$PANEL_SEL .wisden-dist-sparkline line[data-ref]').length")
-assert_eq "Sparkline renders BOTH reference lines (player + global)" "2" "$ref_count"
+assert_eq "Sparkline renders ALL THREE reference lines (player + league + global)" "3" "$ref_count"
 player_stroke=$(unq "$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline line[data-ref=player]')?.getAttribute('stroke') || ''")")
 global_stroke=$(unq "$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline line[data-ref=global]')?.getAttribute('stroke') || ''")")
 assert_eq "Player line is black (#1A1714)" "#1A1714" "$player_stroke"
@@ -286,13 +286,13 @@ assert_eq "Rolling-10 overlay rendered on Scope when n>=10" "1" "$rolling_count"
 rolling_stroke=$(unq "$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline polyline[data-ref=rolling]')?.getAttribute('stroke') || ''")")
 assert_eq "Rolling overlay is oxblood (#7A1F1F)" "#7A1F1F" "$rolling_stroke"
 
-# Gender-tiered global anchor: men's wickets/inn = 1
-# Anchor the legend lookup by content (looking for the gender-global
-# clause) instead of DOM traversal — the sparkline got a scroll
-# wrapper in f3ab06c, so .parentElement.lastElementChild now lands
-# on the SeasonTickAxis sibling rather than the legend.
-legend=$(ab_eval "[...document.querySelectorAll('$PANEL_SEL span')].find(s => /gender-global/.test(s.textContent || ''))?.textContent || ''")
-assert_contains "Wickets tab legend cites men's gender-global (1 wkts/inn)" "1 wkts/inn" "$legend"
+# Gender-tiered global anchor: men's wickets/inn = 1. The label
+# wording was changed from "gender-global ..." to "all-T20 (...
+# wkts/inn)". Look for "all-T20" — that's the discriminator for
+# the gender-tiered global baseline (vs the scope-narrow cohort
+# baseline which reads "cohort at scope").
+legend=$(ab_eval "[...document.querySelectorAll('$PANEL_SEL span, $PANEL_SEL text')].find(s => /all-T20/.test(s.textContent || ''))?.textContent || ''")
+assert_contains "Wickets tab legend cites men's all-T20 baseline (1 wkts/inn)" "1 wkts/inn" "$legend"
 
 # Toggle to Last 10 + verify URL
 ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'Last 10').click()" >/dev/null
@@ -315,8 +315,9 @@ assert_eq "Sparkline visible on Economy tab" "true" "$spark_present_econ"
 spark_econ_title=$(ab_eval "document.querySelector('$PANEL_SEL .wisden-dist-sparkline title')?.textContent || ''")
 assert_contains "Sparkline tooltip on Economy tab mentions econ" "econ" "$spark_econ_title"
 
-# Back to Scope (deletes dist_window) + Wickets (deletes dist_metric)
-ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'Scope').click()" >/dev/null
+# Back to "At scope" (deletes dist_window) + Wickets (deletes
+# dist_metric). The full-window pill was renamed "Scope" → "At scope".
+ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'At scope').click()" >/dev/null
 settle 1
 ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'Wickets').click()" >/dev/null
 settle 1
@@ -358,11 +359,16 @@ assert_eq "Mount n_innings == lifetime SQL anchor (sanity)" "$sql_inns" "$mount_
 
 # Position-based selector — pill text is POV-aware as of 2026-05-12
 # (/bowling → "Bowling first", not "1st innings"). Innings group has
-# 3 stable segs: [All, innings_number=0, innings_number=1].
+# 3 stable segs: [All innings, Bowling first, Bowling second].
+# Option-B POV flip: clicking "Bowling first" writes inning=1 — when
+# your team BOWLED first you BATTED second (your-POV `inning=N` =
+# "your team batted in innings N"). The earlier convention wrote
+# inning=0 for the first pill on every page; the bowling-POV flip
+# inverts that for bowling/fielding pages.
 ab_eval "(() => { const g = Array.from(document.querySelectorAll('.wisden-filter-group')).find(g => g.querySelector('.wisden-filter-label')?.textContent === 'Innings'); g?.querySelectorAll('.wisden-seg')[1]?.click(); })()" >/dev/null
 settle 3
 url_with_inning=$(ab_eval "window.location.href" | tr -d '"')
-assert_contains "InningToggle click writes ?inning=0" "inning=0" "\"$url_with_inning\""
+assert_contains "InningToggle 'Bowling first' click writes ?inning=1 (Option-B POV flip)" "inning=1" "\"$url_with_inning\""
 
 sql_inn0=$(sql "
 SELECT COUNT(*) FROM (
@@ -377,7 +383,11 @@ SELECT COUNT(*) FROM (
 )
 ")
 dom_inn0=$(ab_eval "document.querySelector('$PANEL_SEL').innerText.match(/(\d+)\s+qualifying/)?.[1] || ''")
-assert_eq "Panel n_innings refetches under inning=0" "$sql_inn0" "$dom_inn0"
+# URL has inning=1 (Bowling first POV). Per Option-B the bowling
+# discipline maps inning=1 → innings_number=0 (you bowled in the
+# innings your team didn't bat in). SQL query above uses
+# innings_number=0 — matches the URL state.
+assert_eq "Panel n_innings refetches under inning=1 (Bowling first)" "$sql_inn0" "$dom_inn0"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""

@@ -233,13 +233,14 @@ last10_bars=$(ab_eval "document.querySelectorAll('$PANEL_SEL .wisden-dist-sparkl
 if [ "$last10_bars" -le 10 ]; then ok "Last 10 sparkline ≤ 10 bars (got $last10_bars)"
 else bad "Last 10 sparkline has $last10_bars bars (expected ≤ 10)"; fi
 
-# Back to Scope — URL should DELETE dist_window_f
-ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'Scope').click()" >/dev/null
+# Back to "At scope" — URL should DELETE dist_window_f. The pill was
+# renamed "Scope" → "At scope".
+ab_eval "[...document.querySelectorAll('$PANEL_SEL button.wisden-seg')].find(b => b.innerText.trim() === 'At scope').click()" >/dev/null
 settle 1
 url_w2=$(ab_eval "window.location.href" | tr -d '"')
 case "$url_w2" in
-  *dist_window_f*) bad "Scope click DELETES dist_window_f — still present in: $url_w2" ;;
-  *) ok "Scope click DELETES dist_window_f param" ;;
+  *dist_window_f*) bad "'At scope' click DELETES dist_window_f — still present in: $url_w2" ;;
+  *) ok "'At scope' click DELETES dist_window_f param" ;;
 esac
 
 # ─────────────────────────────────────────────────────────────────

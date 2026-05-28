@@ -307,7 +307,9 @@ agent-browser eval --json "(() => {
 n=$(python3 -c "
 import json
 tt = json.load(open('/tmp/tt.json'))['data']['result']
-print(len([t for t in tt if t and ('Outfielder-cohort' in t or 'Keeper-cohort' in t)]))
+# Tooltip phrasing is 'Outfielder cohort —' / 'Keeper cohort —'
+# (space, em-dash) — was 'Outfielder-cohort' (hyphenated) earlier.
+print(len([t for t in tt if t and ('Outfielder cohort' in t or 'Keeper cohort' in t)]))
 ")
 if [ "$n" -ge 1 ]; then
   ok "/fielding By Phase: ≥1 chip carries fielding cohort tooltip (=$n)"

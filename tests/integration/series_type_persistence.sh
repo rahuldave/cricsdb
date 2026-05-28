@@ -19,7 +19,7 @@ bad() { FAIL=$((FAIL+1)); FAILS="$FAILS\n  - $1"; echo "  FAIL: $1"; }
 agent-browser close --all >/dev/null 2>&1 || true
 sleep 1
 
-SELECTOR="Array.from(document.querySelectorAll('.wisden-filter-group')).find(g => g.querySelector('.wisden-filter-label')?.innerText?.trim() === 'Show')?.querySelector('select')"
+SELECTOR="Array.from(document.querySelectorAll('.wisden-filter-group')).find(g => g.querySelector('.wisden-filter-label')?.innerText?.trim() === 'Series Type')?.querySelector('select')"
 
 assert_tab_carries_bilat() {
   local path="$1"

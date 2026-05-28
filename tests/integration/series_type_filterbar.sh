@@ -32,7 +32,7 @@ assert_contains() {
 agent-browser close --all >/dev/null 2>&1 || true
 sleep 1
 
-SELECTOR="Array.from(document.querySelectorAll('.wisden-filter-group')).find(g => g.querySelector('.wisden-filter-label')?.innerText?.trim() === 'Show')?.querySelector('select')"
+SELECTOR="Array.from(document.querySelectorAll('.wisden-filter-group')).find(g => g.querySelector('.wisden-filter-label')?.innerText?.trim() === 'Series Type')?.querySelector('select')"
 
 # ────────────────────────────────────────────
 echo "Test 1 · Show select renders on /teams + /series + /batting"

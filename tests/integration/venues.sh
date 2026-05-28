@@ -288,8 +288,10 @@ agent-browser open "$BASE/venues?venue=$WANKHEDE_URLENC&tab=Batters&tournament=I
 agent-browser wait --load networkidle >/dev/null 2>&1
 settle 2.0
 assert_snapshot_contains "By average"                  "Batters tab header"
-# Letter-link tooltip check — title attr on .scope-sub carries the scope text.
-LETTER_TOOLTIP=$(agent-browser eval "Array.from(document.querySelectorAll('.scope-sub')).map(a=>a.title).find(t=>t && t.includes('Wankhede')) || ''" 2>/dev/null | tail -1)
+# Letter-link tooltip check — title attr on .scope-phrase carries the
+# scope text. Class was renamed `.scope-sub` → `.scope-phrase` in the
+# 2026-04-19 link-component refactor.
+LETTER_TOOLTIP=$(agent-browser eval "Array.from(document.querySelectorAll('.scope-phrase')).map(a=>a.title).find(t=>t && t.includes('Wankhede')) || ''" 2>/dev/null | tail -1)
 if [[ "$LETTER_TOOLTIP" == *"Wankhede Stadium"* ]]; then
   echo "  ✓ PlayerLink letter-link tooltip carries filter_venue"; PASS=$((PASS + 1))
 else

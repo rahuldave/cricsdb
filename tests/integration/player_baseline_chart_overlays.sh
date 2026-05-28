@@ -387,17 +387,28 @@ assert_contains "/fielding stat-row: Dis/Match chip cites API base $api_base" "v
 # ───────────────────────────────────────────────────────────────────
 
 echo
-echo "=== /bowling — Bumrah IPL By Over (C3 cohort strip) ==="
+echo "=== /bowling — Bumrah IPL By Over (cohort overlay) ==="
 ab open "$BASE/bowling?player=$BUMRAH&$SCOPE_URL&tab=By%20Over"
 sleep 3
 
-help_text=$(ab_eval "
-  Array.from(document.querySelectorAll('.wisden-tab-help'))
-    .map(e => e.textContent?.trim()).join('|')
+# The old C3 "Cohort Econ by Over" .wisden-tab-help strip was
+# deliberately replaced in commit 317adf5 (spec-apples-to-apples T5)
+# by an inline BarChart overlay + a per-chart italic caption. The
+# cohort baseline now renders as dashed forest-green segments on each
+# bar of the "Economy by over" panel, plus a caption showing the
+# cohort range like "cohort at scope (6.34–11.42)".
+econ_panel_text=$(ab_eval "
+  Array.from(document.querySelectorAll('.wisden-perf-cohort'))
+    .map(c => c.innerText || '')
+    .find(t => t.startsWith('Economy by over')) || ''
 ")
-assert_contains "/bowling By Over: cohort econ-by-over baseline strip present (C3)" "Cohort Econ by Over" "$help_text"
-# Sanity-anchor at one over: cohort Over 1 econ matches the cohort
-# scope_averages by_over[0].economy at Bumrah's over_mix.
+assert_contains "/bowling By Over: 'Economy by over' panel present" "Economy by over" "$econ_panel_text"
+assert_contains "/bowling By Over: cohort overlay caption present" "cohort at scope" "$econ_panel_text"
+
+# Sanity-anchor: cohort Over 1 econ from the API. The new caption
+# shows a range "(min–max)" across all 20 overs; Over 1 IS the
+# minimum, so we assert the API value appears as the range's lower
+# bound.
 api_v=$(curl -s "$API/api/v1/bowlers/$BUMRAH/summary?$SCOPE" | python3 -c "
 import json, sys, urllib.parse, urllib.request
 s = json.load(sys.stdin)
@@ -415,7 +426,7 @@ o1 = next((b for b in by_over if b['over'] == 1), {})
 v = o1.get('economy')
 print(f'{v:.2f}' if v is not None else 'NULL')
 ")
-assert_contains "/bowling By Over: Over 1 cohort econ matches API (=$api_v)" "Over 1: $api_v" "$help_text"
+assert_contains "/bowling By Over: Over 1 cohort econ matches API (=$api_v)" "$api_v" "$econ_panel_text"
 
 echo
 echo "─────────────────────────────────────────"
