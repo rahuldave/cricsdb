@@ -3264,10 +3264,10 @@ _BOWLING_WICKET_EXCLUDED_SQL = (
 
 
 async def _bowling_over_cohort_live(
-    db, filters: FilterParams, aux: AuxParams,
+    db, filters: FilterParams, aux: AuxParams, *, by_season: bool = False,
 ):
     """Live per-over bowling cohort aggregation under the six filters
-    (Phase 3d, by-phase column subset).
+    (Phase 3d).
 
     Reproduces, for the filtered pool, the simple-sum + maiden columns of
     `playerscopestatsover` at the over-bucket grain (1..20). Conventions
@@ -3279,9 +3279,20 @@ async def _bowling_over_cohort_live(
       legal balls and 0 runs_total; over bucket = over_number + 1.
 
     Returns cohort_rows[] keyed like the precomputed cohort read so the
-    downstream by_over builder is identical. (by-season / summary add the
-    per-spell columns in 3d-2 / 3d-3.)"""
+    downstream by_over builder is identical. With `by_season=True`, rows
+    also carry `season` and the GROUP BY adds it (per-season over grain).
+
+    Columns: the by-phase subset (runs_conceded / legal_balls / dots /
+    boundaries / wickets / maidens / n_players) PLUS innings_bowled and
+    four_wicket_hauls (used by by-season; by-phase ignores them). The
+    full per-spell threshold set (econ/runs bands, hauls 3/5,
+    innings_with_wicket/two, qualifying) is added in 3d-3 for the
+    summary/distribution path. (summary surfaces add their columns in 3d-3.)"""
     where_full, params = _bowling_live_where(filters, aux)
+    sel_season = "m.season AS season, " if by_season else ""   # m in scope
+    grp_season = "m.season, " if by_season else ""             # m in scope
+    osel_season = "season, " if by_season else ""              # subquery alias
+    ogrp_season = "season, " if by_season else ""              # subquery alias
     joins = """
         FROM delivery d
         JOIN innings i ON i.id = d.innings_id
@@ -3289,18 +3300,17 @@ async def _bowling_over_cohort_live(
     """
     base = f"{joins} WHERE {where_full} AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19"
     deliv_sql = f"""
-        SELECT (d.over_number + 1) AS over_number,
+        SELECT {sel_season}(d.over_number + 1) AS over_number,
                SUM(d.runs_total)                                              AS runs_conceded,
                SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
                SUM(CASE WHEN d.runs_batter = 0 AND d.runs_total = 0 THEN 1 ELSE 0 END)      AS dots,
                SUM(CASE WHEN d.runs_batter IN (4, 6) THEN 1 ELSE 0 END)       AS boundaries,
                COUNT(DISTINCT d.bowler_id)                                    AS n_players
         {base}
-        GROUP BY d.over_number
-        ORDER BY d.over_number
+        GROUP BY {grp_season}d.over_number
     """
     wkt_sql = f"""
-        SELECT (d.over_number + 1) AS over_number, COUNT(*) AS wickets
+        SELECT {sel_season}(d.over_number + 1) AS over_number, COUNT(*) AS wickets
         FROM wicket w
         JOIN delivery d ON d.id = w.delivery_id
         JOIN innings i ON i.id = d.innings_id
@@ -3308,27 +3318,67 @@ async def _bowling_over_cohort_live(
         WHERE {where_full}
           AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19
           AND w.kind NOT IN {_BOWLING_WICKET_EXCLUDED_SQL}
-        GROUP BY d.over_number
+        GROUP BY {grp_season}d.over_number
     """
     maiden_sql = f"""
-        SELECT (over_number + 1) AS over_number, COUNT(*) AS maidens
+        SELECT {osel_season}(over_number + 1) AS over_number, COUNT(*) AS maidens
         FROM (
-            SELECT d.innings_id, d.over_number, d.bowler_id
+            SELECT {sel_season}d.over_number AS over_number, d.innings_id, d.bowler_id
             {base}
-            GROUP BY d.innings_id, d.over_number, d.bowler_id
+            GROUP BY {grp_season}d.innings_id, d.over_number, d.bowler_id
             HAVING SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) = 6
                AND SUM(d.runs_total) = 0
         )
-        GROUP BY over_number
+        GROUP BY {ogrp_season}over_number
     """
-    deliv_rows, wkt_rows, maiden_rows = await asyncio.gather(
+    # innings_bowled (Tier 2): distinct (innings, bowler) with ≥1 legal
+    # ball at this over bucket — the per-bucket per-innings denominator.
+    inn_bowled_sql = f"""
+        SELECT {osel_season}(over_number + 1) AS over_number, COUNT(*) AS innings_bowled
+        FROM (
+            SELECT {sel_season}d.over_number AS over_number, d.innings_id, d.bowler_id
+            {base}
+            GROUP BY {grp_season}d.innings_id, d.over_number, d.bowler_id
+            HAVING SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) >= 1
+        )
+        GROUP BY {ogrp_season}over_number
+    """
+    # four_wicket_hauls: attributed to the over the bowler's 4th valid
+    # wicket fell in (running per-spell count via ROW_NUMBER), credited
+    # once per (innings, bowler). Matches the populate's haul attribution.
+    haul4_sql = f"""
+        SELECT {osel_season}over_number, COUNT(*) AS four_wicket_hauls
+        FROM (
+            SELECT {sel_season}(d.over_number + 1) AS over_number,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY d.innings_id, d.bowler_id
+                       ORDER BY d.over_number, d.delivery_index, d.id
+                   ) AS rn
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match   m ON m.id = i.match_id
+            WHERE {where_full}
+              AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19
+              AND w.kind NOT IN {_BOWLING_WICKET_EXCLUDED_SQL}
+        )
+        WHERE rn = 4
+        GROUP BY {ogrp_season}over_number
+    """
+    deliv_rows, wkt_rows, maiden_rows, inn_rows, haul4_rows = await asyncio.gather(
         db.q(deliv_sql, params),
         db.q(wkt_sql, params),
         db.q(maiden_sql, params),
+        db.q(inn_bowled_sql, params),
+        db.q(haul4_sql, params),
     )
-    by_over: dict[int, dict] = {}
+
+    def _key(r):
+        return (r["season"], r["over_number"]) if by_season else r["over_number"]
+
+    by_key: dict = {}
     for r in deliv_rows:
-        by_over[r["over_number"]] = {
+        row = {
             "over_number": r["over_number"],
             "runs_conceded": r["runs_conceded"] or 0,
             "legal_balls": r["legal_balls"] or 0,
@@ -3337,14 +3387,29 @@ async def _bowling_over_cohort_live(
             "n_players": r["n_players"] or 0,
             "wickets": 0,
             "maidens": 0,
+            "innings_bowled": 0,
+            "four_wicket_hauls": 0,
         }
+        if by_season:
+            row["season"] = r["season"]
+        by_key[_key(r)] = row
     for r in wkt_rows:
-        if r["over_number"] in by_over:
-            by_over[r["over_number"]]["wickets"] = r["wickets"] or 0
+        k = _key(r)
+        if k in by_key:
+            by_key[k]["wickets"] = r["wickets"] or 0
     for r in maiden_rows:
-        if r["over_number"] in by_over:
-            by_over[r["over_number"]]["maidens"] = r["maidens"] or 0
-    return [by_over[o] for o in sorted(by_over)]
+        k = _key(r)
+        if k in by_key:
+            by_key[k]["maidens"] = r["maidens"] or 0
+    for r in inn_rows:
+        k = _key(r)
+        if k in by_key:
+            by_key[k]["innings_bowled"] = r["innings_bowled"] or 0
+    for r in haul4_rows:
+        k = _key(r)
+        if k in by_key:
+            by_key[k]["four_wicket_hauls"] = r["four_wicket_hauls"] or 0
+    return [by_key[k] for k in sorted(by_key, key=lambda x: x if by_season else (x,))]
 
 
 async def _bowling_player_over_mix_live(
@@ -3777,35 +3842,24 @@ async def scope_players_bowling_summary(
 # ============================================================
 
 
-async def compute_players_bowling_by_season(
-    db,
-    person_id: str,
-    filters: FilterParams,
-    aux: AuxParams,
-    drop_set: Optional[set[str]] = None,
-) -> dict:
-    """Per-season bowling cohort baseline keyed off the player's
-    per-season over-mix. Spec: spec-player-baseline-parity.md §3.2.
-    """
+async def _by_season_bowling_precomputed(
+    db, person_id: str, filters: FilterParams, drop_set: Optional[set[str]],
+):
+    """Fast path: per-(season, over) player-mix + cohort + pool +
+    per-season bowling_innings off the precomputed `playerscopestatsover`
+    / parent tables (none-of-six). Returns
+    `(player_rows, cohort_rows, pool_rows, bi_rows)`."""
     where, params = build_scope_clauses(filters, drop=drop_set)
-
-    # Q1: player's per-season legal_balls by over_number (mix derivation).
     player_sql = f"""
-        SELECT pss.season,
-               psso.over_number,
-               psso.legal_balls
+        SELECT pss.season, psso.over_number, psso.legal_balls
         FROM playerscopestatsover psso
         JOIN playerscopestats pss
-          ON pss.scope_key = psso.scope_key
-         AND pss.person_id = psso.person_id
-        WHERE {where}
-          AND psso.person_id = :__pid
+          ON pss.scope_key = psso.scope_key AND pss.person_id = psso.person_id
+        WHERE {where} AND psso.person_id = :__pid
         ORDER BY pss.season, psso.over_number
     """
-    # Q2: cohort aggregates per (season, over_number).
     cohort_sql = f"""
-        SELECT pss.season,
-               psso.over_number,
+        SELECT pss.season, psso.over_number,
                SUM(psso.runs_conceded)      AS runs_conceded,
                SUM(psso.legal_balls)        AS legal_balls,
                SUM(psso.wickets)            AS wickets,
@@ -3817,43 +3871,120 @@ async def compute_players_bowling_by_season(
                COUNT(DISTINCT psso.person_id) AS n_players
         FROM playerscopestatsover psso
         JOIN playerscopestats pss
-          ON pss.scope_key = psso.scope_key
-         AND pss.person_id = psso.person_id
+          ON pss.scope_key = psso.scope_key AND pss.person_id = psso.person_id
         WHERE {where}
         GROUP BY pss.season, psso.over_number
         ORDER BY pss.season, psso.over_number
     """
-    # Q3: per-season pool totals.
     pool_sql = f"""
         SELECT pss.season,
                COUNT(DISTINCT psso.person_id) AS n_players,
                SUM(psso.legal_balls)          AS n_balls_total
         FROM playerscopestatsover psso
         JOIN playerscopestats pss
-          ON pss.scope_key = psso.scope_key
-         AND pss.person_id = psso.person_id
+          ON pss.scope_key = psso.scope_key AND pss.person_id = psso.person_id
         WHERE {where}
         GROUP BY pss.season
         ORDER BY pss.season
     """
-    # Tier 2 of spec-apples-to-apples-baselines.md — per-season cohort
-    # unique innings (denominator for the per-innings-scale factor that
-    # converts per-bucket-attendance-rate cv to per-unique-innings rate).
     bowling_inn_sql = f"""
-        SELECT pss.season,
-               SUM(pss.bowling_innings) AS bowling_innings_total
+        SELECT pss.season, SUM(pss.bowling_innings) AS bowling_innings_total
         FROM playerscopestats pss
         WHERE {where}
         GROUP BY pss.season
         ORDER BY pss.season
     """
     p_params = {**params, "__pid": person_id}
-    player_rows, cohort_rows, pool_rows, bi_rows = await asyncio.gather(
+    return await asyncio.gather(
         db.q(player_sql, p_params),
         db.q(cohort_sql, params),
         db.q(pool_sql, params),
         db.q(bowling_inn_sql, params),
     )
+
+
+async def _by_season_bowling_live(
+    db, person_id: str, filters: FilterParams, aux: AuxParams,
+):
+    """Live path: per-(season, over) player-mix + cohort + pool +
+    per-season bowling_innings aggregated over `delivery` (bowling
+    orientation via `_bowling_live_where`), so the per-season bowling
+    cohort narrows under the six. Cohort rows come from the shared
+    `_bowling_over_cohort_live(by_season=True)`; the other three carry
+    the SAME WHERE so the mix + denominators match the narrowed pool.
+
+    Column shape matches `_by_season_bowling_precomputed`. Spec: Phase 3d
+    of spec-player-baseline-aux-fallback.md + plan §3."""
+    where_full, params = _bowling_live_where(filters, aux)
+    joins = """
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match   m ON m.id = i.match_id
+    """
+    base = f"{joins} WHERE {where_full} AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19"
+    player_sql = f"""
+        SELECT m.season AS season, (d.over_number + 1) AS over_number,
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls
+        {base} AND d.bowler_id = :__pid
+        GROUP BY m.season, d.over_number
+        ORDER BY m.season, d.over_number
+    """
+    pool_sql = f"""
+        SELECT m.season AS season,
+               COUNT(DISTINCT d.bowler_id) AS n_players,
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS n_balls_total
+        {base}
+        GROUP BY m.season
+        ORDER BY m.season
+    """
+    # Per-season bowling_innings = distinct (innings, bowler) spells with
+    # ≥1 legal ball — the live twin of SUM(pss.bowling_innings).
+    bi_sql = f"""
+        SELECT season, COUNT(*) AS bowling_innings_total
+        FROM (
+            SELECT m.season AS season, d.innings_id, d.bowler_id
+            {base}
+            GROUP BY m.season, d.innings_id, d.bowler_id
+            HAVING SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) >= 1
+        )
+        GROUP BY season
+    """
+    p_params = {**params, "__pid": person_id}
+    player_rows, cohort_rows, pool_rows, bi_rows = await asyncio.gather(
+        db.q(player_sql, p_params),
+        _bowling_over_cohort_live(db, filters, aux, by_season=True),
+        db.q(pool_sql, params),
+        db.q(bi_sql, params),
+    )
+    return player_rows, cohort_rows, pool_rows, bi_rows
+
+
+async def compute_players_bowling_by_season(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-season bowling cohort baseline keyed off the player's
+    per-season over-mix.
+
+    Dispatches on `is_precomputed_scope` (Phase 3d-2): none-of-six →
+    precomputed per-(season, over) read; any-of-six → live per-(season,
+    over) aggregation over `delivery` (bowling orientation) so the
+    per-season cohort narrows.
+
+    Spec: spec-player-baseline-parity.md §3.2 + Phase 3d of
+    spec-player-baseline-aux-fallback.md.
+    """
+    if is_precomputed_scope(filters, aux):
+        player_rows, cohort_rows, pool_rows, bi_rows = await _by_season_bowling_precomputed(
+            db, person_id, filters, drop_set,
+        )
+    else:
+        player_rows, cohort_rows, pool_rows, bi_rows = await _by_season_bowling_live(
+            db, person_id, filters, aux,
+        )
 
     # Roll up.
     cohort_by_season: dict[str, dict[int, dict]] = {}

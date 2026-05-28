@@ -477,6 +477,75 @@ else
   bad "bowling filter_opponent orientation wrong (API $BW_OPP_API != i.team=CSK $BW_OPP_EXPECTED)"
 fi
 
+# ── §8 bowling by-season cohort narrows under the six (Phase 3d-2) ──
+# /scope/averages/players/bowling/by-season read the precomputed per-over
+# table until 3d-2 — frozen under the six. After 3d-2 it dispatches to a
+# live per-(season, over) aggregation over `delivery` (bowling
+# orientation). Anchor: J Bumrah IPL 2014-2018, season 2016, inning=0.
+echo
+echo "=== bowling by-season cohort narrows (3d) ==="
+bowl_season() {  # $1=filter  $2=season  → "econ n_balls below"
+  curl -s "$API/api/v1/scope/averages/players/bowling/by-season?$BOWL_SCOPE&$1" \
+    | python3 -c "
+import sys, json
+d = json.load(sys.stdin); s='$2'
+for r in d['by_season']:
+    if r['season']==s:
+        print(r.get('economy'), r.get('n_balls'), r.get('below_support')); break
+else:
+    print('None None None')
+"
+}
+read -r BWS_U_E BWS_U_N _ < <(bowl_season "" 2016)
+read -r BWS_I_E BWS_I_N _ < <(bowl_season "inning=0" 2016)
+echo "  2016 unfiltered: econ=$BWS_U_E n_balls=$BWS_U_N"
+echo "  2016 inning=0:   econ=$BWS_I_E n_balls=$BWS_I_N"
+if [[ -z "$BWS_I_N" || "$BWS_I_N" == "None" ]]; then
+  bad "bowling by-season inning=0: n_balls null"
+elif [[ "$BWS_I_N" != "$BWS_U_N" ]]; then
+  ok "bowling by-season cohort narrowed (n_balls $BWS_U_N -> $BWS_I_N; econ $BWS_U_E -> $BWS_I_E)"
+else
+  bad "bowling by-season cohort FROZEN (n_balls=$BWS_I_N == $BWS_U_N) -- 3d-2 not wired"
+fi
+
+# SQL anchor: live 2016 inning=0 econ == direct delivery aggregation at
+# innings_number=1, convex-combined by Bumrah's narrowed per-over mix.
+BWS_EXPECTED=$(python3 <<'PY'
+import sqlite3, json, urllib.request
+DB="cricket.db"; API="http://localhost:8000"
+BASE="person_id=462411b3&gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2014&season_to=2018&inning=0"
+d=json.load(urllib.request.urlopen(f"{API}/api/v1/scope/averages/players/bowling/by-season?{BASE}"))
+row=[r for r in d['by_season'] if r['season']=='2016']
+if not row: print("None"); raise SystemExit
+mix=row[0]['mix']
+conn=sqlite3.connect(DB)
+rows=conn.execute("""
+ SELECT d.over_number+1 ob, SUM(d.runs_total) runs,
+   SUM(CASE WHEN d.extras_wides=0 AND d.extras_noballs=0 THEN 1 ELSE 0 END) legal
+ FROM delivery d JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id
+ WHERE i.super_over=0 AND m.gender='male' AND m.team_type='club'
+   AND m.event_name='Indian Premier League' AND m.season='2016' AND i.innings_number=1
+   AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19
+ GROUP BY d.over_number""").fetchall()
+econ={ob:(runs*6/legal if legal else None) for ob,runs,legal in rows}
+tot=0.0; tm=0.0
+for o,w in enumerate(mix,1):
+    if w==0: continue
+    v=econ.get(o)
+    if v is None: continue
+    tm+=w; tot+=w*v
+print(round(tot/tm,2) if tm else "None")
+PY
+)
+echo "  SQL-anchored 2016 inning=0 econ: $BWS_EXPECTED  (API: $BWS_I_E)"
+if [[ "$BWS_I_E" == "None" || "$BWS_EXPECTED" == "None" ]]; then
+  bad "bowling by-season SQL anchor inconclusive (API $BWS_I_E, expected $BWS_EXPECTED)"
+elif python3 -c "import sys; sys.exit(0 if abs(float('$BWS_I_E')-float('$BWS_EXPECTED'))<=0.05 else 1)"; then
+  ok "bowling by-season live econ == SQL-anchored ($BWS_I_E ~ $BWS_EXPECTED)"
+else
+  bad "bowling by-season live econ=$BWS_I_E != SQL-anchored $BWS_EXPECTED"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"
