@@ -114,13 +114,40 @@ assert_snapshot_contains "Strike Rate"      "Strike Rate StatCard"
 assert_snapshot_contains "Average"          "Average StatCard"
 
 # --------------------------------------------------------------------
-# (Removed: "Tab switches push history" + "Innings List tab — date link
-# carries highlight_batter". The batting profile was redesigned from
-# URL-driven tabs (tab=By+Over, …) to stacked sections, so there are no
-# tab buttons / tab= URL params, no "Innings List" tab, and the
-# /matches/ date links no longer carry highlight_batter. These tested
-# the removed tab layout. See the note at the foot of this file —
-# confirm those feature removals were intentional.)
+echo ""
+echo "Test 5 · Tab switches write the tab= URL param"
+# The batting profile is tab-driven (button.wisden-tab; tab= URL param,
+# default 'By Season'). Click By Over then vs Bowlers — each writes tab=
+# and pushes history (back returns to the prior tab). Match the exact
+# DOM button text ("By Over"), not the CSS-uppercased visible text.
+click_tab() {
+  agent-browser eval "[...document.querySelectorAll('button.wisden-tab')].find(b => b.textContent.trim() === '$1')?.click()" >/dev/null 2>&1
+}
+click_tab "By Over"; settle 1
+assert_url_contains "tab=By+Over"
+click_tab "vs Bowlers"; settle 1
+assert_url_contains "tab=vs+Bowlers"
+agent-browser back >/dev/null 2>&1; settle 0.8
+assert_url_contains "tab=By+Over"
+
+# --------------------------------------------------------------------
+echo ""
+echo "Test 6 · Innings List tab — date link carries highlight_batter"
+click_tab "Innings List"; settle 1.5
+assert_url_contains "tab=Innings+List"
+# Every date cell links to /matches/:id with highlight_batter=<kohli>.
+HAS_HIGHLIGHT=$(agent-browser eval '(() => {
+  const links = document.querySelectorAll("a.comp-link[href*=\"/matches/\"]");
+  for (const a of links) {
+    if (a.getAttribute("href").includes("highlight_batter=ba607b88")) return "yes";
+  }
+  return "no";
+})()' 2>/dev/null | tr -d '"')
+if [[ "$HAS_HIGHLIGHT" == "yes" ]]; then
+  echo "  ✓ innings-list date link carries highlight_batter=$KOHLI"; PASS=$((PASS + 1))
+else
+  echo "  ✗ innings-list date link missing highlight_batter"; FAIL=$((FAIL + 1))
+fi
 
 # --------------------------------------------------------------------
 agent-browser close >/dev/null 2>&1 || true
@@ -130,12 +157,12 @@ echo "Passed: $PASS"
 echo "Failed: $FAIL"
 [ "$FAIL" -eq 0 ]
 
-# NOTE (2026-05-27): three tests were removed because the batting profile
-# was redesigned from URL-driven tabs to stacked sections. The behaviours
-# they covered no longer exist in the app:
-#   - bare /batting auto-filling season_from (default-season-window);
-#   - tab navigation writing tab=By+Over / tab=vs+Bowlers / tab=Innings+List;
-#   - innings-list /matches/ date links carrying highlight_batter.
-# If any of those removals was UNINTENTIONAL (highlight_batter scorecard
-# links especially look worth keeping), restore the feature + re-add a
-# section-based test rather than the old tab-based one.
+# NOTE (2026-05-27): Tests 5 + 6 (tab nav + innings-list highlight_batter)
+# were restored — those features still exist (the profile is still
+# tab-driven; the old assertions just matched the CSS-uppercased "BY OVER"
+# instead of the DOM text "By Over"). Only the old "useDefaultSeasonWindow
+# populates season_from" test was dropped: that hook
+# (frontend/src/hooks/useDefaultSeasonWindow.ts) is now DEAD CODE — called
+# nowhere in the app, so bare /batting no longer auto-fills season_from.
+# That looks like an UNINTENTIONAL regression (a whole UX hook orphaned) —
+# worth confirming whether the default-season-window should be re-wired.
