@@ -25,13 +25,13 @@ REG pbsl_bat_by_phase_ipl_wankhede      /api/v1/scope/averages/players/batting/b
 
 REG pbsl_bowl_by_season_unfiltered      /api/v1/scope/averages/players/bowling/by-season?person_id=462411b3&gender=male&team_type=club
 REG pbsl_bowl_by_season_ipl_2018        /api/v1/scope/averages/players/bowling/by-season?person_id=462411b3&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2018&season_to=2018
-NEW pbsl_bowl_by_season_ipl_toss_won    /api/v1/scope/averages/players/bowling/by-season?person_id=462411b3&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&toss_outcome=won
+REG pbsl_bowl_by_season_ipl_toss_won    /api/v1/scope/averages/players/bowling/by-season?person_id=462411b3&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&toss_outcome=won
 
 # ── /scope/averages/players/bowling/by-phase ──────────────────
 
-NEW pbsl_bowl_by_phase_unfiltered       /api/v1/scope/averages/players/bowling/by-phase?person_id=462411b3&gender=male&team_type=club
-NEW pbsl_bowl_by_phase_ipl_2018         /api/v1/scope/averages/players/bowling/by-phase?person_id=462411b3&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2018&season_to=2018
-NEW pbsl_bowl_by_phase_ipl_toss_won     /api/v1/scope/averages/players/bowling/by-phase?person_id=462411b3&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&toss_outcome=won
+REG pbsl_bowl_by_phase_unfiltered       /api/v1/scope/averages/players/bowling/by-phase?person_id=462411b3&gender=male&team_type=club
+REG pbsl_bowl_by_phase_ipl_2018         /api/v1/scope/averages/players/bowling/by-phase?person_id=462411b3&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2018&season_to=2018
+REG pbsl_bowl_by_phase_ipl_toss_won     /api/v1/scope/averages/players/bowling/by-phase?person_id=462411b3&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&toss_outcome=won
 
 # ── /scope/averages/players/fielding/by-season ─────────────────
 

@@ -1,5 +1,15 @@
 # Plan — Phase 3d: bowling live cohort under the six filters
 
+> **✅ SHIPPED 2026-05-28.** All three slices landed: 3d-1 by-phase
+> (`75730ea`), 3d-2 by-season (`3f0bc74`), 3d-3 summary+distribution
+> (`1cf1bc7`), plus 2 REG→NEW pre-flips and a NEW→REG flip-back + docs.
+> Live per-over aggregation verified byte-identical to
+> `playerscopestatsover` at none-of-six (440 cells, 0 mismatches). The
+> opponent/team flip + inning flip were SQL-anchored exact. Refactor
+> sweep clean: `player_baseline_filter_matrix` adapted automatically
+> (its bowling reference-line assertion keys off the cohort
+> `below_support`). 3e fielding/keeping is next.
+
 **Spec:** `internal_docs/spec-player-baseline-aux-fallback.md` Phase 3d
 (picks up after 3b/3c shipped — batting summary + distribution +
 by-season + by-phase all narrow live).
