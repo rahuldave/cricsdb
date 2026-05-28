@@ -70,7 +70,47 @@ Each filter answers a real question (pools in §4): _"Is Kohli the best top-orde
 
 - 3d. ✅ **SHIPPED 2026-05-28.** Bowling live (raw deliveries grouped by over — no new table). Three slices, each dispatch on `is_precomputed_scope`: 3d-1 `compute_players_bowling_by_phase`, 3d-2 `compute_players_bowling_by_season`, 3d-3 `compute_players_bowling_cohort` (summary chip + distribution prob baselines). Shared `_bowling_live_where` (bowling/fielding orientation: inning flips to 1-N, toss/result key on the bowling side, filter_team/opponent flipped) + `_bowling_over_cohort_live(by_season, with_spell_cols)` reproducing every `playerscopestatsover` column live, including the per-spell-touching set (maidens, 3/4/5-fer attribution via ROW_NUMBER, innings_with_wicket/two, qualifying + econ/runs bands via a touch/spell/spell_wkts CTE). Verified byte-identical to the precomputed table at none-of-six (20 overs × 22 cols = 440 cells, 0 mismatches). Tests: `player_baseline_aux_fallback.sh` §7-§9. Commits `75730ea` (by-phase) / `3f0bc74` (by-season) / `1cf1bc7` (summary+distribution) + 2 REG→NEW pre-flips. Plan: `internal_docs/plan-3d-bowling-live-cohort.md`.
 
-- 3e. Fielding / keeping live (keeper-binary).
+- 3e. Fielding / keeping live (keeper-binary). **Re-scoped 2026-05-28 —
+  it is NOT the "cheap matchfielderperf mirror" the original §8.3 bullet
+  assumed; it's the heaviest discipline slice. Detailed below.**
+
+  **Denominator B — SHIPPED 2026-05-28 (commit `5341f67`), a prerequisite
+  done ahead of 3e.** Fielding per-match rates + catch-dist prob chips now
+  divide by `matches_fielded` (XI ∧ opponent batted), the activity unit —
+  consistent with batting `innings_batted` / bowling `innings_bowled`.
+  Parent gained `matches_fielded` (DROP+CREATE re-ingest); catch-dist
+  master sample restricted to fielded matches; own (`/summary`,
+  `/by-season`, `/by-phase`) + the three fielding cohort `n_matches_total`
+  denominators all point at it. Displayed career "matches played" stays
+  squad. The By-Dismissed-Position + By-Over TAB denominators stay squad
+  (internally consistent) until they're made live here. So 3e's live
+  denominator builds on `matches_fielded`, not `matches`.
+
+  **3e live cohort — the real scope.** Unlike bowling's single delivery
+  scan, the fielding cohort spans THREE source tables, and the numerator
+  and denominator live at different grains:
+  - **denominator** (matches_fielded): `matchplayer` ⋈ `innings`
+    (`i.team != mp.team`, super_over=0) — match grain. The six narrow it
+    per-fielder-**team** as a match-subset (keyed on `mp.team`), the
+    fielding orientation.
+  - **numerator** (catches/stumpings/run-outs): `fieldingcredit` ⋈
+    delivery → innings → match, `kind IN ('caught','caught_and_bowled')`
+    + `COALESCE(is_substitute,0)=0` (Convention 3) — innings grain,
+    fielding orientation.
+  - **keeper/outfielder partition**: `keeperassignment` — a cohort
+    fielder is a "keeper in scope" iff they kept ≥1 in-scope innings
+    (mirrors how the player's OWN value already decides `is_keeper`, so
+    own↔cohort agree). RESOLVED — not ambiguous.
+  - **summary/distribution extras**: dismissed-batter position bucket via
+    join to `inningsbatterperf` on `player_out`; per-(fielder, match)
+    catch-count distribution for the P(=0/1/≥2) chips.
+  - No mix weighting (D5, keeper-binary). Parity-probe the live aggregation
+    byte-identical to the precomputed fielding tables at none-of-six (like
+    bowling's 440-cell check). Dispatch on `is_precomputed_scope` per
+    surface (summary+distribution / by-season / by-phase), reusing the
+    bowling-side orientation helpers. This also flips the
+    By-Dismissed-Position + By-Over tab denominators to `matches_fielded`
+    (both sides) — the deferred half of B.
   
 
 4. **Docs** — flip audit §A player rows ✗→✓; `server-vs-client-calcs.md`, `how-stats-calculated.md`, `data-pipeline.md` (new columns). **API docs (**`docs/api.md`**) — carry the Phase 1+2 additions that have no entry yet:** the `toss_won`/`toss_lost` fields on `/players/{id}/result-counts` (Phase 1), and the `toss_outcome` aux param now narrowing every player VALUE endpoint via `player_toss_clause` (Phase 2 — document alongside the existing `result`/`inning` aux rows). Note `/players/{id}/result-counts` itself is currently undocumented in `docs/api.md`; add the endpoint while there. Plus `user-help.md` for any user-visible control once the toss control is actually mounted.
