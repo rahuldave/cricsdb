@@ -51,16 +51,19 @@ unq() { echo "$1" | sed -e 's/^"//' -e 's/"$//'; }
 
 # Count numeric Y-axis tick text in the BarChart with the given title.
 # Returns the count as a bare integer string.
+#
+# DOM-walk note: the ChartContainer refactor moved chart titles from
+# inside the SVG into a sibling <h3 class="wisden-chart-title">. So we
+# locate the title element by its text, walk up to the ChartContainer
+# outer block (the parent of the H3), then count numeric tick text in
+# the SVG within that block.
 count_y_ticks() {
   local chart_title="$1"
   ab_eval "(() => {
-    const svgs = Array.from(document.querySelectorAll('svg'));
-    const titleSvg = svgs.find(s => s.textContent && s.textContent.includes('${chart_title}'));
-    if (!titleSvg) return 'NO-SVG';
-    let wrapper = titleSvg.parentElement;
-    while (wrapper && !(wrapper.tagName === 'DIV' && wrapper.classList && wrapper.classList.contains('w-full'))) {
-      wrapper = wrapper.parentElement;
-    }
+    const h3s = Array.from(document.querySelectorAll('h3.wisden-chart-title'));
+    const title = h3s.find(h => (h.textContent || '').trim() === '${chart_title}');
+    if (!title) return 'NO-TITLE';
+    const wrapper = title.parentElement;
     if (!wrapper) return 'NO-WRAPPER';
     const ticks = Array.from(wrapper.querySelectorAll('svg text'))
       .map(t => (t.textContent || '').trim())
