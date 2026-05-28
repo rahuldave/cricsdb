@@ -6,15 +6,28 @@
 #
 # Phase H of the spec — exercises the FilterParams matrix on each
 # of /batting, /bowling, /fielding to confirm:
-#   - By Season LineChart still renders bi-series at every combo
-#   - At least one summary tile still carries a "vs cohort" chip
+#   - By Season LineChart renders at every combo, WITH the grey
+#     "typical player" reference line whenever the cohort clears the
+#     support cliff at that scope (driven off the cohort endpoint's
+#     own below_support flag), and WITHOUT it — player line only —
+#     when every season's narrowed pool is too thin to compare. The
+#     latter is the correct post-Phase-3c behaviour: batting narrows
+#     live, so venue+opponent / venue+toss drop the cohort below the
+#     cliff and the reference line is suppressed rather than showing a
+#     misleading frozen-broad average. Bowling/fielding stay
+#     frozen-broad until 3d/3e, so they keep the reference line — the
+#     test tracks each discipline's real behaviour, not a hard-coded
+#     expectation.
+#   - At least one summary tile still carries a "vs cohort" chip.
 #
 # Plus a click-after-mount probe on each page: deep-link an
 # unnarrowed scope, then click a FilterBar control (venue typeahead
 # select), then re-assert the chart still has the bi-series wiring.
-# Refetch bugs that worked at deep-link but broke on runtime click
-# would hide otherwise — CLAUDE.md "Tests must cover EVERY call
-# site of a shared abstraction" lesson from be4d755.
+# venue-only keeps the batting cohort supported, so the reference line
+# must survive the runtime refetch. Refetch bugs that worked at
+# deep-link but broke on runtime click would hide otherwise —
+# CLAUDE.md "Tests must cover EVERY call site of a shared
+# abstraction" lesson from be4d755.
 #
 # 3 pages × 4 narrowing combos × 2 assertions = 24 matrix assertions
 # + 3 click-after-mount = 27 total.
@@ -39,9 +52,27 @@ probe_chart() {
     return {
       n_frames: frames.length,
       canvas_total: frames.reduce((a, f) => a + f.querySelectorAll('canvas').length, 0),
+      lines_total: lines.length,
       lines_with_ref: lines.filter(e => e.getAttribute('data-test-line-has-reference') === 'yes').length,
     };
   })()" 2>/dev/null > /tmp/chart_probe.json
+}
+
+# Does the per-season cohort actually clear the support cliff at this
+# scope? The chart draws the grey "typical player" reference line only
+# when the cohort endpoint returns ≥1 season with below_support=false.
+# Under a narrow combo the per-season pool can fall below the cliff for
+# every season (correct, intended — a comparison built from a handful
+# of innings is suppressed, not shown). Batting narrows live (Phase 3c);
+# bowling/fielding stay frozen-broad until 3d/3e, so this naturally
+# tracks each discipline's current behaviour instead of hard-coding it.
+cohort_supported() {  # $1 = cohort by-season endpoint URL
+  curl -s "$1" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+rows = d.get('by_season', [])
+print('yes' if any(r.get('below_support') is False for r in rows) else 'no')
+"
 }
 
 # Count "vs cohort" subtitles in the stat rows.
@@ -53,19 +84,26 @@ count_vs_base() {
   python3 -c "import json; print(json.load(open('/tmp/chips.json'))['data']['result'])"
 }
 
-# Assert (chart present, ≥1 chip) for a given page + combo URL.
-# The chart assertion is skipped (and treated as a PASS-with-note)
-# when the by-season payload is genuinely empty at the scope — the
-# LineChart's `seasonData.length > 0` guard then legitimately
-# suppresses rendering. The chip side stays asserted because the
-# /summary endpoint aggregates across seasons and still returns
-# values at narrow scopes.
+# Assert (chart renders, ≥1 chip) for a given page + combo URL.
+#
+# Chart assertion has three outcomes:
+#   - Empty by-season payload (no innings at all) → chart legitimately
+#     suppressed by the LineChart `seasonData.length > 0` guard. PASS.
+#   - Cohort supported at this scope (≥1 season clears the cliff) →
+#     the grey reference line MUST render alongside the player line
+#     (bi-series). This is the wiring/refetch check.
+#   - Cohort NOT supported (every season below the cliff — e.g. the
+#     batting pool at venue+opponent is a handful of innings) → the
+#     player line MUST still render, and the reference line is
+#     correctly absent. PASS. Asserting a reference line here would be
+#     asserting the pre-3c frozen-broad behaviour 3c removed.
+#
+# The chip side stays asserted unconditionally because /summary
+# aggregates across seasons and still returns values at narrow scopes.
 assert_combo() {
-  local label="$1" url="$2" empty_check_url="$3"
+  local label="$1" url="$2" empty_check_url="$3" cohort_url="$4"
   ab open "$url"
   sleep 3
-  # Empty by-season payload is structural data-absence, not a bug
-  # — skip the chart-bi-series check in that case.
   empty=$(curl -s "$empty_check_url" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
@@ -74,17 +112,33 @@ print('yes' if len(d.get('by_season', [])) == 0 else 'no')
   if [ "$empty" = "yes" ]; then
     ok "$label: empty by-season scope — chart legitimately suppressed"
   else
+    supported=$(cohort_supported "$cohort_url")
     probe_chart
-    has_chart=$(python3 -c "
+    renders=$(python3 -c "
 import json
 d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-ok = d['n_frames'] >= 1 and d['canvas_total'] >= 2 and d['lines_with_ref'] >= 1
-print('yes' if ok else 'no')
+print('yes' if d['n_frames'] >= 1 and d['canvas_total'] >= 2 and d['lines_total'] >= 1 else 'no')
 ")
-    if [ "$has_chart" = "yes" ]; then
-      ok "$label: chart bi-series renders"
+    ref=$(python3 -c "
+import json
+d = json.load(open('/tmp/chart_probe.json'))['data']['result']
+print('yes' if d['lines_with_ref'] >= 1 else 'no')
+")
+    if [ "$renders" != "yes" ]; then
+      bad "$label: chart did not render at all — $(cat /tmp/chart_probe.json)"
+    elif [ "$supported" = "yes" ]; then
+      if [ "$ref" = "yes" ]; then
+        ok "$label: chart bi-series renders (cohort supported)"
+      else
+        bad "$label: cohort supported by API but reference line missing — $(cat /tmp/chart_probe.json)"
+      fi
+    elif [ "$ref" = "no" ]; then
+      # Thin pool: cohort correctly suppressed; player line still draws.
+      ok "$label: player line renders, cohort correctly suppressed below cliff (no ref line)"
     else
-      bad "$label: chart bi-series missing — $(cat /tmp/chart_probe.json)"
+      # API says every season is below the cliff, yet a reference line
+      # drew anyway — that's the pre-3c frozen-broad cohort leaking back.
+      bad "$label: cohort below cliff per API but reference line present — frozen-broad leak? $(cat /tmp/chart_probe.json)"
     fi
   fi
   chips=$(count_vs_base)
@@ -112,18 +166,23 @@ API_SCOPE='gender=male&team_type=club&tournament=Indian+Premier+League'
 bat_api() {
   echo "$API/api/v1/batters/$KOHLI/by-season?${API_SCOPE}${1:+&$1}"
 }
+bat_coh() {
+  echo "$API/api/v1/scope/averages/players/batting/by-season?person_id=$KOHLI&${API_SCOPE}${1:+&$1}"
+}
 assert_combo "/batting tournament-only" \
   "$BASE/batting?player=$KOHLI&$SCOPE_BASE&tab=By%20Season" \
-  "$(bat_api '')"
+  "$(bat_api '')" "$(bat_coh '')"
 assert_combo "/batting + venue" \
   "$BASE/batting?player=$KOHLI&$SCOPE_BASE&$WANKHEDE&tab=By%20Season" \
-  "$(bat_api 'filter_venue=Wankhede+Stadium')"
+  "$(bat_api 'filter_venue=Wankhede+Stadium')" "$(bat_coh 'filter_venue=Wankhede+Stadium')"
 assert_combo "/batting + venue + opponent" \
   "$BASE/batting?player=$KOHLI&$SCOPE_BASE&$WANKHEDE&$CSK&tab=By%20Season" \
-  "$(bat_api 'filter_venue=Wankhede+Stadium&filter_opponent=Chennai+Super+Kings')"
+  "$(bat_api 'filter_venue=Wankhede+Stadium&filter_opponent=Chennai+Super+Kings')" \
+  "$(bat_coh 'filter_venue=Wankhede+Stadium&filter_opponent=Chennai+Super+Kings')"
 assert_combo "/batting + venue + toss=won" \
   "$BASE/batting?player=$KOHLI&$SCOPE_BASE&$WANKHEDE&$TOSS_WON&tab=By%20Season" \
-  "$(bat_api 'filter_venue=Wankhede+Stadium&toss_outcome=won')"
+  "$(bat_api 'filter_venue=Wankhede+Stadium&toss_outcome=won')" \
+  "$(bat_coh 'filter_venue=Wankhede+Stadium&toss_outcome=won')"
 
 # ───────────────────────────────────────────────────────────────────
 # /bowling — Bumrah IPL × matrix
@@ -136,18 +195,23 @@ BUMRAH=462411b3
 bow_api() {
   echo "$API/api/v1/bowlers/$BUMRAH/by-season?${API_SCOPE}${1:+&$1}"
 }
+bow_coh() {
+  echo "$API/api/v1/scope/averages/players/bowling/by-season?person_id=$BUMRAH&${API_SCOPE}${1:+&$1}"
+}
 assert_combo "/bowling tournament-only" \
   "$BASE/bowling?player=$BUMRAH&$SCOPE_BASE&tab=By%20Season" \
-  "$(bow_api '')"
+  "$(bow_api '')" "$(bow_coh '')"
 assert_combo "/bowling + venue" \
   "$BASE/bowling?player=$BUMRAH&$SCOPE_BASE&$WANKHEDE&tab=By%20Season" \
-  "$(bow_api 'filter_venue=Wankhede+Stadium')"
+  "$(bow_api 'filter_venue=Wankhede+Stadium')" "$(bow_coh 'filter_venue=Wankhede+Stadium')"
 assert_combo "/bowling + venue + opponent" \
   "$BASE/bowling?player=$BUMRAH&$SCOPE_BASE&$WANKHEDE&$CSK&tab=By%20Season" \
-  "$(bow_api 'filter_venue=Wankhede+Stadium&filter_opponent=Chennai+Super+Kings')"
+  "$(bow_api 'filter_venue=Wankhede+Stadium&filter_opponent=Chennai+Super+Kings')" \
+  "$(bow_coh 'filter_venue=Wankhede+Stadium&filter_opponent=Chennai+Super+Kings')"
 assert_combo "/bowling + venue + toss=won" \
   "$BASE/bowling?player=$BUMRAH&$SCOPE_BASE&$WANKHEDE&$TOSS_WON&tab=By%20Season" \
-  "$(bow_api 'filter_venue=Wankhede+Stadium&toss_outcome=won')"
+  "$(bow_api 'filter_venue=Wankhede+Stadium&toss_outcome=won')" \
+  "$(bow_coh 'filter_venue=Wankhede+Stadium&toss_outcome=won')"
 
 # ───────────────────────────────────────────────────────────────────
 # /fielding — Kohli IPL × matrix
@@ -159,18 +223,23 @@ echo "=== /fielding matrix ==="
 fld_api() {
   echo "$API/api/v1/fielders/$KOHLI/by-season?${API_SCOPE}${1:+&$1}"
 }
+fld_coh() {
+  echo "$API/api/v1/scope/averages/players/fielding/by-season?person_id=$KOHLI&${API_SCOPE}${1:+&$1}"
+}
 assert_combo "/fielding tournament-only" \
   "$BASE/fielding?player=$KOHLI&$SCOPE_BASE&tab=By%20Season" \
-  "$(fld_api '')"
+  "$(fld_api '')" "$(fld_coh '')"
 assert_combo "/fielding + venue" \
   "$BASE/fielding?player=$KOHLI&$SCOPE_BASE&$WANKHEDE&tab=By%20Season" \
-  "$(fld_api 'filter_venue=Wankhede+Stadium')"
+  "$(fld_api 'filter_venue=Wankhede+Stadium')" "$(fld_coh 'filter_venue=Wankhede+Stadium')"
 assert_combo "/fielding + venue + opponent" \
   "$BASE/fielding?player=$KOHLI&$SCOPE_BASE&$WANKHEDE&$CSK&tab=By%20Season" \
-  "$(fld_api 'filter_venue=Wankhede+Stadium&filter_opponent=Chennai+Super+Kings')"
+  "$(fld_api 'filter_venue=Wankhede+Stadium&filter_opponent=Chennai+Super+Kings')" \
+  "$(fld_coh 'filter_venue=Wankhede+Stadium&filter_opponent=Chennai+Super+Kings')"
 assert_combo "/fielding + venue + toss=won" \
   "$BASE/fielding?player=$KOHLI&$SCOPE_BASE&$WANKHEDE&$TOSS_WON&tab=By%20Season" \
-  "$(fld_api 'filter_venue=Wankhede+Stadium&toss_outcome=won')"
+  "$(fld_api 'filter_venue=Wankhede+Stadium&toss_outcome=won')" \
+  "$(fld_coh 'filter_venue=Wankhede+Stadium&toss_outcome=won')"
 
 # ───────────────────────────────────────────────────────────────────
 # Click-after-mount — refetch survives runtime FilterBar click
