@@ -12,7 +12,7 @@
 # G5 (MI club + full_member, must == 30 not 0).
 set -u
 
-BASE="${BASE:-http://localhost:5179}"
+BASE="${BASE:-http://localhost:5173}"
 API="${API:-http://localhost:8000}"
 PASS=0; FAIL=0; FAILS=""
 

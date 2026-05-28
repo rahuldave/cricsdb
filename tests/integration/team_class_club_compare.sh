@@ -13,7 +13,7 @@
 #     is stripped along with the FilterBar one.
 set -u
 
-BASE="${BASE:-http://localhost:5179}"
+BASE="${BASE:-http://localhost:5173}"
 PASS=0; FAIL=0; FAILS=""
 
 ab()      { agent-browser "$@" >/dev/null 2>&1; }
@@ -26,16 +26,34 @@ assert_eq() {
   if [ "$3" = "$2" ]; then ok "$1"; else bad "$1 — expected $2, got $3"; fi
 }
 
+# Poll an eval expression up to ~5s until it returns the expected
+# value. Replaces brittle `sleep 2; eval` patterns that flaked when
+# React's commit ran slower than the sleep budget — the picker
+# always renders, just sometimes after the eval ran.
+wait_for_eval() {
+  local expected="$1" expr="$2" v
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    v=$(ab_eval "$expr")
+    [ "$v" = "$expected" ] && { echo "$v"; return; }
+    sleep 0.5
+  done
+  echo "$v"
+}
+
 agent-browser close --all >/dev/null 2>&1 || true
 sleep 1
 
 # ────────────────────────────────────────────
 echo "Test 1 · Compare quick-picks visible on club mode"
 ab open "$BASE/teams?team=Mumbai%20Indians&gender=male&team_type=club&season_from=2024&season_to=2025&tab=Compare"
-settle 5
+ab wait --load networkidle
+# Wait for the Add Column button to exist before clicking it — Compare
+# grid renders after the parallel team+avg fetch settles, not on
+# networkidle.
+v=$(wait_for_eval 'true' "!!document.querySelector('.wisden-compare-add-btn')")
+[ "$v" = "true" ] || { echo "  FAIL: add-btn never appeared on page"; FAIL=$((FAIL+1)); }
 ab_eval "document.querySelector('.wisden-compare-add-btn')?.click()" >/dev/null
-sleep 2
-v=$(ab_eval "Array.from(document.querySelectorAll('button')).some(b => b.textContent.includes('+ Average primary-club team'))")
+v=$(wait_for_eval 'true' "Array.from(document.querySelectorAll('button')).some(b => b.textContent.includes('+ Average primary-club team'))")
 assert_eq "club: '+ Average primary-club team' visible" 'true' "$v"
 v=$(ab_eval "Array.from(document.querySelectorAll('button')).some(b => b.textContent.includes('+ Average secondary-club team'))")
 assert_eq "club: '+ Average secondary-club team' visible" 'true' "$v"
@@ -45,17 +63,16 @@ assert_eq "club: FM quick-pick hidden" 'false' "$v"
 # ────────────────────────────────────────────
 echo "Test 2 · Quick-pick on club adds compareN_team_class override"
 ab_eval "Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('+ Average primary-club team')).click()" >/dev/null
-sleep 3
-v=$(ab_eval "new URL(location.href).searchParams.get('compare2_team_class') || new URL(location.href).searchParams.get('compare1_team_class') || ''")
+v=$(wait_for_eval '"primary_club"' "new URL(location.href).searchParams.get('compare2_team_class') || new URL(location.href).searchParams.get('compare1_team_class') || ''")
 assert_eq "primary_club override written to compareN_team_class" '"primary_club"' "$v"
 
 # ────────────────────────────────────────────
 echo "Test 3 · Compare quick-picks on intl show FM, not club tier"
 ab open "$BASE/teams?team=India&gender=male&team_type=international&season_from=2024&season_to=2025&tab=Compare"
-settle 5
+ab wait --load networkidle
+settle 3
 ab_eval "document.querySelector('.wisden-compare-add-btn')?.click()" >/dev/null
-sleep 2
-v=$(ab_eval "Array.from(document.querySelectorAll('button')).some(b => b.textContent.includes('+ Average full-member team'))")
+v=$(wait_for_eval 'true' "Array.from(document.querySelectorAll('button')).some(b => b.textContent.includes('+ Average full-member team'))")
 assert_eq "intl: FM quick-pick visible" 'true' "$v"
 v=$(ab_eval "Array.from(document.querySelectorAll('button')).some(b => b.textContent.includes('+ Average primary-club team'))")
 assert_eq "intl: primary-club quick-pick hidden" 'false' "$v"
@@ -65,11 +82,11 @@ echo "Test 4 · SlotScopeEditor Tier dropdown on club mode"
 # Open MI Compare with primary_club; existing slot's editor should
 # expose Primary/Secondary options.
 ab open "$BASE/teams?team=Mumbai%20Indians&gender=male&team_type=club&season_from=2024&season_to=2025&team_class=primary_club&tab=Compare"
-settle 5
+ab wait --load networkidle
+settle 3
 # Click the ✎ edit button on slot 1 (primary col is leftmost)
 ab_eval "Array.from(document.querySelectorAll('button')).find(b => b.title?.includes('Edit') || b.textContent.trim() === '✎')?.click()" >/dev/null
-sleep 2
-v=$(ab_eval "Array.from(document.querySelectorAll('select option')).some(o => o.textContent === 'Primary clubs only')")
+v=$(wait_for_eval 'true' "Array.from(document.querySelectorAll('select option')).some(o => o.textContent === 'Primary clubs only')")
 assert_eq "editor: 'Primary clubs only' option visible" 'true' "$v"
 v=$(ab_eval "Array.from(document.querySelectorAll('select option')).some(o => o.textContent === 'Secondary clubs only')")
 assert_eq "editor: 'Secondary clubs only' option visible" 'true' "$v"

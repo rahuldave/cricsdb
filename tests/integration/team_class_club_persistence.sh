@@ -7,7 +7,7 @@
 # Mirrors the v3 FM-toggle persistence pattern.
 set -u
 
-BASE="${BASE:-http://localhost:5179}"
+BASE="${BASE:-http://localhost:5173}"
 PASS=0; FAIL=0; FAILS=""
 
 ab()      { agent-browser "$@" >/dev/null 2>&1; }

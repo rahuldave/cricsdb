@@ -40,8 +40,14 @@ rcb=$(echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); prin
 avg=$(echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); print([c for c in d if 'verage' in c['name']][0]['matches'])")
 srh=$(echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); print([c for c in d if 'Sunrisers' in c['name']][0]['matches'])")
 
+# Team cols show raw match counts; avg col shows per-team-avg (pool
+# matches × 2 / unique_teams_in_scope — see compare_filters Anchor 5
+# rationale, transform in api/routers/teams.py:_apply_results_per_team).
+# Anchor avg col against the API at runtime.
+api_avg=$(curl -s "${BASE/5173/8000}/api/v1/scope/averages/summary?gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2025&season_to=2025" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('matches'))")
 [ "$rcb" = "15" ] && ok "RCB col: 15 matches" || bad "RCB col expected 15, got $rcb"
-[ "$avg" = "74" ] && ok "IPL avg col: 74 matches" || bad "IPL avg col expected 74, got $avg"
+[ "$avg" = "$api_avg" ] && ok "IPL avg col: $api_avg per-team-avg matches" || bad "IPL avg col expected $api_avg (per-team avg from API), got $avg"
 [ "$srh" = "14" ] && ok "SRH col: 14 matches" || bad "SRH col expected 14, got $srh"
 
 # Defensive gate proof: same URL with &team_class=full_member must

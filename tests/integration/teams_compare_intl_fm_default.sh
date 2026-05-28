@@ -30,7 +30,11 @@ avg=$(echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); prin
 ind=$(echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); print([c for c in d if c['name']=='India'][0]['matches'])")
 
 [ "$aus" = "16" ] && ok "Australia col: 16 matches" || bad "Australia col expected 16, got $aus"
-[ "$avg" = "140" ] && ok "Full-member avg col: 140 matches" || bad "FM avg col expected 140, got $avg"
+# Avg col shows per-team-avg matches, not raw pool total — anchor
+# against the API. (Same rationale as compare_filters Anchor 5.)
+api_avg=$(curl -s "${BASE/5173/8000}/api/v1/scope/averages/summary?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('matches'))")
+[ "$avg" = "$api_avg" ] && ok "Full-member avg col: $api_avg per-team-avg matches" || bad "FM avg col expected $api_avg (per-team avg from API), got $avg"
 [ "$ind" = "31" ] && ok "India col: 31 matches" || bad "India col expected 31, got $ind"
 
 # Avg col label should be "Full-member average"

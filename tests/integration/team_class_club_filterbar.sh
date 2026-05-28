@@ -9,7 +9,7 @@
 set -u
 
 # Auto-discover vite port (sometimes 5173, sometimes 5174+ when in use)
-BASE="${BASE:-http://localhost:5179}"
+BASE="${BASE:-http://localhost:5173}"
 PASS=0; FAIL=0; FAILS=""
 
 ab()      { agent-browser "$@" >/dev/null 2>&1; }
