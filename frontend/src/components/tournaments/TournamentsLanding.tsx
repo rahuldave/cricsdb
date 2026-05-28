@@ -219,13 +219,32 @@ function RivalryGrid({
   )
 }
 
+/** Tournaments whose tiles the hero (TournamentDossier's tier overview)
+ *  deliberately omits from "Top events" so they surface lower down in
+ *  the embedded directory instead. Keeps the marquee bar focused on
+ *  the absolute top events without losing access to second-tier ones.
+ *
+ *  When this list changes, both TournamentDossier (hero filter) and
+ *  TournamentsLanding (embedded display) pick up the change — they
+ *  both import this constant. */
+export const HERO_OMITTED_TOURNAMENTS: readonly string[] = [
+  "The Hundred Women's Competition",
+  "ICC Men's T20 World Cup Qualifier",
+  "ICC Women's T20 World Cup Qualifier",
+]
+
 /** Renders the tournaments-and-rivalries directory.
  *
  *  `embedded` — when rendered as a section inside another page (e.g.
  *  TournamentDossier's Overview tab at broad scope), the H2 + subtitle
- *  are suppressed so the host page's heading hierarchy stays clean.
- *  Standalone callers (currently none — /series renders the dossier)
- *  leave the heading visible.
+ *  are suppressed AND most tile bars are gated off (they duplicate
+ *  what the host's "Top events" already shows). Only the long-tail
+ *  accordion buttons render unconditionally, plus the
+ *  HERO_OMITTED_TOURNAMENTS tiles which are deliberately surfaced
+ *  here instead of in the hero.
+ *
+ *  Standalone callers (none today — /series renders the dossier)
+ *  leave every section visible.
  *
  *  `presetData` — when the host page has already fetched /series/landing
  *  (e.g. for Top events), it passes the data here so we don't double-
@@ -285,9 +304,32 @@ export default function TournamentsLanding({
   const showInternational = filters.team_type !== 'club'
   const showClub = filters.team_type !== 'international'
 
+  // Per-section visibility flags. Flip these to surface a section in
+  // the embedded view later — single edit, no JSX restructuring. The
+  // 3 long-tail accordions ("Show N other men's rivalries", etc.)
+  // always render; the hero never duplicates them, so they're the one
+  // surface unique to this component.
+  const showPageHeader        = !embedded
+  const showRecentEditions    = !embedded
+  const showIntlEventsTiles   = !embedded
+  const showTopMensRivalries  = !embedded
+  const showTopWomensRivalries= !embedded
+  const showFranchiseTiles    = !embedded
+  const showDomesticTiles     = !embedded
+  const showWomensFranchiseTiles = !embedded
+  const showOtherClubTiles    = !embedded
+  // Embedded view surfaces a small "secondary events" grid for tiles
+  // the hero deliberately omits — keeps them one click away without
+  // crowding the marquee.
+  const showHeroOmittedTiles  = embedded
+  const heroOmittedTiles = showHeroOmittedTiles
+    ? [...intlEvents, ...clubWomen]
+        .filter(e => HERO_OMITTED_TOURNAMENTS.includes(e.canonical))
+    : []
+
   return (
     <div>
-      {!embedded && (
+      {showPageHeader && (
         <>
           <h2 className="wisden-page-title">Series</h2>
           <div className="wisden-page-subtitle">
@@ -296,21 +338,33 @@ export default function TournamentsLanding({
         </>
       )}
 
-      <RecentEditionsStrip editions={data.recent_editions} ambient={ambient} />
+      {showRecentEditions && (
+        <RecentEditionsStrip editions={data.recent_editions} ambient={ambient} />
+      )}
+
+      {showHeroOmittedTiles && heroOmittedTiles.length > 0 && (
+        <div className="wisden-tile-grid mt-2" data-test-section="hero-omitted-tiles">
+          {heroOmittedTiles.map(e => (
+            <TournamentTile key={`omit-${e.canonical}`} entry={e} ambient={ambient} />
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
         {/* ── Left column — International ── */}
         {showInternational && (
           <div>
-            <Section
-              title="International events"
-              tiles={intlEvents}
-              ambient={ambient}
-              emptyLabel="No international events in this filter scope."
-            />
+            {showIntlEventsTiles && (
+              <Section
+                title="International events"
+                tiles={intlEvents}
+                ambient={ambient}
+                emptyLabel="No international events in this filter scope."
+              />
+            )}
 
             {/* ── Men's bilateral rivalries ── */}
-            {rivalries.men.top.length > 0 && (
+            {showTopMensRivalries && rivalries.men.top.length > 0 && (
               <RivalryGrid
                 title={`Men's bilateral rivalries (${rivalries.men.top.length})`}
                 top={rivalries.men.top}
@@ -356,7 +410,7 @@ export default function TournamentsLanding({
             )}
 
             {/* ── Women's bilateral rivalries ── */}
-            {rivalries.women.top.length > 0 && (
+            {showTopWomensRivalries && rivalries.women.top.length > 0 && (
               <RivalryGrid
                 title={`Women's bilateral rivalries (${rivalries.women.top.length})`}
                 top={rivalries.women.top}
@@ -438,27 +492,35 @@ export default function TournamentsLanding({
         {/* ── Right column — Club ── */}
         {showClub && (
           <div>
-            <Section
-              title="Franchise leagues"
-              tiles={clubFranchise}
-              ambient={ambient}
-              emptyLabel="No franchise leagues in this filter scope."
-            />
-            <Section
-              title="Domestic leagues"
-              tiles={clubDomestic}
-              ambient={ambient}
-            />
-            <Section
-              title="Women's franchise leagues"
-              tiles={clubWomen}
-              ambient={ambient}
-            />
-            <Section
-              title="Other tournaments"
-              tiles={clubOther}
-              ambient={ambient}
-            />
+            {showFranchiseTiles && (
+              <Section
+                title="Franchise leagues"
+                tiles={clubFranchise}
+                ambient={ambient}
+                emptyLabel="No franchise leagues in this filter scope."
+              />
+            )}
+            {showDomesticTiles && (
+              <Section
+                title="Domestic leagues"
+                tiles={clubDomestic}
+                ambient={ambient}
+              />
+            )}
+            {showWomensFranchiseTiles && (
+              <Section
+                title="Women's franchise leagues"
+                tiles={clubWomen}
+                ambient={ambient}
+              />
+            )}
+            {showOtherClubTiles && (
+              <Section
+                title="Other tournaments"
+                tiles={clubOther}
+                ambient={ambient}
+              />
+            )}
           </div>
         )}
       </div>

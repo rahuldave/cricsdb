@@ -56,7 +56,7 @@ import type {
   TournamentLandingEntry, RivalryEntry,
 } from '../../types'
 import { scopeToProse } from '../scopeLinks'
-import TournamentsLanding, { RecentEditionsStrip, RivalryTile } from './TournamentsLanding'
+import TournamentsLanding, { RecentEditionsStrip, RivalryTile, HERO_OMITTED_TOURNAMENTS } from './TournamentsLanding'
 import TournamentTile, { tileAmbientFromFilters } from './TournamentTile'
 
 const fmt = (v: number | null | undefined, d = 2) =>
@@ -2926,10 +2926,15 @@ function TierExtrasSections({
   const ambient = tileAmbientFromFilters(filters)
 
   // ── Top events — curate marquee tournaments + rivalries from
-  //    /series/landing. Sub-sections hide when empty.
-  const topFranchise = (landing?.club.franchise_leagues ?? []).slice(0, 4)
-  const topWomensFranchise = (landing?.club.women_franchise ?? []).slice(0, 4)
-  const topIcc = (landing?.international.icc_events ?? []).slice(0, 4)
+  //    /series/landing. Sub-sections hide when empty. Tournaments named
+  //    in HERO_OMITTED_TOURNAMENTS are filtered out before the slice so
+  //    they surface in the embedded landing below instead of crowding
+  //    the marquee.
+  const omitHero = (e: { canonical: string }) =>
+    !HERO_OMITTED_TOURNAMENTS.includes(e.canonical)
+  const topFranchise = (landing?.club.franchise_leagues ?? []).filter(omitHero).slice(0, 4)
+  const topWomensFranchise = (landing?.club.women_franchise ?? []).filter(omitHero).slice(0, 4)
+  const topIcc = (landing?.international.icc_events ?? []).filter(omitHero).slice(0, 4)
   const topMensRivalries = (landing?.international.bilateral_rivalries.men.top ?? []).slice(0, 4)
   const topWomensRivalries = (landing?.international.bilateral_rivalries.women.top ?? []).slice(0, 4)
   const hasTopEvents = topFranchise.length + topWomensFranchise.length + topIcc.length
