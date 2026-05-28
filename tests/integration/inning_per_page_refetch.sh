@@ -132,12 +132,16 @@ sleep 1
 
 # ─────────────────────────────────────────────────────────────────
 echo "Test 1 · Player Batting page (Batting.tsx)"
+# Striker OR non-striker — matches the all-ball convention shipped in
+# spec-batting-allball-runs-single-source.md (an innings the player was
+# only at the non-striker end still counts). API /batters/{id}/summary
+# uses the same disjunction.
 SMC_BAT="
   SELECT COUNT(DISTINCT i.match_id) FROM innings i
   JOIN match m ON m.id = i.match_id
   JOIN delivery d ON d.innings_id = i.id
-  WHERE d.batter_id='e94915e6' AND m.gender='male'
-    AND m.team_type='club' AND i.super_over=0
+  WHERE (d.batter_id='e94915e6' OR d.non_striker_id='e94915e6')
+    AND m.gender='male' AND m.team_type='club' AND i.super_over=0
 "
 sql_smc_bat_all=$(sql "$SMC_BAT")
 sql_smc_bat_in0=$(sql "$SMC_BAT AND i.innings_number=0")
@@ -183,13 +187,18 @@ echo "Test 3 · Player Fielding page (Fielding.tsx)"
 # Use catches as the inning-sensitive anchor — Matches doesn't change
 # with inning on a fielding page (the player appears in the same
 # matches regardless of which innings their team fielded in).
+# Convention 3 (CLAUDE.md): catches INCLUDE caught_and_bowled. And the
+# /fielders/{id}/summary.catches headline applies NO is_substitute
+# filter — substitutes are included in volume-framing leaderboards +
+# summary (intentional asymmetry vs /distribution which excludes them).
 SMC_CTC="
   SELECT COUNT(*) FROM fieldingcredit fc
   JOIN delivery d ON d.id = fc.delivery_id
   JOIN innings i ON i.id = d.innings_id
   JOIN match m ON m.id = i.match_id
-  WHERE fc.fielder_id='e94915e6' AND fc.kind='caught'
-    AND fc.is_substitute=0 AND m.gender='male'
+  WHERE fc.fielder_id='e94915e6'
+    AND fc.kind IN ('caught','caught_and_bowled')
+    AND m.gender='male'
     AND m.team_type='club' AND i.super_over=0
 "
 sql_smc_ctc_all=$(sql "$SMC_CTC")
