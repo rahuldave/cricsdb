@@ -197,6 +197,20 @@ Tells you're about to skip the rule:
 - You jump to an Edit before reading the surrounding code.
 - You announce "Going to ship this now" / "Implementing the fix" before the user has confirmed the diagnosis.
 
+**Always include a concrete example to look at.** When you surface a
+(potential) bug for the user to decide on, give them at least:
+
+- a **URL** they can click (full `http://localhost:5173/...` with the
+  relevant params), and
+- **what to look for** on that page in one short phrase ("two
+  'Recently played editions' headings, ~half a page apart", "tab
+  doesn't push `tab=Wickets` to the URL").
+
+Lists of bug descriptions without URLs are unactionable — the user
+can't reproduce, can't tell whether your description matches what's
+on screen, and has to keep asking "show me an example" for each one.
+Saves a round trip and proves you actually reproduced it.
+
 ### Do NOT defer parts of an assigned task
 
 When the user gives you a task — "add per-page Twitter cards", "wire up X for the whole app" — finish it. Don't ship the easy half and pitch the rest as a follow-up. If a part is genuinely out-of-scope or needs a different design call, ASK before cutting it. The "shipped + deferred" pattern reads as scope-shaving and forces the user to re-prompt.
