@@ -546,6 +546,88 @@ else
   bad "bowling by-season live econ=$BWS_I_E != SQL-anchored $BWS_EXPECTED"
 fi
 
+# ── §9 bowling summary + distribution cohort narrows (Phase 3d-3) ──
+# compute_players_bowling_cohort feeds the /bowlers/{id}/summary economy
+# chip AND the /distribution wicket-ladder + econ/runs prob baselines.
+# Read the precomputed per-over table until 3d-3 — frozen under the six.
+# After 3d-3 it dispatches to the live full per-spell per-over
+# aggregation. Note the mix it's weighted by comes from _over_distribution
+# (scope-key grain, NOT narrowed by the six) — same established design as
+# batting 3b's position_distribution — so the SQL anchor below uses the
+# scope-key mix × the narrowed per-over cohort econ.
+echo
+echo "=== bowling summary + distribution cohort narrows (3d) ==="
+BSUM="gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2014&season_to=2018"
+
+sum_econ_cohort() {  # $1=filter → economy scope_avg
+  curl -s "$API/api/v1/bowlers/$BUMRAH/summary?$BSUM&$1" \
+    | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('economy',{}).get('scope_avg'))"
+}
+SE_U=$(sum_econ_cohort "")
+SE_R=$(sum_econ_cohort "result=won")
+echo "  summary economy cohort: none=$SE_U  result=won=$SE_R"
+if [[ "$SE_U" == "None" || "$SE_R" == "None" ]]; then
+  bad "bowling summary economy cohort null"
+elif [[ "$SE_U" != "$SE_R" ]]; then
+  ok "bowling summary economy cohort narrowed ($SE_U -> $SE_R under result=won)"
+else
+  bad "bowling summary economy cohort FROZEN ($SE_U == $SE_R) -- 3d-3 not wired"
+fi
+
+# SQL anchor: summary economy cohort @ inning=0 == scope-key over-mix
+# (Bumrah's full-scope per-over legal balls) × per-over cohort econ at
+# innings_number=1 (the inning=0 bowling flip).
+SE_EXPECTED=$(python3 <<'PY'
+import sqlite3, json, urllib.request
+DB="cricket.db"; API="http://localhost:8000"
+BASE="gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2014&season_to=2018&inning=0"
+api=json.load(urllib.request.urlopen(f"{API}/api/v1/bowlers/462411b3/summary?{BASE}"))
+conn=sqlite3.connect(DB)
+mixrows=conn.execute("""
+ SELECT psso.over_number ob, SUM(psso.legal_balls) lb
+ FROM playerscopestatsover psso JOIN playerscopestats pss
+   ON pss.scope_key=psso.scope_key AND pss.person_id=psso.person_id
+ WHERE psso.person_id='462411b3' AND pss.tournament='Indian Premier League'
+   AND pss.season IN ('2014','2015','2016','2017','2018') AND pss.gender='male' AND pss.team_type='club'
+ GROUP BY psso.over_number""").fetchall()
+tot=sum(lb for _,lb in mixrows); mix={ob:lb/tot for ob,lb in mixrows}
+ec=conn.execute("""
+ SELECT d.over_number+1 ob, SUM(d.runs_total) r,
+   SUM(CASE WHEN d.extras_wides=0 AND d.extras_noballs=0 THEN 1 ELSE 0 END) lb
+ FROM delivery d JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id
+ WHERE i.super_over=0 AND m.gender='male' AND m.team_type='club' AND m.event_name='Indian Premier League'
+   AND m.season IN ('2014','2015','2016','2017','2018') AND i.innings_number=1
+   AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19
+ GROUP BY d.over_number""").fetchall()
+econ={ob:(r*6/lb if lb else None) for ob,r,lb in ec}
+exp=sum(mix[o]*econ[o] for o in mix if econ.get(o) is not None)
+print(round(exp,2))
+PY
+)
+SE_I=$(sum_econ_cohort "inning=0")
+echo "  SQL-anchored inning=0 summary econ: $SE_EXPECTED  (API: $SE_I)"
+if [[ "$SE_I" == "None" || "$SE_EXPECTED" == "None" ]]; then
+  bad "bowling summary SQL anchor inconclusive (API $SE_I, expected $SE_EXPECTED)"
+elif python3 -c "import sys; sys.exit(0 if abs(float('$SE_I')-float('$SE_EXPECTED'))<=0.1 else 1)"; then
+  ok "bowling summary economy cohort == SQL-anchored ($SE_I ~ $SE_EXPECTED)"
+else
+  bad "bowling summary economy cohort=$SE_I != SQL-anchored $SE_EXPECTED"
+fi
+
+# Distribution prob baselines (driven by the per-spell columns) narrow.
+dist_pgeq1() {  # $1=filter → wickets.milestones.p_geq_1.scope_avg
+  curl -s "$API/api/v1/bowlers/$BUMRAH/distribution?$BSUM&$1" \
+    | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['lifetime']['wickets']['milestones'].get('p_geq_1',{}).get('scope_avg'))"
+}
+DP_U=$(dist_pgeq1 "")
+DP_R=$(dist_pgeq1 "result=won")
+echo "  distribution p_geq_1 cohort: none=$DP_U  result=won=$DP_R"
+if [[ "$DP_U" != "None" && "$DP_R" != "None" && "$DP_U" != "$DP_R" ]]; then
+  ok "distribution wicket-prob baseline narrowed ($DP_U -> $DP_R) -- per-spell live path reaches distribution"
+else
+  bad "distribution wicket-prob baseline FROZEN ($DP_U vs $DP_R) -- 3d-3 not reaching distribution"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"

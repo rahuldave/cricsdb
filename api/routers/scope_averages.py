@@ -3264,7 +3264,8 @@ _BOWLING_WICKET_EXCLUDED_SQL = (
 
 
 async def _bowling_over_cohort_live(
-    db, filters: FilterParams, aux: AuxParams, *, by_season: bool = False,
+    db, filters: FilterParams, aux: AuxParams, *,
+    by_season: bool = False, with_spell_cols: bool = False,
 ):
     """Live per-over bowling cohort aggregation under the six filters
     (Phase 3d).
@@ -3343,11 +3344,15 @@ async def _bowling_over_cohort_live(
         )
         GROUP BY {ogrp_season}over_number
     """
-    # four_wicket_hauls: attributed to the over the bowler's 4th valid
-    # wicket fell in (running per-spell count via ROW_NUMBER), credited
-    # once per (innings, bowler). Matches the populate's haul attribution.
-    haul4_sql = f"""
-        SELECT {osel_season}over_number, COUNT(*) AS four_wicket_hauls
+    # three/four/five_wicket_hauls: each attributed to the over the
+    # bowler's Nth valid wicket fell in (running per-spell count via
+    # ROW_NUMBER), credited once per (innings, bowler). Matches the
+    # populate's haul attribution.
+    haul_sql = f"""
+        SELECT {osel_season}over_number,
+               SUM(CASE WHEN rn = 3 THEN 1 ELSE 0 END) AS three_wicket_hauls,
+               SUM(CASE WHEN rn = 4 THEN 1 ELSE 0 END) AS four_wicket_hauls,
+               SUM(CASE WHEN rn = 5 THEN 1 ELSE 0 END) AS five_wicket_hauls
         FROM (
             SELECT {sel_season}(d.over_number + 1) AS over_number,
                    ROW_NUMBER() OVER (
@@ -3362,16 +3367,87 @@ async def _bowling_over_cohort_live(
               AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19
               AND w.kind NOT IN {_BOWLING_WICKET_EXCLUDED_SQL}
         )
-        WHERE rn = 4
+        WHERE rn IN (3, 4, 5)
         GROUP BY {ogrp_season}over_number
     """
-    deliv_rows, wkt_rows, maiden_rows, inn_rows, haul4_rows = await asyncio.gather(
+    queries = [
         db.q(deliv_sql, params),
         db.q(wkt_sql, params),
         db.q(maiden_sql, params),
         db.q(inn_bowled_sql, params),
-        db.q(haul4_sql, params),
+        db.q(haul_sql, params),
+    ]
+
+    # Per-spell-touching threshold counters (summary/distribution only —
+    # over grain). For every (innings, bowler) spell, credit each over
+    # the bowler TOUCHED (≥1 legal ball) with: innings_with_wicket/two
+    # (spell total valid wickets ≥1/≥2, no ball gate); and — gated on a
+    # ≥12-legal-ball spell — innings_qualifying + the econ/runs bands
+    # (spell econ = runs_total*6/legal_balls; runs = SUM runs_total).
+    # Matches populate_playerscopestats_over.py PT2/PT3 exactly.
+    spell_sql = f"""
+        WITH touch AS (
+            SELECT d.innings_id, d.bowler_id, (d.over_number + 1) AS ob
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match   m ON m.id = i.match_id
+            WHERE {where_full}
+              AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19
+            GROUP BY d.innings_id, d.bowler_id, d.over_number
+            HAVING SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) >= 1
+        ),
+        spell AS (
+            SELECT d.innings_id, d.bowler_id,
+                   SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS sp_balls,
+                   SUM(d.runs_total) AS sp_runs
+            FROM delivery d
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match   m ON m.id = i.match_id
+            WHERE {where_full}
+              AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19
+            GROUP BY d.innings_id, d.bowler_id
+        ),
+        spell_wkts AS (
+            SELECT d.innings_id, d.bowler_id, COUNT(*) AS sp_wkts
+            FROM wicket w
+            JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match   m ON m.id = i.match_id
+            WHERE {where_full}
+              AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19
+              AND w.kind NOT IN {_BOWLING_WICKET_EXCLUDED_SQL}
+            GROUP BY d.innings_id, d.bowler_id
+        )
+        SELECT t.ob AS over_number,
+               SUM(CASE WHEN COALESCE(sw.sp_wkts, 0) >= 1 THEN 1 ELSE 0 END) AS innings_with_wicket,
+               SUM(CASE WHEN COALESCE(sw.sp_wkts, 0) >= 2 THEN 1 ELSE 0 END) AS innings_with_two,
+               SUM(CASE WHEN s.sp_balls >= 12 THEN 1 ELSE 0 END) AS innings_qualifying,
+               SUM(CASE WHEN s.sp_balls >= 12 AND s.sp_runs * 6.0 / s.sp_balls <= 6.0  THEN 1 ELSE 0 END) AS innings_econ_leq_6,
+               SUM(CASE WHEN s.sp_balls >= 12 AND s.sp_runs * 6.0 / s.sp_balls <= 7.0  THEN 1 ELSE 0 END) AS innings_econ_leq_7,
+               SUM(CASE WHEN s.sp_balls >= 12 AND s.sp_runs * 6.0 / s.sp_balls >= 9.0  THEN 1 ELSE 0 END) AS innings_econ_geq_9,
+               SUM(CASE WHEN s.sp_balls >= 12 AND s.sp_runs * 6.0 / s.sp_balls >= 10.0 THEN 1 ELSE 0 END) AS innings_econ_geq_10,
+               SUM(CASE WHEN s.sp_balls >= 12 AND s.sp_runs <= 15 THEN 1 ELSE 0 END) AS innings_runs_leq_15,
+               SUM(CASE WHEN s.sp_balls >= 12 AND s.sp_runs <= 25 THEN 1 ELSE 0 END) AS innings_runs_leq_25,
+               SUM(CASE WHEN s.sp_balls >= 12 AND s.sp_runs >= 40 THEN 1 ELSE 0 END) AS innings_runs_geq_40,
+               SUM(CASE WHEN s.sp_balls >= 12 AND s.sp_runs >= 50 THEN 1 ELSE 0 END) AS innings_runs_geq_50
+        FROM touch t
+        JOIN spell s ON s.innings_id = t.innings_id AND s.bowler_id = t.bowler_id
+        LEFT JOIN spell_wkts sw ON sw.innings_id = t.innings_id AND sw.bowler_id = t.bowler_id
+        GROUP BY t.ob
+    """
+    _SPELL_COLS = (
+        "innings_with_wicket", "innings_with_two", "innings_qualifying",
+        "innings_econ_leq_6", "innings_econ_leq_7", "innings_econ_geq_9",
+        "innings_econ_geq_10", "innings_runs_leq_15", "innings_runs_leq_25",
+        "innings_runs_geq_40", "innings_runs_geq_50",
     )
+    if with_spell_cols:
+        # Summary/distribution is over grain only (never by_season).
+        queries.append(db.q(spell_sql, params))
+
+    results = await asyncio.gather(*queries)
+    deliv_rows, wkt_rows, maiden_rows, inn_rows, haul_rows = results[:5]
+    spell_rows = results[5] if with_spell_cols else []
 
     def _key(r):
         return (r["season"], r["over_number"]) if by_season else r["over_number"]
@@ -3388,8 +3464,13 @@ async def _bowling_over_cohort_live(
             "wickets": 0,
             "maidens": 0,
             "innings_bowled": 0,
+            "three_wicket_hauls": 0,
             "four_wicket_hauls": 0,
+            "five_wicket_hauls": 0,
         }
+        if with_spell_cols:
+            for c in _SPELL_COLS:
+                row[c] = 0
         if by_season:
             row["season"] = r["season"]
         by_key[_key(r)] = row
@@ -3405,10 +3486,17 @@ async def _bowling_over_cohort_live(
         k = _key(r)
         if k in by_key:
             by_key[k]["innings_bowled"] = r["innings_bowled"] or 0
-    for r in haul4_rows:
+    for r in haul_rows:
         k = _key(r)
         if k in by_key:
+            by_key[k]["three_wicket_hauls"] = r["three_wicket_hauls"] or 0
             by_key[k]["four_wicket_hauls"] = r["four_wicket_hauls"] or 0
+            by_key[k]["five_wicket_hauls"] = r["five_wicket_hauls"] or 0
+    for r in spell_rows:
+        k = _key(r)
+        if k in by_key:
+            for c in _SPELL_COLS:
+                by_key[k][c] = r[c] or 0
     return [by_key[k] for k in sorted(by_key, key=lambda x: x if by_season else (x,))]
 
 
@@ -3433,20 +3521,13 @@ async def _bowling_player_over_mix_live(
     return await db.q(sql, {**params, "__pid": person_id})
 
 
-async def compute_players_bowling_cohort(
-    db,
-    filters: FilterParams,
-    aux: AuxParams,
-    mix: list[float],
-    drop_set: Optional[set[str]] = None,
-) -> dict:
-    """In-process bowling cohort baseline — same shape as the HTTP
-    endpoint. Phase 4 player /summary endpoints call this to fold the
-    cohort baseline into their envelope-wrapped response without a
-    second HTTP roundtrip.
-    """
+async def _bowling_cohort_precomputed(
+    db, filters: FilterParams, drop_set: Optional[set[str]],
+):
+    """Fast path: per-over cohort + pool + bowling_innings off the
+    precomputed `playerscopestatsover` / parent (none-of-six). Returns
+    `(rows, pool, bi)` for the downstream by_over builder."""
     where, params = build_scope_clauses(filters, drop=drop_set)
-
     main_sql = f"""
         SELECT psso.over_number,
                SUM(psso.runs_conceded)       AS runs_conceded,
@@ -3487,23 +3568,84 @@ async def compute_players_bowling_cohort(
         )
     """
     # Tier 2 of spec-apples-to-apples-baselines.md — cohort_unique_innings
-    # is the per-innings denominator for the per-innings rates'
-    # dimensional alignment with the player-side value (which is
-    # wickets / distinct innings_bowled). The per-bucket cv() yields
-    # per-attendance-tuple rates; multiplying by cohort_avg_attendances_
-    # per_innings ≈ SUM(innings_bowled)/SUM(per-bucket-attendance) scales
-    # back to per-innings. The parent table now carries `bowling_innings`
-    # (populated by Tier 2.SP) so the SUM is one query.
+    # is the per-innings denominator for the per-innings rates' dimensional
+    # alignment with the player-side value (wickets / distinct
+    # innings_bowled). The parent table carries `bowling_innings` so the
+    # SUM is one query.
     bowling_inn_sql = f"""
         SELECT SUM(pss.bowling_innings) AS bowling_innings_total
         FROM playerscopestats pss
         WHERE {where}
     """
-    rows, pool, bi = await asyncio.gather(
+    return await asyncio.gather(
         db.q(main_sql, params),
         db.q(pool_sql, params),
         db.q(bowling_inn_sql, params),
     )
+
+
+async def _bowling_cohort_live(
+    db, filters: FilterParams, aux: AuxParams,
+):
+    """Live path: per-over cohort (full per-spell column set) + pool +
+    bowling_innings aggregated over `delivery` (bowling orientation) so
+    the cohort + distribution prob baselines narrow under the six. Rows
+    come from `_bowling_over_cohort_live(with_spell_cols=True)`; pool +
+    bowling_innings carry the SAME WHERE. Returns `(rows, pool, bi)`."""
+    where_full, params = _bowling_live_where(filters, aux)
+    base = """
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match   m ON m.id = i.match_id
+    """
+    pool_sql = f"""
+        SELECT COUNT(DISTINCT d.bowler_id) AS n_players,
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS n_balls_total
+        {base}
+        WHERE {where_full} AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19
+    """
+    bi_sql = f"""
+        SELECT COUNT(*) AS bowling_innings_total
+        FROM (
+            SELECT d.innings_id, d.bowler_id
+            {base}
+            WHERE {where_full} AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19
+            GROUP BY d.innings_id, d.bowler_id
+            HAVING SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) >= 1
+        )
+    """
+    rows, pool, bi = await asyncio.gather(
+        _bowling_over_cohort_live(db, filters, aux, with_spell_cols=True),
+        db.q(pool_sql, params),
+        db.q(bi_sql, params),
+    )
+    return rows, pool, bi
+
+
+async def compute_players_bowling_cohort(
+    db,
+    filters: FilterParams,
+    aux: AuxParams,
+    mix: list[float],
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """In-process bowling cohort baseline — same shape as the HTTP
+    endpoint. Phase 4 player /summary endpoints call this to fold the
+    cohort baseline into their envelope-wrapped response without a
+    second HTTP roundtrip.
+
+    Dispatches on `is_precomputed_scope` (Phase 3d-3): none-of-six →
+    precomputed per-over read; any-of-six → live per-over aggregation
+    over `delivery` (bowling orientation, full per-spell column set) so
+    the bowling cohort + distribution prob baselines narrow. Both
+    batting.py call sites (/summary chip + /distribution) inherit the
+    fix. Specs: spec-player-compare-average.md Phase 4 +
+    spec-player-baseline-aux-fallback.md Phase 3d.
+    """
+    if is_precomputed_scope(filters, aux):
+        rows, pool, bi = await _bowling_cohort_precomputed(db, filters, drop_set)
+    else:
+        rows, pool, bi = await _bowling_cohort_live(db, filters, aux)
     by_over = {r["over_number"]: r for r in rows}
     n_players_total = (pool[0].get("n_players") if pool else 0) or 0
     n_balls_total = (pool[0].get("n_balls_total") if pool else 0) or 0
