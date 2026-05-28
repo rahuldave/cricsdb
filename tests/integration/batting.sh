@@ -161,8 +161,9 @@ echo "Failed: $FAIL"
 # were restored — those features still exist (the profile is still
 # tab-driven; the old assertions just matched the CSS-uppercased "BY OVER"
 # instead of the DOM text "By Over"). Only the old "useDefaultSeasonWindow
-# populates season_from" test was dropped: that hook
-# (frontend/src/hooks/useDefaultSeasonWindow.ts) is now DEAD CODE — called
-# nowhere in the app, so bare /batting no longer auto-fills season_from.
-# That looks like an UNINTENTIONAL regression (a whole UX hook orphaned) —
-# worth confirming whether the default-season-window should be re-wired.
+# populates season_from" test was dropped — and that removal is CORRECT:
+# commit 700d11b (2026-04-20) deliberately dropped the auto-apply
+# ("User changed their mind — landings open all-time by default; 'last 3'
+# is now an opt-in FilterBar button"). The hook file was intentionally
+# kept for a future opt-in landing, so it's available-but-unused by
+# design, NOT an orphaned regression.
