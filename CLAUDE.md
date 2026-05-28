@@ -165,6 +165,23 @@ Common mobile failure modes:
 
 A frontend change is not "done" until both desktop AND mobile look right. `tsc -b` and `npm run build` verify code correctness, not feature correctness.
 
+### Refactor sweep — find affected integration tests and re-run them
+
+Whenever you refactor a primitive that integration tests reach into via
+DOM queries (e.g. ChartContainer moves a title out of the SVG; a
+component renames a class; a legend label is rewritten; a default
+becomes user-controlled), the tests that probed the old structure go
+silently red without anyone noticing.
+
+The flow is non-negotiable when changing a primitive used by `frontend/src/components/charts/*`, any `wisden-*` CSS class, page-level shared components (FilterBar, ChartHeader, SearchBar, tabs), or any DOM attribute / element type / class name a test could reasonably grep for:
+
+1. **Grep first.** `grep -rln '<old-class>\|old-test-id\|"old label"' tests/integration/` and the same for any selector / attribute / hard-coded text being renamed.
+2. **Re-run every hit** — even if the refactor "shouldn't" affect them.
+3. **Update or replace the selectors** — prefer adding stable `data-test-*` attributes on the refactored primitive so the test asserts structure, not display text. Don't leave the test still grepping the old name; that just makes it red.
+4. **Confirm the test re-passes** — landing the refactor with no test rerun = the test sits red for months until a future session trips over it.
+
+A passing refactor with broken integration tests is not a passing refactor. CI doesn't run agent-browser, so test rot is invisible from the merge view.
+
 ### Bug reports — reproduce, propose, WAIT
 
 When the user reports a bug or asks why something looks/behaves a certain way:
