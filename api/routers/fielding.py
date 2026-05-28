@@ -416,9 +416,20 @@ async def fielding_summary(
         match_parts.append(ri)
     match_clause = " AND ".join(match_parts)
 
+    # `matches` = squad appearances (displayed, career sense).
+    # `matches_fielded` = matches where the player actually took the field
+    # (the opponent batted ≥1 regular innings) — the activity-based
+    # denominator for the per-match RATE tiles, consistent with batting's
+    # innings-batted / bowling's innings-bowled. Spec: Phase 3e
+    # denominator B. Differs only on rare <2-innings matches.
     match_rows = await db.q(
         f"""
-        SELECT COUNT(DISTINCT mp.match_id) as matches
+        SELECT COUNT(DISTINCT mp.match_id) AS matches,
+               COUNT(DISTINCT CASE WHEN EXISTS (
+                   SELECT 1 FROM innings i2
+                   WHERE i2.match_id = mp.match_id
+                     AND i2.super_over = 0 AND i2.team != mp.team
+               ) THEN mp.match_id END) AS matches_fielded
         FROM matchplayer mp
         JOIN match m ON m.id = mp.match_id
         WHERE {match_clause}
@@ -426,6 +437,7 @@ async def fielding_summary(
         match_params,
     )
     matches = match_rows[0]["matches"] if match_rows else 0
+    matches_fielded = match_rows[0]["matches_fielded"] if match_rows else 0
 
     # Tier 2: innings where this person was identified as the keeper.
     # Used by the frontend to decide whether to render the "Keeping" tab.
@@ -476,10 +488,13 @@ async def fielding_summary(
         return m.get("scope_avg") if m else None
 
     cohort_sample = cohort["cohort"]["n_matches_total"] if cohort else None
-    dismissals_pm_val = _safe_div(total, matches, 1, 3)
-    catches_pm_val = _safe_div(catches, matches, 1, 3)
-    stumpings_pm_val = _safe_div(stumpings, matches, 1, 3)
-    run_outs_pm_val = _safe_div(run_outs, matches, 1, 3)
+    # Per-match RATE denominators use matches_fielded (activity), not
+    # squad `matches` (Phase 3e denominator B) — chip↔cohort symmetry:
+    # the cohort now divides by SUM(matches_fielded) too.
+    dismissals_pm_val = _safe_div(total, matches_fielded, 1, 3)
+    catches_pm_val = _safe_div(catches, matches_fielded, 1, 3)
+    stumpings_pm_val = _safe_div(stumpings, matches_fielded, 1, 3)
+    run_outs_pm_val = _safe_div(run_outs, matches_fielded, 1, 3)
 
     return {
         "person_id": person_id,
@@ -559,9 +574,16 @@ async def fielding_by_season(
     if match_where:
         match_parts.append(match_where)
     match_clause = " AND ".join(match_parts)
+    # matches_fielded per season (opponent batted ≥1 regular innings) —
+    # the activity denominator, consistent with the by-season cohort
+    # which now divides by SUM(matches_fielded). Phase 3e denominator B.
     matches_rows = await db.q(
         f"""
-        SELECT m.season, COUNT(DISTINCT m.id) AS n_matches
+        SELECT m.season, COUNT(DISTINCT CASE WHEN EXISTS (
+                   SELECT 1 FROM innings i2
+                   WHERE i2.match_id = m.id
+                     AND i2.super_over = 0 AND i2.team != mp.team
+               ) THEN m.id END) AS n_matches
         FROM matchplayer mp
         JOIN match m ON m.id = mp.match_id
         WHERE {match_clause}
@@ -674,9 +696,20 @@ async def fielding_by_phase(
     if match_where:
         match_parts.append(match_where)
     match_clause = " AND ".join(match_parts)
+    # `matches` = squad appearances (displayed, career sense).
+    # `matches_fielded` = matches where the player actually took the field
+    # (the opponent batted ≥1 regular innings) — the activity-based
+    # denominator for the per-match RATE tiles, consistent with batting's
+    # innings-batted / bowling's innings-bowled. Spec: Phase 3e
+    # denominator B. Differs only on rare <2-innings matches.
     match_rows = await db.q(
         f"""
-        SELECT COUNT(DISTINCT mp.match_id) as matches
+        SELECT COUNT(DISTINCT mp.match_id) AS matches,
+               COUNT(DISTINCT CASE WHEN EXISTS (
+                   SELECT 1 FROM innings i2
+                   WHERE i2.match_id = mp.match_id
+                     AND i2.super_over = 0 AND i2.team != mp.team
+               ) THEN mp.match_id END) AS matches_fielded
         FROM matchplayer mp
         JOIN match m ON m.id = mp.match_id
         WHERE {match_clause}
@@ -684,6 +717,7 @@ async def fielding_by_phase(
         match_params,
     )
     matches = match_rows[0]["matches"] if match_rows else 0
+    matches_fielded = match_rows[0]["matches_fielded"] if match_rows else 0
 
     phase_labels = {"powerplay": "1-6", "middle": "7-15", "death": "16-20"}
     phase_order = ["powerplay", "middle", "death"]
@@ -697,11 +731,11 @@ async def fielding_by_phase(
         catches = p["caught_only"] + p["caught_and_bowled"]
         total = catches + p["stumpings"] + p["run_outs"]
         # Group D3 per-match rates per phase.
-        if matches:
-            tpm = round(total / matches, 3)
-            cpm = round(catches / matches, 3)
-            spm = round(p["stumpings"] / matches, 3)
-            rpm = round(p["run_outs"] / matches, 3)
+        if matches_fielded:
+            tpm = round(total / matches_fielded, 3)
+            cpm = round(catches / matches_fielded, 3)
+            spm = round(p["stumpings"] / matches_fielded, 3)
+            rpm = round(p["run_outs"] / matches_fielded, 3)
         else:
             tpm = cpm = spm = rpm = None
         by_phase.append({

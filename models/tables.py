@@ -199,6 +199,13 @@ class PlayerScopeStats:
     gender: str = ""
     team_type: str = ""
     matches: int = 0  # distinct matches in XI (from matchplayer)
+    # distinct matches the player actually FIELDED in (in the XI AND the
+    # opponent batted ≥1 regular innings). The activity-based denominator
+    # for fielding per-match rates — analogous to innings_batted (batting)
+    # / bowling_innings (bowling), vs `matches` which counts mere
+    # selection. Differs from `matches` only on rare <2-innings matches.
+    # Spec: spec-player-baseline-aux-fallback.md Phase 3e (denominator B).
+    matches_fielded: int = 0
     # batting
     innings_batted: int = 0
     runs: int = 0

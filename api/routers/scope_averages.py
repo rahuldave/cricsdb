@@ -4576,7 +4576,7 @@ async def compute_players_fielding_cohort(
     keeper_pred = ">" if is_keeper else "="
     pool_sql = f"""
         SELECT COUNT(*)                       AS n_fielders,
-               SUM(pss.matches)               AS n_matches_total
+               SUM(pss.matches_fielded)       AS n_matches_total
         FROM playerscopestats pss
         WHERE pss.matches_as_keeper {keeper_pred} 0
           AND {where}
@@ -4760,7 +4760,7 @@ async def compute_players_fielding_by_season(
         SELECT pss.season,
                CASE WHEN pss.matches_as_keeper > 0 THEN 1 ELSE 0 END AS is_keeper,
                COUNT(*)                AS n_fielders,
-               SUM(pss.matches)        AS n_matches_total
+               SUM(pss.matches_fielded) AS n_matches_total
         FROM playerscopestats pss
         WHERE {where}
         GROUP BY pss.season, is_keeper
@@ -4961,7 +4961,7 @@ async def compute_players_fielding_by_phase(
     pool_sql = f"""
         SELECT CASE WHEN pss.matches_as_keeper > 0 THEN 1 ELSE 0 END AS is_keeper,
                COUNT(*)         AS n_fielders,
-               SUM(pss.matches) AS n_matches_total
+               SUM(pss.matches_fielded) AS n_matches_total
         FROM playerscopestats pss
         WHERE {where}
         GROUP BY is_keeper

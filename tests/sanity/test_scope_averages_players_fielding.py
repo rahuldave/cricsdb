@@ -81,11 +81,11 @@ def main() -> int:
     # 2. Pool conservation: cohort.n_matches_total matches SQL.
     print("\n  2. Pool conservation (n_matches_total vs SQL):")
     sql_out = conn.execute("""
-        SELECT SUM(matches) FROM playerscopestats
+        SELECT SUM(matches_fielded) FROM playerscopestats
         WHERE tournament = 'Indian Premier League' AND matches_as_keeper = 0
     """).fetchone()[0]
     sql_kp = conn.execute("""
-        SELECT SUM(matches) FROM playerscopestats
+        SELECT SUM(matches_fielded) FROM playerscopestats
         WHERE tournament = 'Indian Premier League' AND matches_as_keeper > 0
     """).fetchone()[0]
     ok = outfielders["cohort"]["n_matches_total"] == sql_out

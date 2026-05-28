@@ -110,7 +110,7 @@ async def _ensure_tables(db, incremental: bool = False):
     # `four_wicket_hauls` added by spec-rate-vs-volume-audit.md §2.1.
     # `bowling_innings` added by Tier 2 of spec-apples-to-apples-baselines.md.
     for col in ("thirties", "fifties", "hundreds", "ducks",
-                "four_wicket_hauls", "bowling_innings"):
+                "four_wicket_hauls", "bowling_innings", "matches_fielded"):
         try:
             await db.q(
                 f"ALTER TABLE playerscopestats ADD COLUMN {col} "
@@ -132,7 +132,7 @@ async def _ensure_tables(db, incremental: bool = False):
 class _Acc:
     __slots__ = (
         "tournament", "season", "gender", "team_type",
-        "matches_set",
+        "matches_set", "matches_fielded_set",
         "innings_batted_set", "runs", "legal_balls", "dots",
         "fours", "sixes", "dismissals",
         "position_sum", "position_innings",
@@ -153,6 +153,11 @@ class _Acc:
         self.gender = gender
         self.team_type = team_type
         self.matches_set = set()
+        # Distinct matches the player actually fielded in (in the XI AND
+        # the opponent batted ≥1 regular innings). Activity-based fielding
+        # denominator — see model `matches_fielded`. Filled in the
+        # matchplayer pass using the per-match batting-team set.
+        self.matches_fielded_set = set()
         self.innings_batted_set = set()
         self.runs = 0
         self.legal_balls = 0
@@ -205,6 +210,7 @@ class _Acc:
             "gender": self.gender,
             "team_type": self.team_type,
             "matches": len(self.matches_set),
+            "matches_fielded": len(self.matches_fielded_set),
             "innings_batted": len(self.innings_batted_set),
             "runs": self.runs,
             "legal_balls": self.legal_balls,
@@ -311,14 +317,33 @@ async def _aggregate_matches(db, match_ids: list[int] | None) -> dict[tuple[str,
     # Matches in XI (matchplayer drives `matches`).
     # ------------------------------------------------------------
     mid_list = ",".join(str(i) for i in match_meta.keys())
+    # Per-match set of teams that BATTED a regular innings — used to
+    # decide whether each XI player actually fielded (their side fielded
+    # iff some OTHER team batted in that match). Drives `matches_fielded`.
+    bat_teams_by_match: dict[int, set] = defaultdict(set)
+    for r in await db.q(f"""
+        SELECT DISTINCT match_id, team
+        FROM innings
+        WHERE super_over = 0 AND team IS NOT NULL
+          AND match_id IN ({mid_list})
+    """):
+        bat_teams_by_match[r["match_id"]].add(r["team"])
     mp_rows = await db.q(f"""
-        SELECT match_id, person_id
+        SELECT match_id, person_id, team
         FROM matchplayer
         WHERE person_id IS NOT NULL
           AND match_id IN ({mid_list})
     """)
     for r in mp_rows:
-        get_acc(r["person_id"], r["match_id"]).matches_set.add(r["match_id"])
+        acc = get_acc(r["person_id"], r["match_id"])
+        acc.matches_set.add(r["match_id"])
+        # Fielded iff the opponent batted (some batting team ≠ the
+        # player's team) — i.e. the player's side took the field. Excludes
+        # the rare match where the player's team batted but the chase
+        # never happened (no opponent innings → no fielding).
+        bat_teams = bat_teams_by_match.get(r["match_id"])
+        if bat_teams and any(t != r["team"] for t in bat_teams):
+            acc.matches_fielded_set.add(r["match_id"])
 
     # ------------------------------------------------------------
     # Innings list (regular innings only).
@@ -594,13 +619,15 @@ async def populate_full(db) -> int:
     print("Populating player_scope_stats (full rebuild)...")
     start = time.time()
 
+    # DROP+CREATE (not DELETE) so the on-disk schema always tracks the
+    # model — feedback_no_alter_drop_create. The new `matches_fielded`
+    # column comes from the model on the fresh CREATE.
     existing = await db.q(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='playerscopestats'"
     )
-    table_exists = len(existing) > 0
-    table = await _ensure_tables(db, incremental=table_exists)
-    if table_exists:
-        await db.q("DELETE FROM playerscopestats")
+    if len(existing) > 0:
+        await db.q("DROP TABLE playerscopestats")
+    table = await _ensure_tables(db, incremental=False)
 
     # Aggregate over the universe.
     print("  scanning all matches…")

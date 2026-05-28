@@ -127,14 +127,22 @@ async def _aggregate_matches(
         (r["person_id"], r["match_id"]): r["catches"] for r in catches_rows
     }
 
-    # Master sample — every matchplayer at the scope. is_substitute on
-    # matchplayer (if the column exists in this codebase's data model)
-    # is not filtered here because matchplayer records squad members
-    # only; substitute appearances aren't recorded in matchplayer.
+    # Master sample — matchplayer appearances where the player actually
+    # FIELDED (the opponent batted ≥1 regular innings). Activity-based
+    # denominator, consistent with the per-match-rate tiles' matches_fielded
+    # and the cohort's SUM(matches_fielded) — Phase 3e denominator B. A
+    # match the player was selected for but never fielded in (rare
+    # <2-innings match) is not a "0-catch fielding match". is_substitute
+    # isn't filtered — matchplayer records squad members only.
     mp_rows = await db.q(f"""
         SELECT mp.person_id, mp.match_id
         FROM matchplayer mp
         WHERE mp.match_id IN ({mid_list})
+          AND EXISTS (
+              SELECT 1 FROM innings i2
+              WHERE i2.match_id = mp.match_id
+                AND i2.super_over = 0 AND i2.team != mp.team
+          )
     """)
 
     # Bucket per (person, scope_key).
