@@ -76,7 +76,9 @@ sleep 2
 mix_n=$(ab_eval "document.querySelectorAll('.wisden-position-distribution-tab .wisden-mix-histogram').length")
 perf_n=$(ab_eval "document.querySelectorAll('.wisden-position-distribution-tab .wisden-perf-cohort').length")
 assert_eq "A1 · MixHistogram count == 1"        "1" "$mix_n"
-assert_eq "A1 · PerformanceVsCohort count == 1" "1" "$perf_n"
+# 2 PerformanceVsCohort panels on the By Position tab: Strike rate +
+# Batting average (Average added in PositionDistributionTab.tsx).
+assert_eq "A1 · PerformanceVsCohort count == 2" "2" "$perf_n"
 
 # Test A2 — bar + label count
 mix_bars=$(ab_eval "document.querySelector('.wisden-position-distribution-tab .wisden-mix-histogram svg').querySelectorAll('g > rect').length")
@@ -167,7 +169,7 @@ sleep 2
 narrow_mix=$(ab_eval "document.querySelectorAll('.wisden-position-distribution-tab .wisden-mix-histogram').length")
 narrow_perf=$(ab_eval "document.querySelectorAll('.wisden-position-distribution-tab .wisden-perf-cohort').length")
 assert_eq "D10 · narrow scope · MixHistogram count == 1"        "1" "$narrow_mix"
-assert_eq "D10 · narrow scope · PerformanceVsCohort count == 1" "1" "$narrow_perf"
+assert_eq "D10 · narrow scope · PerformanceVsCohort count == 2" "2" "$narrow_perf"
 
 # Test D11 — at least one non-zero player innings bucket
 has_innings=$(ab_eval "(() => {

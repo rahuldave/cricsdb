@@ -63,7 +63,10 @@ sleep 2
 mix_n=$(ab_eval "document.querySelectorAll('.wisden-mix-histogram').length")
 perf_n=$(ab_eval "document.querySelectorAll('.wisden-perf-cohort').length")
 assert_eq "MixHistogram count == 1"          "1" "$mix_n"
-assert_eq "PerformanceVsCohort count == 2"   "2" "$perf_n"
+# 3 PerformanceVsCohort panels on the By Over tab: Economy, Wkts/Inn,
+# Boundaries conceded per over (Boundaries added in
+# OverDistributionTab.tsx alongside the boundaries-conceded surfacing).
+assert_eq "PerformanceVsCohort count == 3"   "3" "$perf_n"
 
 echo
 echo "Test 2 · Mix histogram has 20 bars (one per over)"
