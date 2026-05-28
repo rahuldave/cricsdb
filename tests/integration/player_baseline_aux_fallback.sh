@@ -196,6 +196,79 @@ check_filter "MI + Wankhede"                  "$MI&$WANKHEDE"
 check_filter "RCB + MI"                       "$RCB&$MI"
 check_filter "RCB + result=won + toss=won"    "$RCB&result=won&toss_outcome=won"
 
+# ── §5 by-season cohort narrows under the six (Phase 3c) ──
+# /scope/averages/players/batting/by-season's per-season cohort overlay
+# read off the precomputed scope-key table until 3c — frozen under the
+# six. After 3c it dispatches to a live inningsbatterperf aggregation
+# with m.season in the GROUP BY. Anchor: Kohli IPL 2014-2018, season
+# 2016. inning=0 keeps the per-season pool fat enough that bucket 1
+# clears the support cliff, so SR is a real number to anchor.
+echo
+echo "=== by-season cohort narrows (3c) ==="
+BS_SCOPE="person_id=$KOHLI&gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2014&season_to=2018"
+
+# Read (strike_rate, n_innings) for a given season row under a filter.
+bs_row() {  # $1=filter qs  $2=season
+  curl -s "$API/api/v1/scope/averages/players/batting/by-season?$BS_SCOPE&$1" \
+    | python3 -c "
+import sys, json
+d = json.load(sys.stdin); s='$2'
+for r in d['by_season']:
+    if r['season']==s:
+        print(r.get('strike_rate'), r.get('n_innings')); break
+else:
+    print('None None')
+"
+}
+
+read -r BS_U_SR BS_U_N < <(bs_row "" 2016)
+read -r BS_I_SR BS_I_N < <(bs_row "inning=0" 2016)
+echo "  2016 unfiltered: SR=$BS_U_SR n_inn=$BS_U_N"
+echo "  2016 inning=0:   SR=$BS_I_SR n_inn=$BS_I_N"
+if [[ -z "$BS_I_N" || "$BS_I_N" == "None" ]]; then
+  bad "by-season inning=0: n_innings null"
+elif [[ "$BS_I_N" != "$BS_U_N" ]]; then
+  ok "by-season cohort narrowed (n_inn $BS_U_N -> $BS_I_N; SR $BS_U_SR -> $BS_I_SR)"
+else
+  bad "by-season cohort FROZEN (n_inn=$BS_I_N == $BS_U_N) -- 3c not wired"
+fi
+
+# SQL anchor: live by-season SR @ 2016 inning=0 == direct inningsbatterperf
+# aggregation, convex-combined by Kohli's narrowed per-season mix.
+BS_EXPECTED=$(python3 <<'PY'
+import sqlite3, json, urllib.request
+DB="cricket.db"; API="http://localhost:8000"
+BASE="person_id=ba607b88&gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2014&season_to=2018&inning=0"
+d=json.load(urllib.request.urlopen(f"{API}/api/v1/scope/averages/players/batting/by-season?{BASE}"))
+row=[r for r in d['by_season'] if r['season']=='2016']
+if not row: print("None"); raise SystemExit
+mix=row[0]['mix']
+conn=sqlite3.connect(DB)
+rows=conn.execute("""
+ SELECT ib.position_bucket bk, SUM(ib.runs) runs, SUM(ib.balls) balls
+ FROM inningsbatterperf ib JOIN innings i ON i.id=ib.innings_id JOIN match m ON m.id=i.match_id
+ WHERE i.super_over=0 AND m.gender='male' AND m.team_type='club'
+   AND m.event_name='Indian Premier League' AND m.season='2016' AND i.innings_number=0
+ GROUP BY ib.position_bucket""").fetchall()
+sr={bk:(runs/balls*100 if balls else None) for bk,runs,balls in rows}
+tot=0.0; tm=0.0
+for b,w in enumerate(mix,1):
+    if w==0: continue
+    v=sr.get(b)
+    if v is None: continue
+    tm+=w; tot+=w*v
+print(round(tot/tm,1) if tm else "None")
+PY
+)
+echo "  SQL-anchored 2016 inning=0 SR: $BS_EXPECTED  (API: $BS_I_SR)"
+if [[ "$BS_I_SR" == "None" || "$BS_EXPECTED" == "None" ]]; then
+  bad "by-season SQL anchor inconclusive (API $BS_I_SR, expected $BS_EXPECTED)"
+elif python3 -c "import sys; sys.exit(0 if abs(float('$BS_I_SR')-float('$BS_EXPECTED'))<=0.2 else 1)"; then
+  ok "by-season live SR == SQL-anchored ($BS_I_SR ~ $BS_EXPECTED)"
+else
+  bad "by-season live SR=$BS_I_SR != SQL-anchored $BS_EXPECTED"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"

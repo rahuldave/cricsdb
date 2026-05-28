@@ -1859,6 +1859,33 @@ async def _batting_cohort_precomputed(
     return await asyncio.gather(db.q(main_sql, params), db.q(pool_sql, params))
 
 
+def _batting_live_where(filters: FilterParams, aux: AuxParams) -> tuple[str, dict]:
+    """Build the per-innings (or per-delivery) WHERE for the live batting
+    cohort paths (3b summary + 3c by-season / by-phase). Assumes the
+    query joins `innings i` and `match m`; reuses the team-side cohort
+    clauses keyed on `i.team` so the league baseline narrows
+    apples-to-apples with the player's own number under the SIX
+    aux/filter axes (venue / opponent / team / inning / toss / result).
+
+    Returns `(where_sql, params)` — the caller AND-joins it after any
+    table-specific predicate (e.g. `ib.batter_id = :__pid` for the
+    player-side mix query). Spec: spec-player-baseline-aux-fallback.md
+    Phase 3b/3c."""
+    where, params = filters.build(has_innings_join=True, apply_inning=False, aux=aux)
+    parts = ["i.super_over = 0"]
+    if where:
+        parts.append(where)
+    inn_clause, inn_params = _option_b_team_inning(None, "batting", aux)
+    if inn_clause:
+        parts.append(inn_clause)
+        params.update(inn_params)
+    coh_clause, coh_params = _cohort_outcome_clause("batting", aux)
+    if coh_clause:
+        parts.append(coh_clause)
+        params.update(coh_params)
+    return " AND ".join(parts), params
+
+
 async def _batting_cohort_live(
     db, filters: FilterParams, aux: AuxParams,
 ):
@@ -1877,19 +1904,7 @@ async def _batting_cohort_live(
 
     Spec: internal_docs/spec-player-baseline-aux-fallback.md Phase 3b
     + internal_docs/plan-3b-batting-live-cohort.md."""
-    where, params = filters.build(has_innings_join=True, apply_inning=False, aux=aux)
-    parts = ["i.super_over = 0"]
-    if where:
-        parts.append(where)
-    inn_clause, inn_params = _option_b_team_inning(None, "batting", aux)
-    if inn_clause:
-        parts.append(inn_clause)
-        params.update(inn_params)
-    coh_clause, coh_params = _cohort_outcome_clause("batting", aux)
-    if coh_clause:
-        parts.append(coh_clause)
-        params.update(coh_params)
-    where_full = " AND ".join(parts)
+    where_full, params = _batting_live_where(filters, aux)
     main_sql = f"""
         SELECT ib.position_bucket,
                COUNT(*)                                                       AS innings,
@@ -2232,21 +2247,14 @@ async def scope_players_batting_summary(
 # ============================================================
 
 
-async def compute_players_batting_by_season(
-    db,
-    person_id: str,
-    filters: FilterParams,
-    aux: AuxParams,
-    drop_set: Optional[set[str]] = None,
-) -> dict:
-    """Per-season batting cohort baseline keyed off the player's
-    per-season position-mix. Returns `{by_season: [...]}` where each
-    season row is one of:
-      - {season, mix, n_players, n_innings, <metrics with scope_avg>}
-      - {season, mix, n_players, n_innings, below_support: true,
-         cliff_buckets: [...], <metrics all null>}
-    Spec: spec-player-baseline-parity.md §3.2.
-    """
+async def _by_season_precomputed(
+    db, person_id: str, filters: FilterParams, drop_set: Optional[set[str]],
+):
+    """Fast path: per-(season, position) cohort + player-mix reads off the
+    precomputed `playerscopestatsposition` table by scope_key. Used when
+    none of the six aux/filter axes is set. Returns the
+    `(player_rows, cohort_rows, pool_rows)` triple the downstream
+    row-builder consumes."""
     where, params = build_scope_clauses(filters, drop=drop_set)
 
     # Q1: player's per-season position innings, for mix derivation.
@@ -2302,11 +2310,117 @@ async def compute_players_batting_by_season(
         ORDER BY pss.season
     """
     p_params = {**params, "__pid": person_id}
-    player_rows, cohort_rows, pool_rows = await asyncio.gather(
+    return await asyncio.gather(
         db.q(player_sql, p_params),
         db.q(cohort_sql, params),
         db.q(pool_sql, params),
     )
+
+
+async def _by_season_live(
+    db, person_id: str, filters: FilterParams, aux: AuxParams,
+):
+    """Live path: per-(season, position) cohort + player-mix aggregated
+    over `inningsbatterperf` joined to innings+match, so the six
+    aux/filter axes (venue / opponent / team / inning / toss / result)
+    actually narrow the per-season baseline. Mirrors 3b's
+    `_batting_cohort_live` shape with `m.season` added to the GROUP BY.
+
+    The player-side mix query (Q1) carries the SAME WHERE as the cohort
+    (Q2) — narrowing the player's per-season position mix to the same
+    pool so the convex-combine stays apples-to-apples (chip↔baseline
+    symmetry under filtration). Column shape matches
+    `_by_season_precomputed` so the downstream row-builder is identical.
+
+    Spec: spec-player-baseline-aux-fallback.md Phase 3c
+    + plan-3c-batting-by-season-by-phase-live.md §3."""
+    where_full, params = _batting_live_where(filters, aux)
+
+    # Q1: player's per-(season, position) innings at the narrowed scope.
+    player_sql = f"""
+        SELECT m.season,
+               ib.position_bucket,
+               COUNT(*) AS innings
+        FROM inningsbatterperf ib
+        JOIN innings i ON i.id = ib.innings_id
+        JOIN match   m ON m.id = i.match_id
+        WHERE {where_full}
+          AND ib.batter_id = :__pid
+        GROUP BY m.season, ib.position_bucket
+        ORDER BY m.season, ib.position_bucket
+    """
+    # Q2: cohort aggregates per (season, position_bucket).
+    cohort_sql = f"""
+        SELECT m.season,
+               ib.position_bucket,
+               COUNT(*)                                                       AS innings,
+               SUM(ib.runs)                                                   AS runs,
+               SUM(ib.balls)                                                  AS legal_balls,
+               SUM(CASE WHEN ib.not_out = 0                  THEN 1 ELSE 0 END) AS dismissals,
+               SUM(ib.fours)                                                  AS fours,
+               SUM(ib.sixes)                                                  AS sixes,
+               SUM(ib.dots)                                                   AS dots,
+               SUM(CASE WHEN ib.runs >= 30 AND ib.runs < 50  THEN 1 ELSE 0 END) AS thirties,
+               SUM(CASE WHEN ib.runs >= 50 AND ib.runs < 100 THEN 1 ELSE 0 END) AS fifties,
+               SUM(CASE WHEN ib.runs >= 100                  THEN 1 ELSE 0 END) AS hundreds,
+               SUM(CASE WHEN ib.runs  = 0 AND ib.not_out = 0 THEN 1 ELSE 0 END) AS ducks,
+               COUNT(DISTINCT ib.batter_id)                                   AS n_players
+        FROM inningsbatterperf ib
+        JOIN innings i ON i.id = ib.innings_id
+        JOIN match   m ON m.id = i.match_id
+        WHERE {where_full}
+        GROUP BY m.season, ib.position_bucket
+        ORDER BY m.season, ib.position_bucket
+    """
+    # Q3: per-season pool totals.
+    pool_sql = f"""
+        SELECT m.season,
+               COUNT(DISTINCT ib.batter_id) AS n_players,
+               COUNT(*)                     AS n_innings_total
+        FROM inningsbatterperf ib
+        JOIN innings i ON i.id = ib.innings_id
+        JOIN match   m ON m.id = i.match_id
+        WHERE {where_full}
+        GROUP BY m.season
+        ORDER BY m.season
+    """
+    p_params = {**params, "__pid": person_id}
+    return await asyncio.gather(
+        db.q(player_sql, p_params),
+        db.q(cohort_sql, params),
+        db.q(pool_sql, params),
+    )
+
+
+async def compute_players_batting_by_season(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-season batting cohort baseline keyed off the player's
+    per-season position-mix. Returns `{by_season: [...]}` where each
+    season row is one of:
+      - {season, mix, n_players, n_innings, <metrics with scope_avg>}
+      - {season, mix, n_players, n_innings, below_support: true,
+         cliff_buckets: [...], <metrics all null>}
+
+    Dispatches on `is_precomputed_scope` (mirrors 3b's summary path):
+    none of the six set → precomputed scope-key read; any set → live
+    aggregation over inningsbatterperf so the per-season cohort narrows.
+
+    Spec: spec-player-baseline-parity.md §3.2 + Phase 3c of
+    spec-player-baseline-aux-fallback.md.
+    """
+    if is_precomputed_scope(filters, aux):
+        player_rows, cohort_rows, pool_rows = await _by_season_precomputed(
+            db, person_id, filters, drop_set,
+        )
+    else:
+        player_rows, cohort_rows, pool_rows = await _by_season_live(
+            db, person_id, filters, aux,
+        )
 
     # Roll cohort aggregates into {season: {bucket: row}}.
     cohort_by_season: dict[str, dict[int, dict]] = {}
