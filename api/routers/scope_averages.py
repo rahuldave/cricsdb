@@ -49,6 +49,7 @@ from .teams import (
     _apply_batting_per_innings, _apply_bowling_per_innings,
     _apply_fielding_per_innings, _apply_partnerships_per_innings,
     _apply_results_per_team, _unique_teams_in_scope,
+    _option_b_team_inning, _cohort_outcome_clause,
 )
 from .bucket_baseline_dispatch import (
     is_precomputed_scope, baseline_where, LEAGUE_TEAM_KEY,
@@ -1812,30 +1813,18 @@ async def _partnerships_by_season_live(filters, aux):
 # Spec §5.1 + §6.
 
 
-async def compute_players_batting_cohort(
-    db,
-    filters: FilterParams,
-    aux: AuxParams,
-    mix: list[float],
-    drop_set: Optional[set[str]] = None,
-) -> dict:
-    """In-process batting cohort baseline — same shape as the HTTP
-    endpoint. Phase 4 player /summary endpoints call this to fold the
-    cohort baseline into their envelope-wrapped response without a
-    second HTTP roundtrip. The HTTP endpoint is a thin wrapper.
+async def _batting_cohort_precomputed(
+    db, filters: FilterParams, drop_set: Optional[set[str]],
+):
+    """Fast path: aggregate the precomputed `playerscopestatsposition`
+    table by `scope_key`. Used when none of the six aux/filter axes
+    (venue / opponent / team / inning / toss / result) is set.
 
-    Spec: spec-player-compare-average.md Phase 4 (backend folding).
-    """
+    The scope_key IN-subquery beats a JOIN to playerscopestats by ~5×
+    on unfiltered scopes (SQLite picks parent-first scan-and-search for
+    the JOIN form; IN-subquery seeks the scope_key index). Parallel
+    pool query halves total latency."""
     where, params = build_scope_clauses(filters, drop=drop_set)
-
-    # Use a scope_key IN-subquery rather than a JOIN to playerscopestats.
-    # SQLite's planner picks parent-first scan-and-search for the JOIN
-    # form (~800ms unfiltered, ~97K join lookups); the IN-subquery form
-    # runs an index seek on scope_key and aggregates in ~165ms.
-    #
-    # Parallel: launch the per-bucket aggregation and the pool-totals
-    # query together via asyncio.gather. Two index scans rather than
-    # two serial round-trips — unfiltered drops from ~520ms to ~280ms.
     main_sql = f"""
         SELECT pssp.position_bucket,
                SUM(pssp.innings)      AS innings,
@@ -1867,10 +1856,103 @@ async def compute_players_batting_cohort(
             SELECT scope_key FROM playerscopestats pss WHERE {where}
         )
     """
-    rows, pool = await asyncio.gather(
-        db.q(main_sql, params),
-        db.q(pool_sql, params),
-    )
+    return await asyncio.gather(db.q(main_sql, params), db.q(pool_sql, params))
+
+
+async def _batting_cohort_live(
+    db, filters: FilterParams, aux: AuxParams,
+):
+    """Live path: aggregate `inningsbatterperf` joined to innings+match
+    so the SIX aux/filter axes (venue / opponent / team / inning / toss
+    / result) actually narrow the cohort. Reuses team-side cohort
+    clauses keyed on `i.team` so the league baseline is apples-to-apples
+    with the player's own narrowed number (chip↔baseline symmetry).
+
+    The per-innings table carries every column the precomputed read
+    derives (runs/balls/dots/fours/sixes per innings + not_out +
+    position_bucket); it's an exact-integer rollup of
+    `playerscopestatsposition` at none-of-six (verified by
+    `tests/sanity/test_playerscopestatsposition_rollup.py`), so the
+    dispatch can't introduce a step at the gate boundary.
+
+    Spec: internal_docs/spec-player-baseline-aux-fallback.md Phase 3b
+    + internal_docs/plan-3b-batting-live-cohort.md."""
+    where, params = filters.build(has_innings_join=True, apply_inning=False, aux=aux)
+    parts = ["i.super_over = 0"]
+    if where:
+        parts.append(where)
+    inn_clause, inn_params = _option_b_team_inning(None, "batting", aux)
+    if inn_clause:
+        parts.append(inn_clause)
+        params.update(inn_params)
+    coh_clause, coh_params = _cohort_outcome_clause("batting", aux)
+    if coh_clause:
+        parts.append(coh_clause)
+        params.update(coh_params)
+    where_full = " AND ".join(parts)
+    main_sql = f"""
+        SELECT ib.position_bucket,
+               COUNT(*)                                                       AS innings,
+               SUM(ib.runs)                                                   AS runs,
+               SUM(ib.balls)                                                  AS legal_balls,
+               SUM(CASE WHEN ib.not_out = 0                  THEN 1 ELSE 0 END) AS dismissals,
+               SUM(ib.fours)                                                  AS fours,
+               SUM(ib.sixes)                                                  AS sixes,
+               SUM(ib.dots)                                                   AS dots,
+               SUM(CASE WHEN ib.runs >= 30 AND ib.runs < 50  THEN 1 ELSE 0 END) AS thirties,
+               SUM(CASE WHEN ib.runs >= 50 AND ib.runs < 100 THEN 1 ELSE 0 END) AS fifties,
+               SUM(CASE WHEN ib.runs >= 100                  THEN 1 ELSE 0 END) AS hundreds,
+               SUM(CASE WHEN ib.runs  = 0 AND ib.not_out = 0 THEN 1 ELSE 0 END) AS ducks,
+               SUM(CASE WHEN ib.runs <= 10                   THEN 1 ELSE 0 END) AS failures_10,
+               SUM(CASE WHEN ib.runs >= 70 AND ib.runs < 100 THEN 1 ELSE 0 END) AS seventies,
+               COUNT(DISTINCT ib.batter_id)                                   AS n_players
+        FROM inningsbatterperf ib
+        JOIN innings i ON i.id = ib.innings_id
+        JOIN match   m ON m.id = i.match_id
+        WHERE {where_full}
+        GROUP BY ib.position_bucket
+        ORDER BY ib.position_bucket
+    """
+    pool_sql = f"""
+        SELECT COUNT(DISTINCT ib.batter_id) AS n_players,
+               COUNT(*)                     AS n_innings_total
+        FROM inningsbatterperf ib
+        JOIN innings i ON i.id = ib.innings_id
+        JOIN match   m ON m.id = i.match_id
+        WHERE {where_full}
+    """
+    return await asyncio.gather(db.q(main_sql, params), db.q(pool_sql, params))
+
+
+async def compute_players_batting_cohort(
+    db,
+    filters: FilterParams,
+    aux: AuxParams,
+    mix: list[float],
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """In-process batting cohort baseline — same shape as the HTTP
+    endpoint. Phase 4 player /summary endpoints call this to fold the
+    cohort baseline into their envelope-wrapped response without a
+    second HTTP roundtrip. The HTTP endpoint is a thin wrapper.
+
+    Dispatches on `is_precomputed_scope`:
+      - none of the six set → fast precomputed read
+        (`_batting_cohort_precomputed`).
+      - any of the six set → live aggregation over inningsbatterperf
+        (`_batting_cohort_live`) so the cohort actually narrows.
+
+    `drop_set` masks scope-key axes on the precomputed path only — the
+    live path queries the match table directly, where the axes are
+    already first-class WHERE clauses; current batting callers pass
+    None.
+
+    Specs: spec-player-compare-average.md Phase 4 (backend folding) +
+    spec-player-baseline-aux-fallback.md Phase 3b (live fallback)."""
+    if is_precomputed_scope(filters, aux):
+        rows, pool = await _batting_cohort_precomputed(db, filters, drop_set)
+    else:
+        rows, pool = await _batting_cohort_live(db, filters, aux)
     by_bucket = {r["position_bucket"]: r for r in rows}
     n_players_total = (pool[0].get("n_players") if pool else 0) or 0
     n_innings_total = (pool[0].get("n_innings_total") if pool else 0) or 0
