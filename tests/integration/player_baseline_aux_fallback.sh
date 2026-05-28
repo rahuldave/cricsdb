@@ -269,6 +269,95 @@ else
   bad "by-season live SR=$BS_I_SR != SQL-anchored $BS_EXPECTED"
 fi
 
+# ── §6 by-phase cohort narrows under the six (Phase 3c) ──
+# /scope/averages/players/batting/by-phase's per-phase chip baseline read
+# off the precomputed phase×position table until 3c — frozen under the
+# six. After 3c it dispatches to a live delivery-grain aggregation
+# (over_number → phase, position off inningsbatterperf, all-ball
+# convention). Q4: under inning=0 all three phases keep ~1000 innings,
+# well above the 30-innings support cliff — not degenerate.
+echo
+echo "=== by-phase cohort narrows (3c) ==="
+BP_SCOPE="person_id=$KOHLI&gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2014&season_to=2018"
+
+# Read "SR n_inn below" for a given phase under a filter.
+bp_phase() {  # $1=filter  $2=phase name
+  curl -s "$API/api/v1/scope/averages/players/batting/by-phase?$BP_SCOPE&$1" \
+    | python3 -c "
+import sys, json
+d = json.load(sys.stdin); name='$2'
+for r in d['by_phase']:
+    if r['phase']==name:
+        print(r.get('strike_rate'), r.get('n_innings_in_phase'), r.get('below_support')); break
+else:
+    print('None None None')
+"
+}
+
+read -r BP_U_SR BP_U_N _ < <(bp_phase "" powerplay)
+read -r BP_I_SR BP_I_N BP_I_BELOW < <(bp_phase "inning=0" powerplay)
+echo "  powerplay unfiltered: SR=$BP_U_SR n_inn=$BP_U_N"
+echo "  powerplay inning=0:   SR=$BP_I_SR n_inn=$BP_I_N below=$BP_I_BELOW"
+if [[ -z "$BP_I_N" || "$BP_I_N" == "None" ]]; then
+  bad "by-phase inning=0: n_innings_in_phase null"
+elif [[ "$BP_I_N" != "$BP_U_N" ]]; then
+  ok "by-phase cohort narrowed (n_inn $BP_U_N -> $BP_I_N; SR $BP_U_SR -> $BP_I_SR)"
+else
+  bad "by-phase cohort FROZEN (n_inn=$BP_I_N == $BP_U_N) -- 3c not wired"
+fi
+# Q4 guard: all three phases must stay supported under the inning narrow.
+for PH in powerplay middle death; do
+  read -r _ PN PB < <(bp_phase "inning=0" "$PH")
+  if [[ "$PB" == "False" ]]; then
+    ok "Q4: $PH non-degenerate under inning=0 (n_inn=$PN, supported)"
+  else
+    bad "Q4: $PH degenerate under inning=0 (n_inn=$PN, below_support=$PB)"
+  fi
+done
+
+# SQL anchor: live by-phase powerplay SR @ inning=0 == direct delivery
+# aggregation, convex-combined by Kohli's per-phase position mix.
+BP_EXPECTED=$(python3 <<'PY'
+import sqlite3, json, urllib.request
+DB="cricket.db"; API="http://localhost:8000"
+BASE="person_id=ba607b88&gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2014&season_to=2018&inning=0"
+d=json.load(urllib.request.urlopen(f"{API}/api/v1/scope/averages/players/batting/by-phase?{BASE}"))
+row=[r for r in d['by_phase'] if r['phase']=='powerplay']
+if not row: print("None"); raise SystemExit
+mix=row[0]['mix']
+conn=sqlite3.connect(DB)
+LEGAL="(d.extras_wides=0 AND d.extras_noballs=0)"
+rows=conn.execute(f"""
+ SELECT ib.position_bucket pb, SUM(d.runs_batter) runs,
+   SUM(CASE WHEN {LEGAL} THEN 1 ELSE 0 END) balls
+ FROM delivery d
+ JOIN inningsbatterperf ib ON ib.innings_id=d.innings_id AND ib.batter_id=d.batter_id
+ JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id
+ WHERE i.super_over=0 AND d.over_number<=5
+   AND m.gender='male' AND m.team_type='club'
+   AND m.event_name='Indian Premier League'
+   AND m.season IN ('2014','2015','2016','2017','2018')
+   AND i.innings_number=0 AND ({LEGAL} OR d.runs_batter<>0)
+ GROUP BY pb""").fetchall()
+sr={pb:(runs/balls*100 if balls else None) for pb,runs,balls in rows}
+tot=0.0; tm=0.0
+for b,w in enumerate(mix,1):
+    if w==0: continue
+    v=sr.get(b)
+    if v is None: continue
+    tm+=w; tot+=w*v
+print(round(tot/tm,1) if tm else "None")
+PY
+)
+echo "  SQL-anchored powerplay inning=0 SR: $BP_EXPECTED  (API: $BP_I_SR)"
+if [[ "$BP_I_SR" == "None" || "$BP_EXPECTED" == "None" ]]; then
+  bad "by-phase SQL anchor inconclusive (API $BP_I_SR, expected $BP_EXPECTED)"
+elif python3 -c "import sys; sys.exit(0 if abs(float('$BP_I_SR')-float('$BP_EXPECTED'))<=0.2 else 1)"; then
+  ok "by-phase live SR == SQL-anchored ($BP_I_SR ~ $BP_EXPECTED)"
+else
+  bad "by-phase live SR=$BP_I_SR != SQL-anchored $BP_EXPECTED"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"

@@ -2638,29 +2638,14 @@ async def scope_players_batting_by_season(
 PHASE_INNINGS_THRESHOLD = 30
 
 
-async def compute_players_batting_by_phase(
-    db,
-    person_id: str,
-    filters: FilterParams,
-    aux: AuxParams,
-    drop_set: Optional[set[str]] = None,
-) -> dict:
-    """Per-phase batting cohort baseline — POSITION-WEIGHTED (Tier 3
-    of spec-apples-to-apples-baselines.md).
-
-    For each phase, derives the player's per-phase position mix from
-    the new playerscopestatsbattingphaseposition child table (per-
-    phase innings_in_phase per position bucket), then convex-combines
-    per-(phase, position) cohort rates by that mix. Drops the prior
-    position-FLAT path that compared an opener's powerplay against the
-    league-wide powerplay (dominated by tail-enders).
-
-    Returns `{ by_phase: [{ phase, phase_bucket, n_players,
-    n_innings_in_phase, mix, strike_rate, dot_pct, boundary_pct,
-    balls_per_four, balls_per_boundary, runs_per_innings_in_phase,
-    sixes_per_innings, fours_per_innings, boundaries_per_innings,
-    below_support, cliff_buckets }, …] }`.
-    """
+async def _by_phase_precomputed(
+    db, person_id: str, filters: FilterParams, drop_set: Optional[set[str]],
+):
+    """Fast path: per-(phase, position) cohort + player-mix + per-phase
+    pool reads off the precomputed phase×position / phase child tables by
+    scope_key. Used when none of the six aux/filter axes is set. Returns
+    the `(player_rows, cohort_rows, pool_rows)` triple the downstream
+    row-builder consumes."""
     where, params = build_scope_clauses(filters, drop=drop_set)
 
     # Q1: player's per-(phase, position) innings → mix derivation.
@@ -2709,11 +2694,146 @@ async def compute_players_batting_by_phase(
         GROUP BY pssbp.phase_bucket
     """
     p_params = {**params, "__pid": person_id}
-    player_rows, cohort_rows, pool_rows = await asyncio.gather(
+    return await asyncio.gather(
         db.q(player_sql, p_params),
         db.q(cohort_sql, params),
         db.q(pool_sql, params),
     )
+
+
+async def _by_phase_live(
+    db, person_id: str, filters: FilterParams, aux: AuxParams,
+):
+    """Live path: per-(phase, position) cohort + player-mix + per-phase
+    pool aggregated at the DELIVERY grain so the six aux/filter axes
+    actually narrow the per-phase baseline.
+
+    The per-innings tables carry no phase dimension, so this mirrors the
+    per-ball populate (`populate_playerscopestats_batting_phase_position`)
+    live: each striker delivery is classified into a phase by its over,
+    its innings-level position bucket is read off `inningsbatterperf`
+    (the join is cheap — one row per batter-innings, derived by the same
+    `derive_positions` + `position_to_bucket` the populate uses), and
+    runs/fours/sixes are counted over ALL deliveries while balls/dots and
+    innings-in-phase are legal-ball-only — the shared all-ball convention
+    (`batting_convention.batting_delivery_contrib`). The
+    `(legal OR runs_batter <> 0)` predicate replicates the populate's
+    skip of pure wides / 0-off-bat no-balls so n_players matches exactly.
+
+    Dismissals aren't selected — the by-phase output never reads them
+    (no per-phase average), so the wicket join the populate needs for
+    its dismissals column is skipped here.
+
+    Column shape matches `_by_phase_precomputed` so the downstream
+    row-builder is identical. Spec: spec-player-baseline-aux-fallback.md
+    Phase 3c + plan-3c-batting-by-season-by-phase-live.md §4."""
+    where_full, params = _batting_live_where(filters, aux)
+    # over_number is 0-indexed: 0-5 powerplay, 6-14 middle, 15-19 death
+    # (matches scripts/populate_playerscopestats_batting_phase.phase_bucket).
+    PHASE = ("CASE WHEN d.over_number <= 5 THEN 1 "
+             "WHEN d.over_number <= 14 THEN 2 ELSE 3 END")
+    LEGAL = "(d.extras_wides = 0 AND d.extras_noballs = 0)"
+    # Skip pure wides / 0-off-bat no-balls — they create no populate cell.
+    contributes = f"({LEGAL} OR d.runs_batter <> 0)"
+    joins = """
+        FROM delivery d
+        JOIN inningsbatterperf ib
+          ON ib.innings_id = d.innings_id AND ib.batter_id = d.batter_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match   m ON m.id = i.match_id
+    """
+
+    # Q1: player's per-(phase, position) innings_in_phase → mix.
+    player_sql = f"""
+        SELECT {PHASE} AS phase_bucket,
+               ib.position_bucket,
+               COUNT(DISTINCT CASE WHEN {LEGAL} THEN d.innings_id END) AS innings
+        {joins}
+        WHERE {where_full}
+          AND {contributes}
+          AND d.batter_id = :__pid
+        GROUP BY phase_bucket, ib.position_bucket
+    """
+    # Q2: cohort aggregates per (phase, position). innings = per-(person,
+    # innings) count where the batter faced ≥1 legal ball in the phase.
+    cohort_sql = f"""
+        SELECT {PHASE} AS phase_bucket,
+               ib.position_bucket,
+               COUNT(DISTINCT CASE WHEN {LEGAL}
+                     THEN d.innings_id || '-' || d.batter_id END)        AS innings,
+               SUM(CASE WHEN {LEGAL} THEN 1 ELSE 0 END)                  AS balls,
+               SUM(d.runs_batter)                                        AS runs,
+               SUM(CASE WHEN {LEGAL} AND d.runs_batter = 0
+                         AND d.runs_total = 0 THEN 1 ELSE 0 END)         AS dots,
+               SUM(CASE WHEN d.runs_batter = 4 THEN 1 ELSE 0 END)        AS fours,
+               SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END)        AS sixes,
+               SUM(CASE WHEN d.runs_batter IN (4, 6) THEN 1 ELSE 0 END)  AS boundaries,
+               COUNT(DISTINCT d.batter_id)                               AS n_players
+        {joins}
+        WHERE {where_full}
+          AND {contributes}
+        GROUP BY phase_bucket, ib.position_bucket
+        ORDER BY phase_bucket, ib.position_bucket
+    """
+    # Q3: per-phase pool totals — distinct batters + (person, innings)
+    # pairs that faced ≥1 legal ball in the phase, matching the
+    # phase-only precompute table's grain.
+    pool_sql = f"""
+        SELECT {PHASE} AS phase_bucket,
+               COUNT(DISTINCT CASE WHEN {LEGAL}
+                     THEN d.innings_id || '-' || d.batter_id END) AS innings,
+               COUNT(DISTINCT d.batter_id)                        AS n_players
+        {joins}
+        WHERE {where_full}
+          AND {contributes}
+        GROUP BY phase_bucket
+    """
+    p_params = {**params, "__pid": person_id}
+    return await asyncio.gather(
+        db.q(player_sql, p_params),
+        db.q(cohort_sql, params),
+        db.q(pool_sql, params),
+    )
+
+
+async def compute_players_batting_by_phase(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-phase batting cohort baseline — POSITION-WEIGHTED (Tier 3
+    of spec-apples-to-apples-baselines.md).
+
+    For each phase, derives the player's per-phase position mix from
+    the new playerscopestatsbattingphaseposition child table (per-
+    phase innings_in_phase per position bucket), then convex-combines
+    per-(phase, position) cohort rates by that mix. Drops the prior
+    position-FLAT path that compared an opener's powerplay against the
+    league-wide powerplay (dominated by tail-enders).
+
+    Dispatches on `is_precomputed_scope` (mirrors 3b's summary path):
+    none of the six set → precomputed phase×position read; any set →
+    live delivery-grain aggregation so the per-phase cohort narrows.
+
+    Returns `{ by_phase: [{ phase, phase_bucket, n_players,
+    n_innings_in_phase, mix, strike_rate, dot_pct, boundary_pct,
+    balls_per_four, balls_per_boundary, runs_per_innings_in_phase,
+    sixes_per_innings, fours_per_innings, boundaries_per_innings,
+    below_support, cliff_buckets }, …] }`.
+
+    Spec: spec-player-baseline-parity.md §4 + Phase 3c of
+    spec-player-baseline-aux-fallback.md.
+    """
+    if is_precomputed_scope(filters, aux):
+        player_rows, cohort_rows, pool_rows = await _by_phase_precomputed(
+            db, person_id, filters, drop_set,
+        )
+    else:
+        player_rows, cohort_rows, pool_rows = await _by_phase_live(
+            db, person_id, filters, aux,
+        )
 
     # Roll cohort into {phase: {position: row}}.
     cohort_by_phase: dict[int, dict[int, dict]] = {}
