@@ -135,7 +135,7 @@ cap_count=$(ab_eval "document.querySelectorAll('.prob-chip-caption').length")
 assert_eq "4 captions on Economy row" "4" "$cap_count"
 
 # ─────────────────────────────────────────────────────────────────
-echo "Test 3 · Team Fielding — P(=1) suppressed on 3-simple blocks"
+echo "Test 3 · Team Fielding — 3 captions on Run-outs / Stumpings"
 
 ab open "$BASE/teams?team=Mumbai+Indians&$IPL_SCOPE&tab=Fielding"
 settle 4
@@ -146,17 +146,20 @@ assert_eq "4 captions on Catches row" "4" "$cap_count"
 prefix_count=$(ab_eval "Array.from(document.querySelectorAll('span')).filter(s => s.textContent === 'vs avg').length")
 assert_eq "1 'vs avg' prefix on Catches row" "1" "$prefix_count"
 
-# Run-outs block: 3 chips, P(=1) is direction=null → 2 captions.
+# Run-outs block: P(=0) lower_better, P(=1) higher_better, P(≥2)
+# higher_better → 3 captions. (User override 2026-05-22 in
+# feedback_p_one_higher_better.md — P(=1) is intrinsically positive
+# and no longer suppressed.)
 ab eval "Array.from(document.querySelectorAll('.wisden-seg')).find(b => b.textContent.trim() === 'Run-outs')?.click()"
 settle 2
 cap_count=$(ab_eval "document.querySelectorAll('.prob-chip-caption').length")
-assert_eq "2 captions on Run-outs row (P(=1) suppressed)" "2" "$cap_count"
+assert_eq "3 captions on Run-outs row" "3" "$cap_count"
 
 # Stumpings block: same 3-simple shape.
 ab eval "Array.from(document.querySelectorAll('.wisden-seg')).find(b => b.textContent.trim() === 'Stumpings')?.click()"
 settle 2
 cap_count=$(ab_eval "document.querySelectorAll('.prob-chip-caption').length")
-assert_eq "2 captions on Stumpings row (P(=1) suppressed)" "2" "$cap_count"
+assert_eq "3 captions on Stumpings row" "3" "$cap_count"
 
 # ─────────────────────────────────────────────────────────────────
 echo "Test 4 · Mobile viewport 390×844 — no horizontal overflow"

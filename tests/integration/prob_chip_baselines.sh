@@ -131,15 +131,18 @@ cap_count=$(ab_eval "document.querySelectorAll('.prob-chip-caption').length")
 assert_eq "4 runs-conceded-tab chips render captions" "4" "$cap_count"
 
 # ─────────────────────────────────────────────────────────────────
-echo "Test 3 · Fielding (Kohli IPL) — P(=1) suppressed, 2 captions on the catches block"
+echo "Test 3 · Fielding (Kohli IPL) — 3 captions on the catches block"
 
 ab open "$BASE/fielding?player=$KOHLI&$IPL_SCOPE"
 settle 4
 
 cap_count=$(ab_eval "document.querySelectorAll('.prob-chip-caption').length")
-# Catches block: P(=0) lower_better, P(=1) null (suppressed),
-# P(≥2) higher_better → 2 captions.
-assert_eq "2 fielding catch chips render captions (P(=1) suppressed)" "2" "$cap_count"
+# Catches block: P(=0) lower_better, P(=1) higher_better, P(≥2) higher_better
+# → 3 captions. (Per user override 2026-05-22 in
+# feedback_p_one_higher_better.md, P(=1) renders as higher_better
+# rather than the original "suppressed/descriptive" framing — more
+# matches with at least one event is intrinsically positive.)
+assert_eq "3 fielding catch chips render captions" "3" "$cap_count"
 
 # Anchor against API.
 api_pzero_sa=$(curl -s "$API/api/v1/fielders/$KOHLI/distribution?$IPL_SCOPE" \
