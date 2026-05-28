@@ -214,7 +214,9 @@ COL2_HEADER_4=$(echo "$JSON_4" | python3 -c 'import sys,json; print(json.loads(s
 
 assert_contains "4.col0 header is RCB" "$COL0_HEADER_4" "Royal Challengers Bengaluru"
 assert_contains "4.col1 avg auto-promoted to IPL" "$COL1_HEADER_4" "Indian Premier League"
-assert_contains "4.col1 avg subtitle is just gender (no season range)" "$COL1_SUBTITLE_4" "Men's"
+# Subtitle render format: `Gender: men's · Type: club` (lowercase
+# gender, prefixed) — no season range when none is set.
+assert_contains "4.col1 avg subtitle carries gender" "$COL1_SUBTITLE_4" "men's"
 assert_contains "4.col2 header is CSK" "$COL2_HEADER_4" "Chennai Super Kings"
 
 # ──────────────────── ANCHOR 5 — full_member intl avg ────────────────────
@@ -222,6 +224,13 @@ assert_contains "4.col2 header is CSK" "$COL2_HEADER_4" "Chennai Super Kings"
 # set on the avg slot. Also tests that the underlying numeric data
 # renders (full_member is a live-aggregation path; bucket dispatch
 # refuses precomputed when team_class is set).
+#
+# Match count: the avg col renders the PER-TEAM AVERAGE matches in
+# scope, not the raw pool total — `_apply_results_per_team` in
+# api/routers/teams.py transforms `matches = pool_matches × 2 /
+# unique_teams_in_scope` so every column on the grid speaks per-team.
+# Anchor against the API at runtime so we drift-protect against
+# incremental data updates.
 
 navigate "$BASE/teams?team=Australia&tab=Compare&compare1=__avg__&compare1_team_class=full_member&compare2=India&gender=male&team_type=international&season_from=2024&season_to=2026" \
   "Anchor 5 — Aus / Full-member avg / Ind 2024-2026"
@@ -231,11 +240,10 @@ COL1_HEADER_5=$(echo "$JSON_5" | python3 -c 'import sys,json; print(json.loads(s
 COL1_MATCHES_5=$(echo "$JSON_5" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read())[1]["matches_text"])')
 
 assert_contains "5.col1 avg reads Full-member average" "$COL1_HEADER_5" "Full-member"
-# Full-member 2024-2026 pool: 219 matches between any two ICC full-
-# member sides (men's intl 2024 + 2025/26). Verified by direct sqlite
-# COUNT against cricket.db. The 38-match figure used elsewhere is for
-# T20 WC + full_member intersection, not the unbounded pool.
-assert_contains "5.col1 has 219 matches (full-member 2024-2026 pool)" "$COL1_MATCHES_5" "219 "
+# Pull the expected per-team-avg matches from the API at runtime.
+API_PER_TEAM_5=$(curl -s "${BASE/5173/8000}/api/v1/scope/averages/summary?gender=male&team_type=international&season_from=2024&season_to=2026&team_class=full_member" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('matches'))")
+assert_contains "5.col1 matches == API per-team avg (=$API_PER_TEAM_5)" "$COL1_MATCHES_5" "$API_PER_TEAM_5 matches in scope"
 
 # ──────────────────── ANCHOR 6 — Mode E1 (FilterBar team_class=fm) ────────────────────
 # v3 spec — FilterBar team_class=full_member narrows ALL three
@@ -243,10 +251,10 @@ assert_contains "5.col1 has 219 matches (full-member 2024-2026 pool)" "$COL1_MAT
 # Anchor 5 covers the per-slot path; this anchor proves the symmetric
 # default-flow path).
 #
-# Closed window (2024-2025) pinned anchor file numbers:
-#   col0 (Australia, FM):  16 matches
-#   col1 (Full-member avg, FM): 140 matches
-#   col2 (India, FM):       31 matches
+# Closed window (2024-2025). Team cols (Aus, Ind) show RAW per-team
+# match counts (path-team-specific). Avg col shows the PER-TEAM AVERAGE
+# matches in scope (anchored against the API at runtime — see Anchor 5
+# rationale).
 
 navigate "$BASE/teams?team=Australia&tab=Compare&compare1=__avg__&compare2=India&gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member" \
   "Anchor 6 — Mode E1 (FilterBar fm, 3 cols inherit)"
@@ -257,10 +265,20 @@ COL1_HEADER_6=$(echo "$JSON_6" | python3 -c 'import sys,json; print(json.loads(s
 COL1_MATCHES_6=$(echo "$JSON_6" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read())[1]["matches_text"])')
 COL2_MATCHES_6=$(echo "$JSON_6" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read())[2]["matches_text"])')
 
-assert_contains "6.col0 Aus narrowed to 16 (FM)" "$COL0_MATCHES_6" "16 "
+# Anchor team-col raw counts against the per-team /teams/{team}/summary
+# endpoint — drift-proof.
+# Team /summary endpoints return matches as a MetricEnvelope; read .value.
+API_AUS_6=$(curl -s "${BASE/5173/8000}/api/v1/teams/Australia/summary?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); m=d.get('matches'); print(m.get('value') if isinstance(m, dict) else m)")
+API_IND_6=$(curl -s "${BASE/5173/8000}/api/v1/teams/India/summary?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); m=d.get('matches'); print(m.get('value') if isinstance(m, dict) else m)")
+API_AVG_6=$(curl -s "${BASE/5173/8000}/api/v1/scope/averages/summary?gender=male&team_type=international&season_from=2024&season_to=2025&team_class=full_member" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('matches'))")
+
+assert_contains "6.col0 Aus matches == API (=$API_AUS_6)" "$COL0_MATCHES_6" "$API_AUS_6 "
 assert_contains "6.col1 reads Full-member average (inherited)" "$COL1_HEADER_6" "Full-member"
-assert_contains "6.col1 has 140 matches" "$COL1_MATCHES_6" "140 "
-assert_contains "6.col2 Ind narrowed to 31 (FM)" "$COL2_MATCHES_6" "31 "
+assert_contains "6.col1 matches == API per-team avg (=$API_AVG_6)" "$COL1_MATCHES_6" "$API_AVG_6 matches in scope"
+assert_contains "6.col2 Ind matches == API (=$API_IND_6)" "$COL2_MATCHES_6" "$API_IND_6 "
 
 # ──────────────────── summary ────────────────────
 echo

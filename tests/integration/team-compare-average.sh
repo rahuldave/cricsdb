@@ -133,9 +133,13 @@ echo
 echo "Test 5: scope-computed label respects gender + team_type"
 agent-browser navigate "$BASE/teams?team=Mumbai+Indians&tab=Compare&tournament=Indian+Premier+League&season_from=2024&season_to=2024&team_type=club&gender=male&avg_slot=1" >/dev/null
 sleep 3
-# Should NOT include "Men's" string in label since tournament IPL
-# already pins it; but should include the scope tournament + season.
-assert_snapshot_contains "Indian Premier League 2024 avg" "label shows tournament + season"
+# Label format today: column name is "Indian Premier League average"
+# and the scope strip beneath reads "Gender: men's · Type: club ·
+# Tournament: Indian Premier League · Season: 2024". Tournament + season
+# appear via the scope strip, not as a combined "Tournament YYYY avg"
+# literal. Assert both parts are present on the page.
+assert_snapshot_contains "Indian Premier League average" "avg col title carries tournament"
+assert_snapshot_contains "Season: 2024" "scope strip carries season"
 
 # ──────────────────────────────────────────────────────────────────
 # Test 6 — Canonical reproducer (RCB + SRH + IPL 2025): every section
