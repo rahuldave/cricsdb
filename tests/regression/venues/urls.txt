@@ -16,7 +16,11 @@
 REG bat_summary_plain                 /api/v1/batters/ba607b88/summary
 REG bat_summary_ipl                   /api/v1/batters/ba607b88/summary?tournament=Indian%20Premier%20League
 REG bat_byinn_plain                   /api/v1/batters/ba607b88/by-innings?limit=5
-REG bat_summary_venue_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium
+# bat_summary_venue_wankhede: NEW (was REG) — flipped 2026-05-28
+# because Phase 3b (spec-player-baseline-aux-fallback.md) narrows the
+# /batters/{id}/summary cohort envelope under filter_venue. Own-side
+# numbers unchanged.
+NEW bat_summary_venue_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium
 REG bat_byinn_venue_wankhede          /api/v1/batters/ba607b88/by-innings?filter_venue=Wankhede%20Stadium&limit=5
 
 # ── bowling ──────────────────────────────────────────────────────

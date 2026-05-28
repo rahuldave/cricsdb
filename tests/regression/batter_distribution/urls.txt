@@ -23,11 +23,16 @@ REG dist_kohli_ipl_2023                /api/v1/batters/ba607b88/distribution?gen
 REG dist_kohli_recent_2years           /api/v1/batters/ba607b88/distribution?gender=male&season_from=2024&season_to=2025&as_of_date=2025-01-01
 
 # ── opponent narrowing ───────────────────────────────────────────
-REG dist_kohli_vs_csk_ipl              /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_opponent=Chennai%20Super%20Kings&as_of_date=2025-01-01
-REG dist_kohli_vs_aus_intl             /api/v1/batters/ba607b88/distribution?gender=male&team_type=international&filter_opponent=Australia&as_of_date=2025-01-01
+# NEW (was REG) — flipped 2026-05-28 because Phase 3b
+# (spec-player-baseline-aux-fallback.md) now narrows the cohort baseline
+# under filter_opponent/filter_venue/inning. The own-side numbers are
+# unchanged, but every envelope.scope_avg + sample_size + delta_pct
+# shifts to reflect the narrowed pool.
+NEW dist_kohli_vs_csk_ipl              /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_opponent=Chennai%20Super%20Kings&as_of_date=2025-01-01
+NEW dist_kohli_vs_aus_intl             /api/v1/batters/ba607b88/distribution?gender=male&team_type=international&filter_opponent=Australia&as_of_date=2025-01-01
 
 # ── venue narrowing ──────────────────────────────────────────────
-REG dist_kohli_at_chinnaswamy          /api/v1/batters/ba607b88/distribution?gender=male&filter_venue=M%20Chinnaswamy%20Stadium&as_of_date=2025-01-01
+NEW dist_kohli_at_chinnaswamy          /api/v1/batters/ba607b88/distribution?gender=male&filter_venue=M%20Chinnaswamy%20Stadium&as_of_date=2025-01-01
 
 # ── samson (IPL only) ────────────────────────────────────────────
 REG dist_samson_ipl                    /api/v1/batters/a4cc73aa/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
@@ -43,8 +48,10 @@ REG dist_bumrah_intl                   /api/v1/batters/462411b3/distribution?gen
 REG dist_bumrah_ipl_2024               /api/v1/batters/462411b3/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
 
 # ── inning-aux narrowing (page-local AuxParam) ──────────────────
-REG dist_kohli_ipl_inning0             /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=0&as_of_date=2025-01-01
-REG dist_kohli_ipl_inning1             /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=1&as_of_date=2025-01-01
+# NEW (was REG) — flipped 2026-05-28 with the opponent/venue rows above
+# for the same Phase 3b reason.
+NEW dist_kohli_ipl_inning0             /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=0&as_of_date=2025-01-01
+NEW dist_kohli_ipl_inning1             /api/v1/batters/ba607b88/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=1&as_of_date=2025-01-01
 
 # ── empty scope (no matches) — regression marker for empty handling
 REG dist_kohli_at_nonexistent_venue    /api/v1/batters/ba607b88/distribution?filter_venue=Nonexistent%20Ground&as_of_date=2025-01-01
