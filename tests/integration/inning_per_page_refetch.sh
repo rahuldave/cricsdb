@@ -246,30 +246,74 @@ assert_eq "Players dossier · click All"           "$sql_smc_runs_all" "$(runs_d
 echo
 echo "Test 5 · Teams page subtabs (Batting / Bowling / Fielding / Partnerships)"
 # The team-summary header drives every subtab's Matches counter.
-# Visiting each subtab confirms (a) the InningToggle is actually
-# mounted on that subtab (gating list in Teams.tsx) AND (b) clicking
-# it triggers a refetch in the per-subtab fetches (each TabComponent
-# uses the page-level filterDeps prop).
+# Visiting each subtab confirms (a) the inning narrowing control is
+# mounted on that subtab AND (b) clicking it triggers a refetch in
+# the per-subtab fetches (each TabComponent uses the page-level
+# filterDeps prop).
 #
-# All-innings count comes from the match table directly (260) since
-# the team-summary endpoint counts all matches the team played,
-# including ones with no innings rows for that team. With inning=N,
-# the API switches to innings-row-based counting.
+# Driver: the **Splits Mosaic** (`.wisden-splits-mosaic`) is the
+# inning control on Teams subtabs — the standalone InningToggle
+# `.wisden-filter-group` labelled "Innings" was removed once the
+# Mosaic took over the POV-narrow role. Row-header buttons are
+# POV-aware:
+#   Batting / Partnerships:  "Batted first" / "Batted second"
+#   Bowling / Fielding:      "Bowled second" / "Bowled first"
+# Per Option-B, the FIRST row on every tab (`inning=0` = team batted
+# first) maps to the same underlying set, just labelled by discipline.
+#
+# Clear-row button text: "Both innings · <N>".
+#
+# All-innings count comes from the match table directly (the team-
+# summary endpoint counts all matches the team played, including
+# ones with no innings rows for that team). With inning=N, the API
+# switches to innings-row-based counting.
 sql_csk_all=$(sql "SELECT COUNT(*) FROM match WHERE gender='male' AND team_type='club' AND (team1='Chennai Super Kings' OR team2='Chennai Super Kings')")
+# Per Option-B, inning=0 = "team batted first" — count matches where
+# CSK's own innings is innings_number=0.
 sql_csk_in0=$(sql "SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN match m ON m.id=i.match_id WHERE m.gender='male' AND m.team_type='club' AND i.team='Chennai Super Kings' AND i.super_over=0 AND i.innings_number=0")
-sql_csk_in1=$(sql "SELECT COUNT(DISTINCT i.match_id) FROM innings i JOIN match m ON m.id=i.match_id WHERE m.gender='male' AND m.team_type='club' AND i.team='Chennai Super Kings' AND i.super_over=0 AND i.innings_number=1")
+# For inning=1 = "team batted second" we have to count matches where
+# the OPPONENT batted in innings 0 — NOT `i.team='CSK' AND
+# innings_number=1`. The difference: rain-abandoned matches where
+# CSK bowled first (innings 0 = opponent's) but never got to bat
+# (no innings 1 row at all). The Mosaic counts those matches as
+# "team batted second" (122), the naive SQL misses them (121).
+sql_csk_in1=$(sql "SELECT COUNT(DISTINCT m.id) FROM match m JOIN innings i ON i.match_id=m.id WHERE m.gender='male' AND m.team_type='club' AND i.super_over=0 AND i.innings_number=0 AND (m.team1='Chennai Super Kings' OR m.team2='Chennai Super Kings') AND i.team != 'Chennai Super Kings'")
+
+# Click a Mosaic POV row by its text-prefix. Discipline-aware labels:
+# Batting/Partnerships use "Batted first/second"; Bowling/Fielding
+# use the inverted "Bowled second/first" (per Option-B POV flip).
+click_mosaic_row() {
+  local prefix="$1"
+  ab_eval "Array.from(document.querySelectorAll('button.wisden-splits-row-header')).find(b => (b.textContent||'').trim().startsWith('$prefix'))?.click()" >/dev/null
+  settle 2
+}
+click_mosaic_clear_innings() {
+  ab_eval "Array.from(document.querySelectorAll('button.wisden-splits-clear-link')).find(b => /^Both innings/.test((b.textContent||'').trim()))?.click()" >/dev/null
+  settle 2
+}
 
 for sub in Batting Bowling Fielding Partnerships; do
   echo "  ── subtab: $sub"
   ab open "$BASE/teams?team=Chennai+Super+Kings&gender=male&team_type=club&tab=$sub"
   settle 4
   assert_eq "Teams [$sub] · mount (all)"           "$sql_csk_all" "$(matches_dom)"
-  click_inning 0; settle
-  assert_eq "Teams [$sub] · click 1st innings"     "$sql_csk_in0" "$(matches_dom)"
-  click_inning 1; settle
-  assert_eq "Teams [$sub] · click 2nd innings"     "$sql_csk_in1" "$(matches_dom)"
-  click_inning All; settle
-  assert_eq "Teams [$sub] · click All"             "$sql_csk_all" "$(matches_dom)"
+  # POV-aware row labels: pick the "team batted first" row's label.
+  case "$sub" in
+    Batting|Partnerships) first_label="Batted first"; second_label="Batted second" ;;
+    Bowling|Fielding)     first_label="Bowled second"; second_label="Bowled first" ;;
+  esac
+  click_mosaic_row "$first_label"
+  assert_eq "Teams [$sub] · click 1st innings (Mosaic '$first_label')"  "$sql_csk_in0" "$(matches_dom)"
+  # Mosaic collapses to a single-row "verbose status strip" when one
+  # aux is set (CLAUDE.md §Splits Mosaic: "1 aux URL param set → 2x2
+  # of the two free axes"). To toggle to the other innings the test
+  # has to first CLEAR back to the 4-cell layout, then click the
+  # second row.
+  click_mosaic_clear_innings
+  click_mosaic_row "$second_label"
+  assert_eq "Teams [$sub] · click 2nd innings (Mosaic '$second_label')" "$sql_csk_in1" "$(matches_dom)"
+  click_mosaic_clear_innings
+  assert_eq "Teams [$sub] · click All (Mosaic 'Both innings')"          "$sql_csk_all" "$(matches_dom)"
 done
 
 # ─────────────────────────────────────────────────────────────────
