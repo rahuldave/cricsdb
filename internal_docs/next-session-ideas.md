@@ -11,31 +11,75 @@ UNBLOCKED.** The all-ball convention prereq SHIPPED locally this session
 position cohort is a rollup of it, so 3b's live aggregation over that
 table matches the precomputed path by construction.
 
-### SHIPPED this session — `spec-batting-allball-runs-single-source.md` (local, unpushed)
+### SHIPPED this session — `spec-batting-allball-runs-single-source.md` + app-wide extension + downstream rebuilds + test green-up (local, unpushed)
 
-All-ball batting-runs convention + single per-innings source. Commits
-a60dfd9 (enumerate sites) → 8f86314 (inningsbatterperf non-striker
-completion + not_out excl. retired) → fa2cff3 (position cohort = rollup
-of inningsbatterperf + parent all-ball via shared helper
-`api/batting_convention.batting_delivery_contrib`; reorder records ahead
-of position in both `import_data.py` + `update_recent.py`) → e798acd
-(batting.py read queries all-ball: 9 Pattern-X + 5 Pattern-Y sites per
-`internal_docs/allball-batting-sites.md`; phase/over populates via the
-helper) → f8f2ef2 (head_to_head batter-vs-bowler, extended per scope
-decision) → [Commit 5] (docs). Headline: V Kohli career runs 13117 →
-13166 (the 49 no-ball off-bat runs), balls unchanged (legal), SR
-recomputed. Local DB rebuilt (records + all cohorts). New tests:
-`test_playerscopestatsposition_rollup.py` (exact-integer parity),
-`test_batting_allball_runs.py` (own number + cross-tab + H2H, SQL-
-anchored). Backup before rebuild: `tmp/cricket.db.bak-allball`.
+17 commits **a60dfd9 → 3a70d31** (all local/unpushed). Three arcs:
 
-**Deploy note:** held local until 3b lands — read queries fix on a code
-deploy, but the cohort tables + `inningsbatterperf` need a prod DB
-rebuild; one deploy + one rebuild covers both. The regression harness is
-diff-on-demand (no checked-in goldens), so the committed change leaves no
-stored baseline red; the red-then-green is the direct SQL-anchored
-sanity test, not a REG→NEW flip (the flip window is pre-change-commit,
-which a committed change can't retro-fill — feedback_regression_before_shape).
+**Arc 1 — Spec implementation (Commits 1–5 + 4b, a60dfd9→a614603):**
+all-ball convention on the player batting profile + head-to-head.
+`inningsbatterperf` completed with non-striker innings + `not_out`
+excluding retired (matches the cohort dismissal convention so the rollup is
+exact). `playerscopestatsposition` is now a pure ROLLUP of
+`inningsbatterperf`; parent `player_scope_stats` + the per-over / per-phase
+/ phase×position cohorts go through a new shared helper
+`api/batting_convention.batting_delivery_contrib`. Records-aggregates
+moved AHEAD of the position populate in `import_data.py` +
+`update_recent.py`. batting.py read queries fixed across 9 Pattern-X +
+5 Pattern-Y sites (see `internal_docs/allball-batting-sites.md`).
+**Headline:** Kohli career runs 13117 → 13166 (the 49 off-bat runs off
+no-balls he scored), balls unchanged at 9724 (legal), SR recomputed. New
+tests: `test_playerscopestatsposition_rollup.py` (exact-integer parity),
+`test_batting_allball_runs.py` (SQL-anchored own + cross-tab + H2H).
+
+**Arc 2 — User-approved app-wide extension + downstream-rebuild correction
+(a934f02 → 00e0a80):** extended all-ball to the per-batter SUMs in
+`tournaments.py` (9 sites — top scorer, highest innings, per-team variants,
+by-season, rivalry), `teams.py:2120` (team 50s/100s milestone),
+`reference.py:539` (career-runs-by-team, behind the "teams played for"
+strip). Then the **key user correction** ("anything downstream of the
+change must be rebuilt"): I'd missed two precomputes —
+`populate_bucket_baseline` (fifties/hundreds at line 514 + the
+highest-individual-innings moment at line 1303, legal-gated) and
+`scripts/generate_site_stats.py` (featured-player runs + matchup,
+legal-gated). Fixed both populate gates, rebuilt `bucket_baseline` (×2:
+once for fifties/hundreds, once for moments), regenerated
+`site-stats.json`. The SQL-anchored `test_dispatch_equivalence` CAUGHT
+the team-50s/100s divergence between live and precompute — fixed by
+rebuilding the precompute, NOT reverting the live change. See
+[[feedback-rebuild-downstream-precomputes]].
+
+**Arc 3 — Pre-existing staleness cleanup + corrections (0cf30b1 → 3a70d31):**
+re-baselined integration SQL anchors to all-ball (8 tests:
+toss/result/teams-strip/compare/distribution/inter-wicket/discipline/inning),
+swept the sanity suite stale items (vs base→vs cohort label everywhere
+incl. user-help.md + the cohort docstring; ProbRecord-shape superset checks
+across 6 dist tests; envelope unwraps in catches/slot/fielder crashes;
+match-count anchors refreshed; fielding p_one → higher_better per your
+2026-05-22 override). **Correction:** I'd wrongly deleted batting.sh's
+tab + highlight_batter tests on a botched DOM read; the tabs ARE still
+there (Batting.tsx:60+399), the old assertions just matched "BY OVER"
+(CSS-uppercased) vs the DOM "By Over". Restored + fixed. The
+`useDefaultSeasonWindow` hook IS dead code, but intentionally so
+(700d11b: "user changed their mind — landings open all-time by default;
+'last 3' is an opt-in FilterBar button; hook kept for a future opt-in
+landing"). NOT a regression.
+
+**Verification:** full SQL sanity suite **53/53 green**; batting integration
+green (batting.sh 12/0, batter_distribution 52/0); dispatch_equivalence
+212/0; rollup parity exact. Local DB fully rebuilt; backup
+`tmp/cricket.db.bak-allball`.
+
+**Bowling explicitly confirmed: no changes needed.** Bowler runs conceded
+= `runs_total` (already charges the bowler all the no-ball off-bat runs +
+extras); balls = legal only (the bowler isn't charged extra balls — that's
+correct, he re-bowls); boundaries conceded already all-ball; precomputes
+already use runs_total. NOT in 3b — 3b is only the live "typical player"
+fallback for the aux filters.
+
+**Deploy note:** held local until 3b lands — code deploy + ONE prod DB
+rebuild (records + all cohorts + `bucket_baseline` + `site-stats.json`)
+covers both. The regression harness is diff-on-demand (no checked-in
+goldens), so committed change leaves no stored baseline red.
 
 **THEN resume `spec-player-baseline-aux-fallback.md` at Phase 3b** (its §3
 has a ⏸ PAUSED banner). Once the convention fix lands, `inningsbatterperf`
