@@ -66,7 +66,7 @@ Each filter answers a real question (pools in §4): _"Is Kohli the best top-orde
 
 - 3b. ✅ Batting live comparison (summary chip + distribution) reading the extended table.
 
-- 3c. **NEXT.** Batting by-season + by-phase live. (No by-over for batting — that's bowling's 3d.) Plan: `internal_docs/plan-3c-batting-by-season-by-phase-live.md`.
+- 3c. ✅ **SHIPPED 2026-05-28.** Batting by-season + by-phase live. (No by-over for batting — that's bowling's 3d.) Dispatch wired into `compute_players_batting_by_season` (live aggregates `inningsbatterperf`→innings→match with `m.season` in the GROUP BY) and `compute_players_batting_by_phase` (live aggregates at the DELIVERY grain — over→phase, position off `inningsbatterperf`, all-ball convention; `(legal OR runs_batter<>0)` replicates the populate's wide-skip). Both split into `_by_{season,phase}_{precomputed,live}` and dispatch on `is_precomputed_scope`. 3b's WHERE-building factored into `_batting_live_where`. Live by-phase verified byte-identical to the precomputed phase×position table at none-of-six (26 cells, 0 mismatches). Q4 resolved: under `inning=0` all three phases keep ~1000+ innings, far above the 30-innings cliff. `tests/integration/player_baseline_aux_fallback.sh` §5+§6 lock the red→green narrowing + SQL anchors + Q4 guard. Commits: `321054a` (REG→NEW pre-flip), `886a220` (by-season), `d61c3e6` (by-phase). Plan: `internal_docs/plan-3c-batting-by-season-by-phase-live.md`.
 
 - 3d. Bowling live (raw deliveries grouped by over — no new table).
 
