@@ -51,17 +51,25 @@ Each filter answers a real question (pools in §4): _"Is Kohli the best top-orde
   
 3. **Per-innings table + live comparison** (§8), commit-sliced:
 
-  > **⏸ PAUSED after 3a (2026-05-27).** 3a (extend `inningsbatterperf` with `position_bucket` + `dots`) SHIPPED (commits 56b2a0e + 61ad94d). Building 3a's parity cross-check revealed that `inningsbatterperf` does **not** match the precomputed batting cohort (`playerscopestatsposition`): the player batting analytics drop a batsman's no-ball off-bat runs (legal-only convention) and `inningsbatterperf` misses pure non-striker innings. Using it for 3b as-is would make the "typical player" comparison jump at the gate boundary. **3b is paused pending the convention + single-source fix specced in `internal_docs/spec-batting-allball-runs-single-source.md`** (all-ball batting runs everywhere + complete `inningsbatterperf` with non-striker innings + re-derive `playerscopestatsposition` as a rollup of it). Once that lands, the per-innings table 3b reads is convention-correct and 3b's gate-parity holds by construction. Resume at 3b below.
+  > **3b SHIPPED 2026-05-28** (commit `00ef3d1`). Dispatch wired in
+  > `compute_players_batting_cohort` — none-of-six routes to the
+  > precomputed read; any-of-six runs a live aggregation over
+  > `inningsbatterperf` joined to innings+match using the team-side
+  > cohort clauses (`_option_b_team_inning`, `_cohort_outcome_clause`).
+  > `tests/integration/player_baseline_aux_fallback.sh` locks the
+  > red→green narrowing. Regression annotations flipped REG→NEW for 6
+  > URLs (`cf38935`). Plan doc: `internal_docs/plan-3b-batting-live-cohort.md`.
+  > **3c next:** plan drafted at `internal_docs/plan-3c-batting-by-season-by-phase-live.md`.
 
 
-- 3a. Extend `inningsbatterperf` (+`position_bucket`,+`dots`); rebuild populate + incremental + indexes + backup (§8.4). Parity-tested.
-  
-- 3b. Batting live comparison (summary chip + distribution) reading the extended table.
-  
-- 3c. Batting by-season / by-phase / by-over live.
-  
+- 3a. ✅ Extend `inningsbatterperf` (+`position_bucket`,+`dots`); rebuild populate + incremental + indexes + backup (§8.4). Parity-tested.
+
+- 3b. ✅ Batting live comparison (summary chip + distribution) reading the extended table.
+
+- 3c. **NEXT.** Batting by-season + by-phase live. (No by-over for batting — that's bowling's 3d.) Plan: `internal_docs/plan-3c-batting-by-season-by-phase-live.md`.
+
 - 3d. Bowling live (raw deliveries grouped by over — no new table).
-  
+
 - 3e. Fielding / keeping live (keeper-binary).
   
 

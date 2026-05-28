@@ -1,9 +1,67 @@
-# Next-session ideas — all-ball batting-runs convention + single source (then resume 3b)
+# Next-session ideas — Phase 3c (batting by-season + by-phase live)
 
 > **NO DEPLOYS gate is OFF** as of 2026-04-21. Resume normal deploy
 > cadence.
 
-## NEXT SESSION — top of queue (2026-05-27)
+## NEXT SESSION — top of queue (2026-05-28)
+
+**Implement `internal_docs/spec-player-baseline-aux-fallback.md`
+Phase 3c.** 3b shipped clean this session (commit `00ef3d1` —
+`compute_players_batting_cohort` dispatches on `is_precomputed_scope`,
+falling back to a live aggregation over `inningsbatterperf` joined to
+innings+match when any of the six aux/filter axes is set). 3c extends
+the same dispatch to the two adjacent surfaces:
+
+- `compute_players_batting_by_season` (per-season cohort baseline,
+  /batters/{id}/by-season chart overlay)
+- `compute_players_batting_by_phase` (per-phase cohort baseline,
+  /batters/{id}/by-phase chip baselines)
+
+**Plan doc:** `internal_docs/plan-3c-batting-by-season-by-phase-live.md`
+— read first. It maps both functions, gives the live-path SQL
+skeletons, calls out the Q4 phase-under-innings degeneracy check,
+and lists the regression-flip grep to run first.
+
+**Quick orientation:** 3b's `_batting_cohort_live` in
+`api/routers/scope_averages.py` is the model — by-season is a near-
+copy with `m.season` added to the GROUP BY; by-phase needs the
+delivery-level scan with `batting_delivery_contrib` (the shared
+all-ball helper from `api/batting_convention.py`).
+
+**Two commits expected:** by-season + by-phase, one per surface. Plus
+the REG→NEW flip commit BEFORE the shape changes
+(`feedback_regression_before_shape`).
+
+After 3c: 3d (bowling live, separate function family — no
+`inningsbatterperf` analog) then 3e (fielding / keeping live,
+keeper-binary). Then Phase 4 docs sweep.
+
+### SHIPPED prior session (2026-05-28) — Phase 3b + test-rot sweep
+
+3b: `00ef3d1` `feat(scope-averages): wire live cohort for the six
+aux/filter axes (3b)`. Cohort SR for Kohli at IPL 2016 moves from
+133.8 (frozen) to 131.9 / 139.3 / 134.5 under inning=0 / result=won /
+toss_outcome=won. Distribution endpoint inherits.
+
+Regression flip: `cf38935` — 6 REG URLs hitting
+/batters/{id}/distribution + /summary with one of the six.
+
+Test-rot sweep (in same session, separate work item): the full
+integration suite ran 32 fails / 104. After triage, ALL 32 were test
+rot of various flavours (no real backend bugs). Fixes shipped across
+~14 commits — `47b7c2c` to `a801467`. One real UX bug was uncovered
+during triage and fixed: /series rendered "Recently played editions"
+twice (commit `ad6d206` — TournamentsLanding `!embedded` gates +
+filter HERO_OMITTED_TOURNAMENTS list shared with TournamentDossier,
+new `tests/integration/series_landing_dedup.sh` locks the contract).
+
+CLAUDE.md gained two methodology rules:
+- `55de6fb` — refactor sweep (grep + rerun affected tests when
+  refactoring a primitive integration tests reach into via DOM).
+- `91b808e` — every (potential) bug surfaced for user decision must
+  carry a URL + what-to-look-for.
+
+### Older notes (kept for context)
 
 **Resume `spec-player-baseline-aux-fallback.md` at Phase 3b — now
 UNBLOCKED.** The all-ball convention prereq SHIPPED locally this session
