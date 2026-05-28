@@ -144,8 +144,9 @@ assert_eq "Last 10 n_innings = min(10, lifetime_n)" "$expected_l10_n" "$dom_l10_
 form_delta_visible=$(ab_eval "document.querySelector('section[aria-label=\"Per-innings runs distribution\"]').innerText.includes('Form vs scope')")
 assert_eq "Form delta line visible after Last 10 toggle (window-independent)" "true" "$form_delta_visible"
 
-# Back to Scope (default) via toggle — URL should DELETE dist_window
-ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button')].find(b => b.innerText.trim() === 'Scope').click()" >/dev/null
+# Back to scope (default) via toggle — URL should DELETE dist_window.
+# The button is labelled "At scope" (param='' → useUrlParam deletes it).
+ab_eval "[...document.querySelectorAll('section[aria-label=\"Per-innings runs distribution\"] button')].find(b => b.innerText.trim() === 'At scope')?.click()" >/dev/null
 settle 1
 url_scope=$(ab_eval "window.location.href" | tr -d '"')
 case "$url_scope" in
