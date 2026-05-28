@@ -54,14 +54,19 @@ assert_snapshot_contains() {
 
 settle() { sleep "${1:-1.2}"; }
 
-ref_for() {
-  agent-browser snapshot -i 2>&1 | grep -E "$1" | head -1 | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/'
-}
-
 reset() {
   agent-browser open "$BASE/" >/dev/null 2>&1
   agent-browser wait --load networkidle >/dev/null 2>&1
   settle 1.0
+}
+
+# DOM-eval tab click — replaces the older ref_for + agent-browser
+# click @ref pattern (the ref-based click stopped triggering React
+# onClick on .wisden-tab).
+click_tab() {
+  local tab_text="$1"
+  agent-browser eval "Array.from(document.querySelectorAll('.wisden-tab')).find(b => (b.textContent||'').trim() === '$tab_text')?.click()" >/dev/null 2>&1
+  settle 1.5
 }
 
 # --------------------------------------------------------------------
@@ -89,24 +94,16 @@ assert_snapshot_contains "By Season"            "By Season tab label"
 # --------------------------------------------------------------------
 echo ""
 echo "Test 3 · Switch to Match List tab — URL updates, list renders"
-TAB=$(ref_for 'button "MATCH LIST"')
-if [ -n "$TAB" ]; then
-  agent-browser click "$TAB" >/dev/null 2>&1
-  settle 1.5
-  assert_url_contains "tab=Match+List"
-  assert_snapshot_contains "Opponent"           "match-list header"
-else
-  echo "  ✗ Match List tab not found"; FAIL=$((FAIL + 1))
-fi
+click_tab "Match List"
+assert_url_contains "tab=Match+List"
+assert_snapshot_contains "Opponent"           "match-list header"
 
 # --------------------------------------------------------------------
 echo ""
 echo "Test 4 · Switch to vs Opponent tab + pick Australia"
-TAB=$(ref_for 'button "VS OPPONENT"')
-if [ -n "$TAB" ]; then
-  agent-browser click "$TAB" >/dev/null 2>&1
-  settle 1.5
-  assert_url_contains "tab=vs+Opponent"
+click_tab "vs Opponent"
+assert_url_contains "tab=vs+Opponent"
+if true; then
   # The opponent picker uses TeamSearch; type in and pick Australia.
   OPP_INPUT=$(agent-browser snapshot -i 2>&1 | grep -E 'textbox "Search.+opponent"' | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
   if [ -n "$OPP_INPUT" ]; then
@@ -129,19 +126,15 @@ fi
 # --------------------------------------------------------------------
 echo ""
 echo "Test 5 · Switch to Batting tab — team-batting summary renders"
-TAB=$(ref_for 'button "BATTING"')
-if [ -n "$TAB" ]; then
-  agent-browser click "$TAB" >/dev/null 2>&1
-  settle 2.0
-  assert_url_contains "tab=Batting"
-  # Run rate or total runs should appear — both are StatCard labels.
-  _has_rr=$(_innerText_has "run rate")
-  _has_runs=$(_innerText_has "total runs")
-  if [[ "$_has_rr" == "true" || "$_has_runs" == "true" ]]; then
-    echo "  ✓ Batting tab shows run-rate / runs StatCards"; PASS=$((PASS + 1))
-  else
-    echo "  ✗ Batting tab content missing"; FAIL=$((FAIL + 1))
-  fi
+click_tab "Batting"
+assert_url_contains "tab=Batting"
+# Run rate or total runs should appear — both are StatCard labels.
+_has_rr=$(_innerText_has "run rate")
+_has_runs=$(_innerText_has "total runs")
+if [[ "$_has_rr" == "true" || "$_has_runs" == "true" ]]; then
+  echo "  ✓ Batting tab shows run-rate / runs StatCards"; PASS=$((PASS + 1))
+else
+  echo "  ✗ Batting tab content missing"; FAIL=$((FAIL + 1))
 fi
 
 # --------------------------------------------------------------------

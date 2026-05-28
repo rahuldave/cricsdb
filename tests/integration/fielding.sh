@@ -60,17 +60,23 @@ assert_snapshot_contains() {
 
 settle() { sleep "${1:-1.2}"; }
 
-ref_for() {
-  agent-browser snapshot -i 2>&1 | grep -E "$1" | head -1 | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/'
-}
-
 reset() {
   agent-browser open "$BASE/" >/dev/null 2>&1
   agent-browser wait --load networkidle >/dev/null 2>&1
   settle 1.0
 }
 
-click_ref() { agent-browser click "$1" >/dev/null 2>&1; settle 1.0; }
+# DOM-eval tab click — the older `ref_for` + `agent-browser click @ref`
+# stopped triggering React onClick on .wisden-tab.
+click_tab() {
+  local tab_text="$1"
+  agent-browser eval "Array.from(document.querySelectorAll('.wisden-tab')).find(b => (b.textContent||'').trim() === '$tab_text')?.click()" >/dev/null 2>&1
+  settle 1.0
+}
+tab_present() {
+  local tab_text="$1"
+  agent-browser eval "Array.from(document.querySelectorAll('.wisden-tab')).some(b => (b.textContent||'').trim() === '$tab_text') ? 'yes' : 'no'" 2>/dev/null | tr -d '"'
+}
 
 # --------------------------------------------------------------------
 echo "Test 1 · /fielding landing renders dismissals + keeper leaders"
@@ -108,10 +114,9 @@ agent-browser open "$BASE/fielding?player=$DHONI&gender=male&team_type=internati
 agent-browser wait --load networkidle >/dev/null 2>&1
 settle 2.8
 assert_snapshot_contains "MS Dhoni"             "player name"
-KEEP_REF=$(ref_for 'button "KEEPING"')
-if [ -n "$KEEP_REF" ]; then
+if [ "$(tab_present 'Keeping')" = "yes" ]; then
   echo "  ✓ Keeping tab present for Dhoni"; PASS=$((PASS + 1))
-  click_ref "$KEEP_REF"
+  click_tab "Keeping"
   assert_url_contains "tab=Keeping"
   # Keeping-summary StatCards — stumpings is keeper-only.
   assert_snapshot_contains "Stumpings"          "Stumpings StatCard"

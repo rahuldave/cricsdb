@@ -183,15 +183,14 @@ agent-browser open "$BASE/batting?player=ba607b88&gender=male" >/dev/null 2>&1
 agent-browser wait --load networkidle >/dev/null 2>&1
 settle 1.5
 clear_console
-# By Over → By Phase → vs Bowlers within a tight window.
-BY_OVER_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'button "BY OVER"' | head -1 | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/')
-agent-browser click "$BY_OVER_REF" >/dev/null 2>&1
+# By Over → By Phase → vs Bowlers within a tight window. DOM-eval
+# clicks (the ref-based path stopped triggering React onClick on
+# .wisden-tab).
+agent-browser eval "Array.from(document.querySelectorAll('.wisden-tab')).find(b => (b.textContent||'').trim() === 'By Over')?.click()" >/dev/null 2>&1
 sleep 0.1
-BY_PHASE_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'button "BY PHASE"' | head -1 | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/')
-agent-browser click "$BY_PHASE_REF" >/dev/null 2>&1
+agent-browser eval "Array.from(document.querySelectorAll('.wisden-tab')).find(b => (b.textContent||'').trim() === 'By Phase')?.click()" >/dev/null 2>&1
 sleep 0.1
-VS_BOWLERS_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'button "VS BOWLERS"' | head -1 | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/')
-agent-browser click "$VS_BOWLERS_REF" >/dev/null 2>&1
+agent-browser eval "Array.from(document.querySelectorAll('.wisden-tab')).find(b => (b.textContent||'').trim() === 'vs Bowlers')?.click()" >/dev/null 2>&1
 agent-browser wait --load networkidle >/dev/null 2>&1
 settle 2.0
 assert_url_contains "tab=vs+Bowlers"

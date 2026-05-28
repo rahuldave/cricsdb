@@ -47,17 +47,22 @@ assert_snapshot_contains() {
 
 settle() { sleep "${1:-1.2}"; }
 
-ref_for() {
-  agent-browser snapshot -i 2>&1 | grep -E "$1" | head -1 | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/'
-}
-
 reset() {
   agent-browser open "$BASE/" >/dev/null 2>&1
   agent-browser wait --load networkidle >/dev/null 2>&1
   settle 1.0
 }
 
-click_ref() { agent-browser click "$1" >/dev/null 2>&1; settle 1.0; }
+# Click a .wisden-tab by its visible text. Replaces the older
+# `ref_for 'button "WICKETS"'` + `agent-browser click @ref` pattern,
+# which stopped triggering the React onClick after the tab markup was
+# migrated to a controlled BUTTON (the accessibility-tree click no
+# longer fires the handler). DOM-eval click works reliably.
+click_tab() {
+  local tab_text="$1"
+  agent-browser eval "Array.from(document.querySelectorAll('.wisden-tab')).find(b => (b.textContent||'').trim() === '$tab_text')?.click()" >/dev/null 2>&1
+  settle 1.0
+}
 
 # --------------------------------------------------------------------
 echo "Test 1 · /bowling landing renders leader lists"
@@ -82,23 +87,20 @@ assert_snapshot_contains "Wickets"          "Wickets StatCard"
 # --------------------------------------------------------------------
 echo ""
 echo "Test 3 · Wickets tab — tab switch pushes URL"
-WICK_REF=$(ref_for 'button "WICKETS"')
-click_ref "$WICK_REF"
+click_tab "Wickets"
 assert_url_contains "tab=Wickets"
 assert_snapshot_contains "JJ Bumrah"        "still on Bumrah page"
 
 # --------------------------------------------------------------------
 echo ""
 echo "Test 4 · vs Batters tab — tab URL + matchup rendering"
-VSB_REF=$(ref_for 'button "VS BATTERS"')
-click_ref "$VSB_REF"
+click_tab "vs Batters"
 assert_url_contains "tab=vs+Batters"
 
 # --------------------------------------------------------------------
 echo ""
 echo "Test 5 · Innings List — date link carries highlight_bowler"
-INN_REF=$(ref_for 'button "INNINGS LIST"')
-click_ref "$INN_REF"
+click_tab "Innings List"
 settle 1.5
 assert_url_contains "tab=Innings+List"
 HAS_HIGHLIGHT=$(agent-browser eval '(() => {
