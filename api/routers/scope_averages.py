@@ -3209,6 +3209,165 @@ async def scope_players_batting_by_over(
     )
 
 
+def _bowling_live_where(filters: FilterParams, aux: AuxParams) -> tuple[str, dict]:
+    """Build the per-delivery WHERE for the live bowling cohort paths
+    (Phase 3d). Assumes the query joins `innings i` and `match m`.
+
+    Bowling/fielding orientation (the bowler's team is the side NOT
+    batting in innings i), so it differs from `_batting_live_where`:
+
+      - innings  → `_option_b_team_inning(None, "bowling", aux)` flips to
+        `i.innings_number = (1 - aux.inning)`.
+      - toss/result → `_cohort_outcome_clause("bowling", aux)` keys the
+        outcome on the OTHER match team (the bowling side), not i.team.
+      - filter_team=X (bowler's team) → `i.team != X AND X in match`.
+      - filter_opponent=X (bowled against X = X batting) → `i.team = X`.
+        build()'s native team/opponent clauses are batting orientation,
+        so they're dropped from build and re-added flipped here — the
+        cohort narrows on the same axis as the bowler's OWN value
+        (chip↔baseline symmetry). Spec: spec-player-baseline-aux-fallback.md
+        Phase 3d + plan-3d-bowling-live-cohort.md §2."""
+    where, params = filters.build(
+        has_innings_join=True, apply_inning=False, aux=aux,
+        drop={"filter_team", "filter_opponent"},
+    )
+    parts = ["i.super_over = 0"]
+    if where:
+        parts.append(where)
+    if filters.team:
+        parts.append(
+            "(i.team != :bowl_team AND (m.team1 = :bowl_team OR m.team2 = :bowl_team))"
+        )
+        params["bowl_team"] = filters.team
+    if filters.opponent:
+        parts.append("i.team = :bowl_opp")
+        params["bowl_opp"] = filters.opponent
+    inn_clause, inn_params = _option_b_team_inning(None, "bowling", aux)
+    if inn_clause:
+        parts.append(inn_clause)
+        params.update(inn_params)
+    coh_clause, coh_params = _cohort_outcome_clause("bowling", aux)
+    if coh_clause:
+        parts.append(coh_clause)
+        params.update(coh_params)
+    return " AND ".join(parts), params
+
+
+# Bowler valid-wicket exclusions — MUST match
+# scripts/populate_playerscopestats_over.py BOWLER_WICKET_EXCLUDED (4
+# kinds; NOT the team-side live path's 5-kind set which also drops
+# 'retired not out'). Parity with the precomputed over table depends on
+# this exact set.
+_BOWLING_WICKET_EXCLUDED_SQL = (
+    "('run out', 'retired hurt', 'retired out', 'obstructing the field')"
+)
+
+
+async def _bowling_over_cohort_live(
+    db, filters: FilterParams, aux: AuxParams,
+):
+    """Live per-over bowling cohort aggregation under the six filters
+    (Phase 3d, by-phase column subset).
+
+    Reproduces, for the filtered pool, the simple-sum + maiden columns of
+    `playerscopestatsover` at the over-bucket grain (1..20). Conventions
+    match `scripts/populate_playerscopestats_over.py` exactly:
+      runs_conceded = SUM(runs_total) over ALL deliveries;
+      legal = wides=0 AND noballs=0; dot = runs_batter=0 AND runs_total=0;
+      boundary = runs_batter IN (4,6); valid wicket = kind NOT IN the
+      4-kind excluded set; maiden = a (innings, over, bowler) with 6
+      legal balls and 0 runs_total; over bucket = over_number + 1.
+
+    Returns cohort_rows[] keyed like the precomputed cohort read so the
+    downstream by_over builder is identical. (by-season / summary add the
+    per-spell columns in 3d-2 / 3d-3.)"""
+    where_full, params = _bowling_live_where(filters, aux)
+    joins = """
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match   m ON m.id = i.match_id
+    """
+    base = f"{joins} WHERE {where_full} AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19"
+    deliv_sql = f"""
+        SELECT (d.over_number + 1) AS over_number,
+               SUM(d.runs_total)                                              AS runs_conceded,
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
+               SUM(CASE WHEN d.runs_batter = 0 AND d.runs_total = 0 THEN 1 ELSE 0 END)      AS dots,
+               SUM(CASE WHEN d.runs_batter IN (4, 6) THEN 1 ELSE 0 END)       AS boundaries,
+               COUNT(DISTINCT d.bowler_id)                                    AS n_players
+        {base}
+        GROUP BY d.over_number
+        ORDER BY d.over_number
+    """
+    wkt_sql = f"""
+        SELECT (d.over_number + 1) AS over_number, COUNT(*) AS wickets
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match   m ON m.id = i.match_id
+        WHERE {where_full}
+          AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19
+          AND w.kind NOT IN {_BOWLING_WICKET_EXCLUDED_SQL}
+        GROUP BY d.over_number
+    """
+    maiden_sql = f"""
+        SELECT (over_number + 1) AS over_number, COUNT(*) AS maidens
+        FROM (
+            SELECT d.innings_id, d.over_number, d.bowler_id
+            {base}
+            GROUP BY d.innings_id, d.over_number, d.bowler_id
+            HAVING SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) = 6
+               AND SUM(d.runs_total) = 0
+        )
+        GROUP BY over_number
+    """
+    deliv_rows, wkt_rows, maiden_rows = await asyncio.gather(
+        db.q(deliv_sql, params),
+        db.q(wkt_sql, params),
+        db.q(maiden_sql, params),
+    )
+    by_over: dict[int, dict] = {}
+    for r in deliv_rows:
+        by_over[r["over_number"]] = {
+            "over_number": r["over_number"],
+            "runs_conceded": r["runs_conceded"] or 0,
+            "legal_balls": r["legal_balls"] or 0,
+            "dots": r["dots"] or 0,
+            "boundaries": r["boundaries"] or 0,
+            "n_players": r["n_players"] or 0,
+            "wickets": 0,
+            "maidens": 0,
+        }
+    for r in wkt_rows:
+        if r["over_number"] in by_over:
+            by_over[r["over_number"]]["wickets"] = r["wickets"] or 0
+    for r in maiden_rows:
+        if r["over_number"] in by_over:
+            by_over[r["over_number"]]["maidens"] = r["maidens"] or 0
+    return [by_over[o] for o in sorted(by_over)]
+
+
+async def _bowling_player_over_mix_live(
+    db, person_id: str, filters: FilterParams, aux: AuxParams,
+):
+    """The bowler's own per-over legal-ball counts at the narrowed scope —
+    the over-mix weights for the live by-phase / by-season convex-combine.
+    Same WHERE as the cohort so the mix matches the narrowed pool."""
+    where_full, params = _bowling_live_where(filters, aux)
+    sql = f"""
+        SELECT (d.over_number + 1) AS over_number,
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match   m ON m.id = i.match_id
+        WHERE {where_full}
+          AND d.bowler_id = :__pid AND d.over_number BETWEEN 0 AND 19
+        GROUP BY d.over_number
+        ORDER BY d.over_number
+    """
+    return await db.q(sql, {**params, "__pid": person_id})
+
+
 async def compute_players_bowling_cohort(
     db,
     filters: FilterParams,
@@ -3889,23 +4048,13 @@ PHASE_OVERS = {
 }
 
 
-async def compute_players_bowling_by_phase(
-    db,
-    person_id: str,
-    filters: FilterParams,
-    aux: AuxParams,
-    drop_set: Optional[set[str]] = None,
-) -> dict:
-    """Per-phase bowling cohort baseline with phase-specific over-mix.
-
-    Derives from playerscopestatsover — for each phase, the cohort
-    rates are convex-combined across the overs in that phase, weighted
-    by the player's renormalized over distribution within that phase.
-
-    Spec: spec-player-baseline-parity.md §3.2.
-    """
+async def _by_phase_bowling_precomputed(
+    db, person_id: str, filters: FilterParams, drop_set: Optional[set[str]],
+):
+    """Fast path: per-over player-mix + cohort reads off the precomputed
+    `playerscopestatsover` table by scope_key (none-of-six). Returns the
+    `(player_rows, cohort_rows)` pair the by-phase builder consumes."""
     where, params = build_scope_clauses(filters, drop=drop_set)
-
     player_sql = f"""
         SELECT psso.over_number, psso.legal_balls
         FROM playerscopestatsover psso
@@ -3931,10 +4080,41 @@ async def compute_players_bowling_by_phase(
         ORDER BY psso.over_number
     """
     p_params = {**params, "__pid": person_id}
-    player_rows, cohort_rows = await asyncio.gather(
+    return await asyncio.gather(
         db.q(player_sql, p_params),
         db.q(cohort_sql, params),
     )
+
+
+async def compute_players_bowling_by_phase(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-phase bowling cohort baseline with phase-specific over-mix.
+
+    Derives from playerscopestatsover — for each phase, the cohort
+    rates are convex-combined across the overs in that phase, weighted
+    by the player's renormalized over distribution within that phase.
+
+    Dispatches on `is_precomputed_scope` (Phase 3d): none of the six set
+    → precomputed per-over read; any set → live per-over aggregation over
+    `delivery` (bowling orientation) so the per-phase cohort narrows.
+
+    Spec: spec-player-baseline-parity.md §3.2 + Phase 3d of
+    spec-player-baseline-aux-fallback.md.
+    """
+    if is_precomputed_scope(filters, aux):
+        player_rows, cohort_rows = await _by_phase_bowling_precomputed(
+            db, person_id, filters, drop_set,
+        )
+    else:
+        player_rows, cohort_rows = await asyncio.gather(
+            _bowling_player_over_mix_live(db, person_id, filters, aux),
+            _bowling_over_cohort_live(db, filters, aux),
+        )
 
     cohort_by_over = {r["over_number"]: r for r in cohort_rows}
     player_balls_by_over = {r["over_number"]: r["legal_balls"] for r in player_rows}

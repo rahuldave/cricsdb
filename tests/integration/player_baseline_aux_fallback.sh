@@ -358,6 +358,125 @@ else
   bad "by-phase live SR=$BP_I_SR != SQL-anchored $BP_EXPECTED"
 fi
 
+# ── §7 bowling by-phase cohort narrows under the six (Phase 3d-1) ──
+# /scope/averages/players/bowling/by-phase read the precomputed per-over
+# table (playerscopestatsover) until 3d — frozen under the six. After
+# 3d-1 it dispatches to a live per-over aggregation over `delivery`
+# (bowling orientation: inning flips to 1-N, toss/result key on the
+# bowling side, filter_opponent=X → X batting). Anchor: J Bumrah IPL
+# 2014-2018. Bowling econ is convex-combined over the bowler's per-over
+# legal-ball mix within each phase.
+echo
+echo "=== bowling by-phase cohort narrows (3d) ==="
+BUMRAH="462411b3"
+BOWL_SCOPE="person_id=$BUMRAH&gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2014&season_to=2018"
+
+bowl_phase() {  # $1=filter  $2=phase name  → "econ n_balls below"
+  curl -s "$API/api/v1/scope/averages/players/bowling/by-phase?$BOWL_SCOPE&$1" \
+    | python3 -c "
+import sys, json
+d = json.load(sys.stdin); name='$2'
+for r in d['by_phase']:
+    if r['phase']==name:
+        print(r.get('economy'), r.get('n_balls_in_phase'), r.get('below_support')); break
+else:
+    print('None None None')
+"
+}
+
+read -r BW_U_E BW_U_N _ < <(bowl_phase "" powerplay)
+read -r BW_I_E BW_I_N BW_I_BELOW < <(bowl_phase "inning=0" powerplay)
+echo "  powerplay unfiltered: econ=$BW_U_E n_balls=$BW_U_N"
+echo "  powerplay inning=0:   econ=$BW_I_E n_balls=$BW_I_N below=$BW_I_BELOW"
+if [[ -z "$BW_I_N" || "$BW_I_N" == "None" ]]; then
+  bad "bowling by-phase inning=0: n_balls null"
+elif [[ "$BW_I_N" != "$BW_U_N" ]]; then
+  ok "bowling by-phase cohort narrowed (n_balls $BW_U_N -> $BW_I_N; econ $BW_U_E -> $BW_I_E)"
+else
+  bad "bowling by-phase cohort FROZEN (n_balls=$BW_I_N == $BW_U_N) -- 3d not wired"
+fi
+
+# SQL anchor: live powerplay econ @ inning=0 == direct delivery aggregation
+# at innings_number=1 (the bowling inning-flip of inning=0), convex-
+# combined by Bumrah's narrowed per-over mix within the powerplay.
+BW_EXPECTED=$(python3 <<'PY'
+import sqlite3, json, urllib.request
+DB="cricket.db"; API="http://localhost:8000"
+BASE="person_id=462411b3&gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2014&season_to=2018&inning=0"
+d=json.load(urllib.request.urlopen(f"{API}/api/v1/scope/averages/players/bowling/by-phase?{BASE}"))
+pp=[r for r in d['by_phase'] if r['phase']=='powerplay']
+if not pp: print("None"); raise SystemExit
+mix=pp[0]['mix']; overs=pp[0]['overs']
+conn=sqlite3.connect(DB)
+rows=conn.execute("""
+ SELECT d.over_number+1 ob, SUM(d.runs_total) runs,
+   SUM(CASE WHEN d.extras_wides=0 AND d.extras_noballs=0 THEN 1 ELSE 0 END) legal
+ FROM delivery d JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id
+ WHERE i.super_over=0 AND m.gender='male' AND m.team_type='club'
+   AND m.event_name='Indian Premier League' AND m.season IN ('2014','2015','2016','2017','2018')
+   AND i.innings_number=1 AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 5
+ GROUP BY d.over_number""").fetchall()
+econ={ob:(runs*6/legal if legal else None) for ob,runs,legal in rows}
+tot=0.0; tm=0.0
+for i,o in enumerate(overs):
+    w=mix[i]
+    if w==0: continue
+    v=econ.get(o)
+    if v is None: continue
+    tm+=w; tot+=w*v
+print(round(tot/tm,2) if tm else "None")
+PY
+)
+echo "  SQL-anchored powerplay inning=0 econ: $BW_EXPECTED  (API: $BW_I_E)"
+if [[ "$BW_I_E" == "None" || "$BW_EXPECTED" == "None" ]]; then
+  bad "bowling by-phase SQL anchor inconclusive (API $BW_I_E, expected $BW_EXPECTED)"
+elif python3 -c "import sys; sys.exit(0 if abs(float('$BW_I_E')-float('$BW_EXPECTED'))<=0.05 else 1)"; then
+  ok "bowling by-phase live econ == SQL-anchored ($BW_I_E ~ $BW_EXPECTED)"
+else
+  bad "bowling by-phase live econ=$BW_I_E != SQL-anchored $BW_EXPECTED"
+fi
+
+# Opponent-flip orientation: filter_opponent=X means the bowler bowled
+# AGAINST X (X batting → i.team = X), the mirror of batting. Anchor the
+# powerplay econ against i.team='Chennai Super Kings'.
+BW_OPP_API=$(bowl_phase "filter_opponent=Chennai+Super+Kings" powerplay | awk '{print $1}')
+BW_OPP_EXPECTED=$(python3 <<'PY'
+import sqlite3, json, urllib.request
+DB="cricket.db"; API="http://localhost:8000"
+BASE="person_id=462411b3&gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2014&season_to=2018&filter_opponent=Chennai+Super+Kings"
+d=json.load(urllib.request.urlopen(f"{API}/api/v1/scope/averages/players/bowling/by-phase?{BASE}"))
+pp=[r for r in d['by_phase'] if r['phase']=='powerplay']
+if not pp: print("None"); raise SystemExit
+mix=pp[0]['mix']; overs=pp[0]['overs']
+conn=sqlite3.connect(DB)
+rows=conn.execute("""
+ SELECT d.over_number+1 ob, SUM(d.runs_total) runs,
+   SUM(CASE WHEN d.extras_wides=0 AND d.extras_noballs=0 THEN 1 ELSE 0 END) legal
+ FROM delivery d JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id
+ WHERE i.super_over=0 AND m.gender='male' AND m.team_type='club'
+   AND m.event_name='Indian Premier League' AND m.season IN ('2014','2015','2016','2017','2018')
+   AND i.team='Chennai Super Kings' AND d.bowler_id IS NOT NULL AND d.over_number BETWEEN 0 AND 5
+ GROUP BY d.over_number""").fetchall()
+econ={ob:(runs*6/legal if legal else None) for ob,runs,legal in rows}
+tot=0.0; tm=0.0
+for i,o in enumerate(overs):
+    w=mix[i]
+    if w==0: continue
+    v=econ.get(o)
+    if v is None: continue
+    tm+=w; tot+=w*v
+print(round(tot/tm,2) if tm else "None")
+PY
+)
+echo "  filter_opponent=CSK powerplay econ: API=$BW_OPP_API  SQL(i.team=CSK)=$BW_OPP_EXPECTED"
+if [[ "$BW_OPP_API" == "None" || "$BW_OPP_EXPECTED" == "None" ]]; then
+  bad "bowling opponent-flip anchor inconclusive (API $BW_OPP_API, expected $BW_OPP_EXPECTED)"
+elif python3 -c "import sys; sys.exit(0 if abs(float('$BW_OPP_API')-float('$BW_OPP_EXPECTED'))<=0.05 else 1)"; then
+  ok "bowling filter_opponent flips correctly (against X = X batting; $BW_OPP_API ~ $BW_OPP_EXPECTED)"
+else
+  bad "bowling filter_opponent orientation wrong (API $BW_OPP_API != i.team=CSK $BW_OPP_EXPECTED)"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"
