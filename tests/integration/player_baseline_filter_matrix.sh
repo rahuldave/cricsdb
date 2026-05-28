@@ -28,17 +28,18 @@ ab()      { agent-browser "$@" >/dev/null 2>&1; }
 ok()  { PASS=$((PASS+1)); echo "  PASS: $1"; }
 bad() { FAIL=$((FAIL+1)); FAILS="$FAILS\n  - $1"; echo "  FAIL: $1"; }
 
-# Pull the chart-frame state JSON (canvas counts + legend texts).
+# Pull the chart-frame state JSON. Probes the stable LineChart
+# data-attrs (data-test-line-has-reference) rather than grepping the
+# Semiotic legend's display text, so a copy edit to the legend label
+# (e.g. "base" → "cohort") can't break the matrix.
 probe_chart() {
   agent-browser eval --json "(() => {
     const frames = Array.from(document.querySelectorAll('.stream-xy-frame'));
+    const lines = Array.from(document.querySelectorAll('[data-test-line]'));
     return {
       n_frames: frames.length,
       canvas_total: frames.reduce((a, f) => a + f.querySelectorAll('canvas').length, 0),
-      legends_have_base: frames.every(f =>
-        Array.from(f.querySelectorAll('g.legend-item text'))
-          .some(t => t.textContent && t.textContent.trim() === 'base')
-      ),
+      lines_with_ref: lines.filter(e => e.getAttribute('data-test-line-has-reference') === 'yes').length,
     };
   })()" 2>/dev/null > /tmp/chart_probe.json
 }
@@ -77,7 +78,7 @@ print('yes' if len(d.get('by_season', [])) == 0 else 'no')
     has_chart=$(python3 -c "
 import json
 d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-ok = d['n_frames'] >= 1 and d['canvas_total'] >= 2 and d['legends_have_base']
+ok = d['n_frames'] >= 1 and d['canvas_total'] >= 2 and d['lines_with_ref'] >= 1
 print('yes' if ok else 'no')
 ")
     if [ "$has_chart" = "yes" ]; then
@@ -203,7 +204,7 @@ click_wankhede_then_assert() {
   has_chart=$(python3 -c "
 import json
 d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-ok = d['n_frames'] >= 1 and d['canvas_total'] >= 2 and d['legends_have_base']
+ok = d['n_frames'] >= 1 and d['canvas_total'] >= 2 and d['lines_with_ref'] >= 1
 print('yes' if ok else 'no')
 ")
   if [ "$has_chart" = "yes" ]; then

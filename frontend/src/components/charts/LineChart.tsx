@@ -119,9 +119,20 @@ export default function LineChart<T extends Record<string, any>>({
     xMax = Math.max(...data.map(getX))
   }
 
+  // Stable test attributes so integration tests can find the chart
+  // by structural id instead of grepping legend text (which changes
+  // with copy edits — e.g. the "base" → "cohort" rename).
+  const dataAttrs: Record<string, string> = { 'data-test-line': 'line-chart' }
+  if (hasReference) {
+    dataAttrs['data-test-line-has-reference'] = 'yes'
+    dataAttrs['data-test-line-primary-label'] = primaryLabel
+    dataAttrs['data-test-line-reference-label'] = effectiveReferenceLabel
+  }
+
   return (
     <ChartContainer
       outerRef={ref}
+      dataAttrs={dataAttrs}
       header={<ChartHeader title={title} subtitle={effectiveSubtitle} />}
     >
       {effectiveWidth > 0 && (

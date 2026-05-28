@@ -106,10 +106,23 @@ SCOPE_URL='gender=male&team_type=club&tournament=Indian%20Premier%20League'
 ab open "$BASE/batting?player=$KOHLI&$SCOPE_URL&tab=By%20Season"
 sleep 3
 
-# Test 1 — Legend names both series (primary = player name, ref = base).
+# Test 1 — Chart wires a cohort reference series. We probe LineChart's
+# stable data-attrs (data-test-line-has-reference / -primary-label /
+# -reference-label) instead of grepping Semiotic legend text, so a copy
+# edit to the legend label can't break the test. The text-rendered
+# legend is also checked, but only to confirm the player name shows.
 legend=$(chart_legend_texts)
 assert_contains "/batting By Season: legend names player as primary" "V Kohli" "$legend"
-assert_contains "/batting By Season: legend names cohort as 'base'" "base" "$legend"
+ref_count=$(ab_eval "document.querySelectorAll('[data-test-line-has-reference]').length")
+[ "$ref_count" -ge 1 ] \
+  && ok "/batting By Season: ≥1 LineChart wired with cohort reference (=$ref_count)" \
+  || bad "/batting By Season: NO LineChart wired with cohort reference"
+primary_label=$(ab_eval "document.querySelector('[data-test-line-primary-label]')?.getAttribute('data-test-line-primary-label') || ''")
+ref_label=$(ab_eval "document.querySelector('[data-test-line-reference-label]')?.getAttribute('data-test-line-reference-label') || ''")
+assert_contains "/batting By Season: primary label is player name" "V Kohli" "$(unq "$primary_label")"
+[ -n "$(unq "$ref_label")" ] && [ "$(unq "$ref_label")" != "" ] \
+  && ok "/batting By Season: cohort reference label non-empty (=$(unq "$ref_label"))" \
+  || bad "/batting By Season: cohort reference label empty"
 
 # Test 2 — Chart contains "Runs by Season" and "Strike Rate by Season"
 # titles (the swap from BarChart → LineChart preserves the titles).
@@ -163,25 +176,20 @@ titles2=$(ab_eval "
 ")
 assert_contains "/batting By Season: 'Runs/Inn by Season' chart title present (C2)" "Runs/Inn by Season" "$titles2"
 # spec-rate-vs-volume-audit C1: Runs by Season is a volume chart →
-# overlay dropped. SR by Season is a rate → overlay kept. Test now
-# asserts asymmetric series counts: SR chart has both series, Runs
-# chart has player only.
-sr_has_both=$(python3 -c "
-import json
-d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-# At least one frame (SR chart) must carry both series.
-ok = any('V Kohli' in lbls and 'base' in lbls for lbls in d['legend_texts'])
-print('yes' if ok else 'no')
-")
-assert_eq "/batting By Season: SR chart legend names both series" "yes" "$sr_has_both"
-runs_no_base=$(python3 -c "
-import json
-d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-# At least one frame (Runs chart) must NOT carry 'base'.
-ok = any('base' not in lbls for lbls in d['legend_texts'])
-print('yes' if ok else 'no')
-")
-assert_eq "/batting By Season: Runs chart legend MUST NOT carry 'base' (C1 volume-chart rule)" "yes" "$runs_no_base"
+# overlay dropped. SR + Runs/Inn are rates → overlay kept. Probe via
+# the stable data attributes: count of LineCharts with vs without
+# cohort reference must be asymmetric (2 with, 1 without).
+agent-browser eval --json "(() => {
+  const all = Array.from(document.querySelectorAll('[data-test-line]'));
+  return {
+    total: all.length,
+    with_ref: all.filter(e => e.getAttribute('data-test-line-has-reference') === 'yes').length,
+  };
+})()" > /tmp/line_probe.json 2>/dev/null
+total_lc=$(python3 -c "import json;print(json.load(open('/tmp/line_probe.json'))['data']['result']['total'])")
+with_ref=$(python3 -c "import json;print(json.load(open('/tmp/line_probe.json'))['data']['result']['with_ref'])")
+assert_eq "/batting By Season: 3 LineCharts total (Runs + Runs/Inn + SR)" "3" "$total_lc"
+assert_eq "/batting By Season: 2 LineCharts wired with cohort ref (Runs/Inn + SR; Runs volume → no ref)" "2" "$with_ref"
 
 # Test 4 — Cohort baseline shifts on a scope_key axis (season window).
 # Kohli SR cohort at IPL 2016 vs IPL 2018 must differ — both seasons
@@ -207,7 +215,14 @@ sleep 3
 
 legend=$(chart_legend_texts)
 assert_contains "/bowling By Season: legend names player as primary" "JJ Bumrah" "$legend"
-assert_contains "/bowling By Season: legend names cohort as 'base'" "base" "$legend"
+ref_count=$(ab_eval "document.querySelectorAll('[data-test-line-has-reference]').length")
+[ "$ref_count" -ge 1 ] \
+  && ok "/bowling By Season: ≥1 LineChart wired with cohort reference (=$ref_count)" \
+  || bad "/bowling By Season: NO LineChart wired with cohort reference"
+ref_label=$(ab_eval "document.querySelector('[data-test-line-reference-label]')?.getAttribute('data-test-line-reference-label') || ''")
+[ -n "$(unq "$ref_label")" ] && [ "$(unq "$ref_label")" != "" ] \
+  && ok "/bowling By Season: cohort reference label non-empty (=$(unq "$ref_label"))" \
+  || bad "/bowling By Season: cohort reference label empty"
 
 titles=$(ab_eval "
   Array.from(document.querySelectorAll('h2,h3,h4'))
@@ -248,21 +263,20 @@ titles2=$(ab_eval "
 ")
 assert_contains "/bowling By Season: 'Wkts/Inn by Season' chart title present (C2)" "Wkts/Inn by Season" "$titles2"
 assert_contains "/bowling By Season: 'Economy by Season' chart title present (C2)" "Economy by Season" "$titles2"
-# C1: Wickets by Season volume → overlay dropped. SR rate → kept.
-sr_has_both=$(python3 -c "
-import json
-d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-ok = any('JJ Bumrah' in lbls and 'base' in lbls for lbls in d['legend_texts'])
-print('yes' if ok else 'no')
-")
-assert_eq "/bowling By Season: SR chart legend names both series" "yes" "$sr_has_both"
-wkts_no_base=$(python3 -c "
-import json
-d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-ok = any('base' not in lbls for lbls in d['legend_texts'])
-print('yes' if ok else 'no')
-")
-assert_eq "/bowling By Season: Wickets chart legend MUST NOT carry 'base' (C1)" "yes" "$wkts_no_base"
+# C1: Wickets is volume → overlay dropped. SR + Wkts/Inn + Econ are
+# rates → overlay kept. 4 LineCharts total, 3 with reference. Probe
+# via stable data attributes.
+agent-browser eval --json "(() => {
+  const all = Array.from(document.querySelectorAll('[data-test-line]'));
+  return {
+    total: all.length,
+    with_ref: all.filter(e => e.getAttribute('data-test-line-has-reference') === 'yes').length,
+  };
+})()" > /tmp/line_probe.json 2>/dev/null
+total_lc=$(python3 -c "import json;print(json.load(open('/tmp/line_probe.json'))['data']['result']['total'])")
+with_ref=$(python3 -c "import json;print(json.load(open('/tmp/line_probe.json'))['data']['result']['with_ref'])")
+assert_eq "/bowling By Season: 4 LineCharts total (Wickets + Wkts/Inn + SR + Econ)" "4" "$total_lc"
+assert_eq "/bowling By Season: 3 LineCharts wired with cohort ref (Wkts/Inn + SR + Econ; Wickets volume → no ref)" "3" "$with_ref"
 
 # Cohort shifts on season-window narrowing — same axis as batting.
 sr_2018=$(cohort_metric_at_season "$cohort_url&season_from=2018&season_to=2018" "strike_rate" "2018")
@@ -327,24 +341,19 @@ titles2=$(ab_eval "
     .join('|')
 ")
 assert_contains "/fielding By Season: 'Dis/Match by Season' chart title present (C2)" "Dis/Match by Season" "$titles2"
-# C1: Dismissals (volume) MUST NOT carry 'base'.
-# C2: Dis/Match (rate) MUST carry 'base'.
-dis_no_base=$(python3 -c "
-import json
-d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-# At least one frame (Dismissals) has no 'base'.
-ok = any('base' not in lbls for lbls in d['legend_texts'])
-print('yes' if ok else 'no')
-")
-assert_eq "/fielding By Season: Dismissals chart legend MUST NOT carry 'base' (C1)" "yes" "$dis_no_base"
-dpm_has_base=$(python3 -c "
-import json
-d = json.load(open('/tmp/chart_probe.json'))['data']['result']
-# At least one frame (Dis/Match) has both player and 'base'.
-ok = any('V Kohli' in lbls and 'base' in lbls for lbls in d['legend_texts'])
-print('yes' if ok else 'no')
-")
-assert_eq "/fielding By Season: Dis/Match chart legend names both series (C2)" "yes" "$dpm_has_base"
+# C1: Dismissals (volume) → no overlay. C2: Dis/Match (rate) → overlay.
+# 2 LineCharts total, 1 with reference. Probe via stable data attributes.
+agent-browser eval --json "(() => {
+  const all = Array.from(document.querySelectorAll('[data-test-line]'));
+  return {
+    total: all.length,
+    with_ref: all.filter(e => e.getAttribute('data-test-line-has-reference') === 'yes').length,
+  };
+})()" > /tmp/line_probe.json 2>/dev/null
+total_lc=$(python3 -c "import json;print(json.load(open('/tmp/line_probe.json'))['data']['result']['total'])")
+with_ref=$(python3 -c "import json;print(json.load(open('/tmp/line_probe.json'))['data']['result']['with_ref'])")
+assert_eq "/fielding By Season: 2 LineCharts total (Dismissals + Dis/Match)" "2" "$total_lc"
+assert_eq "/fielding By Season: 1 LineChart wired with cohort ref (Dis/Match; Dismissals volume → no ref)" "1" "$with_ref"
 
 # F4 dropped chips on volume tiles (Catches, Run Outs); their per-
 # match rate siblings (Catches/Match, Run-outs/Match) carry the

@@ -68,6 +68,11 @@ interface ChartContainerProps {
    *  width matches the outer block's width.
    */
   outerRef?: React.RefObject<HTMLDivElement | null>
+  /** Stable test attributes forwarded onto the outer block. Lets
+   *  integration tests find a chart by structural id (e.g.
+   *  `data-test-line-has-reference="yes"`) instead of grepping the
+   *  legend's display text — which changes with copy edits. */
+  dataAttrs?: Record<string, string>
   /** Chart content — typically an <svg> followed by zero or more
    *  absolutely-positioned overlay divs. The overlays' `top` /
    *  `bottom` / `left` / `right` measure from THIS block's edges.
@@ -80,10 +85,11 @@ export default function ChartContainer({
   className = 'w-full',
   style,
   outerRef,
+  dataAttrs,
   children,
 }: ChartContainerProps) {
   return (
-    <div ref={outerRef} className={className} style={style}>
+    <div ref={outerRef} className={className} style={style} {...(dataAttrs ?? {})}>
       {header}
       <div style={{ position: 'relative' }}>
         {children}
