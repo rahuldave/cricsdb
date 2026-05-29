@@ -236,17 +236,35 @@ The four canonical values in the schema are `'caught'`, `'stumped'`,
 must use the underscored form — `'run out'` / `'caught and bowled'`
 silently match zero rows.
 
-### Per-match rates
+### Per-match rates — divide by `matches_fielded`, not squad matches (denominator B)
 
 ```
-catches_per_match    = SUM(catches) ÷ matches_played
-stumpings_per_match  = SUM(stumpings) ÷ matches_played
-run_outs_per_match   = SUM(run_outs) ÷ matches_played
+catches_per_match    = SUM(catches)    ÷ matches_fielded
+stumpings_per_match  = SUM(stumpings)  ÷ matches_fielded
+run_outs_per_match   = SUM(run_outs)   ÷ matches_fielded
+dismissals_per_match = SUM(dismissals) ÷ matches_fielded
 ```
 
-For the avg col, `matches_played` is the per-team match count
-(see "Per-team" transform above), so the rate is comparable
-team-to-team.
+`matches_fielded` = the count of matches where the fielder was in the XI
+**AND the opponent batted at least one regular innings** — i.e. the player
+actually took the field. It is NOT the squad `matches_played` count (which
+still drives the page-header "matches played" display and the per-team
+match count). Computed in `api/routers/fielding.py` (`matches_fielded` via
+`COUNT(DISTINCT match_id)` gated on an `EXISTS` over a non-super-over innings
+by the opponent); precomputed as `playerscopestats.matches_fielded`
+(`scripts/populate_player_scope_stats.py`).
+
+**Why a separate denominator (the "activity unit" rule).** A per-match rate
+should divide by the matches the fielder had a *chance* to act in, mirroring
+batting (`÷ innings_batted` — innings actually faced) and bowling
+(`÷ innings_bowled` — innings actually bowled). Fielding was the only
+discipline still dividing by squad matches; denominator B (2026-05-28) made
+it consistent. The difference is tiny on real data (e.g. Kohli IPL = 279
+fielded of 280 squad — they differ only on abandoned / no-opponent-innings
+matches) but the framing is now uniform. The per-match cohort baselines and
+the distribution catch-count ProbChips divide by the same
+`SUM(matches_fielded)` so chip ↔ cohort stay dimensionally matched
+(`api/routers/fielding.py` cohort path).
 
 ### Substitute fielders — INCLUDED in /leaders, EXCLUDED in /distribution (intentional asymmetry)
 
@@ -418,6 +436,37 @@ has no identity).
 ---
 
 ## Scope conventions
+
+### Cohort baselines narrow live under the six filters
+
+Every player "vs cohort" / "typical player" comparison (the grey/green chips,
+the green chart reference lines, the green sparkline line, the per-bucket
+cohort bars) is a pool-weighted average over all players in the scope. By
+default — gender / team_type / tournament / season / series_type — it is read
+from precomputed tables (`playerscopestats*`) for speed. When **any of the
+six** filters is set — venue, opponent, team, **inning, toss, result** — the
+cohort is **recomputed live** so the comparison narrows to the same subset the
+player's own number narrowed to.
+
+The dispatch is `is_precomputed_scope(filters, aux)` in
+`api/routers/bucket_baseline_dispatch.py`: none-of-six → precomputed read;
+any-of-six → live aggregation (`compute_players_{batting,bowling,fielding}_cohort`
++ `_by_season` / `_by_phase` in `api/routers/scope_averages.py`), which
+reproduces the precomputed value byte-identically at none-of-six. Bowling and
+fielding flip the inning per Option B (the team fields in the innings it did
+not bat); toss/result key on the relevant side.
+
+**Exception — the position/over MIX stays coarse.** On the By Position
+(batting) and By Over (bowling) tabs the *weighting* histogram (what fraction
+of the player's innings/balls fall in each bucket) stays at tournament/season
+grain — it does NOT narrow by the six. Only the per-bucket cohort *values*
+(typical opener SR, typical death-over economy) narrow. Rationale: at deep
+narrowings there isn't enough data for a stable per-bucket mix; a coarse role
+profile is the right weighting (thin per-bucket cohorts blank out via the
+support cliff rather than show a wrong number). Fielding is keeper-binary with
+no mix, so its By Dismissed Position / By Over tabs narrow fully. Full design:
+`spec-tier3-cohort-narrowing.md`; surface-by-surface map +
+`narrowing-audit-coverage.md`.
 
 ### Legal balls vs all deliveries
 

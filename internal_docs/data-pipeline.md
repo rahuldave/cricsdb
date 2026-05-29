@@ -155,18 +155,41 @@ ALTER TABLE ADD COLUMN blocks in the populate scripts migrate
 pre-existing DBs; new DBs created by `db.create` have the columns
 from the start.
 
+10. `playerscopestatsfieldingcatchdist` (one per (person, scope_key) —
+    match-grain catch distribution: `matches_with_0 / _1 / _ge2`) via
+    `scripts/populate_playerscopestats_fielding_catch_dist.py:populate_full()`.
+    Backs the fielding catch-count ProbChip cohort baselines. Its master
+    sample = FIELDED matches (changed from squad by 3e). Sanity:
+    `tests/sanity/test_playerscopestats_fielding_catch_dist.py` (where present).
+
+**Parent column `matches_fielded` (denominator B, 2026-05-28).**
+`playerscopestats` gained `matches_fielded` = distinct matches where the
+player was in the XI AND the opponent batted (actually fielded). It is the
+denominator for every fielding per-match rate (catches/match etc.) and the
+catch-distribution master sample, replacing squad `matches` — the activity-unit
+convention (consistent with batting `innings_batted` / bowling `innings_bowled`).
+Populated in `scripts/populate_player_scope_stats.py`. **Deploy note:** this is
+a new parent column + a changed catch-dist sample, so a deploy to an existing
+prod DB needs a full parent + catch-dist re-ingest (DROP+CREATE populate) or a
+rebuilt-cricket.db upload — an incremental update on a fresh DB fills it
+correctly (verified 2026-05-29 smoke test), but the column must exist first.
+
 ### Incremental updates
 
 `update_recent.py` pulls cricsheet's "recently added" bulk zip,
 filters to T20/IT20 (international + club), dedupes against
 `match.filename`, and imports only what's new. After importing, it
 automatically adds fielding credits, keeper assignments,
-partnerships, player_scope_stats AND the five playerscopestats
+partnerships, player_scope_stats AND the six playerscopestats
 child tables (`playerscopestats_position`, `playerscopestats_over`,
 `playerscopestats_fielding_position`, `playerscopestats_batting_phase`,
-`playerscopestats_fielding_phase`) for the new matches only (via
-`populate_incremental()` on each denormalized table) — no separate
-step needed. New ambiguous keeper innings get appended to today's
+`playerscopestats_fielding_phase`, `playerscopestatsfieldingcatchdist`)
+plus `records` aggregates and `bucket_baseline` cells for the new matches
+only (via `populate_incremental()` on each) — no separate step needed.
+The records aggregates run BEFORE the position child because the position
+child is now a rollup of `inningsbatterperf` (which the records step builds),
+so the per-innings table must be current first (`update_recent.py`
+sequencing). New ambiguous keeper innings get appended to today's
 partition CSV under `docs/keeper-ambiguous/`. All six
 playerscopestats-family incremental paths use the same touched-
 scope recompute strategy: identify scope_keys touched by the new

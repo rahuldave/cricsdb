@@ -28,7 +28,10 @@ api/
   routers/
     reference.py      — /api/v1/tournaments (FilterBar dropdown; canonicalized,
                          accepts team + opponent for rivalry-pair intersection),
-                         /seasons, /teams, /players
+                         /seasons, /teams, /players,
+                         /players/{id}/result-counts (per-player match counts by
+                         own-team result AND toss outcome — feeds the player-page
+                         ResultFilter + TossFilter pills; toss_won/toss_lost fields)
     teams.py          — /api/v1/teams/landing (two-column directory, filter-sensitive)
                          /api/v1/teams/splits (joint toss × inning × result
                          distribution; landing = league unpivot, ?team= = dual
@@ -180,7 +183,7 @@ scripts/populate_playerscopestats_position.py — Per-(person, scope_key, positi
 scripts/populate_playerscopestats_over.py — Per-(person, scope_key, over_number) bowling aggregates. 20 buckets, 1-indexed overs 1..20. Backs the over-mix cohort baseline + over-distribution histogram on /bowlers/{id}/summary.
 scripts/populate_playerscopestats_fielding_position.py — Per-(fielder, scope_key, dismissed-batter-position-bucket) fielding aggregates. Substitute catches EXCLUDED (distribution-side semantics). Convention 3 — catches include caught_and_bowled. Reuses api/innings_positions.derive_positions across the three child-table populates (one position-derivation per innings).
 
-api/routers/scope_averages.py        — 16 endpoints under /api/v1/scope/averages/*. 12 team-side mirrors of /teams/{team}/* with team=None (pool-weighted league baselines for the Teams > Compare tab). 4 player-side endpoints under /scope/averages/players/{batting,bowling,fielding,keeping}/summary — position/over-mix-weighted cohort baselines with strict-cliff sliding-scale gate (see internal_docs/spec-player-compare-average.md §6). Each player-side endpoint exposes both an HTTP wrapper AND an in-process helper `compute_players_<discipline>_cohort()` that the matching /batters|/bowlers|/fielders/{id}/summary handler calls during envelope composition — single round-trip.
+api/routers/scope_averages.py        — team-side mirrors of /teams/{team}/* with team=None (pool-weighted league baselines for the Teams > Compare tab) PLUS 11 player-side endpoints under /scope/averages/players/*: batting {summary, by-season, by-phase, by-over}, bowling {summary, by-season, by-phase}, fielding {summary, by-season, by-phase}, keeping {summary} — position/over-mix-weighted cohort baselines with strict-cliff sliding-scale gate (spec-player-compare-average.md §6). Each exposes both an HTTP wrapper AND an in-process helper (`compute_players_<discipline>_cohort()` / `_by_season` / `_by_phase`) the matching /batters|/bowlers|/fielders/{id} handler calls — single round-trip. **Cohort narrows live under the six off-key filters** (venue/opponent/team/inning/toss/result): each helper dispatches on `is_precomputed_scope()` (api/routers/bucket_baseline_dispatch.py) — precomputed `playerscopestats*` read at none-of-six, else live aggregation via `_{batting,bowling,fielding}_live_where`. The position/over MIX histogram stays coarse (Tier 2). See spec-player-baseline-aux-fallback.md + spec-tier3-cohort-narrowing.md.
 api/scope_averages_players.py        — Shared helpers for the 4 player-side cohort endpoints: sliding-scale thresholds (batting 25→7, bowling U-shape 60-50-30-50-60, fielding 12→3); mix-vector parsing/validation; scope-clause builder honouring tournament/season/gender/team_type/series_type/team_class against playerscopestats columns; convex-combination evaluator. Spec §5 + §6.
 api/innings_positions.py             — Single source of position derivation. derive_positions(deliveries) → {person_id: position 1..11} computed by delivery order. Shared by populate_player_scope_stats, populate_playerscopestats_position, populate_playerscopestats_fielding_position. Computing once per innings and sharing across the three child-table populates is the contract.
 ```

@@ -416,6 +416,57 @@ on 2026-04-19. They cover work that doesn't slot into a single A–Q
 letter (cross-cutting refactors, audit walks, infra fixes, follow-up
 batches) and serves as the "what shipped on day X" history.
 
+### Shipped 2026-05-29 (narrowing audit + docs sweep; incremental-load fix)
+
+Post-arc verification + maintenance:
+- **Exhaustive narrowing audit (job 2 of the post-3e plan).** DOM-level
+  confirmation, surface by surface, that every player/team headline tile,
+  graph and sparkline narrows under the six filters — verdict PASS, no frozen
+  surface (the watch-item green sparkline cohort line narrows on all four
+  pages). New `internal_docs/narrowing-audit-coverage.md` (feature × API ×
+  test matrix) + `narrowing-audit-findings.md` (no open frozen surfaces) +
+  `tests/integration/sparkline_narrowing.sh` (the one coverage gap closed,
+  15/15) + fixed a stale denominator in `dismissed_position_chart.sh`
+  (squad → matches_fielded). 21 narrowing suites run green.
+- **Incremental load**: ingested 52 new cricsheet matches through 2026-05-26
+  (smoke-tested the 3e/3a schema columns fill on new matches); dropped the
+  unpublished 14-day cricsheet bundle from `update_recent.AVAILABLE_WINDOWS`.
+- **Docs sweep**: how-stats (matches_fielded denominator + live cohort
+  narrowing), design-decisions (cohort dispatch + denom-B + Tier-2 mix),
+  server-vs-client-calcs, data-pipeline (matches_fielded column + catch-dist
+  child + incremental order), codebase-tour (result-counts + 11 player scope
+  endpoints), audit-aux-params §A (player rows ✗→✓), user-help.
+
+### Shipped 2026-05-28/29 (player cohort narrows under the six — 3b/3c/3d/3e + denom-B + Tier-3 Phase B)
+
+`spec-player-baseline-aux-fallback.md` + `spec-tier3-cohort-narrowing.md`.
+The player "typical player" comparison (chips, chart cohort lines, sparkline
+line, per-bucket bars) now **narrows live** when any of venue / opponent /
+team / inning / toss / result is set, instead of staying frozen at the
+precomputed scope-key value — closing the `audit-aux-params.md` §E gap.
+- **3b/3c** batting, **3d** bowling, **3e** fielding cohort go live via
+  `compute_players_*_cohort` / `_by_season` / `_by_phase`, dispatching on
+  `is_precomputed_scope` (none-of-six → precomputed read; any → live agg,
+  byte-identical at none-of-six). Bowling/fielding flip the inning per Option B.
+- **Denominator B**: fielding per-match rates + catch-dist chips divide by the
+  new `playerscopestats.matches_fielded` (XI ∧ opponent batted), the activity
+  unit — consistent with batting `innings_batted` / bowling `innings_bowled`.
+- **Tier-3 Phase B**: the per-bucket By Position / By Over / By Dismissed
+  Position cohort bars + batting/fielding By Over lines narrow too; the
+  position/over MIX histogram stays coarse by design (Tier 2).
+Commits `00ef3d1..7a3e6a1`, pushed to origin/main, NOT deployed (deploy needs
+a parent + catch-dist re-ingest for `matches_fielded`).
+
+### Shipped 2026-05-26 (inning unify → Option B)
+
+`spec-inning-unify-option-b.md` (supersedes `spec-inning-split.md`).
+`inning=0` now means the subject's team **batted first** on EVERY
+page/tab/discipline — per-event and discipline-aware (batting →
+`innings_number=N`; bowling/fielding → `1-N`, the team fields in the innings
+it didn't bat). POV-aware pill labels via `useDiscipline()` ("Batting
+first/second" vs "Bowling first/second" with the value flipped). 13 mount
+sites unified. Tested by `inning_toggle_pov_labels.sh` + `inning_unify_*.sh`.
+
 ### Shipped 2026-05-20 (Player position-adaptive baselines — Surface 1)
 
 `spec-player-compare-average.md` fully implemented across 22

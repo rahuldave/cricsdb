@@ -147,7 +147,7 @@ the **denominator**, not the runs numerator.
 | `stumpings` | `/leaders` | `count(fc.kind = 'stumped')` | `fielding.py:97` | |
 | `run_outs` | `/leaders` | `count(fc.kind = 'run_out')` | `fielding.py:98` | |
 | `total_dismissals` | `/{id}/summary` | `catches + stumpings + run_outs + caught_and_bowled` | `fielding.py:222` | siblings sum cleanly because `catches` here is non-inclusive |
-| `dismissals_per_match` | `/{id}/summary` | `total_dismissals / matches` | `fielding.py:275` | matches > 0 |
+| `dismissals_per_match` (+ catches/stumpings/run-outs per match) | `/{id}/summary` | `total_dismissals / matches_fielded` | `fielding.py` per-match rates | **denominator B** — divides by `matches_fielded` (XI ∧ opponent batted), NOT squad matches; activity-unit consistency with batting `÷ innings_batted`, bowling `÷ innings_bowled`. → `design-decisions.md`, `how-stats §Fielding` |
 | `substitute_catches` | `/{id}/summary` | `count(kind='caught' AND is_substitute=1)` | `fielding.py:212` | reconciliation scalar; NOT included in `catches` |
 | `catches.total` | `/{id}/distribution` | `sum_per_innings(count(kind IN ('caught','caught_and_bowled') AND is_substitute=0))` | `api/routers/fielding.py` distribution slice | ✅ INCLUSIVE per Convention 3 (post-2026-05-08 fix) |
 
@@ -191,6 +191,21 @@ across `/summary` endpoints.
 `season_from`/`_to`, `filter_team`, `filter_opponent`,
 `filter_venue`, `team_class`, `series_type`, `inning` (aux). All
 flow through `api/filters.py::FilterParams.build()`.
+
+**Player cohort — precomputed vs live dispatch (3b/3c/3d/3e).** The
+`/scope/averages/players/{batting,bowling,fielding}/{summary,by-season,by-phase,by-over}`
+endpoints (and the in-process `compute_players_*_cohort` calls the
+`/batters|/bowlers|/fielders/{id}` handlers make) dispatch on
+`is_precomputed_scope(filters, aux)` (`api/routers/bucket_baseline_dispatch.py`):
+none of the six off-key filters (venue / opponent / team / inning / toss /
+result) → precomputed `playerscopestats*` read; any set → **live aggregation**
+over `inningsbatterperf` (batting) / `delivery`+`wicket` (bowling) /
+`fieldingcredit`+`matchplayer` (fielding) via `_{batting,bowling,fielding}_live_where`,
+reproducing the precomputed value byte-identically at none-of-six. This is
+what makes the player cohort baseline narrow under all six (was frozen pre-3b
+— see `audit-aux-params.md` §A, all rows now ✓). The position/over MIX
+histogram weighting stays coarse by design (Tier 2). Server-side throughout;
+the frontend just renders the returned cohort value.
 
 ### §1.9 MetricDelta envelope helper — `api/metrics_metadata.py`
 

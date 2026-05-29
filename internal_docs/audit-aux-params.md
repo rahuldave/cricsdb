@@ -19,6 +19,29 @@ Mosaic excluded (per request).
 
 ---
 
+> ## ✅ RESOLVED 2026-05-29 — the player gap (§E items 1 + 2) is CLOSED
+>
+> Everything marked ✗ below was the **2026-05-26 snapshot**. The player-side
+> live cohort fallback shipped in 3b/3c/3d/3e + denominator B + Tier-3 Phase B
+> (commits `00ef3d1..7a3e6a1`, the player-baseline-aux-fallback arc), and the
+> player toss clause was wired. **Now:**
+> - the player "typical player" cohort **narrows live** for all six off-key
+>   filters (venue, opponent, team, inning, toss, result) — dispatch on
+>   `is_precomputed_scope` → live `compute_players_{batting,bowling,fielding}_cohort`
+>   / `_by_season` / `_by_phase` in `scope_averages.py` (mirrors the team side);
+> - **toss is wired for player values** too;
+> - the per-position / per-over MIX histogram intentionally stays coarse
+>   (Tier-2 design) — only the per-bucket cohort VALUES narrow.
+>
+> Every ✗ in §A / §B below should read ✓ as of 2026-05-29 (flipped inline,
+> with the old state struck through). DOM-verified surface-by-surface in
+> `narrowing-audit-coverage.md`; locked by `tests/integration/` (the
+> `player_baseline_*`, `sparkline_narrowing`, `player_toss_value`,
+> `prob_chip_baselines`, per-tab chart suites — all green). The exception
+> (coarse mix) is by design. §C/§E gaps 1+2 are DONE.
+
+---
+
 ## TL;DR — the patterns
 
 1. **Teams = fully fair.** Every team per-discipline tile, band, and chart
@@ -26,11 +49,12 @@ Mosaic excluded (per request).
    - ~~One exception: the Team header Win% tile — baseline frozen.~~ **FIXED
      2026-05-26** (commit 3d802a2): the Win% "vs average" now narrows too
      (recomputed from the Mosaic's per-team-view split under the aux).
-2. **Players = broken.** The player's own numbers narrow for **inning** and
-   **result**, but:
-   - the **"typical player" baseline never narrows** for ANY aux (every
-     summary chip, every chart cohort line, every distribution chip), and
-   - **toss does nothing at all** on player pages (not wired).
+2. ~~**Players = broken.**~~ **Players = fixed (2026-05-29).** The player's own
+   numbers narrow for inning, result **and now toss**, and the **"typical
+   player" baseline now narrows live for all six off-key filters** (every
+   summary chip, every chart cohort line, every distribution chip, every
+   sparkline). The MIX histogram on By Position / By Over stays coarse by
+   design (Tier 2). The 2026-05-26 snapshot below described the pre-fix state.
 3. **Series / Venues leaderboards** narrow by **inning** only (no baseline to
    mismatch; toss/result not applied — arguably fine for ranked lists).
 
@@ -80,29 +104,31 @@ no comparison baseline on this surface. `—` = filter intentionally absent.
 
 | Subtab | Number / graph | inning | toss | result | URL (if broken) |
 |---|---|:-:|:-:|:-:|---|
-| Summary | SR / Average / etc. tiles (vs cohort chip) | ✗ baseline frozen | ✗ no-op | ✗ baseline frozen | `/batting?player=ba607b88&gender=male&inning=0` |
-| By Season | player line vs cohort line | ✗ cohort frozen | ✗ no-op | ✗ cohort frozen | `/batting?player=ba607b88&gender=male&tab=By+Season&inning=0` |
-| By Phase | player vs cohort line | ✗ cohort frozen | ✗ no-op | ✗ cohort frozen | `/batting?player=ba607b88&gender=male&tab=By+Phase&inning=0` |
-| By Over | player vs cohort line | ✗ cohort frozen | ✗ no-op | ✗ cohort frozen | `/batting?player=ba607b88&gender=male&tab=By+Over&inning=0` |
-| Distribution | milestone chips (50+, etc.) vs cohort | ✗ cohort frozen | ✗ no-op | ✗ cohort frozen | `/batting?player=ba607b88&gender=male&inning=0` |
+| Summary | SR / Average / etc. tiles (vs cohort chip) + sparkline cohort line | ✓ | ✓ | ✓ | — (was ✗; fixed 3b) |
+| By Season | player line vs cohort line | ✓ | ✓ | ✓ | — (was ✗; fixed 3c) |
+| By Phase | player vs cohort line | ✓ | ✓ | ✓ | — (was ✗; fixed 3c) |
+| By Over | player vs cohort line | ✓ | ✓ | ✓ | — (was ✗; fixed Tier-3 Phase B; mix histogram stays coarse) |
+| By Position | per-position cohort bars | ✓ | ✓ | ✓ | — (cohort bars narrow; position MIX coarse by design) |
+| Distribution | milestone chips (50+, etc.) vs cohort | ✓ | ✓ | ✓ | — (was ✗; fixed 3b/3c) |
 
 ### Player Bowling page (`/bowling?player=…`)
 
 | Subtab | Number / graph | inning | toss | result | URL (if broken) |
 |---|---|:-:|:-:|:-:|---|
-| Summary | Economy / SR tiles (vs cohort chip) | ✗ baseline frozen | ✗ no-op | ✗ baseline frozen | `/bowling?player=462411b3&gender=male&inning=0` |
-| By Season | player vs cohort line | ✗ cohort frozen | ✗ no-op | ✗ cohort frozen | `/bowling?player=462411b3&gender=male&tab=By+Season&inning=0` |
-| By Phase | player vs cohort line | ✗ cohort frozen | ✗ no-op | ✗ cohort frozen | `/bowling?player=462411b3&gender=male&tab=By+Phase&inning=0` |
-| By Over | player vs cohort line | ✗ cohort frozen | ✗ no-op | ✗ cohort frozen | `/bowling?player=462411b3&gender=male&tab=By+Over&inning=0` |
-| Distribution | milestone chips vs cohort | ✗ cohort frozen | ✗ no-op | ✗ cohort frozen | `/bowling?player=462411b3&gender=male&inning=0` |
+| Summary | Economy / SR tiles (vs cohort chip) + sparkline cohort line | ✓ | ✓ | ✓ | — (was ✗; fixed 3d) |
+| By Season | player vs cohort line | ✓ | ✓ | ✓ | — (was ✗; fixed 3d) |
+| By Phase | player vs cohort line | ✓ | ✓ | ✓ | — (was ✗; fixed 3d) |
+| By Over | per-over cohort bars | ✓ | ✓ | ✓ | — (was ✗; fixed Tier-3 Phase B; over MIX stays coarse) |
+| Distribution | milestone chips vs cohort | ✓ | ✓ | ✓ | — (was ✗; fixed 3d) |
 
 ### Player Fielding page (`/fielding?player=…`)
 
 | Subtab | Number / graph | inning | toss | result | URL (if broken) |
 |---|---|:-:|:-:|:-:|---|
-| Summary | Catches/match tile (vs cohort) | ✗ baseline frozen | ✗ no-op | ✗ baseline frozen | `/fielding?player=ba607b88&gender=male&inning=0` |
-| By Phase / By Season | player vs cohort line | ✗ cohort frozen | ✗ no-op | ✗ cohort frozen | `/fielding?player=ba607b88&gender=male&tab=By+Phase&inning=0` |
-| Distribution | catches chips vs cohort | ✗ cohort frozen | ✗ no-op | ✗ cohort frozen | `/fielding?player=ba607b88&gender=male&inning=0` |
+| Summary | Catches/match tile (vs cohort) + sparkline cohort line | ✓ | ✓ | ✓ | — (was ✗; fixed 3e) |
+| By Phase / By Season | player vs cohort line | ✓ | ✓ | ✓ | — (was ✗; fixed 3e) |
+| By Dismissed Position / By Over | per-bucket cohort bars | ✓ | ✓ | ✓ | — (keeper-binary, no mix → narrows fully; Tier-3 Phase B + 3e) |
+| Distribution | catches chips vs cohort | ✓ | ✓ | ✓ | — (was ✗; fixed 3e) |
 
 ### Series dossier (`/series?tournament=…`) · Venues dossier
 
@@ -122,10 +148,10 @@ no comparison baseline on this surface. `—` = filter intentionally absent.
 | `teams/{t}/{bat,bowl,field,pship}/summary` | ✓/✓/✓ | ✓/✓/✓ | `_option_b_team_inning` | `_result/_toss_match_filter` + `_cohort_outcome_clause` |
 | `teams/{t}/{…}/by-season,by-phase` | ✓/✓/✓ | ✓/✓/✓ | `_option_b_team_inning` | same |
 | `scope/averages/{bat,bowl,field,pship}/*` (team cohort) | ✓/✓/✓ | (is baseline) | `_option_b_team_inning` (cohort path) | `_cohort_outcome_clause` |
-| `batters/{id}/*`, `bowlers/{id}/*`, `fielders/{id}/*` (value) | ✓/✗/✓ | n/a | `player_inning_match_clause` | result: `player_result_clause`; **toss: NONE** |
-| `{batters,bowlers,fielders}/{id}/summary` scope_avg chip | — | ✗/✗/✗ | (cohort, see below) | (cohort) |
-| `scope/averages/players/*` (player cohort: by-season/phase/over + summary chip) | ✗/✗/✗ | (is baseline) | **`build_scope_clauses` — NO aux** | **NONE** |
-| `{batters,bowlers,fielders}/{id}/distribution` cohort | ✗/✗/✗ | ✗/✗/✗ | **`compute_players_*_cohort` → `build_scope_clauses` — NO aux** | **NONE** |
+| `batters/{id}/*`, `bowlers/{id}/*`, `fielders/{id}/*` (value) | ✓/✓/✓ | n/a | `player_inning_match_clause` | result: `player_result_clause`; toss: now wired |
+| `{batters,bowlers,fielders}/{id}/summary` scope_avg chip | — | ✓/✓/✓ | (cohort, see below) | (cohort) |
+| `scope/averages/players/*` (player cohort: by-season/phase/over + summary chip) | ✓/✓/✓ | (is baseline) | live `compute_players_*_{cohort,by_season,by_phase}` when any off-key filter set (else precomputed) | `_*_live_where` (inning Option-B flip + toss/result clause) |
+| `{batters,bowlers,fielders}/{id}/distribution` cohort | ✓/✓/✓ | ✓/✓/✓ | `compute_players_*_cohort` → live aux-aware path | dispatch on `is_precomputed_scope` |
 | `series/{bat,bowl,field}ers-leaders`, `bowlers/leaders` etc. | inn only | n/a | `splice_aux_join_clauses(side=)` | **NONE (toss/result not applied)** |
 
 ---
@@ -140,13 +166,13 @@ mechanisms**, with inconsistent aux coverage. Inventory:
 | 1 | `FilterBarParams.build()` / `build_side_neutral()` | FilterBar fields + central inning (when `apply_inning`) | inning (central, mostly suppressed now) | everything (FilterBar) |
 | 2 | `filters.player_inning_match_clause(side=)` | player inning (per-event) | inning | player value endpoints |
 | 3 | `filters.player_result_clause` | player result | result | player value endpoints |
-| 4 | **(player toss)** | — | **toss — NOT IMPLEMENTED** | — |
+| 4 | `filters.player_toss_clause` | player toss | toss | player value endpoints (wired 2026-05-29) |
 | 5 | `teams.py::_option_b_team_inning(side=)` | team inning (per-event, team-set + cohort) | inning | team value + team cohort |
 | 6 | `teams.py::_inning_match_filter` | team match-level inning | inning | team header/summary/by-season/vs/match-list |
 | 7 | `teams.py::_result_match_filter` / `_toss_outcome_match_filter` | team toss/result (team-set, keyed on `:team`) | toss, result | team value endpoints |
 | 8 | `teams.py::_cohort_outcome_clause(side=)` | team cohort toss/result (keyed on `i.team`) | toss, result | team cohort (scope/averages/{disc}) |
 | 9 | `aux_clauses.splice_aux_join_clauses(side=)` / `tournaments._inning_extras(side=)` | leaderboard inning | inning | series + venues + landing leaders |
-| 10 | `scope_averages.build_scope_clauses(filters)` | FilterBar-only scope on `playerscopestats*` | **NONE of the 3 aux** | **ALL player cohorts** (summary chip + by-season/phase/over + distribution) |
+| 10 | `scope_averages.compute_players_*_cohort` / `_by_season` / `_by_phase` (dispatch on `is_precomputed_scope`) | FilterBar scope + the six off-key filters via a live path; precomputed `playerscopestats*` read only at none-of-six | inning (Option-B flip) + toss + result (live path) | **ALL player cohorts** (summary chip + by-season/phase/over + distribution). Was `build_scope_clauses` (no aux); replaced by the live fallback 2026-05-29 |
 
 ### The gaps, ranked
 1. **Player cohorts honor only the 6 precompute-scope-key filters** (#10) —
@@ -245,21 +271,23 @@ gap) — the own-numbers narrow, the comparison doesn't yet.
 
 ---
 
-## §E — Plan (NEXT SESSION) — make player comparisons fair
+## §E — Plan — make player comparisons fair — ✅ DONE 2026-05-29
 
-Decided 2026-05-26: implement the player-side fixes next session. Scope:
+Decided 2026-05-26; **implemented across 3b/3c/3d/3e + denom-B + Tier-3
+Phase B (commits `00ef3d1..7a3e6a1`) and verified 2026-05-29.** Scope:
 
-1. **Player "typical" cohort must narrow by the off-key filters** (the big
-   one). Today the cohort reads precomputed `playerscopestats*` keyed only
-   by gender/type/tournament/season/tier/series, so it's frozen for
-   `filter_venue`, `filter_opponent`, `filter_team`, `inning`,
-   `toss_outcome`, `result`. Give it a LIVE fallback when any off-key
-   filter is set — same shape as the team side (`is_precomputed_scope` →
-   live via `_option_b_team_inning` + `_cohort_outcome_clause`). Covers
-   the summary chip baselines, the by-season / by-phase / by-over chart
-   cohort lines, and the distribution-panel cohort chips, ×3 disciplines.
-2. **Wire toss for player values** — a `player_toss_clause` peer to
-   `player_result_clause` (player values currently ignore toss entirely).
+1. ✅ **Player "typical" cohort narrows by the off-key filters** (the big
+   one). It now reads precomputed `playerscopestats*` ONLY at none-of-six;
+   when `filter_venue` / `filter_opponent` / `filter_team` / `inning` /
+   `toss_outcome` / `result` is set it falls back to a LIVE path — same shape
+   as the team side (`is_precomputed_scope` → live via the discipline's
+   `_*_live_where` with the Option-B inning flip + toss/result clause).
+   Covers the summary chip baselines, the by-season / by-phase / by-over
+   chart cohort lines, the sparkline cohort line, and the distribution-panel
+   cohort chips, ×3 disciplines. The per-position/per-over MIX histogram
+   stays coarse by design (Tier 2). DOM-verified in `narrowing-audit-coverage.md`.
+2. ✅ **Toss wired for player values** — `player_toss_clause` peer to
+   `player_result_clause`. Locked by `tests/integration/player_toss_value.sh`.
 3. ~~**Team header Win% tile baseline**~~ — **DONE 2026-05-26 (3d802a2).**
    Recomputed from the Mosaic per-team-view split under the aux.
 4. ~~**(Optional / product call)** opponent-only entry point on player

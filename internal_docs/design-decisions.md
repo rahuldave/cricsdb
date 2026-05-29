@@ -205,6 +205,51 @@ The batting summary endpoint runs two queries:
 
 These can't be combined in one query because per-innings stats need a GROUP BY that would change the ball-level aggregation.
 
+### Player cohort baseline: precomputed for speed, live for narrowing
+
+The player "typical player" comparison (`scope_avg` chips, chart cohort
+lines, sparkline line, per-bucket cohort bars) dispatches on
+`is_precomputed_scope(filters, aux)` (`api/routers/bucket_baseline_dispatch.py`):
+
+- **None of the six off-key filters set** (venue / opponent / team / inning /
+  toss / result) → read the precomputed `playerscopestats*` tables (fast; the
+  tables are keyed only by gender/team_type/tournament/season/team_class/series_type).
+- **Any of the six set** → live aggregation (`compute_players_{batting,bowling,fielding}_cohort`
+  + `_by_season` / `_by_phase` in `scope_averages.py`), reproducing the
+  precomputed value byte-identically at none-of-six.
+
+Why not precompute the six too: the Cartesian product of venue × opponent ×
+inning × toss × result × the existing keys is astronomically sparse —
+precomputing it would be mostly empty cells. We precompute only the dense
+(unfiltered) case and fall back to a live query, guarded by the same
+predicates, for the long tail. This mirrors the team side (which already had
+the live fallback) and is what closed the player-cohort "frozen baseline" gap
+(`audit-aux-params.md` §E). Bowling/fielding flip the inning per Option B.
+
+### Fielding per-match denominator is `matches_fielded`, not squad matches (activity-unit rule)
+
+Per-match fielding rates (catches/match, stumpings/match, run-outs/match,
+dismissals/match) and the catch-distribution ProbChips divide by
+`matches_fielded` = matches where the fielder was in the XI **and the opponent
+batted** (i.e. actually took the field), NOT squad `matches_played`. This makes
+the fielding denominator an "activity unit" consistent with batting
+(`÷ innings_batted`) and bowling (`÷ innings_bowled`) — a rate is "per
+opportunity to act". Display "matches played" stays squad. Differs from squad
+only on rare no-opponent-innings matches (Kohli IPL = 279 fielded of 280).
+Column: `playerscopestats.matches_fielded`. → `how-stats-calculated.md §Fielding`.
+
+### Per-bucket cohort narrows; the position/over MIX histogram stays coarse (Tier 2)
+
+On the By Position (batting) and By Over (bowling) tabs, the per-bucket cohort
+*values* (typical opener SR, typical death-over economy) narrow under the six,
+but the *mix histogram* — the weighting showing what fraction of the player's
+innings/balls fall in each bucket — stays at tournament/season grain. Reason:
+at deep narrowings there isn't enough data to estimate a stable per-bucket mix;
+a coarse-but-stable role profile is the right weighting, and thin per-bucket
+cohorts blank out via the support cliff rather than show a wrong number.
+Fielding is keeper-binary (no mix) so its tabs narrow fully. Full rationale +
+the "two hats" balls-weighting detail: `spec-tier3-cohort-narrowing.md`.
+
 ## Frontend
 
 ### URL-synced state for deep linking
