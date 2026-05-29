@@ -5225,33 +5225,23 @@ async def scope_players_fielding_summary(
 # ============================================================
 
 
-async def compute_players_fielding_by_phase(
-    db,
-    person_id: str,
-    filters: FilterParams,
-    aux: AuxParams,
-    drop_set: Optional[set[str]] = None,
-) -> dict:
-    """Per-phase keeper-binary fielding cohort baseline. The player's
-    LIFETIME keeper status (matches_as_keeper > 0 anywhere in scope)
-    determines which cohort the phase row reads — per-season variation
-    is surfaced in /by-season; the phase view is by design a stable
-    role-baseline.
-    Spec: spec-player-baseline-parity.md §3.2.
-    """
+async def _fielding_by_phase_precomputed(
+    db, person_id: str, filters: FilterParams, drop_set: Optional[set[str]],
+):
+    """None-of-six fast path: lifetime keeper status + per-(phase,
+    keeper-flag) reads of the precomputed phase child + parent pool.
+    Returns (player_rows, cohort_rows, pool_rows)."""
     where, params = build_scope_clauses(filters, drop=drop_set)
-
     # Q1: player's keeper status across all scope (lifetime).
     player_sql = f"""
         SELECT CASE WHEN COALESCE(SUM(pss.matches_as_keeper), 0) > 0
-                    THEN 1 ELSE 0 END AS is_keeper,
-               COALESCE(SUM(pss.matches), 0) AS player_matches
+                    THEN 1 ELSE 0 END AS is_keeper
         FROM playerscopestats pss
         WHERE {where}
           AND pss.person_id = :__pid
     """
     # Q2: cohort fielding aggregates per (phase, keeper_flag) from the
-    # new phase child table joined to parent for the keeper partition.
+    # phase child table joined to parent for the keeper partition.
     cohort_sql = f"""
         SELECT pssfph.phase_bucket,
                CASE WHEN pss.matches_as_keeper > 0 THEN 1 ELSE 0 END AS is_keeper,
@@ -5268,9 +5258,7 @@ async def compute_players_fielding_by_phase(
         GROUP BY pssfph.phase_bucket, is_keeper
         ORDER BY pssfph.phase_bucket, is_keeper
     """
-    # Q3: pool denominator (n_matches) per keeper_flag — used as the
-    # per-match-rate denominator. Same partition logic as the cohort
-    # summary's pool query.
+    # Q3: pool denominator (n_matches) per keeper_flag.
     pool_sql = f"""
         SELECT CASE WHEN pss.matches_as_keeper > 0 THEN 1 ELSE 0 END AS is_keeper,
                COUNT(*)         AS n_fielders,
@@ -5280,11 +5268,110 @@ async def compute_players_fielding_by_phase(
         GROUP BY is_keeper
     """
     p_params = {**params, "__pid": person_id}
-    player_rows, cohort_rows, pool_rows = await asyncio.gather(
+    return await asyncio.gather(
         db.q(player_sql, p_params),
         db.q(cohort_sql, params),
         db.q(pool_sql, params),
     )
+
+
+async def _fielding_by_phase_live(
+    db, person_id: str, filters: FilterParams, aux: AuxParams,
+):
+    """Any-of-six live path (Phase 3e): per-phase aggregation under the
+    six. Phase = the over the dismissal fell in (powerplay ≤5 / middle
+    ≤14 / death), mirroring `playerscopestatsfieldingphase`'s
+    `phase_bucket` — NO position resolution (the phase child attributes
+    by over, not dismissed-batter position). The keeper partition is
+    LIFETIME (kept ≥1 in-scope innings anywhere) — a single set, like the
+    summary cohort — and the per-match denominator is the total
+    matches_fielded per keeper-flag (not per-phase). Returns
+    (player_rows, cohort_rows, pool_rows) shaped like the precomputed
+    path."""
+    num_where, num_params = _bowling_live_where(filters, aux)
+    denom_where, denom_params = _fielding_denom_where(filters, aux)
+    keeper_subq = f"""
+        SELECT DISTINCT ka.keeper_id AS pid
+        FROM keeperassignment ka
+        JOIN innings i ON i.id = ka.innings_id
+        JOIN match   m ON m.id = i.match_id
+        WHERE {num_where} AND ka.keeper_id IS NOT NULL
+    """
+    player_sql = f"""
+        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END AS is_keeper
+        FROM keeperassignment ka
+        JOIN innings i ON i.id = ka.innings_id
+        JOIN match   m ON m.id = i.match_id
+        WHERE {num_where} AND ka.keeper_id = :__pid
+    """
+    phase_case = (
+        "CASE WHEN d.over_number <= 5 THEN 1"
+        " WHEN d.over_number <= 14 THEN 2 ELSE 3 END"
+    )
+    cohort_sql = f"""
+        SELECT {phase_case} AS phase_bucket,
+               CASE WHEN ks.pid IS NOT NULL THEN 1 ELSE 0 END AS is_keeper,
+               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled') THEN 1 ELSE 0 END) AS catches,
+               SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+               SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+               COUNT(DISTINCT fc.fielder_id) AS n_players
+        FROM fieldingcredit fc
+        JOIN delivery d ON d.id = fc.delivery_id
+        JOIN innings  i ON i.id = d.innings_id
+        JOIN match    m ON m.id = i.match_id
+        LEFT JOIN ({keeper_subq}) ks ON ks.pid = fc.fielder_id
+        WHERE {num_where}
+          AND fc.fielder_id IS NOT NULL
+          AND COALESCE(fc.is_substitute, 0) = 0
+        GROUP BY phase_bucket, is_keeper
+        ORDER BY phase_bucket, is_keeper
+    """
+    pool_sql = f"""
+        SELECT CASE WHEN ks.pid IS NOT NULL THEN 1 ELSE 0 END AS is_keeper,
+               COUNT(DISTINCT mp.person_id) AS n_fielders,
+               COUNT(*)                     AS n_matches_total
+        FROM matchplayer mp
+        JOIN match m ON m.id = mp.match_id
+        LEFT JOIN ({keeper_subq}) ks ON ks.pid = mp.person_id
+        WHERE {denom_where}
+        GROUP BY is_keeper
+    """
+    denom_combined = {**denom_params, **num_params}
+    player_rows, cohort_rows, pool_rows = await asyncio.gather(
+        db.q(player_sql, {**num_params, "__pid": person_id}),
+        db.q(cohort_sql, num_params),
+        db.q(pool_sql, denom_combined),
+    )
+    for r in cohort_rows:
+        r["dismissals"] = (r["catches"] or 0) + (r["stumpings"] or 0) + (r["run_outs"] or 0)
+    return player_rows, cohort_rows, pool_rows
+
+
+async def compute_players_fielding_by_phase(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-phase keeper-binary fielding cohort baseline. The player's
+    LIFETIME keeper status (matches_as_keeper > 0 anywhere in scope)
+    determines which cohort the phase row reads — per-season variation
+    is surfaced in /by-season; the phase view is by design a stable
+    role-baseline.
+    Dispatches on `is_precomputed_scope` (Phase 3e): none-of-six →
+    precomputed phase child; any-of-six → live per-phase aggregation so
+    the per-phase cohort narrows under the six.
+    Spec: spec-player-baseline-parity.md §3.2 + spec-player-baseline-aux-fallback.md Phase 3e.
+    """
+    if is_precomputed_scope(filters, aux):
+        player_rows, cohort_rows, pool_rows = await _fielding_by_phase_precomputed(
+            db, person_id, filters, drop_set,
+        )
+    else:
+        player_rows, cohort_rows, pool_rows = await _fielding_by_phase_live(
+            db, person_id, filters, aux,
+        )
 
     is_keeper = (player_rows[0].get("is_keeper") if player_rows else 0) or 0
     pool_by_keeper = {r["is_keeper"]: r for r in pool_rows}
