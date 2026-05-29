@@ -860,6 +860,58 @@ else
   bad "By Position own runs=$BPP_I_RUNS != SQL-anchored $BPP_EXPECTED"
 fi
 
+# ── §14 bowling By Over bars narrow, over-mix stays coarse (Phase B) ──
+# /bowlers/{id}/summary over_distribution[] — the By Over tab. Tier-3:
+# the bowler's OWN per-over economy AND the cohort per-over economy narrow
+# under the six; the over-mix histogram (mix_legal_balls = legal balls per
+# over, the weighting) STAYS COARSE (D-B2/D-B3). Anchor: Bumrah IPL, over 6,
+# inning=0 (bowled first → bowling innings_number=1).
+echo
+echo "=== bowling By Over bars narrow, over-mix stays coarse (Phase B) ==="
+bo_over6() {  # $1=filter → "mix_balls own_balls own_econ cohort_econ"
+  curl -s "$API/api/v1/bowlers/462411b3/summary?gender=male&team_type=club&tournament=Indian+Premier+League&$1" \
+    | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+o=[e for e in d['over_distribution'] if e['over']==6]
+if not o: print('None None None None'); raise SystemExit
+e=o[0]
+econ = round(e['runs_conceded']*6/e['legal_balls'],2) if e['legal_balls'] else None
+print(e.get('mix_legal_balls'), e['legal_balls'], econ, e.get('cohort_economy'))
+"
+}
+read -r BO_U_MIX BO_U_BALLS BO_U_E BO_U_CE < <(bo_over6 "")
+read -r BO_I_MIX BO_I_BALLS BO_I_E BO_I_CE < <(bo_over6 "inning=0")
+echo "  over6 unfiltered: mix_balls=$BO_U_MIX own_balls=$BO_U_BALLS own_econ=$BO_U_E cohort_econ=$BO_U_CE"
+echo "  over6 inning=0:   mix_balls=$BO_I_MIX own_balls=$BO_I_BALLS own_econ=$BO_I_E cohort_econ=$BO_I_CE"
+# (a) own economy narrows
+if [[ "$BO_I_E" != "None" && "$BO_I_E" != "$BO_U_E" ]]; then
+  ok "By Over own economy narrowed ($BO_U_E -> $BO_I_E)"
+else
+  bad "By Over own economy FROZEN ($BO_U_E == $BO_I_E) -- Phase B not wired"
+fi
+# (b) cohort economy narrows
+if [[ "$BO_I_CE" != "None" && "$BO_I_CE" != "$BO_U_CE" ]]; then
+  ok "By Over cohort economy narrowed ($BO_U_CE -> $BO_I_CE)"
+else
+  bad "By Over cohort economy FROZEN ($BO_U_CE == $BO_I_CE) -- Phase B not wired"
+fi
+# (c) over-mix (mix_legal_balls) STAYS COARSE
+if [[ "$BO_I_MIX" == "$BO_U_MIX" ]]; then
+  ok "By Over over-mix stayed coarse (mix_balls $BO_U_MIX == $BO_I_MIX)"
+else
+  bad "By Over over-mix narrowed (mix_balls $BO_U_MIX -> $BO_I_MIX) -- should stay coarse"
+fi
+# SQL anchor: own over-6 economy inning=0 == direct delivery agg at
+# innings_number=1 (bowled first), over_number=5.
+BO_EXPECTED=$(sqlite3 cricket.db "SELECT ROUND(SUM(d.runs_total)*6.0/SUM(CASE WHEN d.extras_wides=0 AND d.extras_noballs=0 THEN 1 ELSE 0 END),2) FROM delivery d JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id WHERE d.bowler_id='462411b3' AND d.over_number=5 AND m.gender='male' AND m.team_type='club' AND m.event_name='Indian Premier League' AND i.super_over=0 AND i.innings_number=1;")
+echo "  SQL-anchored over6 inning=0 own econ: $BO_EXPECTED  (API: $BO_I_E)"
+if [[ "$BO_I_E" == "$BO_EXPECTED" ]]; then
+  ok "By Over own economy == SQL-anchored ($BO_I_E)"
+else
+  bad "By Over own economy=$BO_I_E != SQL-anchored $BO_EXPECTED"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"

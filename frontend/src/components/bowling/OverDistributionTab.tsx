@@ -40,16 +40,23 @@ function fmt3(v: number) { return v.toFixed(3) }
 export default function OverDistributionTab({ overDistribution }: Props) {
   if (!overDistribution || overDistribution.length === 0) return null
 
-  const totalBalls = overDistribution.reduce((s, e) => s + (e.legal_balls || 0), 0)
+  // Mix histogram weight = COARSE legal balls per over (mix_legal_balls),
+  // never narrowed by the six (Tier-3 D-B2/D-B3). `legal_balls` itself
+  // narrows under the six for the economy/wickets/boundary bars below, so
+  // the histogram reads the separate coarse copy. Fallback to legal_balls
+  // for none-of-six (where they're equal) / older payloads.
+  const mixBalls = (e: BowlingOverDistributionEntry) => e.mix_legal_balls ?? e.legal_balls
+  const totalBalls = overDistribution.reduce((s, e) => s + (mixBalls(e) || 0), 0)
 
   // Chart A — mix.
   const mixEntries: MixEntry[] = overDistribution.map(e => {
-    const share = totalBalls > 0 ? e.legal_balls / totalBalls : 0
+    const mb = mixBalls(e)
+    const share = totalBalls > 0 ? mb / totalBalls : 0
     return {
       bucket: e.over,
       share,
-      raw: e.legal_balls,
-      tooltip: `Over ${e.over}: ${e.legal_balls} balls (${(share * 100).toFixed(1)}%)`,
+      raw: mb,
+      tooltip: `Over ${e.over}: ${mb} balls (${(share * 100).toFixed(1)}%)`,
     }
   })
 

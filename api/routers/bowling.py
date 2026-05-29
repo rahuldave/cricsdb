@@ -11,6 +11,7 @@ from typing import Optional
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams, player_result_clause, player_toss_clause, player_inning_match_clause
 from ..aux_clauses import splice_aux_join_clauses
+from .bucket_baseline_dispatch import is_precomputed_scope
 from ..metrics_metadata import wrap_metric
 from ..player_nationality import player_nationalities
 from ..scope_links import suggested_splits, scope_dict_from_filters
@@ -31,8 +32,22 @@ def _safe_div(a, b, mul=1, ndigits=2):
     return round(a * mul / b, ndigits)
 
 
-async def _over_distribution(db, person_id: str, filters: FilterParams) -> list[dict]:
+async def _over_distribution(
+    db, person_id: str, filters: FilterParams, aux: AuxParams | None = None,
+) -> list[dict]:
     """Return the bowler's per-over aggregates as a length-20 array.
+
+    Tier-3 sweep (spec-tier3-cohort-narrowing.md Phase B): when any of the
+    six (venue/opponent/team/inning/toss/result) is set, the bowler's OWN
+    per-over performance (runs_conceded/legal_balls/wickets/dots/boundaries/
+    innings_bowled → drives the economy / wickets-per-innings / boundaries
+    bars) narrows live over `delivery` (bowling orientation). The OVER-MIX
+    histogram stays COARSE — its ball-counts live on a separate
+    `mix_legal_balls` field (the over-distribution histogram and the economy
+    bars both divide by balls-per-over, so the mix needs its own coarse copy
+    while `legal_balls` itself narrows for the economy denominator). The
+    cohort per-over bars (`cohort_*`) are re-pointed to the narrowed
+    `by_over[]` by the caller. None-of-six is unchanged.
 
     Joined from `playerscopestats_over` (child) → `playerscopestats`
     (parent, carries the scope-key columns). Only the four scope_key
@@ -118,27 +133,95 @@ async def _over_distribution(db, person_id: str, filters: FilterParams) -> list[
     )
 
     by_over = {r["over_number"]: r for r in player_rows}
+
+    # Tier-3 (Phase B): narrow the bowler's OWN per-over performance under
+    # the six over `delivery` (bowling orientation). The over-mix histogram
+    # keeps the COARSE ball-counts via `mix_legal_balls`; everything else
+    # (runs/legal_balls/wickets/dots/boundaries/innings_bowled) narrows.
+    narrowed_over: dict[int, dict] = {}
+    if aux is not None and not is_precomputed_scope(filters, aux):
+        nw, np_ = filters.build_side_neutral(has_innings_join=True, aux=aux, apply_inning=False)
+        np_["pid"] = person_id
+        nparts = ["d.bowler_id = :pid", "d.over_number BETWEEN 0 AND 19"]
+        if nw:
+            nparts.append(nw)
+        for clause in (
+            player_result_clause(aux, person_id, np_),
+            player_toss_clause(aux, person_id, np_),
+            player_inning_match_clause(aux, person_id, np_, side="bowling"),
+        ):
+            if clause:
+                nparts.append(clause)
+        nwhere = " AND ".join(nparts)
+        joins = "FROM delivery d JOIN innings i ON i.id = d.innings_id JOIN match m ON m.id = i.match_id"
+        deliv_sql = f"""
+            SELECT d.over_number + 1 AS over_number,
+                   SUM(d.runs_total) AS runs_conceded,
+                   SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
+                   SUM(CASE WHEN d.runs_batter = 0 AND d.runs_total = 0 THEN 1 ELSE 0 END) AS dots,
+                   SUM(CASE WHEN d.runs_batter IN (4, 6) THEN 1 ELSE 0 END) AS boundaries
+            {joins} WHERE {nwhere} GROUP BY d.over_number
+        """
+        wkt_sql = f"""
+            SELECT d.over_number + 1 AS over_number, COUNT(*) AS wickets
+            FROM wicket w JOIN delivery d ON d.id = w.delivery_id
+            JOIN innings i ON i.id = d.innings_id JOIN match m ON m.id = i.match_id
+            WHERE {nwhere} AND w.kind NOT IN ('run out', 'retired hurt', 'retired out', 'obstructing the field')
+            GROUP BY d.over_number
+        """
+        inn_sql = f"""
+            SELECT over_number + 1 AS over_number, COUNT(*) AS innings_bowled
+            FROM (
+                SELECT d.over_number AS over_number, d.innings_id
+                {joins} WHERE {nwhere}
+                GROUP BY d.innings_id, d.over_number
+                HAVING SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) >= 1
+            ) GROUP BY over_number
+        """
+        d_rows, w_rows, i_rows = await asyncio.gather(
+            db.q(deliv_sql, np_), db.q(wkt_sql, np_), db.q(inn_sql, np_),
+        )
+        wkt_by = {r["over_number"]: r["wickets"] for r in w_rows}
+        inn_by = {r["over_number"]: r["innings_bowled"] for r in i_rows}
+        for r in d_rows:
+            o = r["over_number"]
+            narrowed_over[o] = {
+                "runs_conceded": r["runs_conceded"] or 0,
+                "legal_balls":   r["legal_balls"] or 0,
+                "dots":          r["dots"] or 0,
+                "boundaries":    r["boundaries"] or 0,
+                "wickets":       wkt_by.get(o, 0),
+                "innings_bowled": inn_by.get(o, 0),
+            }
+
     cohort_by_over = {r["over_number"]: r for r in cohort_rows}
     cohort_total_balls = sum((r["legal_balls"] or 0) for r in cohort_rows)
 
     out: list[dict] = []
     for o in range(1, 21):
         r = by_over.get(o)
-        if r is None:
+        coarse_balls = (r["legal_balls"] or 0) if r is not None else 0
+        # Performance source: narrowed when any-of-six, else the coarse row.
+        nr = narrowed_over.get(o) if narrowed_over else None
+        src = nr if nr is not None else r
+        if src is None:
             entry = {
                 "over": o, "runs_conceded": 0, "legal_balls": 0,
                 "wickets": 0, "dots": 0, "boundaries": 0,
                 "innings_bowled": 0,
+                # mix histogram keeps the coarse ball-count (Tier-2-keep).
+                "mix_legal_balls": coarse_balls,
             }
         else:
             entry = {
                 "over":           o,
-                "runs_conceded":  r["runs_conceded"] or 0,
-                "legal_balls":    r["legal_balls"] or 0,
-                "wickets":        r["wickets"] or 0,
-                "dots":           r["dots"] or 0,
-                "boundaries":     r["boundaries"] or 0,
-                "innings_bowled": r["innings_bowled"] or 0,
+                "runs_conceded":  src["runs_conceded"] or 0,
+                "legal_balls":    src["legal_balls"] or 0,
+                "wickets":        src["wickets"] or 0,
+                "dots":           src["dots"] or 0,
+                "boundaries":     src["boundaries"] or 0,
+                "innings_bowled": src["innings_bowled"] or 0,
+                "mix_legal_balls": coarse_balls,
             }
         c = cohort_by_over.get(o)
         if c is None or cohort_total_balls == 0:
@@ -552,22 +635,54 @@ async def bowling_summary(
     boundaries = fours + sixes
 
     nationalities = await player_nationalities(db, person_id)
-    over_distribution = await _over_distribution(db, person_id, filters)
+    over_distribution = await _over_distribution(db, person_id, filters, aux)
 
     # Derive over-mix from over_distribution and fold the cohort
-    # baseline in-process (spec Phase 4). Skip when no balls in scope
-    # or when a batter_id matchup filter is active.
+    # baseline in-process (spec Phase 4). The weight reads the COARSE
+    # `mix_legal_balls` (Tier-3 D-B2/D-B3: the over-mix stays balls-based
+    # AND coarse — never narrowed by the six), even though `legal_balls`
+    # itself now narrows for the per-over economy bars. Skip when no balls
+    # in scope or when a batter_id matchup filter is active.
     cohort: Optional[dict] = None
     if balls > 0 and not batter_id:
-        total_dist_balls = sum((o.get("legal_balls") or 0) for o in over_distribution)
+        total_dist_balls = sum((o.get("mix_legal_balls") or 0) for o in over_distribution)
         if total_dist_balls > 0:
-            mix = [(o.get("legal_balls") or 0) / total_dist_balls for o in over_distribution]
+            mix = [(o.get("mix_legal_balls") or 0) / total_dist_balls for o in over_distribution]
             while len(mix) < 20:
                 mix.append(0.0)
             from .scope_averages import compute_players_bowling_cohort
             cohort = await compute_players_bowling_cohort(
                 db, filters, aux, mix[:20], drop_set=None,
             )
+
+    # Tier-3 (Phase B): re-point the By Over COHORT bars to the narrowed
+    # per-over cohort under the six (compute_players_bowling_cohort already
+    # narrows by_over[]). The frozen cohort_* on over_distribution would
+    # otherwise stay full-scope. Below-support overs blank. None-of-six
+    # keeps the precomputed cohort_* (identical to by_over there).
+    if cohort is not None and aux is not None and not is_precomputed_scope(filters, aux):
+        bo = {e["over"]: e for e in cohort.get("by_over", [])}
+        coh_balls_total = sum((e.get("n_balls") or 0) for e in cohort.get("by_over", []))
+        for entry in over_distribution:
+            e = bo.get(entry["over"])
+            if e is None or e.get("below_support"):
+                entry["cohort_balls_share"] = None
+                entry["cohort_economy"] = None
+                entry["cohort_wickets_per_innings"] = None
+                entry["cohort_boundaries_per_over"] = None
+            else:
+                entry["cohort_economy"] = e.get("economy")
+                entry["cohort_wickets_per_innings"] = e.get("wickets_per_innings")
+                # boundaries-per-over from the narrowed per-over cohort:
+                # boundary_pct (= boundaries/balls*100) → ×6/100 = per over.
+                bpct = e.get("boundary_pct")
+                entry["cohort_boundaries_per_over"] = (
+                    round(bpct * 6 / 100, 3) if bpct is not None else None
+                )
+                entry["cohort_balls_share"] = (
+                    (e.get("n_balls") or 0) / coh_balls_total
+                    if coh_balls_total else None
+                )
 
     avg_val = _safe_div(runs_conceded, wickets)
     econ_val = _safe_div(runs_conceded, balls, 6)

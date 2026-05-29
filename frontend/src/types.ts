@@ -1283,6 +1283,12 @@ export interface BowlingOverDistributionEntry {
   wickets: number
   dots: number
   boundaries: number
+  /** Coarse legal-ball count per over (scope-key only, NOT narrowed by
+   *  the six) — the over-mix histogram weight. `legal_balls` itself
+   *  narrows under the six for the per-over economy bars; this stays
+   *  coarse so the role-profile weighting keeps enough statistics.
+   *  Tier-3 spec D-B2/D-B3. */
+  mix_legal_balls: number
   /** Player's distinct innings-bowled count that touched this over
    *  (per playerscopestatsover.innings_bowled). Denominator for the
    *  player-side wickets-per-innings rate on the By Over chart. */
