@@ -809,6 +809,57 @@ else
   bad "fielding by-phase cohort FROZEN (n_matches=$FBP_I_N == $FBP_U_N) -- 3e not wired"
 fi
 
+# ── §13 batting By Position bars narrow under the six (Tier-3 Phase B) ──
+# /batters/{id}/summary position_distribution[] — the By Position tab.
+# Tier-3 sweep: the player's OWN per-position performance (runs → SR/avg
+# bars) AND the cohort per-position bars narrow under the six; the MIX
+# histogram (innings per bucket = the weighting) STAYS COARSE. Anchor:
+# Kohli men's international, opener bucket (1), inning=0.
+echo
+echo "=== batting By Position bars narrow, mix stays coarse (Phase B) ==="
+bp_pos1() {  # $1=filter → "innings own_runs cohort_sr"
+  curl -s "$API/api/v1/batters/ba607b88/summary?gender=male&team_type=international&$1" \
+    | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+op=[e for e in d['position_distribution'] if e['bucket']==1]
+if not op: print('None None None'); raise SystemExit
+e=op[0]
+print(e['innings'], e['runs'], e.get('cohort_strike_rate'))
+"
+}
+read -r BPP_U_INN BPP_U_RUNS BPP_U_CSR < <(bp_pos1 "")
+read -r BPP_I_INN BPP_I_RUNS BPP_I_CSR < <(bp_pos1 "inning=0")
+echo "  opener unfiltered: innings(mix)=$BPP_U_INN own_runs=$BPP_U_RUNS cohort_SR=$BPP_U_CSR"
+echo "  opener inning=0:   innings(mix)=$BPP_I_INN own_runs=$BPP_I_RUNS cohort_SR=$BPP_I_CSR"
+# (a) own performance narrows
+if [[ "$BPP_I_RUNS" != "None" && "$BPP_I_RUNS" != "$BPP_U_RUNS" ]]; then
+  ok "By Position own runs narrowed ($BPP_U_RUNS -> $BPP_I_RUNS)"
+else
+  bad "By Position own runs FROZEN ($BPP_U_RUNS == $BPP_I_RUNS) -- Phase B not wired"
+fi
+# (b) cohort bar narrows
+if [[ "$BPP_I_CSR" != "None" && "$BPP_I_CSR" != "$BPP_U_CSR" ]]; then
+  ok "By Position cohort SR narrowed ($BPP_U_CSR -> $BPP_I_CSR)"
+else
+  bad "By Position cohort SR FROZEN ($BPP_U_CSR == $BPP_I_CSR) -- Phase B not wired"
+fi
+# (c) mix histogram (innings) STAYS COARSE (Tier-2-keep)
+if [[ "$BPP_I_INN" == "$BPP_U_INN" ]]; then
+  ok "By Position mix histogram stayed coarse (innings $BPP_U_INN == $BPP_I_INN)"
+else
+  bad "By Position mix histogram narrowed (innings $BPP_U_INN -> $BPP_I_INN) -- should stay coarse"
+fi
+# SQL anchor: opener inning=0 own runs == direct inningsbatterperf agg
+# (batted first → innings_number=0, position_bucket=1).
+BPP_EXPECTED=$(sqlite3 cricket.db "SELECT COALESCE(SUM(ibp.runs),0) FROM inningsbatterperf ibp JOIN innings i ON i.id=ibp.innings_id JOIN match m ON m.id=i.match_id WHERE ibp.batter_id='ba607b88' AND ibp.position_bucket=1 AND m.gender='male' AND m.team_type='international' AND i.super_over=0 AND i.innings_number=0;")
+echo "  SQL-anchored opener inning=0 own runs: $BPP_EXPECTED  (API: $BPP_I_RUNS)"
+if [[ "$BPP_I_RUNS" == "$BPP_EXPECTED" ]]; then
+  ok "By Position own runs == SQL-anchored ($BPP_I_RUNS)"
+else
+  bad "By Position own runs=$BPP_I_RUNS != SQL-anchored $BPP_EXPECTED"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"

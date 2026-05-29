@@ -11,6 +11,7 @@ from typing import Optional
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams, player_result_clause, player_toss_clause, player_inning_match_clause
 from ..aux_clauses import splice_aux_join_clauses
+from .bucket_baseline_dispatch import is_precomputed_scope
 from ..metrics_metadata import wrap_metric
 from ..player_nationality import player_nationalities
 from ..scope_links import suggested_splits, scope_dict_from_filters
@@ -32,8 +33,21 @@ def _safe_div(a, b, mul=1, ndigits=2):
     return round(a * mul / b, ndigits)
 
 
-async def _position_distribution(db, person_id: str, filters: FilterParams) -> list[dict]:
+async def _position_distribution(
+    db, person_id: str, filters: FilterParams, aux: AuxParams | None = None,
+) -> list[dict]:
     """Return the player's per-position batting aggregates as a length-10 array.
+
+    Tier-3 sweep (spec-tier3-cohort-narrowing.md Phase B): when any of the
+    six (venue/opponent/team/inning/toss/result) is set, the player's OWN
+    per-position performance (runs/balls/dismissals/fours/sixes/dots →
+    drives the Strike-Rate + Average bars) narrows live over
+    `inningsbatterperf` (player-POV batting orientation). The MIX HISTOGRAM
+    (`innings` per bucket → the weighting) deliberately STAYS COARSE
+    (scope-key grain), per the Tier-2-keep decision. The cohort per-bucket
+    bars (`cohort_*`) are re-pointed to the narrowed `by_position[]` by the
+    caller (see `_repoint_position_cohort`). None-of-six is unchanged (the
+    narrowed query equals the precomputed read by 3a parity).
 
     Joined from `playerscopestats_position` (child) → `playerscopestats`
     (parent, carries the scope-key columns: tournament/season/gender/
@@ -120,6 +134,41 @@ async def _position_distribution(db, person_id: str, filters: FilterParams) -> l
         db.q(cohort_sql, scope_params),
     )
 
+    # Tier-3 (Phase B): narrow the player's OWN per-position performance
+    # under the six over `inningsbatterperf` (player-POV batting
+    # orientation). `innings` (the mix) stays coarse; only runs/balls/
+    # dismissals/fours/sixes/dots move. None-of-six skips this (the
+    # precomputed read already equals the live aggregation by 3a parity).
+    narrowed_perf: dict[int, dict] = {}
+    if aux is not None and not is_precomputed_scope(filters, aux):
+        nw, np_ = filters.build(has_innings_join=True, aux=aux, apply_inning=False)
+        np_["pid"] = person_id
+        nparts = ["ibp.batter_id = :pid"]
+        if nw:
+            nparts.append(nw)
+        for clause in (
+            player_result_clause(aux, person_id, np_),
+            player_toss_clause(aux, person_id, np_),
+            player_inning_match_clause(aux, person_id, np_),
+        ):
+            if clause:
+                nparts.append(clause)
+        nsql = f"""
+            SELECT ibp.position_bucket,
+                   SUM(ibp.runs)        AS runs,
+                   SUM(ibp.balls)       AS legal_balls,
+                   SUM(CASE WHEN NOT ibp.not_out THEN 1 ELSE 0 END) AS dismissals,
+                   SUM(ibp.fours)       AS fours,
+                   SUM(ibp.sixes)       AS sixes,
+                   SUM(ibp.dots)        AS dots
+            FROM inningsbatterperf ibp
+            JOIN innings i ON i.id = ibp.innings_id
+            JOIN match   m ON m.id = i.match_id
+            WHERE {" AND ".join(nparts)}
+            GROUP BY ibp.position_bucket
+        """
+        narrowed_perf = {r["position_bucket"]: r for r in await db.q(nsql, np_)}
+
     by_bucket = {r["position_bucket"]: r for r in player_rows}
     cohort_by_bucket = {r["position_bucket"]: r for r in cohort_rows}
     cohort_total_innings = sum((r["innings"] or 0) for r in cohort_rows)
@@ -133,16 +182,26 @@ async def _position_distribution(db, person_id: str, filters: FilterParams) -> l
                 "dismissals": 0, "fours": 0, "sixes": 0, "dots": 0,
             }
         else:
+            # `innings` always coarse (the mix). Performance columns come
+            # from the narrowed query when any-of-six is set (Tier-3).
+            perf = narrowed_perf.get(b) if narrowed_perf else None
+            src = perf if perf is not None else r
             entry = {
                 "bucket": b,
                 "innings":     r["innings"] or 0,
-                "runs":        r["runs"] or 0,
-                "legal_balls": r["legal_balls"] or 0,
-                "dismissals":  r["dismissals"] or 0,
-                "fours":       r["fours"] or 0,
-                "sixes":       r["sixes"] or 0,
-                "dots":        r["dots"] or 0,
+                "runs":        src["runs"] or 0,
+                "legal_balls": src["legal_balls"] or 0,
+                "dismissals":  src["dismissals"] or 0,
+                "fours":       src["fours"] or 0,
+                "sixes":       src["sixes"] or 0,
+                "dots":        src["dots"] or 0,
             }
+            # When narrowing is active but the player has no innings at
+            # this bucket in the narrowed scope, performance zeroes out
+            # (mix may still show coarse innings).
+            if narrowed_perf and perf is None:
+                entry.update({"runs": 0, "legal_balls": 0, "dismissals": 0,
+                              "fours": 0, "sixes": 0, "dots": 0})
         c = cohort_by_bucket.get(b)
         if c is None or cohort_total_innings == 0:
             entry["cohort_innings_share"] = None
@@ -503,7 +562,7 @@ async def batting_summary(
 
     matches_count = len({r["match_id"] for r in innings_rows})
     nationalities = await player_nationalities(db, person_id)
-    position_distribution = await _position_distribution(db, person_id, filters)
+    position_distribution = await _position_distribution(db, person_id, filters, aux)
 
     # Compute the player's position-mix from their distribution and
     # fold the cohort baseline in-process. Skip the cohort fetch when
@@ -526,6 +585,29 @@ async def batting_summary(
             cohort = await compute_players_batting_cohort(
                 db, filters, aux, mix[:10], drop_set=None,
             )
+
+    # Tier-3 (Phase B): re-point the By Position COHORT bars to the
+    # narrowed per-bucket cohort under the six. compute_players_batting_cohort
+    # already narrows `by_position[]`; the frozen cohort_* on
+    # position_distribution would otherwise stay full-scope. Below-support
+    # buckets blank (fewer bars, never wrong). None-of-six keeps the
+    # precomputed cohort_* (identical to by_position there).
+    if cohort is not None and aux is not None and not is_precomputed_scope(filters, aux):
+        bp = {e["bucket"]: e for e in cohort.get("by_position", [])}
+        cohort_inn_total = sum((e.get("n_innings") or 0) for e in cohort.get("by_position", []))
+        for entry in position_distribution:
+            e = bp.get(entry["bucket"])
+            if e is None or e.get("below_support"):
+                entry["cohort_strike_rate"] = None
+                entry["cohort_average"] = None
+                entry["cohort_innings_share"] = None
+            else:
+                entry["cohort_strike_rate"] = e.get("strike_rate")
+                entry["cohort_average"] = e.get("average")
+                entry["cohort_innings_share"] = (
+                    (e.get("n_innings") or 0) / cohort_inn_total
+                    if cohort_inn_total else None
+                )
 
     avg_val = _safe_div(runs, dismissals)
     sr_val = _safe_div(runs, balls, 100)
