@@ -3044,6 +3044,85 @@ def batting_over_threshold(over: int) -> int:
     return 40
 
 
+async def _batting_over_cohort_live(db, filters: FilterParams, aux: AuxParams):
+    """Any-of-six live path (Tier-3 Phase B): reproduce the per-over batting
+    COHORT aggregates (runs / legal_balls_faced / dots / fours / sixes /
+    dismissals / innings_faced / n_players) from `delivery` over all batters
+    in the batting orientation (`_batting_live_where`), so the By Over chart's
+    cohort SR/dot%/boundaries reference line narrows under the six.
+
+    All-ball convention matches `scripts/populate_playerscopestats_batting_over.py`
+    (via api/batting_convention.batting_delivery_contrib): runs = runs_batter
+    on every ball; legal = wides=0 AND noballs=0; dot = legal AND
+    runs_batter=0 AND runs_total=0; four/six = runs_batter IN (4,6).
+    Returns (cohort_rows, pool_rows) shaped like the precomputed reads."""
+    where_full, params = _batting_live_where(filters, aux)
+    base = """
+        FROM delivery d
+        JOIN innings i ON i.id = d.innings_id
+        JOIN match   m ON m.id = i.match_id
+    """
+    gate = f"WHERE {where_full} AND d.batter_id IS NOT NULL AND d.over_number BETWEEN 0 AND 19"
+    deliv_sql = f"""
+        SELECT d.over_number + 1 AS over_number,
+               SUM(d.runs_batter)                                                          AS runs,
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS legal_balls,
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 AND d.runs_batter = 0 AND d.runs_total = 0 THEN 1 ELSE 0 END) AS dots,
+               SUM(CASE WHEN d.runs_batter = 4 THEN 1 ELSE 0 END)                           AS fours,
+               SUM(CASE WHEN d.runs_batter = 6 THEN 1 ELSE 0 END)                           AS sixes,
+               COUNT(DISTINCT d.batter_id)                                                  AS n_players
+        {base} {gate}
+        GROUP BY d.over_number
+    """
+    # innings_faced per over: distinct (innings, batter) with ≥1 legal ball.
+    inn_sql = f"""
+        SELECT over_number + 1 AS over_number, COUNT(*) AS innings_faced
+        FROM (
+            SELECT d.over_number AS over_number, d.innings_id, d.batter_id
+            {base} {gate}
+            GROUP BY d.innings_id, d.over_number, d.batter_id
+            HAVING SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) >= 1
+        ) GROUP BY over_number
+    """
+    # dismissals per over (batter out), excluding retired — matches the
+    # populate's BATTER_DISMISSAL_EXCLUDED.
+    wkt_sql = f"""
+        SELECT d.over_number + 1 AS over_number, COUNT(*) AS dismissals
+        FROM wicket w
+        JOIN delivery d ON d.id = w.delivery_id
+        JOIN innings  i ON i.id = d.innings_id
+        JOIN match    m ON m.id = i.match_id
+        WHERE {where_full} AND w.player_out_id IS NOT NULL
+          AND d.over_number BETWEEN 0 AND 19
+          AND w.kind NOT IN ('retired hurt', 'retired out')
+        GROUP BY d.over_number
+    """
+    pool_sql = f"""
+        SELECT COUNT(DISTINCT d.batter_id) AS n_players,
+               SUM(CASE WHEN d.extras_wides = 0 AND d.extras_noballs = 0 THEN 1 ELSE 0 END) AS n_balls_total
+        {base} {gate}
+    """
+    deliv_rows, inn_rows, wkt_rows, pool_rows = await asyncio.gather(
+        db.q(deliv_sql, params), db.q(inn_sql, params),
+        db.q(wkt_sql, params), db.q(pool_sql, params),
+    )
+    inn_by = {r["over_number"]: r["innings_faced"] for r in inn_rows}
+    wkt_by = {r["over_number"]: r["dismissals"] for r in wkt_rows}
+    cohort_rows = []
+    for r in deliv_rows:
+        o = r["over_number"]
+        cohort_rows.append({
+            "over_number": o,
+            "runs": r["runs"] or 0, "legal_balls": r["legal_balls"] or 0,
+            "dots": r["dots"] or 0, "fours": r["fours"] or 0,
+            "sixes": r["sixes"] or 0,
+            "dismissals": wkt_by.get(o, 0),
+            "innings_faced": inn_by.get(o, 0),
+            "n_players": r["n_players"] or 0,
+        })
+    return cohort_rows, pool_rows
+
+
 async def compute_players_batting_by_over(
     db,
     person_id: str,
@@ -3073,38 +3152,48 @@ async def compute_players_batting_by_over(
           AND psbo.person_id = :__pid
         ORDER BY psbo.over_number
     """
-    # Q2: cohort aggregates per over_number.
-    cohort_sql = f"""
-        SELECT psbo.over_number,
-               SUM(psbo.runs)              AS runs,
-               SUM(psbo.legal_balls_faced) AS legal_balls,
-               SUM(psbo.dots)              AS dots,
-               SUM(psbo.fours)             AS fours,
-               SUM(psbo.sixes)             AS sixes,
-               SUM(psbo.dismissals)        AS dismissals,
-               SUM(psbo.innings_faced)     AS innings_faced,
-               COUNT(DISTINCT psbo.person_id) AS n_players
-        FROM playerscopestatsbattingover psbo
-        WHERE psbo.scope_key IN (
-            SELECT scope_key FROM playerscopestats pss WHERE {where}
-        )
-        GROUP BY psbo.over_number
-        ORDER BY psbo.over_number
-    """
-    pool_sql = f"""
-        SELECT COUNT(DISTINCT psbo.person_id) AS n_players,
-               SUM(psbo.legal_balls_faced)    AS n_balls_total
-        FROM playerscopestatsbattingover psbo
-        WHERE psbo.scope_key IN (
-            SELECT scope_key FROM playerscopestats pss WHERE {where}
-        )
-    """
+    # Q2 (cohort per-over) + pool: dispatch on is_precomputed_scope
+    # (Tier-3 Phase B). The player MIX (Q1, ball_mix) ALWAYS reads the
+    # precomputed per-over table and stays coarse (Tier-2-keep). Only the
+    # per-over cohort RATES (the green SR/dot%/boundaries reference line)
+    # narrow under the six.
     p_params = {**params, "__pid": person_id}
-    player_rows, cohort_rows, pool_rows = await asyncio.gather(
-        db.q(player_sql, p_params),
-        db.q(cohort_sql, params),
-        db.q(pool_sql, params),
-    )
+    if is_precomputed_scope(filters, aux):
+        cohort_sql = f"""
+            SELECT psbo.over_number,
+                   SUM(psbo.runs)              AS runs,
+                   SUM(psbo.legal_balls_faced) AS legal_balls,
+                   SUM(psbo.dots)              AS dots,
+                   SUM(psbo.fours)             AS fours,
+                   SUM(psbo.sixes)             AS sixes,
+                   SUM(psbo.dismissals)        AS dismissals,
+                   SUM(psbo.innings_faced)     AS innings_faced,
+                   COUNT(DISTINCT psbo.person_id) AS n_players
+            FROM playerscopestatsbattingover psbo
+            WHERE psbo.scope_key IN (
+                SELECT scope_key FROM playerscopestats pss WHERE {where}
+            )
+            GROUP BY psbo.over_number
+            ORDER BY psbo.over_number
+        """
+        pool_sql = f"""
+            SELECT COUNT(DISTINCT psbo.person_id) AS n_players,
+                   SUM(psbo.legal_balls_faced)    AS n_balls_total
+            FROM playerscopestatsbattingover psbo
+            WHERE psbo.scope_key IN (
+                SELECT scope_key FROM playerscopestats pss WHERE {where}
+            )
+        """
+        player_rows, cohort_rows, pool_rows = await asyncio.gather(
+            db.q(player_sql, p_params),
+            db.q(cohort_sql, params),
+            db.q(pool_sql, params),
+        )
+    else:
+        player_rows, (cohort_rows, pool_rows) = await asyncio.gather(
+            db.q(player_sql, p_params),
+            _batting_over_cohort_live(db, filters, aux),
+        )
 
     by_over_cohort = {r["over_number"]: r for r in cohort_rows}
     n_players_total = (pool_rows[0].get("n_players") if pool_rows else 0) or 0

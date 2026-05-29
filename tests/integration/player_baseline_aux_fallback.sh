@@ -960,6 +960,41 @@ else
   bad "By Dismissed Position own catches=$FD_I_C != SQL-anchored $FD_EXPECTED"
 fi
 
+# ── §16 batting By Over cohort reference line narrows (Phase B) ──
+# /scope/averages/players/batting/by-over — the green SR/dot%/boundaries
+# reference line on the batting By Over chart. Read a scope-key-only table
+# (frozen) until Phase B; now the per-over cohort rates narrow live over
+# delivery (batting orientation). The player's OWN bars already narrow.
+# Over-MIX (ball_mix) stays coarse. Anchor: Kohli men's intl, over 1, inning=0.
+echo
+echo "=== batting By Over cohort reference line narrows (Phase B) ==="
+bbo_over1() {  # $1=filter → "cohort_sr n_balls"
+  curl -s "$API/api/v1/scope/averages/players/batting/by-over?person_id=ba607b88&gender=male&team_type=international&$1" \
+    | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+o=[x for x in d['by_over'] if x['over']==1]
+if not o: print('None None'); raise SystemExit
+print(o[0].get('strike_rate'), o[0].get('n_balls'))
+"
+}
+read -r BBO_U_SR BBO_U_N < <(bbo_over1 "")
+read -r BBO_I_SR BBO_I_N < <(bbo_over1 "inning=0")
+echo "  over1 unfiltered: cohort_SR=$BBO_U_SR n_balls=$BBO_U_N"
+echo "  over1 inning=0:   cohort_SR=$BBO_I_SR n_balls=$BBO_I_N"
+if [[ "$BBO_I_SR" != "None" && "$BBO_I_SR" != "$BBO_U_SR" ]]; then
+  ok "batting By Over cohort SR narrowed ($BBO_U_SR -> $BBO_I_SR)"
+else
+  bad "batting By Over cohort SR FROZEN ($BBO_U_SR == $BBO_I_SR) -- Phase B not wired"
+fi
+BBO_EXPECTED=$(sqlite3 cricket.db "SELECT ROUND(SUM(d.runs_batter)*100.0/SUM(CASE WHEN d.extras_wides=0 AND d.extras_noballs=0 THEN 1 ELSE 0 END),1) FROM delivery d JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id WHERE d.over_number=0 AND d.batter_id IS NOT NULL AND m.gender='male' AND m.team_type='international' AND i.super_over=0 AND i.innings_number=0;")
+echo "  SQL-anchored over1 inning=0 cohort SR: $BBO_EXPECTED  (API: $BBO_I_SR)"
+if [[ "$BBO_I_SR" == "$BBO_EXPECTED" ]]; then
+  ok "batting By Over cohort SR == SQL-anchored ($BBO_I_SR)"
+else
+  bad "batting By Over cohort SR=$BBO_I_SR != SQL-anchored $BBO_EXPECTED"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"
