@@ -258,6 +258,22 @@ When the scope is too thin for a reliable cohort baseline (a single
 sparse season, for example), the subtitle hides — the bold value
 still shows, just without the comparison.
 
+**The comparison re-adapts whenever you narrow.** The `vs cohort`
+number isn't a fixed all-time figure — it recomputes against the same
+slice you're looking at. Pick a venue, an opponent, a single innings,
+won-toss or won-match, and the "typical player" it compares against
+narrows to that same situation, so the comparison stays fair. For
+example, Kohli's average at one ground is compared against how the
+typical opener did *at that ground*, not against his all-time peers;
+switch to "batted second" and both his number and the typical-opener
+number move to the second-innings version. The small green trend line
+on the mini-charts (the "typical at scope" line) moves with it too.
+The one thing that stays broad on purpose is the *mix* bar on the By
+Position / By Over tabs (how often he opened vs batted #3) — there's
+rarely enough data to re-estimate that for a deep filter, so it keeps
+the steadier season-wide picture while the comparison values still
+narrow.
+
 ## The filter bar
 
 Every page (except the home page and individual match scorecards)
@@ -334,6 +350,14 @@ reproduces exactly what you see, but it doesn't follow you to a
 new tab the way Gender / Type / Tournament do. On the Teams page the
 **Splits Mosaic** (above the tabs) is the control — click a cell to
 set it.
+
+Alongside the innings pills, the player Batting / Bowling / Fielding
+pages also carry a **result** pill row (All outcomes / Won / Lost /
+Tied), which narrows to matches the player's team won, lost or tied.
+It behaves the same page-local way, and — like the innings filter —
+both the player's own numbers *and* the "typical player" comparison
+narrow to that subset. (Toss-based narrowing works the same way; on
+Teams it's set via the Splits Mosaic.)
 
 On the team Compare tab a carried-over innings filter applies to
 **every** column (and the league-average column), so the comparison
