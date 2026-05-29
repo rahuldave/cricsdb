@@ -82,7 +82,7 @@ Open http://localhost:5173. Vite proxies `/api/*` → port 8000.
 
 ```bash
 bash deploy.sh           # code-only (DB persists on plash)
-bash deploy.sh --first   # uploads cricket.db (~435 MB)
+bash deploy.sh --first   # uploads cricket.db (~860 MB as of 2026-05-29; grows with the playerscopestats precompute family)
 ```
 
 Type-check with `tsc -b` or `npm run build` — `tsc --noEmit` is a no-op here (root tsconfig has `files: []`).
