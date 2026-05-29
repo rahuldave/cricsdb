@@ -19,7 +19,7 @@ REG field_summary_kohli_intl          /api/v1/fielders/ba607b88/summary?gender=m
 REG field_summary_kohli_ipl           /api/v1/fielders/ba607b88/summary?gender=male&team_type=club&tournament=Indian%20Premier%20League
 REG field_by_season_kohli             /api/v1/fielders/ba607b88/by-season?gender=male&team_type=international
 REG field_by_phase_kohli              /api/v1/fielders/ba607b88/by-phase?gender=male&team_type=international
-NEW field_by_over_kohli               /api/v1/fielders/ba607b88/by-over?gender=male&team_type=international
+REG field_by_over_kohli               /api/v1/fielders/ba607b88/by-over?gender=male&team_type=international
 REG field_dismissal_types_kohli       /api/v1/fielders/ba607b88/dismissal-types?gender=male&team_type=international
 REG field_victims_kohli               /api/v1/fielders/ba607b88/victims?gender=male&team_type=international
 REG field_by_innings_kohli            /api/v1/fielders/ba607b88/by-innings?gender=male&team_type=international&limit=10
@@ -47,7 +47,7 @@ REG field_leaders_men_intl_fm                          /api/v1/fielders/leaders?
 REG field_summary_kohli_intl_fm                        /api/v1/fielders/ba607b88/summary?gender=male&team_type=international&team_class=full_member
 REG field_by_season_kohli_fm                           /api/v1/fielders/ba607b88/by-season?gender=male&team_type=international&team_class=full_member
 REG field_by_phase_kohli_fm                            /api/v1/fielders/ba607b88/by-phase?gender=male&team_type=international&team_class=full_member
-NEW field_by_over_kohli_fm                             /api/v1/fielders/ba607b88/by-over?gender=male&team_type=international&team_class=full_member
+REG field_by_over_kohli_fm                             /api/v1/fielders/ba607b88/by-over?gender=male&team_type=international&team_class=full_member
 REG field_dismissal_types_kohli_fm                     /api/v1/fielders/ba607b88/dismissal-types?gender=male&team_type=international&team_class=full_member
 REG field_victims_kohli_fm                             /api/v1/fielders/ba607b88/victims?gender=male&team_type=international&team_class=full_member
 REG field_by_innings_kohli_fm                          /api/v1/fielders/ba607b88/by-innings?gender=male&team_type=international&limit=10&team_class=full_member
@@ -65,7 +65,7 @@ REG field_leaders_men_intl_bilat                       /api/v1/fielders/leaders?
 REG field_summary_kohli_intl_bilat                     /api/v1/fielders/ba607b88/summary?gender=male&team_type=international&series_type=bilateral_only
 REG field_by_season_kohli_bilat                        /api/v1/fielders/ba607b88/by-season?gender=male&team_type=international&series_type=bilateral_only
 REG field_by_phase_kohli_bilat                         /api/v1/fielders/ba607b88/by-phase?gender=male&team_type=international&series_type=bilateral_only
-NEW field_by_over_kohli_bilat                          /api/v1/fielders/ba607b88/by-over?gender=male&team_type=international&series_type=bilateral_only
+REG field_by_over_kohli_bilat                          /api/v1/fielders/ba607b88/by-over?gender=male&team_type=international&series_type=bilateral_only
 REG field_dismissal_types_kohli_bilat                  /api/v1/fielders/ba607b88/dismissal-types?gender=male&team_type=international&series_type=bilateral_only
 REG field_victims_kohli_bilat                          /api/v1/fielders/ba607b88/victims?gender=male&team_type=international&series_type=bilateral_only
 REG field_by_innings_kohli_bilat                       /api/v1/fielders/ba607b88/by-innings?gender=male&team_type=international&limit=10&series_type=bilateral_only
