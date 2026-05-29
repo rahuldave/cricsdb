@@ -118,9 +118,13 @@ dom_kohli_open_cohort=$(ab_eval "(() => {
 })()")
 assert_eq "A6 · opener cohort c/m matches API ($api_kohli_open_cohort)" "$api_kohli_open_cohort" "$dom_kohli_open_cohort"
 
-# Player c/m at opener: catches[0] / matches.value
+# Player c/m at opener: catches[0] / matches_fielded. The per-dismissed-
+# position rate divides by matches_fielded (XI ∧ opponent batted), NOT squad
+# matches — the denominator-B convention (3e). They differ when the fielder
+# was in the XI but the opponent did not bat (abandoned / no-result), e.g.
+# Kohli IPL = 279 fielded of 280 squad.
 api_kohli_open_player=$(curl -sS "$API_BASE/api/v1/fielders/$KOHLI/summary?$IPL" \
-  | python3 -c "import json,sys;d=json.load(sys.stdin);catches=d['dismissal_position_distribution'][0]['catches'];matches=d['matches']['value'];print(f'{catches/matches:.3f}')")
+  | python3 -c "import json,sys;d=json.load(sys.stdin);catches=d['dismissal_position_distribution'][0]['catches'];mf=d['matches_fielded']['value'];print(f'{catches/mf:.3f}')")
 dom_kohli_open_player=$(ab_eval "(() => {
   const titles = Array.from(document.querySelectorAll('.wisden-dismissed-position-distribution-tab .wisden-perf-cohort title'));
   const t = titles.find(x => x.textContent.startsWith('Open:'));
