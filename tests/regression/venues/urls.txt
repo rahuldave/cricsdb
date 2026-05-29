@@ -34,7 +34,7 @@ REG bow_leaders_wankhede_inn1         /api/v1/bowlers/leaders?filter_venue=Wankh
 
 # ── fielding ─────────────────────────────────────────────────────
 REG field_summary_plain               /api/v1/fielders/ba607b88/summary
-REG field_summary_venue_wankhede      /api/v1/fielders/ba607b88/summary?filter_venue=Wankhede%20Stadium
+NEW field_summary_venue_wankhede      /api/v1/fielders/ba607b88/summary?filter_venue=Wankhede%20Stadium
 
 # ── teams (uses filters.build directly via _team_filter_clause) ──
 REG teams_landing_plain               /api/v1/teams/landing
