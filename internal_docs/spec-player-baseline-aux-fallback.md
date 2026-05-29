@@ -70,7 +70,37 @@ Each filter answers a real question (pools in §4): _"Is Kohli the best top-orde
 
 - 3d. ✅ **SHIPPED 2026-05-28.** Bowling live (raw deliveries grouped by over — no new table). Three slices, each dispatch on `is_precomputed_scope`: 3d-1 `compute_players_bowling_by_phase`, 3d-2 `compute_players_bowling_by_season`, 3d-3 `compute_players_bowling_cohort` (summary chip + distribution prob baselines). Shared `_bowling_live_where` (bowling/fielding orientation: inning flips to 1-N, toss/result key on the bowling side, filter_team/opponent flipped) + `_bowling_over_cohort_live(by_season, with_spell_cols)` reproducing every `playerscopestatsover` column live, including the per-spell-touching set (maidens, 3/4/5-fer attribution via ROW_NUMBER, innings_with_wicket/two, qualifying + econ/runs bands via a touch/spell/spell_wkts CTE). Verified byte-identical to the precomputed table at none-of-six (20 overs × 22 cols = 440 cells, 0 mismatches). Tests: `player_baseline_aux_fallback.sh` §7-§9. Commits `75730ea` (by-phase) / `3f0bc74` (by-season) / `1cf1bc7` (summary+distribution) + 2 REG→NEW pre-flips. Plan: `internal_docs/plan-3d-bowling-live-cohort.md`.
 
-- 3e. Fielding / keeping live (keeper-binary). **Re-scoped 2026-05-28 —
+- 3e. ✅ **SHIPPED 2026-05-28.** Fielding / keeping live (keeper-binary).
+  `compute_players_fielding_cohort` (+ `_by_season` + `_by_phase`) each
+  dispatch on `is_precomputed_scope`: none-of-six → precomputed children
+  (unchanged); any-of-six → live aggregation across the three source
+  tables. New helper `_fielding_denom_where` builds the matchplayer-grain
+  `matches_fielded` denominator keyed on `mp.team` (fielding orientation);
+  the numerator reuses `_bowling_live_where` (fieldingcredit lives in the
+  opponent-batting innings = bowling orientation), Convention 3 +
+  is_substitute=0, with the dismissed-batter bucket from `inningsbatterperf`
+  so it stays byte-identical to `playerscopestatsfieldingposition`; the
+  catch-dist (P chips) buckets the matchplayer master sample by per-match
+  non-sub catch count (mirrors `playerscopestatsfieldingcatchdist`); the
+  keeper/outfielder partition is "kept ≥1 in-scope innings"
+  (`keeperassignment`, summary/by-phase use a single lifetime set,
+  by-season a per-(person,season) set). Side-effect (consistency):
+  team_class/series_type now narrow the fielding cohort too
+  (`is_precomputed_scope` already rejects them), so fielding matches
+  batting/bowling. **Parity:** live == precomputed byte-identical at
+  none-of-six (IPL 2016 summary both cohorts + 10 dismissed-position
+  buckets; by-season 18 seasons; by-phase 6 cells — 0 mismatches).
+  SQL-anchored narrowing: Dhoni men's-intl inning=0 keeper catches/match
+  0.576→0.5 (2365/4726); IPL 2016 inning=1 0.65 (39/60). Browser-confirmed:
+  distribution P-chip cohort 58%→64% under inning=0 (both sides narrow).
+  Tests: `player_baseline_aux_fallback.sh` §10-§12 (red→green). Commits:
+  `11e6818` (REG→NEW pre-flip ×16) → `6ffd315` (summary+distribution) →
+  `e608da0` (by-season) → `decc3d9` (by-phase) → `271ad45` (tests) →
+  `031e0da` (NEW→REG flip-back). This also flipped the
+  By-Dismissed-Position + By-Over TAB denominators to `matches_fielded`
+  (both sides) — the deferred half of B.
+
+  **Original re-scoped scope (2026-05-28), retained for reference —
   it is NOT the "cheap matchfielderperf mirror" the original §8.3 bullet
   assumed; it's the heaviest discipline slice. Detailed below.**
 
