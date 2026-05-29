@@ -130,6 +130,75 @@ support-cliff blank, no new SQL. If not, add the narrowed per-bucket
 fields to the summary payload (or a small by-position scope endpoint).
 The mix histogram keeps reading `position_distribution` / `over_distribution`.
 
+## 3.5 Phase B design — SETTLED with owner 2026-05-29 (read before touching any bar)
+
+The VERIFY (§3 CHECK) came back: the narrowed per-bucket cohort already
+exists in `compute_players_{batting,bowling,fielding}_cohort`
+(`by_position[]` / `by_over[]` / `by_dismissed_position[]`) but is NOT
+exposed on the summary; the tabs read SEPARATE frozen functions
+(`_position_distribution` / `_over_distribution` /
+`_dismissal_position_distribution`, scope-key only). So pre-Phase-B the
+whole tab (own bars AND cohort bars) is frozen under the six.
+
+**Owner decision — what narrows vs stays coarse (D-B1):**
+- the **mix histogram** (which positions/overs the player plays — the
+  WEIGHTING) **STAYS COARSE** (scope-key axes only: gender/team_type/
+  tournament/season, e.g. club-vs-international; NEVER the six). Rationale:
+  enough statistics for a stable role profile; further subdividing the mix
+  by inning/result/etc. (e.g. IPL impact-player rule splitting batting-first
+  vs second) starves it of data.
+- **everything else** — the player's OWN per-bucket rates AND the cohort
+  per-bucket rates (strike rate / economy / average / wickets-per-innings /
+  …) — **NARROWS on the six.** The whole point: "is Bumrah still better
+  than his cohort *bowling first in losses*?" needs both his bar and the
+  cohort bar at `result=lost & inning=1`.
+
+**Bowling over-mix is balls-based, NOT innings-based (D-B2) — do NOT
+"fix" it to innings.** The weight per over = share of the bowler's LEGAL
+BALLS in that over (≡ overs bowled, balls/6). This is intentional and
+correct: overs don't always finish (rain, injury, innings ending, a death
+bowler pulled mid-over), so a late-over specialist bowls fewer *and partial*
+overs at 17. Balls-weighting counts a 3-ball 17th as 3/6 of an over; an
+innings/over COUNT would over-credit partial overs. Batting position-mix is
+innings-based only because innings don't have this partial-unit problem.
+(An earlier attempt to unify bowling onto innings-based was wrong and
+rejected — see the 2026-05-29 discussion.)
+
+**The "two hats" bookkeeping (D-B3) — bowling/fielding only, NOT batting.**
+On batting the histogram divides by `innings` and the SR bars by `balls` —
+different numbers, so keeping the histogram coarse while narrowing the bars
+is free (keep `innings` coarse, narrow `runs`/`balls` independently). On
+bowling the histogram AND the economy bars both divide by *legal balls per
+over* — the SAME raw number used two ways: coarse (the weight) and narrowed
+(the rate denominator). So `over_distribution` carries a coarse
+`mix_legal_balls` (drives the histogram + the cohort-headline weight) AND a
+narrowed `legal_balls` (drives the per-over economy/boundary bars). Same
+visible behaviour as batting; just one extra field because one quantity
+wears two hats. Fielding By Dismissed Position likely the same shape.
+
+**Where the weighting actually applies (D-B4).** The per-over/per-bucket
+BARS are unweighted — own econ@over = narrowed runs ÷ narrowed balls in
+that over; cohort econ@over from `by_over[]` (narrowed); wickets bar =
+wickets ÷ innings_bowled at that over (a flat count ratio — balls only gate
+"did he bowl this over", a partial over still counts as one innings). The
+balls-based over-mix weight ONLY enters when collapsing the per-over rates
+into the single **headline cohort** number (`convex_combine(mix, per-over
+rate)`), and for per-innings rates a `per_innings_scale` factor keeps the
+dimensions honest (per-attendance → per-unique-innings). The player's OWN
+headline economy is just total runs ÷ total balls over the filtered scope —
+a flat aggregate, no per-over tracking, already narrows. So the headline
+economy VALUE never touches the two-hats bookkeeping; only the per-over
+chart and the cohort-headline WEIGHT do.
+
+**Implementation shape per re-pointable surface:** `_*_distribution(...,
+aux)` — keep the coarse mix field; when `aux is not None and not
+is_precomputed_scope`, narrow the player's OWN per-bucket via the live
+player-POV query (inningsbatterperf for batting; delivery+wicket for
+bowling; fieldingcredit for fielding); the summary re-points the cohort
+per-bucket fields to `cohort["by_*"]` (below-support buckets blank). The
+`/distribution` mix-only call site stays unnarrowed (gate on `aux is not
+None`). Batting By Position shipped this way (`9e1a85b`).
+
 ## 4. Per-surface implementation pattern (reuse, don't fork)
 
 1. Reuse `_batting_live_where` / `_bowling_live_where` / new
