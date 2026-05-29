@@ -10,7 +10,7 @@ Usage:
     uv run python update_recent.py --keep        # keep extracted files
 
 Cricsheet only publishes bulk "recently_added" zips for specific windows
-(7, 14, 30 days). Pass any integer via --days; the script picks the
+(2, 7, 30 days). Pass any integer via --days; the script picks the
 smallest available bundle that covers it.
 """
 
@@ -36,7 +36,10 @@ from import_data import (
 CRICSHEET_BASE = "https://cricsheet.org/downloads"
 CRICSHEET_REGISTER = "https://cricsheet.org/register"
 T20_MATCH_TYPES = {"T20", "IT20"}  # club + international T20s
-AVAILABLE_WINDOWS = [2, 7, 14, 30]
+# Bundles cricsheet actually publishes. The 14-day bundle was dropped
+# (its URL 404s as of 2026-05-29); --days 8..14 now rounds up to 30.
+# If cricsheet restores 14, add it back here and pick_window picks it up.
+AVAILABLE_WINDOWS = [2, 7, 30]
 PEOPLE_CSVS = ["people.csv", "names.csv"]
 
 
@@ -151,7 +154,7 @@ async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=30,
                     help="How many days back to fetch. Cricsheet only "
-                         "publishes 2/7/14/30-day bundles, so the smallest "
+                         "publishes 2/7/30-day bundles, so the smallest "
                          "bundle covering --days is used.")
     ap.add_argument("--keep", action="store_true",
                     help="Keep extracted files after import")
