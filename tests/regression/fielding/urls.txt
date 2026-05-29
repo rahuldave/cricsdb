@@ -35,7 +35,7 @@ REG keep_ambiguous_dhoni              /api/v1/fielders/4a8a2e3b/keeping/ambiguou
 REG field_summary_kohli_vs_aus        /api/v1/fielders/ba607b88/summary?gender=male&team_type=international&filter_team=India&filter_opponent=Australia
 
 # ── venue-scope sanity ───────────────────────────────────────────
-REG field_summary_kohli_wankhede      /api/v1/fielders/ba607b88/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG field_summary_kohli_wankhede      /api/v1/fielders/ba607b88/summary?filter_venue=Wankhede%20Stadium
 
 # ── search ───────────────────────────────────────────────────────
 REG ref_players_search_fielder_role   /api/v1/players?q=Dhoni&role=fielder&limit=5

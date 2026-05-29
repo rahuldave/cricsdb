@@ -81,7 +81,7 @@ REG series_other_rivalries_women      /api/v1/series/other-rivalries?gender=fema
 REG rivalries_summary_ind_aus         /api/v1/rivalries/summary?team1=India&team2=Australia&gender=male
 
 # ── venue scope (Phase 2 filter_venue fan-out) ───────────────────
-REG series_summary_ipl_wankhede       /api/v1/series/summary?tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG series_summary_ipl_wankhede       /api/v1/series/summary?tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium
 
 # ── inning-split (spec-inning-split.md) — lock the lowest_all_out
 #    fix from 2026-04-29 (commit 8) so the inning narrowing on

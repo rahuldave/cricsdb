@@ -26,7 +26,7 @@ REG h2h_kohli_vs_bumrah_tournonly     /api/v1/head-to-head/ba607b88/462411b3?ser
 
 # ── filter-scope sanity ──────────────────────────────────────────
 REG h2h_kohli_vs_bumrah_2024          /api/v1/head-to-head/ba607b88/462411b3?season_from=2024&season_to=2024
-REG h2h_kohli_vs_bumrah_wankhede      /api/v1/head-to-head/ba607b88/462411b3?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG h2h_kohli_vs_bumrah_wankhede      /api/v1/head-to-head/ba607b88/462411b3?filter_venue=Wankhede%20Stadium
 
 # ── team-vs-team (mode=team) backs these via /series/* ───────────
 REG h2h_team_summary_ind_aus          /api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male&team_type=international

@@ -37,7 +37,7 @@ NEW bow_summary_bumrah_vs_aus         /api/v1/bowlers/462411b3/summary?gender=ma
 REG bow_by_innings_bumrah_vs_aus      /api/v1/bowlers/462411b3/by-innings?gender=male&team_type=international&filter_team=India&filter_opponent=Australia&limit=5
 
 # ── venue-scope sanity ───────────────────────────────────────────
-NEW bow_summary_bumrah_wankhede       /api/v1/bowlers/462411b3/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+NEW bow_summary_bumrah_wankhede       /api/v1/bowlers/462411b3/summary?filter_venue=Wankhede%20Stadium
 
 # ── search ───────────────────────────────────────────────────────
 REG ref_players_search_bumrah         /api/v1/players?q=Bumrah&limit=5

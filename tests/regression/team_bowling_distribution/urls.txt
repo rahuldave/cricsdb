@@ -31,7 +31,7 @@ REG dist_mi_ipl                   /api/v1/teams/Mumbai%20Indians/bowling/distrib
 REG dist_mi_ipl_2024              /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01
 REG dist_mi_ipl_2023              /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2023&season_to=2023&as_of_date=2025-01-01
 REG dist_mi_vs_csk_ipl            /api/v1/teams/Mumbai%20Indians/bowling/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_opponent=Chennai%20Super%20Kings&as_of_date=2025-01-01
-REG dist_mi_at_wankhede           /api/v1/teams/Mumbai%20Indians/bowling/distribution?filter_venue=Wankhede%20Stadium%2C%20Mumbai&as_of_date=2025-01-01
+REG dist_mi_at_wankhede           /api/v1/teams/Mumbai%20Indians/bowling/distribution?filter_venue=Wankhede%20Stadium&as_of_date=2025-01-01
 
 # ── Chennai Super Kings (sibling franchise) ──────────────────────
 REG dist_csk_all_time             /api/v1/teams/Chennai%20Super%20Kings/bowling/distribution?as_of_date=2025-01-01

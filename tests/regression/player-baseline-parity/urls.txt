@@ -13,13 +13,13 @@
 
 REG pbsl_bat_by_season_unfiltered       /api/v1/scope/averages/players/batting/by-season?person_id=ba607b88&gender=male&team_type=club
 REG pbsl_bat_by_season_ipl_2016         /api/v1/scope/averages/players/batting/by-season?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016
-REG pbsl_bat_by_season_ipl_wankhede     /api/v1/scope/averages/players/batting/by-season?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG pbsl_bat_by_season_ipl_wankhede     /api/v1/scope/averages/players/batting/by-season?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&filter_venue=Wankhede%20Stadium
 
 # ── /scope/averages/players/batting/by-phase ──────────────────
 
 REG pbsl_bat_by_phase_unfiltered        /api/v1/scope/averages/players/batting/by-phase?person_id=ba607b88&gender=male&team_type=club
 REG pbsl_bat_by_phase_ipl_2016          /api/v1/scope/averages/players/batting/by-phase?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016
-REG pbsl_bat_by_phase_ipl_wankhede      /api/v1/scope/averages/players/batting/by-phase?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&filter_venue=Wankhede%20Stadium%2C%20Mumbai
+REG pbsl_bat_by_phase_ipl_wankhede      /api/v1/scope/averages/players/batting/by-phase?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&filter_venue=Wankhede%20Stadium
 
 # ── /scope/averages/players/bowling/by-season ──────────────────
 
@@ -44,3 +44,19 @@ REG pbsl_field_by_season_ipl_inning1    /api/v1/scope/averages/players/fielding/
 REG pbsl_field_by_phase_unfiltered      /api/v1/scope/averages/players/fielding/by-phase?person_id=4a8a2e3b&gender=male&team_type=club
 REG pbsl_field_by_phase_ipl_2016        /api/v1/scope/averages/players/fielding/by-phase?person_id=4a8a2e3b&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016
 REG pbsl_field_by_phase_ipl_inning1     /api/v1/scope/averages/players/fielding/by-phase?person_id=4a8a2e3b&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&inning=1
+
+# ── /scope/averages/players/batting/by-over (added 2026-05-29 — was
+#    the one cohort endpoint with no regression coverage). Tier-3 Phase B
+#    narrowed its per-over cohort bars; lock the narrowed values. ──
+
+REG pbsl_bat_by_over_unfiltered         /api/v1/scope/averages/players/batting/by-over?person_id=ba607b88&gender=male&team_type=club
+REG pbsl_bat_by_over_ipl_2016           /api/v1/scope/averages/players/batting/by-over?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016
+REG pbsl_bat_by_over_ipl_inning0        /api/v1/scope/averages/players/batting/by-over?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&inning=0
+
+# ── extra aux axes so all six are exercised on a cohort endpoint:
+#    result (batting by-season), opponent (bowling by-phase), inning
+#    (batting by-phase). venue/toss/inning already covered above. ──
+
+REG pbsl_bat_by_season_ipl_result_won   /api/v1/scope/averages/players/batting/by-season?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&result=won
+REG pbsl_bat_by_phase_ipl_inning1       /api/v1/scope/averages/players/batting/by-phase?person_id=ba607b88&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&inning=1
+REG pbsl_bowl_by_phase_ipl_vs_csk       /api/v1/scope/averages/players/bowling/by-phase?person_id=462411b3&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&filter_opponent=Chennai%20Super%20Kings

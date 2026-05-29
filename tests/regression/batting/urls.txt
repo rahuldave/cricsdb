@@ -32,7 +32,7 @@ REG bat_by_innings_kohli_vs_aus       /api/v1/batters/ba607b88/by-innings?gender
 REG bat_by_season_kohli_ipl_rcb       /api/v1/batters/ba607b88/by-season?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_team=Royal%20Challengers%20Bangalore
 
 # ── venue-scope sanity ───────────────────────────────────────────
-NEW bat_summary_kohli_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium%2C%20Mumbai
+NEW bat_summary_kohli_wankhede        /api/v1/batters/ba607b88/summary?filter_venue=Wankhede%20Stadium
 
 # ── search (landing → player picker) ─────────────────────────────
 REG ref_players_search_kohli          /api/v1/players?q=Kohli&limit=10

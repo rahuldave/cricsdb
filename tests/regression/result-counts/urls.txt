@@ -1,0 +1,25 @@
+# /api/v1/players/{id}/result-counts — player-page ResultFilter + TossFilter
+# pill counts (wins/losses/ties/no_results + toss_won/toss_lost).
+#
+# Had ZERO regression coverage before 2026-05-29. These lock the output
+# shape AND the narrowing: result-counts honours gender/team_type/tournament/
+# season/filter_venue + inning (Option-B match union) + filter_team (at
+# mp.team), is aux-stripped for result/toss, and DROPS filter_opponent.
+# A REG drift on a narrowed row = the scope narrowing broke.
+#
+# Anchors: Kohli ba607b88, Dhoni 4a8a2e3b. Values SQL-verified in
+# tests/sanity/test_result_counts_and_narrowing.py.
+
+# ── shape capture (broadest) ──────────────────────────────────
+REG rc_kohli_intl            /api/v1/players/ba607b88/result-counts?gender=male&team_type=international
+REG rc_kohli_club            /api/v1/players/ba607b88/result-counts?gender=male&team_type=club
+REG rc_dhoni_ipl             /api/v1/players/4a8a2e3b/result-counts?gender=male&team_type=club&tournament=Indian%20Premier%20League
+
+# ── scope narrowing (counts MUST shrink vs the club/IPL baseline) ──
+REG rc_kohli_ipl             /api/v1/players/ba607b88/result-counts?gender=male&team_type=club&tournament=Indian%20Premier%20League
+REG rc_kohli_ipl_2016        /api/v1/players/ba607b88/result-counts?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016
+REG rc_kohli_ipl_wankhede    /api/v1/players/ba607b88/result-counts?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_venue=Wankhede%20Stadium
+
+# ── aux narrowing: inning applies (Option-B); result/toss are aux-stripped ──
+REG rc_kohli_ipl_inning0     /api/v1/players/ba607b88/result-counts?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=0
+REG rc_kohli_ipl_inning1     /api/v1/players/ba607b88/result-counts?gender=male&team_type=club&tournament=Indian%20Premier%20League&inning=1
