@@ -401,6 +401,46 @@ curl "http://localhost:8000/api/v1/players?q=Kohli&role=batter&tournament=T20+Wo
 }
 ```
 
+## `GET /api/v1/players/{person_id}/result-counts`
+
+Per-player match counts split by the player's own-team **match result**
+AND **toss outcome** — feeds the player-page ResultFilter pills (won /
+lost / tied) and the toss split. Scope = the FilterBar fields
+(`gender`, `team_type`, `tournament`, `season_from`/`_to`, `filter_venue`,
+`series_type`) plus `inning` (Option-B, match-level union) and `filter_team`
+(re-applied at `mp.team` — narrows to matches the player played *for* that
+team). It is **aux-stripped for `result`/`toss_outcome`** (it reports those
+splits, so filtering by them would make the breakdown circular) and **drops
+`filter_opponent`** (the pill counts stay at the team/scope level — see the
+caveat below).
+
+```bash
+curl "http://localhost:8000/api/v1/players/ba607b88/result-counts?gender=male&team_type=club"
+```
+
+```json
+{
+  "matches": 280,
+  "wins": 140,
+  "losses": 134,
+  "ties": 6,
+  "no_results": 0,
+  "toss_won": 132,
+  "toss_lost": 148
+}
+```
+
+Flat integer counts (not envelope-wrapped). `wins + losses + ties +
+no_results == matches`; `toss_won + toss_lost <= matches` (matches with no
+recorded toss winner fall into neither). `tied` collapses true ties +
+no-results (`outcome_winner IS NULL`). Source: `api/routers/reference.py`.
+
+> **Caveat — `filter_opponent` is not applied here.** When a player page
+> carries `filter_opponent` (the "Versus" typeahead), the pill counts from
+> this endpoint stay at the team/scope level rather than narrowing to the
+> opponent. Known behaviour as of 2026-05-29 (the endpoint `drop`s
+> `filter_opponent`); flagged for review.
+
 ---
 
 # Landing pages
@@ -1366,6 +1406,42 @@ prone surfaces (next-spec H2H baselines, venue character
 strips, tournament-era comparisons). Unknown axis names → 400.
 Unused by Surface 1 itself.
 
+### Per-season / per-phase / per-over cohort endpoints (`person_id`)
+
+Distinct from the mix-vector `/summary` endpoints above: these take
+`?person_id=` (NOT a mix vector) and derive the player's position/over
+mix server-side, returning the cohort broken down by season, phase, or
+over. They back the green cohort reference lines on the by-season /
+by-phase / by-over charts.
+
+```bash
+# batting cohort by season (person derives the position mix)
+curl "http://localhost:8000/api/v1/scope/averages/players/batting/by-season?person_id=ba607b88&gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2016&season_to=2016"
+```
+
+- `…/batting/by-season` · `…/bowling/by-season` · `…/fielding/by-season`
+  → `{ by_season: [ { season, mix, n_players, n_innings, below_support,
+  cliff_buckets, strike_rate, runs_per_innings, … } ] }`.
+- `…/{batting,bowling,fielding}/by-phase` → `{ by_phase: [ { phase,
+  phase_bucket, mix, n_players, …, strike_rate / economy / dismissals_per_match } ] }`
+  (3 entries: powerplay / middle / death).
+- `…/batting/by-over` → `{ by_over: [ {over, n_balls, n_players, n_innings,
+  threshold, below_support, strike_rate, dot_pct, boundary_pct, runs_per_innings,
+  dismissals} ], cohort: {…} }` (20 entries).
+
+**Cohort narrows live under the six off-key filters.** All of the
+`/scope/averages/players/*` cohort endpoints (and the cohort blocks the
+`/batters|/bowlers|/fielders/{id}` handlers compose) narrow the comparison
+pool when any of **venue / opponent / team / inning / toss / result** is set:
+the handler dispatches on `is_precomputed_scope` — precomputed read at
+none-of-six, live aggregation (reproducing the precomputed value
+byte-identically at none-of-six) when any is set. `inning` uses the Option-B
+flip (bowling/fielding field in the innings the team did not bat); toss/result
+key on the relevant side. The per-position / per-over **mix histogram**
+weighting stays coarse (tournament/season grain) by design — only the
+per-bucket cohort *values* narrow. See `internal_docs/how-stats-calculated.md`
+§"Cohort baselines narrow live" + `spec-tier3-cohort-narrowing.md`.
+
 ---
 
 ## Compare metric envelope
@@ -2003,12 +2079,24 @@ table.
 
 Same Phase 4 envelope shape. Partition is binary `is_keeper`
 derived from `innings_kept > 0`. Counts have `direction: null`;
-the single rate `dismissals_per_match` is `higher_better` with
-`delta_pct` vs. the keeper-or-outfielder cohort. Includes
+the per-match rates (`catches_per_match`, `stumpings_per_match`,
+`run_outs_per_match`, `dismissals_per_match`) are `higher_better`
+with `delta_pct` vs. the keeper-or-outfielder cohort. Includes
 `dismissal_position_distribution[10]` (per-dismissed-batter-
-position aggregates for the deferred impact-weighted spec) +
-`cohort: {match_dimension: "is_keeper", is_keeper, n_fielders,
-n_matches_total}`.
+position aggregates) + `cohort: {match_dimension: "is_keeper",
+is_keeper, n_fielders, n_matches_total}`.
+
+**`matches_fielded` (denominator B).** All per-match rates divide by
+`matches_fielded` — matches where the fielder was in the XI AND the
+opponent batted (actually took the field) — NOT squad `matches`. This is
+the activity-unit denominator, consistent with batting `innings_batted` /
+bowling `innings_bowled`; `matches` stays the squad count for display. The
+two differ only on rare no-opponent-innings matches (e.g. Kohli IPL = 279
+fielded of 280). The cohort `n_matches_total` divides by the same
+`SUM(matches_fielded)`. The `cohort` block, the per-match rates, and the
+`dismissal_position_distribution` cohort all **narrow live** under the six
+filters (venue/opponent/team/inning/toss/result) — see the
+`/scope/averages/players/*` narrowing note above.
 
 ```bash
 curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/summary?tournament=Indian+Premier+League"
@@ -2018,7 +2106,9 @@ curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/summary?tournament=Indian+P
 {
   "person_id": "4a8a2e3b", "name": "MS Dhoni",
   "matches":               {"value": 277, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
+  "matches_fielded":       {"value": 277, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
   "catches":               {"value": 158, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
+  "catches_per_match":     {"value": 0.570,"scope_avg": 0.584,"delta_pct": -2.4, "direction": "higher_better","sample_size": 2565},
   "stumpings":             {"value": 47,  "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
   "run_outs":              {"value": 53,  "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
   "total_dismissals":      {"value": 258, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
