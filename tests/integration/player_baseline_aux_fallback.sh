@@ -912,6 +912,54 @@ else
   bad "By Over own economy=$BO_I_E != SQL-anchored $BO_EXPECTED"
 fi
 
+# ── §15 fielding By Dismissed Position bars narrow (Phase B) ──
+# /fielders/{id}/summary dismissal_position_distribution[] — fielding is
+# keeper-binary (no per-position weight), so the WHOLE tab narrows under
+# the six: own per-position catches AND cohort bars AND the dismissals
+# histogram (owner decision 2026-05-29). Per-match denom = matches_fielded
+# (denominator B, both sides). Anchor: Dhoni men's intl, bucket 1 (openers),
+# inning=0 (fielded first → fielding innings_number=1).
+echo
+echo "=== fielding By Dismissed Position bars narrow (Phase B) ==="
+fd_b1() {  # $1=filter → "matches_fielded dismissals catches cohort_cpm"
+  curl -s "$API/api/v1/fielders/4a8a2e3b/summary?gender=male&team_type=international&$1" \
+    | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+mf=d.get('matches_fielded',{}).get('value')
+b=[x for x in d['dismissal_position_distribution'] if x['bucket']==1]
+if not b: print('None None None None'); raise SystemExit
+e=b[0]
+print(mf, e['dismissals'], e['catches'], e.get('cohort_catches_per_match'))
+"
+}
+read -r FD_U_MF FD_U_DIS FD_U_C FD_U_CC < <(fd_b1 "")
+read -r FD_I_MF FD_I_DIS FD_I_C FD_I_CC < <(fd_b1 "inning=0")
+echo "  b1 unfiltered: matches_fielded=$FD_U_MF dismissals=$FD_U_DIS catches=$FD_U_C cohort_cpm=$FD_U_CC"
+echo "  b1 inning=0:   matches_fielded=$FD_I_MF dismissals=$FD_I_DIS catches=$FD_I_C cohort_cpm=$FD_I_CC"
+if [[ "$FD_I_C" != "None" && "$FD_I_C" != "$FD_U_C" ]]; then
+  ok "By Dismissed Position own catches narrowed ($FD_U_C -> $FD_I_C)"
+else
+  bad "By Dismissed Position own catches FROZEN ($FD_U_C == $FD_I_C) -- Phase B not wired"
+fi
+if [[ "$FD_I_CC" != "None" && "$FD_I_CC" != "$FD_U_CC" ]]; then
+  ok "By Dismissed Position cohort catches/match narrowed ($FD_U_CC -> $FD_I_CC)"
+else
+  bad "By Dismissed Position cohort FROZEN ($FD_U_CC == $FD_I_CC) -- Phase B not wired"
+fi
+if [[ "$FD_I_DIS" != "None" && "$FD_I_DIS" != "$FD_U_DIS" ]]; then
+  ok "By Dismissed Position histogram narrowed (dismissals $FD_U_DIS -> $FD_I_DIS)"
+else
+  bad "By Dismissed Position histogram FROZEN ($FD_U_DIS == $FD_I_DIS) -- should narrow (no weight)"
+fi
+FD_EXPECTED=$(sqlite3 cricket.db "SELECT COUNT(*) FROM fieldingcredit fc JOIN delivery d ON d.id=fc.delivery_id JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id JOIN wicket w ON w.id=fc.wicket_id JOIN inningsbatterperf ibp ON ibp.innings_id=i.id AND ibp.batter_id=w.player_out_id WHERE fc.fielder_id='4a8a2e3b' AND fc.kind IN ('caught','caught_and_bowled') AND COALESCE(fc.is_substitute,0)=0 AND ibp.position_bucket=1 AND m.gender='male' AND m.team_type='international' AND i.super_over=0 AND i.innings_number=1;")
+echo "  SQL-anchored b1 inning=0 own catches: $FD_EXPECTED  (API: $FD_I_C)"
+if [[ "$FD_I_C" == "$FD_EXPECTED" ]]; then
+  ok "By Dismissed Position own catches == SQL-anchored ($FD_I_C)"
+else
+  bad "By Dismissed Position own catches=$FD_I_C != SQL-anchored $FD_EXPECTED"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"

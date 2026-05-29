@@ -11,6 +11,7 @@ from typing import Optional
 from ..dependencies import get_db
 from ..filters import FilterParams, AuxParams, player_result_clause, player_toss_clause, player_inning_match_clause
 from ..aux_clauses import splice_aux_join_clauses
+from .bucket_baseline_dispatch import is_precomputed_scope
 from ..metrics_metadata import wrap_metric
 from ..player_nationality import player_nationalities
 from ..scope_links import suggested_splits, scope_dict_from_filters
@@ -33,8 +34,21 @@ def _safe_div(a, b, mul=1, ndigits=2):
 
 async def _dismissal_position_distribution(
     db, person_id: str, filters: FilterParams, is_keeper: int = 0,
+    aux: AuxParams | None = None,
 ) -> list[dict]:
     """Return the fielder's per-(dismissed batter position) aggregates.
+
+    Tier-3 sweep (spec-tier3-cohort-narrowing.md Phase B): when any of the
+    six is set, the fielder's OWN per-position catches/stumpings/run-outs/
+    dismissals narrow live over `fieldingcredit` (player-POV fielding
+    orientation, dismissed-batter position resolved via `inningsbatterperf`,
+    Convention 3 + is_substitute=0). Fielding is keeper-binary with NO
+    per-position weighting, so — unlike batting/bowling — the dismissed-
+    position histogram (`dismissals` share) is descriptive, not a weight,
+    and narrows along with everything else (owner decision 2026-05-29). The
+    cohort per-bucket fields are re-pointed to `compute_players_fielding_cohort`'s
+    `by_dismissed_position[]` by the caller. Per-match denominator is
+    `matches_fielded` (denominator B, both sides) — the deferred half 3e left.
 
     Length-10 array keyed by `bucket` (1=opener, 2=#3, …, 10=#11).
     Substitute catches are EXCLUDED — the populate applied
@@ -124,8 +138,11 @@ async def _dismissal_position_distribution(
     # SUM(playerscopestats.matches) for the cohort partition. Run it
     # in parallel with the bucket aggregates so the helper stays a
     # single roundtrip in user time.
+    # Denominator B: per-match cohort rate divides by matches_fielded
+    # (activity), not squad matches — matches compute_players_fielding_cohort
+    # + the headline tiles. (3e deferred this for the By-Dismissed tab.)
     cohort_pool_sql = f"""
-        SELECT SUM(pss.matches) AS n_matches_total
+        SELECT SUM(pss.matches_fielded) AS n_matches_total
         FROM playerscopestats pss
         WHERE pss.matches_as_keeper {keeper_pred} 0
           AND {cohort_where}
@@ -135,6 +152,38 @@ async def _dismissal_position_distribution(
         db.q(cohort_sql, scope_params),
         db.q(cohort_pool_sql, scope_params),
     )
+
+    # Tier-3 (Phase B): narrow the fielder's OWN per-position aggregates
+    # under the six over `fieldingcredit` (player-POV fielding orientation
+    # via _fielding_filter), dismissed-batter position resolved via
+    # inningsbatterperf (matches the position child, so none-of-six parity
+    # holds). Convention 3 + is_substitute=0.
+    narrowed_own: dict[int, dict] = {}
+    if aux is not None and not is_precomputed_scope(filters, aux):
+        fwhere, fparams = _fielding_filter(filters, person_id, aux=aux)
+        nsql = f"""
+            SELECT ibp.position_bucket AS position_bucket,
+                   SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled') THEN 1 ELSE 0 END) AS catches,
+                   SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+                   SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            JOIN innings  i ON i.id = d.innings_id
+            JOIN match    m ON m.id = i.match_id
+            JOIN wicket   w ON w.id = fc.wicket_id
+            JOIN inningsbatterperf ibp
+              ON ibp.innings_id = i.id AND ibp.batter_id = w.player_out_id
+            WHERE {fwhere} AND COALESCE(fc.is_substitute, 0) = 0
+            GROUP BY ibp.position_bucket
+        """
+        for r in await db.q(nsql, fparams):
+            cat = r["catches"] or 0
+            st = r["stumpings"] or 0
+            ro = r["run_outs"] or 0
+            narrowed_own[r["position_bucket"]] = {
+                "catches": cat, "stumpings": st, "run_outs": ro,
+                "dismissals": cat + st + ro,
+            }
 
     by_bucket = {r["position_bucket"]: r for r in player_rows}
     cohort_by_bucket = {r["position_bucket"]: r for r in cohort_rows}
@@ -150,13 +199,18 @@ async def _dismissal_position_distribution(
                 "run_outs": 0, "dismissals": 0,
             }
         else:
+            no = narrowed_own.get(b) if narrowed_own else None
+            src = no if no is not None else r
             entry = {
                 "bucket":     b,
-                "catches":    r["catches"] or 0,
-                "stumpings":  r["stumpings"] or 0,
-                "run_outs":   r["run_outs"] or 0,
-                "dismissals": r["dismissals"] or 0,
+                "catches":    src["catches"] or 0,
+                "stumpings":  src["stumpings"] or 0,
+                "run_outs":   src["run_outs"] or 0,
+                "dismissals": src["dismissals"] or 0,
             }
+        # Narrowing active but no dismissals at this bucket in scope → zero.
+        if narrowed_own and r is not None and narrowed_own.get(b) is None:
+            entry.update({"catches": 0, "stumpings": 0, "run_outs": 0, "dismissals": 0})
         c = cohort_by_bucket.get(b)
         if c is None or cohort_total_dismissals == 0:
             entry["cohort_dismissals_share"] = None
@@ -471,7 +525,7 @@ async def fielding_summary(
     # partition flag, so compute it BEFORE the helper call.
     is_keeper_val = 1 if innings_kept > 0 else 0
     dismissal_position_distribution = await _dismissal_position_distribution(
-        db, person_id, filters, is_keeper_val,
+        db, person_id, filters, is_keeper_val, aux=aux,
     )
 
     cohort: Optional[dict] = None
@@ -480,6 +534,27 @@ async def fielding_summary(
         cohort = await compute_players_fielding_cohort(
             db, filters, aux, is_keeper_val, drop_set=None,
         )
+
+    # Tier-3 (Phase B): re-point the By Dismissed Position COHORT bars to
+    # the narrowed per-bucket cohort under the six. compute_players_fielding_cohort
+    # already narrows by_dismissed_position[]; the frozen cohort_* on
+    # dismissal_position_distribution would otherwise stay full-scope.
+    # Below-support buckets blank. None-of-six keeps the precomputed
+    # cohort_* (identical there).
+    if cohort is not None and aux is not None and not is_precomputed_scope(filters, aux):
+        bd = {e["bucket"]: e for e in cohort.get("by_dismissed_position", [])}
+        coh_dis_total = sum((e.get("n_dismissals") or 0) for e in cohort.get("by_dismissed_position", []))
+        for entry in dismissal_position_distribution:
+            e = bd.get(entry["bucket"])
+            if e is None or e.get("below_support"):
+                entry["cohort_catches_per_match"] = None
+                entry["cohort_dismissals_share"] = None
+            else:
+                entry["cohort_catches_per_match"] = e.get("catches_per_match")
+                entry["cohort_dismissals_share"] = (
+                    (e.get("n_dismissals") or 0) / coh_dis_total
+                    if coh_dis_total else None
+                )
 
     def _cohort_scope_avg(key: str) -> Optional[float]:
         if cohort is None:
@@ -502,6 +577,10 @@ async def fielding_summary(
         "nationalities": nationalities,
         # Numeric fields envelope-wrapped per Phase 4.
         "matches":             wrap_metric(matches,            None, "matches",                    sample_size=cohort_sample),
+        # Activity-based denominator (XI ∧ opponent batted) — narrows with
+        # the six. The By Dismissed Position tab divides per-bucket catches
+        # by this (denominator B, both sides) instead of squad `matches`.
+        "matches_fielded":     wrap_metric(matches_fielded,    None, "matches",                    sample_size=cohort_sample),
         "catches":             wrap_metric(catches,            None, "field_catches",              sample_size=cohort_sample),
         "stumpings":           wrap_metric(stumpings,          None, "field_stumpings",            sample_size=cohort_sample),
         "run_outs":            wrap_metric(run_outs,           None, "field_run_outs",             sample_size=cohort_sample),

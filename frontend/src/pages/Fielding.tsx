@@ -449,7 +449,7 @@ export default function Fielding() {
                   <DismissedPositionDistributionTab
                     dismissalPositionDistribution={summary.dismissal_position_distribution}
                     isKeeper={summary.is_keeper}
-                    playerMatches={summary.matches.value ?? 0}
+                    playerMatches={summary.matches_fielded?.value ?? summary.matches.value ?? 0}
                   />
                 ) : (
                   <p className="wisden-tab-help">No dismissal-position data in this scope.</p>

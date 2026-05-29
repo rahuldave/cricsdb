@@ -1487,6 +1487,10 @@ export interface FieldingSummary {
   nationalities: NationalityEntry[]
   // Numeric fields envelope-wrapped per Phase 4.
   matches: MetricEnvelope
+  /** Activity-based denominator (XI ∧ opponent batted), narrows with the
+   *  six. The By Dismissed Position tab's per-bucket catches/match divides
+   *  by this (denominator B) rather than squad `matches`. */
+  matches_fielded: MetricEnvelope
   catches: MetricEnvelope
   stumpings: MetricEnvelope
   run_outs: MetricEnvelope
