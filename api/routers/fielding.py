@@ -885,62 +885,96 @@ async def fielding_by_over(
     is_keeper_val = 1 if (keep_rows and (keep_rows[0]["mk"] or 0) > 0) else 0
     keeper_pred = ">" if is_keeper_val else "="
 
-    # Cohort dismissals per match by over — keeper-binary partition,
-    # same scope as the player. Two parallel queries:
-    #  - per-over dismissal counts across the cohort
-    #  - total matches across the cohort (constant per over)
-    # Filter at the playerscopestats level on the scope_key axes only
-    # (mirrors _dismissal_position_distribution).
-    scope_clauses: list[str] = []
-    scope_params: dict = {}
-    if filters.gender:
-        scope_clauses.append("pss.gender = :gender")
-        scope_params["gender"] = filters.gender
-    if filters.team_type:
-        scope_clauses.append("pss.team_type = :team_type")
-        scope_params["team_type"] = filters.team_type
-    if filters.tournament:
-        if is_canonical_with_variants(filters.tournament):
-            scope_clauses.append(event_name_in_clause(
-                canonical_variants(filters.tournament), col="pss.tournament",
-            ))
-        else:
-            scope_clauses.append("pss.tournament = :tournament")
-            scope_params["tournament"] = filters.tournament
-    if filters.season_from:
-        scope_clauses.append("pss.season >= :season_from")
-        scope_params["season_from"] = filters.season_from
-    if filters.season_to:
-        scope_clauses.append("pss.season <= :season_to")
-        scope_params["season_to"] = filters.season_to
-    cohort_where = " AND ".join(scope_clauses) if scope_clauses else "1=1"
-
-    cohort_total_matches_sql = f"""
-        SELECT SUM(pss.matches) AS n
-        FROM playerscopestats pss
-        WHERE pss.matches_as_keeper {keeper_pred} 0
-          AND {cohort_where}
-    """
-    cohort_over_sql = f"""
-        SELECT d.over_number,
-               COUNT(*) AS dismissals
-        FROM fieldingcredit fc
-        JOIN delivery d ON d.id = fc.delivery_id
-        JOIN innings i ON i.id = d.innings_id
-        JOIN match m ON m.id = i.match_id
-        WHERE COALESCE(fc.is_substitute, 0) = 0
-          AND fc.fielder_id IN (
-            SELECT DISTINCT pss.person_id
+    # Cohort dismissals per match by over — keeper-binary partition.
+    # Denominator B (both sides): SUM(matches_fielded), not squad matches.
+    # Tier-3 Phase B: dispatch on is_precomputed_scope — none-of-six reads
+    # the precomputed partition (scope_key axes only); any-of-six narrows
+    # the cohort live (fielding orientation via _bowling_live_where + the
+    # matchplayer denominator via _fielding_denom_where + keeper-in-scope
+    # partition), so the cohort dismissals-per-match-by-over line narrows
+    # under the six exactly as the player's own per-over bars already do.
+    if is_precomputed_scope(filters, aux):
+        scope_clauses: list[str] = []
+        scope_params: dict = {}
+        if filters.gender:
+            scope_clauses.append("pss.gender = :gender")
+            scope_params["gender"] = filters.gender
+        if filters.team_type:
+            scope_clauses.append("pss.team_type = :team_type")
+            scope_params["team_type"] = filters.team_type
+        if filters.tournament:
+            if is_canonical_with_variants(filters.tournament):
+                scope_clauses.append(event_name_in_clause(
+                    canonical_variants(filters.tournament), col="pss.tournament",
+                ))
+            else:
+                scope_clauses.append("pss.tournament = :tournament")
+                scope_params["tournament"] = filters.tournament
+        if filters.season_from:
+            scope_clauses.append("pss.season >= :season_from")
+            scope_params["season_from"] = filters.season_from
+        if filters.season_to:
+            scope_clauses.append("pss.season <= :season_to")
+            scope_params["season_to"] = filters.season_to
+        cohort_where = " AND ".join(scope_clauses) if scope_clauses else "1=1"
+        cohort_total_matches_sql = f"""
+            SELECT SUM(pss.matches_fielded) AS n
             FROM playerscopestats pss
             WHERE pss.matches_as_keeper {keeper_pred} 0
               AND {cohort_where}
-          )
-        GROUP BY d.over_number
-    """
-    cohort_match_rows, cohort_over_rows = await asyncio.gather(
-        db.q(cohort_total_matches_sql, scope_params),
-        db.q(cohort_over_sql, scope_params),
-    )
+        """
+        cohort_over_sql = f"""
+            SELECT d.over_number, COUNT(*) AS dismissals
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            JOIN innings i ON i.id = d.innings_id
+            JOIN match m ON m.id = i.match_id
+            WHERE COALESCE(fc.is_substitute, 0) = 0
+              AND fc.fielder_id IN (
+                SELECT DISTINCT pss.person_id
+                FROM playerscopestats pss
+                WHERE pss.matches_as_keeper {keeper_pred} 0
+                  AND {cohort_where}
+              )
+            GROUP BY d.over_number
+        """
+        cohort_match_rows, cohort_over_rows = await asyncio.gather(
+            db.q(cohort_total_matches_sql, scope_params),
+            db.q(cohort_over_sql, scope_params),
+        )
+    else:
+        from .scope_averages import _bowling_live_where, _fielding_denom_where
+        num_where, num_params = _bowling_live_where(filters, aux)
+        denom_where, denom_params = _fielding_denom_where(filters, aux)
+        keeper_op = "IN" if is_keeper_val else "NOT IN"
+        keeper_subq = f"""
+            SELECT ka.keeper_id FROM keeperassignment ka
+            JOIN innings i ON i.id = ka.innings_id
+            JOIN match   m ON m.id = i.match_id
+            WHERE {num_where} AND ka.keeper_id IS NOT NULL
+        """
+        cohort_over_sql = f"""
+            SELECT d.over_number, COUNT(*) AS dismissals
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            JOIN innings  i ON i.id = d.innings_id
+            JOIN match    m ON m.id = i.match_id
+            WHERE {num_where} AND fc.fielder_id IS NOT NULL
+              AND COALESCE(fc.is_substitute, 0) = 0
+              AND fc.fielder_id {keeper_op} ({keeper_subq})
+            GROUP BY d.over_number
+        """
+        cohort_total_matches_sql = f"""
+            SELECT COUNT(*) AS n
+            FROM matchplayer mp
+            JOIN match m ON m.id = mp.match_id
+            WHERE {denom_where} AND mp.person_id {keeper_op} ({keeper_subq})
+        """
+        combined = {**denom_params, **num_params}
+        cohort_match_rows, cohort_over_rows = await asyncio.gather(
+            db.q(cohort_total_matches_sql, combined),
+            db.q(cohort_over_sql, num_params),
+        )
     cohort_total_matches = (cohort_match_rows[0]["n"] if cohort_match_rows else 0) or 0
     cohort_by_over = {r["over_number"]: r["dismissals"] for r in cohort_over_rows}
 

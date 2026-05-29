@@ -995,6 +995,41 @@ else
   bad "batting By Over cohort SR=$BBO_I_SR != SQL-anchored $BBO_EXPECTED"
 fi
 
+# ── §17 fielding By Over cohort line narrows (Phase B) ──
+# /fielders/{id}/by-over cohort_dismissals_per_match — the green reference
+# line on the fielding By Over chart. Scope-key-only (frozen) until Phase B;
+# now narrows live (fielding orientation) + matches_fielded denominator
+# (denominator B). The player's OWN per-over bars already narrow. Anchor:
+# Dhoni men's intl, over 1 (over_number=0), inning=0 (fielded first → innings 1).
+echo
+echo "=== fielding By Over cohort line narrows (Phase B) ==="
+fbo_over1() {  # $1=filter → "own_dis cohort_dpm"
+  curl -s "$API/api/v1/fielders/4a8a2e3b/by-over?gender=male&team_type=international&$1" \
+    | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+o=[x for x in d['by_over'] if x['over_number']==1]
+if not o: print('None None'); raise SystemExit
+print(o[0].get('dismissals'), o[0].get('cohort_dismissals_per_match'))
+"
+}
+read -r FBO_U_D FBO_U_C < <(fbo_over1 "")
+read -r FBO_I_D FBO_I_C < <(fbo_over1 "inning=0")
+echo "  over1 unfiltered: own_dis=$FBO_U_D cohort_dpm=$FBO_U_C"
+echo "  over1 inning=0:   own_dis=$FBO_I_D cohort_dpm=$FBO_I_C"
+if [[ "$FBO_I_C" != "None" && "$FBO_I_C" != "$FBO_U_C" ]]; then
+  ok "fielding By Over cohort dis/match narrowed ($FBO_U_C -> $FBO_I_C)"
+else
+  bad "fielding By Over cohort dis/match FROZEN ($FBO_U_C == $FBO_I_C) -- Phase B not wired"
+fi
+FBO_EXPECTED=$(sqlite3 cricket.db "WITH keepers AS (SELECT DISTINCT ka.keeper_id pid FROM keeperassignment ka JOIN innings i ON i.id=ka.innings_id JOIN match m ON m.id=i.match_id WHERE m.gender='male' AND m.team_type='international' AND i.super_over=0 AND i.innings_number=1 AND ka.keeper_id IS NOT NULL), num AS (SELECT COUNT(*) dis FROM fieldingcredit fc JOIN delivery d ON d.id=fc.delivery_id JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id WHERE m.gender='male' AND m.team_type='international' AND i.super_over=0 AND i.innings_number=1 AND d.over_number=0 AND fc.fielder_id IS NOT NULL AND COALESCE(fc.is_substitute,0)=0 AND fc.fielder_id IN (SELECT pid FROM keepers)), den AS (SELECT COUNT(*) n FROM matchplayer mp JOIN match m ON m.id=mp.match_id WHERE m.gender='male' AND m.team_type='international' AND mp.person_id IN (SELECT pid FROM keepers) AND EXISTS (SELECT 1 FROM innings i2 WHERE i2.match_id=mp.match_id AND i2.super_over=0 AND i2.team!=mp.team) AND EXISTS (SELECT 1 FROM innings i3 WHERE i3.match_id=mp.match_id AND i3.super_over=0 AND i3.team!=mp.team AND i3.innings_number=1)) SELECT ROUND(CAST(num.dis AS REAL)/den.n,4) FROM num,den;")
+echo "  SQL-anchored over1 inning=0 cohort dis/match: $FBO_EXPECTED  (API: $FBO_I_C)"
+if [[ "$FBO_I_C" == "$FBO_EXPECTED" ]]; then
+  ok "fielding By Over cohort dis/match == SQL-anchored ($FBO_I_C)"
+else
+  bad "fielding By Over cohort dis/match=$FBO_I_C != SQL-anchored $FBO_EXPECTED"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"
