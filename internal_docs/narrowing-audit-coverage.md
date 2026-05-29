@@ -184,7 +184,13 @@ PASS: `player_baseline_chart_overlays` (34), `player_baseline_by_phase_chips`
 `batting_inter_wicket_cohort` (3), `dismissal_cohort` (11),
 `prob_chip_baselines` (13), `prob_chip_baselines_teams` (17),
 `team_class_per_tab_narrowing`, `sparkline_league_reference` (9),
-`sparkline_narrowing` (15, NEW).
+`sparkline_narrowing` (15, NEW). Plus the Players-profile + team-distribution
+suites cited above, run-and-green: `player_result_filter` (17),
+`player_toss_value` (6, asserts narrowing under toss), `inning_unify_players`
+(19), `team_batting_distribution` (55), `team_bowling_distribution` (52),
+`team_fielding_distribution` (42). Every surface in the matrix now has a
+run-and-green test, not just a cited one (none drifted under the re-ingest —
+all self-anchor against the live DB).
 
 No other gaps: every narrowing surface now has a dedicated test that asserts
 movement under the six (or under team_class/series_type for teams).
