@@ -35,12 +35,12 @@ REG pbsl_bowl_by_phase_ipl_toss_won     /api/v1/scope/averages/players/bowling/b
 
 # ── /scope/averages/players/fielding/by-season ─────────────────
 
-NEW pbsl_field_by_season_unfiltered     /api/v1/scope/averages/players/fielding/by-season?person_id=4a8a2e3b&gender=male&team_type=club
-NEW pbsl_field_by_season_ipl_2016       /api/v1/scope/averages/players/fielding/by-season?person_id=4a8a2e3b&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016
-NEW pbsl_field_by_season_ipl_inning1    /api/v1/scope/averages/players/fielding/by-season?person_id=4a8a2e3b&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&inning=1
+REG pbsl_field_by_season_unfiltered     /api/v1/scope/averages/players/fielding/by-season?person_id=4a8a2e3b&gender=male&team_type=club
+REG pbsl_field_by_season_ipl_2016       /api/v1/scope/averages/players/fielding/by-season?person_id=4a8a2e3b&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016
+REG pbsl_field_by_season_ipl_inning1    /api/v1/scope/averages/players/fielding/by-season?person_id=4a8a2e3b&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&inning=1
 
 # ── /scope/averages/players/fielding/by-phase ─────────────────
 
-NEW pbsl_field_by_phase_unfiltered      /api/v1/scope/averages/players/fielding/by-phase?person_id=4a8a2e3b&gender=male&team_type=club
-NEW pbsl_field_by_phase_ipl_2016        /api/v1/scope/averages/players/fielding/by-phase?person_id=4a8a2e3b&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016
-NEW pbsl_field_by_phase_ipl_inning1     /api/v1/scope/averages/players/fielding/by-phase?person_id=4a8a2e3b&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&inning=1
+REG pbsl_field_by_phase_unfiltered      /api/v1/scope/averages/players/fielding/by-phase?person_id=4a8a2e3b&gender=male&team_type=club
+REG pbsl_field_by_phase_ipl_2016        /api/v1/scope/averages/players/fielding/by-phase?person_id=4a8a2e3b&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2016&season_to=2016
+REG pbsl_field_by_phase_ipl_inning1     /api/v1/scope/averages/players/fielding/by-phase?person_id=4a8a2e3b&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2014&season_to=2018&inning=1

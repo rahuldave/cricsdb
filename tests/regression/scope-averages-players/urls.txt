@@ -57,7 +57,7 @@ NEW players_field_ipl_keeper           /api/v1/scope/averages/players/fielding/s
 NEW players_field_intl_keeper          /api/v1/scope/averages/players/fielding/summary?gender=male&team_type=international&is_keeper=1
 
 # Primary-club outfielders 2024.
-NEW players_field_primary_club_out_2024 /api/v1/scope/averages/players/fielding/summary?team_type=club&team_class=primary_club&season_from=2024&season_to=2024&is_keeper=0
+REG players_field_primary_club_out_2024 /api/v1/scope/averages/players/fielding/summary?team_type=club&team_class=primary_club&season_from=2024&season_to=2024&is_keeper=0
 
 # Unfiltered keepers.
 NEW players_field_unfiltered_keeper    /api/v1/scope/averages/players/fielding/summary?is_keeper=1

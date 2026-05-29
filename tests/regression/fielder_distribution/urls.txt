@@ -23,14 +23,14 @@ NEW dist_dhoni_all_time                /api/v1/fielders/4a8a2e3b/distribution?as
 # to the per-event fielding subset (matches the fielder FIELDED in 1-N) —
 # was inning-blind. MUST drift NEW vs HEAD, then flip REG once locked.
 # inning=0 → fielded in innings 1 (batted first); inning=1 → fielded in 0.
-NEW dist_dhoni_inn0                    /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=international&inning=0&as_of_date=2025-01-01
-NEW dist_dhoni_inn1                    /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=international&inning=1&as_of_date=2025-01-01
+REG dist_dhoni_inn0                    /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=international&inning=0&as_of_date=2025-01-01
+REG dist_dhoni_inn1                    /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=international&inning=1&as_of_date=2025-01-01
 NEW dist_dhoni_men_intl                /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=international&as_of_date=2025-01-01
 NEW dist_dhoni_ipl                     /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
 NEW dist_dhoni_ipl_2018                /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2018&season_to=2018&as_of_date=2025-01-01
 
 # ── opponent narrowing (side-neutral team filter) ────────────────
-NEW dist_dhoni_vs_mi_ipl               /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_opponent=Mumbai%20Indians&as_of_date=2025-01-01
+REG dist_dhoni_vs_mi_ipl               /api/v1/fielders/4a8a2e3b/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&filter_opponent=Mumbai%20Indians&as_of_date=2025-01-01
 
 # ── Pant (keeper — smaller sample) ───────────────────────────────
 NEW dist_pant_all_time                 /api/v1/fielders/919a3be2/distribution?as_of_date=2025-01-01
@@ -46,10 +46,10 @@ NEW dist_abdv_all_time                 /api/v1/fielders/c4487b84/distribution?as
 NEW dist_abdv_ipl                      /api/v1/fielders/c4487b84/distribution?gender=male&team_type=club&tournament=Indian%20Premier%20League&as_of_date=2025-01-01
 
 # ── venue narrowing ──────────────────────────────────────────────
-NEW dist_dhoni_chepauk                 /api/v1/fielders/4a8a2e3b/distribution?filter_venue=MA%20Chidambaram%20Stadium%2C%20Chepauk&as_of_date=2025-01-01
+REG dist_dhoni_chepauk                 /api/v1/fielders/4a8a2e3b/distribution?filter_venue=MA%20Chidambaram%20Stadium%2C%20Chepauk&as_of_date=2025-01-01
 
 # ── season-only (no tournament) ──────────────────────────────────
 NEW dist_kohli_2023                    /api/v1/fielders/ba607b88/distribution?season_from=2023&season_to=2023&as_of_date=2025-01-01
 
 # ── empty scope (no matches) — regression marker ─────────────────
-NEW dist_dhoni_at_nonexistent_venue    /api/v1/fielders/4a8a2e3b/distribution?filter_venue=Nonexistent%20Ground&as_of_date=2025-01-01
+REG dist_dhoni_at_nonexistent_venue    /api/v1/fielders/4a8a2e3b/distribution?filter_venue=Nonexistent%20Ground&as_of_date=2025-01-01
