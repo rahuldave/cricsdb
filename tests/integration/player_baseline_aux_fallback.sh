@@ -628,6 +628,187 @@ else
   bad "distribution wicket-prob baseline FROZEN ($DP_U vs $DP_R) -- 3d-3 not reaching distribution"
 fi
 
+# ── §10 fielding summary + distribution cohort narrows (Phase 3e) ──
+# compute_players_fielding_cohort feeds /fielders/{id}/summary per-match
+# chips AND /distribution catch ProbChips. It read the precomputed
+# fielding children (frozen under the six) until 3e; now it dispatches to
+# a live aggregation across matchplayer (matches_fielded denominator),
+# fieldingcredit (numerator, Convention 3 + is_substitute=0, fielding
+# orientation), and keeperassignment (keeper-binary partition). Anchor:
+# MS Dhoni (a keeper → is_keeper=1 cohort), men's international.
+echo
+echo "=== fielding summary + distribution cohort narrows (3e) ==="
+DHONI="4a8a2e3b"
+FSUM="gender=male&team_type=international"
+
+fld_cpm() {  # $1=filter → catches_per_match scope_avg
+  curl -s "$API/api/v1/fielders/$DHONI/summary?$FSUM&$1" \
+    | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('catches_per_match',{}).get('scope_avg'))"
+}
+FS_U=$(fld_cpm "")
+FS_I=$(fld_cpm "inning=0")
+echo "  summary catches/match cohort: none=$FS_U  inning=0=$FS_I"
+if [[ "$FS_U" == "None" || "$FS_I" == "None" ]]; then
+  bad "fielding summary catches/match cohort null"
+elif [[ "$FS_U" != "$FS_I" ]]; then
+  ok "fielding summary catches/match cohort narrowed ($FS_U -> $FS_I under inning=0)"
+else
+  bad "fielding summary catches/match cohort FROZEN ($FS_U == $FS_I) -- 3e not wired"
+fi
+
+# SQL anchor: keeper-cohort catches/match @ inning=0 == direct aggregation.
+# inning=0 = batted first → fielding orientation = fielded in innings 1
+# (1-0). Numerator: catches (Convention 3, non-sub, dismissed-position
+# resolved via inningsbatterperf) over the keeper set in innings_number=1.
+# Denominator: matches_fielded across the keeper set where the team fielded
+# in innings 1.
+FS_EXPECTED=$(python3 <<'PY'
+import sqlite3
+DB="cricket.db"
+conn=sqlite3.connect(DB)
+KEEP="""(SELECT DISTINCT ka.keeper_id FROM keeperassignment ka
+  JOIN innings i ON i.id=ka.innings_id JOIN match m ON m.id=i.match_id
+  WHERE m.gender='male' AND m.team_type='international' AND i.super_over=0
+    AND i.innings_number=1 AND ka.keeper_id IS NOT NULL)"""
+catches=conn.execute(f"""
+ SELECT SUM(CASE WHEN fc.kind IN ('caught','caught_and_bowled') THEN 1 ELSE 0 END)
+ FROM fieldingcredit fc JOIN delivery d ON d.id=fc.delivery_id
+ JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id
+ JOIN wicket w ON w.id=fc.wicket_id
+ JOIN inningsbatterperf ibp ON ibp.innings_id=i.id AND ibp.batter_id=w.player_out_id
+ WHERE m.gender='male' AND m.team_type='international' AND i.super_over=0 AND i.innings_number=1
+   AND fc.fielder_id IS NOT NULL AND COALESCE(fc.is_substitute,0)=0
+   AND fc.fielder_id IN {KEEP}""").fetchone()[0] or 0
+nm=conn.execute(f"""
+ SELECT COUNT(*) FROM matchplayer mp JOIN match m ON m.id=mp.match_id
+ WHERE m.gender='male' AND m.team_type='international'
+   AND mp.person_id IN {KEEP}
+   AND EXISTS (SELECT 1 FROM innings i2 WHERE i2.match_id=mp.match_id AND i2.super_over=0 AND i2.team!=mp.team)
+   AND EXISTS (SELECT 1 FROM innings i3 WHERE i3.match_id=mp.match_id AND i3.super_over=0 AND i3.team!=mp.team AND i3.innings_number=1)""").fetchone()[0] or 0
+print(round(catches/nm,3) if nm else "None")
+PY
+)
+echo "  SQL-anchored inning=0 keeper catches/match: $FS_EXPECTED  (API: $FS_I)"
+if [[ "$FS_I" == "None" || "$FS_EXPECTED" == "None" ]]; then
+  bad "fielding summary SQL anchor inconclusive (API $FS_I, expected $FS_EXPECTED)"
+elif python3 -c "import sys; sys.exit(0 if abs(float('$FS_I')-float('$FS_EXPECTED'))<=0.01 else 1)"; then
+  ok "fielding summary catches/match cohort == SQL-anchored ($FS_I ~ $FS_EXPECTED)"
+else
+  bad "fielding summary catches/match cohort=$FS_I != SQL-anchored $FS_EXPECTED"
+fi
+
+# Distribution catch ProbChip baselines narrow (same compute fn reaches
+# /distribution). field_prob_zero is the cohort P(0 catches in a match).
+fld_pzero() {  # $1=filter → lifetime catch P(=0) cohort scope_avg
+  curl -s "$API/api/v1/fielders/$DHONI/distribution?$FSUM&$1" \
+    | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['lifetime']['catches']['milestones'].get('p_zero',{}).get('scope_avg'))"
+}
+FD_U=$(fld_pzero "")
+FD_I=$(fld_pzero "inning=0")
+echo "  distribution catch P(=0) cohort: none=$FD_U  inning=0=$FD_I"
+if [[ "$FD_U" != "None" && "$FD_I" != "None" && "$FD_U" != "$FD_I" ]]; then
+  ok "fielding distribution catch-prob baseline narrowed ($FD_U -> $FD_I)"
+else
+  bad "fielding distribution catch-prob baseline FROZEN ($FD_U vs $FD_I) -- 3e not reaching distribution"
+fi
+
+# ── §11 fielding by-season cohort narrows under the six (Phase 3e) ──
+# /scope/averages/players/fielding/by-season read the precomputed children
+# until 3e — frozen under the six. Now live per-(season, keeper-flag).
+# Anchor: Dhoni IPL, season 2016, inning=1 (keeper cohort).
+echo
+echo "=== fielding by-season cohort narrows (3e) ==="
+FBS_SCOPE="person_id=$DHONI&gender=male&team_type=club&tournament=Indian+Premier+League"
+fld_season() {  # $1=filter $2=season → "catches_per_match n_matches"
+  curl -s "$API/api/v1/scope/averages/players/fielding/by-season?$FBS_SCOPE&$1" \
+    | python3 -c "
+import sys,json
+d=json.load(sys.stdin); s='$2'
+for r in d['by_season']:
+    if r['season']==s:
+        print(r.get('catches_per_match'), r.get('n_matches')); break
+else:
+    print('None None')
+"
+}
+read -r FBS_U_C FBS_U_N < <(fld_season "" 2016)
+read -r FBS_I_C FBS_I_N < <(fld_season "inning=1" 2016)
+echo "  2016 unfiltered: catches/m=$FBS_U_C n_matches=$FBS_U_N"
+echo "  2016 inning=1:   catches/m=$FBS_I_C n_matches=$FBS_I_N"
+if [[ -z "$FBS_I_N" || "$FBS_I_N" == "None" ]]; then
+  bad "fielding by-season inning=1: n_matches null"
+elif [[ "$FBS_I_N" != "$FBS_U_N" ]]; then
+  ok "fielding by-season cohort narrowed (n_matches $FBS_U_N -> $FBS_I_N; catches/m $FBS_U_C -> $FBS_I_C)"
+else
+  bad "fielding by-season cohort FROZEN (n_matches=$FBS_I_N == $FBS_U_N) -- 3e not wired"
+fi
+
+# SQL anchor: 2016 inning=1 keeper cohort catches/match == direct
+# aggregation. inning=1 = batted second → fielded in innings 0 (1-1).
+FBS_EXPECTED=$(python3 <<'PY'
+import sqlite3
+DB="cricket.db"; conn=sqlite3.connect(DB)
+KEEP="""(SELECT pid, kseason FROM (SELECT DISTINCT ka.keeper_id pid, m.season kseason
+  FROM keeperassignment ka JOIN innings i ON i.id=ka.innings_id JOIN match m ON m.id=i.match_id
+  WHERE m.gender='male' AND m.team_type='club' AND m.event_name='Indian Premier League'
+    AND i.super_over=0 AND i.innings_number=0 AND ka.keeper_id IS NOT NULL))"""
+c=conn.execute(f"""
+ SELECT SUM(CASE WHEN fc.kind IN ('caught','caught_and_bowled') THEN 1 ELSE 0 END)
+ FROM fieldingcredit fc JOIN delivery d ON d.id=fc.delivery_id
+ JOIN innings i ON i.id=d.innings_id JOIN match m ON m.id=i.match_id
+ JOIN wicket w ON w.id=fc.wicket_id
+ JOIN inningsbatterperf ibp ON ibp.innings_id=i.id AND ibp.batter_id=w.player_out_id
+ WHERE m.gender='male' AND m.team_type='club' AND m.event_name='Indian Premier League'
+   AND m.season='2016' AND i.super_over=0 AND i.innings_number=0
+   AND fc.fielder_id IS NOT NULL AND COALESCE(fc.is_substitute,0)=0
+   AND (fc.fielder_id, m.season) IN {KEEP}""").fetchone()[0] or 0
+nm=conn.execute(f"""
+ SELECT COUNT(*) FROM matchplayer mp JOIN match m ON m.id=mp.match_id
+ WHERE m.gender='male' AND m.team_type='club' AND m.event_name='Indian Premier League' AND m.season='2016'
+   AND (mp.person_id, m.season) IN {KEEP}
+   AND EXISTS (SELECT 1 FROM innings i2 WHERE i2.match_id=mp.match_id AND i2.super_over=0 AND i2.team!=mp.team)
+   AND EXISTS (SELECT 1 FROM innings i3 WHERE i3.match_id=mp.match_id AND i3.super_over=0 AND i3.team!=mp.team AND i3.innings_number=0)""").fetchone()[0] or 0
+print(round(c/nm,4) if nm else "None")
+PY
+)
+echo "  SQL-anchored 2016 inning=1 catches/match: $FBS_EXPECTED  (API: $FBS_I_C)"
+if [[ "$FBS_I_C" == "None" || "$FBS_EXPECTED" == "None" ]]; then
+  bad "fielding by-season SQL anchor inconclusive (API $FBS_I_C, expected $FBS_EXPECTED)"
+elif python3 -c "import sys; sys.exit(0 if abs(float('$FBS_I_C')-float('$FBS_EXPECTED'))<=0.001 else 1)"; then
+  ok "fielding by-season live catches/match == SQL-anchored ($FBS_I_C ~ $FBS_EXPECTED)"
+else
+  bad "fielding by-season live catches/match=$FBS_I_C != SQL-anchored $FBS_EXPECTED"
+fi
+
+# ── §12 fielding by-phase cohort narrows under the six (Phase 3e) ──
+# /scope/averages/players/fielding/by-phase frozen until 3e; now live
+# per-(phase, keeper-flag), phase = the over the dismissal fell in.
+echo
+echo "=== fielding by-phase cohort narrows (3e) ==="
+fld_phase() {  # $1=filter $2=phase → "catches_per_match n_matches"
+  curl -s "$API/api/v1/scope/averages/players/fielding/by-phase?$FBS_SCOPE&$1" \
+    | python3 -c "
+import sys,json
+d=json.load(sys.stdin); name='$2'
+for r in d['by_phase']:
+    if r['phase']==name:
+        print(r.get('catches_per_match'), r.get('n_matches')); break
+else:
+    print('None None')
+"
+}
+read -r FBP_U_C FBP_U_N < <(fld_phase "" powerplay)
+read -r FBP_I_C FBP_I_N < <(fld_phase "inning=1" powerplay)
+echo "  powerplay unfiltered: catches/m=$FBP_U_C n_matches=$FBP_U_N"
+echo "  powerplay inning=1:   catches/m=$FBP_I_C n_matches=$FBP_I_N"
+if [[ -z "$FBP_I_N" || "$FBP_I_N" == "None" ]]; then
+  bad "fielding by-phase inning=1: n_matches null"
+elif [[ "$FBP_I_N" != "$FBP_U_N" ]]; then
+  ok "fielding by-phase cohort narrowed (n_matches $FBP_U_N -> $FBP_I_N; catches/m $FBP_U_C -> $FBP_I_C)"
+else
+  bad "fielding by-phase cohort FROZEN (n_matches=$FBP_I_N == $FBP_U_N) -- 3e not wired"
+fi
+
 echo
 echo "=========================================="
 echo "PASS=$PASS  FAIL=$FAIL"
