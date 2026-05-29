@@ -4950,24 +4950,17 @@ async def compute_players_fielding_cohort(
 # ============================================================
 
 
-async def compute_players_fielding_by_season(
-    db,
-    person_id: str,
-    filters: FilterParams,
-    aux: AuxParams,
-    drop_set: Optional[set[str]] = None,
-) -> dict:
-    """Per-season fielding cohort baseline keyed off the player's
-    per-season keeper status (binary). Returns one row per season.
-    Spec: spec-player-baseline-parity.md §3.2.
-    """
+async def _fielding_by_season_precomputed(
+    db, person_id: str, filters: FilterParams, drop_set: Optional[set[str]],
+):
+    """None-of-six fast path: per-(season, keeper-flag) reads of the
+    precomputed parent + fielding-position child. Returns
+    (player_rows, pool_rows, nonsub_rows)."""
     where, params = build_scope_clauses(filters, drop=drop_set)
-
     # Q1: player's per-season keeper status.
     player_sql = f"""
         SELECT pss.season,
-               CASE WHEN pss.matches_as_keeper > 0 THEN 1 ELSE 0 END AS is_keeper,
-               pss.matches AS player_matches
+               CASE WHEN pss.matches_as_keeper > 0 THEN 1 ELSE 0 END AS is_keeper
         FROM playerscopestats pss
         WHERE {where}
           AND pss.person_id = :__pid
@@ -5002,11 +4995,113 @@ async def compute_players_fielding_by_season(
         ORDER BY pss.season, is_keeper
     """
     p_params = {**params, "__pid": person_id}
-    player_rows, pool_rows, nonsub_rows = await asyncio.gather(
+    return await asyncio.gather(
         db.q(player_sql, p_params),
         db.q(pool_sql, params),
         db.q(nonsub_sql, params),
     )
+
+
+async def _fielding_by_season_live(
+    db, person_id: str, filters: FilterParams, aux: AuxParams,
+):
+    """Any-of-six live path (Phase 3e): per-(season, keeper-flag)
+    aggregation, same three source tables as the summary cohort but with
+    m.season in the GROUP BY. The keeper partition is PER (person, season)
+    — a cohort fielder is a keeper that season iff they kept ≥1 in-scope
+    innings that season (`keeperassignment`, fielding orientation), via a
+    LEFT JOIN on (person, m.season). Returns (player_rows, pool_rows,
+    nonsub_rows) shaped exactly like the precomputed path."""
+    num_where, num_params = _bowling_live_where(filters, aux)
+    denom_where, denom_params = _fielding_denom_where(filters, aux)
+    keeper_set_sql = f"""
+        SELECT DISTINCT ka.keeper_id AS pid, m.season AS kseason
+        FROM keeperassignment ka
+        JOIN innings i ON i.id = ka.innings_id
+        JOIN match   m ON m.id = i.match_id
+        WHERE {num_where} AND ka.keeper_id IS NOT NULL
+    """
+    player_sql = f"""
+        SELECT m.season AS season,
+               MAX(CASE WHEN ks.pid IS NOT NULL THEN 1 ELSE 0 END) AS is_keeper
+        FROM matchplayer mp
+        JOIN match m ON m.id = mp.match_id
+        LEFT JOIN ({keeper_set_sql}) ks
+          ON ks.pid = mp.person_id AND ks.kseason = m.season
+        WHERE {denom_where} AND mp.person_id = :__pid
+        GROUP BY m.season
+        ORDER BY m.season
+    """
+    pool_sql = f"""
+        SELECT m.season AS season,
+               CASE WHEN ks.pid IS NOT NULL THEN 1 ELSE 0 END AS is_keeper,
+               COUNT(DISTINCT mp.person_id) AS n_fielders,
+               COUNT(*)                     AS n_matches_total
+        FROM matchplayer mp
+        JOIN match m ON m.id = mp.match_id
+        LEFT JOIN ({keeper_set_sql}) ks
+          ON ks.pid = mp.person_id AND ks.kseason = m.season
+        WHERE {denom_where}
+        GROUP BY m.season, is_keeper
+        ORDER BY m.season, is_keeper
+    """
+    nonsub_sql = f"""
+        SELECT m.season AS season,
+               CASE WHEN ks.pid IS NOT NULL THEN 1 ELSE 0 END AS is_keeper,
+               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled') THEN 1 ELSE 0 END) AS catches,
+               SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+               SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs
+        FROM fieldingcredit fc
+        JOIN delivery d ON d.id = fc.delivery_id
+        JOIN innings  i ON i.id = d.innings_id
+        JOIN match    m ON m.id = i.match_id
+        JOIN wicket   w ON w.id = fc.wicket_id
+        JOIN inningsbatterperf ibp
+          ON ibp.innings_id = i.id AND ibp.batter_id = w.player_out_id
+        LEFT JOIN ({keeper_set_sql}) ks
+          ON ks.pid = fc.fielder_id AND ks.kseason = m.season
+        WHERE {num_where}
+          AND fc.fielder_id IS NOT NULL
+          AND COALESCE(fc.is_substitute, 0) = 0
+        GROUP BY m.season, is_keeper
+        ORDER BY m.season, is_keeper
+    """
+    denom_combined = {**denom_params, **num_params}
+    player_params = {**denom_combined, "__pid": person_id}
+    player_rows, pool_rows, nonsub_rows = await asyncio.gather(
+        db.q(player_sql, player_params),
+        db.q(pool_sql, denom_combined),
+        db.q(nonsub_sql, num_params),
+    )
+    # Live numerator omits the `dismissals` column the position child
+    # carries; derive it so the shared roll-up reads one shape.
+    for r in nonsub_rows:
+        r["dismissals"] = (r["catches"] or 0) + (r["stumpings"] or 0) + (r["run_outs"] or 0)
+    return player_rows, pool_rows, nonsub_rows
+
+
+async def compute_players_fielding_by_season(
+    db,
+    person_id: str,
+    filters: FilterParams,
+    aux: AuxParams,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """Per-season fielding cohort baseline keyed off the player's
+    per-season keeper status (binary). Returns one row per season.
+    Dispatches on `is_precomputed_scope` (Phase 3e): none-of-six →
+    precomputed children; any-of-six → live per-season aggregation so
+    the per-season cohort narrows under the six.
+    Spec: spec-player-baseline-parity.md §3.2 + spec-player-baseline-aux-fallback.md Phase 3e.
+    """
+    if is_precomputed_scope(filters, aux):
+        player_rows, pool_rows, nonsub_rows = await _fielding_by_season_precomputed(
+            db, person_id, filters, drop_set,
+        )
+    else:
+        player_rows, pool_rows, nonsub_rows = await _fielding_by_season_live(
+            db, person_id, filters, aux,
+        )
 
     # Roll up. Key by (season, is_keeper).
     pool_by = {(r["season"], r["is_keeper"]): r for r in pool_rows}
