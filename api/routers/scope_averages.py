@@ -4549,30 +4549,87 @@ async def scope_players_bowling_by_phase(
     )
 
 
-async def compute_players_fielding_cohort(
-    db,
-    filters: FilterParams,
-    aux: AuxParams,
-    is_keeper: int,
-    drop_set: Optional[set[str]] = None,
+def _fielding_denom_where(
+    filters: FilterParams, aux: AuxParams
+) -> tuple[str, dict]:
+    """Build the matchplayer-grain WHERE for the live fielding cohort
+    DENOMINATOR (matches_fielded) — Phase 3e. Assumes the query joins
+    `matchplayer mp` and `match m`.
+
+    `matches_fielded` is the activity unit (Phase 3e denominator B): a
+    (person, match) where the person was in the XI AND the opponent
+    batted ≥1 regular innings. The six narrow it per-fielder-TEAM as a
+    match-subset, keyed on `mp.team` (the fielding orientation):
+
+      - filter_team=X (fielder's team) → `mp.team = X`.
+      - filter_opponent=X (fielded against X) → `mp.team != X AND X in match`.
+        build()'s match-level team/opponent clauses are direction-blind
+        (team1=X OR team2=X), so they're dropped from build and re-added
+        keyed on mp.team here — the denominator narrows on the same axis
+        as the fielder's OWN matches_fielded (chip↔baseline symmetry).
+      - innings → the match-subset where the fielder's team FIELDED in
+        innings (1 - aux.inning), mirroring
+        `player_inning_match_clause(side="fielding")`.
+      - toss/result → keyed on mp.team (the fielding side), mirroring
+        `player_toss_clause` / `player_result_clause`.
+    """
+    where, params = filters.build(
+        has_innings_join=False, apply_inning=False, aux=aux,
+        drop={"filter_team", "filter_opponent"},
+    )
+    parts = ["mp.person_id IS NOT NULL"]
+    if where:
+        parts.append(where)
+    # Actually fielded: the opponent batted ≥1 regular innings.
+    parts.append(
+        "EXISTS (SELECT 1 FROM innings i2 WHERE i2.match_id = mp.match_id"
+        " AND i2.super_over = 0 AND i2.team != mp.team)"
+    )
+    if filters.team:
+        parts.append("mp.team = :fld_team")
+        params["fld_team"] = filters.team
+    if filters.opponent:
+        parts.append(
+            "(mp.team != :fld_opp AND (m.team1 = :fld_opp OR m.team2 = :fld_opp))"
+        )
+        params["fld_opp"] = filters.opponent
+    if aux is not None and getattr(aux, "result", None):
+        r = aux.result
+        if r == "won":
+            parts.append("m.outcome_winner = mp.team")
+        elif r == "lost":
+            parts.append("m.outcome_winner IS NOT NULL AND m.outcome_winner != mp.team")
+        elif r == "tied":
+            parts.append("m.outcome_winner IS NULL")
+    if aux is not None and getattr(aux, "toss_outcome", None):
+        t = aux.toss_outcome
+        if t == "won":
+            parts.append("m.toss_winner = mp.team")
+        elif t == "lost":
+            parts.append("m.toss_winner IS NOT NULL AND m.toss_winner != mp.team")
+    if aux is not None and aux.inning is not None:
+        parts.append(
+            "EXISTS (SELECT 1 FROM innings i3 WHERE i3.match_id = mp.match_id"
+            " AND i3.super_over = 0 AND i3.team != mp.team"
+            " AND i3.innings_number = :fld_inn)"
+        )
+        params["fld_inn"] = 1 - aux.inning
+    return " AND ".join(parts), params
+
+
+async def _fielding_cohort_precomputed(
+    db, filters: FilterParams, is_keeper: int, drop_set: Optional[set[str]],
 ) -> dict:
-    """In-process fielding cohort baseline — same shape as the HTTP
-    endpoint. Phase 4 player /summary endpoints call this to fold the
-    cohort baseline into their envelope-wrapped response without a
-    second HTTP roundtrip.
+    """None-of-six fast path: read the precomputed fielding children.
+
+    Cohort partition: matches_as_keeper > 0 selects keepers; = 0 selects
+    pure outfielders. The keeper-flag partition is PER (person, scope) —
+    a player who kept in 2023 but not 2024 belongs to the outfielder
+    cohort for 2024 only. Use a JOIN so the matches_as_keeper predicate
+    gates at the right grain rather than IN-subquery which leaks across
+    scope_keys for one person.
     """
     where, params = build_scope_clauses(filters, drop=drop_set)
-
-    # Cohort partition: matches_as_keeper > 0 selects keepers; = 0
-    # selects pure outfielders. Subtotals over `catches`, `stumpings`,
-    # `runouts`, `matches` aggregated from parent playerscopestats —
-    # non-substitute numerator comes from the fielding-position child
-    # in parallel (substitute fielders excluded there at populate).
-    # The keeper-flag partition is PER (person, scope) — a player who
-    # kept in 2023 but not 2024 belongs to the outfielder cohort for
-    # 2024 only. Use a JOIN so the matches_as_keeper predicate gates
-    # at the right grain rather than IN-subquery which leaks across
-    # scope_keys for one person.
     keeper_pred = ">" if is_keeper else "="
     pool_sql = f"""
         SELECT COUNT(*)                       AS n_fielders,
@@ -4583,18 +4640,6 @@ async def compute_players_fielding_cohort(
     """
     # Non-substitute catches/stumpings/run_outs from the fielding-
     # position child, joined per-row to the parent keeper-partition.
-    nonsub_sql = f"""
-        SELECT SUM(pssfp.catches)    AS catches,
-               SUM(pssfp.stumpings)  AS stumpings,
-               SUM(pssfp.run_outs)   AS run_outs,
-               SUM(pssfp.dismissals) AS dismissals
-        FROM playerscopestatsfieldingposition pssfp
-        JOIN playerscopestats pss
-          ON pss.person_id = pssfp.person_id
-         AND pss.scope_key = pssfp.scope_key
-        WHERE pss.matches_as_keeper {keeper_pred} 0
-          AND {where}
-    """
     by_dis_pos_sql = f"""
         SELECT pssfp.position_bucket,
                SUM(pssfp.catches)    AS catches,
@@ -4611,12 +4656,8 @@ async def compute_players_fielding_cohort(
         GROUP BY pssfp.position_bucket
         ORDER BY pssfp.position_bucket
     """
-
     # PT4 of spec-prob-baselines.md — match-grain catch distribution
-    # aggregated across the keeper-binary cohort. Backs the cohort
-    # baselines for the P(=0)/P(=1)/P(≥2) chips on /fielders/.../
-    # distribution. Joined per-row to the parent keeper-partition so
-    # the cohort matches the existing per-match-rate cohorts.
+    # aggregated across the keeper-binary cohort.
     catch_dist_sql = f"""
         SELECT SUM(pssfcd.matches_with_0)   AS m0,
                SUM(pssfcd.matches_with_1)   AS m1,
@@ -4628,21 +4669,198 @@ async def compute_players_fielding_cohort(
         WHERE pss.matches_as_keeper {keeper_pred} 0
           AND {where}
     """
-
-    pool, nonsub, by_dis_rows, catch_dist = await asyncio.gather(
+    pool, by_dis_rows, catch_dist = await asyncio.gather(
         db.q(pool_sql, params),
-        db.q(nonsub_sql, params),
         db.q(by_dis_pos_sql, params),
         db.q(catch_dist_sql, params),
     )
-
     n_fielders = (pool[0].get("n_fielders") if pool else 0) or 0
     n_matches = (pool[0].get("n_matches_total") if pool else 0) or 0
+    # Headline = sum across the dismissed-position buckets (same source
+    # the by_dismissed_position array reads, so headline ⇄ bars agree).
+    headline = {"catches": 0, "stumpings": 0, "run_outs": 0, "dismissals": 0}
+    for r in by_dis_rows:
+        headline["catches"]    += r["catches"]    or 0
+        headline["stumpings"]  += r["stumpings"]  or 0
+        headline["run_outs"]   += r["run_outs"]   or 0
+        headline["dismissals"] += r["dismissals"] or 0
+    return {
+        "n_fielders": n_fielders, "n_matches": n_matches,
+        "catches": headline["catches"], "stumpings": headline["stumpings"],
+        "run_outs": headline["run_outs"], "dismissals": headline["dismissals"],
+        "by_dis_rows": by_dis_rows,
+        "m0": (catch_dist[0].get("m0")   if catch_dist else 0) or 0,
+        "m1": (catch_dist[0].get("m1")   if catch_dist else 0) or 0,
+        "mge2": (catch_dist[0].get("mge2") if catch_dist else 0) or 0,
+    }
 
-    nonsub_catches    = (nonsub[0].get("catches") if nonsub else 0) or 0
-    nonsub_stumpings  = (nonsub[0].get("stumpings") if nonsub else 0) or 0
-    nonsub_run_outs   = (nonsub[0].get("run_outs") if nonsub else 0) or 0
-    nonsub_dismissals = (nonsub[0].get("dismissals") if nonsub else 0) or 0
+
+async def _fielding_cohort_live(
+    db, filters: FilterParams, aux: AuxParams, is_keeper: int,
+) -> dict:
+    """Any-of-six live path (Phase 3e). Reproduces every figure the
+    precomputed children carry, now sliceable by the six, across the
+    three source tables at their native grains:
+
+      - DENOMINATOR (matches_fielded): `matchplayer` ⋈ `match`, keyed on
+        mp.team via `_fielding_denom_where` (match grain).
+      - NUMERATOR (catches/stumpings/run-outs + dismissed-position): live
+        over `fieldingcredit` ⋈ delivery ⋈ innings ⋈ match in the bowling/
+        fielding orientation (`_bowling_live_where`), Convention 3 +
+        is_substitute=0. The dismissed-batter position bucket comes from
+        `inningsbatterperf` (merged-opener bucket, same source the
+        position child uses) so headline + bars stay byte-identical to the
+        precomputed `playerscopestatsfieldingposition` at none-of-six.
+      - catch-dist (P chips): per-(fielder, fielded-match) non-sub catch
+        count bucketed over the matchplayer master sample — mirrors the
+        precomputed `playerscopestatsfieldingcatchdist` exactly.
+      - keeper/outfielder partition: a cohort fielder is a "keeper in
+        scope" iff they kept ≥1 in-scope innings (`keeperassignment`,
+        same fielding orientation) — mirrors how the player's OWN value
+        decides is_keeper, so own↔cohort agree.
+    """
+    num_where, num_params = _bowling_live_where(filters, aux)
+    denom_where, denom_params = _fielding_denom_where(filters, aux)
+    # Keeper-partition subquery: persons who kept ≥1 in-scope innings.
+    # Same fielding orientation as the numerator (keeper credits live in
+    # the innings the keeper's team fielded). Reuses _bowling_live_where
+    # so its bind names (and values) coincide with num_params.
+    keeper_subq = f"""
+        SELECT ka.keeper_id
+        FROM keeperassignment ka
+        JOIN innings i ON i.id = ka.innings_id
+        JOIN match   m ON m.id = i.match_id
+        WHERE {num_where} AND ka.keeper_id IS NOT NULL
+    """
+    keeper_op = "IN" if is_keeper else "NOT IN"
+
+    # --- Numerator + dismissed-position (position-resolved) ---
+    num_sql = f"""
+        SELECT ibp.position_bucket AS position_bucket,
+               SUM(CASE WHEN fc.kind IN ('caught', 'caught_and_bowled') THEN 1 ELSE 0 END) AS catches,
+               SUM(CASE WHEN fc.kind = 'stumped' THEN 1 ELSE 0 END) AS stumpings,
+               SUM(CASE WHEN fc.kind = 'run_out' THEN 1 ELSE 0 END) AS run_outs,
+               COUNT(DISTINCT fc.fielder_id) AS n_players
+        FROM fieldingcredit fc
+        JOIN delivery d ON d.id = fc.delivery_id
+        JOIN innings  i ON i.id = d.innings_id
+        JOIN match    m ON m.id = i.match_id
+        JOIN wicket   w ON w.id = fc.wicket_id
+        JOIN inningsbatterperf ibp
+          ON ibp.innings_id = i.id AND ibp.batter_id = w.player_out_id
+        WHERE {num_where}
+          AND fc.fielder_id IS NOT NULL
+          AND COALESCE(fc.is_substitute, 0) = 0
+          AND fc.fielder_id {keeper_op} ({keeper_subq})
+        GROUP BY ibp.position_bucket
+        ORDER BY ibp.position_bucket
+    """
+    # --- Denominator (matches_fielded across the cohort) ---
+    denom_sql = f"""
+        SELECT COUNT(*)                    AS n_matches_total,
+               COUNT(DISTINCT mp.person_id) AS n_fielders
+        FROM matchplayer mp
+        JOIN match m ON m.id = mp.match_id
+        WHERE {denom_where}
+          AND mp.person_id {keeper_op} ({keeper_subq})
+    """
+    # --- catch-dist: bucket each (fielder, fielded-match) by non-sub
+    #     catch count over the matchplayer master sample ---
+    catch_dist_sql = f"""
+        WITH catches_pm AS (
+            SELECT fc.fielder_id AS pid, i.match_id AS mid, COUNT(*) AS c
+            FROM fieldingcredit fc
+            JOIN delivery d ON d.id = fc.delivery_id
+            JOIN innings  i ON i.id = d.innings_id
+            JOIN match    m ON m.id = i.match_id
+            WHERE {num_where}
+              AND fc.kind IN ('caught', 'caught_and_bowled')
+              AND COALESCE(fc.is_substitute, 0) = 0
+              AND fc.fielder_id IS NOT NULL
+            GROUP BY fc.fielder_id, i.match_id
+        )
+        SELECT
+            SUM(CASE WHEN COALESCE(c.c, 0) = 0 THEN 1 ELSE 0 END)  AS m0,
+            SUM(CASE WHEN COALESCE(c.c, 0) = 1 THEN 1 ELSE 0 END)  AS m1,
+            SUM(CASE WHEN COALESCE(c.c, 0) >= 2 THEN 1 ELSE 0 END) AS mge2
+        FROM matchplayer mp
+        JOIN match m ON m.id = mp.match_id
+        LEFT JOIN catches_pm c ON c.pid = mp.person_id AND c.mid = mp.match_id
+        WHERE {denom_where}
+          AND mp.person_id {keeper_op} ({keeper_subq})
+    """
+    # num_params ≡ the keeper_subq's params (same _bowling_live_where);
+    # denom_params adds the fld_* binds and shares build()'s scope binds.
+    num_combined = {**num_params}
+    denom_combined = {**denom_params, **num_params}
+    num_rows, denom_rows, cd_rows = await asyncio.gather(
+        db.q(num_sql, num_combined),
+        db.q(denom_sql, denom_combined),
+        db.q(catch_dist_sql, denom_combined),
+    )
+
+    n_matches = (denom_rows[0].get("n_matches_total") if denom_rows else 0) or 0
+    n_fielders = (denom_rows[0].get("n_fielders") if denom_rows else 0) or 0
+
+    by_dis_rows: list[dict] = []
+    headline = {"catches": 0, "stumpings": 0, "run_outs": 0, "dismissals": 0}
+    for r in num_rows:
+        catches = r["catches"] or 0
+        stumpings = r["stumpings"] or 0
+        run_outs = r["run_outs"] or 0
+        dismissals = catches + stumpings + run_outs
+        headline["catches"]    += catches
+        headline["stumpings"]  += stumpings
+        headline["run_outs"]   += run_outs
+        headline["dismissals"] += dismissals
+        by_dis_rows.append({
+            "position_bucket": r["position_bucket"],
+            "catches": catches, "stumpings": stumpings,
+            "run_outs": run_outs, "dismissals": dismissals,
+            "n_players": r["n_players"] or 0,
+        })
+    return {
+        "n_fielders": n_fielders, "n_matches": n_matches,
+        "catches": headline["catches"], "stumpings": headline["stumpings"],
+        "run_outs": headline["run_outs"], "dismissals": headline["dismissals"],
+        "by_dis_rows": by_dis_rows,
+        "m0": (cd_rows[0].get("m0")   if cd_rows else 0) or 0,
+        "m1": (cd_rows[0].get("m1")   if cd_rows else 0) or 0,
+        "mge2": (cd_rows[0].get("mge2") if cd_rows else 0) or 0,
+    }
+
+
+async def compute_players_fielding_cohort(
+    db,
+    filters: FilterParams,
+    aux: AuxParams,
+    is_keeper: int,
+    drop_set: Optional[set[str]] = None,
+) -> dict:
+    """In-process fielding cohort baseline — same shape as the HTTP
+    endpoint. Phase 4 player /summary endpoints call this to fold the
+    cohort baseline into their envelope-wrapped response without a
+    second HTTP roundtrip.
+
+    Dispatches on `is_precomputed_scope` (Phase 3e): none-of-six → fast
+    precomputed children read; any-of-six → live aggregation across
+    matchplayer (denominator) + fieldingcredit (numerator) +
+    keeperassignment (keeper partition) so the keeper-binary fielding
+    cohort + distribution prob baselines narrow under the six. Spec:
+    spec-player-baseline-aux-fallback.md Phase 3e.
+    """
+    if is_precomputed_scope(filters, aux):
+        agg = await _fielding_cohort_precomputed(db, filters, is_keeper, drop_set)
+    else:
+        agg = await _fielding_cohort_live(db, filters, aux, is_keeper)
+
+    n_fielders = agg["n_fielders"]
+    n_matches = agg["n_matches"]
+    nonsub_catches    = agg["catches"]
+    nonsub_stumpings  = agg["stumpings"]
+    nonsub_run_outs   = agg["run_outs"]
+    nonsub_dismissals = agg["dismissals"]
+    by_dis_rows = agg["by_dis_rows"]
 
     def _r(num: int, den: int, ndigits: int) -> Optional[float]:
         return round(num / den, ndigits) if den else None
@@ -4695,9 +4913,9 @@ async def compute_players_fielding_cohort(
     # divide by their sum (which is matches_total across the cohort).
     # The cohort sample matches the chip's master sample exactly
     # (Convention 3 catches + is_substitute=0, matchplayer-based).
-    cd_m0   = (catch_dist[0].get("m0")   if catch_dist else 0) or 0
-    cd_m1   = (catch_dist[0].get("m1")   if catch_dist else 0) or 0
-    cd_mge2 = (catch_dist[0].get("mge2") if catch_dist else 0) or 0
+    cd_m0   = agg["m0"]
+    cd_m1   = agg["m1"]
+    cd_mge2 = agg["mge2"]
     cd_total = cd_m0 + cd_m1 + cd_mge2
     prob_zero  = round(cd_m0   / cd_total, 4) if cd_total else None
     prob_one   = round(cd_m1   / cd_total, 4) if cd_total else None
