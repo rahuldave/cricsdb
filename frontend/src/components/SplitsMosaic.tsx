@@ -452,50 +452,40 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
       }
     : null
 
-  // Marginals come from unauxData when available — that's the
-  // /splits response with aux filters stripped, so the chips
-  // (outcome row + col-header toss + row-header inning) keep
-  // showing 4-rect baseline values regardless of aux filtering.
-  // Falls back to the aux-filtered data.marginals if unauxData
-  // isn't loaded yet (initial render before sibling fetch settles).
-  const marginalsForDisplay = unauxData?.marginals ?? data.marginals
+  // Two marginal sources, deliberately split (the redesign that
+  // separated the widget's two jobs):
+  //
+  //  • fullScopeMarginals — the aux-STRIPPED /splits response (same
+  //    FilterBar scope, but toss/inning/result NOT applied). Drives
+  //    the TOP reset/reference bar so its numbers stay PUT when you
+  //    click into a filter — the stable "what does the whole scope
+  //    look like" anchor. Falls back to data.marginals before the
+  //    sibling unaux fetch settles.
+  //
+  //  • liveMarginals — the aux-FILTERED response. Drives the LIVE
+  //    readouts INSIDE the mosaic (northwest-corner Won/Tied/Lost +
+  //    the toss column-headers + inning row-headers) so they reflect
+  //    the current filter. Under result=won the corner reads Won N /
+  //    Tied 0 / Lost 0 and the toss/inning marginals re-split within
+  //    the wins.
+  const fullScopeMarginals = unauxData?.marginals ?? data.marginals
+  const liveMarginals = data.marginals
 
   return (
     <div ref={mosaicRootRef} className="wisden-splits-mosaic">
       <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} setAux={setAux} bowlingCtx={bowlingCtx} />
 
-      {/* Marginal links above the matrix.
-          Line 1: outcome marginals (Won/Tied/Lost) with color-coded
-                  text + direction-aware MetricDelta.
-          Line 2: All-toss / Both-innings filter-clear links with
-                  numbers + delta (vs per-team league avg, sourced
-                  from the StatCard's matchesEnvelope). */}
-      <div className="wisden-splits-marginal-row">
-        {(['won', 'tied', 'lost'] as Outcome[]).map(rv => {
-          const m = marginalsForDisplay.result[rv]
-          const tint = WISDEN_WL_TINTS[rv]
-          const isActive = r === rv
-          return (
-            <button
-              key={rv}
-              type="button"
-              onClick={() => setOne('result', isActive ? '' : rv)}
-              className={`wisden-splits-outcome-link${isActive ? ' is-active' : ''}`}
-              style={{ color: tint.fg }}
-              title={isActive ? `Clear ${RESULT_LABEL[rv]}` : `Filter to ${RESULT_LABEL[rv]}`}
-            >
-              <span className="wisden-splits-outcome-swatch" style={{ background: OUTCOME_COLOR[rv] }} aria-hidden="true" />
-              <strong className="comp-link">{RESULT_LEGEND[rv]}</strong>{' '}
-              {m?.n ?? 0}
-              {m?.share != null && ` (${(m.share * 100).toFixed(0)}%)`}
-              {hasSubject && (
-                <MetricDelta env={mkEnv(m?.share, m?.league_share, m?.delta_pct, dirForOutcome(rv))} />
-              )}
-            </button>
-          )
-        })}
-      </div>
-      <div className="wisden-splits-marginal-row wisden-splits-marginal-row-secondary">
+      {/* Reset / reference bar — one flex-wrap row holding the
+          FULL-SCOPE (aux-stripped) reference numbers. These stay PUT
+          when you click into a filter, so they read as the stable
+          "whole scope" anchor + the jump/clear controls:
+            • All toss / Both innings — clear that axis.
+            • All won / All tied / All lost — jump to that result
+              (toggle off when already active).
+          Uncolored on purpose: the COLORED, live Won/Tied/Lost
+          readout lives in the mosaic's northwest corner. The grey
+          deltas (vs a typical team at full scope) ride along here. */}
+      <div className="wisden-splits-reset-bar">
         <button
           type="button"
           onClick={() => setOne('toss_outcome', '')}
@@ -514,6 +504,25 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
           <span className="comp-link">Both innings</span> · {allInningsN}
           {matchesDeltaEnv && <MetricDelta env={matchesDeltaEnv} />}
         </button>
+        {(['won', 'tied', 'lost'] as Outcome[]).map(rv => {
+          const m = fullScopeMarginals.result[rv]
+          const isActive = r === rv
+          return (
+            <button
+              key={rv}
+              type="button"
+              onClick={() => setOne('result', isActive ? '' : rv)}
+              className={`wisden-splits-clear-link${isActive ? ' is-active' : ''}`}
+              title={isActive ? `Clear ${RESULT_LABEL[rv]}` : `Filter to ${RESULT_LABEL[rv]}`}
+            >
+              <span className="comp-link">All {RESULT_LEGEND[rv].toLowerCase()}</span> · {m?.n ?? 0}
+              {m?.share != null && ` (${(m.share * 100).toFixed(0)}%)`}
+              {hasSubject && (
+                <MetricDelta env={mkEnv(m?.share, m?.league_share, m?.delta_pct, dirForOutcome(rv))} />
+              )}
+            </button>
+          )
+        })}
       </div>
       <div className="wisden-splits-filter-hint">
         Tip: click any underlined label, count, or cell to filter to that combination.
@@ -528,13 +537,45 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
           on desktop, tall on mobile) so cells get more horizontal
           space on landscape viewports. */}
       <div className="wisden-splits-table">
-        {/* Empty corner */}
-        <div className="wisden-splits-corner-empty" />
+        {/* Northwest corner — LIVE Won/Tied/Lost for the current
+            filter, stacked one-per-line (survives the narrow mobile
+            corner track). Colored swatch + count + share% + live
+            delta; each line clicks to filter result (toggle off when
+            active). Under result=won this reads Won N / Tied 0 /
+            Lost 0. Reads liveMarginals (aux-filtered), the opposite
+            source from the full-scope reset bar above. */}
+        <div className="wisden-splits-corner">
+          {(['won', 'tied', 'lost'] as Outcome[]).map(rv => {
+            const m = liveMarginals.result[rv]
+            const tint = WISDEN_WL_TINTS[rv]
+            const isActive = r === rv
+            return (
+              <button
+                key={rv}
+                type="button"
+                onClick={() => setOne('result', isActive ? '' : rv)}
+                className={`wisden-splits-corner-outcome${isActive ? ' is-active' : ''}`}
+                style={{ color: tint.fg }}
+                title={isActive ? `Clear ${RESULT_LABEL[rv]}` : `Filter to ${RESULT_LABEL[rv]}`}
+              >
+                <span className="wisden-splits-outcome-swatch" style={{ background: OUTCOME_COLOR[rv] }} aria-hidden="true" />
+                <strong className="comp-link">{RESULT_LEGEND[rv]}</strong>{' '}
+                {m?.n ?? 0}
+                {m?.share != null && (
+                  <span className="wisden-splits-share-pct">{' '}({(m.share * 100).toFixed(0)}%)</span>
+                )}
+                {hasSubject && (
+                  <MetricDelta env={mkEnv(m?.share, m?.league_share, m?.delta_pct, dirForOutcome(rv))} />
+                )}
+              </button>
+            )
+          })}
+        </div>
 
         {/* Column-headers row — Won toss / Lost toss, even split */}
         <div className="wisden-splits-col-headers">
           {tossValues.map(tv => {
-            const m = marginalsForDisplay.toss_outcome[tv]
+            const m = liveMarginals.toss_outcome[tv]
             return (
               <button
                 key={tv}
@@ -563,7 +604,7 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
           {inningValues.map(iv => {
             const userIv = teamInningToUserInning(iv, bowlingCtx)
             const userIvStr = String(userIv) as '0' | '1'
-            const m = marginalsForDisplay.inning[String(iv) as '0' | '1']
+            const m = liveMarginals.inning[String(iv) as '0' | '1']
             const primaryLabel = inningLabels[userIvStr]
             const otherLabels = bowlingCtx ? INNING_LABEL_BAT : INNING_LABEL_BOWL
             const secondaryLabel = otherLabels[String(1 - userIv) as '0' | '1']

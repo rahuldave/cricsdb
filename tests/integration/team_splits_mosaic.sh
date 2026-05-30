@@ -363,6 +363,57 @@ assert_eq "No stale Eden Gardens dossier after navigating to bad venue" "false" 
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 12 · Dual-use redesign — top reset bar full-scope, NW corner + marginals live"
+#
+# The Mosaic split its two jobs onto two surfaces:
+#   • top reset/reference bar — FULL-SCOPE (aux-stripped) numbers that
+#     stay PUT when you click into a filter.
+#   • northwest corner Won/Tied/Lost + toss/inning marginals — LIVE,
+#     re-split to the current filter.
+#
+# Anchors derive from the API at runtime (full-scope vs result=won).
+# Against the pre-redesign code every assertion below is RED: there
+# was no corner element, the toss header read the aux-stripped (frozen)
+# value, and the reset-bar class didn't exist.
+
+api_full=$(curl -s "http://localhost:8000/api/v1/teams/splits?team=$TEAM_URL&$SCOPE_URL")
+api_won=$(curl -s "http://localhost:8000/api/v1/teams/splits?team=$TEAM_URL&$SCOPE_URL&result=won")
+
+full_won_n=$(echo "$api_full"   | python3 -c "import sys,json;print(json.load(sys.stdin)['marginals']['result']['won']['n'])")
+full_toss_won=$(echo "$api_full" | python3 -c "import sys,json;print(json.load(sys.stdin)['marginals']['toss_outcome']['won']['n'])")
+won_scope_n=$(echo "$api_won"    | python3 -c "import sys,json;print(json.load(sys.stdin)['scope_total_n'])")
+live_toss_won=$(echo "$api_won"  | python3 -c "import sys,json;print(json.load(sys.stdin)['marginals']['toss_outcome']['won']['n'])")
+
+# 12a — reset bar holds FULL-SCOPE "All won · <N>" even under result=lost.
+ab open "$BASE/teams?team=$TEAM_URL&$SCOPE_URL&result=lost"
+settle 4
+reset_text=$(ab_eval "document.querySelector('$MOSAIC_SEL .wisden-splits-reset-bar')?.innerText.replace(/\\n/g,' ') || ''")
+assert_contains "reset bar shows full-scope 'All won · $full_won_n' under result=lost" "All won · $full_won_n" "$reset_text"
+
+# 12b — northwest corner is LIVE: under result=won it reads Won=<scope>, Tied 0, Lost 0.
+ab open "$BASE/teams?team=$TEAM_URL&$SCOPE_URL&result=won"
+settle 4
+corner_won=$(ab_eval "[...document.querySelectorAll('$MOSAIC_SEL .wisden-splits-corner-outcome')].find(b=>b.innerText.trim().startsWith('Won'))?.innerText.replace(/\\n/g,' ') || ''")
+corner_tied=$(ab_eval "[...document.querySelectorAll('$MOSAIC_SEL .wisden-splits-corner-outcome')].find(b=>b.innerText.trim().startsWith('Tied'))?.innerText.replace(/\\n/g,' ') || ''")
+corner_lost=$(ab_eval "[...document.querySelectorAll('$MOSAIC_SEL .wisden-splits-corner-outcome')].find(b=>b.innerText.trim().startsWith('Lost'))?.innerText.replace(/\\n/g,' ') || ''")
+assert_contains "corner Won is live ($won_scope_n) under result=won" "Won $won_scope_n" "$corner_won"
+assert_contains "corner Tied collapses to 0 under result=won" "Tied 0" "$corner_tied"
+assert_contains "corner Lost collapses to 0 under result=won" "Lost 0" "$corner_lost"
+
+# 12c — toss column-header is LIVE under result=won (re-splits within the
+# wins → $live_toss_won, NOT the full-scope $full_toss_won).
+won_toss_header=$(ab_eval "[...document.querySelectorAll('$MOSAIC_SEL .wisden-splits-col-header')].find(b=>b.innerText.trim().startsWith('Won toss'))?.innerText.replace(/\\n/g,' ') || ''")
+assert_contains "Won-toss header shows LIVE count (· $live_toss_won) under result=won" "· $live_toss_won" "$won_toss_header"
+if [ "$live_toss_won" != "$full_toss_won" ]; then
+  if [[ "$(unq "$won_toss_header")" == *"· $full_toss_won"* ]]; then
+    bad "Won-toss header still shows FROZEN full-scope count ($full_toss_won) — marginal not live"
+  else
+    ok "Won-toss header is not the frozen full-scope count ($full_toss_won)"
+  fi
+fi
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "Test 11 · Mobile viewport (390x844) renders without overflow"
 
 agent-browser set viewport 390 844 >/dev/null 2>&1

@@ -2491,6 +2491,11 @@ a { color: inherit; }
   grid-column: 2;
   grid-row: 1;
   display: flex;
+  /* Bottom-align the toss labels: the corner (grid-row 1) now holds
+     a 3-line Won/Tied/Lost stack, so this row is taller than one
+     line. Anchoring to the bottom keeps "Won toss / Lost toss" just
+     above the divider, adjacent to the cells they head. */
+  align-items: flex-end;
   /* gap: 0 so the first-child's border-right (the inner Won/Lost
      divider) sits exactly at 50% of the strip — aligns with the
      cell-area's center-cross pseudo below.  Padding inside each
@@ -2756,46 +2761,39 @@ a { color: inherit; }
   width: var(--mosaic-unit-x);
   height: var(--mosaic-unit-y);
 }
+/* Northwest corner — LIVE Won/Tied/Lost readout, stacked one per
+   line. Keeps the corner's T-cross borders (right + bottom) so the
+   outer gridlines still meet. Top-aligned, left-flush; each line is
+   a compact filter button (swatch + count + share% + delta). */
 .wisden-splits-corner {
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding-right: 0.6rem;
-  text-align: right;
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 0 0.6rem 0.4rem 0;
   border-right: 1px solid var(--rule-soft);
   border-bottom: 1px solid var(--rule-soft);
-  gap: 0.1rem;
+  gap: 0.15rem;
 }
-.wisden-splits-corner-link {
+.wisden-splits-corner-outcome {
   background: none;
   border: none;
+  padding: 0.05rem 0;
   font-family: var(--sans);
-  font-size: 0.85rem;
-  color: var(--ink-faint);
-  font-style: italic;
-  font-weight: 500;
-  text-align: right;
-  padding: 0;
-  cursor: default;
-  display: inline-block;
-  align-self: flex-end;
-}
-.wisden-splits-corner-link[disabled] { cursor: default; }
-.wisden-splits-corner-link.is-clickable {
+  font-size: 0.82rem;
+  /* Baseline color set inline per outcome (WISDEN_WL_TINTS.fg). */
   cursor: pointer;
-  color: var(--ink);
-  font-style: normal;
-  border-bottom: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  text-align: left;
+  line-height: 1.2;
+  transition: color 120ms;
 }
-.wisden-splits-corner-link.is-clickable:hover {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-.wisden-splits-corner-total {
-  font-size: 0.78rem;
-  color: var(--ink-faint);
-  margin-top: 0.15rem;
-}
+.wisden-splits-corner-outcome:hover { color: var(--accent) !important; }
+.wisden-splits-corner-outcome.is-active { color: var(--accent) !important; }
 .wisden-splits-col-header {
   background: none;
   border: none;
@@ -2833,6 +2831,22 @@ a { color: inherit; }
    the wisden-seg underline-on-hover pattern; outcome links carry
    their WL tint color baseline, switching to oxblood (accent) on
    hover/active. */
+/* Top reset / reference bar — full-scope anchor + jump/clear links.
+   Flexes and wraps so it reflows cleanly on narrow screens (the
+   user's explicit requirement). All entries are link-styled
+   (wisden-splits-clear-link); no color swatches here. */
+.wisden-splits-reset-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem 0.9rem;
+  margin: 0.5rem 0 0.2rem 0;
+  flex-wrap: wrap;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+}
+.wisden-splits-reset-bar .wisden-splits-clear-link.is-active .comp-link {
+  color: var(--accent);
+}
 .wisden-splits-marginal-row {
   display: flex;
   align-items: baseline;
