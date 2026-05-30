@@ -179,11 +179,13 @@ sql_smc_bow_in1=$(sql "$SMC_BOW AND i.innings_number=1")
 ab open "$BASE/bowling?player=e94915e6&gender=male&team_type=club"
 settle 4
 assert_eq "Player Bowling · mount (all innings)" "$sql_smc_bow_all" "$(matches_dom)"
-click_inning 0; settle
+# Bowling refetch recomputes the over-mix cohort — slower than batting,
+# so the default 3s settle reads before the tile updates. Give it 6s.
+click_inning 0; settle 6
 assert_eq "Player Bowling · click 1st innings"   "$sql_smc_bow_in0" "$(matches_dom)"
-click_inning 1; settle
+click_inning 1; settle 6
 assert_eq "Player Bowling · click 2nd innings"   "$sql_smc_bow_in1" "$(matches_dom)"
-click_inning All; settle
+click_inning All; settle 6
 assert_eq "Player Bowling · click All"           "$sql_smc_bow_all" "$(matches_dom)"
 
 # ─────────────────────────────────────────────────────────────────
@@ -240,11 +242,13 @@ sql_smc_runs_in1=$(sql "$SMC_RUNS AND i.innings_number=1")
 ab open "$BASE/players?player=e94915e6&gender=male&team_type=club"
 settle 4
 assert_eq "Players dossier · mount (all innings)" "$sql_smc_runs_all" "$(runs_dom)"
-click_inning 0; settle
+# The dossier refetches all three discipline summaries (+ cohorts) on an
+# inning toggle — give it 6s so the read doesn't catch the prior value.
+click_inning 0; settle 6
 assert_eq "Players dossier · click 1st innings"   "$sql_smc_runs_in0" "$(runs_dom)"
-click_inning 1; settle
+click_inning 1; settle 6
 assert_eq "Players dossier · click 2nd innings"   "$sql_smc_runs_in1" "$(runs_dom)"
-click_inning All; settle
+click_inning All; settle 6
 assert_eq "Players dossier · click All"           "$sql_smc_runs_all" "$(runs_dom)"
 
 # ─────────────────────────────────────────────────────────────────
