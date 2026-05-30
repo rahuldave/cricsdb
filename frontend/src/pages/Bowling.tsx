@@ -301,7 +301,7 @@ export default function Bowling() {
             return (
               <>
           <div className="wisden-statrow cols-6">
-            <StatCard label="Matches" value={summary.matches.value ?? 0} />
+            <StatCard label="Matches bowled" value={summary.matches.value ?? 0} />
             <StatCard label="Innings" value={summary.innings.value ?? 0} />
             <StatCard label="Wickets" value={summary.wickets.value ?? 0} />
             <StatCard label="Wkts/Inn" value={fmt(summary.wickets_per_innings.value, 2)}
