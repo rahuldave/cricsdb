@@ -6,18 +6,30 @@ Specs: `spec-splits-mosaic.md` (Teams-only — implemented 2026-05-11), `splits-
 
 This doc captures the **inviolable rules**. The spec captures the **design**.
 
-> **⚠️ KNOWN ISSUE — confusing summary wording (flagged 2026-05-26, TO FIX).**
-> When a filter is active, the summary line reads "Of **144** matches
-> batting first:" then shows "Won **148** · Tied 2 · Lost **116**" — which
-> total **266** (the full scope), not 144. The header is built from the
-> aux-narrowed count; the W/T/L summary + the All-toss/Both-innings chips
-> are driven by the aux-STRIPPED full-scope fetch (intentional, so the
-> reference doesn't rescale on filter-click), but nothing signals the shown
-> counts are the full-scope reference rather than the 144. On screen it
-> reads as a contradiction. User wants it fixed — reword as an explicit
-> reference, OR make the summary reflect the filtered slice, OR drop the
-> "Of N matches <filter>" header when the counts are full-scope. Sites:
-> `SplitsMosaic.tsx` summary strip + `Teams.tsx` unaux* fetches.
+## Two surfaces: full-scope reference vs live readout (the dual-use split)
+
+The Mosaic is both a *display* (what does this scope look like?) and a
+*widget* (click to narrow). Those two jobs sit on two separate surfaces,
+fed by two separate fetches, so neither lies when the other is active:
+
+| Surface | Fetch | Behaviour under a filter |
+|---|---|---|
+| **Top reset / reference bar** — one flex-wrap row: `All toss · N`, `Both innings · N`, `All won / All tied / All lost · N (s%) Δ` | aux-**stripped** (`unauxData`) | **Stays put.** Full-scope anchor. Uncolored. Carries the vs-typical-team deltas. Toss/inning entries clear that axis; result entries jump to that outcome (toggle off when active). |
+| **Northwest corner** — Won/Tied/Lost stacked one-per-line, colored swatch + count + share% + delta | aux-**filtered** (`data`) | **Goes live.** Under `result=won` reads Won N / Tied 0 / Lost 0. Clickable (filter result). |
+| **Toss column-headers + inning row-headers** | aux-**filtered** (`data`) | **Go live** — re-split within the slice (e.g. `result=won` takes the toss line 133/133 → 79/69), with live deltas. |
+
+The reset bar reads `fullScopeMarginals`; the corner + marginals read
+`liveMarginals` (= `data.marginals`). The corner is stacked vertically
+on purpose — it has to survive the ~min-content corner track at 390w.
+
+This split is what **retired the old "confusing summary wording" issue**
+(flagged 2026-05-26, fixed 2026-05-30): the header read "Of **144**
+matches batting first:" while a W/T/L line below showed the full-scope
+**266**-totalling counts, reading as a contradiction. Full-scope numbers
+now live ONLY on the explicitly-labelled reset bar; the live readout
+(corner + marginals) reflects the filtered slice. Don't reintroduce a
+full-scope W/T/L line under the filtered header. Tested by
+`team_splits_mosaic.sh` Test 12.
 
 ---
 
