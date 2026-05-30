@@ -131,10 +131,15 @@ assert_contains "B/Four subtitle has 'vs cohort'" "vs cohort " "$bf_sub"
 bb_sub=$(tile_sub "B/Boundary")
 assert_contains "B/Boundary subtitle has 'vs cohort'" "vs cohort " "$bb_sub"
 
-# Counts that don't have a cohort baseline should NOT have subtitles
-# (Matches, Innings, Runs).
+# The Matches tile carries a DESCRIPTIVE subtitle ("batted in N"), not a
+# cohort baseline. Confirm the qualifier is present and it's not a "vs
+# cohort" delta (counts have no cohort baseline).
 matches_sub=$(tile_sub "Matches")
-assert_eq "Matches has no subtitle" "" "$matches_sub"
+assert_contains "Matches tile shows the 'batted in' qualifier" "batted in" "$matches_sub"
+case "$(unq "$matches_sub")" in
+  *"vs cohort"*) bad "Matches tile must not carry a cohort delta" ;;
+  *) ok "Matches tile subtitle is descriptive, not a cohort delta" ;;
+esac
 
 # ───────────────────────────────────────────────────────────────────
 # Test 2 — /bowling page, Bumrah IPL 2016

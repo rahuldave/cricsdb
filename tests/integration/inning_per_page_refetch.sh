@@ -96,7 +96,12 @@ click_inning() {
 # DOM extractors. Match label-then-value — same shape as cross_
 # cutting_inning_split.sh's findValueAfter.
 matches_dom() {
-  ab_eval "document.body.textContent.match(/Matches(\d+)/)?.[1] || ''"
+  # Player discipline pages headline PLAYED and show the activity count in
+  # a subtitle: "batted in N" / "bowled in N" / "fielded in N" — that
+  # activity count is what these assertions anchor on (matches batted/
+  # bowled). The Teams page keeps a bare "Matches<value>" headline. Read
+  # the activity subtitle first, fall back to the Teams headline.
+  ab_eval "(() => { const t = document.body.textContent; const a = t.match(/(?:batted|bowled|fielded) in (\d+)/); if (a) return a[1]; const m = t.match(/Matches(\d+)/); return m ? m[1] : ''; })()"
 }
 
 # Player Fielding header doesn't show "Matches"-on-line — it shows

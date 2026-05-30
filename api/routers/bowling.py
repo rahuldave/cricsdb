@@ -568,6 +568,32 @@ async def bowling_summary(
     innings_count = innings_rows[0]["innings"] if innings_rows else 0
     matches_count = innings_rows[0]["matches"] if innings_rows else 0
 
+    # Squad appearances ("played"), match-level — parallels fielding's
+    # `matches`. matches_count above counts matches BOWLED; matches_played
+    # counts matches the player was in the XI for, at scope. The page
+    # shows played as the headline and "bowled in N" as the qualifier
+    # (abandoned/no-bowl matches make played ≥ bowled).
+    mp_where, mp_params = filters.build(has_innings_join=False, aux=aux)
+    mp_params["person_id"] = person_id
+    mp_parts = ["mp.person_id = :person_id"]
+    if mp_where:
+        mp_parts.append(mp_where)
+    _rc = player_result_clause(aux, person_id, mp_params, match_id_expr="mp.match_id")
+    if _rc:
+        mp_parts.append(_rc)
+    _tc = player_toss_clause(aux, person_id, mp_params, match_id_expr="mp.match_id")
+    if _tc:
+        mp_parts.append(_tc)
+    _ri = player_inning_match_clause(aux, person_id, mp_params, match_id_expr="mp.match_id", side="bowling")
+    if _ri:
+        mp_parts.append(_ri)
+    mp_rows = await db.q(
+        f"SELECT COUNT(DISTINCT mp.match_id) AS n FROM matchplayer mp "
+        f"JOIN match m ON m.id = mp.match_id WHERE {' AND '.join(mp_parts)}",
+        mp_params,
+    )
+    matches_played = mp_rows[0]["n"] if mp_rows else 0
+
     # Best figures (per innings)
     best_rows = await db.q(
         f"""
@@ -719,6 +745,7 @@ async def bowling_summary(
         "best_figures": best,
         # Numeric fields envelope-wrapped per Phase 4.
         "matches":             wrap_metric(matches_count,    None,                                     "matches",                  sample_size=cohort_sample),
+        "matches_played":      wrap_metric(matches_played,   None,                                     "matches_played",           sample_size=cohort_sample),
         "innings":             wrap_metric(innings_count,    None,                                     "bowl_innings",             sample_size=cohort_sample),
         "balls":               wrap_metric(balls,            None,                                     "bowl_balls",               sample_size=cohort_sample),
         "runs_conceded":       wrap_metric(runs_conceded,    None,                                     "bowl_runs_conceded",       sample_size=cohort_sample),

@@ -356,7 +356,7 @@ export default function Fielding() {
                 </div>
                 <div className="wisden-statrow cols-6">
                   <StatCard label="Total"      value={summary.total_dismissals.value ?? 0} />
-                  <StatCard label="Matches"    value={summary.matches.value ?? 0} />
+                  <StatCard label="Matches" value={summary.matches.value ?? 0} subtitle={`fielded in ${summary.matches_fielded.value ?? 0}`} />
                   <StatCard label="Dis/Match"  value={fmt(summary.dismissals_per_match.value)}
                     subtitle={summary.dismissals_per_match.scope_avg != null
                       ? <MetricDelta env={summary.dismissals_per_match} withScopeAvg label="cohort" fmt={3}

@@ -327,7 +327,7 @@ export default function Batting() {
             return (
               <>
           <div className="wisden-statrow cols-6">
-            <StatCard label="Matches" value={summary.matches.value} />
+            <StatCard label="Matches" value={summary.matches_played.value} subtitle={`batted in ${summary.matches.value ?? 0}`} />
             <StatCard label="Innings" value={summary.innings.value} />
             <StatCard label="Runs" value={summary.runs.value} />
             <StatCard label="Runs/Inn" value={fmt(summary.runs_per_innings.value, 2)}

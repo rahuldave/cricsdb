@@ -395,6 +395,9 @@ export interface BattingSummary {
   // rate metrics (average, strike_rate, dot_pct, boundary_pct) carry
   // direction + delta_pct vs the position-mix-weighted cohort.
   matches: MetricEnvelope
+  /** Squad appearances ("played") — headline matches count. `matches`
+   *  above is matches BATTED; the tile shows played + "batted in N". */
+  matches_played: MetricEnvelope
   innings: MetricEnvelope
   runs: MetricEnvelope
   balls_faced: MetricEnvelope
@@ -1322,6 +1325,9 @@ export interface BowlingSummary {
   best_figures: string | null
   // Numeric fields envelope-wrapped per Phase 4.
   matches: MetricEnvelope
+  /** Squad appearances ("played") — headline matches count. `matches`
+   *  above is matches BOWLED; the tile shows played + "bowled in N". */
+  matches_played: MetricEnvelope
   innings: MetricEnvelope
   balls: MetricEnvelope
   runs_conceded: MetricEnvelope

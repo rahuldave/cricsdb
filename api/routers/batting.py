@@ -561,6 +561,33 @@ async def batting_summary(
     )
 
     matches_count = len({r["match_id"] for r in innings_rows})
+
+    # Squad appearances ("played"), match-level — parallels fielding's
+    # `matches`. matches_count above counts matches BATTED (innings-
+    # batted); matches_played counts matches the player was in the XI
+    # for, at scope. The page shows played as the headline and "batted
+    # in N" as the qualifier (a #11 plays far more than he bats).
+    mp_where, mp_params = filters.build(has_innings_join=False, aux=aux)
+    mp_params["person_id"] = person_id
+    mp_parts = ["mp.person_id = :person_id"]
+    if mp_where:
+        mp_parts.append(mp_where)
+    _rc = player_result_clause(aux, person_id, mp_params, match_id_expr="mp.match_id")
+    if _rc:
+        mp_parts.append(_rc)
+    _tc = player_toss_clause(aux, person_id, mp_params, match_id_expr="mp.match_id")
+    if _tc:
+        mp_parts.append(_tc)
+    _ri = player_inning_match_clause(aux, person_id, mp_params, match_id_expr="mp.match_id", side="batting")
+    if _ri:
+        mp_parts.append(_ri)
+    mp_rows = await db.q(
+        f"SELECT COUNT(DISTINCT mp.match_id) AS n FROM matchplayer mp "
+        f"JOIN match m ON m.id = mp.match_id WHERE {' AND '.join(mp_parts)}",
+        mp_params,
+    )
+    matches_played = mp_rows[0]["n"] if mp_rows else 0
+
     nationalities = await player_nationalities(db, person_id)
     position_distribution = await _position_distribution(db, person_id, filters, aux)
 
@@ -645,6 +672,7 @@ async def batting_summary(
         # Numeric fields envelope-wrapped per spec Phase 4.
         # Counts (direction=None): delta_pct stays null.
         "matches":          wrap_metric(matches_count,  None,                            "matches",            sample_size=cohort_sample),
+        "matches_played":   wrap_metric(matches_played, None,                            "matches_played",     sample_size=cohort_sample),
         "innings":          wrap_metric(innings_count,  _cohort_scope_avg("innings_batted"), "bat_innings",     sample_size=cohort_sample),
         "runs":             wrap_metric(runs,           _cohort_scope_avg("runs"),       "bat_runs",           sample_size=cohort_sample),
         "balls_faced":      wrap_metric(balls,          None,                            "bat_balls_faced",    sample_size=cohort_sample),

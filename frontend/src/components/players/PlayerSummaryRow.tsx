@@ -72,10 +72,19 @@ export function disciplineHasData(
  *  "how many matches the current filters narrowed this discipline to".
  *  Keeping shows innings-kept in its cards instead, so no head count. */
 function matchesFor(discipline: Discipline, profile: PlayerProfile): number | null {
-  if (discipline === 'batting')  return profile.batting?.matches.value ?? null
-  if (discipline === 'bowling')  return profile.bowling?.matches.value ?? null
+  // Headline = squad appearances ("played"), consistent across all three.
+  if (discipline === 'batting')  return profile.batting?.matches_played.value ?? null
+  if (discipline === 'bowling')  return profile.bowling?.matches_played.value ?? null
   if (discipline === 'fielding') return profile.fielding?.matches.value ?? null
   return null
+}
+
+// Activity qualifier shown as the tile subtitle ("batted in 12" etc.).
+// batting/bowling: `matches` is the activity count; fielding: matches_fielded.
+function activityFor(discipline: Discipline, profile: PlayerProfile): { verb: string; n: number | null } {
+  if (discipline === 'batting')  return { verb: 'batted',  n: profile.batting?.matches.value ?? null }
+  if (discipline === 'bowling')  return { verb: 'bowled',  n: profile.bowling?.matches.value ?? null }
+  return { verb: 'fielded', n: profile.fielding?.matches_fielded.value ?? null }
 }
 
 export default function PlayerSummaryRow({
@@ -216,7 +225,7 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     return (
       <>
         <div className="wisden-statrow cols-7">
-          <StatCard label="Matches"  value={matchesFor('batting', profile)} />
+          <StatCard label="Matches"  value={matchesFor('batting', profile)} subtitle={`batted in ${activityFor('batting', profile).n ?? 0}`} />
           <StatCard label="Runs"     value={b.runs.value} />
           <StatCard label="Runs/Inn" value={fmt(b.runs_per_innings.value, 2)}
             subtitle={baselineSub(b.runs_per_innings, tt, 2)} />
@@ -265,7 +274,7 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     return (
       <>
         <div className="wisden-statrow cols-7">
-          <StatCard label="Matches" value={matchesFor('bowling', profile)} />
+          <StatCard label="Matches" value={matchesFor('bowling', profile)} subtitle={`bowled in ${activityFor('bowling', profile).n ?? 0}`} />
           <StatCard label="Wickets" value={b.wickets.value ?? 0} />
           <StatCard label="Avg"     value={fmt(b.average.value)} subtitle={baselineSub(b.average, tt, 2)} />
           <StatCard label="Econ"    value={fmt(b.economy.value)} subtitle={baselineSub(b.economy, tt, 2)} />
@@ -299,7 +308,7 @@ function renderCards(discipline: Discipline, profile: PlayerProfile) {
     return (
       <>
         <div className="wisden-statrow cols-7">
-          <StatCard label="Matches"        value={matchesFor('fielding', profile)} />
+          <StatCard label="Matches" value={matchesFor('fielding', profile)} subtitle={`fielded in ${activityFor('fielding', profile).n ?? 0}`} />
           <StatCard label="Catches"        value={f.catches.value ?? 0} />
           <StatCard label="Catches/Match"  value={fmt(f.catches_per_match.value, 3)}
             subtitle={baselineSub(f.catches_per_match, tt, 3)} />
