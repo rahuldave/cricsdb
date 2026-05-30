@@ -24,7 +24,7 @@
  *
  * Spec: internal_docs/spec-splits-mosaic.md §3.
  */
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, type ReactNode } from 'react'
 import { useSetUrlParams } from '../hooks/useUrlState'
 import { WISDEN, WISDEN_WL, WISDEN_WL_TINTS } from './charts/palette'
 import MetricDelta from './MetricDelta'
@@ -354,9 +354,34 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
 
   // ─── 0-free case — status strip only ─────────────────────────────
   if (r && t && i !== null) {
+    // Pinning the result collapses the page to wins-only, so the
+    // win-rate-vs-typical comparison the user saw before clicking
+    // (e.g. "Won 36 (59%) ↑+27.9%" in the 1D bar) is lost. Recover it
+    // from the joint cells: the rate of the pinned outcome WITHIN its
+    // parent {toss × inning} slice (result freed), vs the league's rate
+    // in the same slice. league_share's full-scope denominator cancels
+    // in the ratio, so this reproduces the marginal delta exactly.
+    const cmpCells = (unauxData?.cells ?? data.cells) ?? []
+    const iTeam = parseInt(i) as 0 | 1
+    const inParent = (c: SplitsCell) => c.toss_outcome === t && c.inning === iTeam
+    const parent = condStat(cmpCells, inParent)
+    const pinned = condStat(cmpCells, c => inParent(c) && c.result === r)
+    const rate = parent.n > 0 ? pinned.n / parent.n : null
+    const leagueRate = (parent.league_share != null && parent.league_share > 0)
+      ? (pinned.league_share ?? 0) / parent.league_share
+      : null
+    const cmpDeltaPct = (rate != null && leagueRate != null && leagueRate > 0)
+      ? Math.round((rate - leagueRate) / leagueRate * 1000) / 10
+      : null
+    const comparison = (hasSubject && rate != null && parent.n > 0) ? (
+      <span className="wisden-splits-strip-cmp">
+        {' · '}{(rate * 100).toFixed(0)}% of {parent.n}
+        <MetricDelta env={mkEnv(rate, leagueRate, cmpDeltaPct, dirForOutcome(r as Outcome))} />
+      </span>
+    ) : null
     return (
       <div ref={mosaicRootRef} className="wisden-splits-mosaic">
-        <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} bowlingCtx={bowlingCtx} />
+        <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} bowlingCtx={bowlingCtx} comparison={comparison} />
         <ResetBar filters={filters} unauxData={unauxData} data={data} matchesEnvelope={matchesEnvelope} hasSubject={hasSubject} setOne={setOne} setAux={setAux} />
       </div>
     )
@@ -779,17 +804,21 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
 // ─── Sub-components ─────────────────────────────────────────────────
 
 function Strip({
-  filters, total, subjectTeam, thinSample, bowlingCtx,
+  filters, total, subjectTeam, thinSample, bowlingCtx, comparison,
 }: {
   filters: FilterParams; total: number; subjectTeam: string | null;
   thinSample: boolean;
   bowlingCtx: boolean;
+  // Optional trailing chip — the within-parent rate vs typical team,
+  // shown in the all-three-set view so the comparison the user had
+  // before pinning the result isn't lost (see the 0-free branch).
+  comparison?: ReactNode;
 }) {
   // The full reset moved to the ResetBar's "All matches · N" entry —
   // no standalone reset button here any more.
   return (
     <div className="wisden-splits-strip">
-      <span>{strip(filters, total, subjectTeam, bowlingCtx)}</span>
+      <span>{strip(filters, total, subjectTeam, bowlingCtx)}{comparison}</span>
       {thinSample && (
         <span style={{ color: WISDEN.faint, fontStyle: 'italic', marginLeft: '0.6em' }}>
           (thin sample)

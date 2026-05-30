@@ -453,6 +453,25 @@ assert_eq "reset bar mounted in the 0-free status-strip view" "true" "$has_bar0"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
+echo "Test 14 · All-three-set strip carries the within-parent rate comparison"
+#
+# Pinning the result collapses the page to wins-only (Win% → 100%), so
+# the win-rate-vs-typical comparison shown in the 1-free 1D bar would be
+# lost. The 0-free status strip must reproduce it: the pinned outcome's
+# rate WITHIN its {toss × inning} parent slice. Anchor from the 2-filter
+# (parent) fetch: its result-marginal share + total.
+
+parent_json=$(curl -s "http://localhost:8000/api/v1/teams/splits?team=$TEAM_URL&$SCOPE_URL&toss_outcome=won&inning=0")
+parent_n=$(echo "$parent_json"   | python3 -c "import sys,json;print(json.load(sys.stdin)['scope_total_n'])")
+parent_rate=$(echo "$parent_json" | python3 -c "import sys,json;w=json.load(sys.stdin)['marginals']['result'].get('won',{});print(round((w.get('share') or 0)*100))")
+
+ab open "$BASE/teams?team=$TEAM_URL&$SCOPE_URL&toss_outcome=won&inning=0&result=won"
+settle 4
+strip_cmp=$(ab_eval "document.querySelector('$MOSAIC_SEL .wisden-splits-strip')?.innerText.replace(/\\n/g,' ') || ''")
+assert_contains "0-free strip shows within-parent rate '${parent_rate}% of ${parent_n}'" "${parent_rate}% of ${parent_n}" "$strip_cmp"
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
 echo "Test 11 · Mobile viewport (390x844) renders without overflow"
 
 agent-browser set viewport 390 844 >/dev/null 2>&1

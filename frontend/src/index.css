@@ -2420,6 +2420,11 @@ a { color: inherit; }
   margin-bottom: 0.6rem;
   flex-wrap: wrap;
 }
+/* Trailing within-parent rate comparison on the all-three-set strip. */
+.wisden-splits-strip-cmp {
+  color: var(--ink-faint);
+  font-style: italic;
+}
 .wisden-splits-reset {
   background: none;
   border: 1px solid var(--rule-soft);
