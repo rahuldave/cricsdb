@@ -618,10 +618,30 @@ async def team_splits(
             (c["toss_outcome"], c["inning"], c["result"]): c["n"]
             for c in league_cells_all
         }
-        for c in team_cells:
-            key = (c["toss_outcome"], c["inning"], c["result"])
+        team_n_by_key = {
+            (c["toss_outcome"], c["inning"], c["result"]): c["n"]
+            for c in team_cells
+        }
+        # Emit the FULL (toss × inning × result) grid that passes the aux
+        # filter — INCLUDING cells where the subject has 0 matches. Those
+        # zero cells still carry league mass, and the frontend reset-bar
+        # sums per-cell `league_share` to build conditional (drop/switch
+        # one axis) deltas; omitting them would undercount the baseline
+        # (e.g. a team with only 1 of 4 tied cells would show a wrong
+        # "All tied" delta). Zero cells render as nothing in the mosaic
+        # (sqrt(0) area), so this is display-safe. `_marginals` is still
+        # built from the nonzero `team_cells`, so marginals are unchanged.
+        grid = [
+            (t_, i_, r_)
+            for t_ in ("won", "lost")
+            for i_ in (0, 1)
+            for r_ in ("won", "tied", "lost")
+            if _cell_label_for_aux(t_, i_, r_, aux)
+        ]
+        for key in grid:
+            n = team_n_by_key.get(key, 0)
             league_n_for_cell = league_n_by_key.get(key, 0)
-            share = round(c["n"] / team_filtered_total, 4) if team_filtered_total else None
+            share = round(n / team_filtered_total, 4) if team_filtered_total else None
             league_share = round(league_n_for_cell / league_filtered_total, 4) if league_filtered_total else None
             delta = (share - league_share) if (share is not None and league_share is not None) else None
             delta_pct = (
@@ -629,12 +649,12 @@ async def team_splits(
                 if (share is not None and league_share not in (None, 0))
                 else None
             )
-            lo, hi = wilson_ci(c["n"], team_filtered_total)
+            lo, hi = wilson_ci(n, team_filtered_total)
             out_cells.append({
-                "toss_outcome": c["toss_outcome"],
-                "inning": c["inning"],
-                "result": c["result"],
-                "n": c["n"],
+                "toss_outcome": key[0],
+                "inning": key[1],
+                "result": key[2],
+                "n": n,
                 "share": share,
                 "wilson_lo": round(lo, 4) if lo is not None else None,
                 "wilson_hi": round(hi, 4) if hi is not None else None,

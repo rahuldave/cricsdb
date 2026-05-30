@@ -219,6 +219,30 @@ function mkEnv(
   }
 }
 
+// ─── Conditional slice statistic (reset-bar entries) ────────────────
+//
+// A reset-bar entry shows the count of the slice you'd LAND ON if you
+// clicked it, holding the OTHER currently-active axes fixed (drop/switch
+// only this entry's own axis). Because the aux-stripped /splits response
+// carries the full 12-cell joint with per-cell `share` (= n / full total)
+// and `league_share` (league's fraction in that cell) — BOTH additive —
+// every conditional count AND its vs-typical-team delta is just a sum
+// over the matching cells. No extra fetch, no backend support needed.
+type CondStat = { n: number; share: number; league_share: number | null; delta_pct: number | null }
+function condStat(cells: SplitsCell[], pred: (c: SplitsCell) => boolean): CondStat {
+  let n = 0, share = 0, league = 0, hasLeague = false
+  for (const c of cells) {
+    if (!pred(c)) continue
+    n += c.n
+    share += c.share ?? 0
+    if (c.league_share != null) { league += c.league_share; hasLeague = true }
+  }
+  const delta_pct = (hasLeague && league > 0)
+    ? Math.round((share - league) / league * 1000) / 10
+    : null
+  return { n, share, league_share: hasLeague ? league : null, delta_pct }
+}
+
 function dirForOutcome(rv: Outcome): 'higher_better' | 'lower_better' {
   if (rv === 'won') return 'higher_better'
   if (rv === 'lost') return 'lower_better'
@@ -332,7 +356,8 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
   if (r && t && i !== null) {
     return (
       <div ref={mosaicRootRef} className="wisden-splits-mosaic">
-        <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} setAux={setAux} bowlingCtx={bowlingCtx} />
+        <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} bowlingCtx={bowlingCtx} />
+        <ResetBar filters={filters} unauxData={unauxData} data={data} matchesEnvelope={matchesEnvelope} hasSubject={hasSubject} setOne={setOne} setAux={setAux} />
       </div>
     )
   }
@@ -341,7 +366,8 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
   if ([r, t, i].filter(x => x !== null).length === 2) {
     return (
       <div ref={mosaicRootRef} className="wisden-splits-mosaic">
-        <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} setAux={setAux} bowlingCtx={bowlingCtx} />
+        <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} bowlingCtx={bowlingCtx} />
+        <ResetBar filters={filters} unauxData={unauxData} data={data} matchesEnvelope={matchesEnvelope} hasSubject={hasSubject} setOne={setOne} setAux={setAux} />
         <OneDimBar
           marginals={data.marginals}
           freeAxis={r === null ? 'result' : t === null ? 'toss_outcome' : 'inning'}
@@ -423,107 +449,32 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
   // grid-gap between quadrants (set in CSS) — no inline gutter
   // calculation needed here.
 
-  // All-toss / Both-innings totals show the FilterBar-scope total
-  // (= matchesEnvelope.value, FROZEN under aux filters), not the
-  // aux-narrowed `scope_total_n`. The label "All toss · 276" is
-  // meant to clear the toss filter and show all matches, so it
-  // should display the unfiltered total at all times.
-  const baseTotalForRow = matchesEnvelope?.value ?? total
-  const allTossN = baseTotalForRow
-  const allInningsN = baseTotalForRow
+  // Cell-area sizing is driven by `baseTotal` / `unitHalf` above; the
+  // reset bar's full-scope total + volume delta now live inside
+  // <ResetBar/> (computed from matchesEnvelope), so nothing more is
+  // needed here for the marginal rows.
 
-  // Per-team league avg matches — comes straight from the
-  // matchesEnvelope's scope_avg, which the /summary endpoint
-  // already computes correctly (= league_total_n / unique_teams).
-  // Earlier code derived it as `league_total_n / 2 / unique_teams`
-  // which double-divided and produced wrong deltas (e.g. +240% for
-  // teams that actually only sat ~70% above league avg).
-  const leaguePerTeamMatches = matchesEnvelope?.scope_avg ?? null
-  const matchesDeltaPct = (leaguePerTeamMatches != null && leaguePerTeamMatches > 0)
-    ? Math.round((baseTotalForRow - leaguePerTeamMatches) / leaguePerTeamMatches * 100 * 10) / 10
-    : null
-  const matchesDeltaEnv: MetricEnvelope | null = (hasSubject && leaguePerTeamMatches != null && matchesDeltaPct != null)
-    ? {
-        value: baseTotalForRow,
-        scope_avg: Math.round(leaguePerTeamMatches * 10) / 10,
-        delta_pct: matchesDeltaPct,
-        direction: 'higher_better',
-        sample_size: baseTotalForRow,
-      }
-    : null
-
-  // Two marginal sources, deliberately split (the redesign that
-  // separated the widget's two jobs):
-  //
-  //  • fullScopeMarginals — the aux-STRIPPED /splits response (same
-  //    FilterBar scope, but toss/inning/result NOT applied). Drives
-  //    the TOP reset/reference bar so its numbers stay PUT when you
-  //    click into a filter — the stable "what does the whole scope
-  //    look like" anchor. Falls back to data.marginals before the
-  //    sibling unaux fetch settles.
-  //
-  //  • liveMarginals — the aux-FILTERED response. Drives the LIVE
-  //    readouts INSIDE the mosaic (northwest-corner Won/Tied/Lost +
-  //    the toss column-headers + inning row-headers) so they reflect
-  //    the current filter. Under result=won the corner reads Won N /
-  //    Tied 0 / Lost 0 and the toss/inning marginals re-split within
-  //    the wins.
-  const fullScopeMarginals = unauxData?.marginals ?? data.marginals
+  // Marginals INSIDE the mosaic read the aux-FILTERED response, so the
+  // northwest-corner Won/Tied/Lost + the toss column-headers + inning
+  // row-headers all reflect the current filter (under result=won the
+  // corner reads Won N / Tied 0 / Lost 0 and the toss/inning marginals
+  // re-split within the wins). The full-scope reference + the conditional
+  // jump/clear counts live on the ResetBar.
   const liveMarginals = data.marginals
 
   return (
     <div ref={mosaicRootRef} className="wisden-splits-mosaic">
-      <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} setAux={setAux} bowlingCtx={bowlingCtx} />
+      <Strip filters={filters} total={total} subjectTeam={subjectTeam} thinSample={thinSample} bowlingCtx={bowlingCtx} />
 
-      {/* Reset / reference bar — one flex-wrap row holding the
-          FULL-SCOPE (aux-stripped) reference numbers. These stay PUT
-          when you click into a filter, so they read as the stable
-          "whole scope" anchor + the jump/clear controls:
-            • All toss / Both innings — clear that axis.
-            • All won / All tied / All lost — jump to that result
-              (toggle off when already active).
-          Uncolored on purpose: the COLORED, live Won/Tied/Lost
-          readout lives in the mosaic's northwest corner. The grey
-          deltas (vs a typical team at full scope) ride along here. */}
-      <div className="wisden-splits-reset-bar">
-        <button
-          type="button"
-          onClick={() => setOne('toss_outcome', '')}
-          className="wisden-splits-clear-link"
-          title={filters.toss_outcome ? 'Clear toss filter — show both Won toss and Lost toss' : 'Currently showing both Won toss and Lost toss'}
-        >
-          <span className="comp-link">All toss</span> · {allTossN}
-          {matchesDeltaEnv && <MetricDelta env={matchesDeltaEnv} />}
-        </button>
-        <button
-          type="button"
-          onClick={() => setOne('inning', '')}
-          className="wisden-splits-clear-link"
-          title={i !== null ? 'Clear inning filter — show both innings' : 'Currently showing both innings'}
-        >
-          <span className="comp-link">Both innings</span> · {allInningsN}
-          {matchesDeltaEnv && <MetricDelta env={matchesDeltaEnv} />}
-        </button>
-        {(['won', 'tied', 'lost'] as Outcome[]).map(rv => {
-          const m = fullScopeMarginals.result[rv]
-          const isActive = r === rv
-          return (
-            <button
-              key={rv}
-              type="button"
-              onClick={() => setOne('result', isActive ? '' : rv)}
-              className={`wisden-splits-clear-link${isActive ? ' is-active' : ''}`}
-              title={isActive ? `Clear ${RESULT_LABEL[rv]}` : `Filter to ${RESULT_LABEL[rv]}`}
-            >
-              <span className="comp-link">All {RESULT_LEGEND[rv].toLowerCase()}</span> · {m?.n ?? 0}
-              {m?.share != null && ` (${(m.share * 100).toFixed(0)}%)`}
-              {hasSubject && (
-                <MetricDelta env={mkEnv(m?.share, m?.league_share, m?.delta_pct, dirForOutcome(rv))} />
-              )}
-            </button>
-          )
-        })}
-      </div>
+      <ResetBar
+        filters={filters}
+        unauxData={unauxData}
+        data={data}
+        matchesEnvelope={matchesEnvelope}
+        hasSubject={hasSubject}
+        setOne={setOne}
+        setAux={setAux}
+      />
       <div className="wisden-splits-filter-hint">
         Tip: click any underlined label, count, or cell to filter to that combination.
       </div>
@@ -828,31 +779,141 @@ export default function SplitsMosaic({ data, loading, filters, activeTab, matche
 // ─── Sub-components ─────────────────────────────────────────────────
 
 function Strip({
-  filters, total, subjectTeam, thinSample, setAux, bowlingCtx,
+  filters, total, subjectTeam, thinSample, bowlingCtx,
 }: {
   filters: FilterParams; total: number; subjectTeam: string | null;
-  thinSample: boolean; setAux: (o: Partial<Record<'result' | 'toss_outcome' | 'inning', string>>) => void;
+  thinSample: boolean;
   bowlingCtx: boolean;
 }) {
-  const hasAnyFilter = !!(filters.result || filters.toss_outcome || filters.inning)
+  // The full reset moved to the ResetBar's "All matches · N" entry —
+  // no standalone reset button here any more.
   return (
     <div className="wisden-splits-strip">
       <span>{strip(filters, total, subjectTeam, bowlingCtx)}</span>
-      {hasAnyFilter && (
-        <button
-          type="button"
-          onClick={() => setAux({})}
-          className="wisden-splits-reset"
-          title="Clear toss / inning / result narrowings"
-        >
-          reset
-        </button>
-      )}
       {thinSample && (
         <span style={{ color: WISDEN.faint, fontStyle: 'italic', marginLeft: '0.6em' }}>
           (thin sample)
         </span>
       )}
+    </div>
+  )
+}
+
+// ─── Reset / reference bar ──────────────────────────────────────────
+//
+// One flex-wrap row. Every entry shows the count of the slice you'd
+// land on if you clicked it, holding the OTHER active axes fixed:
+//   • All matches      — clears ALL aux (full reset). Volume delta vs a
+//                        typical team (replaces the old `reset` button).
+//   • All toss         — drops the toss axis, keeps inning + result.
+//   • Both innings     — drops the inning axis, keeps toss + result.
+//   • All won/tied/lost — switches the result axis, keeps toss + inning.
+// Numbers + deltas are conditional (they move with the current filter
+// set); deltas are share-of-all vs the league's share-of-all in the same
+// slice (summed from the joint cells). Mounted in EVERY layout branch
+// (2×2, 1D bar, 0-free strip) so the controls are always reachable.
+function ResetBar({
+  filters, unauxData, data, matchesEnvelope, hasSubject, setOne, setAux,
+}: {
+  filters: FilterParams
+  unauxData: TeamSplits | null | undefined
+  data: TeamSplits
+  matchesEnvelope: MetricEnvelope | null | undefined
+  hasSubject: boolean
+  setOne: (key: 'result' | 'toss_outcome' | 'inning', value: string) => void
+  setAux: (o: Partial<Record<'result' | 'toss_outcome' | 'inning', string>>) => void
+}) {
+  const r = (filters.result as Outcome | undefined) || null
+  const t = (filters.toss_outcome as 'won' | 'lost' | undefined) || null
+  // Option-B: URL inning == team_inning (cell.inning) identically, so the
+  // parsed user value compares directly against the cell's batting POV.
+  const i = filters.inning ? (parseInt(filters.inning) as 0 | 1) : null
+
+  const cells = (unauxData?.cells ?? data.cells) ?? []
+  const heldToss   = (c: SplitsCell) => t === null || c.toss_outcome === t
+  const heldInning = (c: SplitsCell) => i === null || c.inning === i
+  const heldResult = (c: SplitsCell) => r === null || c.result === r
+
+  // "All matches" — full-scope count + volume delta vs a typical team
+  // (per-team league avg from /summary's matches envelope).
+  const fullTotal = matchesEnvelope?.value ?? unauxData?.scope_total_n ?? data.scope_total_n
+  const leagueAvg = matchesEnvelope?.scope_avg ?? null
+  const matchesDeltaPct = (leagueAvg != null && leagueAvg > 0)
+    ? Math.round((fullTotal - leagueAvg) / leagueAvg * 1000) / 10
+    : null
+  const matchesDeltaEnv: MetricEnvelope | null = (hasSubject && leagueAvg != null && matchesDeltaPct != null)
+    ? { value: fullTotal, scope_avg: Math.round(leagueAvg * 10) / 10, delta_pct: matchesDeltaPct, direction: 'higher_better', sample_size: fullTotal }
+    : null
+
+  // Direction for the axis-DROP entries (All toss / Both innings): when a
+  // result is held, colour by that outcome's polarity (more wins-while-X
+  // = green); otherwise colour by sign only.
+  const dropDir = r ? dirForOutcome(r) : 'higher_better'
+
+  // Render one entry. `trivial` (share≈1, the whole scope) drops the
+  // %/delta so "All toss · 266" reads clean in the unfiltered view.
+  const Entry = ({ label, stat, dir, onClick, active = false, title }: {
+    label: string; stat: CondStat; dir: 'higher_better' | 'lower_better' | null
+    onClick: () => void; active?: boolean; title: string
+  }) => {
+    // Show the %/delta only for a non-empty, non-whole-scope slice:
+    // "All toss · 266" (whole scope) and "All tied · 0" (empty slice)
+    // both read cleaner as a bare count.
+    const showStats = stat.n > 0 && stat.share < 0.999
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`wisden-splits-clear-link${active ? ' is-active' : ''}`}
+        title={title}
+      >
+        <span className="comp-link">{label}</span> · {stat.n}
+        {showStats && ` (${(stat.share * 100).toFixed(0)}%)`}
+        {hasSubject && showStats && (
+          <MetricDelta env={mkEnv(stat.share, stat.league_share, stat.delta_pct, dir)} />
+        )}
+      </button>
+    )
+  }
+
+  return (
+    <div className="wisden-splits-reset-bar">
+      {/* All matches — full reset. Carries the VOLUME delta (match
+          count vs a typical team), not a share-of-all delta. */}
+      <button
+        type="button"
+        onClick={() => setAux({})}
+        className="wisden-splits-clear-link wisden-splits-allmatches"
+        title="Clear all narrowings — toss, innings and result"
+      >
+        <span className="comp-link">All matches</span> · {fullTotal}
+        {matchesDeltaEnv && <MetricDelta env={matchesDeltaEnv} />}
+      </button>
+      <Entry
+        label="All toss"
+        stat={condStat(cells, c => heldInning(c) && heldResult(c))}
+        dir={dropDir}
+        onClick={() => setOne('toss_outcome', '')}
+        title={t ? 'Clear the toss filter (keep innings + result)' : 'Both toss outcomes'}
+      />
+      <Entry
+        label="Both innings"
+        stat={condStat(cells, c => heldToss(c) && heldResult(c))}
+        dir={dropDir}
+        onClick={() => setOne('inning', '')}
+        title={i !== null ? 'Clear the innings filter (keep toss + result)' : 'Both innings'}
+      />
+      {(['won', 'tied', 'lost'] as Outcome[]).map(rv => (
+        <Entry
+          key={rv}
+          label={`All ${RESULT_LEGEND[rv].toLowerCase()}`}
+          stat={condStat(cells, c => c.result === rv && heldToss(c) && heldInning(c))}
+          dir={dirForOutcome(rv)}
+          active={r === rv}
+          onClick={() => setOne('result', r === rv ? '' : rv)}
+          title={r === rv ? `Clear ${RESULT_LABEL[rv]}` : `Filter to ${RESULT_LABEL[rv]} (keep toss + innings)`}
+        />
+      ))}
     </div>
   )
 }

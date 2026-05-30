@@ -223,16 +223,18 @@ assert_eq "0-free has no 1D bar" "false" "$has_1d"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
-echo "Test 10 · Reset button clears all aux filters"
+echo "Test 10 · 'All matches' entry clears all aux filters (replaces reset button)"
 
 ab open "$BASE/teams?team=$TEAM_URL&$SCOPE_URL&toss_outcome=won&inning=0"
 settle 4
 
-ab_eval "document.querySelector('$MOSAIC_SEL .wisden-splits-reset')?.click()"
+# The standalone [reset] button is gone — the full reset is now the
+# reset-bar's "All matches · N" entry.
+ab_eval "[...document.querySelectorAll('$MOSAIC_SEL .wisden-splits-reset-bar button')].find(b=>b.innerText.trim().startsWith('All matches'))?.click()"
 settle 2
 url_after=$(agent-browser get url 2>/dev/null)
 url_clean=$(echo "$url_after" | grep -cE "toss_outcome=|inning=|result=" || true)
-assert_eq "URL has no aux params after reset" "0" "$url_clean"
+assert_eq "URL has no aux params after 'All matches'" "0" "$url_clean"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
@@ -411,6 +413,43 @@ if [ "$live_toss_won" != "$full_toss_won" ]; then
     ok "Won-toss header is not the frozen full-scope count ($full_toss_won)"
   fi
 fi
+
+# ─────────────────────────────────────────────────────────────────
+echo ""
+echo "Test 13 · Reset-bar entries are CONDITIONAL + mounted in collapsed views"
+#
+# Each 'All X' drops/switches only its own axis and holds the others;
+# the count is the slice you'd land on. Anchors derive from the
+# aux-stripped joint cells at runtime (mirrors the frontend's cell-sum).
+# State: toss_outcome=won & result=won (a 1-free / 1D-bar view).
+
+cells_json=$(curl -s "http://localhost:8000/api/v1/teams/splits?team=$TEAM_URL&$SCOPE_URL")
+cells_count=$(echo "$cells_json" | python3 -c "import sys,json;print(len(json.load(sys.stdin)['cells']))")
+assert_eq "endpoint emits the full 12-cell joint (zero-filled)" "12" "$cells_count"
+
+cond_alltoss=$(echo "$cells_json" | python3 -c "import sys,json;print(sum(c['n'] for c in json.load(sys.stdin)['cells'] if c['result']=='won'))")
+cond_alllost=$(echo "$cells_json" | python3 -c "import sys,json;print(sum(c['n'] for c in json.load(sys.stdin)['cells'] if c['toss_outcome']=='won' and c['result']=='lost'))")
+full_total=$(echo "$cells_json"   | python3 -c "import sys,json;print(json.load(sys.stdin)['scope_total_n'])")
+
+ab open "$BASE/teams?team=$TEAM_URL&$SCOPE_URL&toss_outcome=won&result=won"
+settle 4
+
+# This 2-filter state is the 1-free 1D-bar layout — assert the bar is present there too.
+has_1d=$(ab_eval "!!document.querySelector('$MOSAIC_SEL .wisden-splits-1d')")
+assert_eq "1-free view still shows the 1D bar" "true" "$has_1d"
+has_bar=$(ab_eval "!!document.querySelector('$MOSAIC_SEL .wisden-splits-reset-bar')")
+assert_eq "reset bar mounted in the 1-free view" "true" "$has_bar"
+
+bar=$(ab_eval "document.querySelector('$MOSAIC_SEL .wisden-splits-reset-bar')?.innerText.replace(/\\n/g,' ') || ''")
+assert_contains "All toss conditional (drop toss, keep won) = $cond_alltoss" "All toss · $cond_alltoss" "$bar"
+assert_contains "All lost conditional (won toss, lost game) = $cond_alllost" "All lost · $cond_alllost" "$bar"
+assert_contains "All matches = full scope $full_total" "All matches · $full_total" "$bar"
+
+# Reset bar also mounts in the 0-free (all three set) status-strip view.
+ab open "$BASE/teams?team=$TEAM_URL&$SCOPE_URL&toss_outcome=won&inning=0&result=won"
+settle 4
+has_bar0=$(ab_eval "!!document.querySelector('$MOSAIC_SEL .wisden-splits-reset-bar')")
+assert_eq "reset bar mounted in the 0-free status-strip view" "true" "$has_bar0"
 
 # ─────────────────────────────────────────────────────────────────
 echo ""
