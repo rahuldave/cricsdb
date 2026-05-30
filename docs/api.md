@@ -514,7 +514,13 @@ Two modes:
 - **Team-detail** (`?team=X` set) — team-side cells + league-side
   baseline at the same filter scope + per-cell deltas
   (`share - league_share`, and relative `delta_pct`). Same envelope
-  pattern as the `scope_avg` field on `/teams/{team}/summary`.
+  pattern as the `scope_avg` field on `/teams/{team}/summary`. The
+  **full (toss × inning × result) grid is emitted** (every combination
+  that passes the aux filter, including cells where the subject has
+  `n = 0`), each carrying its `league_share` — so the Splits-Mosaic
+  reset bar can sum cells to build conditional "drop/switch one axis"
+  counts and deltas. (Landing mode still returns only the cells that
+  occur.)
 
 Aux narrowings honoured at the cell level (post-GROUP BY). When
 `?result=` or `?toss_outcome=` is set without `?team=`, the endpoint

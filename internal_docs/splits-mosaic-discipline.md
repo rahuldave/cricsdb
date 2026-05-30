@@ -6,30 +6,50 @@ Specs: `spec-splits-mosaic.md` (Teams-only — implemented 2026-05-11), `splits-
 
 This doc captures the **inviolable rules**. The spec captures the **design**.
 
-## Two surfaces: full-scope reference vs live readout (the dual-use split)
+## Two surfaces: navigation bar vs live readout (the dual-use split)
 
 The Mosaic is both a *display* (what does this scope look like?) and a
-*widget* (click to narrow). Those two jobs sit on two separate surfaces,
-fed by two separate fetches, so neither lies when the other is active:
+*widget* (click to narrow). Those two jobs sit on two separate surfaces
+so neither lies when the other is active:
 
-| Surface | Fetch | Behaviour under a filter |
+| Surface | Source | Behaviour under a filter |
 |---|---|---|
-| **Top reset / reference bar** — one flex-wrap row: `All toss · N`, `Both innings · N`, `All won / All tied / All lost · N (s%) Δ` | aux-**stripped** (`unauxData`) | **Stays put.** Full-scope anchor. Uncolored. Carries the vs-typical-team deltas. Toss/inning entries clear that axis; result entries jump to that outcome (toggle off when active). |
-| **Northwest corner** — Won/Tied/Lost stacked one-per-line, colored swatch + count + share% + delta | aux-**filtered** (`data`) | **Goes live.** Under `result=won` reads Won N / Tied 0 / Lost 0. Clickable (filter result). |
-| **Toss column-headers + inning row-headers** | aux-**filtered** (`data`) | **Go live** — re-split within the slice (e.g. `result=won` takes the toss line 133/133 → 79/69), with live deltas. |
+| **Reset / navigation bar** — one flex-wrap row: `All matches · N Δ`, `All toss · N`, `Both innings · N`, `All won / All tied / All lost · N (s%) Δ` | summed joint cells (`ResetBar`) | **Conditional.** Each entry shows the count of the slice you'd LAND ON: it drops/switches only its own axis and HOLDS the others. `All matches` is the full reset (clears all aux; volume delta). Mounted in **every** layout branch (2×2, 1D bar, 0-free strip). |
+| **Northwest corner** — Won/Tied/Lost stacked one-per-line, colored swatch + count + share% + delta | aux-**filtered** (`data.marginals`) | **Live.** Under `result=won` reads Won N / Tied 0 / Lost 0. Clickable (filter result). Stacked vertically to survive the ~min-content corner track at 390w. |
+| **Toss column-headers + inning row-headers** | aux-**filtered** (`data.marginals`) | **Live** — re-split within the slice (e.g. `result=won` takes the toss line 133/133 → 79/69), with live deltas. |
 
-The reset bar reads `fullScopeMarginals`; the corner + marginals read
-`liveMarginals` (= `data.marginals`). The corner is stacked vertically
-on purpose — it has to survive the ~min-content corner track at 390w.
+### Conditional counts + deltas are summed from the joint cells
 
-This split is what **retired the old "confusing summary wording" issue**
-(flagged 2026-05-26, fixed 2026-05-30): the header read "Of **144**
-matches batting first:" while a W/T/L line below showed the full-scope
-**266**-totalling counts, reading as a contradiction. Full-scope numbers
-now live ONLY on the explicitly-labelled reset bar; the live readout
-(corner + marginals) reflects the filtered slice. Don't reintroduce a
-full-scope W/T/L line under the filtered header. Tested by
-`team_splits_mosaic.sh` Test 12.
+`ResetBar` computes every entry by summing the **aux-stripped joint
+cells** (`unauxData.cells`), holding the currently-active axes fixed and
+freeing/switching its own. This works because each cell carries `share`
+(= n / full total) AND `league_share` (the league's fraction in that
+cell), and **both are additive** — so a conditional count is `Σ n`, its
+share-of-all is `Σ share`, and its vs-typical-team delta is
+`(Σ share − Σ league_share) / Σ league_share`. No extra fetch.
+
+> **Invariant — `/teams/splits` must emit the FULL 12-cell joint in
+> team-detail mode.** Zero-fill cells where the subject has 0 matches;
+> each still carries its `league_share`. If you re-introduce the old
+> "omit zero cells" optimisation, the client's per-slice `league_share`
+> sum undercounts and the conditional deltas go wrong (a team with only
+> 1 of 4 tied cells showed `All tied` at −35% instead of the correct
+> −74%). Marginals are still built from the nonzero cells, so they're
+> unaffected. Locked by `team_splits_mosaic.sh` Test 13 (asserts 12
+> cells) + `test_team_splits.py`.
+
+`All matches` carries the **volume** delta (match count vs a typical
+team, from `/summary`'s matches envelope), not a share delta. Empty
+slices (`All tied · 0`) and the whole scope (`All toss · 266` unfiltered)
+drop the %/delta and read as a bare count.
+
+This two-surface split **retired the old "confusing summary wording"
+issue** (flagged 2026-05-26, fixed 2026-05-30): the header read "Of
+**144** matches batting first:" while a W/T/L line below showed the
+full-scope **266**-totalling counts, reading as a contradiction. There is
+no longer any full-scope W/T/L line under a filtered header — the bar is
+conditional and the corner is live. Don't reintroduce one. Tested by
+`team_splits_mosaic.sh` Tests 12 + 13.
 
 ---
 
