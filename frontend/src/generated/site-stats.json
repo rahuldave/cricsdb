@@ -1,14 +1,14 @@
 {
   "totals": {
-    "matches": 13258,
-    "deliveries": 3026857,
-    "wickets": 164469
+    "matches": 13285,
+    "deliveries": 3032936,
+    "wickets": 164826
   },
   "featured_teams": [
     {
       "name": "Royal Challengers Bengaluru",
       "blurb": "IPL & WPL",
-      "matches": 319
+      "matches": 320
     },
     {
       "name": "Chennai Super Kings",
@@ -18,7 +18,7 @@
     {
       "name": "India",
       "blurb": "International",
-      "matches": 432
+      "matches": 433
     },
     {
       "name": "Australia",
@@ -32,7 +32,7 @@
       "name": "V Kohli",
       "role": "batter",
       "gender": "male",
-      "stat": "13,197 runs"
+      "stat": "13,240 runs"
     },
     {
       "id": "462411b3",

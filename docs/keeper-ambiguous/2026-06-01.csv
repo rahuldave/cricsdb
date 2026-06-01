@@ -1,0 +1,7 @@
+innings_id,match_id,date,tournament,season,fielding_team,innings_number,ambiguous_reason,candidate_ids,candidate_names,resolved_keeper_id,resolved_source,notes
+26526,13259,2026-05-28,India Women tour of England,2026,India,1,multi_career,"721e0199,9c3d4e8a","RM Ghosh,YH Bhatia",,,
+26530,13261,2026-05-27,Vitality Blast,2026,Derbyshire,1,no_candidate,,,,,
+26549,13271,2026-05-26,ICC Men's T20 World Cup Sub Regional Africa Qualifier,2026,Ivory Coast,0,no_candidate,,,,,
+26551,13272,2026-05-28,ICC Men's T20 World Cup Sub Regional Africa Qualifier,2026,Ivory Coast,0,no_candidate,,,,,
+26557,13275,2026-05-29,ICC Men's T20 World Cup Sub Regional Africa Qualifier,2026,Mali,0,no_candidate,,,,,
+26560,13276,2026-05-29,ICC Men's T20 World Cup Sub Regional Africa Qualifier,2026,Ivory Coast,1,no_candidate,,,,,
