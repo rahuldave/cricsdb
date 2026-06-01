@@ -238,17 +238,46 @@ opportunity to act". Display "matches played" stays squad. Differs from squad
 only on rare no-opponent-innings matches (Kohli IPL = 279 fielded of 280).
 Column: `playerscopestats.matches_fielded`. → `how-stats-calculated.md §Fielding`.
 
-### Per-bucket cohort narrows; the position/over MIX histogram stays coarse (Tier 2)
+### What narrows on what (the cohort vs the mix) — the once-and-for-all rule
 
-On the By Position (batting) and By Over (bowling) tabs, the per-bucket cohort
-*values* (typical opener SR, typical death-over economy) narrow under the six,
-but the *mix histogram* — the weighting showing what fraction of the player's
-innings/balls fall in each bucket — stays at tournament/season grain. Reason:
-at deep narrowings there isn't enough data to estimate a stable per-bucket mix;
-a coarse-but-stable role profile is the right weighting, and thin per-bucket
-cohorts blank out via the support cliff rather than show a wrong number.
-Fielding is keeper-binary (no mix) so its tabs narrow fully. Full rationale +
-the "two hats" balls-weighting detail: `spec-tier3-cohort-narrowing.md`.
+This is the canonical answer to "which numbers respond to which filters" on the
+player Distribution / By-Position / By-Over panels. Two axis groups:
+
+- **Scope-key** = gender / team_type / tournament / season (these define the
+  precompute key).
+- **"The six" (off-key)** = venue / opponent / team / **inning / toss /
+  result** (the last three are the AuxParams).
+
+Four kinds of number on those panels, and what each responds to:
+
+| Surface | scope-key | the six (incl. inning/toss/result) |
+|---|---|---|
+| Player's **own** stats (runs, avg, SR, # innings, milestone %s) | ✅ | ✅ |
+| **Cohort** "typical player" comparison (VS COHORT chips, ProbChip baselines, green cohort line, per-bucket cohort bars) | ✅ | ✅ |
+| Per-position / per-over **performance** bars | ✅ | ✅ |
+| **MIX histogram** (the *weighting*: fraction of innings per position / balls per over) | ✅ | ❌ **coarse** |
+
+Two points that trip people up (both confirmed from code + live, 2026-06-01):
+
+1. **The cohort narrows on inning (and toss/result), not just on the FilterBar
+   filters.** `is_precomputed_scope()` returns False whenever any of the six is
+   set — including `aux.inning` / `aux.result` / `aux.toss_outcome` — so the
+   cohort is recomputed LIVE rather than read from the no-inning
+   `playerscopestats` precompute. (A pre-Tier-3 caveat said it "stays full-scope
+   under inning"; that is stale — see `spec-inning-unify-option-b.md` §A8.)
+2. **The MIX histogram is coarse to ALL six, not just to the aux three.** It
+   reads the scope-key precompute, so it does NOT move on venue *or* opponent
+   either — only on tournament/season (+ gender/team_type). Live proof: Kohli's
+   opener-innings share held under `inning=0` AND at Wankhede, but dropped for
+   IPL-2016-only.
+
+Reason the mix stays coarse: at deep narrowings there isn't enough data to
+estimate a stable per-bucket mix; a coarse-but-stable role profile is the right
+weighting, and thin per-bucket cohorts blank out via the support cliff rather
+than show a wrong number. Fielding is keeper-binary (no mix) so its tabs narrow
+fully. Full rationale + the "two hats" balls-weighting detail:
+`spec-tier3-cohort-narrowing.md` §0/§1; feature×axis matrix:
+`narrowing-audit-coverage.md`.
 
 ## Frontend
 
