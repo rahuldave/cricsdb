@@ -1,8 +1,8 @@
 {
   "totals": {
-    "matches": 13330,
-    "deliveries": 3043159,
-    "wickets": 165391
+    "matches": 13573,
+    "deliveries": 3098481,
+    "wickets": 168486
   },
   "featured_teams": [
     {
@@ -18,12 +18,12 @@
     {
       "name": "India",
       "blurb": "International",
-      "matches": 435
+      "matches": 442
     },
     {
       "name": "Australia",
       "blurb": "International",
-      "matches": 375
+      "matches": 383
     }
   ],
   "featured_players": [
@@ -46,14 +46,14 @@
       "name": "S Mandhana",
       "role": "batter",
       "gender": "female",
-      "stat": "7,352 runs"
+      "stat": "7,557 runs"
     },
     {
       "id": "be150fc8",
       "name": "EA Perry",
       "role": "bowler",
       "gender": "female",
-      "stat": "183 wkts"
+      "stat": "187 wkts"
     }
   ],
   "featured_matchups": [
