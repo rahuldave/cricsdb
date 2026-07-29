@@ -472,6 +472,10 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     # ─── Scott Page Field, Vinor (Prague, Czech Republic) ─
     ('Scott Page Field, Vinor', 'Prague'): ('Scott Page Field, Vinor', 'Prague', 'Czech Republic'),
 
+    # ─── Banks Field, Vinor (Prague, Czech Republic) ─
+    # Sibling pitch of Scott Page Field at the Vinoř complex — kept separate.
+    ('Banks Field, Vinor', 'Prague'): ('Banks Field, Vinor', 'Prague', 'Czech Republic'),
+
     # ─── Gahanga B Ground, Rwanda (Kigali, Rwanda) ─
     ('Gahanga B Ground, Rwanda', 'Kigali City'): ('Gahanga B Ground, Rwanda', 'Kigali', 'Rwanda'),
     ('Gahanga B Ground, Rwanda', 'Kigali'): ('Gahanga B Ground, Rwanda', 'Kigali', 'Rwanda'),
@@ -1136,6 +1140,7 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
 
     # ─── Old Deer Park (Richmond, England) ─
     ('Old Deer Park', 'Richmond'): ('Old Deer Park', 'Richmond', 'England'),
+    ('Old Deer Park, Richmond', 'Richmond'): ('Old Deer Park', 'Richmond', 'England'),
 
     # ─── Prairie View Cricket Complex (Houston, USA) ─
     ('Prairie View Cricket Complex', 'Houston'): ('Prairie View Cricket Complex', 'Houston', 'USA'),
@@ -1372,6 +1377,9 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
 
     # ─── Kaizuka Cricket Ground (Osaka, Japan) ─
     ('Kaizuka Cricket Ground', 'Osaka'): ('Kaizuka Cricket Ground', 'Osaka', 'Japan'),
+
+    # ─── Korogi Sports Park (Nisshin, Japan) — T20 WC East Asia-Pacific Qualifier ─
+    ('Korogi Sports Park', 'Nisshin'): ('Korogi Sports Park', 'Nisshin', 'Japan'),
 
     # ─── Kerrydale Oval (Gold Coast, Australia) ─
     ('Kerrydale Oval', 'Gold Coast'): ('Kerrydale Oval', 'Gold Coast', 'Australia'),
@@ -1729,6 +1737,24 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
 
     # ─── Waverley Oval (Sydney, Australia) ─
     ('Waverley Oval', 'Sydney'): ('Waverley Oval', 'Sydney', 'Australia'),
+
+    # ─── 2026-07 worklist cycle (folded from unknowns-2026-07-01 + -07-29) ─
+    # Country confirmed from the hosting tournament + participating teams.
+
+    # Kolej Tuanku Jaafar Cricket Oval (Mantin, Malaysia) — ACC Women's Premier Cup
+    ('Kolej Tuanku Jaafar Cricket Oval, Mantin', 'Mantin'): ('Kolej Tuanku Jaafar Cricket Oval', 'Mantin', 'Malaysia'),
+    ('Kolej Tuanku Jaafar Cricket Oval', 'Mantin'): ('Kolej Tuanku Jaafar Cricket Oval', 'Mantin', 'Malaysia'),
+
+    # Knight Riders Cricket Ground (Pomona, USA) — Major League Cricket (LA Knight Riders)
+    ('Knight Riders Cricket Ground, Pomona', 'Pomona'): ('Knight Riders Cricket Ground', 'Pomona', 'USA'),
+    ('Knight Riders Cricket Ground', 'Pomona'): ('Knight Riders Cricket Ground', 'Pomona', 'USA'),
+
+    # Lisburn Cricket Club, Wallace Park (Lisburn, Ireland) — Cricket Ireland Inter-Provincial
+    ('Lisburn Cricket Club, Wallace Park, Lisburn', 'Lisburn'): ('Lisburn Cricket Club, Wallace Park', 'Lisburn', 'Ireland'),
+    ('Lisburn Cricket Club, Wallace Park', 'Lisburn'): ('Lisburn Cricket Club, Wallace Park', 'Lisburn', 'Ireland'),
+
+    # SSC Karlsruhe (Karlsruhe, Germany) — Switzerland Women tour of Germany
+    ('SSC Karlsruhe', 'Karlsruhe'): ('SSC Karlsruhe', 'Karlsruhe', 'Germany'),
 
 }
 
