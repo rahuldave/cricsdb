@@ -324,6 +324,20 @@ once — each is idempotent, so re-running is a no-op. Re-run
 `fix_venue_names.py` whenever `venue_aliases.py` grows new entries so
 previously-raw rows get retrofitted.
 
+**Dual-key convention when folding a worklist venue.** Cricsheet writes
+the same ground with or without a trailing `", <city>"` (e.g.
+`Old Deer Park` vs `Old Deer Park, Richmond`). `resolve_or_raw` matches
+the raw string exactly; the strip fallback tidies the *display* name but
+leaves `venue_country=NULL`, and — importantly — `fix_venue_names.py`
+resolves against the **stored** (already-stripped) `(venue, city)`, not
+the original raw string. So a ground keyed only under its long suffixed
+form won't round-trip from its stored short name. When you fold a venue,
+add **both** keys — the raw suffixed `('X, City', 'City')` (catches it on
+import) and the stripped `('X', 'City')` (catches the already-stored value
+on retrofit) — each mapping to the same `(canonical, city, country)`
+triple. This mirrors the pre-existing dual-key entries (e.g.
+`The Village, Malahide`).
+
 **Venue punctuation-collision sweep.** The initial canonicalization
 matches on token-level prefix/suffix and will miss pairs that differ
 only by punctuation (e.g. `M.Chinnaswamy Stadium` vs
@@ -335,6 +349,24 @@ and prints candidates with match counts. Human edits
 `api/venue_aliases.py` to remap losers → winners, then
 `fix_venue_names.py` retrofits the DB. Because canonical-venue growth
 requires new stadiums, which is rare, this sweep should rarely fire.
+
+**Round-trip sweep (resolver completeness).** Separate from the
+punctuation sweep. A ground folded only under its long suffixed key
+resolves correctly on import (the raw string hits), but its *stored*
+short name does not round-trip: `fix_venue_names.py` reads the stored
+`(venue, city)`, misses the dict, and re-lists the ground as "unknown"
+on every run — even though its `venue_country` is already correct. These
+false positives bury genuine gaps and pad `unknowns-<date>.csv`. The
+2026-07 sweep (commit `215e90f`) cleared the backlog by generating
+self-referential stripped-form keys
+`('X', 'City') -> ('X', 'City', <country>)` straight from the DB's
+already-correct `venue_country`, for every stored pair that failed to
+round-trip (88 grounds, ~1.6K matches). It changes **no data** — purely
+resolver completeness. Verify with `fix_venue_names.py --dry-run`: after
+the sweep it reports **0 unknown venues and 0 fills** across all matches.
+Going forward the dual-key convention above prevents new false positives,
+so this generate-from-DB pass should only be needed if a bulk fold ever
+reintroduces suffix-only keys.
 
 ### Indexes + ANALYZE (automatic)
 
