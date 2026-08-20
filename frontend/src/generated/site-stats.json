@@ -1,8 +1,8 @@
 {
   "totals": {
-    "matches": 13764,
-    "deliveries": 3142610,
-    "wickets": 170957
+    "matches": 13895,
+    "deliveries": 3170654,
+    "wickets": 172574
   },
   "featured_teams": [
     {
@@ -46,7 +46,7 @@
       "name": "S Mandhana",
       "role": "batter",
       "gender": "female",
-      "stat": "7,662 runs"
+      "stat": "7,789 runs"
     },
     {
       "id": "be150fc8",
@@ -67,7 +67,7 @@
       "batter_id": "d32cf49a",
       "bowler_id": "63e3b6b3",
       "label": "HK Matthews vs M Kapp",
-      "stat": "235 off 226"
+      "stat": "242 off 234"
     }
   ]
 }
