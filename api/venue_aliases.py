@@ -1444,6 +1444,7 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     ('Clontarf Cricket Club Ground, Dublin', 'Dublin'): ('Clontarf Cricket Club Ground', 'Dublin', 'Ireland'),
 
     # ─── Colts Cricket Club Ground (Colombo, Sri Lanka) ─
+    ('Colts Cricket Club Ground, Colombo', 'Colombo'): ('Colts Cricket Club Ground', 'Colombo', 'Sri Lanka'),
     ('Colts Cricket Club Ground', 'Colombo'): ('Colts Cricket Club Ground', 'Colombo', 'Sri Lanka'),
 
     # ─── Cricket Central, Sydney (Sydney, Australia) ─
@@ -1755,6 +1756,26 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
 
     # SSC Karlsruhe (Karlsruhe, Germany) — Switzerland Women tour of Germany
     ('SSC Karlsruhe', 'Karlsruhe'): ('SSC Karlsruhe', 'Karlsruhe', 'Germany'),
+
+    # ─── 2026-08 worklist cycle (folded from unknowns-2026-08-20) ─
+    # Country confirmed from the hosting tournament + participating teams.
+
+    # Police Park Ground (Colombo, Sri Lanka) — Major Clubs T20 Tournament
+    ('Police Park Ground, Colombo', 'Colombo'): ('Police Park Ground', 'Colombo', 'Sri Lanka'),
+    ('Police Park Ground', 'Colombo'): ('Police Park Ground', 'Colombo', 'Sri Lanka'),
+
+    # Surrey Village (Maggona, Sri Lanka) — Major Clubs T20 Tournament
+    ('Surrey Village, Maggona', 'Maggona'): ('Surrey Village', 'Maggona', 'Sri Lanka'),
+    ('Surrey Village', 'Maggona'): ('Surrey Village', 'Maggona', 'Sri Lanka'),
+
+    # Los Pinos Polo Club 1/2, Cundinamarca (Bogota, Colombia) — South
+    # American Men's Championships. Sibling pitches at one complex — kept
+    # separate, per the multi-oval rule. The ", Cundinamarca" suffix is the
+    # department, not the city, so it stays part of the ground name (same
+    # shape as 'Gahanga B Ground, Rwanda') and the stored value round-trips
+    # under a single self-referential key.
+    ('Los Pinos Polo Club 1, Cundinamarca', 'Bogota'): ('Los Pinos Polo Club 1, Cundinamarca', 'Bogota', 'Colombia'),
+    ('Los Pinos Polo Club 2, Cundinamarca', 'Bogota'): ('Los Pinos Polo Club 2, Cundinamarca', 'Bogota', 'Colombia'),
 
     # ─── Round-trip fill (2026-07 sweep) ────────────────────────────
     # Grounds already carrying the correct country in the DB but folded
