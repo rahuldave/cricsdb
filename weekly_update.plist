@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Weekly cricsheet ingest — PREPARE step (see weekly_update.sh).
+
+  Runs Mondays at 10:00 local. It imports and tests, then stops and posts a
+  desktop notification; it never commits and never deploys. Review the report
+  it leaves at tmp/weekly-update-latest.md.
+
+  Install:    cp weekly_update.plist ~/Library/LaunchAgents/com.rahuldave.cricsdb-weekly.plist
+              launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.rahuldave.cricsdb-weekly.plist
+  Status:     launchctl print gui/$(id -u)/com.rahuldave.cricsdb-weekly
+  Run now:    launchctl kickstart -p gui/$(id -u)/com.rahuldave.cricsdb-weekly
+  Remove:     launchctl bootout gui/$(id -u)/com.rahuldave.cricsdb-weekly
+              rm ~/Library/LaunchAgents/com.rahuldave.cricsdb-weekly.plist
+
+  If the Mac is asleep at 10:00 Monday, launchd runs the job once on wake.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.rahuldave.cricsdb-weekly</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/rahul/Projects/cricsdb/weekly_update.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/rahul/Projects/cricsdb</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>10</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/rahul/Projects/cricsdb/tmp/launchd-weekly.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rahul/Projects/cricsdb/tmp/launchd-weekly.err</string>
+</dict>
+</plist>
