@@ -47,6 +47,7 @@ CLAUDE.md is the **inviolable-rules file**. Everything describing what the codeb
 
 **Data + ops**
 - Data pipeline: `internal_docs/data-pipeline.md`
+- Weekly ingest routine (`weekly_update.sh` prepare step + launchd schedule + review step): `internal_docs/data-pipeline.md` §Weekly update cycle
 - Smoke-test update_recent against /tmp DB: `internal_docs/testing-update-recent.md`
 - Deploying: `internal_docs/deploying.md`
 

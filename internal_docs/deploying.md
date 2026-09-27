@@ -105,6 +105,27 @@ fine in local dev. This is in the Known Issues list.
 plash caches aggressively at the CDN. Hard-refresh
 (Cmd-Shift-R) the browser. If still stale, wait 1-2 minutes.
 
+**`plash_deploy` prints `Internal Server Error` and stops.**
+Plash's `/upload` endpoint returned a 500. Seen 2026-09-27, when plash
+started rejecting any request body over roughly 1 MB — which blocks every
+real deploy of this app, `--first` or not (the frontend build alone is
+~7 MB gzipped). Symptoms: the error arrives in 1-4 seconds, far too fast to
+have transferred the payload, with `connection: close` and no
+`X-Plash-Error` header.
+
+Before assuming it's us, note what this failure mode is NOT: not auth
+(`plash_apps` still lists your apps), not the database flag (a code-only
+deploy fails identically), and not the app or its custom domain (the same
+payload fails against a throwaway app). Confirm the size ceiling by
+uploading a trivial tarball — a one-file app deploys fine while anything
+over ~1 MB 500s.
+
+There is no local workaround; the database compresses to ~210 MB, orders of
+magnitude over that ceiling. It is a plash-side regression: wait and retry.
+Meanwhile the live site keeps serving the previously-uploaded database, so
+the only cost is staleness. Commit the data cycle anyway — the commit stands
+on its own and the next deploy attempt carries it.
+
 **`plash_deploy` errors with auth.**
 plash credentials live outside this repo. Re-run whatever plash login
 flow you used initially (`plash_login` or similar). Don't put tokens

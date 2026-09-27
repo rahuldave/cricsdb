@@ -275,6 +275,68 @@ How to read it:
    local copies. If either is `STALE`, run `download_data.py --force`
    to refresh, then `import_data.py` to rebuild.
 
+### Weekly update cycle (scheduled)
+
+`weekly_update.sh` is the scheduled **prepare** half of an update cycle. It
+does the mechanical work and then STOPS — it never commits and never
+deploys, because three things in a cycle need judgment: attributing a
+country to a new ground, triaging a red sanity check, and deciding the
+database is fit to go live.
+
+```bash
+bash weekly_update.sh                # normal run
+bash weekly_update.sh --allow-dirty  # proceed with uncommitted changes
+```
+
+In order: preflight (project root, clean working tree, 5GB free) → staleness
+check → backup → `update_recent.py --days 30` → venue retrofit +
+punctuation sweep → date-continuity check → 11 sanity checks → markdown
+report at `tmp/weekly-update-<date>.md` (plus a stable
+`tmp/weekly-update-latest.md`), full log alongside it at
+`tmp/weekly-update-<date>.log`.
+
+Exit 0 = ready to review (or nothing to import); exit 1 = needs attention.
+
+**Why weekly, not "when we remember".** Cricsheet's largest bundle reaches
+back 30 days. Let the interval exceed that and matches can sit outside every
+bundle, with a full `download_data.py` + `import_data.py` rebuild as the only
+fix. The script warns at 25 days and flags the risk past 30. The 2026-09-27
+cycle ran at 38 days and survived only because the bundle is keyed on
+*added* date, not match date — it still reached back to the day after the
+previous high-water mark. Don't rely on that twice.
+
+**Backups.** Rotated in `backups/` under the existing
+`cricket.db.pre-incremental-<date>` name, keeping the two most recent. A
+nothing-to-import run discards its own backup. An import failure reports the
+`cp` command to restore from.
+
+**`KNOWN_FAILING`.** Sanity checks expected to fail on current data are
+listed in the script so a pre-existing failure reads as "known, unchanged"
+rather than drowning the report — or worse, masking a real regression. Every
+entry needs a documented reason. Currently one: `test_playerscopestats_position`,
+where a single row (R Choden, ACC Women's Premier Cup 2026) carries 3
+dismissals against 2 innings batted, so the per-position breakdown is one
+short of the headline. Pre-dates 2026-08-20 and is unrelated to any ingest.
+If a listed check starts passing, the report says so and the entry should be
+dropped — otherwise a future break goes unnoticed.
+
+**Schedule.** `weekly_update.plist` runs it Mondays at 10:00 via launchd,
+with a desktop notification when it finishes. Install, status, run-now and
+removal commands are in that file's header. launchd runs a missed job once
+on wake, so a sleeping Mac delays the cycle rather than skipping it.
+
+**The review step** (human, or a Claude session with the user present):
+read the report, fold any new grounds into `api/venue_aliases.py` under both
+the raw `"Ground, City"` and stripped `"Ground"` keys (the dual-key rule
+above) and re-run `fix_venue_names.py`, triage anything red, then:
+
+```bash
+git add frontend/src/generated/site-stats.json docs/keeper-ambiguous/<date>.csv
+git commit
+bash deploy.sh --first   # a code-only deploy does NOT carry the data
+git push origin main
+```
+
 ### After importing
 
 The DB on plash persists in plash's `data/` directory. To push the
