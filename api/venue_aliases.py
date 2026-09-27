@@ -1379,6 +1379,7 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     ('Kaizuka Cricket Ground', 'Osaka'): ('Kaizuka Cricket Ground', 'Osaka', 'Japan'),
 
     # ─── Korogi Sports Park (Nisshin, Japan) — T20 WC East Asia-Pacific Qualifier ─
+    ('Korogi Sports Park, Nisshin', 'Nisshin'): ('Korogi Sports Park', 'Nisshin', 'Japan'),
     ('Korogi Sports Park', 'Nisshin'): ('Korogi Sports Park', 'Nisshin', 'Japan'),
 
     # ─── Kerrydale Oval (Gold Coast, Australia) ─
@@ -1587,6 +1588,7 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     ('Nevill Ground', 'Tunbridge Wells'): ('Nevill Ground', 'Tunbridge Wells', 'England'),
 
     # ─── Nondescripts Cricket Club Ground (Colombo, Sri Lanka) ─
+    ('Nondescripts Cricket Club Ground, Colombo', 'Colombo'): ('Nondescripts Cricket Club Ground', 'Colombo', 'Sri Lanka'),
     ('Nondescripts Cricket Club Ground', 'Colombo'): ('Nondescripts Cricket Club Ground', 'Colombo', 'Sri Lanka'),
 
     # ─── North Marine Road Ground, Scarborough (Scarborough, England) ─
@@ -1776,6 +1778,14 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     # under a single self-referential key.
     ('Los Pinos Polo Club 1, Cundinamarca', 'Bogota'): ('Los Pinos Polo Club 1, Cundinamarca', 'Bogota', 'Colombia'),
     ('Los Pinos Polo Club 2, Cundinamarca', 'Bogota'): ('Los Pinos Polo Club 2, Cundinamarca', 'Bogota', 'Colombia'),
+
+    # ─── 2026-09 worklist cycle (folded from unknowns-2026-09-27) ─
+    # Country confirmed from the hosting tournament + participating teams.
+
+    # GelsenTrabPark (Gelsenkirchen, Germany) — Nordic Women T20 Cup, where
+    # Germany played every fixture as host.
+    ('GelsenTrabPark, Gelsenkirchen', 'Gelsenkirchen'): ('GelsenTrabPark', 'Gelsenkirchen', 'Germany'),
+    ('GelsenTrabPark', 'Gelsenkirchen'): ('GelsenTrabPark', 'Gelsenkirchen', 'Germany'),
 
     # ─── Round-trip fill (2026-07 sweep) ────────────────────────────
     # Grounds already carrying the correct country in the DB but folded
