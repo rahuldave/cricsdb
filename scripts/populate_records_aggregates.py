@@ -297,8 +297,9 @@ async def _fill_position_buckets(db, scope_clause: str = ""):
     Reuses derive_positions() + position_to_bucket() (the cohort
     convention) so the per-innings table buckets identically to
     playerscopestatsposition. derive_positions() yields positions for the
-    striker AND the non-striker of every innings; only striker rows exist
-    in inningsbatterperf, so non-striker-only ids simply match no row.
+    striker AND the non-striker of every innings; inningsbatterperf holds
+    a row for both (the ns_sql insert adds non-striker-only batters), so
+    every derived id matches exactly one row.
     Batched 500 innings at a time (mirrors the position populate)."""
     from sqlalchemy import text
     if scope_clause:

@@ -62,7 +62,11 @@ def _reference(conn: sqlite3.Connection, inn_ids: list[int]):
             if (d["extras_wides"] == 0 and d["extras_noballs"] == 0
                     and d["runs_batter"] == 0 and d["runs_total"] == 0):
                 dots[b] += 1
-        for b in {d["batter_id"] for d in ds if d["batter_id"] is not None}:
+        # Every batter derive_positions saw — including ones who only
+        # ever stood at the non-striker's end (0 balls faced, e.g. run
+        # out backing up, or the No.11 left not out). The table carries
+        # rows for them, so the reference must too.
+        for b in positions:
             ref[(b, iid)] = (position_to_bucket(positions[b]), dots[b])
     return ref
 
@@ -123,6 +127,17 @@ def main() -> int:
     ok = len(rows) > 0 and not zero_leak
     print(f"  [{'PASS' if ok else 'FAIL'}] reinserted {len(rows)} rows, no position_bucket 0-leak"
           + ("" if ok else f" (zeros={len(zero_leak)})"))
+    all_passed &= ok
+
+    # Same SET of (batter, innings) rows — the value loop below only walks
+    # table rows, so a batter the reference expects but the table lacks
+    # would otherwise pass silently.
+    table_keys = {(r["batter_id"], r["innings_id"]) for r in rows}
+    missing = sorted(set(expected) - table_keys)
+    extra = sorted(table_keys - set(expected))
+    ok = not missing and not extra
+    print(f"  [{'PASS' if ok else 'FAIL'}] table rows == reference rows ({len(table_keys)})"
+          + ("" if ok else f"\n         missing={missing[:6]} extra={extra[:6]}"))
     all_passed &= ok
 
     mismatches = []
