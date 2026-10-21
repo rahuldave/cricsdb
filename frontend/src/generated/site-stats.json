@@ -1,8 +1,8 @@
 {
   "totals": {
-    "matches": 14088,
-    "deliveries": 3214360,
-    "wickets": 175002
+    "matches": 14145,
+    "deliveries": 3226685,
+    "wickets": 175687
   },
   "featured_teams": [
     {
@@ -18,7 +18,7 @@
     {
       "name": "India",
       "blurb": "International",
-      "matches": 455
+      "matches": 462
     },
     {
       "name": "Australia",
@@ -39,14 +39,14 @@
       "name": "JJ Bumrah",
       "role": "bowler",
       "gender": "male",
-      "stat": "322 wkts"
+      "stat": "324 wkts"
     },
     {
       "id": "5d2eda89",
       "name": "S Mandhana",
       "role": "batter",
       "gender": "female",
-      "stat": "8,002 runs"
+      "stat": "8,118 runs"
     },
     {
       "id": "be150fc8",
