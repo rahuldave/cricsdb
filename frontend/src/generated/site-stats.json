@@ -1,8 +1,8 @@
 {
   "totals": {
-    "matches": 14145,
-    "deliveries": 3226685,
-    "wickets": 175687
+    "matches": 14180,
+    "deliveries": 3233420,
+    "wickets": 176112
   },
   "featured_teams": [
     {
@@ -18,7 +18,7 @@
     {
       "name": "India",
       "blurb": "International",
-      "matches": 462
+      "matches": 464
     },
     {
       "name": "Australia",
