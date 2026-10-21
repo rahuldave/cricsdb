@@ -728,6 +728,11 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     # ─── The Village, Malahide (Dublin, Ireland) ─
     ('The Village, Malahide', 'Dublin'): ('The Village, Malahide', 'Dublin', 'Ireland'),
     ('The Village, Malahide, Dublin', 'Dublin'): ('The Village, Malahide', 'Dublin', 'Ireland'),
+    # Bare "Malahide" is the same ground (Malahide Cricket Club plays at The
+    # Village) — India's Aug 2023 tour games were filed under it, splitting
+    # the ground across two venue pages.
+    ('Malahide, Dublin', 'Dublin'): ('The Village, Malahide', 'Dublin', 'Ireland'),
+    ('Malahide', 'Dublin'): ('The Village, Malahide', 'Dublin', 'Ireland'),
 
     # ─── High Performance Oval, Windhoek (Windhoek, Namibia) ─
     ('High Performance Oval, Windhoek', 'Windhoek'): ('High Performance Oval', 'Windhoek', 'Namibia'),
@@ -1578,9 +1583,6 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     ('Lavington Sports Oval', 'Albury'): ('Lavington Sports Oval', 'Albury', 'Australia'),
     ('Lavington Sports Oval, Albury', 'Albury'): ('Lavington Sports Oval', 'Albury', 'Australia'),
 
-    # ─── Malahide, Dublin (Dublin, Ireland) ─
-    ('Malahide, Dublin', 'Dublin'): ('Malahide', 'Dublin', 'Ireland'),
-
     # ─── Marrara Stadium, Darwin (Darwin, Australia) ─
     ('Marrara Stadium, Darwin', 'Darwin'): ('Marrara Stadium', 'Darwin', 'Australia'),
 
@@ -1873,7 +1875,6 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     ('Latrobe Recreation Ground', 'Latrobe'): ('Latrobe Recreation Ground', 'Latrobe', 'Australia'),
     ('M Chinnaswamy Stadium', 'Bengaluru'): ('M Chinnaswamy Stadium', 'Bengaluru', 'India'),
     ('Maharaja Yadavindra Singh International Cricket Stadium', 'New Chandigarh'): ('Maharaja Yadavindra Singh International Cricket Stadium', 'New Chandigarh', 'India'),
-    ('Malahide', 'Dublin'): ('Malahide', 'Dublin', 'Ireland'),
     ('Malek Cricket Ground', 'Ajman'): ('Malek Cricket Ground', 'Ajman', 'United Arab Emirates'),
     ('Maple Leaf North-East Ground', 'King City'): ('Maple Leaf North-East Ground', 'King City', 'Canada'),
     ('Marina Ground', 'Corfu'): ('Marina Ground', 'Corfu', 'Greece'),
