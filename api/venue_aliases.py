@@ -1787,6 +1787,43 @@ VENUE_ALIASES: dict[tuple[str, Optional[str]], tuple[str, str, str]] = {
     ('GelsenTrabPark, Gelsenkirchen', 'Gelsenkirchen'): ('GelsenTrabPark', 'Gelsenkirchen', 'Germany'),
     ('GelsenTrabPark', 'Gelsenkirchen'): ('GelsenTrabPark', 'Gelsenkirchen', 'Germany'),
 
+    # ─── 2026-10 worklist cycle (folded from unknowns-2026-10-12) ─
+    # Four are existing grounds under new cricsheet spellings, folded into
+    # their established canonical so the ground's history stays on one
+    # page; two are genuinely new.
+
+    # Buffalo Park — East London was renamed KuGompo City (2025); cricsheet
+    # now spells the city that way (and "KuGumpo" in the venue string).
+    # CSA Pro20, Border at home.
+    ('Buffalo Park, KuGumpo City', 'KuGompo City'): ('Buffalo Park', 'East London', 'South Africa'),
+    ('Buffalo Park', 'KuGompo City'): ('Buffalo Park', 'East London', 'South Africa'),
+
+    # Centurion Park — the ground's original (pre-sponsorship) name for
+    # SuperSport Park. CSA Pro20, Titans at home.
+    ('Centurion Park', 'Centurion'): ('SuperSport Park', 'Centurion', 'South Africa'),
+
+    # Gahanga International Cricket Stadium — the ", Rwanda" suffix dropped.
+    # Africa Continental Cup, Kigali.
+    ('Gahanga International Cricket Stadium', 'Kigali City'): ('Gahanga International Cricket Stadium, Rwanda', 'Kigali', 'Rwanda'),
+    ('Gahanga International Cricket Stadium', 'Kigali'): ('Gahanga International Cricket Stadium, Rwanda', 'Kigali', 'Rwanda'),
+
+    # Malahide Cricket Ground — The Village, Malahide. The same European T20
+    # Premier League fortnight played its other 13 fixtures there.
+    ('Malahide Cricket Ground, Dublin', 'Dublin'): ('The Village, Malahide', 'Dublin', 'Ireland'),
+    ('Malahide Cricket Ground', 'Dublin'): ('The Village, Malahide', 'Dublin', 'Ireland'),
+
+    # Pocos Oval (Poços de Caldas, Brazil) — South American Women's
+    # Championships; Poços de Caldas is Brazil's cricket base. Cricsheet's
+    # city field carries the state, misspelt ("Minas Gerias").
+    ('Pocos Oval, Pocos de Caldas', 'Minas Gerias'): ('Pocos Oval', 'Pocos de Caldas', 'Brazil'),
+    ('Pocos Oval', 'Minas Gerias'): ('Pocos Oval', 'Pocos de Caldas', 'Brazil'),
+    ('Pocos Oval', 'Pocos de Caldas'): ('Pocos Oval', 'Pocos de Caldas', 'Brazil'),
+
+    # Uplands College (White River, South Africa) — CSA Pro20, Mpumalanga
+    # at home.
+    ('Uplands College, White River', 'White River'): ('Uplands College', 'White River', 'South Africa'),
+    ('Uplands College', 'White River'): ('Uplands College', 'White River', 'South Africa'),
+
     # ─── Round-trip fill (2026-07 sweep) ────────────────────────────
     # Grounds already carrying the correct country in the DB but folded
     # only under a longer ", <city>"-suffixed key, so the stored short
