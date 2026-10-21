@@ -26,7 +26,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
-import shutil
 import sqlite3
 import sys
 from collections import defaultdict
@@ -40,6 +39,64 @@ from deebase import Database
 from api.innings_positions import derive_positions
 from scripts.populate_playerscopestats_position import position_to_bucket
 from scripts.populate_records_aggregates import populate_incremental
+
+
+def _snapshot(src: str, dst: str) -> None:
+    """Consistent copy of a WAL-mode DB via SQLite's backup API.
+
+    A raw file copy takes only the main file: committed pages still in
+    src-wal are lost, and a leftover dst-wal/-shm from a previous run
+    gets replayed onto the new file. Either yields "database disk image
+    is malformed" (seen in the 2026-10-21 weekly run, right after the
+    import's writes). The backup API reads through SQLite, so it sees
+    the WAL, and writes a fresh dst.
+    """
+    for suffix in ("", "-wal", "-shm"):
+        if os.path.exists(dst + suffix):
+            os.remove(dst + suffix)
+    # Read-only: a read-write handle, closed as the last connection,
+    # checkpoints src's WAL into its main file — this test must not
+    # touch the live cricket.db.
+    s = sqlite3.connect(f"file:{src}?mode=ro", uri=True)
+    d = sqlite3.connect(dst)
+    try:
+        s.backup(d)
+    finally:
+        d.close()
+        s.close()
+
+
+def _snapshot_sees_wal() -> bool:
+    """_snapshot must carry committed pages that live only in the WAL —
+    the case a raw file copy drops — and must leave src's files as they
+    were (no checkpoint into the main file, WAL kept). Tiny throwaway DB;
+    src is a main+WAL pair with no open connection, the state a writer
+    that exited without checkpointing leaves behind."""
+    import shutil
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        src, dst = os.path.join(d, "src.db"), os.path.join(d, "dst.db")
+        w = sqlite3.connect(src)
+        w.execute("PRAGMA journal_mode = WAL")
+        w.execute("PRAGMA wal_autocheckpoint = 0")
+        w.execute("CREATE TABLE t (x)")
+        w.executemany("INSERT INTO t VALUES (?)", [(i,) for i in range(1000)])
+        w.commit()  # committed, still only in the WAL
+        pair = os.path.join(d, "pair.db")
+        shutil.copy(src, pair)
+        shutil.copy(src + "-wal", pair + "-wal")
+        w.close()
+        main_size = os.path.getsize(pair)
+        _snapshot(pair, dst)
+        untouched = (os.path.getsize(pair) == main_size
+                     and os.path.exists(pair + "-wal"))
+        c = sqlite3.connect(dst)
+        try:
+            return untouched and c.execute("SELECT count(*) FROM t").fetchone()[0] == 1000
+        except sqlite3.DatabaseError:
+            return False
+        finally:
+            c.close()
 
 
 def _reference(conn: sqlite3.Connection, inn_ids: list[int]):
@@ -92,7 +149,12 @@ def main() -> int:
         return 1
 
     print(f"Sanity: inningsbatterperf incremental fill (copy of {args.db})")
-    shutil.copy(args.db, TMP_DB)
+    all_passed = True
+    ok = _snapshot_sees_wal()
+    print(f"  [{'PASS' if ok else 'FAIL'}] snapshot carries WAL-only commits, leaves src untouched")
+    all_passed &= ok
+
+    _snapshot(args.db, TMP_DB)
 
     conn = sqlite3.connect(TMP_DB)
     conn.row_factory = sqlite3.Row
@@ -122,7 +184,6 @@ def main() -> int:
     ).fetchall()
     conn.close()
 
-    all_passed = True
     zero_leak = [r for r in rows if r["position_bucket"] == 0]
     ok = len(rows) > 0 and not zero_leak
     print(f"  [{'PASS' if ok else 'FAIL'}] reinserted {len(rows)} rows, no position_bucket 0-leak"
