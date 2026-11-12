@@ -113,6 +113,8 @@ interface ChipsProps {
 /**
  * Show the window badge and the P(=0), P(=1) and P(≥2) chips of one fielding metric.
  * @param props the metric `block`, the `window` (`scope` by default), and the `playerId` that adds a cohort nudge
+ * @param props.window the active window, `'scope'` by default
+ * @param props.playerId the fielder's id; the cohort-narrowing nudge shows only when given
  * @returns the badge and the chip row
  */
 export function FielderChipsRow({

@@ -84,15 +84,18 @@ export function avgDisciplineHasData(
 
 /** Two-line label for the avg column header, computed from the scope.
  *  - `line1` is the column's *anchor* (rendered in the same h2 slot as
- *    team-col team names): "League average", "<Tournament> average", or
- *    "Full-member average". When `teamTournaments` is a singleton AND
+ *    team-col team names): "<Tournament> average", "Full-member average",
+ *    or "Average team" when nothing anchors the scope. When `teamTournaments` is a singleton AND
  *    no explicit tournament filter is set AND team_type is 'club', the
  *    primary team's sole tournament is auto-promoted into line1 (e.g.
  *    RCB's universe collapses to IPL → "Indian Premier League average").
  *  - `line2` is the italic scope subtitle (rendered in the chip-area
  *    sub-line): gender + tier qualifier (when not redundant with line1)
  *    + season range, joined by " · ". Empty when nothing narrows. */
-export interface ScopeAvgLabel { line1: string; line2: string }
+export interface ScopeAvgLabel {
+  line1: string // the column's anchor, such as "Indian Premier League average" or "Average team"
+  line2: string // the italic scope subtitle, or empty when nothing narrows
+}
 
 /** Build the avg column's two-line header label from the filters; see `ScopeAvgLabel`. */
 export function scopeAvgLabel(

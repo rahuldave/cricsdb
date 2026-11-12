@@ -94,6 +94,8 @@ export default function DistributionStatStrip({ dossier }: Props) {
  * `window` (default `'scope'`) picks the badge above the chips. `playerId`, when given, adds the
  * cohort-narrowing nudge after the chips.
  * @param props the dossier, the active window and the batter's id
+ * @param props.window the active window, `'scope'` by default
+ * @param props.playerId the batter's id; the cohort-narrowing nudge shows only when given
  * @returns the badge and the chip row
  */
 export function MilestoneChipsRow({

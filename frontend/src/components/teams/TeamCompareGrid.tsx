@@ -421,7 +421,7 @@ function CompareSlotColumn({
 
   // Avg-col two-line label. line1 anchors on a tournament name when the
   // primary team's universe collapses to a singleton (RCB → IPL); else
-  // "League average" / "Full-member average". line2 is the italic scope
+  // "Full-member average", or "Average team" when nothing anchors it. line2 is the italic scope
   // subtitle (gender · season range).
   const avgLbl = !isTeam ? scopeAvgLabel(slot.scope, primaryTournaments) : null
 

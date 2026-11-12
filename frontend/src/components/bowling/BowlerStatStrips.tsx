@@ -187,6 +187,8 @@ export function EconomyStatStrip({ block }: EconomyProps) {
  * Show the economy milestone chips: P(econ ≤6), P(econ ≤7), P(econ ≥9) and P(econ ≥10).
  * `window` (default `'scope'`) picks the badge above the chips; `playerId`, when given, adds the cohort-narrowing nudge.
  * @param props the economy block, the active window and the bowler's id
+ * @param props.window the active window, `'scope'` by default
+ * @param props.playerId the bowler's id; the cohort-narrowing nudge shows only when given
  * @returns the chip row
  */
 export function EconomyChipsRow({
@@ -240,6 +242,8 @@ export function RunsConcededStatStrip({ block }: RunsConcededProps) {
  * Show the runs-conceded milestone chips: P(≤15), P(≤25), P(≥40) and P(≥50).
  * `window` (default `'scope'`) picks the badge above the chips; `playerId`, when given, adds the cohort-narrowing nudge.
  * @param props the runs-conceded block, the active window and the bowler's id
+ * @param props.window the active window, `'scope'` by default
+ * @param props.playerId the bowler's id; the cohort-narrowing nudge shows only when given
  * @returns the chip row
  */
 export function RunsConcededChipsRow({
