@@ -836,7 +836,7 @@ Every endpoint that joins innings (i.e. has innings-level metrics)
 also accepts the page-local `?inning=0` (1st-innings only) or
 `?inning=1` (2nd-innings only) query param. NOT a FilterBar field —
 it's an AuxParams aux narrowing. Match-level endpoints
-(`/teams/{team}/{summary,by-season,vs-opponent,match-list}`) honour
+(`/teams/{team}/{summary,by-season,vs/{opponent},results}`) honour
 the same param via a derived match-id subquery (`team batted in
 inning X` semantic). Spec: `internal_docs/spec-inning-split.md`
 §3.1a + §5.2.
@@ -972,7 +972,7 @@ Numeric metrics envelope-wrapped; identity-bearing `highest` +
 ### Distribution dossiers (per-innings)
 
 Three sibling endpoints — one per discipline — that mirror the per-
-player distribution dossiers (`/batters/{id}/distribution`, etc.)
+player distribution dossiers (`/batters/{person_id}/distribution`, etc.)
 at team grain. Each is a self-contained per-innings dossier with
 two or three sibling distribution blocks under one master sample,
 phase rollup, four scope-anchored form windows (`last_10` /
@@ -1196,7 +1196,7 @@ scalar). Three sibling count blocks:
   team grain** — every senior team has had a keeper at some
   point; zero-event scopes ship all-zero chips with small-n CIs
   rather than null. (Diverges from player-fielder
-  `/fielders/{id}/distribution`, where the stumpings block is
+  `/fielders/{person_id}/distribution`, where the stumpings block is
   null for non-keepers.)
 
 Top-level scalars: `n_innings_fielded`, `wickets_total` (any-kind
@@ -1437,7 +1437,7 @@ curl "http://localhost:8000/api/v1/scope/averages/players/batting/by-season?pers
 
 **Cohort narrows live under the six off-key filters.** All of the
 `/scope/averages/players/*` cohort endpoints (and the cohort blocks the
-`/batters|/bowlers|/fielders/{id}` handlers compose) narrow the comparison
+`/batters|/bowlers|/fielders/{person_id}` handlers compose) narrow the comparison
 pool when any of **venue / opponent / team / inning / toss / result** is set:
 the handler dispatches on `is_precomputed_scope` — precomputed read at
 none-of-six, live aggregation (reproducing the precomputed value
@@ -1594,13 +1594,13 @@ bat_first_wins, field_first_wins, bat_first_win_pct }`. The
 
 ---
 
-# Batters (`/api/v1/batters/{id}/…`)
+# Batters (`/api/v1/batters/{person_id}/…`)
 
-Source: `api/routers/batting.py`. `{id}` is the cricsheet hex
-person_id (from `/players` search). All accept common filters plus
+Source: `api/routers/batting.py`. `{person_id}` is the cricsheet hex
+person id (from `/players` search). All accept common filters plus
 contextual ones.
 
-## `GET /api/v1/batters/{id}/summary`
+## `GET /api/v1/batters/{person_id}/summary`
 
 Career totals scoped to filters. Drives the StatCard row on a
 player's batting page (and the Batting band on `/players`).
@@ -1676,7 +1676,7 @@ invisible to this endpoint because the per-innings query filtered
 cricket.db are non-striker; for Kohli at IPL the fix moved the
 count from 226 to 228.
 
-## `GET /api/v1/batters/{id}/by-innings`
+## `GET /api/v1/batters/{person_id}/by-innings`
 
 Innings list (Innings List tab). Params: `limit` (default 50),
 `offset`, `sort` (`date`, `runs`, `strike_rate`, etc.).
@@ -1702,7 +1702,7 @@ curl "http://localhost:8000/api/v1/batters/ba607b88/by-innings?limit=1"
 }
 ```
 
-## `GET /api/v1/batters/{id}/vs-bowlers`
+## `GET /api/v1/batters/{person_id}/vs-bowlers`
 
 Matchup table. Params: `bowler_id` (optional, for single-bowler
 drilldown), `min_balls` (default 6).
@@ -1710,35 +1710,35 @@ drilldown), `min_balls` (default 6).
 Returns `{ matchups: [ { bowler_id, bowler, balls, runs,
 dismissals, strike_rate, average, … } ] }`.
 
-## `GET /api/v1/batters/{id}/by-over`
+## `GET /api/v1/batters/{person_id}/by-over`
 
 Over-by-over stats (1..20). Returns `{ by_over: [ { over, balls,
 runs, strike_rate, dismissals, … } ] }`.
 
-## `GET /api/v1/batters/{id}/by-phase`
+## `GET /api/v1/batters/{person_id}/by-phase`
 
 Powerplay / middle / death split. `{ by_phase: [ { phase, balls,
 runs, strike_rate, … } ] }`.
 
-## `GET /api/v1/batters/{id}/by-season`
+## `GET /api/v1/batters/{person_id}/by-season`
 
 Season-by-season career trajectory. `{ by_season: [ { season, balls,
 runs, dismissals, average, strike_rate, innings, fifties, hundreds,
 dots, boundaries, … } ] }`.
 
-## `GET /api/v1/batters/{id}/dismissals`
+## `GET /api/v1/batters/{person_id}/dismissals`
 
 Dismissal analysis. Returns counts by `kind`, primary `bowler_type`
 breakdown, and by_phase dismissal distribution. Used by the
 Dismissals donut + bars.
 
-## `GET /api/v1/batters/{id}/inter-wicket`
+## `GET /api/v1/batters/{person_id}/inter-wicket`
 
 Partnership-segment analysis: runs + rate in each "between-wickets"
 span of an innings. `{ inter_wicket: [ { after_wicket, avg_runs,
 avg_balls, run_rate, n } ] }`.
 
-## `GET /api/v1/batters/{id}/records`
+## `GET /api/v1/batters/{person_id}/records`
 
 Per-player batting record lists — six top-N lists capped at `limit`
 (default 10, max 20):
@@ -1786,7 +1786,7 @@ Every row carries `tournament` + `season` so the frontend Records
 subtab can render an Edition column + per-row `(ed)` link to that
 specific tournament+season.
 
-## `GET /api/v1/batters/{id}/distribution`
+## `GET /api/v1/batters/{person_id}/distribution`
 
 Per-innings runs distribution dossier: lifetime + form-window
 aggregates (mean / median / variance / std / average), milestone
@@ -1856,13 +1856,13 @@ curl "http://localhost:8000/api/v1/batters/ba607b88/distribution?tournament=Indi
 
 ---
 
-# Bowlers (`/api/v1/bowlers/{id}/…`)
+# Bowlers (`/api/v1/bowlers/{person_id}/…`)
 
 Source: `api/routers/bowling.py`. Mirror of the batters pattern.
 
-## `GET /api/v1/bowlers/{id}/summary`
+## `GET /api/v1/bowlers/{person_id}/summary`
 
-Same Phase 4 envelope shape as `/batters/{id}/summary` (see above).
+Same Phase 4 envelope shape as `/batters/{person_id}/summary` (see above).
 Mix axis is over-mix (20 elements); cohort thresholds U-shape per
 over. Identity fields (`overs` formatted string, `best_figures`)
 stay flat. Includes `over_distribution[20]` array + `cohort: {…}`
@@ -1893,7 +1893,7 @@ curl "http://localhost:8000/api/v1/bowlers/462411b3/summary?tournament=Indian+Pr
 **Note (CLAUDE.md convention):** bowling uses `runs_conceded` and
 `wickets`, NOT `runs`/`dismissals`. Don't reuse batting types.
 
-## `GET /api/v1/bowlers/{id}/distribution`
+## `GET /api/v1/bowlers/{person_id}/distribution`
 
 Per-innings bowling distribution dossier. Three sibling
 distribution blocks under one master sample:
@@ -2029,7 +2029,7 @@ curl "http://localhost:8000/api/v1/bowlers/462411b3/distribution?tournament=Indi
 }
 ```
 
-## `GET /api/v1/bowlers/{id}/records`
+## `GET /api/v1/bowlers/{person_id}/records`
 
 Per-player bowling record lists — two top-N lists capped at `limit`
 (default 10, max 20):
@@ -2065,23 +2065,23 @@ curl "http://localhost:8000/api/v1/bowlers/462411b3/records?tournament=Indian%20
 
 ## Other endpoints (same shape pattern)
 
-- `GET /by-innings` — innings list with bowling figures. Params:
+- `GET /api/v1/bowlers/{person_id}/by-innings` — innings list with bowling figures. Params:
   `limit`, `offset`.
-- `GET /vs-batters` — matchup table. Params: `batter_id`, `min_balls`.
-- `GET /by-over` — economy/SR per over (1..20).
-- `GET /by-phase` — powerplay / middle / death split.
-- `GET /by-season` — season-by-season career.
-- `GET /wickets` — wicket analysis: by_kind donut, by_phase bars,
+- `GET /api/v1/bowlers/{person_id}/vs-batters` — matchup table. Params: `batter_id`, `min_balls`.
+- `GET /api/v1/bowlers/{person_id}/by-over` — economy/SR per over (1..20).
+- `GET /api/v1/bowlers/{person_id}/by-phase` — powerplay / middle / death split.
+- `GET /api/v1/bowlers/{person_id}/by-season` — season-by-season career.
+- `GET /api/v1/bowlers/{person_id}/wickets` — wicket analysis: by_kind donut, by_phase bars,
   by_batter (most-dismissed batters), dismissal-over distribution.
 
 ---
 
-# Fielders (`/api/v1/fielders/{id}/…`) — Tier 1
+# Fielders (`/api/v1/fielders/{person_id}/…`) — Tier 1
 
 Source: `api/routers/fielding.py`. Backed by the `fieldingcredit`
 table.
 
-## `GET /api/v1/fielders/{id}/summary`
+## `GET /api/v1/fielders/{person_id}/summary`
 
 Same Phase 4 envelope shape. Partition is binary `is_keeper`
 derived from `innings_kept > 0`. Counts have `direction: null`;
@@ -2130,7 +2130,7 @@ curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/summary?tournament=Indian+P
 Keeping tab. The dismissals/match cohort baseline is keeper-vs-
 keeper here (Dhoni partitioned into the keeper cohort).
 
-## `GET /api/v1/fielders/{id}/distribution`
+## `GET /api/v1/fielders/{person_id}/distribution`
 
 Per-match fielding distribution dossier — three sibling count blocks
 (catches / run_outs / stumpings) with three-simple milestones
@@ -2202,7 +2202,7 @@ in the INDIGO/SAGE/OCHRE palette to match.
 
 Spec: `internal_docs/spec-distribution-stats.md` §13.
 
-## `GET /api/v1/fielders/{id}/records`
+## `GET /api/v1/fielders/{person_id}/records`
 
 Per-player fielding record lists — three top-N lists capped at
 `limit` (default 10, max 20):
@@ -2249,25 +2249,25 @@ curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/records?limit=3"
 
 ## Other endpoints
 
-- `GET /by-season` — dismissals per season split by kind.
-- `GET /by-phase` — dismissals by powerplay / middle / death.
-- `GET /by-over` — per-over dismissal counts.
-- `GET /dismissal-types` — donut data (% catches vs stumpings vs
+- `GET /api/v1/fielders/{person_id}/by-season` — dismissals per season split by kind.
+- `GET /api/v1/fielders/{person_id}/by-phase` — dismissals by powerplay / middle / death.
+- `GET /api/v1/fielders/{person_id}/by-over` — per-over dismissal counts.
+- `GET /api/v1/fielders/{person_id}/dismissal-types` — donut data (% catches vs stumpings vs
   run-outs vs c&b).
-- `GET /victims` — batters dismissed by this fielder, ranked.
-- `GET /by-innings` — innings-level list with per-innings fielding
+- `GET /api/v1/fielders/{person_id}/victims` — batters dismissed by this fielder, ranked.
+- `GET /api/v1/fielders/{person_id}/by-innings` — innings-level list with per-innings fielding
   credits. Params: `limit`, `offset`.
 
 ---
 
-# Keeping (`/api/v1/fielders/{id}/keeping/…`) — Tier 2
+# Keeping (`/api/v1/fielders/{person_id}/keeping/…`) — Tier 2
 
 Source: `api/routers/keeping.py`. Only relevant when
 `summary.innings_kept > 0` (Tier-2 keeper inference has assigned
 innings to this person). See `docs/spec-fielding-tier2.md` for the
 4-layer algorithm.
 
-## `GET /keeping/summary`
+## `GET /api/v1/fielders/{person_id}/keeping/summary`
 
 Same Phase 4 envelope shape. `innings_kept_by_confidence` stays
 flat (it's a dict of category counts). All other numerics
@@ -2296,10 +2296,10 @@ curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/keeping/summary?tournament=
 }
 ```
 
-- `GET /keeping/by-season` — per-season keeping stats.
-- `GET /keeping/by-innings` — innings list for the Keeping tab.
+- `GET /api/v1/fielders/{person_id}/keeping/by-season` — per-season keeping stats.
+- `GET /api/v1/fielders/{person_id}/keeping/by-innings` — innings list for the Keeping tab.
   Params: `limit`, `offset`.
-- `GET /keeping/ambiguous` — innings where this person was a
+- `GET /api/v1/fielders/{person_id}/keeping/ambiguous` — innings where this person was a
   candidate but the algorithm couldn't resolve to a single keeper,
   with the other candidates. For transparency in the UI.
 
@@ -3043,10 +3043,10 @@ is composed client-side from existing summary endpoints — no new
 backend work. Per player, the frontend runs four requests in parallel:
 
 ```
-GET /api/v1/batters/{id}/summary
-GET /api/v1/bowlers/{id}/summary
-GET /api/v1/fielders/{id}/summary
-GET /api/v1/fielders/{id}/keeping/summary
+GET /api/v1/batters/{person_id}/summary
+GET /api/v1/bowlers/{person_id}/summary
+GET /api/v1/fielders/{person_id}/summary
+GET /api/v1/fielders/{person_id}/keeping/summary
 ```
 
 and composes the four responses into a `PlayerProfile` (see
