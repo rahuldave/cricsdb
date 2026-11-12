@@ -2,7 +2,7 @@
  * Bins and tiers for the bowler Distribution panel's wickets, economy and runs-conceded histograms.
  *
  * Pure helpers for the bowler Distribution panel histograms. Spec:
- * internal_docs/spec-distribution-stats.md §12.2.2 / §12.2.3 / §12.2.4.
+ * docs/internal/spec-distribution-stats.md §12.2.2 / §12.2.3 / §12.2.4.
  *
  * Three different bin schemes — discrete wickets, continuous economy
  * (per-over rate), continuous runs-conceded — each with its own

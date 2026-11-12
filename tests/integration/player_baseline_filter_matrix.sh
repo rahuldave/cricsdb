@@ -1,7 +1,7 @@
 #!/bin/bash
 # Player baseline — filter-combination matrix integration test.
 #
-# Spec: internal_docs/spec-player-baseline-parity.md §6.3 +
+# Spec: docs/internal/spec-player-baseline-parity.md §6.3 +
 # CLAUDE.md "Filter-combination testing — the matrix is mandatory".
 #
 # Phase H of the spec — exercises the FilterParams matrix on each

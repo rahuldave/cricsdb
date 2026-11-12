@@ -1,0 +1,5 @@
+---
+title: Front-end reference
+---
+
+A page for each file of `frontend/src`, made by smalldocs from TypeDoc and the comments in the code.

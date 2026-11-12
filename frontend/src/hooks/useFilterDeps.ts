@@ -14,7 +14,7 @@ import { FILTER_KEYS, type FilterKey } from '../components/scopeLinks'
  * this instead of hand-rolling `[filters.gender, filters.team_type, ...]`.
  * Iterates the single `FILTER_KEYS` registry so adding a new filter
  * auto-wires every page's deps (was the documented "filterDeps
- * landmine" — see internal_docs/design-decisions.md).
+ * landmine" — see docs/internal/design-decisions.md).
  *
  * Also tracks every AuxParam that changes the displayed data:
  *   - `filters.inning` (1st/2nd innings toggle)
@@ -28,7 +28,7 @@ import { FILTER_KEYS, type FilterKey } from '../components/scopeLinks'
  * panels showing the pre-filter numbers (stale). Adding them here
  * keeps the "one source of truth for fetch deps" promise even though
  * FILTER_KEYS itself stays narrow. Spec:
- * internal_docs/spec-splits-mosaic.md §1.1.
+ * docs/internal/spec-splits-mosaic.md §1.1.
  *
  * Callers can append additional non-filter deps (e.g. active tab, a
  * row id) with `[...useFilterDeps(), tab]`.

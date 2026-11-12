@@ -32,7 +32,7 @@
 # new chart wrapper that re-introduces the "header inside the
 # positioning context" pattern fails the test on the next CI run.
 #
-# Spec: internal_docs/spec-chart-wrapper-regression.md (TBD).
+# Spec: docs/internal/spec-chart-wrapper-regression.md (TBD).
 
 set -u
 

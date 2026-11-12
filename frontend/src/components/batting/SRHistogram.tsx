@@ -2,7 +2,7 @@
  * Histogram of a batter's strike rate per innings, coloured slow, mid and explosive.
  *
  * Per-innings strike-rate histogram. Spec
- * internal_docs/spec-distribution-stats.md §9 (SR-tab extension
+ * docs/internal/spec-distribution-stats.md §9 (SR-tab extension
  * 2026-05-06).
  *
  * Bin width 25 SR across [0, 200+]. 3-tier coloring matching the

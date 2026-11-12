@@ -2,7 +2,7 @@
 
 This directory holds **partitioned ambiguous worklists** for Tier 2
 wicketkeeper identification. Full background in
-[`../spec-fielding-tier2.md`](../spec-fielding-tier2.md).
+[`../internal/spec-fielding-tier2.md`](../internal/spec-fielding-tier2.md).
 
 ## What's in here
 

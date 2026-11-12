@@ -25,7 +25,7 @@
  *     first" for bowling stats, and "fielded first" for fielding stats
  *     — no single POV label can be accurate for all three.
  *
- * Source-of-truth doc: `internal_docs/spec-inning-split.md` §7.1, superseded
+ * Source-of-truth doc: `docs/internal/spec-inning-split.md` §7.1, superseded
  * for the values by `spec-inning-unify-option-b.md`.
  * Polysemy lock: `tests/integration/inning_toggle_pov_labels.sh`.
  */

@@ -3,7 +3,7 @@
 This is a structural reference for agents and downstream models that
 need to map a natural-language question onto the right page or API
 endpoint. For the conversational human-facing tour, see
-[`frontend/src/content/user-help.md`](../frontend/src/content/user-help.md)
+[`frontend/src/content/user-help.md`](https://github.com/rahuldave/cricsdb/blob/main/frontend/src/content/user-help.md)
 (rendered at <https://t20.rahuldave.com/help/usage>). For the full API
 catalog, see [`docs/api.md`](./api.md).
 
@@ -115,7 +115,7 @@ binary), computed in-process from the corresponding
 into the existing /summary roundtrip. Hover the `vs base N` text
 for the cohort phrasing (player mix + cohort size). Compare-grid
 columns each show an inline delta chip derived from that column's
-own mix. Spec: `internal_docs/spec-player-compare-average.md`.
+own mix. Spec: `docs/internal/spec-player-compare-average.md`.
 
 ### `/batting` (Batter deep dive)
 
@@ -236,7 +236,7 @@ still works.
 
 | URL param | Values | What it filters | Notes |
 |---|---|---|---|
-| `inning` | `0` / `1` | 1st innings (batted first) / 2nd innings (chased) | URL semantics are constant (`innings.innings_number`); the pill label is POV-aware via `useDiscipline()`. Spec: `internal_docs/spec-inning-split.md`. |
+| `inning` | `0` / `1` | 1st innings (batted first) / 2nd innings (chased) | URL semantics are constant (`innings.innings_number`); the pill label is POV-aware via `useDiscipline()`. Spec: `docs/internal/spec-inning-split.md`. |
 | `result` | `won` / `lost` / `tied` | Match outcome from path-team POV | Requires `?team=` (or path team binding); endpoint returns HTTP 400 otherwise. `tied` collapses true ties (super-over loss) + no-result (rain-abandoned). |
 | `toss_outcome` | `won` / `lost` | Toss outcome from path-team POV | Requires `?team=`; otherwise 400. |
 | `series_type` | `all` / `bilateral` / `icc` / `club` | Match category | `bilateral` = international non-ICC; `icc` = ICC tournaments; `club` = `team_type=club`. Legacy `bilateral_only` / `tournament_only` map to `bilateral` / `icc`. |
@@ -359,7 +359,7 @@ records render via `/series/records` with `filter_venue=…`.
   with path, query params, example curl, abbreviated response.
 - **Interactive API docs (Swagger):** <https://t20.rahuldave.com/api/docs>
 - **OpenAPI schema (JSON):** <https://t20.rahuldave.com/api/openapi.json>
-- **User manual:** [`frontend/src/content/user-help.md`](../frontend/src/content/user-help.md)
+- **User manual:** [`frontend/src/content/user-help.md`](https://github.com/rahuldave/cricsdb/blob/main/frontend/src/content/user-help.md)
   — human-facing tour with screenshots.
 - **`llms.txt`:** <https://t20.rahuldave.com/llms.txt> — the
   agent-discovery index pointing at all of the above.

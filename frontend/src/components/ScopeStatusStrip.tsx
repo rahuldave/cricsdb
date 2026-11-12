@@ -151,7 +151,7 @@ function buildSegments(
 
   // Splits Mosaic aux — toss_outcome + result narrowings from the
   // path team's POV. Same AuxParam treatment as inning. Spec:
-  // internal_docs/spec-splits-mosaic.md §2.1.
+  // docs/internal/spec-splits-mosaic.md §2.1.
   if (filters.toss_outcome === 'won') {
     segs.push({ label: 'Toss', value: 'won toss' })
   } else if (filters.toss_outcome === 'lost') {

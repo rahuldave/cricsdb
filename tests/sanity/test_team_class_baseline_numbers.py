@@ -21,7 +21,7 @@ narrow team-side data correctly. For club anchors the defensive
 backend gate must make team_class a no-op (Bp2 must equal Bp1).
 
 Ground truth derived 2026-04-28 by a DB-only subagent (no api/ source
-reads) — see internal_docs/team-class-anchor-numbers.md.
+reads) — see docs/internal/team-class-anchor-numbers.md.
 
 Usage:
   uv run python tests/sanity/test_team_class_baseline_numbers.py

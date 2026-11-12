@@ -1,7 +1,7 @@
 #!/bin/bash
 # Player /players band — Phase F Q6 chip extensions integration test.
 #
-# Spec: internal_docs/spec-player-baseline-parity.md §4.1 + Q6 (ii)
+# Spec: docs/internal/spec-player-baseline-parity.md §4.1 + Q6 (ii)
 # + §6.3.
 #
 # Phase F surfaces the per-innings rate envelopes session 1 shipped

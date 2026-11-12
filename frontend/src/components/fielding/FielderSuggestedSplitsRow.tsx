@@ -1,7 +1,7 @@
 /**
  * Suggested-splits navigation row for the fielder Distribution panel.
  *
- * Spec: internal_docs/spec-distribution-stats.md §14.2.7.
+ * Spec: docs/internal/spec-distribution-stats.md §14.2.7.
  *
  * Sibling of components/bowling/BowlerSuggestedSplitsRow. Navigates to
  * the SAME /fielding page with the same player but the split's scope

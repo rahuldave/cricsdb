@@ -24,7 +24,7 @@
  * carries per-cell deltas vs the league baseline at the same filter
  * scope (envelope pattern from `/summary`).
  *
- * Spec: internal_docs/spec-splits-mosaic.md §3.
+ * Spec: docs/internal/spec-splits-mosaic.md §3.
  */
 import { useMemo, useRef, type ReactNode } from 'react'
 import { useSetUrlParams } from '../hooks/useUrlState'

@@ -20,7 +20,7 @@ Bucket integrity: position_bucket BETWEEN 1 AND 10, no NULLs.
 Spot-check Dhoni at IPL (heavy stumpings + opener-concentrated
 catches profile for a keeper).
 
-Spec: internal_docs/spec-player-compare-average.md §4.4 + Phase 2c.
+Spec: docs/internal/spec-player-compare-average.md §4.4 + Phase 2c.
 
 Usage:
   uv run python tests/sanity/test_playerscopestats_fielding_position.py

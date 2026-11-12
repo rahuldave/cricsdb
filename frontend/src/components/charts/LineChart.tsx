@@ -40,7 +40,7 @@ interface LineChartProps<T extends Record<string, any>> {
    *  e.g. a pool-weighted league baseline against which a team's line
    *  should be read (spec-series-trend-charts.md step 11). Must share
    *  the same x and y accessors as the primary data. Forest green
-   *  stroke (`internal_docs/colors.md`'s league-avg reference color);
+   *  stroke (`docs/internal/colors.md`'s league-avg reference color);
    *  the primary keeps WISDEN_PALETTE's first color. Ignored when
    *  `lineBy` is already set (multi-series mode wins). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

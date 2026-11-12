@@ -25,7 +25,7 @@ Usage:
   uv run python tests/sanity/test_team_splits.py
   uv run python tests/sanity/test_team_splits.py --db tmp/cricket-prod-test.db
 
-Spec: internal_docs/spec-splits-mosaic.md §1.3-1.5, §6.1.
+Spec: docs/internal/spec-splits-mosaic.md §1.3-1.5, §6.1.
 """
 from __future__ import annotations
 

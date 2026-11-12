@@ -7,7 +7,7 @@ but for the new `team_class` values:
   - secondary_club (5 men's + 2 women's domestic competitions)
 
 Anchors derived directly from cricket.db on 2026-04-30; full
-provenance + SQL: internal_docs/club-tier-anchor-numbers.md.
+provenance + SQL: docs/internal/club-tier-anchor-numbers.md.
 
 Ten anchor groups:
   P1-P12  match counts (men's club, 2024-25 window)
@@ -66,7 +66,7 @@ INTL_24_25_M = ("m.gender = 'male' AND m.team_type = 'international' "
                 "AND m.season IN ('2024','2024/25','2025')")
 
 
-# Anchors verbatim from internal_docs/spec-filterbar-team-class-club.md §5.
+# Anchors verbatim from docs/internal/spec-filterbar-team-class-club.md §5.
 # Each anchor → one DB-direct count + one assertion.
 ANCHORS: dict[str, int] = {
     # P-series — match counts (men's club 2024-25)

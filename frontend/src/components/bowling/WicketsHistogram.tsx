@@ -2,7 +2,7 @@
  * Histogram of a bowler's wickets per innings.
  *
  * Discrete-bar histogram of wickets per innings for the bowler
- * Distribution panel. Spec: internal_docs/spec-distribution-stats.md
+ * Distribution panel. Spec: docs/internal/spec-distribution-stats.md
  * §12.2.2.
  *
  * Bin scheme: integer wicket counts 0..5, plus a "6+" catch-all.

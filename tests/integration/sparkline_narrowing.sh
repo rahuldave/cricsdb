@@ -1,5 +1,5 @@
 #!/bin/bash
-# Narrowing-audit gap-filler (internal_docs/narrowing-audit-coverage.md).
+# Narrowing-audit gap-filler (docs/internal/narrowing-audit-coverage.md).
 #
 # sparkline_league_reference.sh asserts the green "cohort at scope" line is
 # PRESENT and matches /summary scope_avg at a FIXED scope. It does NOT assert

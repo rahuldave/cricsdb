@@ -1,6 +1,6 @@
 """Sanity: per-bucket cohort fields on /bowlers/{id}/summary over_distribution.
 
-Spec: internal_docs/spec-mix-and-performance-charts.md §3.2 — the
+Spec: docs/internal/spec-mix-and-performance-charts.md §3.2 — the
 mix-histogram + performance-vs-cohort charts read three cohort fields
 attached to each `over_distribution` entry without a second roundtrip:
 

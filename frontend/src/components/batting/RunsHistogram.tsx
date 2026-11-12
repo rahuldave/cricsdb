@@ -2,7 +2,7 @@
  * Histogram of a batter's runs per innings, coloured by tier.
  *
  * Per-innings runs histogram for the batter Distribution panel.
- * Spec: internal_docs/spec-distribution-stats.md §9.2.2.
+ * Spec: docs/internal/spec-distribution-stats.md §9.2.2.
  *
  * Wraps the existing semiotic-backed BarChart with the width-10
  * bin scheme + tier coloring. Pure presentational — caller passes

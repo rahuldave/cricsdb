@@ -1,6 +1,6 @@
 /**
  * Season-tick axis rendered below the distribution sparkline. Spec
- * internal_docs/spec-distribution-stats.md §12.2.6 (originally
+ * docs/internal/spec-distribution-stats.md §12.2.6 (originally
  * shipped on the bowler panel; lifted here so the batter panel
  * shares the same primitive).
  *

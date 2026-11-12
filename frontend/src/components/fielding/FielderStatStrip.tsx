@@ -2,7 +2,7 @@
  * The stat strip and the probability-chip row of the fielder Distribution panel.
  *
  * Per-metric stat strip + milestone-chip row for the fielder
- * Distribution panel. Spec: internal_docs/spec-distribution-stats.md
+ * Distribution panel. Spec: docs/internal/spec-distribution-stats.md
  * §14.2.4.
  *
  * Uniform schema across all three tabs — Matches / Total / Median /

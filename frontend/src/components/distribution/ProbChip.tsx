@@ -32,8 +32,8 @@
  *    on a known-cohort chip (below-sample) renders "vs — (below
  *    sample)" in muted italic.
  *
- * Spec: internal_docs/spec-distribution-stats.md §11.3 (helper),
- * §12.2.5 (visual contract); internal_docs/spec-prob-baselines.md
+ * Spec: docs/internal/spec-distribution-stats.md §11.3 (helper),
+ * §12.2.5 (visual contract); docs/internal/spec-prob-baselines.md
  * §5 Option C (caption + polarity).
  */
 

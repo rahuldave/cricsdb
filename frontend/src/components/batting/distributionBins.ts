@@ -2,7 +2,7 @@
  * Bins and tiers for the batter Distribution panel's runs and strike-rate histograms.
  *
  * Pure helpers for the batter Distribution panel histogram. Spec:
- * internal_docs/spec-distribution-stats.md §9.2.2.
+ * docs/internal/spec-distribution-stats.md §9.2.2.
  *
  * Bin definition: 20 width-10 bins from [0,9] through [190,199] +
  * a [200+] terminal catch-all = 21 bins (indices 0..20). For each

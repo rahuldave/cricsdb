@@ -2,7 +2,7 @@
  * Two lines under the team fielding distribution: the scope average, then the form change in each recent window.
  *
  * Form-delta two-line summary for the team-fielding Distribution
- * panel. Spec: internal_docs/spec-distribution-stats.md §17.5.
+ * panel. Spec: docs/internal/spec-distribution-stats.md §17.5.
  *
  * Sibling of TeamBattingFormDeltaLine + TeamBowlingFormDeltaLine.
  * Window-independent — does NOT redraw when the metric tab or window

@@ -16,7 +16,7 @@
 > routes and avoids a special case.
 
 Practical one-page reference for every endpoint. Pair this with
-[`../SPEC.md`](../SPEC.md) when you need the underlying SQL or the
+[`../SPEC.md`](https://github.com/rahuldave/cricsdb/blob/main/SPEC.md) when you need the underlying SQL or the
 full schema — this doc just gives you the URL, a one-liner, and a
 representative response. Examples taken from local dev
 (`http://localhost:8000`); swap to `https://t20.rahuldave.com` for
@@ -65,8 +65,8 @@ filters that aren't driven by the FilterBar UI:
 | `scope_to_team` | string | Narrows the match pool to events that team has appeared in (intersection of `m.event_name`s). Used by the Compare-tab avg slot; gated frontend-side on `team_type='club'` (closed-league semantic). | `scope_to_team=Royal%20Challengers%20Bengaluru` |
 | `team_class` | `full_member` / `primary_club` / `secondary_club` | Polymorphic over `team_type`. **`full_member`** (`team_type=international`): both teams are ICC full members (Afghanistan, Australia, Bangladesh, England, India, Ireland, New Zealand, Pakistan, South Africa, Sri Lanka, West Indies, Zimbabwe). **`primary_club`** (`team_type=club`): match's event_name is in a marquee international franchise league (IPL, BBL, PSL, BPL, CPL, SA20, ILT20, LPL, MLC, The Hundred (M+W), WBBL, WPL, Women's Cricket Super League). **`secondary_club`** (`team_type=club`): match's event_name is in a domestic state/county/provincial competition (Vitality Blast, Syed Mushtaq Ali Trophy, CSA T20 Challenge, Super Smash, Nepal Premier League, Women's Super Smash, NZC Women's T20). Cross-type combinations are silent no-ops (defensive backend gate — preserves URL robustness when frontend gate fails or curl mixes them). | `team_class=full_member` · `team_class=primary_club` · `team_class=secondary_club` |
 | `inning` | `0` / `1` | 1st innings (`0`, batted first) or 2nd innings (`1`, batted second). Team-router endpoints honour this at match level via `_inning_match_filter`; innings-joined endpoints (batting/bowling/fielding) honour it via `filters.build` when `has_innings_join=True`. Per-slot override on the Compare tab via `compareN_inning`. | `inning=0` |
-| `result` | `won` / `lost` / `tied` | Match-outcome filter from the path team's POV. `won` = path team is `outcome_winner`; `lost` = another team won; `tied` = `outcome_winner IS NULL` (collapses true ties + no-results — T20 ties go to super-over and that winner becomes `outcome_winner`, so NULL is almost exclusively rain-abandoned). Subject-team endpoints key on `:team`. The `/scope/averages/*` **cohort** narrows per-row — subject = each innings' batting team `i.team` (bowling/fielding disciplines flip to the other side) — so the league baseline is among-winners, a real distinct number (NOT tautological: the count is ~50% but the stats differ). Other non-team endpoints ignore. Spec: `internal_docs/spec-compare-toss-result.md`, `spec-splits-mosaic.md`. | `result=won` |
-| `toss_outcome` | `won` / `lost` | Toss-outcome filter from the path team's POV. `won` = `toss_winner = :team`; `lost` = `toss_winner != :team AND toss_winner IS NOT NULL`. The `/scope/averages/*` cohort narrows per-row on `i.team` (same as `result`). Spec: `internal_docs/spec-compare-toss-result.md`, `spec-splits-mosaic.md`. | `toss_outcome=won` |
+| `result` | `won` / `lost` / `tied` | Match-outcome filter from the path team's POV. `won` = path team is `outcome_winner`; `lost` = another team won; `tied` = `outcome_winner IS NULL` (collapses true ties + no-results — T20 ties go to super-over and that winner becomes `outcome_winner`, so NULL is almost exclusively rain-abandoned). Subject-team endpoints key on `:team`. The `/scope/averages/*` **cohort** narrows per-row — subject = each innings' batting team `i.team` (bowling/fielding disciplines flip to the other side) — so the league baseline is among-winners, a real distinct number (NOT tautological: the count is ~50% but the stats differ). Other non-team endpoints ignore. Spec: `docs/internal/spec-compare-toss-result.md`, `spec-splits-mosaic.md`. | `result=won` |
+| `toss_outcome` | `won` / `lost` | Toss-outcome filter from the path team's POV. `won` = `toss_winner = :team`; `lost` = `toss_winner != :team AND toss_winner IS NOT NULL`. The `/scope/averages/*` cohort narrows per-row on `i.team` (same as `result`). Spec: `docs/internal/spec-compare-toss-result.md`, `spec-splits-mosaic.md`. | `toss_outcome=won` |
 
 Aux filters are accepted by **every endpoint** that takes
 `FilterBarParams`. Routers declare both as FastAPI `Depends()` and
@@ -447,7 +447,7 @@ no-results (`outcome_winner IS NULL`). Source: `api/routers/reference.py`.
 
 Each search-bar tab has one endpoint for the filter-sensitive
 directory shown below the search. See
-[`perf-leaderboards.md`](perf-leaderboards.md) for the perf pattern
+[`perf-leaderboards.md`](internal/perf-leaderboards.md) for the perf pattern
 (conditional JOINs + composite indexes + ANALYZE).
 
 ## `GET /api/v1/teams/landing`
@@ -504,7 +504,7 @@ curl "http://localhost:8000/api/v1/teams/landing?gender=male&team_type=club&tour
 ## `GET /api/v1/teams/splits`
 
 Joint distribution of (toss outcome × team innings × match result)
-for the Splits Mosaic. Spec: `internal_docs/spec-splits-mosaic.md`.
+for the Splits Mosaic. Spec: `docs/internal/spec-splits-mosaic.md`.
 
 Two modes:
 
@@ -810,7 +810,7 @@ curl "http://localhost:8000/api/v1/teams/India/players-by-season?gender=male&tea
 ## Team ball-level: batting / bowling / fielding / partnerships
 
 Per-team aggregates that power the Batting / Bowling / Fielding /
-Partnerships tabs on `/teams`. See `docs/spec-team-stats.md` for the
+Partnerships tabs on `/teams`. See `docs/internal/spec-team-stats.md` for the
 design. Shape follows a consistent pattern:
 
 - `.../summary` — top-line ball-level stats (runs/balls/avg/SR/etc.).
@@ -824,7 +824,7 @@ design. Shape follows a consistent pattern:
   `/by-phase` for the inning-split spec; partitions every numeric
   metric on `i.innings_number` (0/1). Same envelope shape as
   `/by-phase`. Available for batting / bowling / fielding /
-  partnerships. Spec: `internal_docs/spec-inning-split.md` §3.2.
+  partnerships. Spec: `docs/internal/spec-inning-split.md` §3.2.
 - `.../top-batters` `.../top-bowlers` `.../top-fielders` — top-N
   players for that team. Params: `limit` (default 5).
 - `.../phase-season-heatmap` — phase × season matrix for run rate +
@@ -838,7 +838,7 @@ also accepts the page-local `?inning=0` (1st-innings only) or
 it's an AuxParams aux narrowing. Match-level endpoints
 (`/teams/{team}/{summary,by-season,vs/{opponent},results}`) honour
 the same param via a derived match-id subquery (`team batted in
-inning X` semantic). Spec: `internal_docs/spec-inning-split.md`
+inning X` semantic). Spec: `docs/internal/spec-inning-split.md`
 §3.1a + §5.2.
 
 ### Batting
@@ -983,7 +983,7 @@ probability, and scope-derived suggested-splits.
 dominates. `FilterParams.filter_opponent` works as expected.
 Optional `as_of_date` (YYYY-MM-DD) anchors the calendar form
 windows deterministically; production callers omit it. Spec:
-`internal_docs/spec-distribution-stats.md` §16.
+`docs/internal/spec-distribution-stats.md` §16.
 
 #### `GET /api/v1/teams/{team}/batting/distribution`
 
@@ -1104,7 +1104,7 @@ credited kinds). This DIVERGES from `/teams/{team}/bowling/summary`
 which uses the bowler-credited 5-element exclusion list (also
 excludes `'run out'`). Both numbers are correct — they answer
 different questions ("how many wickets did this team take?" vs
-"how many wickets did our bowlers take?"). See `internal_docs/
+"how many wickets did our bowlers take?"). See `docs/internal/
 design-decisions.md` "Team-bowling distribution wicket count"
 for rationale.
 
@@ -1318,7 +1318,7 @@ player `/summary` endpoints during envelope composition. Each is
 also a standalone read for ad-hoc analysis.
 
 Shipped 2026-05-20 with the player-baseline rollout
-(`internal_docs/spec-player-compare-average.md`).
+(`docs/internal/spec-player-compare-average.md`).
 
 Shared shape: a `cohort: {…}` metadata block + envelope-wrapped
 headline metrics + a `by_<axis>` array carrying per-bucket
@@ -1445,7 +1445,7 @@ byte-identically at none-of-six) when any is set. `inning` uses the Option-B
 flip (bowling/fielding field in the innings the team did not bat); toss/result
 key on the relevant side. The per-position / per-over **mix histogram**
 weighting stays coarse (tournament/season grain) by design — only the
-per-bucket cohort *values* narrow. See `internal_docs/how-stats-calculated.md`
+per-bucket cohort *values* narrow. See `docs/internal/how-stats-calculated.md`
 §"Cohort baselines narrow live" + `spec-tier3-cohort-narrowing.md`.
 
 ---
@@ -1490,7 +1490,7 @@ Identity-bearing nested objects (`highest_total`, `lowest_all_out_total`,
 The envelope is consumed lightly by the Teams > Compare UI today
 (`value` only). The other fields are shipped for Spec-2 surfaces
 (player compare, leaderboard delta columns, H2H baseline) — see
-`internal_docs/outlook-comparisons.md`.
+`docs/internal/outlook-comparisons.md`.
 
 The new `/scope/averages/*` endpoints below stay flat — they're the
 baseline data, not a per-entity-with-baseline view.
@@ -1519,7 +1519,7 @@ Every numeric field on these endpoints (except match-level totals
 on `/scope/averages/summary` and identity-bearing payloads like
 `highest_total` / `best_partnership`) returns a per-INNINGS average
 — what one batting / bowling / fielding innings yields in scope.
-NOT a pool aggregate. See `internal_docs/perf-bucket-baselines.md`
+NOT a pool aggregate. See `docs/internal/perf-bucket-baselines.md`
 "What 'average' means" for the per-metric table.
 
 `innings_batted` / `innings_bowled` are dropped from the response
@@ -1619,7 +1619,7 @@ delta_pct, direction, sample_size}`) carrying the player's value
 alongside a position-mix-weighted cohort baseline. Identity-bearing
 fields stay flat (`highest_score`, `name`, `person_id`,
 `nationalities`). See "Player position-mix cohort baselines" above
-and `internal_docs/spec-player-compare-average.md`.
+and `docs/internal/spec-player-compare-average.md`.
 
 Counts (`matches, innings, runs, hundreds, …`) have
 `direction: null` → `delta_pct` always null. Rates (`average`,
@@ -1800,7 +1800,7 @@ lifetime; a `delta` block reports window-mean-minus-lifetime-mean
 and window-median-minus-lifetime-median. Optional `as_of_date`
 (YYYY-MM-DD) anchors the last-60-day window deterministically;
 production callers omit it. Spec:
-`internal_docs/spec-distribution-stats.md` §8.
+`docs/internal/spec-distribution-stats.md` §8.
 
 ```bash
 curl "http://localhost:8000/api/v1/batters/ba607b88/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
@@ -1936,7 +1936,7 @@ clearing the `min_balls` qualifying-innings threshold. Default
 
 Optional `as_of_date` (YYYY-MM-DD) anchors the calendar form
 windows deterministically; production callers omit it. Spec:
-`internal_docs/spec-distribution-stats.md` §11.
+`docs/internal/spec-distribution-stats.md` §11.
 
 ```bash
 curl "http://localhost:8000/api/v1/bowlers/462411b3/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
@@ -2200,7 +2200,7 @@ Three-simples invariant: `p_zero + p_one + p_geq_2 == 1.0` per
 block. The frontend Distribution panel renders three discrete bars
 in the INDIGO/SAGE/OCHRE palette to match.
 
-Spec: `internal_docs/spec-distribution-stats.md` §13.
+Spec: `docs/internal/spec-distribution-stats.md` §13.
 
 ## `GET /api/v1/fielders/{person_id}/records`
 
@@ -2264,7 +2264,7 @@ curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/records?limit=3"
 
 Source: `api/routers/keeping.py`. Only relevant when
 `summary.innings_kept > 0` (Tier-2 keeper inference has assigned
-innings to this person). See `docs/spec-fielding-tier2.md` for the
+innings to this person). See `docs/internal/spec-fielding-tier2.md` for the
 4-layer algorithm.
 
 ## `GET /api/v1/fielders/{person_id}/keeping/summary`
@@ -3072,4 +3072,4 @@ filter_opponent), so narrowing the URL narrows every card at once.
   `/teams/{team}/vs/{opponent}` rollup (enhancement B in
   next-session-ideas).
 - Cross-worker / cross-restart caching. Not needed yet — see the
-  "three options" capture in `docs/next-session-ideas.md`.
+  "three options" capture in `docs/internal/next-session-ideas.md`.

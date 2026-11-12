@@ -1,7 +1,7 @@
 /**
  * Form-delta one-line summary for the fielder Distribution panel.
  *
- * Spec: internal_docs/spec-distribution-stats.md §14.2.6.
+ * Spec: docs/internal/spec-distribution-stats.md §14.2.6.
  *
  * Reads `dossier.form.delta`. Window-independent — does not redraw
  * when the metric tab or window toggle changes. Up to three deltas

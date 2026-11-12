@@ -24,7 +24,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "cricket.db")
 # Venues the alias table doesn't know about. Populated during
 # import_match_file when resolve_or_raw() returns (raw, raw, None).
 # Written to docs/venue-worklist/unknowns-<date>.csv at end of run so the
-# next worklist cycle can fold them in. See internal_docs/spec-venues.md.
+# next worklist cycle can fold them in. See docs/internal/spec-venues.md.
 UNKNOWN_VENUES: set[tuple[str, str | None]] = set()
 
 MATCH_DIRS = [
@@ -512,7 +512,7 @@ async def main():
     # Built but not consumed by any endpoint in Spec 1; lives here so
     # Spec 2 (cross-app comparisons, esp. position-matched player
     # compare) starts with a hot schema. See
-    # internal_docs/spec-team-compare-average.md.
+    # docs/internal/spec-team-compare-average.md.
     print("\nPopulating player_scope_stats…")
     from scripts.populate_player_scope_stats import populate_full as pss_full
     await pss_full(db)
@@ -532,7 +532,7 @@ async def main():
     # of player_scope_stats, now a rollup of inningsbatterperf (above).
     # Drives the position-mix cohort baseline endpoints and the per-
     # player position-distribution histograms.
-    # Spec: internal_docs/spec-player-compare-average.md §4.2.
+    # Spec: docs/internal/spec-player-compare-average.md §4.2.
     print("\nPopulating playerscopestats_position…")
     from scripts.populate_playerscopestats_position import (
         populate_full as pssp_full,
@@ -562,7 +562,7 @@ async def main():
     # match-grain catch distribution buckets (matches_with_0/_1/_ge2).
     # Drives the fielding ProbChip cohort baselines (P(=0)/P(=1)/P(≥2))
     # on /fielders/{id}/distribution. Spec:
-    # internal_docs/spec-prob-baselines.md PT4.
+    # docs/internal/spec-prob-baselines.md PT4.
     print("\nPopulating playerscopestats_fielding_catch_dist…")
     from scripts.populate_playerscopestats_fielding_catch_dist import (
         populate_full as pssfcd_full,
@@ -572,7 +572,7 @@ async def main():
     # Populate playerscopestats_batting_phase — per-phase batting
     # child of player_scope_stats. Drives the per-phase batting cohort
     # baseline endpoint and per-batter phase-distribution visuals.
-    # Spec: internal_docs/spec-player-baseline-parity.md §3.1.1.
+    # Spec: docs/internal/spec-player-baseline-parity.md §3.1.1.
     print("\nPopulating playerscopestats_batting_phase…")
     from scripts.populate_playerscopestats_batting_phase import (
         populate_full as pssbp_full,
@@ -581,7 +581,7 @@ async def main():
 
     # Populate playerscopestats_fielding_phase — per (fielder, phase)
     # aggregates. Substitute fielders excluded. Convention 3 applied.
-    # Spec: internal_docs/spec-player-baseline-parity.md §3.1.2.
+    # Spec: docs/internal/spec-player-baseline-parity.md §3.1.2.
     print("\nPopulating playerscopestats_fielding_phase…")
     from scripts.populate_playerscopestats_fielding_phase import (
         populate_full as pssfph_full,
@@ -589,7 +589,7 @@ async def main():
     await pssfph_full(db)
 
     # Phase 2 of Compare-tab perf — per-cell precomputed baselines.
-    # See internal_docs/spec-team-bucket-baseline.md.
+    # See docs/internal/spec-team-bucket-baseline.md.
     print("\nPopulating bucket_baseline_*…")
     from scripts.populate_bucket_baseline import populate_full as bb_full
     await bb_full(db)

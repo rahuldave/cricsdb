@@ -2,7 +2,7 @@
  * The batter's per-innings runs and strike-rate distribution panel on `/batting?player=X`.
  *
  * Batter Distribution panel — top-level orchestrator. Spec
- * internal_docs/spec-distribution-stats.md §9 + §12.2.6 sparkline
+ * docs/internal/spec-distribution-stats.md §9 + §12.2.6 sparkline
  * conventions.
  *
  * Mounted on /batting?player=X between stat row 1 and stat row 2
@@ -46,7 +46,7 @@ type DistMetric = 'runs' | 'sr'
 // batting = 5: one duck swings the mean by ~runs/5, which the eye
 // can still attribute to one innings rather than smoothing it
 // away. Window = 10 oversmoothed visible IPL-scope swings (user
-// feedback 2026-05-14). See internal_docs/colors.md "Rolling-mean
+// feedback 2026-05-14). See docs/internal/colors.md "Rolling-mean
 // windows by grain" for the per-panel table.
 const ROLLING_WINDOW = 5
 

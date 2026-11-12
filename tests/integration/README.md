@@ -28,7 +28,7 @@ integration/
                             sub-tab, scope-class). 113 assertions across
                             9 anchors as of Batch 1 (2026-04-28). See
                             tests/integration/dom/README.md +
-                            internal_docs/spec-dom-grounded-tests.md.
+                            docs/internal/spec-dom-grounded-tests.md.
                             Replaces the old compare_avg_chips.sh —
                             its A/A'/E1/B anchors are split across
                             dom/teams_compare_intl.sh +
@@ -104,7 +104,7 @@ unmount hygiene). Concrete examples:
 
 - `cross_cutting_url_state.sh` — URL-state discipline: every user-
   initiated param change must push; every auto-correction must
-  replace. See `internal_docs/url-state.md`. The tab-specific
+  replace. See `docs/internal/url-state.md`. The tab-specific
   instances (e.g. `/batting` gender fill, `/series` series_type
   reset, `/matches` filter push) live in the per-tab scripts —
   this file keeps only the cross-tab widgets (ScopeIndicator,
@@ -136,7 +136,7 @@ curl suffice):
 
 - Pure SQL logic (add to `tests/integration/` only if the JSON
   response shape matters across many routes — then the approach in
-  `internal_docs/regression-testing-api.md` is better).
+  `docs/internal/regression-testing-api.md` is better).
 - Component rendering (TS type-check + manual browser-agent poke
   during dev is enough).
 
@@ -151,7 +151,7 @@ layers goes wrong — not every refactor. Run them:
   are produced or consumed.
 - Before a deploy that ships either of the above.
 - When touching the FilterBar, router, or any of the setter-calling
-  sites listed in `internal_docs/url-state.md`.
+  sites listed in `docs/internal/url-state.md`.
 
 Between those, TypeScript + the build are enough. No need to run
 after a small copy edit, a docs pass, or a backend-only change that

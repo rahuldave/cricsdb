@@ -3,7 +3,7 @@
  *
  * Bowling "By Over" tab — Mix histogram + stacked Performance vs cohort.
  *
- * Spec: internal_docs/spec-mix-and-performance-charts.md §1 + §2.2.
+ * Spec: docs/internal/spec-mix-and-performance-charts.md §1 + §2.2.
  * Mounts on /bowling?player=X. Reads per-bucket player + cohort values
  * directly from /bowlers/{id}/summary.over_distribution (single
  * payload — no extra fetch per spec §3.2).

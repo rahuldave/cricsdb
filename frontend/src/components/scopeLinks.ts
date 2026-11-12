@@ -20,7 +20,7 @@
  *
  * This guarantees no tab falls out of sync when a filter is added — the
  * "explicit, per-page, easy to under-wire" landmine documented in
- * internal_docs/design-decisions.md doesn't reappear on link URLs.
+ * docs/internal/design-decisions.md doesn't reappear on link URLs.
  */
 import { createContext, useContext } from 'react'
 import type { FilterParams } from '../types'
@@ -248,7 +248,7 @@ export function abbreviateScope(
 
   // Splits Mosaic aux — match-outcome (result) and toss-outcome
   // narrowings from the path team's POV. Same AuxParam treatment
-  // as inning. Spec: internal_docs/spec-splits-mosaic.md §2.1.
+  // as inning. Spec: docs/internal/spec-splits-mosaic.md §2.1.
   if (scope.toss_outcome === 'won') parts.push('won toss')
   else if (scope.toss_outcome === 'lost') parts.push('lost toss')
 
@@ -532,7 +532,7 @@ export function resolveScopePhrases(
 // fixture at `tests/sanity/scope_splits_fixtures.json`. Every change
 // here MUST be mirrored in api/scope_links.py + the fixture.
 //
-// Spec: internal_docs/spec-distribution-stats.md §8.7.
+// Spec: docs/internal/spec-distribution-stats.md §8.7.
 
 // Gender only — team_type is a narrowing axis, NOT identity. See the
 // Python mirror for the rationale (api/scope_links.py).

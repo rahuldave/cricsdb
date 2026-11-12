@@ -3,7 +3,7 @@
  *
  * Team-bowling Distribution panel — top-level orchestrator for the
  * §17.4 frontend slice. Spec:
- * internal_docs/spec-distribution-stats.md §17.4.
+ * docs/internal/spec-distribution-stats.md §17.4.
  *
  * Mounted at the top of the Teams page Bowling tab content area
  * (see Teams.tsx).
@@ -78,7 +78,7 @@ const VALID_METRICS: ReadonlyArray<DistMetric> = ['runs_conceded', 'economy']
 // Rolling-mean overlay window for the Scope tab. Team-grain
 // bowling = 7: same logic as team batting — spans two-plus
 // bilaterals, draws in WC scopes, smooths a lower-variance series
-// than player-grain. See internal_docs/colors.md "Rolling-mean
+// than player-grain. See docs/internal/colors.md "Rolling-mean
 // windows by grain".
 const ROLLING_WINDOW = 7
 

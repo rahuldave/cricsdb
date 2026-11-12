@@ -2,7 +2,7 @@
  * The per-innings team batting distribution panel on the Teams page Batting tab.
  *
  * Team-batting Distribution panel — top-level orchestrator for the
- * §17 frontend slice. Spec: internal_docs/spec-distribution-stats.md
+ * §17 frontend slice. Spec: docs/internal/spec-distribution-stats.md
  * §17.3.
  *
  * Mounted at the top of the Teams page Batting tab content area
@@ -79,7 +79,7 @@ const VALID_WINDOWS: ReadonlyArray<DistWindow> = ['last_10', 'last_60d', 'last_6
 // the World Cup ceiling so the overlay still draws in tournament
 // scopes. Lower per-innings variance than player-grain (team
 // total is a sum) so 7 smooths reliably without staleness.
-// See internal_docs/colors.md "Rolling-mean windows by grain".
+// See docs/internal/colors.md "Rolling-mean windows by grain".
 const ROLLING_WINDOW = 7
 const VALID_METRICS: ReadonlyArray<DistMetric> = ['run_rate']
 

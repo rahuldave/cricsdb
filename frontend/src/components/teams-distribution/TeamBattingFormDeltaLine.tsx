@@ -2,7 +2,7 @@
  * Two lines under the team batting distribution: the scope average, then the form change in each recent window.
  *
  * Form-delta two-line summary for the team-batting Distribution
- * panel. Spec: internal_docs/spec-distribution-stats.md §17.3.
+ * panel. Spec: docs/internal/spec-distribution-stats.md §17.3.
  *
  * Reads `dossier.form.delta`. Window-independent — does not redraw
  * when the metric tab or window toggle changes. Two metrics shown

@@ -2,7 +2,7 @@
  * Bins and colour tiers for the team batting, bowling and fielding histograms and sparklines.
  *
  * Team-batting distribution bin / tier helpers. Spec:
- * internal_docs/spec-distribution-stats.md §17.3.
+ * docs/internal/spec-distribution-stats.md §17.3.
  *
  * Two histograms — Runs (width-10 bins, like batter v1 but with
  * team-grain thresholds at 100 and 200 runs) and Run Rate (width-1

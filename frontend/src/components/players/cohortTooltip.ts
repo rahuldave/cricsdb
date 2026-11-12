@@ -1,6 +1,6 @@
 /** Tooltip phrasing for the "vs cohort N" line on player baseline tiles.
  *
- *  Spec: internal_docs/spec-player-compare-average.md §3.4.
+ *  Spec: docs/internal/spec-player-compare-average.md §3.4.
  *
  *  Two phrasings depending on mix concentration:
  *    - Concentrated (one bucket ≥ 0.70):

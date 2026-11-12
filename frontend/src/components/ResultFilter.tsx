@@ -19,7 +19,7 @@
  *
  * Where this mounts: subtabs where the full Mosaic chart is overkill
  * but result-only narrowing is still useful. First mount site: Teams
- * Match List. See `internal_docs/inning-controls-mount-sites.md`.
+ * Match List. See `docs/internal/inning-controls-mount-sites.md`.
  */
 import { useUrlParam } from '../hooks/useUrlState'
 

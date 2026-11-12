@@ -3,7 +3,7 @@
  *
  * Discrete-bar histogram of catches / run-outs / stumpings per match
  * for the fielder Distribution panel. Spec:
- * internal_docs/spec-distribution-stats.md §14.2.3.
+ * docs/internal/spec-distribution-stats.md §14.2.3.
  *
  * Three fixed bars: 0 / 1 / ≥2. Linear y-axis. Tier colors INDIGO /
  * SAGE / OCHRE per the §10.3 3-tier palette.

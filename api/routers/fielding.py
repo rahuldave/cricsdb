@@ -268,7 +268,7 @@ async def fielding_leaders(
         the fielder was the designated keeper per
         `keeper_assignment`. This separates specialist keeping from
         sub-fielders who caught behind the stumps. Uses the Tier 2
-        keeper-identification pipeline; see docs/spec-fielding-tier2.md.
+        keeper-identification pipeline; see docs/internal/spec-fielding-tier2.md.
 
     Tiebreak: stumpings DESC (evidence of sharp hands) then catches
     DESC then run-outs DESC.
@@ -1176,7 +1176,7 @@ async def fielding_by_innings(
 # (catches / run_outs / stumpings) with three-simple milestone
 # probabilities (P=0 / P=1 / P≥2), Wilson 95% CIs, and four form
 # windows. Stumpings block emitted only for players with
-# innings_kept > 0 in scope. Spec: internal_docs/spec-distribution-stats.md §13.
+# innings_kept > 0 in scope. Spec: docs/internal/spec-distribution-stats.md §13.
 
 
 async def _match_master_sample_fielder(
@@ -1472,7 +1472,7 @@ async def fielding_distribution(
     with a Wilson 95% CI. Three simples per block: `p_zero`, `p_one`,
     `p_geq_2`.
 
-    Spec: internal_docs/spec-distribution-stats.md §13.
+    Spec: docs/internal/spec-distribution-stats.md §13.
     """
     db = get_db()
     today = date.fromisoformat(as_of_date) if as_of_date else date.today()
@@ -1597,7 +1597,7 @@ async def fielding_records(
 
     Reads from matchfielderperf (precomputed). Option-B inning IS
     applied as a MATCH subset (matches where the fielder's team batted
-    in innings N — internal_docs/spec-inning-unify-option-b.md), which
+    in innings N — docs/internal/spec-inning-unify-option-b.md), which
     composes cleanly with the per-match precomp grain via a match-id
     filter. This is NOT per-event inning ("which innings he fielded
     in") — Option B's inning is a match filter, so the clause keys on

@@ -2,7 +2,7 @@
  * A "Compare to:" row of links that open the same team under a suggested scope.
  *
  * Suggested-splits navigation row for the team-bowling Distribution
- * panel. Spec: internal_docs/spec-distribution-stats.md §17.4.
+ * panel. Spec: docs/internal/spec-distribution-stats.md §17.4.
  *
  * Sibling of TeamBattingSuggestedSplitsRow — preserves the same
  * page-local URL state keys when navigating between scopes so the

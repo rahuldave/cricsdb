@@ -1,7 +1,7 @@
 """Populate the keeper_assignment table — Tier 2 of fielding analytics.
 
 Implements the 4-layer inference algorithm from
-`docs/spec-fielding-tier2.md`:
+`docs/internal/spec-fielding-tier2.md`:
 
     A — stumping this innings (definitive)
     B — exactly 1 season-candidate in XI (high)

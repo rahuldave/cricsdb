@@ -1,6 +1,6 @@
 """Populate playerscopestats_fielding_phase — per-phase fielding aggregates.
 
-Spec: `internal_docs/spec-player-baseline-parity.md` §3.1.2.
+Spec: `docs/internal/spec-player-baseline-parity.md` §3.1.2.
 One row per (person_id [FIELDER], scope_key, phase_bucket); phase_bucket
 is 1=powerplay (overs 0-5), 2=middle (6-14), 3=death (15-19) — matches
 the parent populate's `_phase` boundaries and the team-side conventions.

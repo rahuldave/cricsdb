@@ -1,7 +1,7 @@
 /**
  * Bar chart of a player's share at each bucket: "where does this player operate?"
  *
- * Spec: internal_docs/spec-mix-and-performance-charts.md §1 (Chart A)
+ * Spec: docs/internal/spec-mix-and-performance-charts.md §1 (Chart A)
  * + §4.1. One bar per bucket; bar height = the player's share of the
  * discipline-specific unit at that bucket (% of career-in-scope).
  * Phase tint banded as background.

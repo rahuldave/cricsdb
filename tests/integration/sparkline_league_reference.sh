@@ -1,5 +1,5 @@
 #!/bin/bash
-# Tier 6 of internal_docs/spec-apples-to-apples-baselines.md.
+# Tier 6 of docs/internal/spec-apples-to-apples-baselines.md.
 #
 # Asserts the forest-green `leagueReferenceValue` line renders on the
 # distribution sparkline of every player-discipline panel (batting,

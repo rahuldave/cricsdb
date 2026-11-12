@@ -2401,7 +2401,7 @@ a { color: inherit; }
   padding: 0.5rem 0 0.75rem 1rem;
 }
 
-/* ─── Splits Mosaic (spec internal_docs/spec-splits-mosaic.md §3) ──── */
+/* ─── Splits Mosaic (spec docs/internal/spec-splits-mosaic.md §3) ──── */
 
 .wisden-splits-mosaic {
   background: var(--cream);

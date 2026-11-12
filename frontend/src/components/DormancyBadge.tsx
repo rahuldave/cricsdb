@@ -6,7 +6,7 @@
  * "last match: Oct 2021") when the entity has been
  * inactive in scope for more than 60 days.
  *
- * Spec: internal_docs/design-decisions.md "Dormancy badge".
+ * Spec: docs/internal/design-decisions.md "Dormancy badge".
  */
 
 import { useDormancy, dormancyGapDays, dormancyBadgeText } from './DormancyContext'

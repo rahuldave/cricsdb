@@ -1,7 +1,7 @@
 #!/bin/bash
 # Batter Distribution panel — DOM integration test.
 #
-# Spec: internal_docs/spec-distribution-stats.md §9.10.
+# Spec: docs/internal/spec-distribution-stats.md §9.10.
 #
 # Asserts the panel renders correctly on /batting?player=X, that
 # stat-strip values match SQL-derived anchors against cricket.db,

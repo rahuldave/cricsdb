@@ -1,7 +1,7 @@
 """Sanity: per-bucket cohort fields on /batters/{id}/summary
 position_distribution.
 
-Spec: internal_docs/spec-mix-and-performance-charts.md §3.1 — the
+Spec: docs/internal/spec-mix-and-performance-charts.md §3.1 — the
 mix-histogram + performance-vs-cohort charts read two cohort fields
 attached to each `position_distribution` entry without a second
 roundtrip:

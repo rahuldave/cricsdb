@@ -1576,7 +1576,7 @@ async def batting_inter_wicket(
 #
 # Per-innings runs distribution for a batter, with phase decomposition,
 # milestone probabilities, and last-10-innings + last-60-day form
-# windows. Spec: internal_docs/spec-distribution-stats.md §8.
+# windows. Spec: docs/internal/spec-distribution-stats.md §8.
 #
 # The spec mentions three "retired" exclusions for the dismissed flag
 # but existing batting endpoints exclude only ('retired hurt',
@@ -1863,7 +1863,7 @@ async def batting_distribution(
     last-60 days + last-6 months + last-1 year) plus scope-derived
     suggested-splits navigation hints.
 
-    Spec: internal_docs/spec-distribution-stats.md §8.
+    Spec: docs/internal/spec-distribution-stats.md §8.
     """
     db = get_db()
     today = date.fromisoformat(as_of_date) if as_of_date else date.today()
@@ -2010,7 +2010,7 @@ async def batting_records(
     each match comes from the matchplayer join; opponent is derived
     from match.team1/team2 vs the player's team.
 
-    Spec: internal_docs/inning-controls-mount-sites.md §5 + the
+    Spec: docs/internal/inning-controls-mount-sites.md §5 + the
     spec-driven 2026-05-16 player-records request.
     """
     db = get_db()

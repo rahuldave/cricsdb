@@ -4,7 +4,7 @@
  * Stat strip for the batter Distribution panel — the right-hand
  * column beside the histogram, plus a separate full-width milestone-
  * chips row exported alongside. Spec:
- * internal_docs/spec-distribution-stats.md §9.2.3.
+ * docs/internal/spec-distribution-stats.md §9.2.3.
  *
  * The point summaries (Mean / Median / Std / CV / Average) live
  * adjacent to the histogram. Milestone chips (simples + conditionals,

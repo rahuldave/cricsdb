@@ -33,7 +33,7 @@ PT1.B cohort baseline plumbing on each chip's ProbRecord:
      cohort.n_innings_total at the same scope (the cohort tooltip
      denominator).
 
-Spec: internal_docs/spec-prob-baselines.md §9.
+Spec: docs/internal/spec-prob-baselines.md §9.
 
 Usage:
   uv run python tests/sanity/test_prob_baselines_batting.py

@@ -4,7 +4,7 @@
  * Batting "By Position" tab — Mix histogram + single-panel
  * Performance vs cohort (Strike Rate).
  *
- * Spec: internal_docs/spec-mix-and-performance-charts.md §1 + §2.1.
+ * Spec: docs/internal/spec-mix-and-performance-charts.md §1 + §2.1.
  * Mounts on /batting?player=X. Reads per-bucket player + cohort
  * values directly from /batters/{id}/summary.position_distribution
  * (single payload — no extra fetch per spec §3.1).

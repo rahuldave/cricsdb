@@ -102,7 +102,7 @@ def _inning_match_filter(
     than the batting-only 121. The two clauses partition cleanly (a match
     can't be batted-N and fielded-N at once).
 
-    Spec: internal_docs/spec-inning-unify-option-b.md §2 (per-event) +
+    Spec: docs/internal/spec-inning-unify-option-b.md §2 (per-event) +
     spec-inning-split.md §3.1a.
     """
     if aux is None or aux.inning is None or not team_value:
@@ -125,7 +125,7 @@ def _option_b_team_inning(
     replacement for the central per-event `i.innings_number = :inning`
     clause (callers must pass `build(..., apply_inning=False)`).
 
-    Option B (internal_docs/spec-inning-unify-option-b.md §2): the toggle
+    Option B (docs/internal/spec-inning-unify-option-b.md §2): the toggle
     label `inning=N` means "the team batted in innings N" — but the FILTER
     is per-EVENT and DISCIPLINE-AWARE, narrowing to the innings where that
     discipline actually happened:
@@ -174,7 +174,7 @@ def _result_match_filter(
                ties are decided by super-over so a NULL outcome_winner
                is almost exclusively rain-abandoned)
 
-    Spec: internal_docs/spec-splits-mosaic.md §1.1.
+    Spec: docs/internal/spec-splits-mosaic.md §1.1.
     """
     if aux is None or aux.result is None or not team_value:
         return "", {}
@@ -200,7 +200,7 @@ def _toss_outcome_match_filter(
     with un-recorded toss (rare) are excluded from both 'won' and 'lost'
     slices.
 
-    Spec: internal_docs/spec-splits-mosaic.md §1.1.
+    Spec: docs/internal/spec-splits-mosaic.md §1.1.
     """
     if aux is None or aux.toss_outcome is None or not team_value:
         return "", {}
@@ -243,7 +243,7 @@ def _cohort_outcome_clause(
     `:team`; this is their cohort twin keyed on `i.team`.)
 
     Returns ('', {}) when neither aux is set. No binds — all literal
-    column comparisons. Spec: internal_docs/spec-compare-toss-result.md §2.
+    column comparisons. Spec: docs/internal/spec-compare-toss-result.md §2.
     """
     if aux is None:
         return "", {}
@@ -547,7 +547,7 @@ async def team_splits(
 ):
     """Joint (toss × inning × result) distribution.
 
-    Spec: internal_docs/spec-splits-mosaic.md §1.3.
+    Spec: docs/internal/spec-splits-mosaic.md §1.3.
     """
     # Previously this endpoint 400'd ?result= / ?toss_outcome= without
     # ?team= on the "tautological 50% by construction" argument. That
@@ -786,7 +786,7 @@ async def team_summary(
     # per-team transform. Each scope_avg in the envelope must be a
     # PER-TEAM average so the displayed avg col + chip baseline align
     # with what a typical team actually has (not the pool total).
-    # See internal_docs/spec-avg-col-per-team-transform.md.
+    # See docs/internal/spec-avg-col-per-team-transform.md.
     pool_matches    = sr.get("matches", 0) or 0
     pool_decided    = sr.get("decided", 0) or 0
     pool_ties       = sr.get("ties", 0) or 0
@@ -825,7 +825,7 @@ async def team_summary(
     # per-team-view split the Mosaic uses (`_splits_cells`), narrowed by
     # the aux via `_cell_label_for_aux` — so the baseline narrows in
     # lockstep with the team value (chip↔baseline symmetry). No-aux path
-    # is untouched (byte-identical). Spec: internal_docs/audit-aux-params.md §E.
+    # is untouched (byte-identical). Spec: docs/internal/audit-aux-params.md §E.
     if aux is not None and (
         aux.inning is not None or aux.toss_outcome is not None or aux.result is not None
     ):
@@ -1051,7 +1051,7 @@ async def team_vs_opponent(
     # toss_outcome) flow through — previous direct `filters.build`
     # call skipped the result + toss_outcome match-level filters and
     # the vs-opponent counts ignored those aux params. Spec:
-    # internal_docs/spec-splits-mosaic.md §1.2.
+    # docs/internal/spec-splits-mosaic.md §1.2.
     team_filt, params = _team_filter_clause(filters, aux=aux, team_value=team)
     params["opponent"] = opponent
     params["team"] = team
@@ -1459,7 +1459,7 @@ async def team_players_by_season(
 
 # ============================================================
 # Team ball-level stats — batting, bowling, fielding, partnerships.
-# See internal_docs/spec-team-stats.md.
+# See docs/internal/spec-team-stats.md.
 # ============================================================
 
 
@@ -2654,8 +2654,8 @@ async def team_batting_distribution(
     `FilterParams.filter_team` is IGNORED — the team path-param
     dominates. `FilterParams.filter_opponent` works as expected.
 
-    Spec: internal_docs/spec-distribution-stats.md §16.2 +
-    internal_docs/spec-prob-baselines-teams.md.
+    Spec: docs/internal/spec-distribution-stats.md §16.2 +
+    docs/internal/spec-prob-baselines-teams.md.
     """
     today = date.fromisoformat(as_of_date) if as_of_date else date.today()
 
@@ -4231,8 +4231,8 @@ async def team_bowling_distribution(
     `FilterParams.filter_team` is IGNORED — the team path-param
     dominates. `FilterParams.filter_opponent` works as expected.
 
-    Spec: internal_docs/spec-distribution-stats.md §16.3 +
-    internal_docs/spec-prob-baselines-teams.md.
+    Spec: docs/internal/spec-distribution-stats.md §16.3 +
+    docs/internal/spec-prob-baselines-teams.md.
     """
     today = date.fromisoformat(as_of_date) if as_of_date else date.today()
 
@@ -5551,8 +5551,8 @@ async def team_fielding_distribution(
     `FilterParams.filter_team` is IGNORED — the team path-param
     dominates. `FilterParams.filter_opponent` works as expected.
 
-    Spec: internal_docs/spec-distribution-stats.md §16.4 +
-    internal_docs/spec-prob-baselines-teams.md.
+    Spec: docs/internal/spec-distribution-stats.md §16.4 +
+    docs/internal/spec-prob-baselines-teams.md.
     """
     today = date.fromisoformat(as_of_date) if as_of_date else date.today()
 
@@ -6599,7 +6599,7 @@ async def team_records(
     Mirrors the asyncio.gather pattern from /series/records (commit
     854b10a) — the 8 reads are independent.
 
-    Spec: internal_docs/inning-controls-mount-sites.md §4.1 + the
+    Spec: docs/internal/inning-controls-mount-sites.md §4.1 + the
     spec-driven request 2026-05-16.
     """
     db = get_db()

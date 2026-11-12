@@ -1,6 +1,6 @@
 """Populate the bucket_baseline_* tables — denormalized per-cell aggregates.
 
-See `internal_docs/spec-team-bucket-baseline.md` for the full spec.
+See `docs/internal/spec-team-bucket-baseline.md` for the full spec.
 
 Granularity: one row per (gender, team_type, tournament, season, team).
 team='__league__' rows are pool-weighted league baselines aggregating the

@@ -23,7 +23,7 @@ def scope_anchor(observations: list[dict], today: date) -> date:
     producing empty results when today's calendar window doesn't
     intersect the scope's date range.
 
-    Spec: internal_docs/spec-distribution-stats.md §8.6 (revised
+    Spec: docs/internal/spec-distribution-stats.md §8.6 (revised
     2026-05-07 from today-direct).
 
     Empty observations → returns `today` (windows are trivially

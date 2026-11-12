@@ -3,7 +3,7 @@
  *
  * Team-fielding Distribution panel — top-level orchestrator for the
  * §17.5 frontend slice. Spec:
- * internal_docs/spec-distribution-stats.md §17.5.
+ * docs/internal/spec-distribution-stats.md §17.5.
  *
  * Mounted at the top of the Teams page Fielding tab content area
  * (see Teams.tsx).
@@ -79,7 +79,7 @@ const VALID_METRICS: ReadonlyArray<DistMetric> = ['run_outs', 'stumpings']
 // wickets/innings). Run-outs + stumpings = 12 (lower-frequency,
 // slower-drifting signals: run-outs reflects team athleticism,
 // stumpings is essentially a keeper-property — both warrant
-// heavier smoothing). See internal_docs/colors.md "Rolling-mean
+// heavier smoothing). See docs/internal/colors.md "Rolling-mean
 // windows by grain".
 const ROLLING_WINDOW_BY_METRIC: Record<DistMetric, number> = {
   catches: 7,

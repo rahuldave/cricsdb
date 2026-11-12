@@ -17,7 +17,7 @@ export const ANY_SENTINEL = '__any__'
  *
  * **Pushes history by default** — the back button walks through filter
  * states the user actually created. Pass `{ replace: true }` to the
- * setter for programmatic, auto-correcting updates (see internal_docs/url-state.md
+ * setter for programmatic, auto-correcting updates (see docs/internal/url-state.md
  * for which call-sites need replace).
  */
 export function useUrlParam(

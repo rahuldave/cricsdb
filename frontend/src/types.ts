@@ -57,19 +57,19 @@ export interface FilterParams {
    *  Batting/Bowling/Fielding/Partnerships pages, OR per-slot via the
    *  Compare-tab SlotScopeEditor (compareN_inning URL param). Mirror
    *  of api/filters.py::AuxParams.inning. Spec:
-   *  internal_docs/spec-inning-split.md. */
+   *  docs/internal/spec-inning-split.md. */
   inning?: string
   /** Match-outcome filter from path team's POV — 'won' / 'lost' /
    *  'tied' (last collapses true ties + no-results). AuxParam, set
    *  by the Splits Mosaic's marginals + cells + sub-rect clicks
    *  (`?result=won`). Only meaningful when subject team is bound.
    *  Mirror of api/filters.py::AuxParams.result. Spec:
-   *  internal_docs/spec-splits-mosaic.md §1.1. */
+   *  docs/internal/spec-splits-mosaic.md §1.1. */
   result?: string
   /** Toss-outcome filter from path team's POV — 'won' / 'lost'.
    *  AuxParam, set by the Splits Mosaic. Mirror of
    *  api/filters.py::AuxParams.toss_outcome. Spec:
-   *  internal_docs/spec-splits-mosaic.md §1.1. */
+   *  docs/internal/spec-splits-mosaic.md §1.1. */
   toss_outcome?: string
 }
 
@@ -103,7 +103,7 @@ export interface PlayerSearchResult {
  *  See `api/metrics_metadata.py` for direction map. Spec-1 UI renders
  *  only `value`; the other fields are shipped for Spec-2 surfaces
  *  (player compare, leaderboard delta columns, H2H baseline).
- *  See `internal_docs/outlook-comparisons.md`. */
+ *  See `docs/internal/outlook-comparisons.md`. */
 export interface MetricEnvelope {
   value: number | null // the metric's value; null when it cannot be computed
   scope_avg: number | null // the average of the same metric over the scope; null when there is none
@@ -669,7 +669,7 @@ export interface InterWicketStats {
 // ─── Batter distribution dossier ────────────────────────────────────────
 //
 // Mirror of the /api/v1/batters/{id}/distribution response. Spec:
-// internal_docs/spec-distribution-stats.md §8.8.
+// docs/internal/spec-distribution-stats.md §8.8.
 
 /** One innings of a batter in a distribution dossier, with its runs and balls by phase. */
 export interface InningsObservation {
@@ -770,7 +770,7 @@ export interface BatterDistribution {
 // ─── Bowler distribution dossier ────────────────────────────────────────
 //
 // Mirror of /api/v1/bowlers/{id}/distribution. Spec:
-// internal_docs/spec-distribution-stats.md §11.8.
+// docs/internal/spec-distribution-stats.md §11.8.
 
 /**
  * Wilson 95% CI binomial proportion record. Used by every probability
@@ -930,7 +930,7 @@ export interface BowlerDistribution {
 // ─── Fielder distribution dossier ───────────────────────────────────────
 //
 // Mirror of /api/v1/fielders/{id}/distribution. Spec:
-// internal_docs/spec-distribution-stats.md §13.
+// docs/internal/spec-distribution-stats.md §13.
 
 /** One match of a fielder in a distribution dossier. */
 export interface FielderObservation {
@@ -990,7 +990,7 @@ export interface FielderDistribution {
 // ─── Team batting distribution dossier ──────────────────────────────────
 //
 // Mirror of /api/v1/teams/{team}/batting/distribution. Spec:
-// internal_docs/spec-distribution-stats.md §16.2.
+// docs/internal/spec-distribution-stats.md §16.2.
 
 /** One batting innings of a team in a distribution dossier, with its figures at 10 overs and by phase. */
 export interface TeamBattingInningsObservation {
@@ -1111,7 +1111,7 @@ export interface TeamBattingDistribution {
 // ─── Team bowling distribution dossier ──────────────────────────────────
 //
 // Mirror of /api/v1/teams/{team}/bowling/distribution. Spec:
-// internal_docs/spec-distribution-stats.md §16.3 (backend) + §17.4 (frontend).
+// docs/internal/spec-distribution-stats.md §16.3 (backend) + §17.4 (frontend).
 
 /** One bowling innings of a team in a distribution dossier, with the opposition's figures at 10 overs and by phase. */
 export interface TeamBowlingInningsObservation {
@@ -1266,7 +1266,7 @@ export interface TeamBowlingDistribution {
 // ─── Team fielding distribution dossier ─────────────────────────────────
 //
 // Mirror of /api/v1/teams/{team}/fielding/distribution. Spec:
-// internal_docs/spec-distribution-stats.md §16.4 (backend) + §17.5 (frontend).
+// docs/internal/spec-distribution-stats.md §16.4 (backend) + §17.5 (frontend).
 //
 // Differs from the player-fielder dossier (§13/§14) in two ways:
 //   1. `stumpings` is ALWAYS non-null at team grain (every senior team
@@ -1951,7 +1951,7 @@ export interface InningsGridResponse {
 
 // ============================================================
 // Team stats — batting / bowling / fielding / partnerships
-// (see internal_docs/spec-team-stats.md)
+// (see docs/internal/spec-team-stats.md)
 // ============================================================
 
 /** A team's innings total, with the match it came from. */

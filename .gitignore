@@ -26,7 +26,7 @@ data/*.csv
 build_plash/
 
 # Local scratch — prod-DB test copies, ad-hoc fix scripts, etc.
-# (see internal_docs/testing-update-recent.md for the test-DB pattern)
+# (see docs/internal/testing-update-recent.md for the test-DB pattern)
 tmp/
 
 # DeeBase
@@ -55,3 +55,9 @@ skills-lock.json
 
 # Local DB backup snapshots (~5GB each — not source)
 backups/
+
+# Docs site (smalldocs): the built site and the generated front-end reference
+docs/_site/
+docs/_symbols.json
+docs/api/*
+!docs/api/index.qmd

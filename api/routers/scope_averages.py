@@ -20,7 +20,7 @@ they're meaningful at scope level (highest league total has a team
 owner, league's best pair has people identity) and dropped where they
 aren't (a "league average team" has no captain or home ground).
 
-Spec: `internal_docs/spec-team-compare-average.md`.
+Spec: `docs/internal/spec-team-compare-average.md`.
 """
 from __future__ import annotations
 
@@ -1902,8 +1902,8 @@ async def _batting_cohort_live(
     `tests/sanity/test_playerscopestatsposition_rollup.py`), so the
     dispatch can't introduce a step at the gate boundary.
 
-    Spec: internal_docs/spec-player-baseline-aux-fallback.md Phase 3b
-    + internal_docs/plan-3b-batting-live-cohort.md."""
+    Spec: docs/internal/spec-player-baseline-aux-fallback.md Phase 3b
+    + docs/internal/plan-3b-batting-live-cohort.md."""
     where_full, params = _batting_live_where(filters, aux)
     main_sql = f"""
         SELECT ib.position_bucket,

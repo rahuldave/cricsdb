@@ -2,7 +2,7 @@
  * Two lines under the team bowling distribution: the scope average, then the form change in each recent window.
  *
  * Form-delta two-line summary for the team-bowling Distribution
- * panel. Spec: internal_docs/spec-distribution-stats.md §17.4.
+ * panel. Spec: docs/internal/spec-distribution-stats.md §17.4.
  *
  * Sibling of TeamBattingFormDeltaLine. Window-independent — does
  * NOT redraw when the metric tab or window toggle changes. Three

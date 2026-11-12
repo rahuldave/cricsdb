@@ -30,7 +30,7 @@
 #   - Widgets that overflow but live inside a legitimate
 #     `overflow-x: auto` ancestor that actually scrolls. Those
 #     are the Compare pattern doing its job, and are an
-#     intentional design decision (see internal_docs/colors.md).
+#     intentional design decision (see docs/internal/colors.md).
 #   - Touch-scroll affordance / fade indicators on scroll
 #     containers (visual UX, not assertable here).
 

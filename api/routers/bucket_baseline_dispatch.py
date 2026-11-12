@@ -2,7 +2,7 @@
 table reads when the scope is in the precomputed regime, falling back
 to live aggregation otherwise.
 
-Spec: internal_docs/spec-team-bucket-baseline.md
+Spec: docs/internal/spec-team-bucket-baseline.md
 """
 from __future__ import annotations
 
@@ -48,13 +48,13 @@ def is_precomputed_scope(filters: FilterParams, aux: Optional[AuxParams]) -> boo
             return False
     # Inning narrowing — bucket tables don't carry an innings dimension.
     # Live aggregation handles it; precompute later iff measured hot.
-    # Spec: internal_docs/spec-inning-split.md §5.4.
+    # Spec: docs/internal/spec-inning-split.md §5.4.
     if aux is not None and aux.inning is not None:
         return False
     # Result / toss_outcome aux filters are match-level slices that the
     # pre-aggregated bucket tables don't carry. Force the live path so
     # the filter actually fires. Spec:
-    # internal_docs/spec-splits-mosaic.md §1.2.
+    # docs/internal/spec-splits-mosaic.md §1.2.
     if aux is not None and (aux.result is not None or aux.toss_outcome is not None):
         return False
     return True

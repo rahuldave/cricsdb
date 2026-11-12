@@ -2,7 +2,7 @@
  * The line that compares a batter's recent mean and median runs with the scope's.
  *
  * Form-delta one-line summary for the batter Distribution panel.
- * Spec: internal_docs/spec-distribution-stats.md §9.2.5.
+ * Spec: docs/internal/spec-distribution-stats.md §9.2.5.
  *
  * Reads `dossier.form.delta` directly. Both windows always shown
  * (window-independent — toggling the panel's display window does

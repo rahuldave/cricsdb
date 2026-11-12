@@ -2,7 +2,7 @@
  * The "Compare to:" row of links to the same batter under a broader scope.
  *
  * Suggested-splits navigation row for the batter Distribution panel.
- * Spec: internal_docs/spec-distribution-stats.md §9.2.6.
+ * Spec: docs/internal/spec-distribution-stats.md §9.2.6.
  *
  * Reads `dossier.suggested_splits` (server-emitted). Each split is a
  * (label, params) pair — clicking navigates to the SAME /batting page

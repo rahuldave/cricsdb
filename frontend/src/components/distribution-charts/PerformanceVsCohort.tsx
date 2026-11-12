@@ -1,7 +1,7 @@
 /**
  * Bar chart of a player's rate at each bucket, with the cohort's rate as a tick: "how does this player perform there?"
  *
- * Spec: internal_docs/spec-mix-and-performance-charts.md §1 (Chart B)
+ * Spec: docs/internal/spec-mix-and-performance-charts.md §1 (Chart B)
  * + §4.2. Same X-axis as MixHistogram; player per-bucket rate as a
  * bar, cohort rate as a forest-green tick at the matching X position
  * (matches the colors.md reference-line convention).

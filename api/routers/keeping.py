@@ -2,7 +2,7 @@
 
 Uses the `keeper_assignment` table (populated by
 scripts/populate_keeper_assignments.py) to expose keeper-specific
-stats. See docs/spec-fielding-tier2.md for the algorithm + data model.
+stats. See docs/internal/spec-fielding-tier2.md for the algorithm + data model.
 """
 
 from __future__ import annotations

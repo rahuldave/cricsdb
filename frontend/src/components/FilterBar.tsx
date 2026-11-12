@@ -116,7 +116,7 @@ export default function FilterBar() {
   // fill them in from the tournament's metadata as soon as the
   // tournaments list loads. Without this, /matches?tournament=IPL
   // would aggregate IPL men + WPL women for any team that exists in
-  // both — see internal_docs/design-decisions.md "Tournament deep links".
+  // both — see docs/internal/design-decisions.md "Tournament deep links".
   useEffect(() => {
     if (tournamentsStale) return
     if (tournaments.length === 0 || !tournament) return
@@ -348,7 +348,7 @@ export default function FilterBar() {
          *  Secondary = domestic state/county/provincial competitions
          *  + small-market franchises (Vitality Blast, Syed Mushtaq Ali,
          *  Super Smash, NPL, …). Spec:
-         *  internal_docs/spec-filterbar-team-class-club.md §4.1. */}
+         *  docs/internal/spec-filterbar-team-class-club.md §4.1. */}
         {teamType === 'club' && (
           <div className="wisden-filter-group">
             <span className="wisden-filter-label">Tier</span>

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Dormancy badge integration test.
 #
-# Spec: internal_docs/design-decisions.md "Dormancy badge" +
+# Spec: docs/internal/design-decisions.md "Dormancy badge" +
 # spec-distribution-stats.md §8 / §11 / §13 (last_match_date field
 # on distribution lifetime block).
 #

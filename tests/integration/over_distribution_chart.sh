@@ -1,7 +1,7 @@
 #!/bin/bash
 # Bowling By Over tab — Mix histogram + Performance vs cohort.
 #
-# Spec: internal_docs/spec-mix-and-performance-charts.md §M1 + §6.
+# Spec: docs/internal/spec-mix-and-performance-charts.md §M1 + §6.
 #
 # Asserts the new charts on /bowling?player=X&tab=By+Over render
 # the spec-locked invariants:

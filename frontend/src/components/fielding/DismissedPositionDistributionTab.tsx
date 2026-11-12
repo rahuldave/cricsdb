@@ -4,7 +4,7 @@
  * Fielding "By Dismissed Position" tab — Mix histogram +
  * single-panel Performance vs cohort (Catches per match).
  *
- * Spec: internal_docs/spec-mix-and-performance-charts.md §1 + §2.3.
+ * Spec: docs/internal/spec-mix-and-performance-charts.md §1 + §2.3.
  * Mounts on /fielding?player=X. Reads per-bucket player + cohort
  * values directly from /fielders/{id}/summary
  * .dismissal_position_distribution (single payload — no extra

@@ -12,7 +12,7 @@
  * <abbreviation>" on its own row below it, then the optional
  * comparison line.
  *
- * Spec: internal_docs/spec-distribution-stats.md §9.1 (the language
+ * Spec: docs/internal/spec-distribution-stats.md §9.1 (the language
  * established for the batter Distribution panel) — promoted here
  * to a cross-page component.
  */

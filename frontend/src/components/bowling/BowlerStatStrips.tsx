@@ -2,7 +2,7 @@
  * The bowler's stat strip and milestone chips for each metric tab: wickets, economy and runs conceded.
  *
  * Per-metric stat strips + milestone-chip rows for the bowler
- * Distribution panel. Spec: internal_docs/spec-distribution-stats.md
+ * Distribution panel. Spec: docs/internal/spec-distribution-stats.md
  * §12.2.5.
  *
  * Three small stateless components — one per metric tab. Each

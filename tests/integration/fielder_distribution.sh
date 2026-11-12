@@ -1,7 +1,7 @@
 #!/bin/bash
 # Fielder Distribution panel — DOM integration test.
 #
-# Spec: internal_docs/spec-distribution-stats.md §14.6.
+# Spec: docs/internal/spec-distribution-stats.md §14.6.
 #
 # Asserts the panel renders correctly on /fielding?player=X across
 # Catches / Run-outs / Stumpings tabs, that stat-strip + chip values

@@ -1,0 +1,53 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.md
+    - api.md
+    - tab-structure.md
+    - 'internal/*.md'
+    - 'api/**/*.qmd'
+
+website:
+  title: CricsDB
+  description: T20 cricket statistics from cricsheet's ball-by-ball data
+  site-url: https://rahuldave.com/cricsdb/
+  repo-url: https://github.com/rahuldave/cricsdb
+  navbar:
+    left:
+      - text: Guide
+        href: tab-structure.md
+      - text: HTTP API
+        href: api.md
+      - text: Front-end reference
+        href: api/index.qmd
+    tools:
+      - icon: github
+        href: https://github.com/rahuldave/cricsdb
+  sidebar:
+    style: docked
+    search: true
+    contents:
+      - index.md
+      - text: Guide
+        href: tab-structure.md
+      - text: HTTP API
+        href: api.md
+      - section: Contributors
+        contents:
+          - auto: "internal/*.md"
+      - section: Front-end reference
+        contents:
+          - auto: "api/**"
+
+theme: cosmo
+toc: true
+search: true
+
+api:
+  language: typescript
+  entry: ../frontend/src
+  tsconfig: ../frontend/tsconfig.app.json
+  root: ..
+  source: https://github.com/rahuldave/cricsdb/blob/main
+  out: api

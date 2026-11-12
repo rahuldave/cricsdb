@@ -14,7 +14,7 @@
  * navigation resets the context via the consumer hook (each page's
  * useEffect clears + re-sets).
  *
- * Spec: internal_docs/design-decisions.md "Dormancy badge".
+ * Spec: docs/internal/design-decisions.md "Dormancy badge".
  */
 
 import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react'

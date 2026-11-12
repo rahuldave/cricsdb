@@ -14,7 +14,7 @@ The Python and TypeScript implementations are kept in lockstep via
 `tests/sanity/scope_splits_fixtures.json` — the same fixture drives
 both test suites.
 
-Spec: internal_docs/spec-distribution-stats.md §8.7.
+Spec: docs/internal/spec-distribution-stats.md §8.7.
 """
 
 from __future__ import annotations

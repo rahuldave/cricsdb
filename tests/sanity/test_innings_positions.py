@@ -2,7 +2,7 @@
 
 Pure unit test on synthetic delivery lists — no DB needed.
 
-Spec: internal_docs/spec-player-compare-average.md §4.5 (shared helper
+Spec: docs/internal/spec-player-compare-average.md §4.5 (shared helper
 contract). The function was extracted verbatim from
 scripts/populate_player_scope_stats.py::_derive_positions in Phase 1.5
 of the player-baselines rollout; these tests lock in the position

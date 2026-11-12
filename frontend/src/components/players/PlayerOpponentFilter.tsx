@@ -6,7 +6,7 @@
  * scoping the whole page to "this player vs that team" — e.g. Kohli vs
  * Australia, or Ashwin vs RCB across every franchise he's played for.
  * It's the first opponent-only entry point on a player (the rivalry
- * pair sets the team too); see internal_docs/audit-aux-params.md §D.
+ * pair sets the team too); see docs/internal/audit-aux-params.md §D.
  *
  * The opponent menu is bounded and small (~tens of teams), so it's
  * fetched once at scope and filtered client-side as the user types —

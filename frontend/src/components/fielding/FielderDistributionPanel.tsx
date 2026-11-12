@@ -2,7 +2,7 @@
  * The fielder Distribution panel: per-match histograms, stats and chips for catches, run-outs and stumpings.
  *
  * Fielder Distribution panel — top-level orchestrator for the §14
- * frontend slice. Spec: internal_docs/spec-distribution-stats.md §14.
+ * frontend slice. Spec: docs/internal/spec-distribution-stats.md §14.
  *
  * Mounted on /fielding?player=X between the count tiles row and the
  * Tabs row.

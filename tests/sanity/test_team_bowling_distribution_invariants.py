@@ -6,7 +6,7 @@ CLAUDE.md "integration tests must self-anchor against SQL", every
 numeric expected value derives from sqlite3 against `cricket.db`
 at runtime — no hardcoded literals.
 
-Invariants (spec internal_docs/spec-distribution-stats.md §16.6):
+Invariants (spec docs/internal/spec-distribution-stats.md §16.6):
 
   1. n_innings == len(wickets.observations) on lifetime + each form window.
   2. last_10.n_innings ≤ 10; last_10.observations is the contiguous

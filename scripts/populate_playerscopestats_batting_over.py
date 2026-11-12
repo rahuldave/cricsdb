@@ -1,6 +1,6 @@
 """Populate playerscopestats_batting_over — per-over batting aggregates.
 
-Tier 4 of internal_docs/spec-apples-to-apples-baselines.md. Mirrors
+Tier 4 of docs/internal/spec-apples-to-apples-baselines.md. Mirrors
 the bowling-side per-over child (`scripts/populate_playerscopestats_
 over.py`): one row per (person_id, scope_key, over_number), with
 the BATTER as the subject.

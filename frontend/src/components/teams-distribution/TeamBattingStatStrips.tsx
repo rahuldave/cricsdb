@@ -2,7 +2,7 @@
  * Stat strips and probability-chip rows for the Runs and Run Rate tabs of the team batting distribution.
  *
  * Per-metric stat strips + milestone-chip rows for the team-batting
- * Distribution panel. Spec: internal_docs/spec-distribution-stats.md
+ * Distribution panel. Spec: docs/internal/spec-distribution-stats.md
  * §17.3.
  *
  * Two metric tabs: Runs (default) + Run Rate. Uniform stat-strip

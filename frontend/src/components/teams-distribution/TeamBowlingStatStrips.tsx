@@ -2,7 +2,7 @@
  * Stat strips and probability-chip rows for the Wickets, Runs Conceded and Economy tabs of the team bowling distribution.
  *
  * Per-metric stat strips + milestone-chip rows for the team-bowling
- * Distribution panel. Spec: internal_docs/spec-distribution-stats.md
+ * Distribution panel. Spec: docs/internal/spec-distribution-stats.md
  * §17.4.
  *
  * Three metric tabs: Wickets (default), Runs Conceded, Economy.

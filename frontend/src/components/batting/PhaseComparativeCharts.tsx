@@ -14,7 +14,7 @@
  * boundaries / overs-in-phase, cohort = boundary_pct × 6 / 100. Both
  * use legal balls so the denominators are DLS-safe by construction.
  *
- * Spec / context: internal_docs/spec-mix-and-performance-charts.md
+ * Spec / context: docs/internal/spec-mix-and-performance-charts.md
  * §M2 pattern, applied to the phase axis. User-asked 2026-05-22.
  */
 

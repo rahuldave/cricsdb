@@ -8,11 +8,11 @@ canonical map. UIs consume `direction` directly; they don't enumerate
 the metric list themselves so they stay in lockstep when a new metric
 joins.
 
-See `internal_docs/spec-team-compare-average.md` Phase 2B for the
+See `docs/internal/spec-team-compare-average.md` Phase 2B for the
 contract. Spec-1 UI (Teams > Compare) renders only `value`; the rest of
 the envelope is shipped for future surfaces (player compare, leaderboard
 delta columns, H2H baselines — see
-`internal_docs/outlook-comparisons.md`).
+`docs/internal/outlook-comparisons.md`).
 """
 from __future__ import annotations
 
@@ -101,7 +101,7 @@ METRIC_DIRECTIONS: dict[str, Direction] = {
     # like `bat_dot_pct` already exist above (team-side) with matching
     # player-side semantics and are reused — only fields that need a
     # new mapping live here. Spec:
-    # internal_docs/spec-player-compare-average.md §5.7.
+    # docs/internal/spec-player-compare-average.md §5.7.
     "bat_innings":             None,
     "bat_runs":                None,
     "bat_balls_faced":         None,

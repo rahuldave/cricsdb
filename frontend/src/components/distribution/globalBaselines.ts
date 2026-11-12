@@ -1,6 +1,6 @@
 /**
  * Gender-tiered global baseline anchors for distribution sparklines.
- * Spec: internal_docs/spec-distribution-stats.md §12.2.6.
+ * Spec: docs/internal/spec-distribution-stats.md §12.2.6.
  *
  * Empirical centres rounded to whole numbers, derived from
  * `cricket.db` at the date of writing (2026-05-06).

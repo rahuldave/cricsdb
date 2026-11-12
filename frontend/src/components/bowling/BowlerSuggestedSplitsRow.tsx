@@ -2,7 +2,7 @@
  * The "Compare to:" row of links to the same bowler under a broader scope.
  *
  * Suggested-splits navigation row for the bowler Distribution panel.
- * Spec: internal_docs/spec-distribution-stats.md §12.2.8.
+ * Spec: docs/internal/spec-distribution-stats.md §12.2.8.
  *
  * Sibling of components/batting/SuggestedSplitsRow. Navigates to the
  * SAME /bowling page with the same player but the split's scope

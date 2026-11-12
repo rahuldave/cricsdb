@@ -12,7 +12,7 @@
  * its Overview "Tournaments in scope" tile grid. Single source of
  * truth — both consumers render identical tiles.
  *
- * Spec: internal_docs/spec-league-pages.md step 6.
+ * Spec: docs/internal/spec-league-pages.md step 6.
  */
 import type { useFilters } from '../../hooks/useFilters'
 import SeriesLink from '../SeriesLink'

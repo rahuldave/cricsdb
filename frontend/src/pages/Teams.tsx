@@ -298,7 +298,7 @@ export default function Teams() {
   // Splits Mosaic — joint (toss × inning × result) distribution. Same
   // fetch on landing (selected=null → ?team= absent → league side) and
   // team-detail (?team= set → dual envelope with deltas). Spec:
-  // internal_docs/spec-splits-mosaic.md §2.9.
+  // docs/internal/spec-splits-mosaic.md §2.9.
   //
   // Inning POV translation: the URL's `?inning=` follows the active
   // Option-B (spec-inning-unify-option-b.md): `?inning=` is UNIFIED to
@@ -367,7 +367,7 @@ export default function Teams() {
   // Team Records — gated on tab so it doesn't fan out 8 SQL queries
   // every time the user lands on the page. Shape matches /series/records
   // so the existing RecordsTab component renders both. Spec: see
-  // internal_docs/inning-controls-mount-sites.md §4.1 + the records
+  // docs/internal/inning-controls-mount-sites.md §4.1 + the records
   // perf trio (commit 854b10a + this commit + the precomputed-tables
   // followup).
   const recordsFetch = useFetch<import('../types').TournamentRecords | null>(

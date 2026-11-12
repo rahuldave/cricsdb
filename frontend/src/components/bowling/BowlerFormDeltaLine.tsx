@@ -2,7 +2,7 @@
  * The line that compares a bowler's recent wickets and economy with the scope's.
  *
  * Form-delta one-line summary for the bowler Distribution panel.
- * Spec: internal_docs/spec-distribution-stats.md §12.2.7.
+ * Spec: docs/internal/spec-distribution-stats.md §12.2.7.
  *
  * Reads `dossier.form.delta`. Window-independent — does not redraw
  * when the metric tab or window toggle changes. Two metrics shown

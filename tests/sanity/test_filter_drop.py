@@ -10,7 +10,7 @@ Verifies:
   3. `season` is a single name masking both season_from and season_to.
   4. Unknown axis names raise ValueError.
 
-Spec: internal_docs/spec-player-compare-average.md §4.6.
+Spec: docs/internal/spec-player-compare-average.md §4.6.
 
 Usage:
   uv run python tests/sanity/test_filter_drop.py

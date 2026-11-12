@@ -2,7 +2,7 @@
  * Stat strips and probability-chip rows for the Catches, Run-outs and Stumpings tabs of the team fielding distribution.
  *
  * Per-metric stat strips + milestone-chip rows for the team-fielding
- * Distribution panel. Spec: internal_docs/spec-distribution-stats.md
+ * Distribution panel. Spec: docs/internal/spec-distribution-stats.md
  * §17.5.
  *
  * Three metric tabs: Catches (default), Run-outs, Stumpings. Uniform

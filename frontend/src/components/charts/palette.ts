@@ -50,7 +50,7 @@ export const WISDEN_PHASES: string[] = [WISDEN.indigo, WISDEN.ochre, WISDEN.oxbl
  * (the league-average reference stroke) to read as a fill at
  * cell scale.
  *
- * Spec: internal_docs/spec-splits-mosaic.md §2.2.
+ * Spec: docs/internal/spec-splits-mosaic.md §2.2.
  */
 export const WISDEN_WL = {
   won:   '#4B7A3B',
@@ -73,7 +73,7 @@ export const WISDEN_WL_TINTS: Record<
 /**
  * Three-tier coloring SHARED across distribution histograms,
  * sparklines, AND probability chips. Spec:
- * internal_docs/spec-distribution-stats.md §10.3 (revised
+ * docs/internal/spec-distribution-stats.md §10.3 (revised
  * 2026-05-06 — unified palette per user feedback that the chip
  * polarity scheme didn't match the histogram tier scheme).
  *

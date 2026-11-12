@@ -75,7 +75,7 @@ type ReferenceCtx = F & {
    *  this as `person_id`; the wrapper below renames before send so
    *  callers don't need to know the backend convention. Player-aware
    *  seasons fix the retired-player gap on first-3 / last-3 buttons —
-   *  see internal_docs/design-decisions.md "FilterBar season-window
+   *  see docs/internal/design-decisions.md "FilterBar season-window
    *  quick-select buttons". */
   player?: string
 }
@@ -905,7 +905,7 @@ export const getTeamProfile = async (team: string, filters?: F) => {
 // The "average team" counterpart to getTeam* — same FilterBar scope,
 // no team filter. Drives the average column on the Teams > Compare tab
 // + phase-band / per-wicket / season-trajectory expansions.
-// See internal_docs/spec-team-compare-average.md.
+// See docs/internal/spec-team-compare-average.md.
 
 /**
  * Fetch the league's top-line record at the filter scope.

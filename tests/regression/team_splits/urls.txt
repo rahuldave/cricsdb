@@ -14,7 +14,7 @@
 # whose response shape didn't change; only the params are new and
 # default to unset, so the response is byte-identical to pre-spec.
 #
-# Spec: internal_docs/spec-splits-mosaic.md §6.3.
+# Spec: docs/internal/spec-splits-mosaic.md §6.3.
 
 # ── /teams/splits — Landing mode (no ?team=) ────────────────────
 NEW splits_landing_ipl_2024                 /api/v1/teams/splits?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024

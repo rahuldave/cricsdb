@@ -1,7 +1,7 @@
 /**
  * Discrete bin helpers for the fielder Distribution panel histograms.
  *
- * Spec: internal_docs/spec-distribution-stats.md §14.2.3.
+ * Spec: docs/internal/spec-distribution-stats.md §14.2.3.
  *
  * Three fixed bins per metric tab: 0 / 1 / ≥2. Catches max ~5/match,
  * stumpings ~3, run-outs ~2 in T20 — collapsing 2+ into a single
