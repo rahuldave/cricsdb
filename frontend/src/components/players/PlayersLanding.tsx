@@ -1,3 +1,6 @@
+/**
+ * The /players landing when no player is picked: curated profile tiles and compare pairs, by gender.
+ */
 import { Link } from 'react-router-dom'
 import FlagBadge from '../FlagBadge'
 import { useFetch } from '../../hooks/useFetch'
@@ -11,8 +14,9 @@ import { carryFilters } from './roleUtils'
 import type { FilterParams } from '../../types'
 import { SectionHeader } from '../ChartHeader'
 
+/** Props of `PlayersLanding`. */
 interface Props {
-  filters: FilterParams
+  filters: FilterParams // the scope; `gender` picks the men's or women's tiles, and the tile links carry the rest
 }
 
 // Flag-mapping uses cricsheet team strings. For the landing tiles we
@@ -48,6 +52,7 @@ const FLAG_BY_ID: Record<string, string> = {
   d32cf49a: 'West Indies',
 }
 
+/** Show the curated profile tiles and compare pairs, men's and women's or only the scope's gender. */
 export default function PlayersLanding({ filters }: Props) {
   const showMen   = filters.gender !== 'female'
   const showWomen = filters.gender !== 'male'

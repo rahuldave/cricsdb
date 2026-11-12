@@ -1,4 +1,6 @@
 /**
+ * Stat strips and probability-chip rows for the Wickets, Runs Conceded and Economy tabs of the team bowling distribution.
+ *
  * Per-metric stat strips + milestone-chip rows for the team-bowling
  * Distribution panel. Spec: internal_docs/spec-distribution-stats.md
  * §17.4.
@@ -71,15 +73,17 @@ function ChipRow({ children }: { children: React.ReactNode }) {
 
 // ─── Wickets tab ─────────────────────────────────────────────────────
 
+/** Props of `WicketsStatStrip`. */
 interface WicketsProps {
-  block: TeamBowlingWicketsBlock
+  block: TeamBowlingWicketsBlock // the wickets block of the active window
   /** Server-computed Pool SR (balls/wkt) on the parent dossier — added
    *  audit §4.3 to remove the cascade derivation that previously
    *  reconstructed balls via runs_conceded * 6 / economy.pool. */
   pool_strike_rate: number | null
-  n_innings: number
+  n_innings: number // the innings bowled in the scope and window
 }
 
+/** Show innings bowled, mean, median, std and total wickets, and the pool strike rate. */
 export function WicketsStatStrip({ block, pool_strike_rate, n_innings }: WicketsProps) {
   return (
     <div>
@@ -111,6 +115,11 @@ export function WicketsStatStrip({ block, pool_strike_rate, n_innings }: Wickets
   )
 }
 
+/**
+ * Show the wickets chips: P(≤3), P(≥5), P(≥7), P(=10), their conditionals, and the at-over-10 chips.
+ * @param props the props object
+ * @param props.block the wickets block; its `milestones` are read
+ */
 export function WicketsChipsRow({ block }: { block: TeamBowlingWicketsBlock }) {
   const m = block.milestones
   // Tier discipline per spec §17.4: ≤3 INDIGO (poor) / 4-6 SAGE
@@ -135,11 +144,13 @@ export function WicketsChipsRow({ block }: { block: TeamBowlingWicketsBlock }) {
 
 // ─── Runs Conceded tab ──────────────────────────────────────────────
 
+/** Props of `RunsConcededStatStrip`. */
 interface RunsConcededProps {
-  block: TeamBowlingRunsConcededBlock
-  n_innings: number
+  block: TeamBowlingRunsConcededBlock // the runs-conceded block of the active window
+  n_innings: number // the innings bowled in the scope and window
 }
 
+/** Show innings bowled, mean, median, std and total runs conceded, and the escalation from over 10. */
 export function RunsConcededStatStrip({ block, n_innings }: RunsConcededProps) {
   return (
     <div>
@@ -172,6 +183,11 @@ export function RunsConcededStatStrip({ block, n_innings }: RunsConcededProps) {
   )
 }
 
+/**
+ * Show the runs-conceded chips, P(<100) to P(≥230) and the conditionals, with low totals tinted as good.
+ * @param props the props object
+ * @param props.block the runs-conceded block; its `milestones` are read
+ */
 export function RunsConcededChipsRow({ block }: { block: TeamBowlingRunsConcededBlock }) {
   const m = block.milestones
   // FLIPPED polarity per spec §17.2 + §17.4: low conceded = OCHRE
@@ -196,11 +212,13 @@ export function RunsConcededChipsRow({ block }: { block: TeamBowlingRunsConceded
 
 // ─── Economy tab ────────────────────────────────────────────────────
 
+/** Props of `EconomyStatStrip`. */
 interface EconomyProps {
-  block: TeamBowlingEconomyBlock
-  n_innings: number
+  block: TeamBowlingEconomyBlock // the economy block of the active window
+  n_innings: number // the innings bowled in the scope and window
 }
 
+/** Show innings bowled, pool runs per over, mean, median and std of the per-innings economy. */
 export function EconomyStatStrip({ block, n_innings }: EconomyProps) {
   return (
     <div>
@@ -228,6 +246,11 @@ export function EconomyStatStrip({ block, n_innings }: EconomyProps) {
   )
 }
 
+/**
+ * Show the economy chips: P(econ ≤6), P(econ ≤7), P(econ ≥9) and P(econ ≥10).
+ * @param props the props object
+ * @param props.block the economy block; its `milestones` are read
+ */
 export function EconomyChipsRow({ block }: { block: TeamBowlingEconomyBlock }) {
   const m = block.milestones
   // Bowler-conventional polarity: low RPO is OCHRE (tight), high is

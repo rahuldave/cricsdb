@@ -1,3 +1,6 @@
+/**
+ * The user guide at `/help/usage`, rendered from `content/user-help.md`.
+ */
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import userHelpMd from '../content/user-help.md?raw'
@@ -5,6 +8,10 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 // /help/usage — renders frontend/src/content/user-help.md.
 // Editable by the site maintainer; rebuilt on next `npm run build`.
+/**
+ * Show the user guide, with a link back to `/help`.
+ * @returns the page
+ */
 export default function HelpUsage() {
   useDocumentTitle('How to use CricsDB')
 

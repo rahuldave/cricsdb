@@ -1,8 +1,15 @@
+/**
+ * The red error box that a page shows when a request fails.
+ * @packageDocumentation
+ */
+
+/** Props of `ErrorBanner`. */
 interface ErrorBannerProps {
-  message: string
-  onRetry?: () => void
+  message: string // the error text to show
+  onRetry?: () => void // called by the Retry button; no button when absent
 }
 
+/** Show an error message in a red box, with a Retry button when `onRetry` is given. */
 export default function ErrorBanner({ message, onRetry }: ErrorBannerProps) {
   return (
     <div role="alert" className="wisden-errorbanner">

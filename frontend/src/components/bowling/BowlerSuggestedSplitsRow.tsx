@@ -1,4 +1,6 @@
 /**
+ * The "Compare to:" row of links to the same bowler under a broader scope.
+ *
  * Suggested-splits navigation row for the bowler Distribution panel.
  * Spec: internal_docs/spec-distribution-stats.md §12.2.8.
  *
@@ -12,13 +14,15 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import type { SuggestedSplit } from '../../types'
 
+/** Props of `BowlerSuggestedSplitsRow`. */
 interface Props {
-  playerId: string
-  splits: SuggestedSplit[]
+  playerId: string // the bowler's id, kept in each link
+  splits: SuggestedSplit[] // the splits to link to, each a label and the scope params it sets
 }
 
 const PRESERVED_KEYS = ['inning', 'dist_metric', 'dist_window']
 
+/** Show a link to `/bowling` for each split, keeping `inning`, `dist_metric` and `dist_window`; nothing when there are no splits. */
 export default function BowlerSuggestedSplitsRow({ playerId, splits }: Props) {
   const [searchParams] = useSearchParams()
   if (splits.length === 0) return null

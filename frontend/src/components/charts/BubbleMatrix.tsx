@@ -1,9 +1,13 @@
+/**
+ * A grid of bubbles, such as opponent by season, sized by matches and coloured by win percent.
+ */
 import { useMemo, useState } from 'react'
 import { useIsMobile } from '../../hooks/useMediaQuery'
 
+/** One bubble of `BubbleMatrix`: its column and row, its size, and the value that picks its colour. */
 export interface BubbleCell {
-  x: string | number
-  y: string | number
+  x: string | number // the column category, one of `xCategories`
+  y: string | number // the row category, one of `yCategories`
   /** Magnitude — bubble area is proportional to this. */
   size: number
   /** Outcome metric used to bucket the bubble's colour. Optional —
@@ -13,10 +17,11 @@ export interface BubbleCell {
   meta?: Record<string, number | string | null | undefined>
 }
 
+/** Props of `BubbleMatrix`. */
 interface BubbleMatrixProps {
-  cells: BubbleCell[]
-  xCategories: (string | number)[]
-  yCategories: (string | number)[]
+  cells: BubbleCell[] // the bubbles; a grid position with no cell stays empty
+  xCategories: (string | number)[] // the columns, in order
+  yCategories: (string | number)[] // the rows, in order
   /** Format the y-axis tick labels. */
   formatYTick?: (y: string | number) => string
   /** Buckets for `value`. Default: <40 indigo, 40–60 ochre, >60 oxblood
@@ -81,6 +86,8 @@ function shortTeam(name: string): string {
 }
 
 /**
+ * Show a grid of clickable bubbles, with area by `size` and colour bucketed by `value`.
+ *
  * BubbleMatrix — opponent × season grid of bubbles. Bubble area is
  * proportional to `size` (matches); colour is bucketed by `value`
  * (win-percent). Cells are clickable.

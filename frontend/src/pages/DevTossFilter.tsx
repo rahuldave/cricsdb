@@ -18,6 +18,10 @@ import { useFetch } from '../hooks/useFetch'
 import { getPlayerResultCounts } from '../api'
 import TossFilter from '../components/TossFilter'
 
+/**
+ * Show the `TossFilter` control with the toss counts of the player in `?player=`.
+ * @returns the page
+ */
 export default function DevTossFilter() {
   const filters = useFilters()
   const [playerId] = useUrlParam('player')

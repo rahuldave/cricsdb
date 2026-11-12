@@ -1,4 +1,6 @@
 /**
+ * The URLs and phrases of scope links, and the one-line scope summaries that page headers show.
+ *
  * Shared scope-link helpers used by PlayerLink and TeamLink.
  *
  * Model
@@ -28,6 +30,7 @@ import { useFilters } from '../hooks/useFilters'
 //
 // Single source of truth for which FilterBar fields appear in subscript
 // link URLs. Every one rides through by default.
+/** The FilterBar fields, in order, that every scope link URL carries. */
 export const FILTER_KEYS = [
   'gender',
   'team_type',
@@ -40,6 +43,7 @@ export const FILTER_KEYS = [
   'team_class',
   'series_type',
 ] as const
+/** The name of one FilterBar field in `FILTER_KEYS`. */
 export type FilterKey = typeof FILTER_KEYS[number]
 
 // ─── Subscript source (per-row override) ───────────────────────────────
@@ -50,13 +54,14 @@ export type FilterKey = typeof FILTER_KEYS[number]
 // This decouples the ergonomic per-row shape from the filter registry so
 // new filter keys don't force per-row API churn.
 
+/** A row's own scope, which replaces the page filters in that row's scope phrases. */
 export interface SubscriptSource {
-  tournament?: string | null
+  tournament?: string | null // the row's tournament, written as `tournament`
   /** Single season — expands to season_from = season_to = season. */
   season?: string | null
   /** Rivalry pair. TeamLink auto-swaps so filter_team = the linked team. */
-  team1?: string | null
-  team2?: string | null
+  team1?: string | null // written as `filter_team`
+  team2?: string | null // written as `filter_opponent`
 }
 
 /** How SubscriptSource's friendly keys map onto FILTER_KEYS. `season`
@@ -88,11 +93,13 @@ const SOURCE_MAP: Record<keyof SubscriptSource, FilterKey[]> = {
 // that surfaces a filter) plug into whichever layer they belong to
 // without forcing every link call site to know about them.
 
+/** Filters a page sets from its own identity, such as the team on /teams, for the links inside it. Empty by default. */
 export const ScopeContext = createContext<Partial<FilterParams>>({})
 
 /** FilterBar state merged with the current page scope. Use this (not
  *  useFilters) in link-building components so path-identity narrowings
- *  flow through without per-call-site prop-drilling. */
+ *  flow through without per-call-site prop-drilling.
+ *  @returns the filters, with `ScopeContext` values over the URL's */
 export function useScopeFilters(): FilterParams {
   const base = useFilters()
   const extra = useContext(ScopeContext)
@@ -106,10 +113,11 @@ export function useScopeFilters(): FilterParams {
  *  keys the tier wants to drop. */
 export type SubscriptBucket = { [K in FilterKey]: string | null | undefined }
 
+/** Take every `FILTER_KEYS` field from the filters, then put the row's own values over them. */
 export function resolveBucket(
-  filters: FilterParams,
-  source: SubscriptSource | undefined,
-): SubscriptBucket {
+  filters: FilterParams, // the page's filters, usually from `useScopeFilters`
+  source: SubscriptSource | undefined, // the row's own scope; a field that is undefined keeps the filter's value
+): SubscriptBucket { // the scope that the phrase links start from
   const bucket: Partial<SubscriptBucket> = {}
   for (const k of FILTER_KEYS) bucket[k] = filters[k]
   if (source) {
@@ -136,9 +144,9 @@ export function resolveBucket(
  *  "Australia women" and there is no Australia club side).
  *  PlayerLink uses the default; TeamLink passes ['gender','team_type']. */
 export function nameParams(
-  filters: FilterParams,
-  identityKeys: readonly FilterKey[] = ['gender'],
-): Record<string, string> {
+  filters: FilterParams, // the filters to take the identity from
+  identityKeys: readonly FilterKey[] = ['gender'], // the fields to keep
+): Record<string, string> { // the kept fields that are set, as URL parameters
   const p: Record<string, string> = {}
   for (const k of identityKeys) {
     const v = filters[k]
@@ -152,9 +160,9 @@ export function nameParams(
 /** Human-readable season tag: "2024" if from==to, "2023–2024" if both
  *  set and different, "2023+" if only from, "≤2024" if only to. */
 export function seasonTag(
-  from: string | null | undefined,
-  to: string | null | undefined,
-): string {
+  from: string | null | undefined, // the first season
+  to: string | null | undefined, // the last season
+): string { // the tag, or "" when neither is set
   if (from && to) return from === to ? from : `${from}–${to}`
   if (from) return `${from}+`
   if (to) return `≤${to}`
@@ -184,9 +192,9 @@ export type Discipline = 'batting' | 'bowling' | 'fielding' | null
  * Source-of-truth for callers is the `useDiscipline()` hook.
  */
 export function abbreviateScope(
-  scope: Partial<FilterParams>,
-  opts?: { discipline?: Discipline },
-): string {
+  scope: Partial<FilterParams>, // the filters, including the inning, toss and result aux filters
+  opts?: { discipline?: Discipline }, // the page's discipline, which words the inning filter
+): string { // the values joined by " · ", or "" for no filters
   const parts: string[] = []
 
   if (scope.gender === 'male') parts.push("men's")
@@ -269,6 +277,9 @@ export function abbreviateScope(
  *   gender=female&team_type=international          → "Women's international Twenty20 cricket"
  *   + season_from=2024&season_to=2025              → "…, 2024–2025"
  *   + filter_venue=Wankhede Stadium                → "…, at Wankhede Stadium"
+ *
+ * @param scope the filters to describe
+ * @returns the phrase, as in the examples
  */
 export function scopeToProse(scope: Partial<FilterParams>): string {
   const gender = scope.gender
@@ -317,6 +328,7 @@ export function scopeToProse(scope: Partial<FilterParams>): string {
   return suffixes.length > 0 ? `${subject}, ${suffixes.join(', ')}` : subject
 }
 
+/** One scope phrase of a link: its text, its URL parameters and its tooltip. */
 export interface PhraseTier {
   /** Phrase text, e.g. "at T20 World Cup" or "vs Australia" or "at IPL, 2024 vs CSK". */
   label: string
@@ -359,14 +371,14 @@ export interface PhraseTier {
  * Identity keys (gender, team_type) + filter_venue ride through silently
  * on every tier URL. */
 export function resolveScopePhrases(
-  bucket: SubscriptBucket,
-  options: {
+  bucket: SubscriptBucket, // the link's scope, from `resolveBucket`
+  options: { // how to word and build the phrases
     swapForTeam?: string
     seriesType?: string | null
     /** Preserve rivalry pair in URL + emit "vs <Opp>" phrase (PlayerLink). */
     keepRivalry?: boolean
   } = {},
-): PhraseTier[] {
+): PhraseTier[] { // the phrases, narrowest first; empty when the scope has nothing to narrow
   const seriesType = options.seriesType
   const keepRivalry = options.keepRivalry ?? false
   const hasTournament = !!bucket.tournament
@@ -526,9 +538,10 @@ export function resolveScopePhrases(
 // Python mirror for the rationale (api/scope_links.py).
 const IDENTITY_KEYS_FOR_SPLITS = ['gender'] as const
 
+/** A link to a related scope, such as "All IPL" or "vs all opponents". */
 export interface SplitSuggestion {
-  label: string
-  params: Record<string, string>
+  label: string // the link text
+  params: Record<string, string> // the URL parameters of the related scope
 }
 
 function _truthy(v: string | null | undefined): v is string {
@@ -570,6 +583,11 @@ function _withoutKeys(
   return out
 }
 
+/**
+ * List the broader and nearby scopes for a scope, in the same order as `api/scope_links.py::suggested_splits`.
+ * @param scope the current filters
+ * @returns the suggestions: wider scopes first, then the opponent, venue and gender ones
+ */
 export function suggestedSplits(scope: Partial<FilterParams>): SplitSuggestion[] {
   const splits: SplitSuggestion[] = []
   const identity = _identityForSplits(scope)

@@ -1,3 +1,6 @@
+/**
+ * A bar chart on Semiotic's `BarChart`, with a filter-state subtitle, rotated labels, top labels and cohort reference lines.
+ */
 import { BarChart as SemioticBarChart } from 'semiotic'
 import ChartContainer from './ChartContainer'
 import ChartHeader from '../ChartHeader'
@@ -7,23 +10,24 @@ import { useDiscipline } from '../../hooks/useDiscipline'
 import { useFilters } from '../../hooks/useFilters'
 import { WISDEN_PALETTE } from './palette'
 
+/** Props of `BarChart`. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface BarChartProps<T extends Record<string, any>> {
-  data: T[]
-  categoryAccessor: string | ((d: T) => string)
-  valueAccessor: string | ((d: T) => number)
-  title?: string
+  data: T[] // the rows, one bar each
+  categoryAccessor: string | ((d: T) => string) // the field or function that gives a row's category
+  valueAccessor: string | ((d: T) => number) // the field or function that gives a row's bar value
+  title?: string // the chart title; with none, no auto subtitle either
   /** Faint italic line under the title, typically the filter-state
    *  abbreviation. Empty string is treated as no subtitle. */
   subtitle?: string
   /** When omitted, the chart fills its container via ResizeObserver. */
   width?: number
-  height?: number
-  colorScheme?: string[]
-  colorBy?: string
-  categoryLabel?: string
-  valueLabel?: string
-  orientation?: 'vertical' | 'horizontal'
+  height?: number // the chart height in pixels, 400 by default; 60 more when labels rotate
+  colorScheme?: string[] // the bar colours, `WISDEN_PALETTE` by default
+  colorBy?: string // the field whose value picks a bar's colour
+  categoryLabel?: string // the category axis title; hidden when labels rotate
+  valueLabel?: string // the value axis title
+  orientation?: 'vertical' | 'horizontal' // the bar direction, passed to Semiotic
   /**
    * Rotate the category (x-axis) tick labels to vertical. Useful when
    * categories are wide enough to overlap (e.g. year labels on a
@@ -58,6 +62,7 @@ interface BarChartProps<T extends Record<string, any>> {
   barOpacity?: number
 }
 
+/** Show a bar chart that fills its container's width, with optional top labels and dashed cohort reference segments. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function BarChart<T extends Record<string, any>>({
   data, categoryAccessor, valueAccessor, title, subtitle, width, height = 400,

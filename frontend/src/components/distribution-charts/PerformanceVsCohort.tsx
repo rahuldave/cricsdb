@@ -1,5 +1,5 @@
 /**
- * Performance vs cohort — "how does this player perform there?"
+ * Bar chart of a player's rate at each bucket, with the cohort's rate as a tick: "how does this player perform there?"
  *
  * Spec: internal_docs/spec-mix-and-performance-charts.md §1 (Chart B)
  * + §4.2. Same X-axis as MixHistogram; player per-bucket rate as a
@@ -31,35 +31,41 @@ const VB_W = 100
 const TICK_HEIGHT_PX = 1.0
 const TICK_OVERHANG_FRAC = 0.10
 
+/** One bucket of `PerformanceVsCohort`: the player's rate and the cohort's rate there. */
 export interface PerfEntry {
-  bucket: number
-  playerValue: number | null
-  cohortValue: number | null
+  bucket: number // the bucket number on the x-axis, as in `MixEntry`
+  playerValue: number | null // the player's rate at this bucket; no bar when null or 0 or less
+  cohortValue: number | null // the cohort's rate at this bucket; no tick when null
   /** True when the player has zero mix here (cohort still drawn). */
   faded: boolean
   /** Optional native title tooltip — caller composes per-bucket. */
   tooltip?: string
 }
 
+/** Props of `PerformanceVsCohort`. */
 interface Props {
-  entries: PerfEntry[]
-  bucketLabel: (bucket: number) => string
-  phaseTint?: (bucket: number) => string | null
-  title?: string
-  subtitle?: string
+  entries: PerfEntry[] // the buckets, in x-axis order; nothing renders when empty
+  bucketLabel: (bucket: number) => string // the x-axis label of a bucket
+  phaseTint?: (bucket: number) => string | null // background tint colour of a bucket, or null for none
+  title?: string // caption above the chart
+  subtitle?: string // italic caption under the title
   /** Y-axis caption rendered as a small italic note above-left. */
   yLabel?: string
   /** Format tick value labels (e.g. (v)=>v.toFixed(1)). Used both
    *  by the new on-chart y-axis labels (max / mid / 0) and by the
    *  legend's cohort value range. */
   yFmt?: (v: number) => string
-  height?: number
+  height?: number // chart height in pixels; default 80
   /** Sentence-form explanation of what the green cohort tick
    *  represents at this scope — rendered above the chart so the
    *  reader doesn't have to infer the comparison anchor. */
   cohortExplainer?: string
 }
 
+/**
+ * Show a player's rate at each bucket as bars, with a green tick for the cohort's rate, and a legend underneath.
+ * Renders nothing when `entries` is empty.
+ */
 export default function PerformanceVsCohort({
   entries, bucketLabel, phaseTint,
   title, subtitle, yLabel, yFmt,

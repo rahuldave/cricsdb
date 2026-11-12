@@ -1,4 +1,6 @@
 /**
+ * The one-line strip under the filter bar that says, in words, what the page shows, with a copy-link button.
+ *
  * ScopeStatusStrip — one-line read-only summary of active filters.
  *
  * Deliberately duplicates the FilterBar chip state: FilterBar is edit
@@ -191,6 +193,10 @@ function buildSegments(
   return segs
 }
 
+/**
+ * Show the page's subject and active filters as one line of labelled segments, with a button that copies the URL.
+ * @returns the strip ("all-time" when no filter is set), or null on the home, scorecard and help pages
+ */
 export default function ScopeStatusStrip() {
   const filters = useFilters()
   const [params] = useSearchParams()

@@ -1,4 +1,6 @@
 /**
+ * A link to the Series page with the scope given as props, not taken from the filter bar.
+ *
  * SeriesLink — single link that navigates to `/series?...` with a fully
  * described scope.
  *
@@ -19,23 +21,25 @@
 import type React from 'react'
 import { Link } from 'react-router-dom'
 
+/** Props of `SeriesLink`: the URL parameters to set; an empty one is left out. */
 interface SeriesLinkProps {
-  tournament?: string | null
-  season?: string | null
-  season_from?: string | null
-  season_to?: string | null
-  seriesType?: string | null
-  team1?: string | null
-  team2?: string | null
-  gender?: string | null
-  team_type?: string | null
-  filter_venue?: string | null
-  className?: string
-  title?: string
-  onClick?: React.MouseEventHandler<HTMLAnchorElement>
-  children: React.ReactNode
+  tournament?: string | null // the tournament name
+  season?: string | null // one season; sets both `season_from` and `season_to`, and wins over them
+  season_from?: string | null // the first season of a range
+  season_to?: string | null // the last season of a range
+  seriesType?: string | null // the `series_type` parameter; "all" is left out
+  team1?: string | null // written as `filter_team`
+  team2?: string | null // written as `filter_opponent`
+  gender?: string | null // "male" or "female"
+  team_type?: string | null // "international" or "club"
+  filter_venue?: string | null // the venue name
+  className?: string // the link's class; defaults to "comp-link"
+  title?: string // the tooltip
+  onClick?: React.MouseEventHandler<HTMLAnchorElement> // called on click, before navigation
+  children: React.ReactNode // the link content
 }
 
+/** Show a link to `/series` with the given scope as URL parameters. */
 export default function SeriesLink({
   tournament, season, season_from, season_to, seriesType,
   team1, team2, gender, team_type, filter_venue,

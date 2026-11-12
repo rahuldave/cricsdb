@@ -1,5 +1,9 @@
+/**
+ * Shared helpers for the Teams Compare grid: row counts per discipline, data gates and the avg column label.
+ */
 import type { FilterParams, TeamProfile, ScopeAverageProfile } from '../../types'
 
+/** One of the five row sections of the Teams Compare grid. */
 export type TeamDiscipline =
   | 'results' | 'batting' | 'bowling' | 'fielding' | 'partnerships'
 
@@ -33,9 +37,14 @@ export const DISCIPLINE_TOTAL_ROWS: Record<TeamDiscipline, number> = {
   partnerships: 1 + STAT_ROWS_BY_DISCIPLINE.partnerships + BY_WICKET_ROWS,    // 18
 }
 
-/** Each discipline's "has meaningful data in scope" gate. Drives both
+/** Return whether a team column has data for a discipline in scope.
+ *  Each discipline's "has meaningful data in scope" gate. Drives both
  *  per-column band visibility and the grid-wide anyHasData mask.
- *  Reads `.value` off the envelope. */
+ *  Reads `.value` off the envelope.
+ *  @param discipline the section to test
+ *  @param profile the team's fetched profile
+ *  @returns true when the team has matches, innings, dismissals or partnerships for it
+ */
 export function teamDisciplineHasData(
   discipline: TeamDiscipline, profile: TeamProfile,
 ): boolean {
@@ -50,10 +59,15 @@ export function teamDisciplineHasData(
   return (profile.partnerships?.total?.value ?? 0) > 0
 }
 
-/** Same gate but for the league-average column. Keys on `legal_balls`
+/** Return whether the league-average column has data for a discipline in scope.
+ *  Same gate but for the league-average column. Keys on `legal_balls`
  *  for batting/bowling — `innings_batted`/`innings_bowled` are NOT
  *  on `ScopeBattingSummary`/`ScopeBowlingSummary` (spec dropped them
- *  per per-innings semantic; the type enforces it). */
+ *  per per-innings semantic; the type enforces it).
+ *  @param discipline the section to test
+ *  @param profile the scope-average profile
+ *  @returns true when the scope has matches, legal balls, dismissals or partnerships for it
+ */
 export function avgDisciplineHasData(
   discipline: TeamDiscipline, profile: ScopeAverageProfile,
 ): boolean {
@@ -68,7 +82,7 @@ export function avgDisciplineHasData(
   return (profile.partnerships?.total ?? 0) > 0
 }
 
-/** Two-line scope-computed label for the avg column header.
+/** Two-line label for the avg column header, computed from the scope.
  *  - `line1` is the column's *anchor* (rendered in the same h2 slot as
  *    team-col team names): "League average", "<Tournament> average", or
  *    "Full-member average". When `teamTournaments` is a singleton AND
@@ -80,10 +94,11 @@ export function avgDisciplineHasData(
  *    + season range, joined by " · ". Empty when nothing narrows. */
 export interface ScopeAvgLabel { line1: string; line2: string }
 
+/** Build the avg column's two-line header label from the filters; see `ScopeAvgLabel`. */
 export function scopeAvgLabel(
-  filters: FilterParams,
-  teamTournaments?: string[],
-): ScopeAvgLabel {
+  filters: FilterParams, // the slot's resolved filters
+  teamTournaments?: string[], // the primary team's tournaments; one club tournament is promoted into line1
+): ScopeAvgLabel { // the anchor line and the scope subtitle
   // Auto-promote the primary team's tournament when its universe
   // collapses to a singleton — same gate as the backend's _league_aux
   // scope_to_team narrowing (club + no explicit tournament).
@@ -154,20 +169,27 @@ export function scopeAvgLabel(
   return { line1, line2: parts.join(' · ') }
 }
 
-/** Filter-scoped match count for the column identity line. Uses
+/** Return the team's match count in scope, for the column identity line.
+ *  Filter-scoped match count for the column identity line. Uses
  *  summary.matches as the canonical match-level count (team_summary's
  *  COUNT(*) over the filtered match table). fielding.matches and
  *  bowling.matches are innings-derived and can diverge by a handful
  *  of abandoned / no-result matches where a team never fielded or
- *  bowled — correct for their own stats, misleading as a headline. */
+ *  bowled — correct for their own stats, misleading as a headline.
+ *  @param profile the team's fetched profile
+ *  @returns summary.matches, else bowling.matches, else 0
+ */
 export function teamMatchesInScope(profile: TeamProfile): number {
   return profile.summary?.matches?.value
     ?? profile.bowling?.matches?.value
     ?? 0
 }
 
-/** Query-string carry for a Teams-page deep link — all active FilterBar
- *  params. Mirrors `players/roleUtils.carryFilters`. */
+/** Return the active FilterBar params to carry into a Teams-page deep link.
+ *  Mirrors `players/roleUtils.carryFilters`.
+ *  @param filters the current filters
+ *  @returns gender, team_type, tournament, seasons and venue, only those that are set
+ */
 export function carryTeamFilters(filters: FilterParams): Record<string, string> {
   const out: Record<string, string> = {}
   if (filters.gender)          out.gender          = filters.gender

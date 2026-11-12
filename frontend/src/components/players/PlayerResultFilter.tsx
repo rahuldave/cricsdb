@@ -22,11 +22,13 @@ import { getPlayerResultCounts } from '../../api'
 import ResultFilter from '../ResultFilter'
 import type { FilterParams } from '../../types'
 
+/** Props of `PlayerResultFilter`. */
 interface Props {
-  playerId: string
-  filters: FilterParams
+  playerId: string // the player whose result counts are fetched
+  filters: FilterParams // the scope of the counts
 }
 
+/** Show the won/lost/tied pills for the player's own side, with counts; nothing when the player has no matches in scope. */
 export default function PlayerResultFilter({ playerId, filters }: Props) {
   const filterDeps = [playerId, ...useFilterDeps()]
   const fetchState = useFetch<{

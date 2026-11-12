@@ -1,3 +1,6 @@
+/**
+ * The "vs cohort 28.7  ↑ +47.7%" line that compares a metric with its scope average.
+ */
 import type { MetricEnvelope } from '../types'
 
 /** Inline scope-avg subtitle + directional delta chip.
@@ -20,7 +23,7 @@ import type { MetricEnvelope } from '../types'
 export default function MetricDelta({
   env, withScopeAvg = false, fmt = 1, label = 'avg', scopeAvgTooltip,
 }: {
-  env: MetricEnvelope | null | undefined
+  env: MetricEnvelope | null | undefined // the metric's value, scope average, delta and direction; nothing renders when absent
   /** When true, render "vs <label> <scope_avg>" as a small prefix
    *  before the chip. Useful for StatCard subtitles where horizontal
    *  space is generous; off for inline compare cells where the chip

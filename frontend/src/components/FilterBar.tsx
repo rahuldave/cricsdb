@@ -1,3 +1,6 @@
+/**
+ * The filter bar at the top of the scoped pages: gender, team type, tier, tournament, seasons and venue.
+ */
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getTournaments, getSeasons } from '../api'
@@ -6,6 +9,13 @@ import { useFilters } from '../hooks/useFilters'
 import VenueSearch from './VenueSearch'
 import type { Tournament } from '../types'
 
+/**
+ * Show the filter controls and write each choice to the URL.
+ *
+ * The tournament and season lists narrow to the current filters, team and player. Deep links that name a
+ * tournament get their gender and team type filled in, and a clash between filters clears the dependent one.
+ * @returns the filter bar
+ */
 export default function FilterBar() {
   const [params] = useSearchParams()
   const setUrlParams = useSetUrlParams()

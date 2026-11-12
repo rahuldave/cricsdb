@@ -1,8 +1,12 @@
+/**
+ * The venue picker in the filter bar: a type-ahead box, or the chosen venue with a clear button.
+ */
 import { useState, useEffect, useRef } from 'react'
 import { getVenues } from '../api'
 import { useFilters } from '../hooks/useFilters'
 import type { VenueInfo } from '../types'
 
+/** Props of `VenueSearch`. */
 interface VenueSearchProps {
   /** Called when the user picks a venue. Parent writes the canonical
    *  name into the URL (filter_venue=...). */
@@ -14,7 +18,7 @@ interface VenueSearchProps {
    *  component renders a compact chip with a "× Clear venue" button
    *  instead of the typeahead input. */
   value?: string
-  placeholder?: string
+  placeholder?: string // the input's placeholder; defaults to "Search venue…"
 }
 
 /**

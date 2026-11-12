@@ -24,8 +24,10 @@
  * Refresh script: see commit 91eaaad (bowling) + this module's
  * commit (batting). Same SQL pattern: per-innings aggregation
  * grouped by gender, AVG(value), pool ratio for SR/RPO.
+ * @packageDocumentation
  */
 
+/** Global reference values for a bowler's per-spell sparkline. */
 export interface GlobalBowlingBaselines {
   /** Mean wickets per qualifying spell. */
   wickets: number
@@ -35,6 +37,7 @@ export interface GlobalBowlingBaselines {
   rpo: number
 }
 
+/** Global reference values for a batter's per-innings sparkline. */
 export interface GlobalBattingBaselines {
   /** Mean runs per innings (no min-balls floor). */
   runs: number
@@ -44,19 +47,23 @@ export interface GlobalBattingBaselines {
 
 // ─── Bowling baselines ────────────────────────────────────────────────
 
+/** Global bowling baseline for all T20 cricket, used when no gender is set. */
 export const BOWLING_GLOBAL_ALL_T20: GlobalBowlingBaselines = {
   wickets: 1, runs: 25, rpo: 7,
 }
+/** Global bowling baseline for men's T20 cricket. */
 export const BOWLING_GLOBAL_MEN: GlobalBowlingBaselines = {
   wickets: 1, runs: 26, rpo: 8,
 }
+/** Global bowling baseline for women's T20 cricket. */
 export const BOWLING_GLOBAL_WOMEN: GlobalBowlingBaselines = {
   wickets: 1, runs: 20, rpo: 6,
 }
 
+/** Pick the global bowling baseline for the scope's gender: men, women, or all T20 when the gender is not set. */
 export function pickBowlingBaseline(
-  scope: Record<string, string>,
-): GlobalBowlingBaselines {
+  scope: Record<string, string>, // the filter params; only `gender` is read
+): GlobalBowlingBaselines { // the men's, women's or all-T20 baseline
   const g = scope.gender
   if (g === 'male') return BOWLING_GLOBAL_MEN
   if (g === 'female') return BOWLING_GLOBAL_WOMEN
@@ -65,19 +72,23 @@ export function pickBowlingBaseline(
 
 // ─── Batting baselines ────────────────────────────────────────────────
 
+/** Global batting baseline for all T20 cricket, used when no gender is set. */
 export const BATTING_GLOBAL_ALL_T20: GlobalBattingBaselines = {
   runs: 17, sr: 118,
 }
+/** Global batting baseline for men's T20 cricket. */
 export const BATTING_GLOBAL_MEN: GlobalBattingBaselines = {
   runs: 18, sr: 125,
 }
+/** Global batting baseline for women's T20 cricket. */
 export const BATTING_GLOBAL_WOMEN: GlobalBattingBaselines = {
   runs: 13, sr: 95,
 }
 
+/** Pick the global batting baseline for the scope's gender: men, women, or all T20 when the gender is not set. */
 export function pickBattingBaseline(
-  scope: Record<string, string>,
-): GlobalBattingBaselines {
+  scope: Record<string, string>, // the filter params; only `gender` is read
+): GlobalBattingBaselines { // the men's, women's or all-T20 baseline
   const g = scope.gender
   if (g === 'male') return BATTING_GLOBAL_MEN
   if (g === 'female') return BATTING_GLOBAL_WOMEN
@@ -97,6 +108,7 @@ export function pickBattingBaseline(
 // Whole-number rounded per spec §17.2 — "men's IPL team innings ≈ 167
 // runs" is an IPL-specific anchor; gender-global is a wider centre.
 
+/** Global reference values for a team's per-innings batting sparkline. */
 export interface GlobalTeamBattingBaselines {
   /** Mean runs per innings at team grain. */
   runs: number
@@ -104,19 +116,23 @@ export interface GlobalTeamBattingBaselines {
   rr: number
 }
 
+/** Global team batting baseline for all T20 cricket, used when no gender is set. */
 export const TEAM_BATTING_GLOBAL_ALL_T20: GlobalTeamBattingBaselines = {
   runs: 140, rr: 8,
 }
+/** Global team batting baseline for men's T20 cricket. */
 export const TEAM_BATTING_GLOBAL_MEN: GlobalTeamBattingBaselines = {
   runs: 148, rr: 8,
 }
+/** Global team batting baseline for women's T20 cricket. */
 export const TEAM_BATTING_GLOBAL_WOMEN: GlobalTeamBattingBaselines = {
   runs: 112, rr: 6,
 }
 
+/** Pick the global team batting baseline for the scope's gender: men, women, or all T20 when the gender is not set. */
 export function pickTeamBattingBaseline(
-  scope: Record<string, string>,
-): GlobalTeamBattingBaselines {
+  scope: Record<string, string>, // the filter params; only `gender` is read
+): GlobalTeamBattingBaselines { // the men's, women's or all-T20 baseline
   const g = scope.gender
   if (g === 'male') return TEAM_BATTING_GLOBAL_MEN
   if (g === 'female') return TEAM_BATTING_GLOBAL_WOMEN
@@ -138,6 +154,7 @@ export function pickTeamBattingBaseline(
 // list (run-outs counted; retired/obstructing excluded). Whole-number
 // rounded per spec §17.2.
 
+/** Global reference values for a team's per-innings bowling sparkline. */
 export interface GlobalTeamBowlingBaselines {
   /** Mean wickets credited per team-innings. */
   wickets: number
@@ -147,19 +164,23 @@ export interface GlobalTeamBowlingBaselines {
   rpo: number
 }
 
+/** Global team bowling baseline for all T20 cricket, used when no gender is set. */
 export const TEAM_BOWLING_GLOBAL_ALL_T20: GlobalTeamBowlingBaselines = {
   wickets: 6, runs: 140, rpo: 8,
 }
+/** Global team bowling baseline for men's T20 cricket. */
 export const TEAM_BOWLING_GLOBAL_MEN: GlobalTeamBowlingBaselines = {
   wickets: 6, runs: 148, rpo: 8,
 }
+/** Global team bowling baseline for women's T20 cricket. */
 export const TEAM_BOWLING_GLOBAL_WOMEN: GlobalTeamBowlingBaselines = {
   wickets: 6, runs: 112, rpo: 6,
 }
 
+/** Pick the global team bowling baseline for the scope's gender: men, women, or all T20 when the gender is not set. */
 export function pickTeamBowlingBaseline(
-  scope: Record<string, string>,
-): GlobalTeamBowlingBaselines {
+  scope: Record<string, string>, // the filter params; only `gender` is read
+): GlobalTeamBowlingBaselines { // the men's, women's or all-T20 baseline
   const g = scope.gender
   if (g === 'male') return TEAM_BOWLING_GLOBAL_MEN
   if (g === 'female') return TEAM_BOWLING_GLOBAL_WOMEN
@@ -182,6 +203,7 @@ export function pickTeamBowlingBaseline(
 // won't render visibly — the scope-baseline (team's lifetime mean,
 // typically ~0.2-0.5) becomes the visible reference on that tab.
 
+/** Global reference values for a team's per-innings fielding sparkline. */
 export interface GlobalTeamFieldingBaselines {
   /** Mean catches per team-innings (substitute catches excluded). */
   catches: number
@@ -191,19 +213,23 @@ export interface GlobalTeamFieldingBaselines {
   stumpings: number
 }
 
+/** Global team fielding baseline for all T20 cricket, used when no gender is set. */
 export const TEAM_FIELDING_GLOBAL_ALL_T20: GlobalTeamFieldingBaselines = {
   catches: 4, run_outs: 1, stumpings: 0,
 }
+/** Global team fielding baseline for men's T20 cricket. */
 export const TEAM_FIELDING_GLOBAL_MEN: GlobalTeamFieldingBaselines = {
   catches: 4, run_outs: 1, stumpings: 0,
 }
+/** Global team fielding baseline for women's T20 cricket. */
 export const TEAM_FIELDING_GLOBAL_WOMEN: GlobalTeamFieldingBaselines = {
   catches: 3, run_outs: 1, stumpings: 0,
 }
 
+/** Pick the global team fielding baseline for the scope's gender: men, women, or all T20 when the gender is not set. */
 export function pickTeamFieldingBaseline(
-  scope: Record<string, string>,
-): GlobalTeamFieldingBaselines {
+  scope: Record<string, string>, // the filter params; only `gender` is read
+): GlobalTeamFieldingBaselines { // the men's, women's or all-T20 baseline
   const g = scope.gender
   if (g === 'male') return TEAM_FIELDING_GLOBAL_MEN
   if (g === 'female') return TEAM_FIELDING_GLOBAL_WOMEN

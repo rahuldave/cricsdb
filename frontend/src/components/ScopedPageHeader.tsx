@@ -1,4 +1,6 @@
 /**
+ * The title of a scoped page, with the dormancy badge and the abbreviated active scope below it.
+ *
  * ScopedPageHeader — page-level title bar with the active filter
  * scope rendered inline as an italic abbreviation. Used on every
  * scoped page (Batting / Bowling / Fielding / Players / Teams /
@@ -6,9 +8,9 @@
  * subject (the title content — name + flag etc.) AND the active
  * scope at a glance, without consulting the status strip.
  *
- * Layout: flex container; title content on the left, "SCOPE
- * <abbreviation>" on the right. Wraps to a second row on narrow
- * viewports so the abbreviation drops below the title on mobile.
+ * Layout: a flex column; the title row first, then "SCOPE
+ * <abbreviation>" on its own row below it, then the optional
+ * comparison line.
  *
  * Spec: internal_docs/spec-distribution-stats.md §9.1 (the language
  * established for the batter Distribution panel) — promoted here
@@ -66,8 +68,9 @@ function renderComparisonText(template: string): ReactNode {
   ))
 }
 
+/** Props of `ScopedPageHeader`. */
 interface Props {
-  filters: FilterParams
+  filters: FilterParams // the page filters to abbreviate as the scope line, and to keep on the "(all)" link
   /** Axes to exclude from the abbreviated scope — typically the
    *  page's subject axis when it's already in the title. e.g. the
    *  Series dossier omits 'tournament' (its H2 IS the tournament
@@ -95,9 +98,10 @@ interface Props {
    *  is selected; /players itself never sets it (it IS the
    *  destination). User-asked 2026-05-22. */
   playerId?: string
-  children: ReactNode
+  children: ReactNode // the title content, such as the name and flag
 }
 
+/** Show the page title with its dormancy badge, then the scope line and the optional comparison line. */
 export default function ScopedPageHeader({ filters, omit, hideAbbrev, comparison, playerId, children }: Props) {
   const discipline = useDiscipline()
   const scoped: FilterParams = omit && omit.length > 0

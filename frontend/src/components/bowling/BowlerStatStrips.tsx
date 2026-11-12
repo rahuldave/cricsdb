@@ -1,4 +1,6 @@
 /**
+ * The bowler's stat strip and milestone chips for each metric tab: wickets, economy and runs conceded.
+ *
  * Per-metric stat strips + milestone-chip rows for the bowler
  * Distribution panel. Spec: internal_docs/spec-distribution-stats.md
  * §12.2.5.
@@ -75,12 +77,14 @@ function ChipRow({
 
 // ─── Wickets tab ─────────────────────────────────────────────────────
 
+/** Props of `WicketsStatStrip`. */
 interface WicketsProps {
-  block: BowlerWicketsBlock
-  dossier: BowlerDossier
-  n_innings: number
+  block: BowlerWicketsBlock // the wickets block of the active window
+  dossier: BowlerDossier // the active window's dossier, for strike rate, economy and average
+  n_innings: number // the number of qualifying innings, shown under the stats
 }
 
+/** Show the mean, median and total wickets, and the strike rate, economy and average, each with a tooltip. */
 export function WicketsStatStrip({ block, dossier, n_innings }: WicketsProps) {
   return (
     <div>
@@ -119,6 +123,14 @@ export function WicketsStatStrip({ block, dossier, n_innings }: WicketsProps) {
   )
 }
 
+/**
+ * Show the wickets milestone chips: P(0), P(≥1) to P(≥5), and P(≥3), P(≥4), P(≥5) given ≥2.
+ * `window` (default `'scope'`) picks the badge above the chips; `playerId`, when given, adds the cohort-narrowing nudge.
+ * @param props the props
+ * @param props.block the wickets block of the active window
+ * @param props.window the active window, `'scope'` by default
+ * @param props.playerId the bowler's id; the cohort-narrowing nudge shows only when given
+ */
 export function WicketsChipsRow({
   block, window = 'scope', playerId,
 }: { block: BowlerWicketsBlock; window?: DistWindow; playerId?: string }) {
@@ -142,10 +154,12 @@ export function WicketsChipsRow({
 
 // ─── Economy tab ─────────────────────────────────────────────────────
 
+/** Props of `EconomyStatStrip` and `EconomyChipsRow`. */
 interface EconomyProps {
-  block: BowlerEconomyBlock
+  block: BowlerEconomyBlock // the economy block of the active window
 }
 
+/** Show the career economy, the mean, median and standard deviation of per-innings economy, each with a tooltip. */
 export function EconomyStatStrip({ block }: EconomyProps) {
   return (
     <div>
@@ -169,6 +183,12 @@ export function EconomyStatStrip({ block }: EconomyProps) {
   )
 }
 
+/**
+ * Show the economy milestone chips: P(econ ≤6), P(econ ≤7), P(econ ≥9) and P(econ ≥10).
+ * `window` (default `'scope'`) picks the badge above the chips; `playerId`, when given, adds the cohort-narrowing nudge.
+ * @param props the economy block, the active window and the bowler's id
+ * @returns the chip row
+ */
 export function EconomyChipsRow({
   block, window = 'scope', playerId,
 }: EconomyProps & { window?: DistWindow; playerId?: string }) {
@@ -187,10 +207,12 @@ export function EconomyChipsRow({
 
 // ─── Runs conceded tab ──────────────────────────────────────────────
 
+/** Props of `RunsConcededStatStrip` and `RunsConcededChipsRow`. */
 interface RunsConcededProps {
-  block: BowlerRunsConcededBlock
+  block: BowlerRunsConcededBlock // the runs-conceded block of the active window
 }
 
+/** Show the total, mean, median and standard deviation of runs conceded per innings, each with a tooltip. */
 export function RunsConcededStatStrip({ block }: RunsConcededProps) {
   return (
     <div>
@@ -214,6 +236,12 @@ export function RunsConcededStatStrip({ block }: RunsConcededProps) {
   )
 }
 
+/**
+ * Show the runs-conceded milestone chips: P(≤15), P(≤25), P(≥40) and P(≥50).
+ * `window` (default `'scope'`) picks the badge above the chips; `playerId`, when given, adds the cohort-narrowing nudge.
+ * @param props the runs-conceded block, the active window and the bowler's id
+ * @returns the chip row
+ */
 export function RunsConcededChipsRow({
   block, window = 'scope', playerId,
 }: RunsConcededProps & { window?: DistWindow; playerId?: string }) {

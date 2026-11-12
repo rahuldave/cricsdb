@@ -1,5 +1,6 @@
 /**
  * Fielding "By Phase" — per-phase catches and run-outs charts.
+ *
  * Four PerformanceVsCohort panels stacked vertically:
  *   1. Catches by phase            — raw counts, no cohort.
  *   2. Catches per match by phase  — rate vs cohort tick.
@@ -19,9 +20,10 @@ import PerformanceVsCohort, { type PerfEntry } from '../distribution-charts/Perf
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 import type { FieldingPhase, ScopePlayerFieldingPhase } from '../../types'
 
+/** Props of `PhaseComparativeCharts`. */
 interface Props {
-  phaseData: FieldingPhase[]
-  phaseBaseline: ScopePlayerFieldingPhase[]
+  phaseData: FieldingPhase[] // the fielder's rows by phase; none renders nothing
+  phaseBaseline: ScopePlayerFieldingPhase[] // the cohort's rows by phase, for the per-match ticks
 }
 
 const PHASE_BUCKET: Record<string, number> = {
@@ -44,6 +46,7 @@ function phaseTint(b: number): string | null {
 function fmt0(v: number) { return v.toFixed(0) }
 function fmt3(v: number) { return v.toFixed(3) }
 
+/** Show catches and run-outs by phase, as counts and as rates per match against the cohort. */
 export default function PhaseComparativeCharts({ phaseData, phaseBaseline }: Props) {
   if (!phaseData || phaseData.length === 0) return null
 

@@ -1,4 +1,6 @@
 /**
+ * The batter's Dismissals tab charts: how and when the batter gets out, against the cohort.
+ *
  * Dismissals tab — three player-vs-cohort distribution charts.
  *
  * The donut above shows the player's absolute mode breakdown; these
@@ -22,9 +24,10 @@ import PerformanceVsCohort, { type PerfEntry } from '../distribution-charts/Perf
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 import type { DismissalAnalysis, ScopeDismissals } from '../../types'
 
+/** Props of `DismissalCohortCharts`. */
 interface Props {
-  player: DismissalAnalysis
-  cohort: ScopeDismissals | null
+  player: DismissalAnalysis // the batter's dismissals, from `/batters/{id}/dismissals`
+  cohort: ScopeDismissals | null // the scope cohort's dismissals; null shows no cohort ticks
 }
 
 // Canonical batting dismissal modalities, in reading order, plus the
@@ -65,6 +68,10 @@ function phaseTint(b: number): string | null {
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`
 
+/**
+ * Show three charts against the cohort: the share of innings ending each way (not-out included),
+ * and the share of dismissals in each over and in each phase.
+ */
 export default function DismissalCohortCharts({ player, cohort }: Props) {
   // --- Mode of dismissal: each modality ÷ innings (not-out included) ---
   const pInn = player.innings || 0

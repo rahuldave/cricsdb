@@ -1,3 +1,11 @@
+/**
+ * The bowling page at `/bowling`: a landing board of bowlers, or one bowler's dossier.
+ *
+ * With no `?player=`, it shows a player search, quick-start picks and the bowling landing board.
+ * With `?player=<id>`, it shows the bowler's summary and distribution, and the tabs in `?tab=`
+ * (default `By Season`): By Season, By Over, By Phase, vs Batters, Wickets, Victims, Innings List
+ * and Records. Every fetch follows the FilterBar filters.
+ */
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
@@ -59,6 +67,10 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
 const tabs = ['By Season', 'By Over', 'By Phase', 'vs Batters', 'Wickets', 'Victims', 'Innings List', 'Records'] as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
+/**
+ * Show the bowling landing board, or the dossier of the bowler in `?player=`.
+ * @returns the page
+ */
 export default function Bowling() {
   const filters = useFilters()
   const [playerId] = useUrlParam('player')

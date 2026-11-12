@@ -29,6 +29,7 @@ import { getSeasons } from '../../api'
 import type { DistWindow } from './WindowBadge'
 
 
+/** Props of `CohortNarrowNudge`. */
 interface Props {
   /** Active dist_window. Nudge hidden when window === 'scope'. */
   window: DistWindow
@@ -38,6 +39,10 @@ interface Props {
 }
 
 
+/**
+ * Offer one-click season narrows when a `dist_window` slice is shown against a wider scope.
+ * Hidden when the window is 'scope', the scope is one season, or there is nothing to suggest.
+ */
 export default function CohortNarrowNudge({ window, playerId }: Props) {
   // CRITICAL: every hook MUST be called unconditionally (Rules of
   // Hooks). Early returns below must come AFTER every useFoo call,

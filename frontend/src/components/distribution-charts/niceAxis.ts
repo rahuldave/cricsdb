@@ -1,5 +1,5 @@
 /**
- * Nice-numbers y-axis helper for the distribution-charts components.
+ * Round y-axis ticks for the distribution-charts components.
  *
  * Replaces the previous (max / mid / 0) tick scheme that produced
  * awkward labels like "143.96 / 71.98 / 0.00" — user flagged
@@ -12,6 +12,7 @@
  * Gems, 1990) — the canonical algorithm every charting library
  * cites. Adapted for the per-chart `rawMax → ticks + niceMax`
  * contract this codebase needs.
+ * @packageDocumentation
  */
 
 function niceNum(value: number, round: boolean): number {
@@ -64,6 +65,11 @@ function nextNiceUp(step: number): number {
   return 10 * Math.pow(10, exp)
 }
 
+/**
+ * Pick 3 or 4 round ticks from 0 up to at least `rawMax`, with a step of 1, 2 or 5 times a power of ten.
+ * @param rawMax the largest data value; 0 or less gives the single tick 0 and a `niceMax` of 1
+ * @returns the ticks (largest first), the `niceMax` to scale bars by, and the step
+ */
 export function niceYAxis(rawMax: number): NiceAxis {
   if (rawMax <= 0) return { ticks: [0], niceMax: 1, step: 1 }
   // Three intervals → up to 4 ticks. Per user feedback we want

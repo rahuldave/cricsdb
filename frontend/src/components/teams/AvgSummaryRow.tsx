@@ -1,10 +1,14 @@
+/**
+ * One discipline section of the league-average column in the Teams Compare grid.
+ */
 import type { ScopeAverageProfile } from '../../types'
 import { STAT_ROWS_BY_DISCIPLINE, type TeamDiscipline } from './teamUtils'
 
+/** Props of `AvgSummaryRow`. */
 interface Props {
-  discipline: TeamDiscipline
-  profile: ScopeAverageProfile
-  placeholder?: boolean
+  discipline: TeamDiscipline // the section to render
+  profile: ScopeAverageProfile // the scope-average profile
+  placeholder?: boolean // show "— no <discipline> in scope —" instead of stats; default false
 }
 
 const fmt = (v: number | null | undefined, d = 2) =>
@@ -18,6 +22,7 @@ const LABEL: Record<TeamDiscipline, string> = {
   partnerships: 'PARTNERSHIPS',
 }
 
+/** Show the avg column's section head and stat rows for one discipline, on the parent grid's subgrid rows. */
 export default function AvgSummaryRow({
   discipline, profile, placeholder = false,
 }: Props) {

@@ -1,4 +1,6 @@
 /**
+ * The wrapper that puts a chart's header above its drawing area, so overlays measure from the top of the SVG.
+ *
  * ChartContainer — the canonical wrapper for any chart that needs a
  * header (title / subtitle) above its drawing area AND absolutely-
  * positioned overlays (rotated x-axis labels, top-of-bar annotations,
@@ -51,6 +53,7 @@
 
 import type { ReactNode } from 'react'
 
+/** Props of `ChartContainer`. */
 interface ChartContainerProps {
   /** Header element (typically <ChartHeader/>). Rendered above the
    *  chart area in normal document flow. Pass null for chart-less
@@ -80,6 +83,7 @@ interface ChartContainerProps {
   children: ReactNode
 }
 
+/** Render the header, then the chart content inside a `position: relative` block that its overlays measure from. */
 export default function ChartContainer({
   header,
   className = 'w-full',

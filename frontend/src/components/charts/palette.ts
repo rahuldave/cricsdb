@@ -1,4 +1,8 @@
 /**
+ * The chart colours: the Wisden palette, the outcome and tier palettes, their chip tints, and the delivery colours.
+ * @packageDocumentation
+ */
+/**
  * Wisden chart palette — colors that read well on the cream
  * (#FAF7F0) page background and harmonize with the editorial type.
  *
@@ -102,6 +106,7 @@ export const WISDEN_RUN_TIERS: Record<
   impact:   WISDEN.ochre,  // ochre — match-shaping (50+) ★
 }
 
+/** Tier colours for wickets in an innings: indigo for none, sage for 1-2, ochre for 3 or more. */
 export const WISDEN_WICKET_TIERS: Record<
   'wicketless' | 'building' | 'strike', string
 > = {
@@ -110,6 +115,7 @@ export const WISDEN_WICKET_TIERS: Record<
   strike:     WISDEN.ochre,  // ochre — strong spell (3+, cricket-iconic) ★
 }
 
+/** Tier colours for strike rate: indigo for slow, sage for typical, ochre for 150 or more. */
 export const WISDEN_SR_TIERS: Record<
   'slow' | 'mid' | 'explosive', string
 > = {
@@ -118,6 +124,7 @@ export const WISDEN_SR_TIERS: Record<
   explosive: WISDEN.ochre,  // ochre — 150+ aggressor ★
 }
 
+/** Tier colours for lower-is-better metrics such as economy: ochre for tight, sage for typical, indigo for loose. */
 export const WISDEN_LOWER_TIERS: Record<
   'tight' | 'mid' | 'loose', string
 > = {
@@ -143,7 +150,9 @@ export const WISDEN_TIER_TINTS: Record<
 }
 
 /** Map a tier color (from any of the WISDEN_*_TIERS palettes) to
- *  its chip-tint pair. */
+ *  its chip-tint pair.
+ * @param color a tier colour as a hex string
+ * @returns the tint's background and text colours; a faint slate pair for any other colour */
 export function tintForTierColor(color: string): { bg: string; fg: string } {
   if (color === '#7090A8') return WISDEN_TIER_TINTS.indigo
   if (color === '#7A8E6A') return WISDEN_TIER_TINTS.sage
@@ -205,7 +214,11 @@ export const DELIVERY = {
   atCreaseB: '#B8C5C2',  // antique sage / blue-grey
 } as const
 
-/** Off-bat run color by runs scored. */
+/**
+ * Off-bat run color by runs scored.
+ * @param runs the runs off the bat; 6 or more share the darkest colour
+ * @returns the cell colour, from `DELIVERY.run0` to `DELIVERY.run6`
+ */
 export const deliveryRunColor = (runs: number): string => {
   switch (runs) {
     case 0: return DELIVERY.run0

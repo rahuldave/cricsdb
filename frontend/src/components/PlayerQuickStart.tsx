@@ -1,4 +1,6 @@
 /**
+ * The "Try:" row of famous players under the player search on the batting, bowling and fielding pages.
+ *
  * Quick-start chip row rendered below the PlayerSearch on
  * /batting, /bowling, /fielding. Curated marquee names per
  * discipline so first-time visitors have a one-click path to
@@ -15,6 +17,7 @@
 
 import { Link, useSearchParams } from 'react-router-dom'
 
+/** The page a quick-start row is for, which picks its list of players. */
 export type QuickStartDiscipline = 'batting' | 'bowling' | 'fielding'
 
 interface Suggestion {
@@ -49,11 +52,13 @@ const SUGGESTIONS: Record<QuickStartDiscipline, Suggestion[]> = {
   ],
 }
 
+/** Props of `PlayerQuickStart`. */
 interface Props {
-  discipline: QuickStartDiscipline
+  discipline: QuickStartDiscipline // which list of players to show
   basePath: string  // e.g. '/batting'
 }
 
+/** Show six player links that open `basePath` with `player` set and the other URL parameters kept. */
 export default function PlayerQuickStart({ discipline, basePath }: Props) {
   const [searchParams] = useSearchParams()
   const suggestions = SUGGESTIONS[discipline]

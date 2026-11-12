@@ -1,4 +1,6 @@
 /**
+ * The All / Won toss / Lost toss pills, with match counts, that set the `?toss_outcome=` filter on a page.
+ *
  * TossFilter — page-local won / lost toss-outcome filter pill row.
  *
  * Sibling of ResultFilter (won/lost/tied match result), built to the
@@ -18,12 +20,14 @@
  */
 import { useUrlParam } from '../hooks/useUrlState'
 
+/** Props of `TossFilter`: the counts shown on the pills; null shows 0. */
 interface Props {
-  matches: number | null
-  won: number | null
-  lost: number | null
+  matches: number | null // all matches in scope, on the All pill
+  won: number | null // matches where the toss was won
+  lost: number | null // matches where the toss was lost
 }
 
+/** Show the toss pills with their counts and write the choice to `?toss_outcome=`. */
 export default function TossFilter({ matches, won, lost }: Props) {
   const [toss, setToss] = useUrlParam('toss_outcome')
   const seg = (active: boolean) => `wisden-seg${active ? ' is-active' : ''}`

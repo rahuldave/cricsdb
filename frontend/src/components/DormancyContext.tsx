@@ -1,11 +1,13 @@
 /**
+ * The context that carries a page's last match date to the dormancy badge, and the functions that word the badge.
+ *
  * DormancyContext — page → chrome bridge for the dormancy badge.
  *
  * Each page that fetches a Distribution dossier sets the
  * `last_match_date` from `lifetime.last_match_date` here. The
- * ScopedPageHeader and ScopeStatusStrip read from the same context
- * and render the tiered badge ('(0 in 60d)' / '(0 in 6mo)' /
- * '(0 in 1y+)') when the gap from today exceeds the threshold.
+ * ScopedPageHeader reads from the same context (through DormancyBadge)
+ * and renders the badge ("5 months since last match" /
+ * "last match: Oct 2021") when the gap from today exceeds 60 days.
  *
  * Pages without a Distribution panel never call setLastMatchDate,
  * so the context stays null and the badge stays absent. Page
@@ -17,10 +19,11 @@
 
 import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react'
 
+/** What `useDormancy` returns: the last match date and its setter. */
 interface DormancyState {
   /** ISO YYYY-MM-DD; null when the scope has no observations or page hasn't fetched. */
   lastMatchDate: string | null
-  setLastMatchDate: (d: string | null) => void
+  setLastMatchDate: (d: string | null) => void // sets the date; it keeps one identity across renders
 }
 
 const Ctx = createContext<DormancyState>({
@@ -28,6 +31,10 @@ const Ctx = createContext<DormancyState>({
   setLastMatchDate: () => {},
 })
 
+/** Hold the last match date for the pages inside it. `App` wraps the whole app in it.
+ * @param props the props
+ * @param props.children the part of the app that can read and set the date
+ */
 export function DormancyProvider({ children }: { children: ReactNode }) {
   const [lastMatchDate, setRaw] = useState<string | null>(null)
   // Stable setter so consumer-side useEffect deps don't churn.
@@ -39,17 +46,21 @@ export function DormancyProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
+/**
+ * Read the dormancy context.
+ * @returns the last match date and its setter; outside a provider, null and a setter that does nothing
+ */
 export function useDormancy() {
   return useContext(Ctx)
 }
 
 /** Computes the dormancy gap in days. Returns 0 when last_match_date
- *  is null or in the future (clamped). Pure function — exported for
+ *  is null, invalid or in the future (clamped). Pure function — exported for
  *  unit-testing. */
 export function dormancyGapDays(
-  lastMatchDate: string | null,
-  today: Date = new Date(),
-): number {
+  lastMatchDate: string | null, // the last match, as ISO YYYY-MM-DD, or null
+  today: Date = new Date(), // the day to count to; defaults to now
+): number { // whole days from the last match to today, never negative
   if (!lastMatchDate) return 0
   const last = new Date(lastMatchDate)
   if (Number.isNaN(last.getTime())) return 0
@@ -70,9 +81,9 @@ export function dormancyGapDays(
  *  understated ABdV's 4.5-year gap as "1y+".
  */
 export function dormancyBadgeText(
-  gapDays: number,
-  lastMatchDate: string | null,
-): string | null {
+  gapDays: number, // the gap from `dormancyGapDays`
+  lastMatchDate: string | null, // the last match, as ISO YYYY-MM-DD; used for the month and year after a year's gap
+): string | null { // the badge text, or null when there is no badge
   if (gapDays <= 60) return null
   if (gapDays < 365) {
     // Round to nearest month — 30.5 days/month gives 2-12 months

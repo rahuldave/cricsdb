@@ -9,6 +9,12 @@
  * components rather than one labelled-by-prop component, so each row
  * prefix stays tied to one comparison concept. Styling intentionally
  * duplicated from CohortRowPrefix so the two stay visually paired.
+ * @packageDocumentation
+ */
+
+/**
+ * Show the italic "vs avg" label at the start of a team chip row.
+ * @returns the label
  */
 export default function AvgRowPrefix() {
   return (

@@ -1,5 +1,6 @@
 /**
  * Form-delta one-line summary for the fielder Distribution panel.
+ *
  * Spec: internal_docs/spec-distribution-stats.md §14.2.6.
  *
  * Reads `dossier.form.delta`. Window-independent — does not redraw
@@ -23,8 +24,9 @@
 import type { FielderDistribution } from '../../types'
 import { WISDEN } from '../charts/palette'
 
+/** Props of `FielderFormDeltaLine`. */
 interface Props {
-  dossier: FielderDistribution
+  dossier: FielderDistribution // the fielder's distribution: its lifetime means and its form deltas
 }
 
 const OXBLOOD = '#7A1F1F'
@@ -48,6 +50,7 @@ function Delta({ value }: { value: number | null | undefined }) {
   return <span className="num" style={{ color, fontWeight: 600 }}>{text}</span>
 }
 
+/** Show the fielder's scope mean per match for each metric, and on a second line the form deltas in oxblood. */
 export default function FielderFormDeltaLine({ dossier }: Props) {
   const { delta } = dossier.form
   const lifetime = dossier.lifetime

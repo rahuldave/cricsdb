@@ -1,5 +1,5 @@
 /**
- * Mix histogram — "where does this player operate?"
+ * Bar chart of a player's share at each bucket: "where does this player operate?"
  *
  * Spec: internal_docs/spec-mix-and-performance-charts.md §1 (Chart A)
  * + §4.1. One bar per bucket; bar height = the player's share of the
@@ -13,16 +13,18 @@
 
 import { niceYAxis } from './niceAxis'
 
+/** One bar of `MixHistogram`: a bucket and the player's share there. */
 export interface MixEntry {
-  bucket: number
+  bucket: number // the bucket number on the x-axis (batting position, over, or dismissed position)
   share: number          // 0-1, sums to 1 across entries (or less if cohort has gaps)
   raw: number            // underlying count for the hover tooltip
   tooltip: string        // native title attribute text
 }
 
+/** Props of `MixHistogram`. */
 interface Props {
-  entries: MixEntry[]
-  bucketLabel: (bucket: number) => string
+  entries: MixEntry[] // the bars, in x-axis order; nothing renders when empty
+  bucketLabel: (bucket: number) => string // the x-axis label of a bucket
   /** Per-bucket background tint colour (or null to skip). Used to band
    *  powerplay / middle / death (bowling) or top-order / middle /
    *  lower (batting + fielding). */
@@ -31,7 +33,7 @@ interface Props {
   title?: string
   /** Italic caption under the title — typically the unit hint. */
   subtitle?: string
-  height?: number
+  height?: number // chart height in pixels; default 80
   /** Optional vertical reference line at a fractional bucket value
    *  (1..N, not array index). Used on /batting?tab=By+Position to
    *  mark the player's mean batting bucket so the reader sees where
@@ -44,6 +46,10 @@ const BAR_COLOR = '#3C5B7A'  // WISDEN.slate
 const BAR_OPACITY = 0.8
 const VB_W = 100
 
+/**
+ * Show a player's share of their in-scope total at each bucket as bars, with round percent ticks and optional phase bands.
+ * Renders nothing when `entries` is empty.
+ */
 export default function MixHistogram({
   entries, bucketLabel, phaseTint,
   title, subtitle, height = 80,

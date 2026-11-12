@@ -1,3 +1,6 @@
+/**
+ * One discipline section of a team column in the Teams Compare grid, with delta chips against the scope average.
+ */
 import { Link } from 'react-router-dom'
 import type { FilterParams, MetricEnvelope, TeamProfile } from '../../types'
 import MetricDelta from '../MetricDelta'
@@ -7,11 +10,12 @@ import {
   type TeamDiscipline,
 } from './teamUtils'
 
+/** Props of `TeamSummaryRow`. */
 interface Props {
-  discipline: TeamDiscipline
-  profile: TeamProfile
-  team: string
-  filters: FilterParams
+  discipline: TeamDiscipline // the section to render
+  profile: TeamProfile // the team's fetched profile
+  team: string // the team, for the "(open ↗)" link to its page
+  filters: FilterParams // the column's filters, carried into that link
   /** Dim placeholder when a column has no data for this discipline.
    *  Keeps rows aligned across compare columns. */
   placeholder?: boolean
@@ -64,6 +68,7 @@ const TAB_FOR: Record<TeamDiscipline, string | null> = {
   partnerships: 'Partnerships',
 }
 
+/** Show the section head with an "(open ↗)" link and the stat rows for one discipline, on the parent grid's subgrid rows. */
 export default function TeamSummaryRow({
   discipline, profile, team, filters, placeholder = false,
 }: Props) {

@@ -1,4 +1,6 @@
 /**
+ * The landing tile for one canonical tournament, linking to its all-editions page.
+ *
  * TournamentTile — wisden-tile card for one canonical tournament.
  *
  * Renders the canonical name, edition + match counts, most-titles
@@ -20,16 +22,17 @@ import type { TournamentLandingEntry } from '../../types'
 /** Pass-through scope fields common to every landing link. Used by the
  *  stretched primary link on each tile. */
 export interface TileAmbientScope {
-  gender?: string
-  team_type?: string
-  season_from?: string
-  season_to?: string
-  filter_venue?: string
+  gender?: string // "male" or "female"; absent when not set
+  team_type?: string // "international" or "club"; absent when not set
+  season_from?: string // the first season of the range
+  season_to?: string // the last season of the range
+  filter_venue?: string // the venue filter
 }
 
+/** Pick the tile's pass-through scope out of the page filters, dropping empty values. */
 export function tileAmbientFromFilters(
-  filters: ReturnType<typeof useFilters>,
-): TileAmbientScope {
+  filters: ReturnType<typeof useFilters>, // the page filters from `useFilters`
+): TileAmbientScope { // gender, team_type, seasons and venue, each undefined when empty
   return {
     gender: filters.gender || undefined,
     team_type: filters.team_type || undefined,
@@ -39,6 +42,14 @@ export function tileAmbientFromFilters(
   }
 }
 
+/**
+ * Show a tournament's name, edition and match counts, most-titles team, latest edition and its winner.
+ * `entry` is the tournament's landing entry; `ambient` is the pass-through scope for the links.
+ * The tile's own gender and team_type win over the ambient ones on every link.
+ * @param props the props
+ * @param props.entry the tournament's landing entry
+ * @param props.ambient the pass-through scope for the links
+ */
 export default function TournamentTile({
   entry, ambient,
 }: { entry: TournamentLandingEntry; ambient: TileAmbientScope }) {

@@ -1,3 +1,6 @@
+/**
+ * The Overview tab of a venue's page: headline numbers, toss, phases, ground records and matches hosted.
+ */
 import { Link } from 'react-router-dom'
 import type { VenueSummary, VenueTGSRow } from '../../types'
 import StatCard from '../StatCard'
@@ -15,6 +18,10 @@ const teamLink = (team: string) => (
   <Link to={`/teams?team=${encodeURIComponent(team)}`} className="comp-link">{team}</Link>
 )
 
+/** Show a venue's summary as stat cards and tables.
+ * @param props the props
+ * @param props.summary the venue's /summary response
+ */
 export default function VenueOverviewPanel({ summary }: { summary: VenueSummary }) {
   const totalToss = Object.values(summary.toss_decision_split).reduce((a, b) => a + b, 0)
   const bat = summary.toss_decision_split.bat ?? 0

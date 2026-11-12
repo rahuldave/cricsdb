@@ -1,3 +1,6 @@
+/**
+ * One venue's page, with Overview, Batters, Bowlers, Fielders, Matches and Records tabs.
+ */
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
@@ -72,6 +75,10 @@ function TeamWithEd({ team, row, gender, team_type }: {
   )
 }
 
+/** Show a venue's page in the current filter scope, fetching the data for the open tab only (the summary always).
+ * @param props the props
+ * @param props.venue the venue's canonical name
+ */
 export default function VenueDossier({ venue }: { venue: string }) {
   const filters = useFilters()
   const [activeTab, setActiveTab] = useUrlParam('tab', 'Overview')

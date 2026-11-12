@@ -1,4 +1,6 @@
 /**
+ * The line that compares a bowler's recent wickets and economy with the scope's.
+ *
  * Form-delta one-line summary for the bowler Distribution panel.
  * Spec: internal_docs/spec-distribution-stats.md §12.2.7.
  *
@@ -14,8 +16,9 @@
 import type { BowlerDistribution } from '../../types'
 import { WISDEN } from '../charts/palette'
 
+/** Props of `BowlerFormDeltaLine`. */
 interface Props {
-  dossier: BowlerDistribution
+  dossier: BowlerDistribution // the bowler's distribution; only `form.delta` is read
 }
 
 function fmtDelta(v: number | null | undefined): string {
@@ -45,6 +48,10 @@ function EconomyDelta({ value }: { value: number | null | undefined }) {
   return <span className="num" style={{ color, fontWeight: 600 }}>{text}</span>
 }
 
+/**
+ * Show the wickets-mean and economy deltas for the last 10 innings, 60 days, 6 months and 1 year.
+ * A rise in wickets is green and a rise in economy is red; a missing delta reads "insufficient".
+ */
 export default function BowlerFormDeltaLine({ dossier }: Props) {
   const { delta } = dossier.form
   return (

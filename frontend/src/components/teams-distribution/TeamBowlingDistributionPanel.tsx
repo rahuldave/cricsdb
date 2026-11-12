@@ -1,4 +1,6 @@
 /**
+ * The per-innings team bowling distribution panel on the Teams page Bowling tab.
+ *
  * Team-bowling Distribution panel — top-level orchestrator for the
  * §17.4 frontend slice. Spec:
  * internal_docs/spec-distribution-stats.md §17.4.
@@ -217,11 +219,12 @@ function SparklineLegend({ globalLegend, leagueLegend, rollingWindow }: {
   )
 }
 
+/** Props of `TeamBowlingDistributionPanel`. */
 interface Props {
-  team: string
-  distribution: TeamBowlingDistribution | null
-  loading: boolean
-  error: string | null
+  team: string // the team's name, passed to the suggested-splits links
+  distribution: TeamBowlingDistribution | null // the team's bowling distribution; nothing renders when null
+  loading: boolean // true while the distribution loads; nothing renders then
+  error: string | null // the fetch error, if any; nothing renders when set
   /** Same-scope league averages from the existing /summary envelope.
    *  - `wickets` ← `summary.wickets.scope_avg` (per-innings).
    *  - `runsConceded` ← `summary.runs_conceded.scope_avg`.
@@ -229,6 +232,10 @@ interface Props {
   leagueAvg?: { wickets: number | null; runsConceded: number | null; economy: number | null }
 }
 
+/**
+ * Show a team's per-innings bowling distribution for wickets, runs conceded or economy: histogram, stat strip, chips, sparkline,
+ * form delta and suggested splits, with the window and metric kept in the URL.
+ */
 export default function TeamBowlingDistributionPanel({
   team, distribution, loading, error, leagueAvg,
 }: Props) {

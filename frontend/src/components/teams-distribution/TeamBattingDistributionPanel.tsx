@@ -1,4 +1,6 @@
 /**
+ * The per-innings team batting distribution panel on the Teams page Batting tab.
+ *
  * Team-batting Distribution panel — top-level orchestrator for the
  * §17 frontend slice. Spec: internal_docs/spec-distribution-stats.md
  * §17.3.
@@ -200,11 +202,12 @@ function SparklineLegend({ globalLegend, leagueLegend, rollingWindow }: {
   )
 }
 
+/** Props of `TeamBattingDistributionPanel`. */
 interface Props {
-  team: string
-  distribution: TeamBattingDistribution | null
-  loading: boolean
-  error: string | null
+  team: string // the team's name, passed to the suggested-splits links
+  distribution: TeamBattingDistribution | null // the team's batting distribution; nothing renders when null
+  loading: boolean // true while the distribution loads; nothing renders then
+  error: string | null // the fetch error, if any; nothing renders when set
   /** Same-scope league averages for the green reference line on the
    *  sparkline. Sourced from the existing /summary endpoint's
    *  scope_avg envelope (already fetched by the parent BattingTab).
@@ -213,6 +216,10 @@ interface Props {
   leagueAvg?: { runs: number | null; runRate: number | null }
 }
 
+/**
+ * Show a team's per-innings batting distribution for runs or run rate: histogram, stat strip, chips, sparkline,
+ * form delta and suggested splits, with the window and metric kept in the URL.
+ */
 export default function TeamBattingDistributionPanel({
   team, distribution, loading, error, leagueAvg,
 }: Props) {

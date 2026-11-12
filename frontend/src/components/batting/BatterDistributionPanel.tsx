@@ -1,4 +1,6 @@
 /**
+ * The batter's per-innings runs and strike-rate distribution panel on `/batting?player=X`.
+ *
  * Batter Distribution panel — top-level orchestrator. Spec
  * internal_docs/spec-distribution-stats.md §9 + §12.2.6 sparkline
  * conventions.
@@ -13,9 +15,10 @@
  *
  * Sparkline now uses the lifted DistributionSparkline with:
  *   - Tier-coloured bars on the Runs tab (matching the histogram
- *     bins — failure/building/fifty/century/rare).
- *   - Dual reference lines: black scope average + gray gender-
- *     global anchor (BATTING_GLOBAL_* in distribution/globalBaselines).
+ *     bins — failure/building/impact).
+ *   - Reference lines: black scope average, gray gender-global
+ *     anchor (BATTING_GLOBAL_* in distribution/globalBaselines), and
+ *     forest-green same-scope league average.
  *   - Rolling-N mean overlay (oxblood/red) on the Scope window
  *     when n ≥ N. Player-grain N = 5 (smaller window keeps recent
  *     swings visible; one bad innings is the floor).
@@ -244,19 +247,24 @@ function SparklineLegend({ globalLegend, leagueLegend, rollingWindow }: {
   )
 }
 
+/** Props of `BatterDistributionPanel`. */
 interface Props {
-  playerId: string
-  distribution: BatterDistribution | null
+  playerId: string // the batter's id, for the cohort nudge and the suggested-split links
+  distribution: BatterDistribution | null // the batter's distribution; null shows nothing
   /** Tier 6 of spec-apples-to-apples-baselines.md — when present, the
    *  sparkline draws a forest-green reference line at the active-scope
    *  cohort baseline (position-weighted via Tier 1). Sourced from the
    *  /batters/{id}/summary `runs_per_innings.scope_avg` for the runs
    *  tab and `strike_rate.scope_avg` for the SR tab. */
   summary: BattingSummary | null
-  loading: boolean
-  error: string | null
+  loading: boolean // true while the distribution loads; the panel shows nothing
+  error: string | null // the request's error; the panel shows nothing when set
 }
 
+/**
+ * Show the batter's histogram, stats, milestone chips, sparkline, form deltas and suggested splits.
+ * The window and the metric (runs or strike rate) come from `?dist_window` and `?dist_metric`.
+ */
 export default function BatterDistributionPanel({
   playerId, distribution, summary, loading, error,
 }: Props) {

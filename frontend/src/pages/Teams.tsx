@@ -1,3 +1,13 @@
+/**
+ * The teams page at `/teams`: a landing board of teams, or one team's dossier.
+ *
+ * With no `?team=`, it shows a team search and the teams landing board. With `?team=<name>`, it
+ * shows the tabs in `?tab=` (default `By Season`): By Season, vs Opponent (the opponent in `?vs=`),
+ * Compare (up to three columns from `compare1`, `compare2` and their `compareN_*` overrides),
+ * Batting, Bowling, Fielding, Partnerships (`?partnership_side=`, default `batting`), Players,
+ * Records and Match List. On first load it rewrites legacy `compare=A,B` and `avg_slot=1` URLs
+ * into the `compareN` params.
+ */
 import type React from 'react'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -78,6 +88,10 @@ const tabs = [
   'Players', 'Records', 'Match List',
 ] as const
 
+/**
+ * Show the teams landing board, or the tabs of the team in `?team=`.
+ * @returns the page
+ */
 export default function Teams() {
   const navigate = useNavigate()
   const filters = useFilters()

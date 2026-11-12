@@ -1,4 +1,6 @@
 /**
+ * The line that compares a batter's recent mean and median runs with the scope's.
+ *
  * Form-delta one-line summary for the batter Distribution panel.
  * Spec: internal_docs/spec-distribution-stats.md §9.2.5.
  *
@@ -10,8 +12,9 @@
 import type { BatterDistribution } from '../../types'
 import { WISDEN } from '../charts/palette'
 
+/** Props of `FormDeltaLine`. */
 interface Props {
-  dossier: BatterDistribution
+  dossier: BatterDistribution // the batter's distribution; only `form.delta` is read
 }
 
 function signed(v: number | null | undefined): { text: string; color: string } {
@@ -34,6 +37,10 @@ function Delta({ value }: { value: number | null | undefined }) {
   )
 }
 
+/**
+ * Show the mean and median deltas for the last 10 innings, 60 days, 6 months and 1 year.
+ * A rise is green and a fall is red; a missing delta reads "insufficient".
+ */
 export default function FormDeltaLine({ dossier }: Props) {
   const { delta } = dossier.form
   return (

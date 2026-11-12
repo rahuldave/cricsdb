@@ -1,8 +1,12 @@
+/** `useFilterDeps`: the filter values as a `useFetch` deps array, so a page refetches when any filter changes. */
+
 import { useMemo } from 'react'
 import { useFilters } from './useFilters'
 import { FILTER_KEYS, type FilterKey } from '../components/scopeLinks'
 
 /**
+ * Return the filter values in a fixed order, as a stable array for `useFetch` deps.
+ *
  * useFilterDeps — returns a stable array of FilterParams values in a
  * fixed order, suitable as a `useFetch` deps argument.
  *
@@ -29,7 +33,7 @@ import { FILTER_KEYS, type FilterKey } from '../components/scopeLinks'
  * Callers can append additional non-filter deps (e.g. active tab, a
  * row id) with `[...useFilterDeps(), tab]`.
  */
-export function useFilterDeps(): (string | undefined)[] {
+export function useFilterDeps(): (string | undefined)[] { // the `FILTER_KEYS` values, then inning, toss_outcome and result
   const filters = useFilters()
   // `filters` is already memoized on URL string (see useFilters), so
   // reference identity changes only when values change. One more memo

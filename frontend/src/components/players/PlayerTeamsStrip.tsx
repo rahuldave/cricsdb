@@ -26,9 +26,10 @@ import TeamLink from '../TeamLink'
 import { SectionHeader } from '../ChartHeader'
 import type { FilterParams, PlayerTeamTotals } from '../../types'
 
+/** Props of `PlayerTeamsStrip`. */
 interface Props {
-  playerId: string
-  filters: FilterParams
+  playerId: string // the player whose teams are listed
+  filters: FilterParams // the scope; the links carry it
   /** Drop the trailing Batting/Bowling/Fielding per-discipline links.
    *  Set on the single-discipline pages (/batting, /bowling, /fielding)
    *  where the strip is a team index, not a discipline launcher — the
@@ -56,6 +57,7 @@ function disciplineHref(
   return `${base}?${qs}`
 }
 
+/** List each team the player played for in scope, with matches, runs, wickets and catches, and links narrowed to that team. */
 export default function PlayerTeamsStrip({ playerId, filters, hideDisciplineLinks = false }: Props) {
   // The "N matches @" lead-in stays on the page the reader is already
   // on, scoped to that team: on /batting it lands on this player's

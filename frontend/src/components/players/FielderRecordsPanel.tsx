@@ -16,12 +16,13 @@ import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
 import type { FielderRecords, PlayerFieldingRecord } from '../../types'
 
+/** Props of `FielderRecordsPanel`. */
 interface Props {
-  data: FielderRecords | null
-  loading: boolean
-  error: string | null
-  refetch?: () => void
-  lists?: Array<keyof Omit<FielderRecords, 'person_id' | 'name'>>
+  data: FielderRecords | null // the player's record lists; nothing is shown while null
+  loading: boolean // true while the records load; shows a spinner
+  error: string | null // the request's error, shown in an `ErrorBanner`; null when there is none
+  refetch?: () => void // called by the banner's Retry button
+  lists?: Array<keyof Omit<FielderRecords, 'person_id' | 'name'>> // only these lists; all of them when absent
 }
 
 const matchLink = (matchId: number, label: string | number) => (
@@ -60,6 +61,7 @@ const LISTS: ListDef[] = [
     rows: d => d.most_dismissals_match },
 ]
 
+/** Show the player's fielding record lists, most catches, stumpings and dismissals in a match, each as a table. */
 export default function FielderRecordsPanel({ data, loading, error, refetch, lists }: Props) {
   if (loading) return <Spinner label="Loading records…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />

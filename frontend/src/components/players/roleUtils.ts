@@ -1,15 +1,38 @@
+/**
+ * Tell which disciplines a player has data in, name the player's primary role, and carry filters into deep-dive links.
+ */
 import type { PlayerProfile, FilterParams } from '../../types'
 
 // Per-discipline "has meaningful data" gates. Thresholds mirror the
 // existing leaderboard minimums so a landing-ranked player doesn't
 // render a row the leaderboard itself would have excluded.
+/**
+ * Tell whether the player batted at least one innings in scope.
+ * @param p the player's profile in scope
+ * @returns true when the batting innings count is above 0
+ */
 export const hasBatting  = (p: PlayerProfile) => (p.batting?.innings.value ?? 0) > 0
+/**
+ * Tell whether the player bowled at least one ball in scope.
+ * @param p the player's profile in scope
+ * @returns true when the balls bowled count is above 0
+ */
 export const hasBowling  = (p: PlayerProfile) => (p.bowling?.balls.value ?? 0) > 0
+/**
+ * Tell whether the player took a catch, a stumping or a run-out in scope.
+ * @param p the player's profile in scope
+ * @returns true when catches, stumpings and run-outs add up to more than 0
+ */
 export const hasFielding = (p: PlayerProfile) => {
   const f = p.fielding
   if (!f) return false
   return ((f.catches.value ?? 0) + (f.stumpings.value ?? 0) + (f.run_outs.value ?? 0)) > 0
 }
+/**
+ * Tell whether the player kept wicket in at least one innings in scope.
+ * @param p the player's profile in scope
+ * @returns true when the innings kept count is above 0
+ */
 export const hasKeeping  = (p: PlayerProfile) => (p.keeping?.innings_kept.value ?? 0) > 0
 
 // Role-classification thresholds. These are stricter than the "has data"
@@ -31,19 +54,29 @@ export const hasKeeping  = (p: PlayerProfile) => (p.keeping?.innings_kept.value 
 // matches where the bowler actually sent down a delivery, which
 // flatters anyone who bowled once or twice. fielding.matches is the
 // true denominator (everyone fields every match).
+/** Fewest batting innings for the role to count as "batted". */
 export const ROLE_BATTED_MIN_INNINGS        = 5
+/** Fewest balls faced per innings for the role to count as "batted". */
 export const ROLE_BATTED_MIN_BALLS_PER_INN  = 5
+/** Lowest batting average for the role to count as "batted". */
 export const ROLE_BATTED_MIN_AVERAGE        = 10
+/** Fewest balls bowled (60 = 10 overs) for the role to count as "bowled". */
 export const ROLE_BOWLED_MIN_BALLS          = 60
+/** Fewest balls bowled per career match in scope for the role to count as "bowled". */
 export const ROLE_BOWLED_MIN_BALLS_PER_MATCH = 3
+/** Fewest innings kept for the role to count as a keeper. */
 export const KEEPING_INNINGS_THRESHOLD      = 3
 
-/** Primary-role label for the identity line. See spec §"Primary-role
+/** Return the primary-role label for the identity line, such as 'all-rounder' or 'wicketkeeper'.
+ *
+ *  Primary-role label for the identity line. See spec §"Primary-role
  *  label — definition" (thresholds refined in-repo to exclude tail-
  *  enders and one-over-a-season dabblers — see constants above).
  *  Recomputed per profile so narrowing scope can truthfully flip
  *  Kohli from "specialist batter" to "all-rounder" if he bowled
- *  meaningfully there. */
+ *  meaningfully there.
+ *  @param p the player's profile in scope
+ *  @returns 'keeper-batter', 'wicketkeeper', 'all-rounder', 'specialist batter', 'specialist bowler', 'fielder' or 'no matches in scope' */
 export function classifyRole(p: PlayerProfile): string {
   const b = p.batting
   const bw = p.bowling
@@ -83,8 +116,12 @@ export function classifyRole(p: PlayerProfile): string {
   return 'no matches in scope'
 }
 
-/** "375 matches" — the larger of any discipline's match count, which
- *  handles specialist roles where one summary may be null. */
+/** Return the player's match count in scope.
+ *
+ *  "375 matches" — the larger of any discipline's match count, which
+ *  handles specialist roles where one summary may be null.
+ *  @param p the player's profile in scope
+ *  @returns the largest of the batting, bowling and fielding match counts */
 export function matchesInScope(p: PlayerProfile): number {
   return Math.max(
     p.batting?.matches.value ?? 0,
@@ -93,8 +130,11 @@ export function matchesInScope(p: PlayerProfile): number {
   )
 }
 
-/** Build the query-string carry for a discipline deep-dive link —
- *  all active FilterBar params plus the player ID. */
+/** Build the query-string carry for a discipline deep-dive link.
+ *
+ *  Carries gender, team type, tournament, season range, team, opponent and venue; the caller adds the player ID.
+ *  @param filters the active FilterBar params
+ *  @returns the set params, by name */
 export function carryFilters(filters: FilterParams): Record<string, string> {
   const out: Record<string, string> = {}
   if (filters.gender)          out.gender          = filters.gender

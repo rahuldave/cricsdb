@@ -1,4 +1,6 @@
 /**
+ * A team tab's table of headline metrics, overall and by innings (batted or bowled first and second).
+ *
  * InningBandsRow — compact 3-row table (Overall / 1st innings /
  * 2nd innings) of headline metrics for a team Batting / Bowling /
  * Fielding / Partnerships tab. Sibling of PhaseBandsRow but with
@@ -30,26 +32,31 @@ import { SectionHeader } from '../ChartHeader'
 
 type Discipline = 'batting' | 'bowling' | 'fielding' | 'partnerships'
 
+/** Props of `InningBandsRow` for the batting tab. */
 interface BattingProps {
-  discipline: 'batting'
-  summary: TeamBattingSummary
-  bands: TeamBattingInning[]
+  discipline: 'batting' // the tab
+  summary: TeamBattingSummary // the team's /summary response, for the Overall row
+  bands: TeamBattingInning[] // the /by-inning rows; empty hides the table
 }
+/** Props of `InningBandsRow` for the bowling tab. */
 interface BowlingProps {
-  discipline: 'bowling'
-  summary: TeamBowlingSummary
-  bands: TeamBowlingInning[]
+  discipline: 'bowling' // the tab
+  summary: TeamBowlingSummary // the team's /summary response, for the Overall row
+  bands: TeamBowlingInning[] // the /by-inning rows; empty hides the table
 }
+/** Props of `InningBandsRow` for the fielding tab. */
 interface FieldingProps {
-  discipline: 'fielding'
-  summary: TeamFieldingSummary
-  bands: TeamFieldingInning[]
+  discipline: 'fielding' // the tab
+  summary: TeamFieldingSummary // the team's /summary response, for the Overall row
+  bands: TeamFieldingInning[] // the /by-inning rows; empty hides the table
 }
+/** Props of `InningBandsRow` for the partnerships tab. */
 interface PartnershipsProps {
-  discipline: 'partnerships'
-  summary: TeamPartnershipsSummary
-  bands: TeamPartnershipsInning[]
+  discipline: 'partnerships' // the tab
+  summary: TeamPartnershipsSummary // the team's /summary response, for the Overall row
+  bands: TeamPartnershipsInning[] // the /by-inning rows; empty hides the table
 }
+/** Props of `InningBandsRow`: one shape per discipline. */
 type Props = BattingProps | BowlingProps | FieldingProps | PartnershipsProps
 
 const fmt2 = (v: number | null | undefined) => v == null ? '-' : v.toFixed(2)
@@ -209,6 +216,11 @@ const TITLE_FOR: Record<Discipline, string> = {
   partnerships: 'By innings — partnerships',
 }
 
+/**
+ * Show the Overall row from the summary and one row per innings from the bands, with POV-aware labels.
+ * @param props the discipline, the team's summary and its by-inning bands
+ * @returns the table, or null when there are no bands
+ */
 export default function InningBandsRow(props: Props) {
   const { headers, rows } = buildRows(props)
   // Hide entirely if the by-inning fetch returned nothing (out-of-

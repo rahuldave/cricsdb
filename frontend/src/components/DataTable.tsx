@@ -1,18 +1,24 @@
+/**
+ * A sortable table with optional paging, row highlighting and row clicks.
+ */
 import { useState, useEffect, useRef } from 'react'
 
+/** One column of a `DataTable`: the row field it shows, its heading, and how to format it. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface Column<T = any> {
-  key: keyof T & string
-  label: string
-  sortable?: boolean
+  key: keyof T & string // the row field the column shows and sorts by
+  label: string // the column heading
+  sortable?: boolean // true lets a click on the heading sort by this column
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  format?: (value: any, row: T) => string | number
+  format?: (value: any, row: T) => string | number // turns the cell value into text; without it the value shows as is, or "-" when null
 }
 
+/** Props of `DataTable`. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface DataTableProps<T = any> {
-  columns: Column<T>[]
-  data: T[]
+  columns: Column<T>[] // the columns, in order
+  data: T[] // the rows
+  /** Shows a "Showing a–b of n" line with Prev and Next buttons that call `onPage` with the new offset. */
   pagination?: { total: number; limit: number; offset: number; onPage: (offset: number) => void }
   /** Stable identity for a row — required to use highlightKey/onRowClick. */
   rowKey?: (row: T) => string
@@ -26,6 +32,7 @@ interface DataTableProps<T = any> {
   rowClass?: (row: T) => string | undefined
 }
 
+/** Show rows in a table that sorts by a clicked column, and pages, highlights or reacts to clicks when asked. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function DataTable<T extends Record<string, any> = Record<string, any>>({
   columns, data, pagination, rowKey, highlightKey, onRowClick, rowClass,

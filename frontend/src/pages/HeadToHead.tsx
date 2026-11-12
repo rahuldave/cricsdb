@@ -1,3 +1,11 @@
+/**
+ * The head-to-head page at `/head-to-head`: one batter against one bowler, or one team against another.
+ *
+ * `?mode=player` (the default) picks a batter (`?batter=`) and a bowler (`?bowler=`) and shows
+ * their record: totals, the matches they met in, and a `?series_type=` filter (default `all`).
+ * `?mode=team`, or `?team1=` and `?team2=` both set, picks two teams and shows the rivalry as a
+ * `TournamentDossier`. With nothing picked, each mode suggests popular matchups.
+ */
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
@@ -49,6 +57,10 @@ const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed
 
 type Mode = 'player' | 'team'
 
+/**
+ * Show the mode picker and either the player-against-player or the team-against-team view.
+ * @returns the page
+ */
 export default function HeadToHead() {
   const [mode] = useUrlParam('mode', 'player') as [Mode, (v: Mode) => void]
   const setUrlParams = useSetUrlParams()

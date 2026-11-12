@@ -12,12 +12,13 @@ import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
 import type { BowlerRecords, PlayerBowlingRecord } from '../../types'
 
+/** Props of `BowlerRecordsPanel`. */
 interface Props {
-  data: BowlerRecords | null
-  loading: boolean
-  error: string | null
-  refetch?: () => void
-  lists?: Array<keyof Omit<BowlerRecords, 'person_id' | 'name'>>
+  data: BowlerRecords | null // the player's record lists; nothing is shown while null
+  loading: boolean // true while the records load; shows a spinner
+  error: string | null // the request's error, shown in an `ErrorBanner`; null when there is none
+  refetch?: () => void // called by the banner's Retry button
+  lists?: Array<keyof Omit<BowlerRecords, 'person_id' | 'name'>> // only these lists; all of them when absent
 }
 
 const matchLink = (matchId: number, label: string | number) => (
@@ -55,6 +56,7 @@ const LISTS: ListDef[] = [
     rows: d => d.most_economical },
 ]
 
+/** Show the player's bowling record lists, best figures and most economical spells, each as a table. */
 export default function BowlerRecordsPanel({ data, loading, error, refetch, lists }: Props) {
   if (loading) return <Spinner label="Loading records…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />

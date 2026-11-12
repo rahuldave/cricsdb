@@ -20,11 +20,12 @@
 
 import { useMemo } from 'react'
 
+/** Props of `SeasonTickAxis`. */
 interface Props {
   /** ISO date strings (YYYY-MM-DD) in chronological order, one per
    *  bar in the sparkline above. Nulls allowed and skipped. */
   dates: (string | null)[]
-  height?: number
+  height?: number // axis height in pixels; 18 by default
 }
 
 function yearOf(date: string | null): string {
@@ -41,6 +42,7 @@ interface TickMark {
   label: string
 }
 
+/** Mark the first bar of each calendar year with a tick and a 2-digit year label; nothing when no date has a year. */
 export default function SeasonTickAxis({ dates, height = 18 }: Props) {
   const ticks: TickMark[] = useMemo(() => {
     if (dates.length === 0) return []

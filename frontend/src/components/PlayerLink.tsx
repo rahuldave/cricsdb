@@ -1,4 +1,6 @@
 /**
+ * A player's name as a link to their page, followed by links to the same player in the current scope.
+ *
  * PlayerLink — name link + contextual scope-phrase subscripts for a player.
  *
  *   Name link    → /batting|/bowling|/fielding|/players?player=X
@@ -40,11 +42,12 @@ const ROLE_PATH: Record<PlayerRole, string> = {
   fielder: '/fielding',
 }
 
+/** Props of `PlayerLink`. */
 interface PlayerLinkProps {
-  personId: string | null | undefined
-  name: string
-  role: PlayerRole
-  subscriptSource?: SubscriptSource
+  personId: string | null | undefined // the player's id; without it the name shows as plain text
+  name: string // the name to show
+  role: PlayerRole // the page to link to: home is /players, batter /batting, bowler /bowling, fielder /fielding
+  subscriptSource?: SubscriptSource // a row's own match scope, used for the phrases instead of the page filters
   /** Override gender on the name link. Defaults to FilterBar's gender.
    *  Use on curated/filter-less surfaces (Home's featured players) where
    *  gender is known per-link but no FilterBar is present. */
@@ -84,6 +87,7 @@ interface PlayerLinkProps {
   keepRivalry?: boolean
 }
 
+/** Show a player's name linked to their page, then the scope phrases ("vs Australia", "at IPL, 2024") as links. */
 export default function PlayerLink({
   personId, name, role, subscriptSource, gender, compact, trailingContent,
   maxTiers, phraseLabel, phraseClassName,

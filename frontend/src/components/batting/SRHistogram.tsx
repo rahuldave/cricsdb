@@ -1,4 +1,6 @@
 /**
+ * Histogram of a batter's strike rate per innings, coloured slow, mid and explosive.
+ *
  * Per-innings strike-rate histogram. Spec
  * internal_docs/spec-distribution-stats.md §9 (SR-tab extension
  * 2026-05-06).
@@ -13,15 +15,17 @@ import { WISDEN_SR_TIERS } from '../charts/palette'
 import { buildSRHistogramRows } from './distributionBins'
 import type { InningsObservation } from '../../types'
 
+/** Props of `SRHistogram`. */
 interface Props {
-  observations: InningsObservation[]
-  title?: string
-  height?: number
+  observations: InningsObservation[] // the batter's innings to bin by strike rate
+  title?: string // the chart title; none when absent
+  height?: number // the chart height in pixels; 220 by default
 }
 
 const TIER_ORDER: (keyof typeof WISDEN_SR_TIERS)[] = ['slow', 'mid', 'explosive']
 const COLOR_SCHEME = TIER_ORDER.map(t => WISDEN_SR_TIERS[t])
 
+/** Show the strike-rate histogram in width-25 bins; nothing when there are no rows. */
 export default function SRHistogram({ observations, title, height = 220 }: Props) {
   const rows = useMemo(
     () => buildSRHistogramRows(observations),

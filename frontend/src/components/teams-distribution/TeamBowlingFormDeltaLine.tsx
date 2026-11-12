@@ -1,4 +1,6 @@
 /**
+ * Two lines under the team bowling distribution: the scope average, then the form change in each recent window.
+ *
  * Form-delta two-line summary for the team-bowling Distribution
  * panel. Spec: internal_docs/spec-distribution-stats.md §17.4.
  *
@@ -19,8 +21,9 @@
 import type { TeamBowlingDistribution } from '../../types'
 import { WISDEN } from '../charts/palette'
 
+/** Props of `TeamBowlingFormDeltaLine`. */
 interface Props {
-  dossier: TeamBowlingDistribution
+  dossier: TeamBowlingDistribution // the team's distribution; its lifetime block and `form.delta` are read
 }
 
 const OXBLOOD = '#7A1F1F'
@@ -45,6 +48,10 @@ function Delta({ value, digits }: { value: number | null | undefined; digits: nu
 
 type WindowKey = 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
 
+/**
+ * Show the team's scope average for wickets, runs conceded and economy, and the change from it over the last 10 innings,
+ * 60 days, 6 months and 1 year. A missing delta shows as a dash.
+ */
 export default function TeamBowlingFormDeltaLine({ dossier }: Props) {
   const lifetime = dossier.lifetime
   // Cast for template-string lookup over 12 typed keys.

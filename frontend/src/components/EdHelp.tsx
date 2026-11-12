@@ -1,4 +1,11 @@
 /**
+ * The caption that explains the "ed" tag after a team name in a table.
+ * @packageDocumentation
+ */
+
+/**
+ * Show the caption that explains the "ed" link after team names.
+ *
  * EdHelp — small table caption explaining the per-row ED subscript.
  *
  * Rendered beneath a DataTable title (or appended to an existing
@@ -8,6 +15,8 @@
  * who don't know the convention can learn it without leaving the
  * page. Convention docs: internal_docs/design-decisions.md
  * "Per-row '(ed)' tag uses row scope".
+ * @param props the props
+ * @param props.className extra classes added after `wisden-tab-help`
  */
 export default function EdHelp({ className }: { className?: string }) {
   return (

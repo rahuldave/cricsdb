@@ -11,9 +11,10 @@
  * per-bar color override. Component knows nothing about
  * Bowler vs Batter observation shapes.
  *
- * Two reference lines per spec §12.2.6 — green scope average
- * (where this player usually sits) + black gender-global
- * (where any player at this tier usually sits).
+ * Reference lines per spec §12.2.6 — black scope average
+ * (where this player usually sits), gray gender-global
+ * (where any player at this tier usually sits), and an optional
+ * forest-green same-scope league average.
  *
  * Mobile: bar <a> elements get `pointer-events: none` via the
  * `.wisden-dist-sparkline a { pointer-events: none }` rule
@@ -22,6 +23,7 @@
 
 import { useNavigate } from 'react-router-dom'
 
+/** One bar of a `DistributionSparkline`: one innings or match. */
 export interface SparklinePoint {
   /** ISO date YYYY-MM-DD (used by the SeasonTickAxis sibling). */
   date: string | null
@@ -39,8 +41,9 @@ export interface SparklinePoint {
   opacity?: number
 }
 
+/** Props of `DistributionSparkline`. */
 interface Props {
-  points: SparklinePoint[]
+  points: SparklinePoint[] // the bars, oldest first
   /** Player reference line — scope average mean. Solid black, thicker. */
   playerReferenceValue?: number | null
   /** Global reference line — gender-tiered league centre. Gray, thicker. */
@@ -55,7 +58,7 @@ interface Props {
   /** Rolling-N mean overlay (oxbow). Skipped when points.length < N.
    *  Use only on the widest window where smoothing is meaningful. */
   rollingWindow?: number
-  height?: number
+  height?: number // SVG height in pixels; 36 by default
 }
 
 const DEFAULT_COLOR = '#3C5B7A'  // WISDEN.slate
@@ -84,6 +87,10 @@ const ROLLING_LINE_WIDTH = 1.2
 // match navigation. Per user feedback 2026-05-06.
 const STUB_HEIGHT = 4
 
+/**
+ * Draw one bar per observation, each linking to its match, with optional player, global and league
+ * reference lines and a rolling-mean line. Nothing when there are no points.
+ */
 export default function DistributionSparkline({
   points,
   playerReferenceValue,

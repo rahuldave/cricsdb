@@ -1,10 +1,13 @@
+/** `useFetch`: run an async request when its dependencies change, and keep its state. */
+
 import { useEffect, useState, useCallback, useRef } from 'react'
 
+/** What `useFetch` returns: the data, whether it is loading, the error, and a way to fetch again. */
 export interface FetchState<T> {
-  data: T | null
-  loading: boolean
-  error: string | null
-  refetch: () => void
+  data: T | null // the last result; it stays while a new request loads, and is null before the first result and after an error
+  loading: boolean // true while a request is in flight
+  error: string | null // the error message of the last request, or null
+  refetch: () => void // run the request again with the same dependencies
 }
 
 /**
@@ -17,10 +20,10 @@ export interface FetchState<T> {
  * actually drives re-fetching.
  */
 export function useFetch<T>(
-  fn: () => Promise<T>,
+  fn: () => Promise<T>, // the request to run
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  deps: any[],
-): FetchState<T> {
+  deps: any[], // values that start a new request when they change
+): FetchState<T> { // the data, loading flag, error and refetch
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)

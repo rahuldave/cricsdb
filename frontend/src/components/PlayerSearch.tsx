@@ -1,13 +1,17 @@
+/**
+ * The type-ahead box that finds a player by name.
+ */
 import { useState, useEffect, useRef } from 'react'
 import { searchPlayers } from '../api'
 import type { PlayerSearchResult, FilterParams } from '../types'
 
+/** Props of `PlayerSearch`. */
 interface PlayerSearchProps {
   /** Omit for role-agnostic search (the /players tab). When set, the
    *  server narrows results to people with ≥N innings in that role. */
   role?: 'batter' | 'bowler' | 'fielder'
-  onSelect: (player: PlayerSearchResult) => void
-  placeholder?: string
+  onSelect: (player: PlayerSearchResult) => void // called with the player the user picks
+  placeholder?: string // the input's placeholder; defaults to "Search batters…" and so on, or "Search players…"
   /** Canonical display value — usually the URL-derived picked-player
    *  name. The input shows this when the user isn't actively typing.
    *  Omit for pickers where the input should reset after each pick
@@ -20,6 +24,7 @@ interface PlayerSearchProps {
   scope?: FilterParams & { series_type?: string }
 }
 
+/** Search players as the user types (from two letters, after a 300 ms pause) and show the matches in a dropdown. */
 export default function PlayerSearch({ role, onSelect, placeholder, value, scope }: PlayerSearchProps) {
   // Transient typing buffer. `null` = not editing; the input falls
   // through to `value` (the source of truth in the parent). Non-null

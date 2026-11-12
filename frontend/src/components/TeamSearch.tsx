@@ -1,17 +1,22 @@
+/**
+ * The type-ahead box that finds a team by name within the current filters.
+ */
 import { useState, useEffect, useRef } from 'react'
 import { getTeams } from '../api'
 import { useFilters } from '../hooks/useFilters'
 import type { TeamInfo } from '../types'
 
+/** Props of `TeamSearch`. */
 interface TeamSearchProps {
-  onSelect: (teamName: string) => void
-  placeholder?: string
+  onSelect: (teamName: string) => void // called with the name of the team the user picks
+  placeholder?: string // the input's placeholder; defaults to "Search team…"
   /** Canonical value — the URL-derived team name. Input shows this
    *  when the user isn't actively typing. Changes from the parent
    *  (e.g. back-nav clearing the URL) propagate naturally. */
   value?: string
 }
 
+/** Search teams as the user types (from two letters, after 250 ms) and show up to 12 matches in a dropdown. */
 export default function TeamSearch({
   onSelect, placeholder, value,
 }: TeamSearchProps) {

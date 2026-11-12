@@ -1,4 +1,6 @@
 /**
+ * The All / first / second innings pills that set the `?inning=` filter on a page.
+ *
  * InningToggle — page-local 1st-innings / 2nd-innings filter pill.
  *
  * Three-state segmented control writing the URL `?inning=` param. NOT
@@ -9,9 +11,10 @@
  *   [ All innings | Batting first | Batting second ]   (batting POV)
  *   [ All innings | Bowling first | Bowling second ]   (bowling/fielding POV)
  *
- * URL semantics are constant across all POVs — `?inning=0` ALWAYS
- * means `innings.innings_number = 0` (the match's 1st innings half).
- * The visible label is POV-aware via `useDiscipline()`:
+ * URL semantics follow Option B on every POV — `?inning=0` ALWAYS
+ * means the team batted first, `?inning=1` that it batted second.
+ * The visible label is POV-aware via `useDiscipline()`, so on bowling
+ * and fielding the pill's value flips ("Bowling first" writes `inning=1`):
  *
  *   - batting (incl. Partnerships) → "Batting first / second"
  *   - bowling | fielding          → "Bowling first / second"
@@ -22,12 +25,17 @@
  *     first" for bowling stats, and "fielded first" for fielding stats
  *     — no single POV label can be accurate for all three.
  *
- * Source-of-truth doc: `internal_docs/spec-inning-split.md` §7.1.
+ * Source-of-truth doc: `internal_docs/spec-inning-split.md` §7.1, superseded
+ * for the values by `spec-inning-unify-option-b.md`.
  * Polysemy lock: `tests/integration/inning_toggle_pov_labels.sh`.
  */
 import { useUrlParam } from '../hooks/useUrlState'
 import { useDiscipline } from '../hooks/useDiscipline'
 
+/**
+ * Show the three innings pills, labelled for the page's discipline, and write the choice to `?inning=`.
+ * @returns the pill group
+ */
 export default function InningToggle() {
   const [inning, setInning] = useUrlParam('inning')
   const discipline = useDiscipline()

@@ -1,4 +1,6 @@
 /**
+ * The country flag shown next to an international team's name.
+ *
  * FlagBadge — renders a country flag for a cricket team string.
  *
  * Uses the flag-icons CSS library for ISO country flags. Special cases
@@ -8,6 +10,7 @@
  *
  * Returns null for unmappable team strings (club teams, unrecognised
  * associate nations) so the caller doesn't need to guard before use.
+ * @packageDocumentation
  */
 
 // Cricsheet team string → flag-icons code OR special tag ("wi" / "eng" / …).
@@ -130,7 +133,7 @@ type FlagSize = 'xs' | 'sm' | 'md' | 'lg'
 const SIZE_PX: Record<FlagSize, number> = {
   xs: 12,   // tile badges, dense lists
   sm: 18,   // H2H title, inline with player names
-  md: 22,   // default
+  md: 22,   // H2H / larger inline
   lg: 32,   // player-page header
 }
 
@@ -144,16 +147,18 @@ const Y_NUDGE_EM: Record<FlagSize, string> = {
   lg: '-0.15em',
 }
 
+/** Props of `FlagBadge`. */
 interface FlagBadgeProps {
-  team: string | null | undefined
-  gender?: string | null
-  size?: FlagSize
-  className?: string
+  team: string | null | undefined // the Cricsheet team name; no flag when absent or not a known country
+  gender?: string | null // "male" or "female"; added to the team page link when set
+  size?: FlagSize // the flag height: xs 12px, sm 18px (default), md 22px, lg 32px
+  className?: string // extra classes on the flag
   /** When true, wrap the flag in a Link to the team page. Requires `team`
    *  to resolve to a known code (club sides fall through as before). */
   linkTo?: boolean
 }
 
+/** Show the flag of a national team, or a "WI" pill for West Indies, and link it to the team page when `linkTo` is set. */
 export default function FlagBadge({
   team, gender, size = 'sm', className = '', linkTo = false,
 }: FlagBadgeProps) {

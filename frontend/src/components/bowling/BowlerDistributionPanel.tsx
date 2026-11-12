@@ -1,4 +1,6 @@
 /**
+ * The bowler's per-innings wickets, economy and runs-conceded distribution panel on `/bowling?player=X`.
+ *
  * Bowler Distribution panel — top-level orchestrator for the §12
  * frontend slice. Spec: internal_docs/spec-distribution-stats.md §12.
  *
@@ -217,16 +219,21 @@ function SparklineLegend({ globalLegend, leagueLegend, rollingWindow }: {
 }
 
 
+/** Props of `BowlerDistributionPanel`. */
 interface Props {
-  playerId: string
-  distribution: BowlerDistribution | null
+  playerId: string // the bowler's id, for the cohort nudge and the suggested-split links
+  distribution: BowlerDistribution | null // the bowler's distribution; null shows nothing
   /** Tier 6 of spec-apples-to-apples-baselines.md — same-scope cohort
    *  baseline source for the green sparkline reference line. */
   summary: BowlingSummary | null
-  loading: boolean
-  error: string | null
+  loading: boolean // true while the distribution loads; the panel shows nothing
+  error: string | null // the request's error; the panel shows nothing when set
 }
 
+/**
+ * Show the bowler's histogram, stats, milestone chips, sparkline, form deltas and suggested splits.
+ * The window and the metric (wickets, economy or runs conceded) come from `?dist_window` and `?dist_metric`.
+ */
 export default function BowlerDistributionPanel({
   playerId, distribution, summary, loading, error,
 }: Props) {
