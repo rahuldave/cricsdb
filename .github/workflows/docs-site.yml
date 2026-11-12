@@ -32,10 +32,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       # TypeDoc reads the front end's types, so it needs its packages.
-      # `npm install`, not `npm ci`: package-lock.json is out of step with
-      # package.json (@emnapi/*), and `npm ci` refuses it.
       - name: Install the front end's packages
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
         working-directory: frontend
       - name: Write the front-end reference
         run: uvx smalldocs==0.5.9 api build --dir docs
