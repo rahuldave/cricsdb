@@ -28,11 +28,12 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       # TypeDoc reads the front end's types, so it needs its packages.
       - name: Install the front end's packages
+        # npm 10 needs @emnapi/core and @emnapi/runtime in the lockfile; npm 11 drops them on install. Keep them.
         run: npm ci --no-audit --no-fund
         working-directory: frontend
       - name: Write the front-end reference
