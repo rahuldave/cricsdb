@@ -2,7 +2,7 @@
 title: Backend reference
 ---
 
-A page for each module of the Python package `api`, the FastAPI backend. smalldocs imports the package
+This reference has a page for each module of the Python package `api`, the FastAPI backend. smalldocs imports the package
 and writes these pages from its docstrings and the comments beside the parameters. The pages show the
 public functions and classes of each module. A public name does not start with `_`, so the private
 helpers and Python's own methods, such as `__init__`, are not here.

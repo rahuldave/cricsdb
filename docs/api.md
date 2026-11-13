@@ -1,52 +1,57 @@
 # CricsDB API Reference
 
-> **Also useful:**
-> [Interactive Swagger UI](https://t20.rahuldave.com/api/docs) (prod) or
-> [`http://localhost:5173/api/docs`](http://localhost:5173/api/docs) (local via Vite proxy) /
-> [`http://localhost:8000/api/docs`](http://localhost:8000/api/docs) (local direct)
-> — FastAPI auto-generates this from the route decorators. Every
-> endpoint is clickable with a "Try it out" button. If you want to
-> poke at something live, start there; come back here for narrative
-> + the specific example responses that justify the section text.
->
-> The docs live under `/api/docs` (not the FastAPI default `/docs`)
-> so the Vite dev-server proxy forwards the request to the backend.
-> In prod both frontend and backend share an origin, so either path
-> would work, but keeping it on `/api/*` matches the rest of the
-> routes and avoids a special case.
+This page is a practical reference to every endpoint of the CricsDB HTTP API, on one page. For each
+endpoint, it gives the URL, a
+one-line description and a typical response.
+
+For the SQL behind an endpoint, or for the full schema, read
+[`../SPEC.md`](https://github.com/rahuldave/cricsdb/blob/main/SPEC.md) with this page. The examples come
+from local development (`http://localhost:8000`). For production, use `https://t20.rahuldave.com` instead.
+The responses are cut short and show only the shape of each payload.
 
 The [HTTP reference](https://rahuldave.com/cricsdb/http/) lists every endpoint with all of its parameters, their types
 and defaults. smalldocs writes it from the code at each build.
 
-Practical one-page reference for every endpoint. Pair this with
-[`../SPEC.md`](https://github.com/rahuldave/cricsdb/blob/main/SPEC.md) when you need the underlying SQL or the
-full schema — this doc just gives you the URL, a one-liner, and a
-representative response. Examples taken from local dev
-(`http://localhost:8000`); swap to `https://t20.rahuldave.com` for
-prod. Responses have been truncated to show shape, not full payloads.
+> **Also useful:** the
+> [Interactive Swagger UI](https://t20.rahuldave.com/api/docs) (production), or
+> [`http://localhost:5173/api/docs`](http://localhost:5173/api/docs) (local, through the Vite proxy) or
+> [`http://localhost:8000/api/docs`](http://localhost:8000/api/docs) (local, direct).
+> FastAPI generates the Swagger UI from the route decorators. Every
+> endpoint on it has a "Try it out" button. To try an endpoint live,
+> start there. Come back here for the narrative and for the example
+> responses that support the text of each section.
+
+> The Swagger UI is at `/api/docs`, not at the FastAPI default `/docs`,
+> so that the Vite dev-server proxy forwards the request to the backend.
+> In production the frontend and the backend share an origin, so either
+> path would work. But a path under `/api/*` matches the rest of the
+> routes and avoids a special case.
 
 ## Conventions
 
 - All endpoints return JSON.
-- All endpoints are `GET`. No auth required (the deebase admin UI at
-  `/admin/*` is the only protected surface, via HTTP Basic Auth).
-- Responses are best-effort on failure: a 500 returns
+- All endpoints are `GET`, and none needs authentication. The only
+  protected part is the deebase admin UI at `/admin/*`, which uses HTTP
+  Basic Auth.
+- On a failure, the response is best effort. A 500 returns
   `{"detail": "..."}` rather than partial JSON.
-- **Venue / city strings are canonical.** `match.venue` and `match.city`
-  go through `api/venue_aliases.py` at insert time, so every endpoint
-  that echoes them returns the canonicalized form (e.g. `Wankhede
-  Stadium, Mumbai`, not the raw cricsheet `Wankhede`; `County Ground
-  (Taunton)`, not the ambiguous `County Ground`). Safe to use as an
-  exact-match key. `match.venue_country` exists in the DB but is not
-  yet surfaced on any endpoint — that's a Phase 2 addition when the
-  `/venues` landing ships.
+- **Venue and city strings are canonical.** At insert time, `match.venue`
+  and `match.city` go through `api/venue_aliases.py`. So every endpoint
+  that returns them gives the canonical form, for example `Wankhede
+  Stadium, Mumbai` and not the raw cricsheet `Wankhede`, or `County Ground
+  (Taunton)` and not the ambiguous `County Ground`. They are safe to use
+  as keys for an exact match. `match.venue_country` exists in the
+  database, but no endpoint returns it yet. It is a Phase 2 addition, for
+  when the `/venues` landing ships.
 
 ## Common filter query params
 
-Applied across almost every endpoint below (enforced via
-`api/filters.py::FilterBarParams` — formerly `FilterParams`, alias
-preserved for incremental migration). When omitted → no constraint on
-that axis.
+The FilterBar is the row of filter dropdowns at the top of the site's
+pages. Its values are URL query parameters, and almost every endpoint
+below takes them. `api/filters.py::FilterBarParams`
+enforces them. Its old name, `FilterParams`, is kept as an alias, so that
+the code can move to the new name step by step. If a parameter is
+omitted, it puts no limit on that axis.
 
 | Param | Type | What it filters | Example |
 |---|---|---|---|
@@ -59,55 +64,57 @@ that axis.
 
 ### Aux filters (page-local narrowings)
 
-A separate `AuxParams` class (`api/filters.py`) holds page-local
-filters that aren't driven by the FilterBar UI:
+A separate `AuxParams` class (`api/filters.py`) holds the aux filters.
+They are page-local filters, and the FilterBar UI does not set them:
 
 | Param | Type | What it filters | Example |
 |---|---|---|---|
-| `series_type` | `all`/`bilateral`/`icc`/`club` (default `all`) | Categorises the match — `bilateral` = international non-ICC; `icc` = ICC events (T20 WC etc.); `club` = `team_type=club` | `series_type=bilateral` |
+| `series_type` | `all`/`bilateral`/`icc`/`club` (default `all`) | Categorises the match. `bilateral` = international non-ICC; `icc` = ICC events (T20 WC etc.); `club` = `team_type=club` | `series_type=bilateral` |
 | `scope_to_team` | string | Narrows the match pool to events that team has appeared in (intersection of `m.event_name`s). Used by the Compare-tab avg slot; gated frontend-side on `team_type='club'` (closed-league semantic). | `scope_to_team=Royal%20Challengers%20Bengaluru` |
-| `team_class` | `full_member` / `primary_club` / `secondary_club` | Polymorphic over `team_type`. **`full_member`** (`team_type=international`): both teams are ICC full members (Afghanistan, Australia, Bangladesh, England, India, Ireland, New Zealand, Pakistan, South Africa, Sri Lanka, West Indies, Zimbabwe). **`primary_club`** (`team_type=club`): match's event_name is in a marquee international franchise league (IPL, BBL, PSL, BPL, CPL, SA20, ILT20, LPL, MLC, The Hundred (M+W), WBBL, WPL, Women's Cricket Super League). **`secondary_club`** (`team_type=club`): match's event_name is in a domestic state/county/provincial competition (Vitality Blast, Syed Mushtaq Ali Trophy, CSA T20 Challenge, Super Smash, Nepal Premier League, Women's Super Smash, NZC Women's T20). Cross-type combinations are silent no-ops (defensive backend gate — preserves URL robustness when frontend gate fails or curl mixes them). | `team_class=full_member` · `team_class=primary_club` · `team_class=secondary_club` |
-| `inning` | `0` / `1` | 1st innings (`0`, batted first) or 2nd innings (`1`, batted second). Team-router endpoints honour this at match level via `_inning_match_filter`; innings-joined endpoints (batting/bowling/fielding) honour it via `filters.build` when `has_innings_join=True`. Per-slot override on the Compare tab via `compareN_inning`. | `inning=0` |
-| `result` | `won` / `lost` / `tied` | Match-outcome filter from the path team's POV. `won` = path team is `outcome_winner`; `lost` = another team won; `tied` = `outcome_winner IS NULL` (collapses true ties + no-results — T20 ties go to super-over and that winner becomes `outcome_winner`, so NULL is almost exclusively rain-abandoned). Subject-team endpoints key on `:team`. The `/scope/averages/*` **cohort** narrows per-row — subject = each innings' batting team `i.team` (bowling/fielding disciplines flip to the other side) — so the league baseline is among-winners, a real distinct number (NOT tautological: the count is ~50% but the stats differ). Other non-team endpoints ignore. Spec: `docs/internal/spec-compare-toss-result.md`, `spec-splits-mosaic.md`. | `result=won` |
+| `team_class` | `full_member` / `primary_club` / `secondary_club` | Polymorphic over `team_type`. **`full_member`** (`team_type=international`): both teams are ICC full members (Afghanistan, Australia, Bangladesh, England, India, Ireland, New Zealand, Pakistan, South Africa, Sri Lanka, West Indies, Zimbabwe). **`primary_club`** (`team_type=club`): match's event_name is in a marquee international franchise league (IPL, BBL, PSL, BPL, CPL, SA20, ILT20, LPL, MLC, The Hundred (M+W), WBBL, WPL, Women's Cricket Super League). **`secondary_club`** (`team_type=club`): match's event_name is in a domestic state/county/provincial competition (Vitality Blast, Syed Mushtaq Ali Trophy, CSA T20 Challenge, Super Smash, Nepal Premier League, Women's Super Smash, NZC Women's T20). Cross-type combinations are silent no-ops (a defensive backend gate, which keeps URLs robust when frontend gate fails or curl mixes them). | `team_class=full_member` or `team_class=primary_club` or `team_class=secondary_club` |
+| `inning` | `0` / `1` | 1st innings (`0`, batted first) or 2nd innings (`1`, batted second). Team-router endpoints apply it at match level via `_inning_match_filter`; innings-joined endpoints (batting/bowling/fielding) apply it via `filters.build` when `has_innings_join=True`. Per-slot override on the Compare tab via `compareN_inning`. | `inning=0` |
+| `result` | `won` / `lost` / `tied` | Match-outcome filter from the point of view (POV) of the path team, the team named in the URL path. `won` = path team is `outcome_winner`; `lost` = another team won; `tied` = `outcome_winner IS NULL` (collapses true ties and no-results. T20 ties go to super-over and that winner becomes `outcome_winner`, so NULL is almost exclusively rain-abandoned). Subject-team endpoints key on `:team`. The `/scope/averages/*` **cohort** (the set of innings behind the league baseline) narrows per-row. The subject is each innings' batting team `i.team` (bowling/fielding disciplines flip to the other side), so the league baseline is among-winners, a real distinct number (NOT tautological: the count is ~50% but the stats differ). Other non-team endpoints ignore it. Spec: `docs/internal/spec-compare-toss-result.md`, `spec-splits-mosaic.md`. | `result=won` |
 | `toss_outcome` | `won` / `lost` | Toss-outcome filter from the path team's POV. `won` = `toss_winner = :team`; `lost` = `toss_winner != :team AND toss_winner IS NOT NULL`. The `/scope/averages/*` cohort narrows per-row on `i.team` (same as `result`). Spec: `docs/internal/spec-compare-toss-result.md`, `spec-splits-mosaic.md`. | `toss_outcome=won` |
 
-Aux filters are accepted by **every endpoint** that takes
-`FilterBarParams`. Routers declare both as FastAPI `Depends()` and
-pass the aux through `filters.build(aux=aux)`, which appends the
-relevant SQL clauses (e.g. `series_type_clause`) centrally so no
-router has to wire each one by hand. Practical effect: every
-`teams/...`, `batters/...`, `bowlers/...`, `fielders/...`, `matches`,
-`venues/...` endpoint now narrows correctly under `?series_type=icc`
-etc. (Pre-2026-04-19 they silently ignored it.)
+Every endpoint that takes `FilterBarParams` also takes the aux filters.
+Routers declare both as FastAPI `Depends()` and pass the aux filters
+through `filters.build(aux=aux)`. That function adds the SQL clauses
+(e.g. `series_type_clause`) in one place, so no router has to wire each
+one by hand. As a result, every `teams/...`, `batters/...`,
+`bowlers/...`, `fielders/...`, `matches` and `venues/...` endpoint now
+narrows correctly under `?series_type=icc` and the other aux filters.
+Before 2026-04-19, they ignored `series_type` and gave no error.
 
-Legacy `bilateral_only` / `tournament_only` values map to `bilateral`
-/ `icc` for URL-bookmark compat.
+The legacy values `bilateral_only` and `tournament_only` map to
+`bilateral` and `icc`, so that old bookmarked URLs still work.
 
-The `tournament` filter is canonicalization-aware everywhere. Pass
-`T20 World Cup (Men)` and FilterParams expands it to
+The `tournament` filter knows the canonical names everywhere. If you
+pass `T20 World Cup (Men)`, FilterParams expands it to
 `event_name IN ('ICC World Twenty20', 'World T20', "ICC Men's T20 World Cup")`.
-The mapping lives in `api/tournament_canonical.py`. Single-variant
-tournaments (IPL, BBL, …) pass through unchanged.
+The mapping is in `api/tournament_canonical.py`. A tournament with
+one variant (for example IPL or BBL) passes through unchanged.
 
-Some endpoints also accept contextual filters:
-- `filter_team=<name>` — narrows to matches involving this team
-  (player-page contextual; tournament dossier rivalry scope).
-- `filter_opponent=<name>` — narrows to matches against this opponent.
-  When both `filter_team` + `filter_opponent` are set on a tournament-
-  dossier endpoint, the scope becomes a team-pair rivalry and summary
-  responses gain a `by_team` companion object.
+Some endpoints also take contextual filters:
 
-`filter_venue` is an **ambient** filter (honored by every endpoint that
-echoes the FilterBar, same as `gender`/`season`). Must match the
-canonical venue name exactly — see the Conventions note above on venue
-canonicalization. The FilterBar's Venue typeahead (frontend) calls
-`/api/v1/venues?q=...` so the user doesn't need to know the exact
+- `filter_team=<name>` narrows to matches that involve this team.
+  Player pages use it as context, and tournament dossiers use it to set
+  the scope of a rivalry.
+- `filter_opponent=<name>` narrows to matches against this opponent.
+  On a tournament-dossier endpoint with both `filter_team` and
+  `filter_opponent` set, the scope becomes the rivalry of the two teams.
+  Summary responses then also have a `by_team` companion object.
+
+`filter_venue` is an **ambient** filter. Every endpoint that echoes the
+FilterBar applies it, the same as `gender`/`season`. It must match the
+canonical venue name exactly, as the note on venues under Conventions
+says. The Venue typeahead of the FilterBar, in the frontend, calls
+`/api/v1/venues?q=...`, so the user does not need to know the exact
 canonical string.
 
-A handful of endpoints add endpoint-specific params (`limit`,
-`offset`, `min_balls`, `min_dismissals`, `min_wickets`, `q`, `role`,
-`top_n`, `bowler_id` / `batter_id` in matchup endpoints, etc.) —
-called out per endpoint below.
+A few endpoints add parameters of their own, and the section for each
+endpoint below lists them. Some examples are `limit`, `offset`,
+`min_balls`, `min_dismissals`, `min_wickets`, `q`, `role`, `top_n`, and
+`bowler_id` / `batter_id` in the matchup endpoints.
 
 ### `team_class` worked examples
 
@@ -127,42 +134,43 @@ curl 'http://localhost:8000/api/v1/teams/India/summary?...&team_class=primary_cl
 curl 'http://localhost:8000/api/v1/teams/Mumbai%20Indians/summary?...&team_class=full_member'   # club + intl tier
 ```
 
-Tournament dropdown (`/api/v1/tournaments`) and team typeahead
-(`/api/v1/teams`) both respect `team_class` — they auto-narrow to
-events / teams in the chosen tier so the user can't pick a
-combination that would zero out (e.g. `tournament=Vitality Blast` +
-`team_class=primary_club`).
+The tournament dropdown (`/api/v1/tournaments`) and the team typeahead
+(`/api/v1/teams`) both respect `team_class`. They narrow by themselves
+to the events and teams of the chosen tier. So the user cannot pick a
+combination that returns nothing, for example `tournament=Vitality Blast`
+with `team_class=primary_club`.
 
 ## Seasons convention
 
-- Season labels are the cricsheet strings — a mix of calendar
-  (`"2024"`) and split-year (`"2024/25"`). Lex sort matches
-  chronology.
-- `season_from <= m.season <= season_to` is inclusive on both sides.
+- Season labels are the cricsheet strings, a mix of calendar years
+  (`"2024"`) and split years (`"2024/25"`). A lexical sort puts them in
+  time order.
+- `season_from <= m.season <= season_to` includes both ends.
 
 ---
 
 # Reference data (`/api/v1/*`)
 
-Source: `api/routers/reference.py`.
+The source is `api/routers/reference.py`.
 
 ## `GET /api/v1/tournaments`
 
-List tournaments with match counts. Variants are merged under their
-canonical display name — picking "T20 World Cup (Men)" in the FilterBar
-narrows queries across all three cricsheet event_names. Accepts the
-common filters plus:
+Lists tournaments with their match counts. Variants are merged under
+their canonical display name. So picking "T20 World Cup (Men)" in the
+FilterBar narrows queries across all three cricsheet event_names. The
+endpoint takes the common filters, and also these:
 
-- `team` — tournaments a given team played in (scopes the dropdown on
-  a team-scoped page).
-- `opponent` — combined with `team`, returns only tournaments where
-  the two teams actually played each other. Lets FilterBar decide
-  whether a rivalry implies a single competition (MI vs CSK → IPL
-  only) or spans many (Ind vs Aus → bilaterals + ICC).
+- `team` gives the tournaments that a team played in. It sets the scope
+  of the dropdown on a page about one team.
+- `opponent`, with `team`, gives only the tournaments where the two
+  teams played each other. The FilterBar uses it to decide whether a
+  rivalry is in one competition (MI vs CSK, only IPL) or in many
+  (Ind vs Aus, bilaterals and ICC).
 
-Despite being called `tournaments`, this is the FILTER-BAR dropdown
-list (selecting an `event_name`). The sectioned catalog used by the
-`/series` page lives under `/api/v1/series/*` — see below.
+The endpoint is called `tournaments`, but it gives the list for the
+FilterBar dropdown, where the user selects an `event_name`. The catalog
+in sections that the `/series` page uses is under `/api/v1/series/*`,
+described below.
 
 ```bash
 curl "http://localhost:8000/api/v1/tournaments?team_type=club&gender=male"
@@ -191,12 +199,13 @@ curl "http://localhost:8000/api/v1/tournaments?team_type=club&gender=male"
 
 ## `GET /api/v1/seasons`
 
-List seasons in chronological order. Accepts every FilterBar axis
+Lists seasons in time order. The endpoint takes every FilterBar axis
 (`team`, `gender`, `team_type`, `tournament`, `filter_team`,
-`filter_opponent`, `filter_venue`, `team_class`, `series_type`)
-plus the rivalry pair (when `filter_team` + `filter_opponent` are
-both set, narrows to seasons the two teams actually met) and —
-added 2026-05-07 — `person_id` for player-aware narrowing.
+`filter_opponent`, `filter_venue`, `team_class`, `series_type`). It also
+takes the rivalry pair. When `filter_team` and `filter_opponent` are
+both set, it narrows to the seasons in which the two teams met. Since
+2026-05-07, it also takes `person_id`, which narrows to the seasons of
+one player.
 
 ```bash
 curl "http://localhost:8000/api/v1/seasons"
@@ -206,18 +215,17 @@ curl "http://localhost:8000/api/v1/seasons"
 { "seasons": ["2004/05", "2005", "2005/06", "…", "2025/26", "2026"] }
 ```
 
-### `person_id` — player-aware narrowing
+### `person_id`, player-aware narrowing
 
-When set, the result is intersected with seasons the player
-appeared in (matchplayer join). The FilterBar passes the page's
-current `?player=<id>` URL param as `?person_id=<id>` so the
-From/To dropdowns + the `first-3` / `prev-3` / `last-3` /
-`latest` quick-select buttons all reflect the player's actual
-career-in-scope rather than the broader dataset. Fixes the
-retired-player gap — clicking `last-3` on AB de Villiers'
-batting page now sets the season filter to `2019/20`-`2021`
-(his actual final seasons) rather than `2024`-`2026` (the
-dataset's recent seasons, which would show empty data).
+When it is set, the result keeps only the seasons in which the
+player appeared (a join on matchplayer). The FilterBar passes the
+page's current `?player=<id>` URL parameter as `?person_id=<id>`. So the
+From and To dropdowns, and the quick-select buttons `first-3`, `prev-3`,
+`last-3` and `latest`, all follow the player's career in scope rather
+than the whole dataset. The narrowing fixes a gap for retired players. On
+AB de Villiers' batting page, `last-3` now sets the season filter to
+`2019/20` to `2021`, his last seasons. Before, it set `2024` to `2026`,
+the recent seasons of the dataset, which would show no data.
 
 ```bash
 # Active player — Kohli's seasons span 2007/08 to current.
@@ -237,17 +245,17 @@ curl "http://localhost:8000/api/v1/seasons?person_id=c4487b84&tournament=Indian%
 { "seasons": ["2007/08", "2009", "2009/10", "…", "2020/21", "2021"] }
 ```
 
-`person_id` composes with the other filter axes via intersection
-— `?tournament=Indian Premier League&person_id=c4487b84` returns
-only IPL seasons ABdV played. The frontend `getSeasons()` wrapper
-in `frontend/src/api.ts` accepts `player` (the URL convention)
-and forwards it as `person_id` to this endpoint so callers don't
-need to know the backend convention.
+`person_id` combines with the other filter axes by intersection. For
+example, `?tournament=Indian Premier League&person_id=c4487b84` returns
+only the IPL seasons that ABdV played. In the frontend, the
+`getSeasons()` wrapper in `frontend/src/api.ts` takes `player` (the URL
+convention) and forwards it to this endpoint as `person_id`. So callers
+do not need to know the backend convention.
 
 ## `GET /api/v1/teams`
 
-Search team names. Supports all common filters + `q` (substring
-match on team name).
+Searches team names. The endpoint takes all the common filters and
+`q`, a substring match on the team name.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams?q=India&team_type=international&gender=male"
@@ -259,14 +267,16 @@ curl "http://localhost:8000/api/v1/teams?q=India&team_type=international&gender=
 
 ## `GET /api/v1/venues`
 
-Scope-narrowed venue list, used as the FilterBar's Venue typeahead
-(`components/VenueSearch.tsx`). Accepts all common filters except
-`filter_venue` itself (self-referential) plus:
+Lists the venues in scope. The Venue typeahead of the FilterBar
+(`components/VenueSearch.tsx`) uses it. The endpoint takes all the
+common filters except `filter_venue` itself, which would refer to
+itself. It also takes these:
 
-- `q` — substring match (case-insensitive) on `venue` OR `city`. When
-  absent, returns the top-50 by match count (enough for an empty-state
-  dropdown-on-focus).
-- `limit` — default 50, max 500.
+- `q` is a case-insensitive substring match on `venue` or `city`.
+  Without it, the endpoint returns the top 50 venues by match count.
+  The top 50 is enough for the dropdown that opens when the empty field gets
+  the focus.
+- `limit` has a default of 50 and a maximum of 500.
 
 ```bash
 curl "http://localhost:8000/api/v1/venues?q=wank&limit=3"
@@ -283,9 +293,10 @@ curl "http://localhost:8000/api/v1/venues?q=wank&limit=3"
 
 ## `GET /api/v1/venues/landing`
 
-Country-grouped venue directory powering the `/venues` landing page.
-Accepts all common filters except `filter_venue`. Countries ordered by
-total match count DESC; venues within a country by match count DESC.
+Gives the directory of venues, grouped by country, for the `/venues`
+landing page. The endpoint takes all the common filters except
+`filter_venue`. Countries are in descending order of total match count,
+and the venues within each country are in descending order of their own match count.
 
 ```bash
 curl "http://localhost:8000/api/v1/venues/landing"
@@ -306,34 +317,43 @@ curl "http://localhost:8000/api/v1/venues/landing"
 }
 ```
 
-88 countries in the current DB. Filter-sensitive: with
-`?team_type=international&gender=male`, totals and venue inclusion
-narrow to men's internationals only.
+The current database has 88 countries. The response follows the
+filters. For example, with `?team_type=international&gender=male`, the
+totals and the list of venues narrow to men's internationals only.
 
 ## `GET /api/v1/venues/{venue}/summary`
 
-Venue-character dossier bundle (Phase 3). Pins `m.venue = :venue` from
-the path and strips any ambient `filter_venue` on the query; every
-other common filter (gender / team_type / tournament / season window
-/ filter_team / filter_opponent / team_class) is honored.
+Gives the dossier of one venue's character, as one bundle (Phase 3).
+The path sets `m.venue = :venue`, and the endpoint drops any ambient
+`filter_venue` in the query. It applies every other common filter
+(gender, team_type, tournament, season window, filter_team,
+filter_opponent and team_class).
 
 Status codes:
-- **200** with `matches: 0` and empty payload sections — venue
-  exists in the DB but the current filter scope has no matches
-  (e.g. MCG + `team_class=secondary_club` — MCG hosts only
-  BBL/WBBL, both primary). Frontend renders an empty-state page,
-  not a generic error. **Behaviour change shipped 2026-04-30**:
-  pre-fix, the endpoint conflated this with a missing venue and
-  returned 404; the conflation only surfaced once the club-tier
-  filter made zero-scope reachable.
-- **404** only when `venue` doesn't appear at all in `match.venue`
-  (genuine missing-venue path).
 
-Returns: headline match count; matches-hosted-by tournament × gender
-× season; average first-innings total; bat-first vs chase win counts
-and percentages; toss decision split; toss-winner outcome correlation
-per decision; boundary % and dot % per phase (powerplay 1-6, middle
-7-15, death 16-20); ground-record highest total and lowest all-out.
+- **200** with `matches: 0` and empty payload sections means that the
+  venue exists in the database, but the current filter scope has no
+  matches. An example is MCG with `team_class=secondary_club`, because
+  MCG hosts only BBL and WBBL, which are both primary. The frontend shows
+  an empty-state page, not a generic error. **Behaviour change shipped
+  2026-04-30.** Before the fix, the endpoint treated this case as a
+  missing venue and returned 404. The problem showed only once the
+  club-tier filter made an empty scope possible.
+- **404** means only that `venue` does not appear at all in
+  `match.venue`, so the venue is missing.
+
+The response gives:
+
+- the number of matches
+- the matches hosted, by tournament, gender and season
+- the average first-innings total
+- the wins batting first and chasing, as counts and percentages
+- the split of toss decisions
+- for each toss decision, how often the toss winner won the match
+- the boundary % and the dot % for each phase (powerplay overs 1 to 6,
+  middle overs 7 to 15, death overs 16 to 20)
+- the ground records, which are the highest total and the lowest all-out
+  total
 
 ```bash
 curl "http://localhost:8000/api/v1/venues/Wankhede%20Stadium%2C%20Mumbai/summary"
@@ -372,21 +392,23 @@ curl "http://localhost:8000/api/v1/venues/Wankhede%20Stadium%2C%20Mumbai/summary
 }
 ```
 
-Sanity: `bat_first_win_pct < 50` on dew-heavy grounds (Wankhede,
-Chinnaswamy), ≥ 50 on spin-friendly grounds (Chepauk).
+As a sanity check, `bat_first_win_pct < 50` on grounds with heavy dew
+(Wankhede, Chinnaswamy), and it is at least 50 on grounds that suit
+spin (Chepauk).
 
 ## `GET /api/v1/players`
 
-Player search. Params: `q` (≥2 chars), `role` (`batter`/`bowler`/
-`fielder`, optional), `limit` (default 20).
+Searches players. The parameters are `q` (at least 2 characters),
+`role` (`batter`/`bowler`/`fielder`, optional) and `limit` (default 20).
 
-Optional FilterBar + aux scope params — when any of `gender`, `team_type`,
-`tournament`, `season_from`, `season_to`, `filter_team`, `filter_opponent`,
-`filter_venue`, or `series_type` is set, the endpoint narrows to people
-who appeared on either team in scope matches (same match-level filter
-as the `/series/*-leaders` endpoints). Used by the Series tab's
-discipline-picker typeaheads so e.g. "AB" on T20 WC Men 2022/23-2025/26
-doesn't surface AB de Villiers.
+The endpoint also takes optional FilterBar and aux parameters for the
+scope. When any of `gender`, `team_type`, `tournament`, `season_from`,
+`season_to`, `filter_team`, `filter_opponent`, `filter_venue` or
+`series_type` is set, it narrows to people who played for either team in
+a match in scope. The filter at match level is the same as in the
+`/series/*-leaders` endpoints. The discipline-picker typeaheads of the
+Series tab use it. So, for example, "AB" on T20 WC Men 2022/23 to
+2025/26 does not show AB de Villiers.
 
 ```bash
 curl "http://localhost:8000/api/v1/players?q=Kohli&limit=3"
@@ -406,16 +428,19 @@ curl "http://localhost:8000/api/v1/players?q=Kohli&role=batter&tournament=T20+Wo
 
 ## `GET /api/v1/players/{person_id}/result-counts`
 
-Per-player match counts split by the player's own-team **match result**
-AND **toss outcome** — feeds the player-page ResultFilter pills (won /
-lost / tied) and the toss split. Scope = the FilterBar fields
-(`gender`, `team_type`, `tournament`, `season_from`/`_to`, `filter_venue`,
-`series_type`) plus `inning` (Option-B, match-level union) and `filter_team`
-(re-applied at `mp.team` — narrows to matches the player played *for* that
-team). It is **aux-stripped for `result`/`toss_outcome`** (it reports those
-splits, so filtering by them would make the breakdown circular) and **drops
-`filter_opponent`** (the pill counts stay at the team/scope level — see the
-caveat below).
+Gives one player's match counts, split by the match result of the
+player's own team and by the toss outcome. The ResultFilter pills (won,
+lost, tied) on the player page use these counts, and so does the toss
+split. The scope is the FilterBar fields (`gender`, `team_type`,
+`tournament`, `season_from`/`_to`, `filter_venue`, `series_type`). It also
+includes `inning` (Option-B, a union at match level) and `filter_team`.
+It applies that filter again at `mp.team`, so it narrows to
+matches in which the player played *for* that team.
+
+The endpoint drops the aux filters `result`/`toss_outcome`, because it
+reports those splits, and a filter on them would make the breakdown
+circular. It also drops `filter_opponent`, so the pill counts stay at the
+level of the team and the scope (see the caveat below).
 
 ```bash
 curl "http://localhost:8000/api/v1/players/ba607b88/result-counts?gender=male&team_type=club"
@@ -433,45 +458,46 @@ curl "http://localhost:8000/api/v1/players/ba607b88/result-counts?gender=male&te
 }
 ```
 
-Flat integer counts (not envelope-wrapped). `wins + losses + ties +
-no_results == matches`; `toss_won + toss_lost <= matches` (matches with no
-recorded toss winner fall into neither). `tied` collapses true ties +
-no-results (`outcome_winner IS NULL`). Source: `api/routers/reference.py`.
+The counts are flat integers. They are not wrapped in a metric envelope, the
+object that holds a value next to its baseline (see "Compare metric envelope"). `wins + losses + ties +
+no_results == matches`, and `toss_won + toss_lost <= matches`, because a
+match with no recorded toss winner is in neither count. `tied` collapses
+true ties and no-results (`outcome_winner IS NULL`). The source is
+`api/routers/reference.py`.
 
-> **Caveat — `filter_opponent` is not applied here.** When a player page
-> carries `filter_opponent` (the "Versus" typeahead), the pill counts from
-> this endpoint stay at the team/scope level rather than narrowing to the
-> opponent. Known behaviour as of 2026-05-29 (the endpoint `drop`s
-> `filter_opponent`); flagged for review.
+> **Caveat: `filter_opponent` is not applied here.** A player page can
+> carry `filter_opponent` (the "Versus" typeahead). The pill counts from
+> this endpoint then stay at the level of the team and the scope, and do
+> not narrow to the opponent. The behaviour is known as of 2026-05-29
+> (the endpoint `drop`s `filter_opponent`), and it is flagged for review.
 
 ---
 
 # Landing pages
 
-Each search-bar tab has one endpoint for the filter-sensitive
-directory shown below the search. See
-[`perf-leaderboards.md`](internal/perf-leaderboards.md) for the perf pattern
-(conditional JOINs + composite indexes + ANALYZE).
+Each tab of the search bar has one endpoint for the directory below the search. The directory
+changes with the filters. See [`perf-leaderboards.md`](internal/perf-leaderboards.md) for the
+pattern that keeps these endpoints fast (conditional JOINs, composite indexes and ANALYZE).
 
 ## `GET /api/v1/teams/landing`
 
-Two-column directory.
+The endpoint returns a directory in two columns. International teams are split by **gender** (men's and women's), so that the women's full
+members do not get lost in a mixed list. Each gender bucket has `regular` (ICC full members) and
+`associate`. If a gender filter is set, the endpoint fills only the bucket of that gender.
 
-International is split by **gender** (men's / women's) so women's full
-members aren't buried inside a mixed list. Each gender bucket has
-`regular` (ICC full members) vs `associate`. With a gender filter set,
-only that gender's bucket is populated.
+Club tournaments are put in buckets by series_type. The canonicalization map in
+`api/tournament_canonical.py` gives the buckets:
 
-Club tournaments are bucketed by series_type using the canonicalization
-map in `api/tournament_canonical.py`: **franchise_leagues** (IPL, BBL,
-PSL, …), **domestic_leagues** / national championships (Vitality Blast,
-Syed Mushtaq Ali Trophy, CSA T20 Challenge), **women_franchise** (WBBL,
-WPL, The Hundred Women's, …), and **other** for unclassified.
+- **franchise_leagues**, for example IPL, BBL and PSL.
+- **domestic_leagues**, the national championships, for example Vitality Blast, Syed Mushtaq Ali
+  Trophy and CSA T20 Challenge.
+- **women_franchise**, for example WBBL, WPL and The Hundred Women's.
+- **other**, for a tournament that is not classified.
 
-Each team entry carries a `gender` field — when no gender filter is
-set, the same string ("Royal Challengers Bengaluru" = IPL/men's AND
-WPL/women's) appears as separate entries with different gender so the
-frontend can disambiguate them with a "men's" / "women's" suffix.
+Each team entry carries a `gender` field. If no gender filter is set, one name can belong to two
+teams. For example, "Royal Challengers Bengaluru" is a men's team in the IPL and a women's team in
+the WPL. The two appear as separate entries with different genders, so that the frontend can tell
+them apart with a "men's" or "women's" suffix.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/landing?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024"
@@ -506,29 +532,25 @@ curl "http://localhost:8000/api/v1/teams/landing?gender=male&team_type=club&tour
 
 ## `GET /api/v1/teams/splits`
 
-Joint distribution of (toss outcome × team innings × match result)
-for the Splits Mosaic. Spec: `docs/internal/spec-splits-mosaic.md`.
+The endpoint returns the joint distribution of toss outcome, team innings and match result for
+the Splits Mosaic. Spec: `docs/internal/spec-splits-mosaic.md`.
 
-Two modes:
+The endpoint has two modes:
 
-- **Landing** (no `?team=`) — league-side cells from unpivoting every
-  match in scope into two team-views (one per side). Each match
-  contributes 2 rows to the joint distribution.
-- **Team-detail** (`?team=X` set) — team-side cells + league-side
-  baseline at the same filter scope + per-cell deltas
-  (`share - league_share`, and relative `delta_pct`). Same envelope
-  pattern as the `scope_avg` field on `/teams/{team}/summary`. The
-  **full (toss × inning × result) grid is emitted** (every combination
-  that passes the aux filter, including cells where the subject has
-  `n = 0`), each carrying its `league_share` — so the Splits-Mosaic
-  reset bar can sum cells to build conditional "drop/switch one axis"
-  counts and deltas. (Landing mode still returns only the cells that
-  occur.)
+- **Landing** (no `?team=`) gives league-side cells. It unpivots every match in scope into two
+  team views, one for each side. So each match adds 2 rows to the joint distribution.
+- **Team-detail** (`?team=X` set) gives team-side cells, the league-side baseline at the same
+  filter scope, and a delta for each cell (`share - league_share`, and the relative `delta_pct`).
+  The envelope pattern is the same as for
+  the `scope_avg` field on `/teams/{team}/summary`. The endpoint **returns the full grid of toss,
+  inning and result**, with every combination that passes the aux filter, including cells where
+  the subject has `n = 0`. Each cell carries its `league_share`. So the reset bar of the Splits
+  Mosaic can sum cells to build conditional counts and deltas that "drop/switch one axis".
+  (Landing mode still returns only the cells that occur.)
 
-Aux narrowings honoured at the cell level (post-GROUP BY). When
-`?result=` or `?toss_outcome=` is set without `?team=`, the endpoint
-returns HTTP 400 — both filters are subject-POV-relative and have no
-meaning without a team subject.
+The endpoint applies aux narrowings at the cell level, after the GROUP BY. If `?result=` or
+`?toss_outcome=` is set without `?team=`, the endpoint returns HTTP 400. Both filters are relative
+to the subject's point of view (POV), so they have no meaning without a team as the subject.
 
 ```bash
 # Landing
@@ -570,20 +592,21 @@ curl "http://localhost:8000/api/v1/teams/splits?team=Royal%20Challengers%20Benga
 ```
 
 Cell coordinates:
-- `toss_outcome`: `"won"` / `"lost"`
-- `inning`: `0` (batted first) / `1` (batted second)
-- `result`: `"won"` / `"lost"` / `"tied"` (last collapses tied + no-result)
 
-Subject-POV gate:
-- `?result=won` without `?team=` → 400 `"?result= requires ?team= (subject POV needed)."`
-- `?toss_outcome=won` without `?team=` → 400 `"?toss_outcome= requires ?team= (subject POV needed)."`
+- `toss_outcome`: `"won"` or `"lost"`
+- `inning`: `0` (batted first) or `1` (batted second)
+- `result`: `"won"`, `"lost"` or `"tied"` (the last one joins tied and no-result)
+
+Errors when a filter needs a subject team:
+
+- `?result=won` without `?team=` returns 400 `"?result= requires ?team= (subject POV needed)."`
+- `?toss_outcome=won` without `?team=` returns 400 `"?toss_outcome= requires ?team= (subject POV needed)."`
 
 ## `GET /api/v1/batters/leaders`
 
-Top-N batters by average and by strike rate, with min-sample
-thresholds to exclude cameos. Params: `limit` (default 10),
-`min_balls` (default 100), `min_dismissals` (default 3, applies to
-averages list only).
+The endpoint returns the top N batters by average and by strike rate. Thresholds on the size of
+the sample leave out cameos. Params: `limit` (default 10), `min_balls` (default 100),
+`min_dismissals` (default 3, for the list by average only).
 
 ```bash
 curl "http://localhost:8000/api/v1/batters/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=3"
@@ -603,9 +626,9 @@ curl "http://localhost:8000/api/v1/batters/leaders?gender=male&team_type=club&to
 
 ## `GET /api/v1/bowlers/leaders`
 
-Top-N bowlers by strike rate and by economy. Params: `limit`
-(default 10), `min_balls` (default 60 = 10 overs), `min_wickets`
-(default 3, applies to SR list only).
+The endpoint returns the top N bowlers by strike rate and by economy. Params: `limit`
+(default 10), `min_balls` (default 60, which is 10 overs), `min_wickets` (default 3, for the list
+by strike rate only).
 
 ```bash
 curl "http://localhost:8000/api/v1/bowlers/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=3"
@@ -625,10 +648,9 @@ curl "http://localhost:8000/api/v1/bowlers/leaders?gender=male&team_type=club&to
 
 ## `GET /api/v1/fielders/leaders`
 
-Top-N fielders by total dismissals (catches + stumpings +
-run-outs + caught-and-bowled) and top-N keepers by designated-
-keeper dismissals. Volume-based, no thresholds. Keepers sourced
-via `keeper_assignment` (Tier 2).
+The endpoint returns the top N fielders by total dismissals (catches, stumpings, run-outs and
+caught-and-bowled). It also returns the top N keepers by dismissals as the designated keeper. The
+lists rank by volume and have no thresholds. The keepers come from `keeper_assignment` (Tier 2).
 
 ```bash
 curl "http://localhost:8000/api/v1/fielders/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=3"
@@ -649,17 +671,15 @@ curl "http://localhost:8000/api/v1/fielders/leaders?gender=male&team_type=club&t
 
 # Teams (`/api/v1/teams/{team}/…`)
 
-Source: `api/routers/teams.py`. `{team}` is URL-encoded team name
-(e.g. `Mumbai%20Indians`). All endpoints accept the common filters.
+Source: `api/routers/teams.py`. `{team}` is the URL-encoded name of the team, for example
+`Mumbai%20Indians`. All endpoints accept the common filters.
 
 ## `GET /api/v1/teams/{team}/summary`
 
-Win/loss totals, toss stats, gender-breakdown banner, Tier-2 keeper
-list, and the canonical tournaments the team has matches in within
-the active filter scope. Each numeric metric is wrapped in the per-
-metric envelope (see "Compare metric envelope" below); identity-
-bearing fields (`gender_breakdown`, `keepers`, `tournaments_in_scope`)
-stay flat.
+The endpoint returns the totals of wins and losses, toss stats, the banner of the gender breakdown
+and the list of Tier-2 keepers. It also returns the canonical tournaments in which the team has
+matches within the active filter scope. Each numeric metric is wrapped in the envelope for one
+metric (see "Compare metric envelope" below). Fields that identify something (`gender_breakdown`, `keepers`, `tournaments_in_scope`) stay flat.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/summary?gender=male&team_type=international"
@@ -687,21 +707,18 @@ curl "http://localhost:8000/api/v1/teams/India/summary?gender=male&team_type=int
 }
 ```
 
-`tournaments_in_scope` drives the avg-col label promotion on the
-Compare tab — when a club team's universe collapses to a singleton
-(RCB → IPL), the avg col labels as the tournament instead of the
-generic "Men's club average".
+The Compare tab uses `tournaments_in_scope` to choose the label of the average column. If a club
+team plays in only one tournament in scope (RCB in the IPL), the column takes the name of the
+tournament instead of the generic "Men's club average".
 
-`last_match_date` is the team's most recent match in scope (ISO
-YYYY-MM-DD). Drives the dormancy badge in the team-page header
-via DormancyContext — gap > 60 days renders a small italic
-"5 months since last match" / "last match: Oct 2021" badge per
-the standard dormancy ladder. Null when the team has no matches
-in scope.
+`last_match_date` is the date of the team's most recent match in scope (ISO YYYY-MM-DD). It sets
+the dormancy badge in the header of the team page, through DormancyContext. If the gap is more than
+60 days, the page shows a small italic badge, such as "5 months since last match" or "last match:
+Oct 2021", by the standard dormancy ladder. The field is null when the team has no matches in scope.
 
 ## `GET /api/v1/teams/{team}/results`
 
-Paginated match list for a team. Params: `limit` (default 50),
+The endpoint returns the list of a team's matches, in pages. Params: `limit` (default 50),
 `offset`.
 
 ```bash
@@ -729,7 +746,8 @@ curl "http://localhost:8000/api/v1/teams/India/results?gender=male&team_type=int
 
 ## `GET /api/v1/teams/{team}/vs/{opponent}`
 
-Head-to-head team record (summary + per-season + match list).
+The endpoint returns the head-to-head record of two teams, with a summary, a row for each season and
+the list of matches.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/vs/Australia?gender=male&team_type=international&season_from=2024&season_to=2025"
@@ -746,14 +764,14 @@ curl "http://localhost:8000/api/v1/teams/India/vs/Australia?gender=male&team_typ
 
 ## `GET /api/v1/teams/{team}/opponents`
 
-Flat list of opponents with match counts (unused by UI currently,
-kept for completeness).
+The endpoint returns a flat list of opponents with the count of matches against each. The UI does
+not use it at present, and it stays for completeness.
 
 ## `GET /api/v1/teams/{team}/opponents-matrix`
 
-Rollup (top-N opponents by match volume) + per-season cells for the
-vs-Opponent tab's stacked bars + bubble matrix. Params: `top_n`
-(default 8).
+The endpoint returns a rollup of the top N opponents by number of matches, and a cell for each
+opponent in each season. The vs-Opponent tab draws its stacked bars and its bubble matrix from them. Params:
+`top_n` (default 8).
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/opponents-matrix?gender=male&team_type=international&top_n=2"
@@ -770,7 +788,7 @@ curl "http://localhost:8000/api/v1/teams/India/opponents-matrix?gender=male&team
 
 ## `GET /api/v1/teams/{team}/by-season`
 
-Wins/losses per season, used by the "Wins by Season" bar chart.
+The endpoint returns the wins and losses in each season, for the "Wins by Season" bar chart.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/by-season?gender=male&team_type=international&season_from=2024&season_to=2025"
@@ -787,9 +805,9 @@ curl "http://localhost:8000/api/v1/teams/India/by-season?gender=male&team_type=i
 
 ## `GET /api/v1/teams/{team}/players-by-season`
 
-Per-season roster — everyone who appeared in the XI, alphabetical,
-with batting average + bowling SR + year-over-year turnover.
-Full-name resolution via `personname` variants.
+The endpoint returns the roster of each season. The roster lists everyone who played in the XI, in
+alphabetical order, with the batting average and the bowling strike rate. It also gives the
+turnover from the year before. The full names come from the variants in `personname`.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/players-by-season?gender=male&team_type=international&season_from=2024&season_to=2024"
@@ -812,37 +830,35 @@ curl "http://localhost:8000/api/v1/teams/India/players-by-season?gender=male&tea
 
 ## Team ball-level: batting / bowling / fielding / partnerships
 
-Per-team aggregates that power the Batting / Bowling / Fielding /
-Partnerships tabs on `/teams`. See `docs/internal/spec-team-stats.md` for the
-design. Shape follows a consistent pattern:
+These endpoints give the aggregates for one team behind the Batting, Bowling, Fielding and
+Partnerships tabs on `/teams`. See `docs/internal/spec-team-stats.md` for the design. Their
+shapes follow one pattern:
 
-- `.../summary` — top-line ball-level stats (runs/balls/avg/SR/etc.).
-  Each numeric metric envelope-wrapped — see "Compare metric envelope".
-- `.../by-season` — season rows for the line/bar charts.
-- `.../by-phase` — powerplay / middle / death split. Per-phase
-  numeric metrics (run_rate / economy / boundary_pct / dot_pct)
-  envelope-wrapped against the in-scope league baseline; counts
-  (runs / balls / wickets_lost / fours / sixes) stay flat.
-- `.../by-inning` — 1st-innings / 2nd-innings split. Sibling of
-  `/by-phase` for the inning-split spec; partitions every numeric
-  metric on `i.innings_number` (0/1). Same envelope shape as
-  `/by-phase`. Available for batting / bowling / fielding /
+- `.../summary` gives the top-line ball-level stats, such as runs, balls, average and strike
+  rate. Each numeric metric is wrapped in the envelope (see "Compare metric envelope").
+- `.../by-season` gives the season rows for the line and bar charts.
+- `.../by-phase` splits by powerplay, middle and death. The numeric metrics of each phase
+  (run_rate, economy, boundary_pct, dot_pct) are wrapped in the envelope against the league
+  baseline in scope. The counts (runs, balls, wickets_lost, fours, sixes) stay flat.
+- `.../by-inning` splits by 1st innings and 2nd innings. It is the sibling of `/by-phase` for the
+  inning-split spec, and it partitions every numeric metric on `i.innings_number` (0 or 1). Its
+  envelope shape is the same as for `/by-phase`. It exists for batting, bowling, fielding and
   partnerships. Spec: `docs/internal/spec-inning-split.md` §3.2.
-- `.../top-batters` `.../top-bowlers` `.../top-fielders` — top-N
-  players for that team. Params: `limit` (default 5).
-- `.../phase-season-heatmap` — phase × season matrix for run rate +
-  wickets/innings.
+- `.../top-batters`, `.../top-bowlers` and `.../top-fielders` give the top N players for that
+  team. Params: `limit` (default 5).
+- `.../phase-season-heatmap` gives a matrix of phase by season for the run rate and the wickets
+  per innings.
 
 #### Page-local `?inning=0|1` narrowing (AuxParams)
 
-Every endpoint that joins innings (i.e. has innings-level metrics)
-also accepts the page-local `?inning=0` (1st-innings only) or
-`?inning=1` (2nd-innings only) query param. NOT a FilterBar field —
-it's an AuxParams aux narrowing. Match-level endpoints
-(`/teams/{team}/{summary,by-season,vs/{opponent},results}`) honour
-the same param via a derived match-id subquery (`team batted in
-inning X` semantic). Spec: `docs/internal/spec-inning-split.md`
-§3.1a + §5.2.
+Every endpoint that joins innings, that is, every endpoint with metrics at the innings level, also
+accepts a page-local query param. It is `?inning=0` for the 1st innings only, or `?inning=1` for
+the 2nd innings only. It is a page-local aux narrowing of AuxParams, and
+NOT a field of the FilterBar. The match-level endpoints
+(`/teams/{team}/{summary,by-season,vs/{opponent},results}`) honour the same param through a derived
+subquery on the match ids, with the meaning `team batted in
+inning X`. Spec: `docs/internal/spec-inning-split.md`
+§3.1a and §5.2.
 
 ### Batting
 
@@ -850,15 +866,14 @@ inning X` semantic). Spec: `docs/internal/spec-inning-split.md`
 curl "http://localhost:8000/api/v1/teams/India/batting/summary?gender=male&team_type=international&season_from=2024&season_to=2025"
 ```
 
-Each numeric metric is wrapped in the per-metric envelope (see
-"Compare metric envelope" below). Returns:
+Each numeric metric is wrapped in the envelope for one metric (see
+"Compare metric envelope" below). The endpoint returns:
 `{ team, innings_batted, total_runs, legal_balls, run_rate,
 boundary_pct, dot_pct, fours, sixes, fifties, hundreds,
 avg_1st_innings_total, avg_2nd_innings_total,
-highest_total, lowest_all_out_total }`. Identity-bearing fields
-(`highest_total`, `lowest_all_out_total`) stay flat. Subroutes:
-`/by-season`, `/by-phase`, `/by-inning`, `/top-batters`,
-`/phase-season-heatmap` (unchanged shapes).
+highest_total, lowest_all_out_total }`. The fields that identify an innings
+(`highest_total`, `lowest_all_out_total`) stay flat. The subroutes `/by-season`, `/by-phase`, `/by-inning`, `/top-batters` and
+`/phase-season-heatmap` keep their shapes.
 
 The `/by-inning` shape:
 
@@ -879,12 +894,10 @@ curl "http://localhost:8000/api/v1/teams/Royal%20Challengers%20Bengaluru/batting
 }
 ```
 
-Same shape for `/bowling/by-inning` (with `runs_conceded` /
-`economy` / `wickets` / `fours_conceded` / `sixes_conceded`
-instead) and `/fielding/by-inning` (`matches` / `catches` /
-`stumpings` / `run_outs` / `*_per_match`). For
-`/partnerships/by-inning` the per-row keys are `n` / `avg_runs` /
-`avg_balls` / `best_runs` (sibling of `/by-wicket`).
+`/bowling/by-inning` has the same shape, with `runs_conceded`, `economy`, `wickets`,
+`fours_conceded` and `sixes_conceded` instead. So does `/fielding/by-inning`, with `matches`,
+`catches`, `stumpings`, `run_outs` and `*_per_match`. For `/partnerships/by-inning`, a sibling of
+`/by-wicket`, the keys of each row are `n`, `avg_runs`, `avg_balls` and `best_runs`.
 
 ### Bowling
 
@@ -892,13 +905,13 @@ instead) and `/fielding/by-inning` (`matches` / `catches` /
 curl "http://localhost:8000/api/v1/teams/India/bowling/summary?gender=male&team_type=international&season_from=2024&season_to=2025"
 ```
 
-Each numeric metric envelope-wrapped. Returns:
+Each numeric metric is wrapped in the envelope. The endpoint returns:
 `{ team, innings_bowled, matches, runs_conceded, legal_balls, overs,
 wickets, economy, strike_rate, average, dot_pct, fours_conceded,
 sixes_conceded, wides, noballs, wides_per_match, noballs_per_match,
 avg_opposition_total, worst_conceded, best_defence }`.
-Identity-bearing fields (`worst_conceded`, `best_defence`) stay flat.
-Subroutes as per batting — with `/top-bowlers` instead of
+The fields that identify an innings (`worst_conceded`, `best_defence`) stay flat.
+The subroutes are as for batting, with `/top-bowlers` instead of
 `/top-batters`.
 
 ### Fielding
@@ -907,40 +920,38 @@ Subroutes as per batting — with `/top-bowlers` instead of
 curl "http://localhost:8000/api/v1/teams/India/fielding/summary?gender=male&team_type=international&season_from=2024&season_to=2025"
 ```
 
-Each numeric metric envelope-wrapped. Returns:
+Each numeric metric is wrapped in the envelope. The endpoint returns:
 `{ team, matches, catches, caught_and_bowled, stumpings, run_outs,
 total_dismissals_contributed, catches_per_match, stumpings_per_match,
-run_outs_per_match }`. Per-match rates' `scope_avg` is halved server-
-side (each match has 2 fielding sides — team-side comparable is /2).
+run_outs_per_match }`. For the rates per match, the server halves `scope_avg`. Each match has 2
+fielding sides, so the value that compares with one team is the total divided by 2.
 Subroutes: `/by-season`, `/top-fielders`.
 
 ### Partnerships
 
-Five endpoints, all under `/teams/{team}/partnerships/…`. Takes the
-same filter scope plus `side` (`batting`/`bowling` — whether
-partnerships are FOR or AGAINST the team).
+The group has five endpoints, all under `/teams/{team}/partnerships/…`. They take the same
+filter scope, and also `side` (`batting` or `bowling`), which says whether the partnerships are
+FOR or AGAINST the team.
 
-- `.../by-wicket?side=batting` — stats per wicket-number (1st-wicket
-  avg partnership, 2nd, …, 10th). Numeric metrics (n, avg_runs)
-  envelope-wrapped per wicket; identity-bearing best_partnership
-  stays flat.
-- `.../best-pairs` — top-3 pairs per wicket by total runs together.
-- `.../heatmap` — wicket × season matrix for avg partnership.
-- `.../top?side=batting&limit=10` — top-N individual partnerships.
-- `.../summary?side=batting` — aggregate counts (total / 50+ / 100+),
-  highest single partnership, avg runs, and the all-time top pair.
-  Powers the Teams → Compare tab's partnerships row. Each numeric
-  metric is wrapped in the per-metric envelope (see "Compare metric
+- `.../by-wicket?side=batting` gives the stats for each wicket number, that is, the average partnership
+  for the 1st wicket, the 2nd, and so on to the 10th. The numeric metrics (n, avg_runs) are wrapped in
+  the envelope for each wicket. best_partnership identifies a partnership, so it stays flat.
+- `.../best-pairs` gives the top 3 pairs for each wicket, by total runs together.
+- `.../heatmap` gives a matrix of wicket by season for the average partnership.
+- `.../top?side=batting&limit=10` gives the top N individual partnerships.
+- `.../summary?side=batting` gives the counts (total, 50+, 100+), the highest single partnership,
+  the average runs and the top pair of all time. It feeds the partnerships row of the Compare tab
+  under Teams. Each numeric metric is wrapped in the envelope for one metric (see "Compare metric
   envelope" below).
-- `.../by-season?side=batting` — per-season partnership rollup (total,
-  50+, 100+, avg, best). Drives the partnerships band on the Compare
-  tab's season-trajectory strip.
+- `.../by-season?side=batting` gives a rollup of partnerships for each season (total, 50+, 100+,
+  average, best). It feeds the partnerships band on the season-trajectory strip of the Compare
+  tab.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/partnerships/top?gender=male&team_type=international&season_from=2024&limit=1&side=batting"
 ```
 
-Returns a list of `{ partnership_id, match_id, date, season,
+The endpoint returns a list of `{ partnership_id, match_id, date, season,
 opposition, wicket_number, batter1, batter2, runs, balls, run_rate,
 ended_by_kind }`.
 
@@ -948,8 +959,8 @@ ended_by_kind }`.
 curl "http://localhost:8000/api/v1/teams/India/partnerships/summary?gender=male&team_type=international"
 ```
 
-Numeric metrics envelope-wrapped; identity-bearing `highest` +
-`best_pair` stay flat.
+The numeric metrics are wrapped in the envelope. `highest` and `best_pair` identify a
+partnership or a pair, so they stay flat.
 
 ```json
 {
@@ -974,30 +985,34 @@ Numeric metrics envelope-wrapped; identity-bearing `highest` +
 
 ### Distribution dossiers (per-innings)
 
-Three sibling endpoints — one per discipline — that mirror the per-
-player distribution dossiers (`/batters/{person_id}/distribution`, etc.)
-at team grain. Each is a self-contained per-innings dossier with
-two or three sibling distribution blocks under one master sample,
-phase rollup, four scope-anchored form windows (`last_10` /
-`last_60d` / `last_6mo` / `last_1yr`), Wilson 95% CIs on every
-probability, and scope-derived suggested-splits.
+The group has one endpoint for each discipline, and the three are siblings. They mirror a player's
+distribution dossiers, such as `/batters/{person_id}/distribution`, at team grain. Each
+endpoint returns a self-contained dossier over innings. The dossier has these parts:
 
-`FilterParams.filter_team` is IGNORED — the team path-param
-dominates. `FilterParams.filter_opponent` works as expected.
-Optional `as_of_date` (YYYY-MM-DD) anchors the calendar form
-windows deterministically; production callers omit it. Spec:
-`docs/internal/spec-distribution-stats.md` §16.
+- two or three sibling distribution blocks under one master sample, which is the set of innings
+  that the dossier counts
+- a rollup by phase
+- four form windows anchored to the scope (`last_10`, `last_60d`, `last_6mo`, `last_1yr`)
+- a Wilson 95% confidence interval (CI) on every probability
+- suggested splits derived from the scope
+
+The endpoints IGNORE `FilterParams.filter_team`, because the team in the path wins.
+`FilterParams.filter_opponent` works as expected. The optional `as_of_date` (YYYY-MM-DD) fixes the
+anchor of the calendar form windows, so that the result does not change from day to day.
+Production callers omit it. Spec: `docs/internal/spec-distribution-stats.md` §16.
 
 #### `GET /api/v1/teams/{team}/batting/distribution`
 
-Master sample = each innings the team batted (`i.team = :team`).
-Two sibling blocks: `runs` (skewed continuous; chain-ladder
-conditionals at 100/150/200/230 + over-aware doubling at the
-10-over checkpoint) + `run_rate` (continuous per-over; flipped
-polarity vs. bowler economy — high RR is good for batting). Per-
-innings observation row carries `runs_at_10` / `wickets_at_10` /
-`reached_10_overs` for the over-aware probabilities + the
-escalation-ratio paired magnitude stat.
+The master sample is each innings that the team batted (`i.team = :team`). The endpoint has two
+sibling blocks:
+
+- `runs` is a skewed continuous value. It has chain-ladder conditionals at 100, 150, 200 and 230,
+  and an over-aware doubling at the checkpoint of 10 overs.
+- `run_rate` is a continuous rate, in runs per over. Its polarity is the reverse of bowler economy,
+  because a high run rate is good for batting.
+
+The observation row of each innings carries `runs_at_10`, `wickets_at_10` and `reached_10_overs`.
+They feed the over-aware probabilities and the paired magnitude stat, the escalation ratio.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/batting/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
@@ -1075,41 +1090,36 @@ curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/batting/distribution?t
 }
 ```
 
-Wickets here is the team-batting "wickets fallen" count and excludes
-`'retired hurt'` / `'retired not out'` (matches the existing team-
-batting/by-phase convention).
+Here the wickets are the team-batting count of "wickets fallen". The count excludes
+`'retired hurt'` and `'retired not out'`, which follows the existing convention of team-batting by-phase.
 
 #### `GET /api/v1/teams/{team}/bowling/distribution`
 
-Master sample = the OPPONENT's batting innings under the active
-filter scope (side-neutral team filter — match has the team, the
-innings's batting side is NOT the team). Three sibling blocks:
+The master sample is the OPPONENT's batting innings under the active filter scope. The team filter
+is side-neutral. The match has the team, and the batting side of the innings is NOT the team. The
+endpoint has three sibling blocks:
 
-- **`wickets`** — discrete count + simples (`p_leq_3`, `p_geq_5`,
-  `p_geq_7`, `p_eq_10`) + ≥5-anchored conditionals (`p_7_given_5`,
-  `p_10_given_5`) + over-aware `p_geq_3_at_10` ("early
-  breakthrough") and `p_eq_10_given_3_at_10` ("finishing rate
-  after early breakthrough").
-- **`runs_conceded`** — mirror of team-batting `runs` polarity-
-  flipped (low conceded is good). Five simples
-  (`p_lt_100`/`p_lt_150`/`p_geq_150`/`p_geq_200`/`p_geq_230`) +
-  chain ladder + over-aware doubling (`p_double_at_10` —
-  "opp doubled on us from halfway").
-- **`economy`** — sibling of bowler v1 economy block, at team
-  grain. Same pool / per-innings / median schema; same milestones
-  (`p_econ_leq_6/7`, `p_econ_geq_9/10`).
+- **`wickets`** is a discrete count. It has the simple probabilities (`p_leq_3`, `p_geq_5`,
+  `p_geq_7`, `p_eq_10`) and the conditionals anchored at 5 or more wickets (`p_7_given_5`,
+  `p_10_given_5`). It also has the over-aware `p_geq_3_at_10` ("early breakthrough") and
+  `p_eq_10_given_3_at_10` ("finishing rate after early breakthrough").
+- **`runs_conceded`** mirrors the team-batting `runs` with the polarity reversed, because few runs
+  conceded is good. It has five simple probabilities
+  (`p_lt_100`/`p_lt_150`/`p_geq_150`/`p_geq_200`/`p_geq_230`), the chain ladder and the over-aware
+  doubling (`p_double_at_10`, "opp doubled on us from halfway").
+- **`economy`** is the sibling of the economy block of bowler v1, at team grain. It has the same
+  schema of pool, per-innings values and median, and the same milestones (`p_econ_leq_6/7`,
+  `p_econ_geq_9/10`).
 
-**Wickets exclusion list (TEAM-CREDITED).** The wickets count on
-this endpoint INCLUDES run-outs — the team caused them (a fielder
-threw the ball). Excluded kinds: `'retired hurt'`, `'retired out'`,
-`'retired not out'`, `'obstructing the field'` (the four non-team-
-credited kinds). This DIVERGES from `/teams/{team}/bowling/summary`
-which uses the bowler-credited 5-element exclusion list (also
-excludes `'run out'`). Both numbers are correct — they answer
-different questions ("how many wickets did this team take?" vs
-"how many wickets did our bowlers take?"). See `docs/internal/
+**Wickets exclusion list (TEAM-CREDITED).** The wickets count on this endpoint INCLUDES run-outs,
+because the team caused them (a fielder threw the ball). It excludes `'retired hurt'`,
+`'retired out'`, `'retired not out'` and `'obstructing the field'`, the four kinds that are not
+credited to the team. The count DIVERGES from `/teams/{team}/bowling/summary`, which uses the
+bowler-credited exclusion list of 5 elements (it also excludes `'run out'`). Both numbers are
+correct, because they answer different questions, "how many wickets did this team take?" and
+"how many wickets did our bowlers take?". See `docs/internal/
 design-decisions.md` "Team-bowling distribution wicket count"
-for rationale.
+for the reasons.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/bowling/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
@@ -1186,25 +1196,22 @@ curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/bowling/distribution?t
 
 #### `GET /api/v1/teams/{team}/fielding/distribution`
 
-Master sample = the OPPONENT's batting innings; counts fielding
-events credited to any of the team's matchplayers in that match
-(substitutes are tracked separately on the `substitute_catches`
-scalar). Three sibling count blocks:
+The master sample is the OPPONENT's batting innings. The endpoint counts the fielding events
+credited to any of the team's matchplayers in that match. The `substitute_catches` scalar counts
+the substitutes on their own. The endpoint has three sibling count blocks:
 
-- **`catches`** — 4 simples (`p_eq_0`, `p_geq_3`, `p_geq_5`,
-  `p_geq_7`); no conditional ladder.
-- **`run_outs`** — 3-simple partition (`p_eq_0`, `p_eq_1`,
-  `p_geq_2`); sums to 1.
-- **`stumpings`** — same 3-simple partition. **ALWAYS shipped at
-  team grain** — every senior team has had a keeper at some
-  point; zero-event scopes ship all-zero chips with small-n CIs
-  rather than null. (Diverges from player-fielder
-  `/fielders/{person_id}/distribution`, where the stumpings block is
-  null for non-keepers.)
+- **`catches`** has 4 simple probabilities (`p_eq_0`, `p_geq_3`, `p_geq_5`, `p_geq_7`), and no
+  conditional ladder.
+- **`run_outs`** has a partition into 3 simple probabilities (`p_eq_0`, `p_eq_1`, `p_geq_2`),
+  which sum to 1.
+- **`stumpings`** has the same partition into 3. The endpoint **ALWAYS returns it at team grain**,
+  because every senior team has had a keeper at some point. A scope with no events returns chips
+  that are all zero, with CIs for a small n, rather than null. (The player fielder endpoint
+  `/fielders/{person_id}/distribution` differs, because there the stumpings block is null for a
+  player who is not a keeper.)
 
-Top-level scalars: `n_innings_fielded`, `wickets_total` (any-kind
-count for the fielder-ratio tooltip "X catches of Y wickets"),
-`substitute_catches`.
+The scalars at the top level are `n_innings_fielded`, `wickets_total` and `substitute_catches`.
+The second scalar counts wickets of any kind, for the fielder-ratio tooltip "X catches of Y wickets".
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/fielding/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
@@ -1267,10 +1274,9 @@ curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/fielding/distribution?
 
 ## `GET /api/v1/teams/{team}/records`
 
-Team-scoped record lists — same response shape as `/series/records`
-so the frontend `RecordsTab` component renders both. Subject-team
-semantics throughout: every list reads "team X's …" rather than
-"any team's … in matches involving X":
+The endpoint returns the record lists of one team. The response has the same shape as
+`/series/records`, so that the frontend `RecordsTab` component renders both. Every list is about
+the subject team. It reads "team X's …" rather than "any team's … in matches involving X":
 
 | List | Predicate |
 |---|---|
@@ -1281,14 +1287,12 @@ semantics throughout: every list reads "team X's …" rather than
 | `largest_partnerships` | partnership where the batting side is team X |
 | `best_individual_batting` | a team X batter in a team X innings |
 | `best_bowling_figures` | a team X bowler (≥2 wickets gate) |
-| `most_sixes_in_a_match` | sixes hit BY team X in a single match — NOT match-grain total across both sides (the `/series/records` semantic) |
+| `most_sixes_in_a_match` | sixes hit BY team X in a single match, NOT the match-grain total across both sides (the `/series/records` semantic) |
 
-Each list capped at `limit` (default 5, max 20). Reads from the
-precomp tables `inningstotal`, `inningsbatterperf`, `matchbowlerperf`
-populated by `scripts/populate_*.py`. Honours all FilterBar
-narrowings + `aux.inning` (applied at match level for win lists,
-at innings level for batting/partnership lists). The 8 reads run
-in parallel via `asyncio.gather`.
+Each list stops at `limit` (default 5, max 20). The endpoint reads from the precomputed tables
+`inningstotal`, `inningsbatterperf` and `matchbowlerperf`, which `scripts/populate_*.py` fills.
+It honours all the narrowings of the FilterBar and `aux.inning`, which it applies at the match
+level for the lists of wins, and at the innings level for the lists of batting and partnerships. The 8 reads run in parallel through `asyncio.gather`.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/records?tournament=Indian%20Premier%20League&limit=2"
@@ -1309,155 +1313,161 @@ curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/records?tournament=Ind
 }
 ```
 
-Every row carries `tournament` + `season` so the Records subtab
-can render an Edition column + per-row `(ed)` link to that
-specific edition (independent of the FilterBar's season window).
+Every row carries `tournament` and `season`, so that the Records subtab can render an Edition
+column. In each row it can also render an `(ed)` link to that edition, independent of the season
+window of the FilterBar.
 
 ## Player position-mix cohort baselines
 
-The four `/api/v1/scope/averages/players/*` endpoints expose
-position/over/keeper-mix-weighted cohort baselines used by the
-player `/summary` endpoints during envelope composition. Each is
-also a standalone read for ad-hoc analysis.
+A cohort is the group that the API compares a subject with, in the same filter scope. For a player, it
+is the pool of players. A cohort
+baseline is the average of that pool. For batting it is weighted by the player's mix of batting positions,
+and for bowling by the player's mix of overs. For fielding and keeping it is split by the keeper flag.
 
-Shipped 2026-05-20 with the player-baseline rollout
+An envelope is a small object that wraps one metric. It holds the player's or the team's value
+next to the baseline, with the difference in percent, the direction and the sample size.
+
+The four `/api/v1/scope/averages/players/*` endpoints give these cohort baselines. The player `/summary` endpoints use them when they build each envelope.
+You can also call each one on its own for ad-hoc analysis.
+
+The endpoints shipped on 2026-05-20 with the rollout of the player baselines
 (`docs/internal/spec-player-compare-average.md`).
 
-Shared shape: a `cohort: {…}` metadata block + envelope-wrapped
-headline metrics + a `by_<axis>` array carrying per-bucket
-aggregates. Each endpoint applies a sliding-scale strict cliff:
-if any bucket the player has non-zero mix-weight on has cohort
-sample below the bucket's threshold, the entire response's
-`scope_avg` is null and `cliff_buckets` lists the offending
-buckets.
+All four endpoints share one shape:
+
+- a `cohort: {…}` metadata block
+- the headline metrics, each wrapped in an envelope
+- a `by_<axis>` array with the aggregates of each bucket, where a bucket is one position or one over
+
+Each endpoint applies a strict cliff on a sliding scale. Take each bucket where the player has a non-zero
+mix weight. If the cohort sample in any of them is below the threshold of that bucket, the `scope_avg` of
+the whole response is null. Then `cliff_buckets` lists the buckets that failed.
 
 ### `GET /api/v1/scope/averages/players/batting/summary`
 
-Position-mix-weighted cohort baseline for batting. Mix vector =
-10 floats (opener at index 0 = positions 1+2 merged, then
-#3..#11), summing to 1.0 ± 0.001.
+The cohort baseline for batting is weighted by the player's mix of batting positions. The mix vector is 10
+floats that sum to 1.0 ± 0.001. Index 0 is the opener, which merges positions 1 and 2, and the next nine
+are #3 to #11.
 
 ```bash
 curl "http://localhost:8000/api/v1/scope/averages/players/batting/summary?tournament=Indian+Premier+League&position_mix=0.54,0.38,0.05,0.03"
 ```
 
-Returns six envelope-wrapped headline metrics (`innings_batted`,
-`runs`, `average`, `strike_rate`, `boundary_pct`, `dot_pct`),
-cohort metadata (`n_players`, `n_innings_total`, the input
-`position_mix`), and `by_position[10]` with per-bucket
-aggregates + thresholds + `below_support` flags.
+The response has six headline metrics, each wrapped in an envelope (`innings_batted`,
+`runs`, `average`, `strike_rate`, `boundary_pct`, `dot_pct`). It also has the cohort metadata
+(`n_players`, `n_innings_total`, the input `position_mix`) and `by_position[10]`. That array gives the
+aggregates, the threshold and the `below_support` flag of each bucket.
 
-Per-bucket thresholds (`cohort innings`): linear `27 − 2·bucket`
-→ 25, 23, 21, 19, 17, 15, 13, 11, 9, 7.
+The threshold of each bucket is in `cohort innings`. It is linear, `27 − 2·bucket`, which gives 25, 23, 21,
+19, 17, 15, 13, 11, 9 and 7.
 
 ### `GET /api/v1/scope/averages/players/bowling/summary`
 
-Over-mix-weighted cohort baseline for bowling. Mix vector = 20
-floats indexed by 0-based over (0 = "Over 1"; rendered 1-indexed
-in tooltips/labels).
+The cohort baseline for bowling is weighted by the player's mix of overs. The mix vector is 20 floats,
+indexed by the 0-based over. Index 0 is "Over 1", and the tooltips and labels show the overs counted from 1.
 
 ```bash
 curl "http://localhost:8000/api/v1/scope/averages/players/bowling/summary?tournament=Indian+Premier+League&over_mix=0.02,0.10,0.05,0.10,0.07,0.08,0.02,0.01,0.01,0.01,0.03,0.04,0.05,0.04,0.05,0.04,0.10,0.07,0.08,0.03"
 ```
 
-Six headline rates (`economy`, `average`, `strike_rate`,
-`dot_pct`, `wickets_per_over`, `boundary_pct`) + `by_over[20]`.
+The response has six headline rates (`economy`, `average`, `strike_rate`,
+`dot_pct`, `wickets_per_over`, `boundary_pct`) and `by_over[20]`.
 
-Per-over thresholds (`cohort legal_balls`): U-shape — 60 at
-overs 1-2 and 20, 50 at overs 3-6 and 16-19, 30 at overs 7-15.
+The threshold of each over is in `cohort legal_balls`, and it has a U shape:
+
+- 60 at overs 1 to 2 and 20
+- 50 at overs 3 to 6 and 16 to 19
+- 30 at overs 7 to 15
 
 ### `GET /api/v1/scope/averages/players/fielding/summary`
 
-Keeper-flag-partitioned cohort baseline. NOT position-weighted
-(dimensional analysis on per-position catches/match doesn't
-compose into a comparable rate — see
-`spec-player-compare-average.md` §5.4). Query: `?is_keeper=0|1`.
+The cohort baseline for fielding is split by the keeper flag. It is NOT weighted by position. By dimensional
+analysis, the catches per match of each position do not combine into a comparable rate (see
+`spec-player-compare-average.md` §5.4). The query takes `?is_keeper=0|1`.
 
 ```bash
 curl "http://localhost:8000/api/v1/scope/averages/players/fielding/summary?tournament=Indian+Premier+League&is_keeper=1"
 ```
 
-Four headline rates (`catches_per_match`, `stumpings_per_match`,
-`run_outs_per_match`, `dismissals_per_match`) +
-`by_dismissed_position[10]` (per-dismissed-batter-position
-sub-rates for the deferred `spec-fielding-impact.md`).
+The response has four headline rates (`catches_per_match`, `stumpings_per_match`,
+`run_outs_per_match`, `dismissals_per_match`) and `by_dismissed_position[10]`. That array gives sub-rates
+for each position of the dismissed batter, for the deferred `spec-fielding-impact.md`.
 
-The keeper partition is **per-(person, scope)** — a player who
-kept in 2023 but not 2024 belongs to the outfielder cohort for
-2024 only. Substitute catches are excluded from the numerator
-(distribution-side semantics — CLAUDE.md "Substitute fielders
-INCLUDED in /leaders, EXCLUDED in /distribution").
+The keeper partition is per (person, scope). For example, a player who kept wicket in 2023 but not in 2024
+belongs to the outfielder cohort for 2024 only. Substitute catches are excluded from the numerator. The
+endpoint follows the semantics of the distribution side, as CLAUDE.md says, "Substitute fielders INCLUDED
+in /leaders, EXCLUDED in /distribution".
 
 ### `GET /api/v1/scope/averages/players/keeping/summary`
 
-Keeper-only cohort baseline; per-match rates use
-`matches_as_keeper` as the denominator (rather than total
-matches, so keeping-rate isn't diluted by outfielding matches).
-No mix parameter — simple binary partition.
+The cohort baseline for keeping has keepers only. Its per-match rates divide by `matches_as_keeper`
+and not by the total matches, so that the matches in the outfield do not dilute the keeping rate.
+It takes no mix parameter, because the partition is a simple binary one.
 
 ```bash
 curl "http://localhost:8000/api/v1/scope/averages/players/keeping/summary?tournament=Indian+Premier+League"
 ```
 
-Four headline rates (catches/stumpings/run_outs/dismissals
-`_per_match`). Byes-per-innings deferred — needs a
-keeperassignment + delivery join not precomputed in
-playerscopestats.
+The response has four headline rates, for catches, stumpings, run_outs and dismissals, each
+`_per_match`. Byes per innings are deferred. They need a join of keeperassignment and delivery, and
+playerscopestats does not precompute it.
 
 ### `drop=` query parameter
 
-Every `/scope/averages/players/*` endpoint accepts `?drop=`
-with a comma-separated list of axis names to mask before clause
-construction: `gender, team_type, tournament, season,
+Every `/scope/averages/players/*` endpoint accepts `?drop=`. Its value is a comma-separated list of axis
+names to mask before the clauses are built. The names are `gender, team_type, tournament, season,
 filter_venue, filter_team, filter_opponent, team_class,
-series_type`. Per-endpoint structural plumbing for tautology-
-prone surfaces (next-spec H2H baselines, venue character
-strips, tournament-era comparisons). Unknown axis names → 400.
-Unused by Surface 1 itself.
+series_type`.
+
+Each endpoint carries the parameter as plumbing for surfaces where a baseline can turn tautological. Examples
+are the H2H (head-to-head) baselines of the next spec, the venue character strips and the comparisons
+across tournament eras. An unknown axis name gives a 400. Surface 1 itself does not use the parameter.
 
 ### Per-season / per-phase / per-over cohort endpoints (`person_id`)
 
-Distinct from the mix-vector `/summary` endpoints above: these take
-`?person_id=` (NOT a mix vector) and derive the player's position/over
-mix server-side, returning the cohort broken down by season, phase, or
-over. They back the green cohort reference lines on the by-season /
-by-phase / by-over charts.
+Unlike the mix-vector `/summary` endpoints above, these endpoints take
+`?person_id=` and NOT a mix vector. The server derives the player's mix of positions or overs, and it
+returns the cohort broken down by season, phase or over. They give the green cohort reference lines
+on the by-season, by-phase and by-over charts.
 
 ```bash
 # batting cohort by season (person derives the position mix)
 curl "http://localhost:8000/api/v1/scope/averages/players/batting/by-season?person_id=ba607b88&gender=male&team_type=club&tournament=Indian+Premier+League&season_from=2016&season_to=2016"
 ```
 
-- `…/batting/by-season` · `…/bowling/by-season` · `…/fielding/by-season`
-  → `{ by_season: [ { season, mix, n_players, n_innings, below_support,
+- `…/batting/by-season`, `…/bowling/by-season` and `…/fielding/by-season`
+  return `{ by_season: [ { season, mix, n_players, n_innings, below_support,
   cliff_buckets, strike_rate, runs_per_innings, … } ] }`.
-- `…/{batting,bowling,fielding}/by-phase` → `{ by_phase: [ { phase,
-  phase_bucket, mix, n_players, …, strike_rate / economy / dismissals_per_match } ] }`
-  (3 entries: powerplay / middle / death).
-- `…/batting/by-over` → `{ by_over: [ {over, n_balls, n_players, n_innings,
+- `…/{batting,bowling,fielding}/by-phase` returns `{ by_phase: [ { phase,
+  phase_bucket, mix, n_players, …, strike_rate / economy / dismissals_per_match } ] }`,
+  with 3 entries, for powerplay, middle and death.
+- `…/batting/by-over` returns `{ by_over: [ {over, n_balls, n_players, n_innings,
   threshold, below_support, strike_rate, dot_pct, boundary_pct, runs_per_innings,
-  dismissals} ], cohort: {…} }` (20 entries).
+  dismissals} ], cohort: {…} }`, with 20 entries.
 
-**Cohort narrows live under the six off-key filters.** All of the
-`/scope/averages/players/*` cohort endpoints (and the cohort blocks the
-`/batters|/bowlers|/fielders/{person_id}` handlers compose) narrow the comparison
-pool when any of **venue / opponent / team / inning / toss / result** is set:
-the handler dispatches on `is_precomputed_scope` — precomputed read at
-none-of-six, live aggregation (reproducing the precomputed value
-byte-identically at none-of-six) when any is set. `inning` uses the Option-B
-flip (bowling/fielding field in the innings the team did not bat); toss/result
-key on the relevant side. The per-position / per-over **mix histogram**
-weighting stays coarse (tournament/season grain) by design — only the
-per-bucket cohort *values* narrow. See `docs/internal/how-stats-calculated.md`
-§"Cohort baselines narrow live" + `spec-tier3-cohort-narrowing.md`.
+**The cohort narrows live under the six off-key filters.** The six are venue, opponent, team, inning,
+toss and result. When any of them is set, all of the
+`/scope/averages/players/*` cohort endpoints narrow the comparison pool. So do the cohort blocks that the
+`/batters|/bowlers|/fielders/{person_id}` handlers build.
+
+The handler dispatches on `is_precomputed_scope`. When none of the six is set, it reads the precomputed
+values. When any of them is set, it aggregates live. With none of the six set, the live aggregation gives
+the precomputed value byte for byte. `inning` uses the Option-B flip, so bowling and fielding count the
+innings in which the team did not bat. Toss and result key on the relevant side.
+
+The weighting by the mix histogram of positions or overs stays coarse by design, at the grain of
+tournament and season. Only the cohort values of each bucket narrow. See
+`docs/internal/how-stats-calculated.md` §"Cohort baselines narrow live" and
+`spec-tier3-cohort-narrowing.md`.
 
 ---
 
 ## Compare metric envelope
 
-The 5 team-compare summary endpoints —
-`/teams/{team}/{summary,batting/summary,bowling/summary,fielding/summary,partnerships/summary}` —
-wrap each numeric metric in a per-metric envelope:
+The five team-compare summary endpoints wrap each numeric metric in an envelope of its own. The endpoints
+are
+`/teams/{team}/{summary,batting/summary,bowling/summary,fielding/summary,partnerships/summary}`.
+Each envelope has this shape:
 
 ```json
 {
@@ -1469,76 +1479,65 @@ wrap each numeric metric in a per-metric envelope:
 }
 ```
 
-- `value` — the team's raw value.
-- `scope_avg` — the league baseline in the same FilterBar scope
-  (computed server-side via the same SQL with `team=None`). For
-  per-match fielding rates, the league pool is halved to be
-  per-team comparable (each match has 2 fielding sides).
-- `delta_pct` — signed `(value - scope_avg) / scope_avg × 100`,
-  rounded to 1 decimal. Returns `null` for count metrics (`fours`,
-  `wickets`, `total_runs`, etc.) where league total dwarfs team
-  total — the percentage is mathematically computable but not
-  meaningfully interpretable as "above/below average."
-- `direction` — `"higher_better"` / `"lower_better"` / `null`.
-  Per-metric constant in `api/metrics_metadata.py::METRIC_DIRECTIONS`.
-- `sample_size` — the denominator that makes the comparison
-  defensible (legal_balls for batting rates, balls_bowled for
-  bowling rates, partnerships for partnership stats, matches for
-  outcome rates).
+- `value` is the team's raw value.
+- `scope_avg` is the league baseline in the same FilterBar scope. The server computes it with the same
+  SQL and `team=None`. For per-match fielding rates, the league pool is halved so that it compares with
+  one team, because each match has 2 fielding sides.
+- `delta_pct` is the signed `(value - scope_avg) / scope_avg × 100`,
+  rounded to 1 decimal. It is `null` for count metrics, for example `fours`,
+  `wickets` and `total_runs`, where the league total dwarfs the team total. For those metrics the
+  percentage can be computed, but it has no useful meaning as "above/below average".
+- `direction` is `"higher_better"`, `"lower_better"` or `null`. Each metric has a constant in
+  `api/metrics_metadata.py::METRIC_DIRECTIONS`.
+- `sample_size` is the denominator that makes the comparison defensible. It is legal_balls for batting
+  rates, balls_bowled for bowling rates, partnerships for partnership stats and matches for outcome rates.
 
-Identity-bearing nested objects (`highest_total`, `lowest_all_out_total`,
+The nested objects that carry an identity (`highest_total`, `lowest_all_out_total`,
 `worst_conceded`, `best_defence`, `best_pair`, `keepers`,
-`gender_breakdown`) stay flat — they're not metrics.
+`gender_breakdown`) stay flat, because they are not metrics.
 
-The envelope is consumed lightly by the Teams > Compare UI today
-(`value` only). The other fields are shipped for Spec-2 surfaces
-(player compare, leaderboard delta columns, H2H baseline) — see
-`docs/internal/outlook-comparisons.md`.
+Today the Teams > Compare UI reads only `value`. The other fields are
+there for the Spec-2 surfaces, which are player compare, the delta columns of the leaderboards and the H2H
+baseline (see `docs/internal/outlook-comparisons.md`).
 
-The new `/scope/averages/*` endpoints below stay flat — they're the
-baseline data, not a per-entity-with-baseline view.
+The new `/scope/averages/*` endpoints below stay flat. They are the baseline data, and not a view of one
+entity with its baseline.
 
 ---
 
 # Scope averages (`/api/v1/scope/averages/…`)
 
-Source: `api/routers/scope_averages.py`. The "average team" / league-
-baseline counterpart to the team endpoints. Same FilterBar scope,
-no team filter — pool-weighted aggregates across every team in the
-filtered window. Drives the Average column on the Teams > Compare
-tab plus the phase-bands and season-trajectory expansions.
+Source: `api/routers/scope_averages.py`. These endpoints are the counterpart of the team endpoints for the
+"average team", the league baseline. They use the same FilterBar scope with no team filter, and they
+return pool-weighted aggregates across every team in the filtered window. They drive the Average column on
+the Teams > Compare tab, and the expansions for the phase bands and the season trajectory.
 
 All endpoints accept the standard FilterBar params (`gender`,
 `team_type`, `tournament`, `season_from`, `season_to`,
-`filter_venue`), the page-local `series_type`, the avg-slot's
-`scope_to_team` (auto-narrows tournament universe to the team's
-events when no tournament filter is set — applied frontend-side
-only for `team_type='club'`; internationals default to the full
-pool), and `team_class` (polymorphic — `full_member` on intl,
-`primary_club` / `secondary_club` on clubs).
+`filter_venue`), the page-local `series_type`, `team_class`, and the avg slot's `scope_to_team`.
 
-**Per-innings semantic** (since 2026-04-26):
-Every numeric field on these endpoints (except match-level totals
-on `/scope/averages/summary` and identity-bearing payloads like
-`highest_total` / `best_partnership`) returns a per-INNINGS average
-— what one batting / bowling / fielding innings yields in scope.
-NOT a pool aggregate. See `docs/internal/perf-bucket-baselines.md`
-"What 'average' means" for the per-metric table.
+- `scope_to_team` narrows the tournament universe to the team's events when no tournament filter is
+  set. The frontend applies it only for `team_type='club'`, and internationals default to the full pool.
+- `team_class` is polymorphic: `full_member` on intl, `primary_club` / `secondary_club` on clubs.
 
-`innings_batted` / `innings_bowled` are dropped from the response
-(they'd always be 1 under per-innings semantic). Per-match rates
-(`catches_per_match`, `wides_per_match`, etc.) are halved at source
-to express per-fielding-side or per-bowling-side rate, comparable
-to a single team's contribution per match.
+**Per-innings semantic (since 2026-04-26).** Every numeric field on these endpoints returns a per-INNINGS
+average, which is what one batting, bowling or fielding innings yields in the scope. It is NOT a pool
+aggregate. The exceptions are the match-level totals on `/scope/averages/summary`, and the payloads that
+carry an identity, such as `highest_total` and `best_partnership`. See
+`docs/internal/perf-bucket-baselines.md`, "What 'average' means", for the table of each metric.
+
+The response drops `innings_batted` and `innings_bowled`, because under the per-innings semantic they would
+always be 1. The per-match rates, for example `catches_per_match` and `wides_per_match`, are halved at the
+source. They then give a rate for each fielding side or bowling side, which compares with one team's
+contribution per match.
 
 The response shape mirrors the team siblings, with two differences:
 
-1. No `team` field on top-level (no team identity).
-2. Identity-bearing nested objects are kept where meaningful at scope
-   level. `highest_total` carries the team that scored it; the
-   league's `best_partnership` at each wicket carries pair identity.
-   The "average team's best pair" doesn't exist, so summary-level
-   `best_pair` is omitted from the partnerships endpoint.
+1. There is no top-level `team` field, because there is no team identity.
+2. The nested objects that carry an identity are kept where they mean something at the scope level.
+   `highest_total` carries the team that scored it, and the league's `best_partnership` at each wicket
+   carries the identity of the pair. The "average team's best pair" does not exist, so the partnerships
+   endpoint omits the summary-level `best_pair`.
 
 | Endpoint | Mirrors |
 |---|---|
@@ -1579,60 +1578,52 @@ curl "http://localhost:8000/api/v1/scope/averages/batting/summary?tournament=Ind
 }
 ```
 
-Per-innings semantic — `total_runs: 182.89` reads as "an avg
-batting innings in IPL 2024 scored 182.89 runs". `fours: 15.31` =
-~15 fours per innings. Rates (`run_rate`, `boundary_pct`,
-`dot_pct`, `avg_*_innings_total`) unchanged from pool — they're
-inherently per-innings. `highest_total` is identity (single
-observation), not an average.
+Under the per-innings semantic, `total_runs: 182.89` reads as "an avg batting innings in IPL 2024 scored
+182.89 runs". `fours: 15.31` means about 15 fours per innings. The rates (`run_rate`, `boundary_pct`,
+`dot_pct`, `avg_*_innings_total`) are unchanged from the pool, because they are per innings by nature.
+`highest_total` is a single observation that carries an identity, not an average.
 
 ```bash
 curl "http://localhost:8000/api/v1/scope/averages/summary?tournament=Indian+Premier+League&season_from=2024&season_to=2024"
 ```
 
-Returns `{ matches, decided, ties, no_results, toss_decided,
-bat_first_wins, field_first_wins, bat_first_win_pct }`. The
-`bat_first_win_pct` is the most informative league-level signal —
-"bat first wins X% of matches in this scope."
+It returns `{ matches, decided, ties, no_results, toss_decided,
+bat_first_wins, field_first_wins, bat_first_win_pct }`. The `bat_first_win_pct` is the most informative
+signal at the league level. It reads as "bat first wins X% of matches in this scope."
 
 ---
 
 # Batters (`/api/v1/batters/{person_id}/…`)
 
-Source: `api/routers/batting.py`. `{person_id}` is the cricsheet hex
-person id (from `/players` search). All accept common filters plus
-contextual ones.
+Source: `api/routers/batting.py`. `{person_id}` is the cricsheet hex person id, which the `/players` search
+gives. All the endpoints accept the common filters, and contextual ones as well.
 
 ## `GET /api/v1/batters/{person_id}/summary`
 
-Career totals scoped to filters. Drives the StatCard row on a
-player's batting page (and the Batting band on `/players`).
+It gives the career totals within the filters. It drives the StatCard row on a player's batting page, and
+the Batting band on `/players`.
 
-**Runs are all-ball.** `runs` (and `fours`/`sixes`) sum the batter's
-off-bat runs over **all** his deliveries — a four hit off a no-ball is
-his. `balls`/`dots` count legal balls only, so `strike_rate` = all-ball
-runs / legal balls. This is the single convention across every batting
-endpoint + the cohort baselines (`spec-batting-allball-runs-single-
-source.md`); it raised e.g. V Kohli's career runs from 13117 (the old
-legal-only number) to 13166.
+**Runs are all-ball.** `runs`, `fours` and `sixes` sum the batter's off-bat runs over all his
+deliveries, so a four hit off a no-ball is his. `balls` and `dots` count legal balls only, so
+`strike_rate` is the all-ball runs over the legal balls. Every batting endpoint and the cohort baselines use
+this one convention (`spec-batting-allball-runs-single-
+source.md`). The switch to it raised V Kohli's career runs from 13117, the old legal-only number, to 13166.
 
-**Response shape — Phase 4 envelope migration (2026-05-20).** Each
-numeric field is a `MetricEnvelope` object (`{value, scope_avg,
-delta_pct, direction, sample_size}`) carrying the player's value
-alongside a position-mix-weighted cohort baseline. Identity-bearing
-fields stay flat (`highest_score`, `name`, `person_id`,
-`nationalities`). See "Player position-mix cohort baselines" above
+**Response shape, Phase 4 envelope migration (2026-05-20).** Each numeric field is a `MetricEnvelope`
+object (`{value, scope_avg,
+delta_pct, direction, sample_size}`). It carries the player's value next to a cohort baseline that is
+weighted by the position mix. The fields that carry an identity stay flat (`highest_score`, `name`,
+`person_id`, `nationalities`). See "Player position-mix cohort baselines" above,
 and `docs/internal/spec-player-compare-average.md`.
 
-Counts (`matches, innings, runs, hundreds, …`) have
-`direction: null` → `delta_pct` always null. Rates (`average`,
-`strike_rate`, `dot_pct`, `boundary_pct`, `balls_per_*`) carry a
-direction + signed `delta_pct` vs. the cohort.
+The counts (`matches, innings, runs, hundreds, …`) have `direction: null`, so their `delta_pct` is always
+null. The rates (`average`, `strike_rate`, `dot_pct`, `boundary_pct`, `balls_per_*`) carry a direction and
+a signed `delta_pct` against the cohort.
 
-The response also includes a `position_distribution: [10]` array
-(per-position aggregates feeding the next-spec position-histogram
-viz), a `cohort: {…}` metadata block, and `cohort_below_support` /
-`cohort_cliff_buckets` flags surfacing the sliding-scale gate.
+The response also includes a `position_distribution: [10]` array, with the aggregates of each position.
+They feed the position histogram of the next spec. The response also has a `cohort: {…}` metadata block,
+and the `cohort_below_support` and `cohort_cliff_buckets` flags, which show the result of the sliding-scale
+gate.
 
 ```bash
 curl "http://localhost:8000/api/v1/batters/ba607b88/summary?tournament=Indian+Premier+League"
@@ -1670,19 +1661,17 @@ curl "http://localhost:8000/api/v1/batters/ba607b88/summary?tournament=Indian+Pr
 }
 ```
 
-**Non-striker dismissals (fix shipped 2026-05-20).** `dismissals` /
-`not_outs` count includes wickets where the batter was at the non-
-striker's end (run-outs at the bowler's end, the rare obstructing
-/ handled-the-ball as non-striker). Pre-fix, those dismissals were
-invisible to this endpoint because the per-innings query filtered
-`d.batter_id = :pid` AND LEFT-JOIN'd wicket. 4.2% of dismissals in
-cricket.db are non-striker; for Kohli at IPL the fix moved the
-count from 226 to 228.
+**Non-striker dismissals (fix shipped 2026-05-20).** The `dismissals` and `not_outs` counts include the
+wickets where the batter was at the non-striker's end. Examples are run-outs at the bowler's end, and the
+rare obstructing or handled-the-ball as non-striker. Before the fix, this endpoint did not see those
+dismissals, because the per-innings query filtered `d.batter_id = :pid` AND used a LEFT JOIN on wicket. In
+cricket.db, 4.2% of dismissals are non-striker dismissals. For Kohli at IPL, the fix moved the count from
+226 to 228.
 
 ## `GET /api/v1/batters/{person_id}/by-innings`
 
-Innings list (Innings List tab). Params: `limit` (default 50),
-`offset`, `sort` (`date`, `runs`, `strike_rate`, etc.).
+It gives the innings list for the Innings List tab. Params: `limit` (default 50), `offset` and `sort` (for
+example `date`, `runs` or `strike_rate`).
 
 ```bash
 curl "http://localhost:8000/api/v1/batters/ba607b88/by-innings?limit=1"
@@ -1707,60 +1696,59 @@ curl "http://localhost:8000/api/v1/batters/ba607b88/by-innings?limit=1"
 
 ## `GET /api/v1/batters/{person_id}/vs-bowlers`
 
-Matchup table. Params: `bowler_id` (optional, for single-bowler
-drilldown), `min_balls` (default 6).
+It gives the matchup table. Params: `bowler_id` (optional, for the drilldown to one bowler) and
+`min_balls` (default 6).
 
-Returns `{ matchups: [ { bowler_id, bowler, balls, runs,
+It returns `{ matchups: [ { bowler_id, bowler, balls, runs,
 dismissals, strike_rate, average, … } ] }`.
 
 ## `GET /api/v1/batters/{person_id}/by-over`
 
-Over-by-over stats (1..20). Returns `{ by_over: [ { over, balls,
+It gives the stats of each over, 1 to 20. It returns `{ by_over: [ { over, balls,
 runs, strike_rate, dismissals, … } ] }`.
 
 ## `GET /api/v1/batters/{person_id}/by-phase`
 
-Powerplay / middle / death split. `{ by_phase: [ { phase, balls,
+It splits the stats into the powerplay, middle and death phases. It returns `{ by_phase: [ { phase, balls,
 runs, strike_rate, … } ] }`.
 
 ## `GET /api/v1/batters/{person_id}/by-season`
 
-Season-by-season career trajectory. `{ by_season: [ { season, balls,
+It gives the career trajectory season by season. It returns `{ by_season: [ { season, balls,
 runs, dismissals, average, strike_rate, innings, fifties, hundreds,
 dots, boundaries, … } ] }`.
 
 ## `GET /api/v1/batters/{person_id}/dismissals`
 
-Dismissal analysis. Returns counts by `kind`, primary `bowler_type`
-breakdown, and by_phase dismissal distribution. Used by the
-Dismissals donut + bars.
+It gives the dismissal analysis. It returns the counts by `kind`, a breakdown by the primary `bowler_type`,
+and the distribution of dismissals by phase. The Dismissals donut and bars use it.
 
 ## `GET /api/v1/batters/{person_id}/inter-wicket`
 
-Partnership-segment analysis: runs + rate in each "between-wickets"
-span of an innings. `{ inter_wicket: [ { after_wicket, avg_runs,
+It gives the analysis of partnership segments, which are the runs and the rate in each span of an innings
+between two wickets. It returns `{ inter_wicket: [ { after_wicket, avg_runs,
 avg_balls, run_rate, n } ] }`.
 
 ## `GET /api/v1/batters/{person_id}/records`
 
-Per-player batting record lists — six top-N lists capped at `limit`
+It gives the batting record lists of one player. There are six top-N lists, each capped at `limit`
 (default 10, max 20):
 
-- `highest_scores` — by runs DESC, balls ASC tiebreak.
-- `fastest_50s` — innings reaching 50, by balls ASC.
-- `fastest_100s` — innings reaching 100, by balls ASC.
-- `most_sixes_innings` — by sixes DESC.
-- `most_fours_innings` — by fours DESC.
-- `best_strike_rates` — min 20 balls gate, by SR DESC. The 20-ball
-  floor filters out 1-ball-6-runs cameos.
+- `highest_scores`: by runs DESC, with balls ASC as the tiebreak.
+- `fastest_50s`: innings that reach 50, by balls ASC.
+- `fastest_100s`: innings that reach 100, by balls ASC.
+- `most_sixes_innings`: by sixes DESC.
+- `most_fours_innings`: by fours DESC.
+- `best_strike_rates`: by SR DESC, with a gate of at least 20 balls. The 20-ball floor filters out
+  cameos of 1 ball and 6 runs.
 
-Reads from `inningsbatterperf` (precomputed per-(batter,innings)
-aggregate populated by `scripts/populate_records_aggregates.py`).
-Honours all FilterBar narrowings + `aux.inning`. Runs are **all-ball**
-(off-bat runs off no-balls included); balls faced are legal-only. The
-table carries a 0-runs/0-balls row for each pure non-striker innings (a
-batter who never faced a ball as striker still batted), so its innings
-count matches the summary's. Not-out excludes retired hurt/out.
+The endpoint reads from `inningsbatterperf`, a precomputed aggregate for each (batter, innings) that
+`scripts/populate_records_aggregates.py` fills. It honours all the FilterBar narrowings and `aux.inning`.
+Runs are all-ball, so off-bat runs off no-balls are included, and balls faced are legal-only.
+
+The table carries a row of 0 runs and 0 balls for each pure non-striker innings. A batter who never
+faced a ball as striker still batted, so the table's innings count matches the summary's. Not-out excludes
+retired hurt and retired out.
 
 ```bash
 curl "http://localhost:8000/api/v1/batters/ba607b88/records?tournament=Indian%20Premier%20League&limit=3"
@@ -1785,24 +1773,24 @@ curl "http://localhost:8000/api/v1/batters/ba607b88/records?tournament=Indian%20
 }
 ```
 
-Every row carries `tournament` + `season` so the frontend Records
-subtab can render an Edition column + per-row `(ed)` link to that
-specific tournament+season.
+Every row carries `tournament` and `season`, so the frontend Records subtab can show an Edition column.
+Each row can also show an `(ed)` link to that tournament and season.
 
 ## `GET /api/v1/batters/{person_id}/distribution`
 
-Per-innings runs distribution dossier: lifetime + form-window
-aggregates (mean / median / variance / std / average), milestone
-probabilities (`p_failure_10`, `p_25_plus`, `p_50_plus`,
-`p_100_plus`), phase decomposition (powerplay / middle / death
-runs and balls per phase, plus per-innings phase columns on every
-observation), and scope-derived suggested-splits navigation hints
-("All IPL", "All cricket in 2024", "All-time"). Form windows are
-last-10 innings + last-60 days, both with the same shape as
-lifetime; a `delta` block reports window-mean-minus-lifetime-mean
-and window-median-minus-lifetime-median. Optional `as_of_date`
-(YYYY-MM-DD) anchors the last-60-day window deterministically;
-production callers omit it. Spec:
+It gives a dossier of the runs distribution per innings. The dossier has these parts:
+
+- aggregates for the lifetime and for the form windows (mean, median, variance, std, average)
+- milestone probabilities (`p_failure_10`, `p_25_plus`, `p_50_plus`, `p_100_plus`)
+- a phase decomposition, with the runs and balls of each phase (powerplay, middle, death), and the phase
+  columns of each innings on every observation
+- hints for the suggested-splits navigation, derived from the scope ("All IPL", "All cricket in 2024",
+  "All-time")
+
+The form windows are the last 10 innings and the last 60 days, and both have the same shape as the
+lifetime block. A `delta` block reports the window mean minus the lifetime mean, and the window median
+minus the lifetime median. The optional `as_of_date` (YYYY-MM-DD) anchors the last-60-day window
+deterministically, and production callers omit it. Spec:
 `docs/internal/spec-distribution-stats.md` §8.
 
 ```bash
@@ -1861,15 +1849,17 @@ curl "http://localhost:8000/api/v1/batters/ba607b88/distribution?tournament=Indi
 
 # Bowlers (`/api/v1/bowlers/{person_id}/…`)
 
-Source: `api/routers/bowling.py`. Mirror of the batters pattern.
+Source: `api/routers/bowling.py`. The bowler endpoints follow the same pattern as the batter
+endpoints.
 
 ## `GET /api/v1/bowlers/{person_id}/summary`
 
-Same Phase 4 envelope shape as `/batters/{person_id}/summary` (see above).
-Mix axis is over-mix (20 elements); cohort thresholds U-shape per
-over. Identity fields (`overs` formatted string, `best_figures`)
-stay flat. Includes `over_distribution[20]` array + `cohort: {…}`
-metadata.
+The response has the same Phase 4 envelope shape as `/batters/{person_id}/summary` (see above).
+In the envelope, each numeric field is an object with its value, the scope average, the difference
+in percent, the direction and the sample size. The mix axis is the over mix, with 20 elements, and
+the cohort thresholds form a U shape over the overs. The identity fields, `overs` (a formatted
+string) and `best_figures`, stay flat. The response also includes the `over_distribution[20]` array
+and the `cohort: {…}` metadata.
 
 ```bash
 curl "http://localhost:8000/api/v1/bowlers/462411b3/summary?tournament=Indian+Premier+League"
@@ -1894,51 +1884,53 @@ curl "http://localhost:8000/api/v1/bowlers/462411b3/summary?tournament=Indian+Pr
 ```
 
 **Note (CLAUDE.md convention):** bowling uses `runs_conceded` and
-`wickets`, NOT `runs`/`dismissals`. Don't reuse batting types.
+`wickets`, not `runs`/`dismissals`. Do not reuse the batting types.
 
 ## `GET /api/v1/bowlers/{person_id}/distribution`
 
-Per-innings bowling distribution dossier. Three sibling
-distribution blocks under one master sample:
+The endpoint returns a dossier of the bowler's distributions per innings. It has three sibling
+distribution blocks, all from one master sample:
 
-- **`wickets`** — zero-inflated discrete count distribution
-  (per-innings wickets taken). Six simples
+- **`wickets`** is a zero-inflated distribution of a discrete count, the wickets taken in each
+  innings. It has six simple probabilities
   (`p_zero`/`p_geq_1`/`p_geq_2`/`p_geq_3`/`p_geq_4`/`p_geq_5`)
-  + three ≥2-anchored conditionals (`p_3_given_2`/`p_4_given_2`/
-  `p_5_given_2`). All conditional denominators equal `count(w ≥ 2)`
-  for stable noise across the rare-event upper rungs (chain
-  conditionals like `P(≥5│≥4)` would shrink the denominator
-  geometrically and produce ±20pp confidence intervals at the top
-  rung; anchoring keeps it bounded by `count(≥2)`).
-- **`runs_conceded`** — skewed continuous, simples only
+  and three conditionals anchored at 2 or more wickets (`p_3_given_2`/`p_4_given_2`/
+  `p_5_given_2`). Every conditional has the denominator `count(w ≥ 2)`,
+  so the noise stays stable across the rare upper rungs. A chain of
+  conditionals such as `P(≥5│≥4)` would shrink the denominator
+  geometrically and give confidence intervals of ±20pp at the top
+  rung. The anchor keeps the denominator bounded by `count(≥2)`.
+- **`runs_conceded`** is a skewed continuous distribution, with simple probabilities only
   (`p_leq_15`/`p_leq_25`/`p_geq_40`/`p_geq_50`).
-- **`economy`** — continuous per-over rate. Surfaces BOTH `pool`
-  (balls-weighted, the conventional career number) AND
-  `mean_per_innings` (unweighted mean of per-innings RPO) — they
-  answer different questions; histograms read against
-  `mean_per_innings` for visual centre-of-mass, summary text
-  reads against `pool`. Simples
+- **`economy`** is a continuous rate per over. It gives both `pool`
+  (weighted by balls, the conventional career number) and
+  `mean_per_innings` (the unweighted mean of the runs per over in each innings). The two
+  answer different questions. The histograms read against
+  `mean_per_innings` for the visual centre of mass, and the summary text
+  reads against `pool`. Its simple probabilities are
   `p_econ_leq_6`/`p_econ_leq_7`/`p_econ_geq_9`/`p_econ_geq_10`.
 
-Plus phase decomposition (powerplay/middle/death runs+balls+
-wickets per phase, plus per-innings phase columns on every
-observation), four form windows (last-10 innings, last-60d,
-last-6mo, last-1yr), pool-derived scalars (`pool_strike_rate`,
-`pool_average`), and scope-derived suggested-splits.
+The response also has these parts:
 
-**Every probability field** ships as
-`{ value, num, denom, ci_low, ci_high }` with a Wilson 95%
-confidence interval. `value`, `ci_low`, `ci_high` are `null`
-when `denom == 0` (undefined ratio).
+- a phase decomposition, with the runs, balls and wickets in each phase (powerplay, middle and
+  death), and phase columns for each innings on every observation
+- four form windows, for the last 10 innings, the last 60 days, the last 6 months and the last year
+- scalars from the pool (`pool_strike_rate` and `pool_average`)
+- suggested splits that come from the scope
 
-**Master sample** = per `(match, innings the bowler bowled in)`
-clearing the `min_balls` qualifying-innings threshold. Default
-`min_balls=12` (= 2 legal overs); pass `min_balls=0` to include
-1-ball cameos. The threshold is echoed back in
+**Every probability field** comes as
+`{ value, num, denom, ci_low, ci_high }`, with a Wilson 95%
+confidence interval. `value`, `ci_low` and `ci_high` are `null`
+when `denom == 0`, because the ratio is undefined.
+
+**Master sample.** The master sample has one row per `(match, innings the bowler bowled in)`
+that clears the `min_balls` threshold for a qualifying innings. The default is
+`min_balls=12` (2 legal overs). Pass `min_balls=0` to include
+cameos of 1 ball. The response echoes the threshold in
 `response.thresholds.min_balls`.
 
-Optional `as_of_date` (YYYY-MM-DD) anchors the calendar form
-windows deterministically; production callers omit it. Spec:
+The optional `as_of_date` (YYYY-MM-DD) anchors the calendar form
+windows to a fixed date, so that the result is deterministic. Production callers omit it. Spec:
 `docs/internal/spec-distribution-stats.md` §11.
 
 ```bash
@@ -2034,18 +2026,18 @@ curl "http://localhost:8000/api/v1/bowlers/462411b3/distribution?tournament=Indi
 
 ## `GET /api/v1/bowlers/{person_id}/records`
 
-Per-player bowling record lists — two top-N lists capped at `limit`
-(default 10, max 20):
+The endpoint returns the bowling records of one player, in two top-N lists. `limit` caps each
+list (default 10, max 20):
 
-- `best_figures` — wickets DESC, runs ASC tiebreak; min 2 wickets gate.
-- `most_economical` — economy ASC; min 18 balls (3 overs) gate.
+- `best_figures`: wickets DESC, with runs ASC as the tiebreak. A match needs at least 2 wickets.
+- `most_economical`: economy ASC. A match needs at least 18 balls (3 overs).
 
-Reads from `matchbowlerperf` (precomputed per-(bowler, match)
-aggregate populated by `scripts/populate_matchbowlerperf.py`).
-`aux.inning` is NOT applied — `matchbowlerperf` collapses across
-both innings the bowler bowled in, so an inning-specific record
-list would require a per-(bowler, innings) primitive that doesn't
-yet exist.
+The endpoint reads from `matchbowlerperf`, an aggregate per bowler and match that
+`scripts/populate_matchbowlerperf.py` precomputes. It does not apply `aux.inning`, the auxiliary
+filter for the innings, because `matchbowlerperf` collapses across
+both innings the bowler bowled in. A record list for one innings
+would need a primitive per bowler and innings, and that primitive does not
+exist yet.
 
 ```bash
 curl "http://localhost:8000/api/v1/bowlers/462411b3/records?tournament=Indian%20Premier%20League&limit=3"
@@ -2068,44 +2060,45 @@ curl "http://localhost:8000/api/v1/bowlers/462411b3/records?tournament=Indian%20
 
 ## Other endpoints (same shape pattern)
 
-- `GET /api/v1/bowlers/{person_id}/by-innings` — innings list with bowling figures. Params:
-  `limit`, `offset`.
-- `GET /api/v1/bowlers/{person_id}/vs-batters` — matchup table. Params: `batter_id`, `min_balls`.
-- `GET /api/v1/bowlers/{person_id}/by-over` — economy/SR per over (1..20).
-- `GET /api/v1/bowlers/{person_id}/by-phase` — powerplay / middle / death split.
-- `GET /api/v1/bowlers/{person_id}/by-season` — season-by-season career.
-- `GET /api/v1/bowlers/{person_id}/wickets` — wicket analysis: by_kind donut, by_phase bars,
-  by_batter (most-dismissed batters), dismissal-over distribution.
+- `GET /api/v1/bowlers/{person_id}/by-innings`: the list of innings, with the bowling figures.
+  Params: `limit`, `offset`.
+- `GET /api/v1/bowlers/{person_id}/vs-batters`: the matchup table. Params: `batter_id`, `min_balls`.
+- `GET /api/v1/bowlers/{person_id}/by-over`: economy and strike rate per over (1 to 20).
+- `GET /api/v1/bowlers/{person_id}/by-phase`: the split by powerplay, middle and death.
+- `GET /api/v1/bowlers/{person_id}/by-season`: the career season by season.
+- `GET /api/v1/bowlers/{person_id}/wickets`: the wicket analysis, with the by_kind donut, the
+  by_phase bars, by_batter (the batters dismissed most) and the distribution of the dismissal overs.
 
 ---
 
-# Fielders (`/api/v1/fielders/{person_id}/…`) — Tier 1
+# Fielders (`/api/v1/fielders/{person_id}/…`), Tier 1
 
-Source: `api/routers/fielding.py`. Backed by the `fieldingcredit`
-table.
+Source: `api/routers/fielding.py`. The `fieldingcredit` table backs these endpoints.
 
 ## `GET /api/v1/fielders/{person_id}/summary`
 
-Same Phase 4 envelope shape. Partition is binary `is_keeper`
-derived from `innings_kept > 0`. Counts have `direction: null`;
-the per-match rates (`catches_per_match`, `stumpings_per_match`,
-`run_outs_per_match`, `dismissals_per_match`) are `higher_better`
-with `delta_pct` vs. the keeper-or-outfielder cohort. Includes
-`dismissal_position_distribution[10]` (per-dismissed-batter-
-position aggregates) + `cohort: {match_dimension: "is_keeper",
+The response has the same Phase 4 envelope shape. The cohort splits in two on `is_keeper`,
+which comes from `innings_kept > 0`. The counts have `direction: null`.
+The rates per match (`catches_per_match`, `stumpings_per_match`,
+`run_outs_per_match`, `dismissals_per_match`) are `higher_better`,
+with `delta_pct` against the cohort of keepers or of outfielders. The response also includes
+`dismissal_position_distribution[10]`, which aggregates by the position of the dismissed
+batter, and `cohort: {match_dimension: "is_keeper",
 is_keeper, n_fielders, n_matches_total}`.
 
-**`matches_fielded` (denominator B).** All per-match rates divide by
-`matches_fielded` — matches where the fielder was in the XI AND the
-opponent batted (actually took the field) — NOT squad `matches`. This is
-the activity-unit denominator, consistent with batting `innings_batted` /
-bowling `innings_bowled`; `matches` stays the squad count for display. The
-two differ only on rare no-opponent-innings matches (e.g. Kohli IPL = 279
-fielded of 280). The cohort `n_matches_total` divides by the same
-`SUM(matches_fielded)`. The `cohort` block, the per-match rates, and the
-`dismissal_position_distribution` cohort all **narrow live** under the six
-filters (venue/opponent/team/inning/toss/result) — see the
-`/scope/averages/players/*` narrowing note above.
+**`matches_fielded` (denominator B).** All rates per match divide by
+`matches_fielded`, not by the squad count `matches`. It counts the matches where
+the fielder was in the XI and the opponent batted, that is, the matches where the fielder took the field. It is
+the denominator in units of activity, as `innings_batted` is for batting and
+`innings_bowled` is for bowling. `matches` stays the squad count for display. The
+two differ only on rare matches with no innings by the opponent (e.g. Kohli in the IPL fielded
+in 279 of 280).
+
+The cohort `n_matches_total` divides by the same
+`SUM(matches_fielded)`. The `cohort` block, the rates per match and the
+`dismissal_position_distribution` cohort all narrow live under the six
+filters (venue/opponent/team/inning/toss/result). See the narrowing note for
+`/scope/averages/players/*` above.
 
 ```bash
 curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/summary?tournament=Indian+Premier+League"
@@ -2129,23 +2122,23 @@ curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/summary?tournament=Indian+P
 }
 ```
 
-`is_keeper` (top-level field) signals to the frontend to show the
-Keeping tab. The dismissals/match cohort baseline is keeper-vs-
-keeper here (Dhoni partitioned into the keeper cohort).
+The top-level field `is_keeper` tells the frontend to show the
+Keeping tab. Here the cohort baseline for dismissals per match compares keepers with
+keepers, because Dhoni falls in the keeper cohort.
 
 ## `GET /api/v1/fielders/{person_id}/distribution`
 
-Per-match fielding distribution dossier — three sibling count blocks
-(catches / run_outs / stumpings) with three-simple milestones
-(`P=0` / `P=1` / `P≥2`), Wilson 95% CIs, and four form windows.
-Master sample is per-MATCH (not per-innings); fielding events span
-both opponent-batting innings, so the natural unit is the match.
+The endpoint returns a dossier of the fielding distributions per match. It has three sibling
+count blocks (catches, run_outs and stumpings), and each block has three simple milestones
+(`P=0` / `P=1` / `P≥2`) with Wilson 95% confidence intervals (CIs). It also has four form
+windows. The master sample has one row per match, not per innings. Fielding events span
+both innings in which the opponent bats, so the natural unit is the match.
 
-Stumpings block is `null` for non-keepers (`innings_kept == 0`);
-the frontend uses this to hide the Stumpings tab. Substitute catches
-are excluded from `catches.total` and surfaced separately as
-`substitute_catches` for reconciliation against `/summary.catches`.
-Caught-and-bowled is bowler-credited and lives on the bowling
+The stumpings block is `null` for non-keepers (`innings_kept == 0`),
+and the frontend uses the null to hide the Stumpings tab. `catches.total` excludes substitute
+catches. The response gives them separately as
+`substitute_catches`, to reconcile against `/summary.catches`.
+A caught-and-bowled dismissal is credited to the bowler, so it is in the bowling
 distribution dossier.
 
 ```bash
@@ -2196,39 +2189,38 @@ curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/distribution?tournament=Ind
 }
 ```
 
-`as_of_date` (optional ISO date) anchors the calendar form windows
-for deterministic regression tests; production callers omit it.
+`as_of_date`, an optional ISO date, anchors the calendar form windows
+so that the regression tests are deterministic. Production callers omit it.
 
-Three-simples invariant: `p_zero + p_one + p_geq_2 == 1.0` per
-block. The frontend Distribution panel renders three discrete bars
-in the INDIGO/SAGE/OCHRE palette to match.
+**Invariant of the three simples.** In each block, `p_zero + p_one + p_geq_2 == 1.0`.
+To match, the Distribution panel of the frontend draws three discrete bars
+in the INDIGO/SAGE/OCHRE palette.
 
 Spec: `docs/internal/spec-distribution-stats.md` §13.
 
 ## `GET /api/v1/fielders/{person_id}/records`
 
-Per-player fielding record lists — three top-N lists capped at
-`limit` (default 10, max 20):
+The endpoint returns the fielding records of one player, in three top-N lists. `limit` caps each
+list (default 10, max 20):
 
-- `most_catches_match` — catches DESC; dismissals DESC tiebreak.
-- `most_stumpings_match` — stumpings DESC. Populated only when the
-  player has appeared as the designated keeper; typically empty for
+- `most_catches_match`: catches DESC, with dismissals DESC as the tiebreak.
+- `most_stumpings_match`: stumpings DESC. The list fills only when the
+  player has appeared as the designated keeper, so it is typically empty for
   outfielders.
-- `most_dismissals_match` — catches + stumpings + run_outs DESC.
+- `most_dismissals_match`: catches + stumpings + run_outs, DESC.
 
-Reads from `matchfielderperf` (precomputed per-(fielder, match)
-aggregate populated by `scripts/populate_matchfielderperf.py`).
+The endpoint reads from `matchfielderperf`, an aggregate per fielder and match that
+`scripts/populate_matchfielderperf.py` precomputes.
 
-**Catches use the volume framing**: `kind IN ('caught',
-'caught_and_bowled')` AND no `is_substitute` filter. This matches
-the `/leaders` and `/summary` semantics (Convention 3) rather than
-the `/distribution` semantic that excludes substitute appearances.
-A substitute who took a catch took a catch — the record list
-reflects that.
+**Catches use the volume framing.** A catch is any dismissal with `kind IN ('caught',
+'caught_and_bowled')`, and there is no `is_substitute` filter. The rule matches
+the semantics of `/leaders` and `/summary` (Convention 3), not
+the semantics of `/distribution`, which excludes substitute appearances.
+So the record list counts a catch taken by a
+substitute.
 
-`aux.inning` is not applied — the precomp grain is per-match (a
-fielder can field across both innings), so the inning toggle is a
-no-op on this endpoint.
+The endpoint does not apply `aux.inning`, so the inning toggle does nothing on it. The precomputed
+table has one row for each fielder and match, because a fielder can field across both innings.
 
 ```bash
 curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/records?limit=3"
@@ -2252,35 +2244,35 @@ curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/records?limit=3"
 
 ## Other endpoints
 
-- `GET /api/v1/fielders/{person_id}/by-season` — dismissals per season split by kind.
-- `GET /api/v1/fielders/{person_id}/by-phase` — dismissals by powerplay / middle / death.
-- `GET /api/v1/fielders/{person_id}/by-over` — per-over dismissal counts.
-- `GET /api/v1/fielders/{person_id}/dismissal-types` — donut data (% catches vs stumpings vs
-  run-outs vs c&b).
-- `GET /api/v1/fielders/{person_id}/victims` — batters dismissed by this fielder, ranked.
-- `GET /api/v1/fielders/{person_id}/by-innings` — innings-level list with per-innings fielding
-  credits. Params: `limit`, `offset`.
+- `GET /api/v1/fielders/{person_id}/by-season`: the dismissals per season, split by kind.
+- `GET /api/v1/fielders/{person_id}/by-phase`: the dismissals by powerplay, middle and death.
+- `GET /api/v1/fielders/{person_id}/by-over`: the count of dismissals per over.
+- `GET /api/v1/fielders/{person_id}/dismissal-types`: the donut data (the percentages of catches,
+  stumpings, run-outs and c&b).
+- `GET /api/v1/fielders/{person_id}/victims`: the batters this fielder dismissed, ranked.
+- `GET /api/v1/fielders/{person_id}/by-innings`: the list of innings, with the fielding
+  credits of each innings. Params: `limit`, `offset`.
 
 ---
 
-# Keeping (`/api/v1/fielders/{person_id}/keeping/…`) — Tier 2
+# Keeping (`/api/v1/fielders/{person_id}/keeping/…`), Tier 2
 
-Source: `api/routers/keeping.py`. Only relevant when
-`summary.innings_kept > 0` (Tier-2 keeper inference has assigned
-innings to this person). See `docs/internal/spec-fielding-tier2.md` for the
-4-layer algorithm.
+Source: `api/routers/keeping.py`. The keeping endpoints matter only when
+`summary.innings_kept > 0`, which means that the Tier-2 keeper inference has assigned
+innings to this person. See `docs/internal/spec-fielding-tier2.md` for the
+algorithm, which has 4 layers.
 
 ## `GET /api/v1/fielders/{person_id}/keeping/summary`
 
-Same Phase 4 envelope shape. `innings_kept_by_confidence` stays
-flat (it's a dict of category counts). All other numerics
-envelope-wrapped. `byes_per_innings` carries `lower_better`
+The response has the same Phase 4 envelope shape. `innings_kept_by_confidence` stays
+flat, because it is a dict of counts per category. Every other numeric field is wrapped in the
+envelope. `byes_per_innings` has the `lower_better`
 direction. `cohort: {match_dimension: "is_keeper", is_keeper: 1,
-n_keepers, n_matches_keeping}` surfaces the keeper cohort
-metadata — note the per-MATCH (not per-innings) denominator
-mismatch with this endpoint's rates, so the cohort headline rates
-aren't directly used as `scope_avg` here. Reserved for a future
-cohort enhancement when byes precompute lands.
+n_keepers, n_matches_keeping}` gives the metadata of the keeper cohort.
+
+The cohort denominator is per match, not per innings, so it does not match the rates of this
+endpoint. For that reason the endpoint does not use the headline rates of the cohort directly
+as `scope_avg`. The use of the cohort for `scope_avg` waits for a future enhancement, when the precompute of byes lands.
 
 ```bash
 curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/keeping/summary?tournament=Indian+Premier+League"
@@ -2299,42 +2291,42 @@ curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/keeping/summary?tournament=
 }
 ```
 
-- `GET /api/v1/fielders/{person_id}/keeping/by-season` — per-season keeping stats.
-- `GET /api/v1/fielders/{person_id}/keeping/by-innings` — innings list for the Keeping tab.
+- `GET /api/v1/fielders/{person_id}/keeping/by-season`: the keeping stats per season.
+- `GET /api/v1/fielders/{person_id}/keeping/by-innings`: the list of innings for the Keeping tab.
   Params: `limit`, `offset`.
-- `GET /api/v1/fielders/{person_id}/keeping/ambiguous` — innings where this person was a
-  candidate but the algorithm couldn't resolve to a single keeper,
-  with the other candidates. For transparency in the UI.
+- `GET /api/v1/fielders/{person_id}/keeping/ambiguous`: the innings where this person was a
+  candidate but the algorithm could not resolve a single keeper,
+  with the other candidates. The UI shows them for transparency.
 
 ---
 
 # Head-to-head (`/api/v1/head-to-head/{batter_id}/{bowler_id}`)
 
-Source: `api/routers/head_to_head.py`. Single endpoint — returns
-everything the HeadToHead Player-vs-Player page needs. Filter scope
-applies; if the pair never met under those filters, arrays come back
-empty but the structure stays consistent.
+Source: `api/routers/head_to_head.py`. One endpoint returns
+everything that the HeadToHead Player-vs-Player page needs. The filter scope
+applies. If the pair never met under those filters, the arrays come back
+empty, but the structure stays the same.
 
-Accepts an optional **`series_type`** query param to narrow by series
-category — same semantics as the tournament-dossier endpoints. Four
-mutually-exclusive categories that partition the data:
+**`series_type`** is an optional query parameter that narrows by series
+category, with the same semantics as in the tournament-dossier endpoints. Its four
+categories are mutually exclusive and partition the data:
 
-- `all` (default) — every meeting
-- `bilateral` — international bilateral T20Is only (e.g. "India tour
-  of Australia"). Excludes ICC events AND club tournaments.
-- `icc` — ICC events only (T20 World Cup, Asia Cup, qualifiers, …)
-- `club` — club tournaments only (IPL, BBL, PSL, Vitality Blast, …)
+- `all` (default): every meeting
+- `bilateral`: international bilateral T20Is only (e.g. "India tour
+  of Australia"). It excludes ICC events and club tournaments.
+- `icc`: ICC events only (for example the T20 World Cup, the Asia Cup and qualifiers)
+- `club`: club tournaments only (for example the IPL, BBL, PSL and Vitality Blast)
 
-For matchups where both players are international teammates (Kohli +
-Bumrah on India), `bilateral` and `icc` both return 0 — they never
+When both players are international teammates (Kohli and
+Bumrah for India), `bilateral` and `icc` both return 0, because the two never
 face each other internationally. `club` returns their full IPL record
-(108 balls, 159 runs lifetime). `series_type` composes with FilterBar
-filters; setting `team_type=international&series_type=club` is
+(108 balls and 159 runs, lifetime). `series_type` composes with the filters of the FilterBar,
+the bar of filters in the frontend. So `team_type=international&series_type=club` is
 contradictory and yields 0.
 
-Legacy names `bilateral_only` and `tournament_only` map to `bilateral`
-and `icc` respectively for URL compat. The old `bilateral_only`
-included club matches; the new `bilateral` is international-only.
+For compatibility with old URLs, the legacy names `bilateral_only` and `tournament_only` map to
+`bilateral` and `icc`. The old `bilateral_only`
+included club matches, but the new `bilateral` is international only.
 
 ```bash
 curl "http://localhost:8000/api/v1/head-to-head/ba607b88/3fb19989?team_type=international&gender=male"
@@ -2367,9 +2359,9 @@ Source: `api/routers/matches.py`.
 
 ## `GET /api/v1/matches`
 
-Paginated list of matches. Accepts common filters plus `player_id`,
-`team`, `opponent`, `venue`, `city`, `q`, `limit`, `offset`,
-`sort` (date/runs/…).
+The endpoint returns a paginated list of matches. It accepts the common filters, and also `player_id`,
+`team`, `opponent`, `venue`, `city`, `q`, `limit`, `offset` and
+`sort` (date, runs and other keys).
 
 ```bash
 curl "http://localhost:8000/api/v1/matches?gender=male&team_type=international&limit=1"
@@ -2393,8 +2385,8 @@ curl "http://localhost:8000/api/v1/matches?gender=male&team_type=international&l
 
 ## `GET /api/v1/matches/{match_id}/scorecard`
 
-Full scorecard — both innings with batting, bowling, extras, fall
-of wickets, by-over run/wicket progression, keeper label.
+The endpoint returns the full scorecard. Each of the two innings has the batting, the bowling,
+the extras, the fall of wickets, the progression of runs and wickets by over, and the keeper label.
 
 ```json
 {
@@ -2415,13 +2407,13 @@ of wickets, by-over run/wicket progression, keeper label.
 }
 ```
 
-**Fielder attribution:** each `batting[]` row carries
-`dismissal_fielder_ids: string[]` from `fieldingcredit`, used by
-the scorecard to highlight via `?highlight_fielder=<person_id>`.
+**Fielder attribution.** Each `batting[]` row carries
+`dismissal_fielder_ids: string[]` from `fieldingcredit`. The scorecard uses the list to
+highlight a fielder through `?highlight_fielder=<person_id>`.
 
 ## `GET /api/v1/matches/{match_id}/innings-grid`
 
-Per-delivery grid for the InningsGridChart (every ball as a cell).
+The endpoint returns a grid of the deliveries for the InningsGridChart, with every ball as a cell.
 
 ```json
 {
@@ -2452,39 +2444,44 @@ Per-delivery grid for the InningsGridChart (every ball as a cell).
 
 # Series catalog / match-set dossier (`/api/v1/series/*`)
 
-Source: `api/routers/tournaments.py` (filename is historical — the
-router was renamed from `/tournaments/*` to `/series/*` to
-disambiguate from the FilterBar's "Tournament" dropdown). These
-power the `/series` landing + dossier UI AND the
-`/head-to-head?mode=team` Team-vs-Team view.
+Source: `api/routers/tournaments.py`. The file name is historical.
+The router was renamed from `/tournaments/*` to `/series/*` so that
+its name does not clash with the "Tournament" dropdown of the FilterBar.
+These endpoints power the `/series` landing page and the dossier UI.
+They also power the `/head-to-head?mode=team` Team-vs-Team view.
 
-The "match-set" framing is the unifying concept: every endpoint
-takes optional `tournament` (canonical name; expanded to IN-variants),
-optional `series_type` (`all` / `bilateral_only` / `tournament_only`),
-plus the standard FilterParams including `filter_team` / `filter_opponent`
-for rivalry scope. Same endpoints serve:
+These endpoints share one concept, the "match-set", which is the set
+of matches that the filters select. Every endpoint takes an
+optional `tournament` (the canonical name, expanded to its IN-variants)
+and an optional `series_type` (`all`, `bilateral_only` or `tournament_only`).
+It also takes the standard FilterParams, including `filter_team` and
+`filter_opponent` for the scope of a rivalry. The same endpoints serve
+these match-sets:
 
 - IPL all-time (`?tournament=Indian+Premier+League`)
 - IND vs AUS bilateral (`?filter_team=India&filter_opponent=Australia&series_type=bilateral_only`)
 - IND vs AUS within T20 World Cups (`?tournament=T20+World+Cup+%28Men%29&filter_team=India&filter_opponent=Australia`)
-- League baseline for any team (call without a team filter; same shape)
+- League baseline for any team (call it without a team filter, and the response has the same shape)
 
-When `filter_team` + `filter_opponent` are both set, summary returns a
-`by_team` companion with per-team breakdowns of top scorer, top wicket-
-taker, highest individual, largest partnership — AND a top-level
-`head_to_head` object with team1_wins / team2_wins / ties / no_result
-so the dossier can show "who won how much" as the top stat row.
+When `filter_team` and `filter_opponent` are both set, the summary
+returns a `by_team` companion object. It gives a breakdown for each
+team of the top scorer, the top wicket-taker, the highest individual
+score and the largest partnership. The summary also returns a top-level
+`head_to_head` object with team1_wins, team2_wins, ties and no_result.
+With these counts, the dossier can show "who won how much" as its top row
+of stats.
 
 ## `GET /api/v1/series/landing`
 
-Sectioned directory for the `/series` landing page. Bilateral
-rivalry tiles are bilateral-only and split by gender (top-9 full-member
-men's and women's pairs). Each rivalry entry's `latest_match` carries
-the most recent meeting across **all** international meetings (not
-bilateral-only) — `tournament` is the canonical ICC event name when
-the meeting was a recognized tournament (T20 WC, Asia Cup, …), or
-`null` for bilateral tours. The pair counts (`matches`, `team1_wins`,
-etc.) remain bilateral-only.
+The endpoint returns a directory in sections for the `/series` landing
+page. The tiles for bilateral rivalries count bilateral matches only,
+and they are split by gender (the top-9 full-member pairs for men and
+for women). The `latest_match` of each rivalry entry is the most recent
+meeting across all international meetings, not bilateral meetings only.
+Its `tournament` is the canonical ICC event name when the meeting was
+in a recognized tournament (for example the T20 WC or the Asia Cup).
+It is `null` for a bilateral tour. The pair counts (`matches`,
+`team1_wins` and the others) still count bilateral matches only.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/landing?gender=male"
@@ -2534,44 +2531,44 @@ curl "http://localhost:8000/api/v1/series/landing?gender=male"
 }
 ```
 
-The `club.rivalries` lists are top-12 most-played team pairs within
-club tournaments per gender — drives the H2H Team-vs-Team page's club
-suggestion tiles. Each entry carries the dominant tournament for
-context (franchise pairs are unambiguously single-tournament: RCB vs
-CSK is always IPL, never WBBL).
+The `club.rivalries` lists give, for each gender, the top-12
+most-played team pairs within club tournaments. They drive the club
+suggestion tiles on the H2H Team-vs-Team page. Each entry carries the
+dominant tournament for context. A franchise pair plays in only one
+tournament. For example, RCB vs CSK is always IPL, never WBBL.
 
 ## `GET /api/v1/series/summary`
 
-Headline numbers for any match-set scope. Tournament + series_type +
-filter_team/opponent are all optional. Returns `by_team` when team-pair
-in scope.
+The endpoint gives the headline numbers for any match-set scope.
+Tournament, series_type and filter_team/opponent are all optional. It
+returns `by_team` when a team pair is in scope.
 
-At broad scope (no tournament, no rivalry, no inning/aux narrowing,
-no team_class narrowing matching team_type) the count + rate
-queries source from precomputed `bucketbaselinematch` /
-`bucketbaselinebatting` / `bucketbaselinebowling` tables, dropping
-sub-second. Per-(person, match) Best moments
-(`highest_individual`, `best_bowling`, `best_fielding`) stay live
-since no precompute table carries that grain — they're gathered
-with everything else via `asyncio.gather`.
+Broad scope means no tournament, no rivalry, no inning or aux narrowing,
+and no team_class narrowing that matches team_type. At broad scope, the
+count and rate queries read from the precomputed tables
+`bucketbaselinematch`, `bucketbaselinebatting` and `bucketbaselinebowling`,
+so they return in under a second. The Best moments for each
+(person, match) pair (`highest_individual`, `best_bowling`,
+`best_fielding`) stay live, because no precompute table carries that
+grain. They are gathered with everything else through `asyncio.gather`.
 
-Returns `top_teams_international` + `top_teams_club` (top 5 each,
-min 100 games, SUM bat_first_wins + field_first_wins from
-`bucketbaselinematch`) at tier mode; empty in tournament/rivalry
-mode where `teams[]` chips are shown instead.
+In tier mode, the endpoint returns `top_teams_international` and
+`top_teams_club`. Each list has the top 5 teams with at least 100 games,
+ranked by the sum of bat_first_wins and field_first_wins from
+`bucketbaselinematch`. Both lists are empty in tournament mode and in
+rivalry mode, where the page shows `teams[]` chips instead.
 
-`champions_by_season` rows carry the per-row `tournament`
-(cricsheet `event_name`) so cross-tournament tier-mode Champions
-tables can render a Tournament column. In tournament-mode every
-row's tournament equals the dossier's — the field is redundant
-there.
+Each row of `champions_by_season` carries its own `tournament` (the
+cricsheet `event_name`). The Champions tables of cross-tournament tier
+mode use it to show a Tournament column. In tournament mode, every
+row's tournament equals the dossier's, so the field is redundant there.
 
-> **Historical:** there used to be a `/api/v1/league/*` router with
-> 5 endpoints (`/league/overview`, `/league/champions`,
-> `/league/leaders/{batting,bowling,fielding}`) added 2026-05-13.
-> Deleted 2026-05-14 — they were parallel copies of `/series/*`
-> with `tournament=null`. All functionality lives on `/series/*`
-> now.
+> **Historical:** A `/api/v1/league/*` router once had 5 endpoints
+> (`/league/overview`, `/league/champions` and
+> `/league/leaders/{batting,bowling,fielding}`). They were added on
+> 2026-05-13 and deleted on 2026-05-14, because they were parallel
+> copies of `/series/*` with `tournament=null`. All of their functions
+> now live on `/series/*`.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male"
@@ -2655,11 +2652,12 @@ curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_oppon
 
 ## `GET /api/v1/series/by-season`
 
-Per-edition rollup: champion, runner-up, top scorer, top wicket-taker,
-run rate, boundary %, sixes. Tournament + series_type + filter_*
-optional. `champion_record` / `runner_up_record` carry `{played, won}`
-for that team in that edition — used by the dossier's Editions tab to
-render "India (8/9)" style bracketed fractions.
+The endpoint gives a rollup for each edition. Each row has the
+champion, the runner-up, the top scorer, the top wicket-taker, the run
+rate, the boundary % and the sixes. Tournament, series_type and filter_* are
+optional. `champion_record` and `runner_up_record` carry `{played, won}`
+for that team in that edition. The Editions tab of the dossier uses
+them to show bracketed fractions such as "India (8/9)".
 
 ```bash
 curl "http://localhost:8000/api/v1/series/by-season?tournament=Indian+Premier+League&gender=male&team_type=club"
@@ -2686,10 +2684,10 @@ curl "http://localhost:8000/api/v1/series/by-season?tournament=Indian+Premier+Le
 
 ## `GET /api/v1/series/points-table`
 
-Reconstructed league-stage points table + NRR. Single-season scope
-required (`season_from=season_to`). Tournament required. Returns one
-table per `event_group` for ICC events; one combined table for IPL-shape
-leagues.
+The endpoint reconstructs the league-stage points table, with NRR. It
+requires a single-season scope (`season_from=season_to`) and a
+tournament. It returns one table per `event_group` for ICC events, and
+one combined table for leagues shaped like the IPL.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/points-table?tournament=Indian+Premier+League&season_from=2024&season_to=2024&gender=male&team_type=club"
@@ -2710,14 +2708,14 @@ curl "http://localhost:8000/api/v1/series/points-table?tournament=Indian+Premier
 }
 ```
 
-When the requested scope is multi-season, response is
-`{ "tables": [], "reason": "multi_season" }` so the frontend can hide
-the tab.
+When the requested scope covers several seasons, the response is
+`{ "tables": [], "reason": "multi_season" }`, so that the frontend can
+hide the tab.
 
 ## `GET /api/v1/series/records`
 
-Records sub-lists for the match-set, each capped at `limit` (default 5).
-Tournament optional.
+The endpoint gives the records sub-lists for the match-set, each capped
+at `limit` (default 5). Tournament is optional.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/records?tournament=Indian+Premier+League&gender=male&team_type=club&limit=2"
@@ -2755,32 +2753,37 @@ curl "http://localhost:8000/api/v1/series/records?tournament=Indian+Premier+Leag
 }
 ```
 
-Every row carries `tournament` + `season` so the frontend Records tab
-can render an Edition column + per-row `(ed)` team subscripts that
-point at that specific tournament+season rather than the FilterBar's
-ambient season window. Partnership + most-sixes rows additionally
-split `teams` into explicit `team1` / `team2` for clean link
-rendering.
+Every row carries `tournament` and `season`. The Records tab of the
+frontend uses them to show an Edition column and a `(ed)` team
+subscript on each row. The subscript points at that row's own
+tournament and season, rather than at the season window that the
+FilterBar sets. Partnership rows and most-sixes rows also split `teams` into
+explicit `team1` and `team2` fields, so that the links render cleanly.
 
 ## `GET /api/v1/series/{batters,bowlers,fielders}-leaders`
 
-Variant-aware leader lists (the `/batters/leaders` etc. wrappers, but
-tournament canonical is expanded to IN-variants). Tournament optional;
-when omitted, ranks across the full filter scope (useful for "top
-batters in this rivalry").
+The endpoints give leader lists that cover every name variant of a
+tournament. They wrap `/batters/leaders` and its siblings, and they
+expand the canonical tournament name to its IN-variants. Tournament is optional. Without it,
+the lists rank across the full filter scope, which is useful for the
+"top batters in this rivalry".
 
-Each row carries a `team` field — the player's dominant side in the
-current scope (most balls faced for batters, most balls bowled for
-bowlers, most fielding credits for fielders). In rivalry mode the UI
-uses this to flip `filter_team` / `filter_opponent` per row so the
-"vs <opponent>" context link points the player at their actual
-opponent, not the dossier's verbatim `filter_opponent`.
+Each row carries a `team` field, which is the player's dominant side in
+the current scope. The dominant side is the team with the most balls
+faced for a batter, the most balls bowled for a bowler, or the most
+fielding credits for a fielder. In rivalry mode, the UI uses the field
+to flip `filter_team` and `filter_opponent` for each row. The
+"vs <opponent>" context link then goes to the player's actual opponent,
+and not to the dossier's `filter_opponent` as written.
 
-`fielders-leaders` returns three top-N lists: `by_dismissals`
-(catches + stumpings + run-outs + c&b), `by_keeper_dismissals`
-(keeper-only — catches + stumpings sourced via `keeper_assignment`),
-and `by_run_outs` (run-outs alone, sorted DESC, tiebreak on total;
-excludes fielders with zero run-outs so the list isn't padded).
+`fielders-leaders` returns three top-N lists of fielders:
+
+- `by_dismissals`: catches, stumpings, run-outs and c&b.
+- `by_keeper_dismissals`: keeper dismissals only, which are the catches
+  and stumpings taken through `keeper_assignment`.
+- `by_run_outs`: run-outs alone, sorted DESC, with ties broken on the
+  total. It leaves out fielders with zero run-outs, so that the list is
+  not padded.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/batters-leaders?tournament=T20+World+Cup+%28Men%29&gender=male&limit=3"
@@ -2795,7 +2798,7 @@ curl "http://localhost:8000/api/v1/series/fielders-leaders?tournament=Indian+Pre
 }
 ```
 
-`fielders-leaders` response abbreviated:
+An abbreviated `fielders-leaders` response:
 
 ```json
 {
@@ -2807,16 +2810,19 @@ curl "http://localhost:8000/api/v1/series/fielders-leaders?tournament=Indian+Pre
 
 ## `GET /api/v1/series/fielder-scope-stats`
 
-Aggregate fielding stats for one picked player in the current scope —
-sibling of `batter-scope-stats` and `bowler-scope-stats`. Backs the
-Series > Fielders "Picked fielder" tile. Fielding is universal
-(every XI member fields), so this endpoint differs from its batter /
-bowler siblings in one way: when the player took 0 credits in scope
-BUT was in the XI for ≥1 scope match (matchplayer check), it returns
-a zero-filled entry rather than `{"entry": null}`. That way the
-picker can render e.g. "Jadeja · 0 · 0 · 0 · 0 · 0" for an all-
-rounder who fielded every match but took no catches / run-outs.
-Truly out-of-scope players (no matchplayer entry) still return null.
+The endpoint gives aggregate fielding stats for one picked player in
+the current scope. It is a sibling of `batter-scope-stats` and
+`bowler-scope-stats`, and it backs the "Picked fielder" tile of
+Series > Fielders. Every member of the XI fields, so this endpoint
+differs from its batter and bowler siblings in one way.
+
+If the player took 0 credits in scope but was in the XI for at least
+1 scope match (the matchplayer check), the endpoint returns a
+zero-filled entry rather than `{"entry": null}`. The picker
+can then show, for example, "Jadeja · 0 · 0 · 0 · 0 · 0" for an
+all-rounder who fielded in every match but took no catches or run-outs.
+A player who is out of scope, with no matchplayer entry, still gets
+null.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/fielder-scope-stats?person_id=ba607b88&tournament=T20+World+Cup+%28Men%29&gender=male&team_type=international&season_from=2022%2F23&season_to=2025%2F26"
@@ -2835,10 +2841,11 @@ curl "http://localhost:8000/api/v1/series/fielder-scope-stats?person_id=ba607b88
 
 ## `GET /api/v1/series/bowler-scope-stats`
 
-Aggregate bowling stats for one picked player in the current scope —
-sibling of `batter-scope-stats`. Backs the Series > Bowlers "Picked
-bowler" tile. Returns `{"entry": null}` when the player has no
-deliveries as bowler in scope. Same param set as the batter variant.
+The endpoint gives aggregate bowling stats for one picked player in the
+current scope. It is a sibling of `batter-scope-stats`, and it backs the
+"Picked bowler" tile of Series > Bowlers. It returns `{"entry": null}`
+when the player has no deliveries as bowler in scope. It takes the same
+parameters as the batter variant.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/bowler-scope-stats?person_id=462411b3&tournament=T20+World+Cup+%28Men%29&gender=male&team_type=international&season_from=2022%2F23&season_to=2025%2F26"
@@ -2857,15 +2864,15 @@ curl "http://localhost:8000/api/v1/series/bowler-scope-stats?person_id=462411b3&
 
 ## `GET /api/v1/series/batter-scope-stats`
 
-Aggregate batting stats for one specific player in the current
-match-set scope. Backs the Series > Batters "Picked batter" tile: the
-user picks a player from the scope-aware typeahead; this returns the
-same row shape as `/series/batters-leaders` so the card reuses the
-leaderboard cell renderers. Returns `{"entry": null}` when the
-picked player has no deliveries in scope (e.g. filter tweaked after
-picking).
+The endpoint gives aggregate batting stats for one specific player in
+the current match-set scope. It backs the "Picked batter" tile of
+Series > Batters, where the user picks a player from the scope-aware
+typeahead. It returns the same row shape as `/series/batters-leaders`,
+so that the card reuses the cell renderers of the leaderboard. It
+returns `{"entry": null}` when the picked player has no deliveries in
+scope, for example when the user changed a filter after the pick.
 
-Params: `person_id` (required), `tournament`, `series_type`, + full
+Params: `person_id` (required), `tournament`, `series_type` and the full
 FilterBar.
 
 ```bash
@@ -2885,11 +2892,12 @@ curl "http://localhost:8000/api/v1/series/batter-scope-stats?person_id=ba607b88&
 
 ## `GET /api/v1/series/partnerships/by-wicket`
 
-Per-wicket partnership rollup. Each row includes the single best stand
-(batters + match + season + date) so multi-edition scope is
-disambiguated. Tournament + filter_team optional. With `filter_team`,
-narrows to that team's partnerships (side=batting) or against them
-(side=bowling).
+The endpoint gives a partnership rollup for each wicket. Each row
+includes the single best stand (the batters, the match, the season and
+the date), so that a scope of several editions stays unambiguous.
+Tournament and filter_team are optional. With `filter_team`, the
+endpoint narrows to that team's partnerships (side=batting) or to the
+partnerships against them (side=bowling).
 
 ```bash
 curl "http://localhost:8000/api/v1/series/partnerships/by-wicket?tournament=Indian+Premier+League&gender=male&team_type=club"
@@ -2915,8 +2923,8 @@ curl "http://localhost:8000/api/v1/series/partnerships/by-wicket?tournament=Indi
 
 ## `GET /api/v1/series/partnerships/top`
 
-Top-N partnerships in the match-set scope. Same filters as `by-wicket`;
-adds `limit` (default 10).
+The endpoint gives the top-N partnerships in the match-set scope. It
+takes the same filters as `by-wicket`, and adds `limit` (default 10).
 
 ```bash
 curl "http://localhost:8000/api/v1/series/partnerships/top?tournament=Indian+Premier+League&limit=2&gender=male&team_type=club"
@@ -2940,9 +2948,10 @@ curl "http://localhost:8000/api/v1/series/partnerships/top?tournament=Indian+Pre
 
 ## `GET /api/v1/series/partnerships/top-by-wicket`
 
-Top-N partnerships **per wicket number** (1–10). Same filters as
-`top`; replaces `limit` with `per_wicket` (default 10, max 20).
-Returns ten grouped sub-lists.
+The endpoint gives the top-N partnerships for each wicket number
+(1 to 10). It takes the same filters as `top`, but replaces `limit`
+with `per_wicket` (default 10, max 20). It returns ten grouped
+sub-lists.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/partnerships/top-by-wicket?tournament=Indian+Premier+League&per_wicket=2&gender=male&team_type=club"
@@ -2975,7 +2984,8 @@ curl "http://localhost:8000/api/v1/series/partnerships/top-by-wicket?tournament=
 
 ## `GET /api/v1/series/partnerships/heatmap`
 
-Season × wicket-number average-runs matrix.
+The endpoint gives a matrix of average runs, by season and by wicket
+number.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/partnerships/heatmap?tournament=Indian+Premier+League&gender=male&team_type=club"
@@ -2995,9 +3005,10 @@ curl "http://localhost:8000/api/v1/series/partnerships/heatmap?tournament=Indian
 
 ## `GET /api/v1/series/other-rivalries`
 
-Lazy-loaded by the landing's "Show other rivalries" expander. Pairs
-involving at least one non-top-9 team with ≥ 5 bilateral matches in
-scope. Pass `gender` to scope.
+The "Show other rivalries" expander on the landing page loads this
+endpoint lazily. It lists the pairs that involve at least one team
+outside the top 9 and that have at least 5 bilateral matches in scope.
+Pass `gender` to set the scope.
 
 ```bash
 curl "http://localhost:8000/api/v1/series/other-rivalries?gender=male"
@@ -3015,8 +3026,9 @@ curl "http://localhost:8000/api/v1/series/other-rivalries?gender=male"
 
 ## `GET /api/v1/rivalries/summary`
 
-Synthesized bilateral-rivalry dossier (legacy — new code uses the
-match-set dossier endpoints above). Kept for compatibility.
+The endpoint gives a synthesized dossier for a bilateral rivalry. It is
+legacy and kept for compatibility. New code uses the match-set dossier
+endpoints above.
 
 ```bash
 curl "http://localhost:8000/api/v1/rivalries/summary?team1=India&team2=Australia&gender=male"
@@ -3039,11 +3051,12 @@ curl "http://localhost:8000/api/v1/rivalries/summary?team1=India&team2=Australia
 
 ---
 
-# Players tab — no new endpoints
+# Players tab, no new endpoints
 
-The `/players` tab (single-player overview + N-way career comparison)
-is composed client-side from existing summary endpoints — no new
-backend work. Per player, the frontend runs four requests in parallel:
+The `/players` tab gives a single-player overview and an N-way
+comparison of careers. The client builds it from existing summary
+endpoints, so it needed no new backend work. For each player, the
+frontend runs four requests in parallel:
 
 ```
 GET /api/v1/batters/{person_id}/summary
@@ -3052,27 +3065,27 @@ GET /api/v1/fielders/{person_id}/summary
 GET /api/v1/fielders/{person_id}/keeping/summary
 ```
 
-and composes the four responses into a `PlayerProfile` (see
-`frontend/src/api.ts::getPlayerProfile`). A 404 on any single
-endpoint (specialist batters have no bowling row, etc.) resolves
-to `null` without aborting the rest — the Players page hides
-discipline bands whose summary came back empty.
+The frontend then composes the four responses into a `PlayerProfile`
+(see `frontend/src/api.ts::getPlayerProfile`). A 404 on any single
+endpoint resolves to `null` and does not abort the rest. For example,
+a specialist batter has no bowling row. The Players page hides each
+discipline band whose summary came back empty.
 
-For N-way comparison, each of the two or three players fires its own
-four-fetch bundle in parallel. All fetches share the same FilterBar
-scope (gender / team_type / tournament / season / filter_team /
-filter_opponent), so narrowing the URL narrows every card at once.
+For an N-way comparison, each of the two or three players fires its own
+bundle of four fetches in parallel. All fetches share the same FilterBar
+scope (gender, team_type, tournament, season, filter_team and
+filter_opponent), so a narrower URL narrows every card at once.
 
 ---
 
 # Things NOT yet in the API
 
-- **Tournament-baseline overlays** (enhancement O) on team / batter /
-  bowler / fielder pages — endpoints are baseline-ready but the
-  frontend wiring (overlay charts + "vs league avg" columns) hasn't
-  shipped.
+- **Tournament-baseline overlays** (enhancement O) on the team, batter,
+  bowler and fielder pages. The endpoints are ready for baselines, but
+  the frontend wiring (overlay charts and "vs league avg" columns) has
+  not shipped.
 - Team-to-team head-to-head beyond the current
   `/teams/{team}/vs/{opponent}` rollup (enhancement B in
   next-session-ideas).
-- Cross-worker / cross-restart caching. Not needed yet — see the
-  "three options" capture in `docs/internal/next-session-ideas.md`.
+- Caching across workers and across restarts. It is not needed yet.
+  See the "three options" capture in `docs/internal/next-session-ideas.md`.

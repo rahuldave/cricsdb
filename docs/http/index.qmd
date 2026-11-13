@@ -2,7 +2,7 @@
 title: HTTP reference
 ---
 
-A page for each group of endpoints of the backend, with a page of the error schemas. An endpoint is one
+This reference has a page for each group of endpoints of the backend, and a page of the error schemas. An endpoint is one
 method on one path, such as `GET /api/v1/teams`. smalldocs writes these pages from the OpenAPI document
 that the FastAPI app makes. OpenAPI is a standard format that describes an HTTP API. Each entry gives
 the path and query parameters, their types and defaults, and a link to the line of its route in the code.
