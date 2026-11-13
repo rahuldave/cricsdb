@@ -56,8 +56,12 @@ skills-lock.json
 # Local DB backup snapshots (~5GB each — not source)
 backups/
 
-# Docs site (smalldocs): the built site and the generated front-end reference
+# Docs site (smalldocs): the built site and the generated references (front end, HTTP, backend)
 docs/_site/
 docs/_symbols.json
 docs/api/*
 !docs/api/index.qmd
+docs/http/*
+!docs/http/index.qmd
+docs/backend/*
+!docs/backend/index.qmd

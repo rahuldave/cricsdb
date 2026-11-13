@@ -10,7 +10,7 @@ Undocumented features decay fastest. The codebase has dedicated docs for each co
 
 - **Added / changed / removed an API route?** Update `docs/api.md` — add or amend the endpoint section (path, one-liner, curl, abbreviated JSON response). Hit the endpoint via `curl` to capture a real response rather than inventing one.
 - **Changed a URL scheme, filter param, or response shape on an existing endpoint?** Same — update the affected `docs/api.md` section. Re-curl the example if the shape changed.
-- **Added a new router file, a new page, or a new hook?** Update `docs/internal/codebase-tour.md` (both the router summary line and the frontend hooks block).
+- **Added a new router file, a new page, or a new hook?** Update `docs/internal/codebase-tour.md` (both the router summary line and the frontend hooks block). If a new router has a new OpenAPI tag, add its page to the table in `docs/http/index.qmd`.
 - **Shipped a feature that belongs in the A-O narrative?** Add or amend the entry in `docs/internal/enhancements-roadmap.md`; done items stay there as historical markers.
 - **Made a non-obvious design decision** (a convention future contributors would otherwise try to change)? Add a bullet to `docs/internal/design-decisions.md`.
 - **Added or changed a metric formula** (run rate, economy, win %, a transform, an exclusion rule)? Update the matching section in `docs/internal/how-stats-calculated.md` with the new formula + WHY. The doc grows with the codebase; never let a formula go undocumented.

@@ -2,8 +2,12 @@ name: Documentation site
 
 # Builds the docs site with smalldocs on every pull request, and on a push to
 # main also publishes it to GitHub Pages at https://rahuldave.com/cricsdb/.
-# smalldocs 0.5.9 is the first release that reads TypeScript; until it is on
-# PyPI, this workflow fails at the API step.
+# The site has three references. smalldocs writes the front-end one with TypeDoc,
+# the HTTP one from the OpenAPI document of the FastAPI app, and the backend one
+# by importing the Python package `api`. The last two import the backend, so the
+# job installs the project's Python packages. No database is needed. Importing the
+# app opens none; the `setup` function adds the routers, and the database opens
+# only when the server starts.
 
 on:
   pull_request: {}
@@ -36,10 +40,15 @@ jobs:
         # npm 10 needs @emnapi/core and @emnapi/runtime in the lockfile; npm 11 drops them on install. Keep them.
         run: npm ci --no-audit --no-fund
         working-directory: frontend
-      - name: Write the front-end reference
-        run: uvx smalldocs==0.5.9 api build --dir docs
+      # The HTTP and backend references import the backend, and so does the render,
+      # which reads the backend reference. So smalldocs runs in the project's
+      # environment, from uv.lock, with no change to the lockfile.
+      - name: Install the backend's packages
+        run: uv sync --frozen
+      - name: Write the references
+        run: uv run --frozen --with smalldocs==0.5.9 smalldocs api build --dir docs
       - name: Render the site
-        run: uvx smalldocs==0.5.9 render docs --strict
+        run: uv run --frozen --with smalldocs==0.5.9 smalldocs render docs --strict
       - name: Upload site
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v4

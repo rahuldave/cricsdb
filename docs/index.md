@@ -4,14 +4,21 @@ title: CricsDB
 
 CricsDB is a T20 cricket statistics site, live at <https://t20.rahuldave.com>. It reads ball-by-ball data
 from [cricsheet](https://cricsheet.org) into SQLite, serves it from a FastAPI backend, and shows it in a React
-front end. This site is its documentation, and has three parts:
+front end. This site is its documentation, and has these parts:
 
 - **[Guide](tab-structure.md).** The pages of the site, their tabs, the URL parameters that drive them, and
   the endpoints behind them.
 - **[HTTP API](api.md).** Each endpoint of `/api/v1`, with an example `curl` command and its response. The
   in-app Help page links to it.
+- **[HTTP reference](http/index.qmd).** Each endpoint with its parameters, their types and defaults.
+  smalldocs writes these pages from the OpenAPI document of the FastAPI app.
+- **[Backend reference](backend/index.qmd).** A page for each module of the Python package `api`, with
+  its public functions and classes. smalldocs writes these pages from the docstrings.
 - **[Front-end reference](api/index.qmd).** A page for each file of `frontend/src`. smalldocs writes these
   pages from the doc comments in the code.
+
+The three references are in the Reference menu of the navigation bar. smalldocs writes them again at
+each build, so they match the code.
 
 The contributor documents are in the Contributors section of the sidebar. They come from `docs/internal/` in
 the repository. [The specification](https://github.com/rahuldave/cricsdb/blob/main/SPEC.md) gives the
