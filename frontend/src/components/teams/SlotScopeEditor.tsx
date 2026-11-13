@@ -1,3 +1,6 @@
+/**
+ * The inline form under a Compare column that overrides its scope: tournament, seasons, venue, series, class or tier, innings.
+ */
 import { useState } from 'react'
 import { useFetch } from '../../hooks/useFetch'
 import { getTournaments, getSeasons } from '../../api'
@@ -6,13 +9,14 @@ import { ANY_SENTINEL } from '../../hooks/useUrlState'
 import type { FilterParams } from '../../types'
 import type { SlotOverrides } from '../../hooks/useCompareSlots'
 
+/** Props of `SlotScopeEditor`. */
 interface Props {
-  primary: FilterParams
-  team?: string
-  initial: SlotOverrides
-  onApply: (overrides: SlotOverrides) => void
-  onReset: () => void
-  onCancel: () => void
+  primary: FilterParams // the primary column's filters, which the slot inherits
+  team?: string // the slot's team, to scope the tournament and season lists; absent for an avg slot
+  initial: SlotOverrides // the slot's current overrides
+  onApply: (overrides: SlotOverrides) => void // called by Apply with only the fields that differ from primary
+  onReset: () => void // called by "Reset to primary" to drop all overrides
+  onCancel: () => void // called by Cancel
 }
 
 // Editor state encodes the user's intent for each field as one of:
@@ -32,6 +36,10 @@ const toEditorValue = (override: string | undefined, primaryVal?: string): strin
   return override
 }
 
+/**
+ * Show the slot's scope fields as dropdowns and a venue search, starting from its overrides or primary's values.
+ * An "(any)" option broadens a field that primary narrows.
+ */
 export default function SlotScopeEditor({
   primary, team, initial, onApply, onReset, onCancel,
 }: Props) {

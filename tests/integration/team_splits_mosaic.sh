@@ -1,7 +1,7 @@
 #!/bin/bash
 # Splits Mosaic — DOM integration test on /teams.
 #
-# Spec: internal_docs/spec-splits-mosaic.md §6.2.
+# Spec: docs/internal/spec-splits-mosaic.md §6.2.
 #
 # Covers all four dimensionality cases (0/1/2/3 aux filters set),
 # the three click surfaces (marginal / outer cell / outcome sub-rect)

@@ -105,7 +105,7 @@ by both `import_data.py` (full rebuild) and `update_recent.py`
 
 The `keeperassignment` table identifies the wicketkeeper per regular
 innings via a 4-layer algorithm (cricsheet has no keeper designation).
-Full spec: `docs/spec-fielding-tier2.md`. Populated automatically in
+Full spec: `docs/internal/spec-fielding-tier2.md`. Populated automatically in
 the same pipeline as `fieldingcredit`. When no single keeper can be
 inferred, the row stays NULL and the innings is exported to a
 partitioned CSV under `docs/keeper-ambiguous/` for manual or
@@ -1225,7 +1225,7 @@ Four additional endpoints live on the same prefix (`/api/v1/fielders/{id}/`)
 under a `keeping/` sub-namespace. All read from the `keeperassignment`
 table (populated by the 4-layer algorithm in
 `scripts/populate_keeper_assignments.py` — see
-`docs/spec-fielding-tier2.md` for the algorithm).
+`docs/internal/spec-fielding-tier2.md` for the algorithm).
 
 - `GET /api/v1/fielders/{id}/keeping/summary` — `innings_kept`,
   `innings_kept_by_confidence: {definitive, high, medium, low}`,
@@ -1780,7 +1780,7 @@ a table of batters dismissed, not a drill-down filter).
 ```
 
 **Tier 2 — keeper identification**: Full details in
-`docs/spec-fielding-tier2.md`. The 4-layer algorithm (stumping →
+`docs/internal/spec-fielding-tier2.md`. The 4-layer algorithm (stumping →
 season-candidate in XI → career N≥3 → team-ever-keeper) populates
 `keeperassignment` with a `confidence` enum (`definitive/high/medium/low/NULL`).
 The Keeping sub-tab shows only when `summary.innings_kept > 0`.

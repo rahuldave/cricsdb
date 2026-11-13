@@ -26,7 +26,7 @@ invariants:
      (c) Buckets with mix-weight = 0 may carry below_support=true
          without nullifying the headline.
 
-Spec: internal_docs/spec-player-compare-average.md §8 Sanity tests.
+Spec: docs/internal/spec-player-compare-average.md §8 Sanity tests.
 
 Usage:
   uv run python tests/sanity/test_scope_averages_players_batting.py

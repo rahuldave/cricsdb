@@ -1,3 +1,6 @@
+/**
+ * The Venues landing page: every venue in scope, grouped by country, with a search box.
+ */
 import { useMemo, useState } from 'react'
 import type { FilterParams, VenuesLanding, VenueCountryGroup } from '../../types'
 import { getVenuesLanding } from '../../api'
@@ -6,9 +9,10 @@ import { useSetUrlParams } from '../../hooks/useUrlState'
 import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
 
+/** Props of `VenuesLandingBoard`. */
 interface Props {
-  filters: FilterParams
-  filterDeps: unknown[]
+  filters: FilterParams // the filters to fetch the venues for
+  filterDeps: unknown[] // values that start a new fetch when they change
 }
 
 /**

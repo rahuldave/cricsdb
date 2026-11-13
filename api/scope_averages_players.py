@@ -1,7 +1,7 @@
 """Helpers for the `/scope/averages/players/*` endpoint family.
 
 Phase 3 of the player-baselines rollout. See
-`internal_docs/spec-player-compare-average.md` §5 + §7 Phase 3.
+`docs/internal/spec-player-compare-average.md` §5 + §7 Phase 3.
 
 Each discipline endpoint composes:
   1. Mix-vector parsing (10 floats batting / 20 bowling / binary

@@ -1,14 +1,18 @@
+/**
+ * The worm chart of a match: cumulative runs by over for each innings, with the wickets marked.
+ */
 import LineChart from './LineChart'
 import ChartContainer from './ChartContainer'
 import ChartHeader from '../ChartHeader'
 import { WISDEN, WISDEN_PAIR } from './palette'
 import type { ScorecardInnings } from '../../types'
 
+/** Props of `WormChart`. */
 interface Props {
-  innings: ScorecardInnings[]
+  innings: ScorecardInnings[] // the match's innings; super overs are left out
   /** When omitted, the inner LineChart fills its container. */
   width?: number
-  height?: number
+  height?: number // the chart height in pixels, 480 by default
 }
 
 interface WormPoint {
@@ -95,6 +99,8 @@ function partnershipForOver(spans: PartnershipSpan[], over: number): Partnership
 }
 
 /**
+ * Show cumulative runs by over, one line per innings, with a point at each wicket.
+ *
  * Worm chart — cumulative runs by over, one line per innings, with
  * wicket points marked on the line.
  *

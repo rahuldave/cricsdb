@@ -31,7 +31,7 @@ inline blocks (one per leaders endpoint) that built the inning
 clause + mutated params + concatenated. User feedback 2026-04-30:
 "better that you iterate through a set of functions via an
 interface". This module is that interface.
-Spec: internal_docs/design-decisions.md "Aux-clause registry".
+Spec: docs/internal/design-decisions.md "Aux-clause registry".
 """
 from __future__ import annotations
 

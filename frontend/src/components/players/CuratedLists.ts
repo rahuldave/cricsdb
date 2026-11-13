@@ -1,28 +1,36 @@
-// Curated seeds for the /players landing.
-//
-// `role` picks which summary fetch drives the tile's one-line stat
-// strip (batters/keepers/all-rounders show batting numbers; specialist
-// bowlers show bowling numbers).
-//
-// IDs are resolved from the DB (`person` table) — if a seed player
-// isn't in our cricsheet corpus we sub the closest canonical name.
-// Cricsheet stores abbreviated forms ("S Mandhana", "D Sharma",
-// "MM Lanning") — we display the canonical abbreviation here rather
-// than re-spelling, since that's what the rest of the site uses.
+/**
+ * The players and pairs that the /players landing offers as tiles.
+ *
+ * Curated seeds for the /players landing.
+ *
+ * `role` picks which summary fetch drives the tile's one-line stat
+ * strip (batters/keepers/all-rounders show batting numbers; specialist
+ * bowlers show bowling numbers).
+ *
+ * IDs are resolved from the DB (`person` table) — if a seed player
+ * isn't in our cricsheet corpus we sub the closest canonical name.
+ * Cricsheet stores abbreviated forms ("S Mandhana", "D Sharma",
+ * "MM Lanning") — we display the canonical abbreviation here rather
+ * than re-spelling, since that's what the rest of the site uses.
+ * @packageDocumentation
+ */
 
+/** One player tile on the landing. */
 export interface ProfileTile {
-  id: string
-  name: string
-  gender: 'male' | 'female'
+  id: string // the player's person ID
+  name: string // the name as Cricsheet writes it, such as "S Mandhana"
+  gender: 'male' | 'female' // the gender whose scope the tile links to
   /** Drives which summary the tile fetches for its stat strip. */
   role: 'batter' | 'bowler'
 }
 
+/** Two players that a compare tile on the landing puts side by side. */
 export interface ComparePair {
-  a: ProfileTile
-  b: ProfileTile
+  a: ProfileTile // the first player
+  b: ProfileTile // the second player
 }
 
+/** Men's player tiles on the landing. */
 export const PROFILE_MEN: ProfileTile[] = [
   { id: 'ba607b88', name: 'V Kohli',       gender: 'male', role: 'batter' },
   { id: '462411b3', name: 'JJ Bumrah',     gender: 'male', role: 'bowler' },
@@ -35,6 +43,7 @@ export const PROFILE_MEN: ProfileTile[] = [
   { id: '0f721006', name: 'JO Holder',     gender: 'male', role: 'bowler' },
 ]
 
+/** Women's player tiles on the landing. */
 export const PROFILE_WOMEN: ProfileTile[] = [
   { id: '5d2eda89', name: 'S Mandhana',    gender: 'female', role: 'batter' },
   { id: 'be150fc8', name: 'EA Perry',      gender: 'female', role: 'batter' },
@@ -47,6 +56,7 @@ export const PROFILE_WOMEN: ProfileTile[] = [
   { id: 'd32cf49a', name: 'HK Matthews',   gender: 'female', role: 'batter' },
 ]
 
+/** Men's compare pairs on the landing. */
 export const COMPARE_MEN: ComparePair[] = [
   { a: PROFILE_MEN[0], b: { id: '6a26221c', name: 'AK Markram',   gender: 'male', role: 'batter' } },
   { a: PROFILE_MEN[2], b: { id: 'a343262c', name: 'JE Root',      gender: 'male', role: 'batter' } },
@@ -56,6 +66,7 @@ export const COMPARE_MEN: ComparePair[] = [
   { a: PROFILE_MEN[4], b: { id: '2b6e6dec', name: 'AC Gilchrist', gender: 'male', role: 'batter' } },
 ]
 
+/** Women's compare pairs on the landing. */
 export const COMPARE_WOMEN: ComparePair[] = [
   { a: PROFILE_WOMEN[0], b: PROFILE_WOMEN[3] },   // Mandhana × Mooney
   { a: PROFILE_WOMEN[1], b: PROFILE_WOMEN[2] },   // Perry × Knight

@@ -1,4 +1,6 @@
 /**
+ * The All / Won / Lost / Tied pills, with match counts, that set the `?result=` filter on a page.
+ *
  * ResultFilter — page-local won / lost / tied filter pill row.
  *
  * Mirrors InningToggle's structure (segmented pills writing a URL aux
@@ -17,18 +19,20 @@
  *
  * Where this mounts: subtabs where the full Mosaic chart is overkill
  * but result-only narrowing is still useful. First mount site: Teams
- * Match List. See `internal_docs/inning-controls-mount-sites.md`.
+ * Match List. See `docs/internal/inning-controls-mount-sites.md`.
  */
 import { useUrlParam } from '../hooks/useUrlState'
 
+/** Props of `ResultFilter`: the counts shown on the pills; null shows 0. */
 interface Props {
-  matches: number | null
-  wins: number | null
-  losses: number | null
-  ties: number | null
-  noResults: number | null
+  matches: number | null // all matches in scope, on the All pill
+  wins: number | null // matches won
+  losses: number | null // matches lost
+  ties: number | null // ties, added to `noResults` on the Tied pill
+  noResults: number | null // no-results, added to `ties` on the Tied pill
 }
 
+/** Show the result pills with their counts and write the choice to `?result=`. */
 export default function ResultFilter({ matches, wins, losses, ties, noResults }: Props) {
   const [result, setResult] = useUrlParam('result')
   const tiedTotal = (ties ?? 0) + (noResults ?? 0)

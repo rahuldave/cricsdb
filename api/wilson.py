@@ -5,7 +5,7 @@ Used by every probability field in the distribution dossiers
 import site so the bowler v1 endpoint and the batter retrofit
 share one source of truth.
 
-Spec: internal_docs/spec-distribution-stats.md §11.3.
+Spec: docs/internal/spec-distribution-stats.md §11.3.
 """
 
 from __future__ import annotations

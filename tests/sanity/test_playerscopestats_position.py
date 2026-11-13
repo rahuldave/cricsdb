@@ -23,7 +23,7 @@ mismatches per column. Zero mismatches = pass.
 Position-bucket sanity is asserted separately: every row must have
 position_bucket in 1..10 (no NULL, no out-of-range).
 
-Spec: internal_docs/spec-player-compare-average.md §4.2 + §7 Phase 2a.
+Spec: docs/internal/spec-player-compare-average.md §4.2 + §7 Phase 2a.
 
 Usage:
   uv run python tests/sanity/test_playerscopestats_position.py

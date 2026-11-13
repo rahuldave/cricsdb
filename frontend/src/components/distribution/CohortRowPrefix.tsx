@@ -10,7 +10,13 @@
  * immediately before the first <ProbChip>. The whole chip row remains
  * flex-wrap so the prefix wraps with the chips on narrow viewports.
  *
- * Spec: internal_docs/spec-prob-baselines.md §5 Option C.
+ * Spec: docs/internal/spec-prob-baselines.md §5 Option C.
+ * @packageDocumentation
+ */
+
+/**
+ * Show the italic "vs cohort" label at the start of a player chip row.
+ * @returns the label
  */
 export default function CohortRowPrefix() {
   return (

@@ -24,7 +24,7 @@ PT4.B cohort baseline plumbing on the catches-block ProbRecords:
 
 Subject: V Kohli IPL all-time (outfielder cohort, is_keeper=0).
 
-Spec: internal_docs/spec-prob-baselines.md §3.3 + §6 + §9.
+Spec: docs/internal/spec-prob-baselines.md §3.3 + §6 + §9.
 
 Usage:
   uv run python tests/sanity/test_prob_baselines_fielding.py

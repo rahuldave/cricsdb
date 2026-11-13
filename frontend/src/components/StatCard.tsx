@@ -1,7 +1,11 @@
+/**
+ * A small card with a label, a big value and an optional subtitle, used in the rows of headline stats.
+ */
 import type React from 'react'
 
+/** Props of `StatCard`. */
 interface StatCardProps {
-  label: string
+  label: string // the caption above the value
   /** Primary value rendered in the big serif bold slot. Pass a ReactNode
    *  (e.g. <PlayerLink compact />) to make the name a link while keeping
    *  the card's big-number visual weight. */
@@ -17,6 +21,7 @@ interface StatCardProps {
   subtitle?: string | React.ReactNode
 }
 
+/** Show one headline stat: its label, its value (with ± σ when given), and a subtitle. Numbers get thousands separators. */
 export default function StatCard({ label, value, stdDev, subtitle }: StatCardProps) {
   const display = value == null
     ? '-'

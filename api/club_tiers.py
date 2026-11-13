@@ -17,9 +17,9 @@ once:
 
 Rationale + the marquee-international principle behind each
 classification:
-`internal_docs/club-tier-classification.md`. Spec:
-`internal_docs/spec-filterbar-team-class-club.md`. DB-derived
-anchors: `internal_docs/club-tier-anchor-numbers.md`.
+`docs/internal/club-tier-classification.md`. Spec:
+`docs/internal/spec-filterbar-team-class-club.md`. DB-derived
+anchors: `docs/internal/club-tier-anchor-numbers.md`.
 
 Structurally analogous to api/full_members.py — a frozenset of
 trusted hardcoded names + a clause builder that interpolates safely.

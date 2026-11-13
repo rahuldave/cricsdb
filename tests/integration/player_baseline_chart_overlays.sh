@@ -1,7 +1,7 @@
 #!/bin/bash
 # Player baseline — chart-overlay integration test.
 #
-# Spec: internal_docs/spec-player-baseline-parity.md §5 + §6.3.
+# Spec: docs/internal/spec-player-baseline-parity.md §5 + §6.3.
 #
 # Phase C+D+E of the spec wire scope-baseline reference lines onto
 # every by-season LineChart on /batting, /bowling, /fielding. The

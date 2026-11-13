@@ -1,6 +1,8 @@
 /**
+ * Two lines under the team batting distribution: the scope average, then the form change in each recent window.
+ *
  * Form-delta two-line summary for the team-batting Distribution
- * panel. Spec: internal_docs/spec-distribution-stats.md §17.3.
+ * panel. Spec: docs/internal/spec-distribution-stats.md §17.3.
  *
  * Reads `dossier.form.delta`. Window-independent — does not redraw
  * when the metric tab or window toggle changes. Two metrics shown
@@ -20,8 +22,9 @@
 import type { TeamBattingDistribution } from '../../types'
 import { WISDEN } from '../charts/palette'
 
+/** Props of `TeamBattingFormDeltaLine`. */
 interface Props {
-  dossier: TeamBattingDistribution
+  dossier: TeamBattingDistribution // the team's distribution; its lifetime block and `form.delta` are read
 }
 
 const OXBLOOD = '#7A1F1F'
@@ -46,6 +49,10 @@ function Delta({ value, digits }: { value: number | null | undefined; digits: nu
 
 type WindowKey = 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
 
+/**
+ * Show the team's scope average for runs and run rate, and the change from it over the last 10 innings,
+ * 60 days, 6 months and 1 year. A missing delta shows as a dash.
+ */
 export default function TeamBattingFormDeltaLine({ dossier }: Props) {
   const lifetime = dossier.lifetime
   // The strict TeamBattingDistribution type lists every key explicitly

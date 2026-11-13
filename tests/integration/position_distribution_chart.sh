@@ -1,7 +1,7 @@
 #!/bin/bash
 # Batting By Position tab — Mix histogram + SR vs cohort.
 #
-# Spec: internal_docs/spec-mix-and-performance-charts.md §M2 + §6.
+# Spec: docs/internal/spec-mix-and-performance-charts.md §M2 + §6.
 #
 # Per CLAUDE.md "Filter-combination testing — the matrix is
 # mandatory": exercises the new charts across diverse subject ×

@@ -2,7 +2,7 @@
 # Prob-chip scope-avg baseline captions — DOM integration test for
 # the team Distribution panels.
 #
-# Spec: internal_docs/spec-prob-baselines-teams.md TT4.F.
+# Spec: docs/internal/spec-prob-baselines-teams.md TT4.F.
 #
 # For each of the three team Distribution panel surfaces (batting /
 # bowling / fielding), asserts:

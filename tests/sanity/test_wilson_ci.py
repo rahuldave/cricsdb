@@ -9,7 +9,7 @@ property-based checks together ensure both:
   - General properties hold (CI within [0,1]; lo ≤ value ≤ hi;
     monotonicity in n; symmetry at p̂=0 vs p̂=1).
 
-Spec: internal_docs/spec-distribution-stats.md §11.3.
+Spec: docs/internal/spec-distribution-stats.md §11.3.
 
 Usage:
   uv run python tests/sanity/test_wilson_ci.py

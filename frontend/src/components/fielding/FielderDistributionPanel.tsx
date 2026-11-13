@@ -1,6 +1,8 @@
 /**
+ * The fielder Distribution panel: per-match histograms, stats and chips for catches, run-outs and stumpings.
+ *
  * Fielder Distribution panel — top-level orchestrator for the §14
- * frontend slice. Spec: internal_docs/spec-distribution-stats.md §14.
+ * frontend slice. Spec: docs/internal/spec-distribution-stats.md §14.
  *
  * Mounted on /fielding?player=X between the count tiles row and the
  * Tabs row.
@@ -76,16 +78,18 @@ const METRIC_LABEL: Record<DistMetric, string> = {
   catches: 'Catches', run_outs: 'Run-outs', stumpings: 'Stumpings',
 }
 
+/** Props of `FielderDistributionPanel`. */
 interface Props {
-  playerId: string
-  distribution: FielderDistribution | null
+  playerId: string // the fielder's id, for the chip and split links
+  distribution: FielderDistribution | null // the fielder's distribution payload; null renders nothing
   /** Tier 6 of spec-apples-to-apples-baselines.md — same-scope cohort
    *  baseline source for the green sparkline reference line. */
   summary: FieldingSummary | null
-  loading: boolean
-  error: string | null
+  loading: boolean // true while the distribution loads; renders nothing
+  error: string | null // the load error, if any; renders nothing
 }
 
+/** Show the fielder's distribution for the window and metric in the URL (`dist_window_f`, `dist_metric_f`). */
 export default function FielderDistributionPanel({
   playerId, distribution, summary, loading, error,
 }: Props) {

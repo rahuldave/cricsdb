@@ -6,7 +6,7 @@ CLAUDE.md "integration tests must self-anchor against SQL", every
 numeric expected value derives from sqlite3 against `cricket.db`
 at runtime — no hardcoded literals.
 
-Invariants (spec internal_docs/spec-distribution-stats.md §11.9):
+Invariants (spec docs/internal/spec-distribution-stats.md §11.9):
 
   1. n_innings == len(wickets.observations) on lifetime + each form window.
   2. last_10.n_innings ≤ 10; last_10.observations is the contiguous
@@ -241,7 +241,7 @@ def assert_endpoint_invariants(label: str, resp: dict) -> list[tuple[bool, str]]
 
     # last_match_date — present on lifetime; equals max obs date.
     # Drives the frontend dormancy badge. Spec §11 +
-    # internal_docs/design-decisions.md "Dormancy badge".
+    # docs/internal/design-decisions.md "Dormancy badge".
     lifetime_obs = resp["lifetime"]["wickets"]["observations"]
     obs_dates = [o["date"] for o in lifetime_obs if o.get("date")]
     expected_lmd = max(obs_dates) if obs_dates else None

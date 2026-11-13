@@ -1,7 +1,7 @@
 #!/bin/bash
 # Team-batting Distribution panel — DOM integration test.
 #
-# Spec: internal_docs/spec-distribution-stats.md §17.7.
+# Spec: docs/internal/spec-distribution-stats.md §17.7.
 #
 # Asserts the panel renders correctly on /teams?team=X&tab=Batting,
 # that stat-strip + chip values match SQL-derived anchors, that both

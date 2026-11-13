@@ -1,6 +1,8 @@
 /**
+ * The stat strip and the probability-chip row of the fielder Distribution panel.
+ *
  * Per-metric stat strip + milestone-chip row for the fielder
- * Distribution panel. Spec: internal_docs/spec-distribution-stats.md
+ * Distribution panel. Spec: docs/internal/spec-distribution-stats.md
  * §14.2.4.
  *
  * Uniform schema across all three tabs — Matches / Total / Median /
@@ -54,14 +56,16 @@ function StatRow({ label, value, accent, tooltip }: {
   )
 }
 
+/** Props of `FielderStatStrip`. */
 interface StripProps {
-  block: FielderCountBlock
+  block: FielderCountBlock // the metric's total, mean, median and std
   metricLabel: string  // "Catches" / "Run-outs" / "Stumpings"
-  nMatches: number
+  nMatches: number // the matches in scope and window
   /** Substitute catches surfaced as a footnote on the catches tab only. */
   substituteCatches?: number
 }
 
+/** Show the matches, total, mean per match, median and std of one fielding metric. */
 export function FielderStatStrip({
   block, metricLabel, nMatches, substituteCatches,
 }: StripProps) {
@@ -101,10 +105,18 @@ export function FielderStatStrip({
   )
 }
 
+/** Props of `FielderChipsRow`, with `window` and `playerId` added at the function. */
 interface ChipsProps {
-  block: FielderCountBlock
+  block: FielderCountBlock // the metric, whose milestones give P(=0), P(=1) and P(≥2)
 }
 
+/**
+ * Show the window badge and the P(=0), P(=1) and P(≥2) chips of one fielding metric.
+ * @param props the metric `block`, the `window` (`scope` by default), and the `playerId` that adds a cohort nudge
+ * @param props.window the active window, `'scope'` by default
+ * @param props.playerId the fielder's id; the cohort-narrowing nudge shows only when given
+ * @returns the badge and the chip row
+ */
 export function FielderChipsRow({
   block, window = 'scope', playerId,
 }: ChipsProps & { window?: DistWindow; playerId?: string }) {

@@ -47,7 +47,7 @@ from .tournament_canonical import (
 # being absent (default-inherit) or empty-string (URL machinery's
 # delete-on-falsy makes that indistinguishable from absent).
 # Decoded as no-narrowing on the backend.
-# Spec: internal_docs/spec-slot-override-chip-alignment.md §4.1.
+# Spec: docs/internal/spec-slot-override-chip-alignment.md §4.1.
 ANY_SENTINEL = "__any__"
 
 
@@ -63,7 +63,7 @@ def _is_set(v) -> bool:
 # `season` name masks both season_from and season_to. Per-endpoint
 # structural plumbing for tautology-prone baseline surfaces (player-
 # compare position baselines, H2H baselines, venue character strips);
-# not a user-facing toggle. Spec: internal_docs/spec-player-compare-
+# not a user-facing toggle. Spec: docs/internal/spec-player-compare-
 # average.md §4.6.
 _DROP_AXES: frozenset[str] = frozenset({
     "gender", "team_type", "tournament", "season",
@@ -160,7 +160,7 @@ class AuxParams:
                 " (has_innings_join=False) honour inning via the"
                 " separate `_inning_match_filter` helper in"
                 " api/routers/teams.py — see"
-                " internal_docs/spec-inning-split.md §3.1a."
+                " docs/internal/spec-inning-split.md §3.1a."
             ),
         ),
         result: Optional[str] = Query(
@@ -178,7 +178,7 @@ class AuxParams:
                 " via `_result_match_filter` (match level) and folded"
                 " into both `_team_filter_clause` and"
                 " `_team_innings_clause`. Spec:"
-                " internal_docs/spec-splits-mosaic.md §1.1."
+                " docs/internal/spec-splits-mosaic.md §1.1."
             ),
         ),
         toss_outcome: Optional[str] = Query(
@@ -188,7 +188,7 @@ class AuxParams:
                 " | 'lost'. Restricts to matches where the team did"
                 " (or did not) win the toss. Only meaningful when a"
                 " path :team is bound. Spec:"
-                " internal_docs/spec-splits-mosaic.md §1.1."
+                " docs/internal/spec-splits-mosaic.md §1.1."
             ),
         ),
     ):
@@ -237,7 +237,7 @@ class FilterBarParams:
                 " Blast, SMA Trophy, CSA T20 Challenge, Super Smash, NPL,"
                 " Women's Super Smash, …)."
                 " Cross-type values are silent no-ops (defensive backend"
-                " gate). Spec: internal_docs/spec-filterbar-team-class-club.md."
+                " gate). Spec: docs/internal/spec-filterbar-team-class-club.md."
             ),
         ),
         series_type: Optional[str] = Query(
@@ -287,7 +287,7 @@ class FilterBarParams:
                 (e.g. compute the league baseline at the same scope as the
                 player query but with the venue narrowing dropped). Per-
                 endpoint structural plumbing, not a user-facing toggle. See
-                internal_docs/spec-player-compare-average.md §4.6.
+                docs/internal/spec-player-compare-average.md §4.6.
                 Recognised names: gender, team_type, tournament, season,
                 filter_venue, filter_team, filter_opponent, team_class,
                 series_type. The single `season` name masks both
@@ -402,12 +402,12 @@ class FilterBarParams:
         # on has_innings_join because the clause references the innings
         # alias; match-level endpoints honour inning via
         # _inning_match_filter in api/routers/teams.py instead. Spec:
-        # internal_docs/spec-inning-split.md.
+        # docs/internal/spec-inning-split.md.
         # Per-event innings_number narrowing. `apply_inning=False` lets
         # player/team discipline callers suppress this in favour of the
         # match-subset clause (player_inning_match_clause /
         # _inning_match_filter) — the Option-B "batted-first" unification
-        # (internal_docs/spec-inning-unify-option-b.md). Match-level
+        # (docs/internal/spec-inning-unify-option-b.md). Match-level
         # endpoints already route inning through the match filter, so
         # they pass apply_inning=False too.
         if apply_inning and has_innings_join and aux is not None and aux.inning is not None:
@@ -576,7 +576,7 @@ def player_inning_match_clause(
     side: str = "batting",
 ) -> str:
     """Player-POV `inning` narrowing — Option-B, DISCIPLINE-AWARE
-    (internal_docs/spec-inning-unify-option-b.md). The toggle label
+    (docs/internal/spec-inning-unify-option-b.md). The toggle label
     `inning=N` means "the player's team batted in innings N", but the
     underlying filter follows the innings the discipline actually
     happened in:

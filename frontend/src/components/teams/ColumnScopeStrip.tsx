@@ -1,4 +1,6 @@
 /**
+ * The effective-scope readout under each Compare column's name.
+ *
  * ColumnScopeStrip — per-column effective-scope readout under each
  * Compare column's name. Mirrors the global ScopeStatusStrip below
  * the FilterBar (same segLabel / segValue / sep visual primitives)
@@ -20,9 +22,10 @@
  */
 import type { ResolvedSlotScope } from '../../hooks/useCompareSlots'
 
+/** Props of `ColumnScopeStrip`. */
 interface Props {
-  scope: ResolvedSlotScope
-  overrideKeys: Set<string>
+  scope: ResolvedSlotScope // the column's resolved scope
+  overrideKeys: Set<string> // filter keys this column overrides from primary; marked with ✎
 }
 
 interface Segment {
@@ -54,10 +57,11 @@ function formatSeason(from?: string, to?: string): string {
  *  Override-to-empty: when override exists but resolved value is
  *  undefined (the __any__ broaden case), still emit a segment with
  *  value="any" so the user sees what they explicitly broadened. */
+/** List the label/value segments of a column's scope, in display order, each flagged when overridden. */
 export function buildSlotSegments(
-  scope: ResolvedSlotScope,
-  overrideKeys: Set<string>,
-): Segment[] {
+  scope: ResolvedSlotScope, // the column's resolved scope
+  overrideKeys: Set<string>, // filter keys this column overrides from primary
+): Segment[] { // one segment per set filter, or "any" for a cleared override
   const segs: Segment[] = []
   const ovr = (k: string) => overrideKeys.has(k)
 
@@ -147,6 +151,7 @@ export function buildSlotSegments(
   return segs
 }
 
+/** Show a column's scope as "Label: value" segments joined by " · ", or nothing when no filter is set. */
 export default function ColumnScopeStrip({ scope, overrideKeys }: Props) {
   const segs = buildSlotSegments(scope, overrideKeys)
   if (segs.length === 0) return null

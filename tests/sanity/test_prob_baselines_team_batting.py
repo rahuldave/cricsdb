@@ -35,7 +35,7 @@ TT1.B dual-query baseline plumbing on each chip's ProbRecord:
      carry-over. We confirm by checking that at least one window's
      scope_avg differs from the lifetime scope_avg on a marquee chip.
 
-Spec: internal_docs/spec-prob-baselines-teams.md §4 + §5 + §9.
+Spec: docs/internal/spec-prob-baselines-teams.md §4 + §5 + §9.
 
 Usage:
   uv run python tests/sanity/test_prob_baselines_team_batting.py

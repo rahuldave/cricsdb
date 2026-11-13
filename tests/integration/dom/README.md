@@ -8,8 +8,8 @@ sqlite, NOT the API code path under test).
 
 ## Spec
 
-- **Umbrella:** `internal_docs/spec-dom-grounded-tests.md`
-- **Series + Teams inventory:** `internal_docs/spec-dom-tests-series-teams.md`
+- **Umbrella:** `docs/internal/spec-dom-grounded-tests.md`
+- **Series + Teams inventory:** `docs/internal/spec-dom-tests-series-teams.md`
 
 ## Conventions
 

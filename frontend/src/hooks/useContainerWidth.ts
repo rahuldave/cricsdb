@@ -1,3 +1,5 @@
+/** `useContainerWidth`: measure an element's width, for charts that need a width in pixels. */
+
 import { useEffect, useRef, useState, type RefObject } from 'react'
 
 /**
@@ -11,7 +13,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
  * the chart on `width > 0` to avoid passing 0 to chart libraries that
  * crash on it.
  */
-export function useContainerWidth<T extends HTMLElement = HTMLDivElement>(): [
+export function useContainerWidth<T extends HTMLElement = HTMLDivElement>(): [ // the ref to attach, and the width in whole pixels
   RefObject<T | null>,
   number,
 ] {

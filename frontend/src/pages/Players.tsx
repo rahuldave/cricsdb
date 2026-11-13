@@ -1,3 +1,10 @@
+/**
+ * The players page at `/players`: a landing board, one player's profile, or two or three players side by side.
+ *
+ * With no `?player=`, it shows the players landing board. With `?player=<id>`, it shows the
+ * player's profile across batting, bowling and fielding, with the innings toggle and a match-result
+ * filter. `?compare=<id>,<id>` adds up to two more players and shows a compare grid instead.
+ */
 import { useEffect } from 'react'
 import { useFilters } from '../hooks/useFilters'
 import { useFilterDeps } from '../hooks/useFilterDeps'
@@ -16,6 +23,10 @@ import ErrorBanner from '../components/ErrorBanner'
 import { getPlayerProfile } from '../api'
 import type { PlayerSearchResult, PlayerProfile as PlayerProfileT } from '../types'
 
+/**
+ * Show the players landing board, one player's profile, or the compare grid.
+ * @returns the page
+ */
 export default function Players() {
   const filters = useFilters()
   const [playerId] = useUrlParam('player')

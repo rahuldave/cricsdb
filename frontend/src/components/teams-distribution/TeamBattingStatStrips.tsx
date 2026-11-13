@@ -1,6 +1,8 @@
 /**
+ * Stat strips and probability-chip rows for the Runs and Run Rate tabs of the team batting distribution.
+ *
  * Per-metric stat strips + milestone-chip rows for the team-batting
- * Distribution panel. Spec: internal_docs/spec-distribution-stats.md
+ * Distribution panel. Spec: docs/internal/spec-distribution-stats.md
  * §17.3.
  *
  * Two metric tabs: Runs (default) + Run Rate. Uniform stat-strip
@@ -68,11 +70,13 @@ function ChipRow({ children }: { children: React.ReactNode }) {
 
 // ─── Runs tab ────────────────────────────────────────────────────────
 
+/** Props of `RunsStatStrip`. */
 interface RunsProps {
-  block: TeamBattingRunsBlock
-  n_innings: number
+  block: TeamBattingRunsBlock // the runs block of the active window
+  n_innings: number // the team innings in the scope and window
 }
 
+/** Show innings, mean, median, std and total runs per team innings. */
 export function RunsStatStrip({ block, n_innings }: RunsProps) {
   return (
     <div>
@@ -100,6 +104,11 @@ export function RunsStatStrip({ block, n_innings }: RunsProps) {
   )
 }
 
+/**
+ * Show the runs milestone chips: P(<100) to P(≥230), the chain conditionals, and doubling the score at over 10.
+ * @param props the props object
+ * @param props.block the runs block; its `milestones` are read
+ */
 export function RunsChipsRow({ block }: { block: TeamBattingRunsBlock }) {
   const m = block.milestones
   // Tier discipline per spec §17.2: <100 INDIGO (low) / 100-199 SAGE
@@ -124,11 +133,13 @@ export function RunsChipsRow({ block }: { block: TeamBattingRunsBlock }) {
 
 // ─── Run Rate tab ────────────────────────────────────────────────────
 
+/** Props of `RRStatStrip`. */
 interface RRProps {
-  block: TeamBattingRunRateBlock
-  n_innings: number
+  block: TeamBattingRunRateBlock // the run-rate block of the active window
+  n_innings: number // the team innings in the scope and window
 }
 
+/** Show innings, pool run rate, mean, median and std of the per-innings run rate. */
 export function RRStatStrip({ block, n_innings }: RRProps) {
   return (
     <div>
@@ -156,6 +167,11 @@ export function RRStatStrip({ block, n_innings }: RRProps) {
   )
 }
 
+/**
+ * Show the run-rate chips: P(RR ≤7), P(RR ≤8), P(RR ≥9) and P(RR ≥10).
+ * @param props the props object
+ * @param props.block the run-rate block; its `milestones` are read
+ */
 export function RRChipsRow({ block }: { block: TeamBattingRunRateBlock }) {
   const m = block.milestones
   // Polarity-flipped from bowler economy (CLAUDE.md "Distribution-

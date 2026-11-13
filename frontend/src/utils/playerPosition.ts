@@ -1,4 +1,6 @@
 /**
+ * A batter's typical batting position, from the innings in each position bucket.
+ *
  * Helpers that derive a player's "typical batting position" from the
  * 10-bucket `position_distribution` already on /batters/{id}/summary.
  *
@@ -22,8 +24,8 @@ import type { BattingPositionDistributionEntry } from '../types'
 /** Mean BUCKET (1..10) of the player's batting position, weighted by
  *  innings in each bucket. Returns null when there are no innings. */
 export function meanPositionBucket(
-  positionDistribution: BattingPositionDistributionEntry[] | undefined | null,
-): number | null {
+  positionDistribution: BattingPositionDistributionEntry[] | undefined | null, // innings per bucket, from the batter's summary
+): number | null { // the mean bucket, from 1 to 10, or null
   if (!positionDistribution || positionDistribution.length === 0) return null
   let totalInnings = 0
   let weightedSum = 0
@@ -42,8 +44,8 @@ export function meanPositionBucket(
  *  (positions #3..#11) map to wd = bucket (so a #3 batter walks in at
  *  wd = 2). Returns null when there are no innings. */
 export function meanWicketsDown(
-  positionDistribution: BattingPositionDistributionEntry[] | undefined | null,
-): number | null {
+  positionDistribution: BattingPositionDistributionEntry[] | undefined | null, // innings per bucket, from the batter's summary
+): number | null { // the mean wickets down, from 0.5 to 10, or null
   if (!positionDistribution || positionDistribution.length === 0) return null
   let totalInnings = 0
   let weightedSum = 0

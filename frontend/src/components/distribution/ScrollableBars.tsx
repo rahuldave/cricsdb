@@ -24,8 +24,10 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 
+/** Default minimum width of one bar, in pixels. */
 export const MIN_BAR_PX = 2
 
+/** Props of `ScrollableBars`. */
 interface Props {
   /** Number of bars rendered inside (e.g. observations.length). The
    *  inner div is sized to at least `count * MIN_BAR_PX` so each
@@ -33,9 +35,10 @@ interface Props {
   count: number
   /** Override the floor — typically left at the default. */
   minBarPx?: number
-  children: ReactNode
+  children: ReactNode // the sparkline and the season axis to wrap
 }
 
+/** Wrap bars in a horizontal scroller that keeps each bar at least `minBarPx` wide, and start scrolled to the latest bar. */
 export default function ScrollableBars({ count, minBarPx = MIN_BAR_PX, children }: Props) {
   const outerRef = useRef<HTMLDivElement | null>(null)
 

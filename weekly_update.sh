@@ -7,7 +7,7 @@
 # It deliberately does NOT commit and does NOT deploy. Those need a human
 # (or a Claude session) to attribute countries for any new grounds, triage
 # test failures, and write the commit message. See the review step in
-# internal_docs/data-pipeline.md "Weekly update cycle".
+# docs/internal/data-pipeline.md "Weekly update cycle".
 #
 # Safe to re-run: matches dedupe on cricsheet's stable match id, the venue
 # retrofit is idempotent, and the index/ANALYZE step is a no-op when current.

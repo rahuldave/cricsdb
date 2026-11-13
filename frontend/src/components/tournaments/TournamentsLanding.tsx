@@ -1,3 +1,6 @@
+/**
+ * The Series directory: tournament tiles, bilateral rivalry tiles and recently played editions, scoped by the filters.
+ */
 import { useState } from 'react'
 import { useFilters } from '../../hooks/useFilters'
 import { useFetch } from '../../hooks/useFetch'
@@ -18,6 +21,15 @@ import type {
   RivalryEntry,
 } from '../../types'
 
+/**
+ * Show a bilateral rivalry tile: the two teams, matches, the win record and the latest meeting.
+ * The tile links to the rivalry dossier on all series types.
+ * `entry` is the rivalry; `ambient` is the pass-through scope; `gender` is the rivalry's gender.
+ * @param props the props
+ * @param props.entry the rivalry
+ * @param props.ambient the pass-through scope for the links
+ * @param props.gender the rivalry's gender
+ */
 export function RivalryTile({
   entry, ambient, gender,
 }: { entry: RivalryEntry; ambient: AmbientScope; gender: 'male' | 'female' }) {
@@ -108,14 +120,21 @@ export function RivalryTile({
   )
 }
 
-/** Top-of-landing strip — the 5 most recently played editions across
+/** Show the most recently played editions as a list of links.
+ *  `editions` are the editions to list; `ambient` is the pass-through scope for the links.
+ *
+ *  Top-of-landing strip — the 5 most recently played editions across
  *  every tournament, latest-first. Includes in-progress editions
  *  (champion is null until a Final is played). Vertical stack of
  *  links so the user can jump straight to the edition dossier.
  *
  *  Exported so TournamentDossier can render this strip side-by-side
  *  with Best moments at broad scope (tier mode) without duplicating
- *  the markup. */
+ *  the markup.
+ * @param props the props
+ * @param props.editions the editions to list, latest first
+ * @param props.ambient the pass-through scope for the links
+ */
 export function RecentEditionsStrip({
   editions, ambient,
 }: { editions: RecentEditionEntry[]; ambient: AmbientScope }) {
@@ -233,7 +252,7 @@ export const HERO_OMITTED_TOURNAMENTS: readonly string[] = [
   "ICC Women's T20 World Cup Qualifier",
 ]
 
-/** Renders the tournaments-and-rivalries directory.
+/** Show the tournaments-and-rivalries directory.
  *
  *  `embedded` — when rendered as a section inside another page (e.g.
  *  TournamentDossier's Overview tab at broad scope), the H2 + subtitle
@@ -250,7 +269,11 @@ export const HERO_OMITTED_TOURNAMENTS: readonly string[] = [
  *  (e.g. for Top events), it passes the data here so we don't double-
  *  fetch. SQLite serializes async reads, so a duplicate landing fetch
  *  adds ~3s to the wall-clock load. With presetData, the directory
- *  renders synchronously from the host's cache. */
+ *  renders synchronously from the host's cache.
+ * @param props the props
+ * @param props.embedded true when a host page renders the landing inside its own layout; false by default
+ * @param props.presetData the /series/landing data when the host page has fetched it already
+ */
 export default function TournamentsLanding({
   embedded = false, presetData,
 }: { embedded?: boolean; presetData?: TLandingData | null } = {}) {

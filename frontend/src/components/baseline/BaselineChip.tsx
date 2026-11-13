@@ -1,3 +1,6 @@
+/**
+ * The "vs cohort" chip for a player's stat when the API gives plain numbers rather than a metric envelope.
+ */
 import MetricDelta from '../MetricDelta'
 
 /** Per-tile "vs cohort N — ↑+M%" subtitle component.
@@ -21,11 +24,11 @@ import MetricDelta from '../MetricDelta'
 export default function BaselineChip({
   v, base, dir, fmt: digits = 1, tooltip,
 }: {
-  v: number | null | undefined
-  base: number | null | undefined
-  dir: 'higher_better' | 'lower_better'
-  fmt?: number
-  tooltip?: string
+  v: number | null | undefined // the player's value; no chip when absent
+  base: number | null | undefined // the cohort's value; no chip when absent or 0
+  dir: 'higher_better' | 'lower_better' // whether a higher value is better, which sets the chip's colour
+  fmt?: number // decimal places for the cohort value; defaults to 1
+  tooltip?: string // the hover text on "vs cohort N"
 }) {
   if (v == null || base == null || base === 0) return null
   const env = {

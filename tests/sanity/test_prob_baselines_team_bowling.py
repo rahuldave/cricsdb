@@ -12,7 +12,7 @@ invariants:
   5. sample_size == league denom (non-conditional samples).
   6. Per-window scope_avg independence (spec decision c4).
 
-Spec: internal_docs/spec-prob-baselines-teams.md §4 + §5 + §9.
+Spec: docs/internal/spec-prob-baselines-teams.md §4 + §5 + §9.
 """
 
 from __future__ import annotations

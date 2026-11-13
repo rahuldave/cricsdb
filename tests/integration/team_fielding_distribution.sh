@@ -1,7 +1,7 @@
 #!/bin/bash
 # Team-fielding Distribution panel — DOM integration test.
 #
-# Spec: internal_docs/spec-distribution-stats.md §17.5 + §17.7.
+# Spec: docs/internal/spec-distribution-stats.md §17.5 + §17.7.
 #
 # Asserts the panel renders correctly on /teams?team=X&tab=Fielding,
 # that stat-strip + chip values match SQL-derived anchors across the

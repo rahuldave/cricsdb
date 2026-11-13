@@ -77,7 +77,7 @@ def _build_filter_clauses(
     delivery-level query's own clause instead. Reference dropdown
     callers (no innings join) keep the default and silently no-op
     the inning narrowing.
-    Spec: internal_docs/spec-inning-split.md §5.3.
+    Spec: docs/internal/spec-inning-split.md §5.3.
     """
     clauses: list[str] = []
     params: dict = {}

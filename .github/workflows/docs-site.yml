@@ -1,0 +1,63 @@
+name: Documentation site
+
+# Builds the docs site with smalldocs on every pull request, and on a push to
+# main also publishes it to GitHub Pages at https://rahuldave.com/cricsdb/.
+# smalldocs 0.5.9 is the first release that reads TypeScript; until it is on
+# PyPI, this workflow fails at the API step.
+
+on:
+  pull_request: {}
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-site-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build documentation site
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # TypeDoc reads the front end's types, so it needs its packages.
+      - name: Install the front end's packages
+        run: npm ci --no-audit --no-fund
+        working-directory: frontend
+      - name: Write the front-end reference
+        run: uvx smalldocs==0.5.9 api build --dir docs
+      - name: Render the site
+        run: uvx smalldocs==0.5.9 render docs --strict
+      - name: Upload site
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs/_site
+
+  deploy:
+    name: Publish documentation
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy site
+        id: deployment
+        uses: actions/deploy-pages@v4

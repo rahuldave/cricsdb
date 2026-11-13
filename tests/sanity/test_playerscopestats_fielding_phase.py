@@ -23,7 +23,7 @@ Bucket integrity: phase_bucket BETWEEN 1 AND 3, no NULLs.
 Spot-check Dhoni at IPL (keeper profile — heavy stumpings, mostly
 powerplay/middle-overs catches).
 
-Spec: internal_docs/spec-player-baseline-parity.md §3.1.2.
+Spec: docs/internal/spec-player-baseline-parity.md §3.1.2.
 
 Usage:
   uv run python tests/sanity/test_playerscopestats_fielding_phase.py

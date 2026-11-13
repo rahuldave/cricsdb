@@ -1,10 +1,14 @@
+/**
+ * A match's two scores on one line, as "185/6 │ 180/5".
+ */
 import { Link } from 'react-router-dom'
 
+/** Props of `Score`. */
 type Props = {
-  team1Score: string | null | undefined
-  team2Score: string | null | undefined
-  matchId?: number | null
-  title?: string
+  team1Score: string | null | undefined // the first team's score, as "185/6"; "—" when absent
+  team2Score: string | null | undefined // the second team's score; "—" when absent
+  matchId?: number | null // when set, the score links to that match's scorecard
+  title?: string // the tooltip
 }
 
 /** Compact innings-score renderer — "185/6 │ 180/5" with a thin

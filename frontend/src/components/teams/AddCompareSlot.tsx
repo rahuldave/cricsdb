@@ -1,3 +1,6 @@
+/**
+ * The "+ Add a column" picker of the Teams Compare tab, with quick-picks and a custom column builder.
+ */
 import { useEffect, useState } from 'react'
 import TeamSearch from '../TeamSearch'
 import { getTeamSummary, getSeasons } from '../../api'
@@ -6,10 +9,11 @@ import SlotScopeEditor from './SlotScopeEditor'
 import type { FilterParams } from '../../types'
 import { AVG_SENTINEL, type CompareSlots, type SlotOverrides } from '../../hooks/useCompareSlots'
 
+/** Props of `AddCompareSlot`. */
 interface Props {
-  primaryTeam: string
-  primaryFilters: FilterParams
-  slots: CompareSlots
+  primaryTeam: string // the primary column's team
+  primaryFilters: FilterParams // the primary column's filters, which new slots inherit or override
+  slots: CompareSlots // the current compare slots; the picker hides when both are filled
   /** Add a new compare slot to the next empty position. */
   onAddSlot: (entity: string, overrides: SlotOverrides) => void
 }
@@ -23,6 +27,11 @@ const QP_BTN_STYLE: React.CSSProperties = {
   font: 'inherit',
 }
 
+/**
+ * Show a toggleable panel that adds a compare column: same team in the previous season or all-time,
+ * an average team (current scope, all-time, full-member or club tier), a different team, or a custom column.
+ * Renders nothing when both compare slots are filled.
+ */
 export default function AddCompareSlot({
   primaryTeam, primaryFilters, slots, onAddSlot,
 }: Props) {

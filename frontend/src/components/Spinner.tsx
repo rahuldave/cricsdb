@@ -1,6 +1,11 @@
+/**
+ * The spinning circle shown while data loads.
+ * @packageDocumentation
+ */
+/** Props of `Spinner`. */
 interface SpinnerProps {
-  label?: string
-  size?: 'sm' | 'md' | 'lg'
+  label?: string // text shown next to the spinner and read by screen readers; "Loading" for screen readers when absent
+  size?: 'sm' | 'md' | 'lg' // the circle's size; defaults to md
 }
 
 const SIZE_CLASSES = {
@@ -9,6 +14,7 @@ const SIZE_CLASSES = {
   lg: 'h-10 w-10 border-[3px]',
 }
 
+/** Show a centred spinner, with an optional label beside it. */
 export default function Spinner({ label, size = 'md' }: SpinnerProps) {
   return (
     <div className="flex items-center justify-center gap-3 py-8 wisden-spinner-wrap">

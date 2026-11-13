@@ -1,9 +1,13 @@
+/** `useFilters`: the page's filters, read from the URL. */
+
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { FILTER_KEYS, type FilterKey } from '../components/scopeLinks'
 import type { FilterParams } from '../types'
 
 /**
+ * Read the filter URL params, and the inning, result and toss_outcome params, into a `FilterParams`.
+ *
  * useFilters — read every FilterBar-tracked URL param into a FilterParams
  * object. Iterates the single `FILTER_KEYS` registry so adding a new
  * filter is ONE edit (in scopeLinks.ts); consumers here don't change.
@@ -12,7 +16,7 @@ import type { FilterParams } from '../types'
  * itself and link-building helpers can depend on it without circular
  * imports.
  */
-export function useFilters(): FilterParams {
+export function useFilters(): FilterParams { // the params that are set; the same object until the URL changes
   const [params] = useSearchParams()
   // Memoize by the actual URL-params string so consumers get a stable
   // reference when nothing changed — lets `Object.values(filters)` be

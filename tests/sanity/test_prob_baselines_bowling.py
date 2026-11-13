@@ -35,7 +35,7 @@ wickets block:
 
 Subject: Bumrah IPL all-time + Bumrah IPL 2024 (small sample).
 
-Spec: internal_docs/spec-prob-baselines.md §3.2 + §6 + §9.
+Spec: docs/internal/spec-prob-baselines.md §3.2 + §6 + §9.
 
 Usage:
   uv run python tests/sanity/test_prob_baselines_bowling.py

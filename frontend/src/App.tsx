@@ -1,3 +1,4 @@
+/** The app's routes: each URL path and the page it shows, inside the shared layout. */
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
 import { DormancyProvider } from './components/DormancyContext'
@@ -32,6 +33,10 @@ function LeagueRedirect() {
   return <Navigate to={`/series${search}`} replace />
 }
 
+/**
+ * Show the app: the router, the dormancy context, and the page for the current URL.
+ * @returns the app
+ */
 export default function App() {
   return (
     <BrowserRouter>

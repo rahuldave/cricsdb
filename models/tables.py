@@ -149,7 +149,7 @@ class FieldingCredit:
 class KeeperAssignment:
     """One row per regular innings — who kept, at what confidence.
 
-    See docs/spec-fielding-tier2.md for the 4-layer algorithm that
+    See docs/internal/spec-fielding-tier2.md for the 4-layer algorithm that
     populates this table and the ambiguous_reason / confidence enums.
     NULL keeper_id means the innings was ambiguous; details in
     ambiguous_reason + candidate_ids_json.
@@ -173,10 +173,10 @@ class PlayerScopeStats:
 
     Built and maintained by `scripts/populate_player_scope_stats.py`,
     auto-called from `import_data.py` (full) and `update_recent.py`
-    (incremental). Spec 1 of `internal_docs/spec-team-compare-average.md`
+    (incremental). Spec 1 of `docs/internal/spec-team-compare-average.md`
     populates this table but does NOT consume it from any endpoint —
     it exists as the foundation for Spec 2 (cross-app comparisons,
-    `internal_docs/outlook-comparisons.md`), particularly position-
+    `docs/internal/outlook-comparisons.md`), particularly position-
     matched player compare.
 
     Phase boundaries match `api/routers/teams.py`:
@@ -269,7 +269,7 @@ class PlayerScopeStatsOver:
     Built and maintained by
     `scripts/populate_playerscopestats_over.py`, auto-called from
     `import_data.py` (full) and `update_recent.py` (incremental).
-    Spec: `internal_docs/spec-player-compare-average.md` §4.3.
+    Spec: `docs/internal/spec-player-compare-average.md` §4.3.
 
     Per-over aggregates (legal-balls-only for the rate denominator):
       runs_conceded — SUM(runs_total) over ALL deliveries in the over
@@ -362,7 +362,7 @@ class PlayerScopeStatsOver:
 class PlayerScopeStatsFieldingCatchDist:
     """One row per (person, scope) — per-match catches distribution.
 
-    PT4 of internal_docs/spec-prob-baselines.md. Backs the fielding
+    PT4 of docs/internal/spec-prob-baselines.md. Backs the fielding
     ProbChip cohort baselines P(=0) / P(=1) / P(≥2) on the
     /fielders/{id}/distribution catches block.
 
@@ -414,7 +414,7 @@ class PlayerScopeStatsFieldingPosition:
 
     Drives the fielding cohort baseline endpoint (Phase 3) and the
     per-fielder dismissed-position histogram (next-spec viz). Spec:
-    `internal_docs/spec-player-compare-average.md` §4.4.
+    `docs/internal/spec-player-compare-average.md` §4.4.
     """
     person_id: ForeignKey[str, "person"]  # the FIELDER
     scope_key: str  # matches PlayerScopeStats.scope_key
@@ -442,7 +442,7 @@ class PlayerScopeStatsBattingPhase:
     `scripts/populate_playerscopestats_batting_phase.py`, auto-called
     from `import_data.py` (full) and `update_recent.py` (incremental)
     alongside the position child populate. Spec:
-    `internal_docs/spec-player-baseline-parity.md` §3.1.1.
+    `docs/internal/spec-player-baseline-parity.md` §3.1.1.
 
     Aggregation excluded-kinds match the parent:
       - Batter dismissals exclude 'retired hurt' / 'retired out'
@@ -465,7 +465,7 @@ class PlayerScopeStatsBattingPhasePosition:
     """One row per (person, scope, phase_bucket, position_bucket) —
     position × phase per-batter aggregates.
 
-    Tier 3 of internal_docs/spec-apples-to-apples-baselines.md. Cross
+    Tier 3 of docs/internal/spec-apples-to-apples-baselines.md. Cross
     of PlayerScopeStatsBattingPhase (phase_bucket axis) and
     PlayerScopeStatsPosition (position_bucket axis): 3 phases × 10
     positions = up to 30 rows per (person, scope).
@@ -530,7 +530,7 @@ class PlayerScopeStatsFieldingPhase:
 
     Drives the per-phase fielding cohort baseline endpoint
     (`/api/v1/scope/averages/players/fielding/by-phase`). Spec:
-    `internal_docs/spec-player-baseline-parity.md` §3.1.2.
+    `docs/internal/spec-player-baseline-parity.md` §3.1.2.
     """
     person_id: ForeignKey[str, "person"]  # the FIELDER
     scope_key: str
@@ -559,7 +559,7 @@ class PlayerScopeStatsPosition:
     `scripts/populate_playerscopestats_position.py`, auto-called from
     `import_data.py` (full) and `update_recent.py` (incremental)
     alongside the parent PlayerScopeStats populate. Spec:
-    `internal_docs/spec-player-compare-average.md` §4.2.
+    `docs/internal/spec-player-compare-average.md` §4.2.
     """
     person_id: ForeignKey[str, "person"]
     scope_key: str  # matches PlayerScopeStats.scope_key
@@ -592,7 +592,7 @@ class PlayerScopeStatsPosition:
 class PlayerScopeStatsBattingOver:
     """One row per (person, scope, over_number) — per-over batting aggregates.
 
-    Tier 4 of internal_docs/spec-apples-to-apples-baselines.md. Mirrors
+    Tier 4 of docs/internal/spec-apples-to-apples-baselines.md. Mirrors
     PlayerScopeStatsOver on the bowling side: same scope_key semantics,
     further keyed by the over the BATTER faced a delivery in.
 
@@ -640,7 +640,7 @@ class PlayerScopeStatsBattingOver:
 class Partnership:
     """One row per on-field batting partnership.
 
-    See internal_docs/spec-team-stats.md. `partnership_runs` includes ALL extras
+    See docs/internal/spec-team-stats.md. `partnership_runs` includes ALL extras
     (matches innings total math); `partnership_balls` is legal balls only.
     Per-batter `batter{1,2}_runs` are off-the-bat only. `batter1` is the
     earlier-arriver (= survivor of previous partnership; = striker on
@@ -677,7 +677,7 @@ class Partnership:
 #
 # Built and maintained by `scripts/populate_bucket_baseline.py`,
 # auto-called from `import_data.py` (full) and `update_recent.py`
-# (incremental). Spec: `internal_docs/spec-team-bucket-baseline.md`.
+# (incremental). Spec: `docs/internal/spec-team-bucket-baseline.md`.
 #
 # `tournament=''` represents NULL event_name (bilateral matches without
 # an explicit tournament). Stored as empty string for SQL convenience.

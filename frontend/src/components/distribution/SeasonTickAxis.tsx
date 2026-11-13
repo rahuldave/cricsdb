@@ -1,6 +1,6 @@
 /**
  * Season-tick axis rendered below the distribution sparkline. Spec
- * internal_docs/spec-distribution-stats.md §12.2.6 (originally
+ * docs/internal/spec-distribution-stats.md §12.2.6 (originally
  * shipped on the bowler panel; lifted here so the batter panel
  * shares the same primitive).
  *
@@ -20,11 +20,12 @@
 
 import { useMemo } from 'react'
 
+/** Props of `SeasonTickAxis`. */
 interface Props {
   /** ISO date strings (YYYY-MM-DD) in chronological order, one per
    *  bar in the sparkline above. Nulls allowed and skipped. */
   dates: (string | null)[]
-  height?: number
+  height?: number // axis height in pixels; 18 by default
 }
 
 function yearOf(date: string | null): string {
@@ -41,6 +42,7 @@ interface TickMark {
   label: string
 }
 
+/** Mark the first bar of each calendar year with a tick and a 2-digit year label; nothing when no date has a year. */
 export default function SeasonTickAxis({ dates, height = 18 }: Props) {
   const ticks: TickMark[] = useMemo(() => {
     if (dates.length === 0) return []

@@ -1,3 +1,6 @@
+/**
+ * The compare view: two or three players side by side, one column each, with a band per discipline.
+ */
 import { Link } from 'react-router-dom'
 import FlagBadge from '../FlagBadge'
 import Spinner from '../Spinner'
@@ -13,14 +16,19 @@ import type {
   PlayerProfile as PlayerProfileT, FilterParams,
 } from '../../types'
 
+/** Props of `PlayerCompareGrid`. */
 interface Props {
   ids: string[]          // [primary, ...compareIds] length 2 or 3
-  filters: FilterParams
+  filters: FilterParams // the scope; every column fetches its profile with it
 }
 
 type Discipline = 'batting' | 'bowling' | 'fielding' | 'keeping'
 const DISCIPLINES: Discipline[] = ['batting', 'bowling', 'fielding', 'keeping']
 
+/**
+ * Show the players' profiles in columns, with a discipline band whenever any column has data for it,
+ * and a button on each column that removes that player (the primary one clears the comparison).
+ */
 export default function PlayerCompareGrid({ ids, filters }: Props) {
   const setUrlParams = useSetUrlParams()
 

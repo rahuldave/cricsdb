@@ -1,7 +1,7 @@
 """Populate playerscopestats_over — per-over bowling aggregates.
 
 Phase 2b of the player-baselines rollout. See
-`internal_docs/spec-player-compare-average.md` §4.3 + §7 Phase 2b.
+`docs/internal/spec-player-compare-average.md` §4.3 + §7 Phase 2b.
 One row per (person_id, scope_key, over_number); the scope_key
 matches the parent PlayerScopeStats row's hash of (tournament ||
 season || gender || team_type).

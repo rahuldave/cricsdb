@@ -6,7 +6,7 @@
  * scoping the whole page to "this player vs that team" — e.g. Kohli vs
  * Australia, or Ashwin vs RCB across every franchise he's played for.
  * It's the first opponent-only entry point on a player (the rivalry
- * pair sets the team too); see internal_docs/audit-aux-params.md §D.
+ * pair sets the team too); see docs/internal/audit-aux-params.md §D.
  *
  * The opponent menu is bounded and small (~tens of teams), so it's
  * fetched once at scope and filtered client-side as the user types —
@@ -31,11 +31,13 @@ import { useSetUrlParams } from '../../hooks/useUrlState'
 import { getPlayerOpponents } from '../../api'
 import type { FilterParams, PlayerOpponentTotals } from '../../types'
 
+/** Props of `PlayerOpponentFilter`. */
 interface Props {
-  playerId: string
-  filters: FilterParams
+  playerId: string // the player whose opponents are listed
+  filters: FilterParams // the scope the opponents are fetched at; `filter_opponent` is the current pick
 }
 
+/** Pick an opponent from the teams the player has faced, and set `filter_opponent`; a chip with Clear once one is picked. */
 export default function PlayerOpponentFilter({ playerId, filters }: Props) {
   const setUrlParams = useSetUrlParams()
   const filterDeps = [playerId, ...useFilterDeps()]

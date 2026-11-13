@@ -1,3 +1,6 @@
+/**
+ * The ten partnership-by-wicket rows of a Teams Compare column: average runs, partnerships per innings and the best stand.
+ */
 import type { CSSProperties } from 'react'
 import type {
   TeamProfile, ScopeAverageProfile,
@@ -5,15 +8,16 @@ import type {
 } from '../../types'
 import MetricDelta from '../MetricDelta'
 
+/** Props of `PartnershipByWicketRows`. */
 interface Props {
-  profile: TeamProfile | ScopeAverageProfile
+  profile: TeamProfile | ScopeAverageProfile // a team's profile or the scope-average profile
   /** Avg-column flag (no longer used for suppression — kept for
    *  prop-shape stability with prior callers). After Commit 5 of
    *  spec-avg-column-per-innings.md, the `· n` substat is per-innings
    *  on both columns; tiny rates at late wickets (e.g. n=0.11 at 10th)
    *  convey rarity directly without suppression. */
   isAverage?: boolean
-  placeholder?: boolean
+  placeholder?: boolean // render empty rows that keep the grid aligned; default false
 }
 
 const fmt1 = (v: number | null | undefined) => v == null ? '-' : v.toFixed(1)
@@ -62,6 +66,10 @@ const BY_WICKET_SUBGRID_STYLE: CSSProperties = {
   gridRow: `span ${BY_WICKET_ROWS}`,
 }
 
+/**
+ * Show one row per wicket, 1st to 10th, on ten subgrid tracks; empty rows when there is no data.
+ * The team side divides the count by innings batted; the avg side is already per innings.
+ */
 export default function PartnershipByWicketRows({
   profile, isAverage: _isAverage = false, placeholder = false,
 }: Props) {

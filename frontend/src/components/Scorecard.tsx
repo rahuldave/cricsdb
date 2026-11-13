@@ -1,17 +1,22 @@
+/**
+ * A whole match scorecard: the match header, toss, venue, result and player of the match, then each innings.
+ */
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { Scorecard } from '../types'
 import InningsCard from './InningsCard'
 
+/** Props of `ScorecardView`. */
 interface Props {
-  data: Scorecard
+  data: Scorecard // the match info and its innings
   /** Optional content rendered between the header and the innings cards (e.g. charts). */
   children?: ReactNode
-  highlightBatterId?: string | null
-  highlightBowlerId?: string | null
-  highlightFielderId?: string | null
+  highlightBatterId?: string | null // batter ids to highlight, comma-separated; passed to each `InningsCard`
+  highlightBowlerId?: string | null // the bowler id to highlight
+  highlightFielderId?: string | null // the fielder id whose dismissals to highlight
 }
 
+/** Show the match header and result, then any `children`, then an `InningsCard` for each innings. */
 export default function ScorecardView({ data, children, highlightBatterId, highlightBowlerId, highlightFielderId }: Props) {
   const { info, innings } = data
   const tossNode: ReactNode = info.toss_winner && info.toss_decision

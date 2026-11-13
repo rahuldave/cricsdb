@@ -1,6 +1,6 @@
 """Populate playerscopestats_batting_phase — per-phase batting aggregates.
 
-Spec: `internal_docs/spec-player-baseline-parity.md` §3.1.1.
+Spec: `docs/internal/spec-player-baseline-parity.md` §3.1.1.
 One row per (person_id, scope_key, phase_bucket); the scope_key matches
 the parent PlayerScopeStats row's hash of (tournament || season ||
 gender || team_type).

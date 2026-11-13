@@ -1,9 +1,13 @@
+/** `useDefaultSeasonWindow`: set the last few seasons as the default filter on the player landing pages. */
+
 import { useEffect, useRef } from 'react'
 import { getSeasons } from '../api'
 import { useSetUrlParams } from './useUrlState'
 import type { FilterParams } from '../types'
 
 /**
+ * Write the last `n` seasons into the URL once, when a landing page opens with no season filter.
+ *
  * Landing pages for /batting, /bowling, /fielding default to the
  * last N seasons in scope when the user arrives without a season
  * filter. This hook detects that state and one-shot auto-applies
@@ -23,9 +27,9 @@ import type { FilterParams } from '../types'
  * when `tournament=Indian Premier League` is set).
  */
 export function useDefaultSeasonWindow(
-  filters: FilterParams,
-  enabled: boolean,
-  n: number = 3,
+  filters: FilterParams, // the page's filters; gender, team type and tournament choose the seasons
+  enabled: boolean, // false to do nothing, for example when the page is not a landing page
+  n: number = 3, // how many of the most recent seasons to select
 ) {
   const setUrlParams = useSetUrlParams()
   const appliedRef = useRef(false)

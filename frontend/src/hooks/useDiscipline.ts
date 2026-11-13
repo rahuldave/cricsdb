@@ -1,8 +1,13 @@
+/** `useDiscipline`: which side of the ball the current page shows, read from the URL. */
+
 import { useLocation, useSearchParams } from 'react-router-dom'
 
+/** A stat discipline, or null when the page shows none in particular. */
 export type Discipline = 'batting' | 'bowling' | 'fielding' | null
 
 /**
+ * Return the active stat discipline, from the path or the `tab` URL param.
+ *
  * useDiscipline — derive the active stat discipline from URL state.
  *
  * Single source of truth for "which side of the ball is the user
@@ -22,7 +27,7 @@ export type Discipline = 'batting' | 'bowling' | 'fielding' | null
  * any component mounted under <BrowserRouter>. Stable reference between
  * URL changes via the hooks' internal memoization.
  */
-export function useDiscipline(): Discipline {
+export function useDiscipline(): Discipline { // 'batting', 'bowling', 'fielding', or null
   const { pathname } = useLocation()
   const [params] = useSearchParams()
 

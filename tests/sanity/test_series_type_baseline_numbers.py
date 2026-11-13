@@ -13,7 +13,7 @@ If a future refactor accidentally drops series_type from
 FilterBarParams or rewires it to a different clause, every anchor
 here breaks loudly.
 
-Anchors (S1-S10 from internal_docs/series-type-anchor-numbers.md):
+Anchors (S1-S10 from docs/internal/series-type-anchor-numbers.md):
   S1  men_intl 2024-25 plain                       870
   S2  + bilateral_only                             802
   S3  + tournament_only / icc                       68

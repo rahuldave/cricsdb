@@ -1,3 +1,8 @@
+/**
+ * The home page at `/`: the masthead with site totals, links to the competitions, and recent matches.
+ *
+ * It fetches only the five latest matches; the totals come from the built-in site stats.
+ */
 import type React from 'react'
 import { Link } from 'react-router-dom'
 import { getMatches } from '../api'
@@ -86,6 +91,10 @@ function PlayerLink({
   )
 }
 
+/**
+ * Show the home page.
+ * @returns the page
+ */
 export default function Home() {
   useDocumentTitle('')
   const { data, loading, error, refetch } = useFetch(

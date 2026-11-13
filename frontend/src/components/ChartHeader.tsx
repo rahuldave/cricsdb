@@ -1,10 +1,14 @@
+/**
+ * The headings that sit above charts, sections and distribution panels, with an optional scope subtitle.
+ */
 import type { CSSProperties, ReactNode } from 'react'
 import { abbreviateScope } from './scopeLinks'
 import { useFilters } from '../hooks/useFilters'
 import { useDiscipline } from '../hooks/useDiscipline'
 
+/** Props of `ChartHeader`. */
 export interface ChartHeaderProps {
-  title?: ReactNode
+  title?: ReactNode // the heading; nothing renders when both it and the subtitle are empty
   /** Optional subtitle. Renders only when truthy and non-empty — empty
    *  string ("") collapses the line entirely, so callers can pass
    *  `abbreviateScope(filters)` and let an unfiltered scope hide the
@@ -21,6 +25,7 @@ export interface ChartHeaderProps {
   variant?: 'chart' | 'section'
 }
 
+/** Show a chart title with a subtitle below it, or, with `variant="section"`, a label and subtitle on one row above a rule. */
 export default function ChartHeader({
   title,
   subtitle,
@@ -51,8 +56,9 @@ export default function ChartHeader({
   )
 }
 
+/** Props of `SectionHeader`. */
 export interface SectionHeaderProps {
-  title: ReactNode
+  title: ReactNode // the heading text
   /** Optional subtitle. If omitted, auto-resolves to abbreviateScope(filters)
    *  — the filter-state reminder line. Pass "" to suppress; pass a string or
    *  ReactNode to override. */
@@ -87,8 +93,9 @@ export function SectionHeader({ title, subtitle, style }: SectionHeaderProps) {
   )
 }
 
+/** Props of `KickerHeader`. */
 export interface KickerHeaderProps {
-  title: ReactNode
+  title: ReactNode // the eyebrow label text
   /** Same opt-out semantics as the other headers — undefined auto-fills
    *  from abbreviateScope(useFilters()), "" suppresses, anything else
    *  is used verbatim. */

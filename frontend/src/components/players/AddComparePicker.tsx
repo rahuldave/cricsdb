@@ -1,9 +1,13 @@
+/**
+ * The player search that adds a player to the compare view, up to three players.
+ */
 import { useState } from 'react'
 import PlayerSearch from '../PlayerSearch'
 import { useSetUrlParams } from '../../hooks/useUrlState'
 import { getBatterSummary } from '../../api'
 import type { PlayerSearchResult } from '../../types'
 
+/** Props of `AddComparePicker`. */
 interface Props {
   /** Currently-compared IDs (incl. primary). Used to dedupe and to
    *  cap additions at 3. */
@@ -14,6 +18,10 @@ interface Props {
   gender: string | undefined
 }
 
+/**
+ * Search for a player and add them to the `compare` URL param; refuse a player already shown or of the other gender.
+ * Hidden once three players are compared.
+ */
 export default function AddComparePicker({ currentIds, gender }: Props) {
   const setUrlParams = useSetUrlParams()
   const [err, setErr] = useState<string | null>(null)

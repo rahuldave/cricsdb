@@ -1,6 +1,8 @@
 /**
+ * The bowler's per-innings wickets, economy and runs-conceded distribution panel on `/bowling?player=X`.
+ *
  * Bowler Distribution panel — top-level orchestrator for the §12
- * frontend slice. Spec: internal_docs/spec-distribution-stats.md §12.
+ * frontend slice. Spec: docs/internal/spec-distribution-stats.md §12.
  *
  * Mounted on /bowling?player=X between stat row 1 (Wickets / Average
  * / Economy) and stat row 2 (Strike Rate / Best Figures / Dot% /
@@ -70,7 +72,7 @@ const VALID_METRICS: ReadonlyArray<DistMetric> = ['economy', 'runs']
 // bowling = 5: per-spell wickets are very bursty (0/1 modal, 3+
 // rare) so smaller window preserves the visual signature of a
 // hot streak. Window = 10 oversmoothed visible IPL-scope swings
-// (user feedback 2026-05-14). See internal_docs/colors.md
+// (user feedback 2026-05-14). See docs/internal/colors.md
 // "Rolling-mean windows by grain".
 const ROLLING_WINDOW = 5
 
@@ -217,16 +219,21 @@ function SparklineLegend({ globalLegend, leagueLegend, rollingWindow }: {
 }
 
 
+/** Props of `BowlerDistributionPanel`. */
 interface Props {
-  playerId: string
-  distribution: BowlerDistribution | null
+  playerId: string // the bowler's id, for the cohort nudge and the suggested-split links
+  distribution: BowlerDistribution | null // the bowler's distribution; null shows nothing
   /** Tier 6 of spec-apples-to-apples-baselines.md — same-scope cohort
    *  baseline source for the green sparkline reference line. */
   summary: BowlingSummary | null
-  loading: boolean
-  error: string | null
+  loading: boolean // true while the distribution loads; the panel shows nothing
+  error: string | null // the request's error; the panel shows nothing when set
 }
 
+/**
+ * Show the bowler's histogram, stats, milestone chips, sparkline, form deltas and suggested splits.
+ * The window and the metric (wickets, economy or runs conceded) come from `?dist_window` and `?dist_metric`.
+ */
 export default function BowlerDistributionPanel({
   playerId, distribution, summary, loading, error,
 }: Props) {

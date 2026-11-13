@@ -1,6 +1,6 @@
 """Populate the player_scope_stats table — denormalized per-player aggregates.
 
-See `internal_docs/spec-team-compare-average.md` for the full spec.
+See `docs/internal/spec-team-compare-average.md` for the full spec.
 The table grain is one row per (person_id, scope_key), where scope_key
 encodes (tournament || season || gender || team_type). Spec 1 populates
 this table but does NOT consume it from any endpoint — it exists as

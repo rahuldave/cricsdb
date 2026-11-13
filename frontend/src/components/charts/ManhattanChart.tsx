@@ -1,13 +1,17 @@
+/**
+ * The Manhattan chart of a match: one bar chart of runs per over for each innings.
+ */
 import BarChart from './BarChart'
 import ChartContainer from './ChartContainer'
 import ChartHeader from '../ChartHeader'
 import { WISDEN_PAIR } from './palette'
 import type { ScorecardInnings } from '../../types'
 
+/** Props of `ManhattanChart`. */
 interface Props {
-  innings: ScorecardInnings[]
-  width?: number
-  height?: number
+  innings: ScorecardInnings[] // the match's innings; super overs are left out
+  width?: number // each bar chart's width in pixels; fills its column when absent
+  height?: number // each bar chart's height in pixels, 260 by default
 }
 
 const COLORS = WISDEN_PAIR

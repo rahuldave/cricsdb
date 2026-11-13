@@ -29,18 +29,20 @@ import type {
   BatterRecords, BowlerRecords, FielderRecords, FilterParams,
 } from '../../types'
 
+/** Props of `PlayerRecordsSummary`. */
 interface Props {
-  playerId: string
-  filters: FilterParams
-  hasBatting: boolean
-  hasBowling: boolean
-  hasFielding: boolean
+  playerId: string // the player whose records are fetched
+  filters: FilterParams // the scope of the records
+  hasBatting: boolean // show and fetch the batting row
+  hasBowling: boolean // show and fetch the bowling row
+  hasFielding: boolean // show and fetch the fielding row
   /** Optional trailing cell rendered inside the records grid after
    *  the discipline panels. Used to slot the "Compare with another
    *  player" picker into the spare column on the last row. */
   trailingSlot?: ReactNode
 }
 
+/** Show the top 5 records of each discipline the player has data in, under one Records header; nothing when there is none. */
 export default function PlayerRecordsSummary({
   playerId, filters, hasBatting, hasBowling, hasFielding, trailingSlot,
 }: Props) {

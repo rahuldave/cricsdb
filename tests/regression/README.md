@@ -1,7 +1,7 @@
 # Regression tests — backend URL md5-diff
 
 Checked-in versions of the HEAD-vs-patched harness described in
-`internal_docs/regression-testing-api.md`. Run before shipping any
+`docs/internal/regression-testing-api.md`. Run before shipping any
 backend change with high blast radius — a shared `FilterParams`
 update, a router filter-helper refactor, a SQL-generator change —
 to prove queries you didn't intend to change still return byte-

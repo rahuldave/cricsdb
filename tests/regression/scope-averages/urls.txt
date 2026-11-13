@@ -1,6 +1,6 @@
 # Scope averages — URL inventory for the /api/v1/scope/averages/*
 # router family that powers the "average team" column on the Teams >
-# Compare tab. See internal_docs/perf-bucket-baselines.md for the
+# Compare tab. See docs/internal/perf-bucket-baselines.md for the
 # read-side mechanism + per-innings semantic.
 #
 # All entries REG (post per-innings work, 2026-04-26). When refactoring

@@ -2,7 +2,7 @@
 # Rolling-mean overlay window — cross-panel integration test.
 #
 # Locks the per-grain × per-discipline windows codified in
-# internal_docs/colors.md "Rolling-mean windows by grain":
+# docs/internal/colors.md "Rolling-mean windows by grain":
 #
 #   Player batting  N=5    bowling N=5    (fielder has no overlay)
 #   Team   batting  N=7    bowling N=7

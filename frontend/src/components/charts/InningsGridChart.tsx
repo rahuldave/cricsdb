@@ -1,9 +1,13 @@
+/**
+ * The innings grid: one row per delivery and one column per batter, coloured by runs, extras and wickets.
+ */
 import type { InningsGridInnings, InningsGridDelivery } from '../../types'
 import ChartHeader from '../ChartHeader'
 import { DELIVERY, deliveryRunColor } from './palette'
 
+/** Props of `InningsGridChart`. */
 interface Props {
-  innings: InningsGridInnings
+  innings: InningsGridInnings // the innings: its batters, its deliveries and its totals
 }
 
 // Sizing in rem so it respects the user's root font scale.
@@ -283,6 +287,7 @@ function summarizeDismissalScores(
   return result
 }
 
+/** Show an innings ball by ball, with the bowler, over, score, wickets and partnerships beside each row. */
 export default function InningsGridChart({ innings }: Props) {
   const N = innings.batters.length
   const headerHeight = '4.5rem'

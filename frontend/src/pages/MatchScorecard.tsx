@@ -1,3 +1,10 @@
+/**
+ * The scorecard page at `/matches/:matchId`: one match's scorecard, worm and Manhattan charts, and innings grids.
+ *
+ * `?highlight_batter=`, `?highlight_bowler=` and `?highlight_fielder=` mark those players' rows,
+ * and the page scrolls to the first marked row once the data has loaded.
+ * The back button goes back in history, or to `/matches` on a direct visit.
+ */
 import { useEffect } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { getMatchScorecard, getInningsGrid } from '../api'
@@ -11,6 +18,10 @@ import ErrorBanner from '../components/ErrorBanner'
 import { useFetch } from '../hooks/useFetch'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
+/**
+ * Show the scorecard and charts of the match in the route's `matchId`.
+ * @returns the page
+ */
 export default function MatchScorecard() {
   const { matchId } = useParams<{ matchId: string }>()
   const [searchParams] = useSearchParams()

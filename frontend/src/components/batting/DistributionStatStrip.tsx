@@ -1,8 +1,10 @@
 /**
+ * The batter's runs summary beside the histogram, and the row of milestone chips.
+ *
  * Stat strip for the batter Distribution panel — the right-hand
  * column beside the histogram, plus a separate full-width milestone-
  * chips row exported alongside. Spec:
- * internal_docs/spec-distribution-stats.md §9.2.3.
+ * docs/internal/spec-distribution-stats.md §9.2.3.
  *
  * The point summaries (Mean / Median / Std / CV / Average) live
  * adjacent to the histogram. Milestone chips (simples + conditionals,
@@ -24,8 +26,9 @@ const T_INDIGO = WISDEN_TIER_TINTS.indigo
 const T_SAGE   = WISDEN_TIER_TINTS.sage
 const T_OCHRE  = WISDEN_TIER_TINTS.ochre
 
+/** Props of `DistributionStatStrip` and `MilestoneChipsRow`. */
 interface Props {
-  dossier: DistributionDossier
+  dossier: DistributionDossier // the active window's dossier
 }
 
 function fmtNum(v: number | null | undefined, digits = 2): string {
@@ -55,6 +58,7 @@ function StatRow({ label, value, accent }: { label: string; value: string; accen
 // Single source of truth across batter + bowler panels for
 // Wilson-CI tooltip + small-n fade + null handling.
 
+/** Show the mean, median, standard deviation, CV and average per innings, and the innings, outs and not-outs. */
 export default function DistributionStatStrip({ dossier }: Props) {
   const { runs, n_innings, n_dismissals } = dossier
   const cv = (runs.mean_per_innings && runs.mean_per_innings > 0 && runs.std !== null)
@@ -86,6 +90,13 @@ export default function DistributionStatStrip({ dossier }: Props) {
  * across the panel, and on narrow viewports they wrap naturally.
  * Order: simples (P(≤10), P(≥30), P(≥50), P(≥100)) first,
  * conditionals (P(≥50│≥30), P(≥70│≥50)) last.
+ *
+ * `window` (default `'scope'`) picks the badge above the chips. `playerId`, when given, adds the
+ * cohort-narrowing nudge after the chips.
+ * @param props the dossier, the active window and the batter's id
+ * @param props.window the active window, `'scope'` by default
+ * @param props.playerId the batter's id; the cohort-narrowing nudge shows only when given
+ * @returns the badge and the chip row
  */
 export function MilestoneChipsRow({
   dossier, window = 'scope', playerId,

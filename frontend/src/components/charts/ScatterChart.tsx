@@ -1,3 +1,6 @@
+/**
+ * A scatter plot on Semiotic's `Scatterplot`, with a filter-state subtitle.
+ */
 import { Scatterplot } from 'semiotic'
 import ChartContainer from './ChartContainer'
 import ChartHeader from '../ChartHeader'
@@ -8,24 +11,25 @@ import { useFilters } from '../../hooks/useFilters'
 import { WISDEN_PALETTE, WISDEN } from './palette'
 const DEFAULT_POINT = WISDEN.indigo
 
+/** Props of `ScatterChart`. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface ScatterChartProps<T extends Record<string, any>> {
-  data: T[]
-  xAccessor?: string | ((d: T) => number)
-  yAccessor?: string | ((d: T) => number)
-  sizeBy?: string | ((d: T) => number)
-  colorBy?: string
-  colorScheme?: string[]
-  pointColor?: string
-  title?: string
+  data: T[] // the points
+  xAccessor?: string | ((d: T) => number) // the field or function that gives a point's x, `'x'` by default
+  yAccessor?: string | ((d: T) => number) // the field or function that gives a point's y, `'y'` by default
+  sizeBy?: string | ((d: T) => number) // the field or function that sets a point's size
+  colorBy?: string // the field whose value picks a point's colour from `colorScheme`
+  colorScheme?: string[] // the point colours with `colorBy`, `WISDEN_PALETTE` by default
+  pointColor?: string // the colour of every point when there is no `colorBy`, indigo by default
+  title?: string // the chart title; with none, no auto subtitle either
   /** Faint italic line under the title, typically the filter-state
    *  abbreviation. Empty string is treated as no subtitle. */
   subtitle?: string
   /** When omitted, the chart fills its container via ResizeObserver. */
   width?: number
-  height?: number
-  xLabel?: string
-  yLabel?: string
+  height?: number // the chart height in pixels, 400 by default
+  xLabel?: string // the x-axis title
+  yLabel?: string // the y-axis title
   /** Pass-through to Semiotic — title accessor + fields config. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tooltip?: any
@@ -39,6 +43,7 @@ interface ScatterChartProps<T extends Record<string, any>> {
   frameProps?: any
 }
 
+/** Show a scatter plot with hover and a grid, that fills its container's width. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function ScatterChart<T extends Record<string, any>>({
   data, xAccessor = 'x', yAccessor = 'y', sizeBy, colorBy,

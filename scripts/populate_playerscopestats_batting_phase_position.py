@@ -1,7 +1,7 @@
 """Populate playerscopestats_batting_phase_position — position × phase
 per-batter aggregates.
 
-Tier 3 of internal_docs/spec-apples-to-apples-baselines.md. Mirrors
+Tier 3 of docs/internal/spec-apples-to-apples-baselines.md. Mirrors
 populate_playerscopestats_batting_phase.py, but each row is keyed by
 (person_id, scope_key, phase_bucket, position_bucket) — 3 phases × 10
 position buckets per (person, scope), up to 30 rows.

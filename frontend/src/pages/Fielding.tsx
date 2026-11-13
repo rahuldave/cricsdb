@@ -1,3 +1,12 @@
+/**
+ * The fielding page at `/fielding`: a landing board of fielders, or one fielder's dossier.
+ *
+ * With no `?player=`, it shows a player search, quick-start picks and the fielding landing board.
+ * With `?player=<id>`, it shows the fielder's summary and distribution, and the tabs in `?tab=`
+ * (default `By Season`): By Season, By Dismissed Position, By Over, By Phase, Dismissal Types,
+ * Victims, Innings List and Records, plus a Keeping tab for players who have kept wicket.
+ * Every fetch follows the FilterBar filters.
+ */
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
@@ -60,6 +69,10 @@ const BASE_TABS = ['By Season', 'By Dismissed Position', 'By Over', 'By Phase', 
 const KEEPING_TAB = 'Keeping' as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
+/**
+ * Show the fielding landing board, or the dossier of the fielder in `?player=`.
+ * @returns the page
+ */
 export default function Fielding() {
   const filters = useFilters()
   const [playerId] = useUrlParam('player')

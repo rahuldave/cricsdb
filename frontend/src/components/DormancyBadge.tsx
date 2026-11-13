@@ -1,13 +1,20 @@
 /**
+ * The badge in a page header that says how long ago the player or team last played in the scope.
+ *
  * DormancyBadge — small italic badge that reads from DormancyContext
- * and renders the tiered '(0 in N)' label when the entity has been
+ * and renders the tiered label ("5 months since last match" or
+ * "last match: Oct 2021") when the entity has been
  * inactive in scope for more than 60 days.
  *
- * Spec: internal_docs/design-decisions.md "Dormancy badge".
+ * Spec: docs/internal/design-decisions.md "Dormancy badge".
  */
 
 import { useDormancy, dormancyGapDays, dormancyBadgeText } from './DormancyContext'
 
+/**
+ * Show the dormancy text for the last match date in `DormancyContext`, with the date and gap as a tooltip.
+ * @returns the badge, or null when the gap is 60 days or less
+ */
 export default function DormancyBadge() {
   const { lastMatchDate } = useDormancy()
   const gap = dormancyGapDays(lastMatchDate)

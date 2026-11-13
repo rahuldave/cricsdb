@@ -22,50 +22,50 @@ CLAUDE.md is the **inviolable-rules file**. Everything describing what the codeb
 ## Pointers
 
 **Orientation**
-- Codebase tour: `internal_docs/codebase-tour.md`
-- React + Vite primer (this codebase): `internal_docs/react-primer.md`
-- Frontend build pipeline: `internal_docs/frontend-build-pipeline.md`
-- Visual identity / Wisden styles: `internal_docs/visual-identity.md`
-- Color discipline (palettes, reference lines, swatch alignment): `internal_docs/colors.md`
-- Local dev prerequisites + REPL: `internal_docs/local-development.md`
-- **Semiotic v3 gotchas (canvas vs SVG, opacity props, `pieceStyle` replace-not-merge trap, lookup workflow): `internal_docs/semiotic-notes.md`** — read BEFORE writing any Semiotic chart code
+- Codebase tour: `docs/internal/codebase-tour.md`
+- React + Vite primer (this codebase): `docs/internal/react-primer.md`
+- Frontend build pipeline: `docs/internal/frontend-build-pipeline.md`
+- Visual identity / Wisden styles: `docs/internal/visual-identity.md`
+- Color discipline (palettes, reference lines, swatch alignment): `docs/internal/colors.md`
+- Local dev prerequisites + REPL: `docs/internal/local-development.md`
+- **Semiotic v3 gotchas (canvas vs SVG, opacity props, `pieceStyle` replace-not-merge trap, lookup workflow): `docs/internal/semiotic-notes.md`** — read BEFORE writing any Semiotic chart code
 
 **Rules detail (subordinate to this file)**
-- Code patterns (router imports, ChartContainer, extend-don't-fork, ScopedPageHeader, URL-clean, chip↔chart, rate-vs-volume, cascade-clear, no-hacks): `internal_docs/code-patterns.md`
-- Testing discipline (SQL-anchored expecteds, every-call-site, sparkline bar count, /summary anchor): `internal_docs/testing-discipline.md`
-- Roughdraft spec-review workflow + CriticMarkup syntax: `internal_docs/roughdraft-workflow.md`
+- Code patterns (router imports, ChartContainer, extend-don't-fork, ScopedPageHeader, URL-clean, chip↔chart, rate-vs-volume, cascade-clear, no-hacks): `docs/internal/code-patterns.md`
+- Testing discipline (SQL-anchored expecteds, every-call-site, sparkline bar count, /summary anchor): `docs/internal/testing-discipline.md`
+- Roughdraft spec-review workflow + CriticMarkup syntax: `docs/internal/roughdraft-workflow.md`
 
 **Domain + UX**
-- Landing pages on every search-bar tab + Compare slots + Series/H2H/Venues structure: `internal_docs/landing-pages.md`
+- Landing pages on every search-bar tab + Compare slots + Series/H2H/Venues structure: `docs/internal/landing-pages.md`
 - API reference (every endpoint, curl, response): `docs/api.md` — also `/api/docs` (Swagger) and `/api/redoc`
-- Stat formulas: `internal_docs/how-stats-calculated.md`
-- Server-vs-client calc inventory + cross-endpoint divergence audit: `internal_docs/server-vs-client-calcs.md` — read before changing any predicate or shipping a new derived metric
-- Design decisions: `internal_docs/design-decisions.md`
-- URL state discipline: `internal_docs/url-state.md`
-- Link components (TeamLink / PlayerLink / SeriesLink contract — read before writing ANY navigation): `internal_docs/links.md`
-- Inning-controls mount-site inventory (InningToggle / Splits Mosaic per route × subtab — read before adding/moving either widget): `internal_docs/inning-controls-mount-sites.md`
+- Stat formulas: `docs/internal/how-stats-calculated.md`
+- Server-vs-client calc inventory + cross-endpoint divergence audit: `docs/internal/server-vs-client-calcs.md` — read before changing any predicate or shipping a new derived metric
+- Design decisions: `docs/internal/design-decisions.md`
+- URL state discipline: `docs/internal/url-state.md`
+- Link components (TeamLink / PlayerLink / SeriesLink contract — read before writing ANY navigation): `docs/internal/links.md`
+- Inning-controls mount-site inventory (InningToggle / Splits Mosaic per route × subtab — read before adding/moving either widget): `docs/internal/inning-controls-mount-sites.md`
 
 **Data + ops**
-- Data pipeline: `internal_docs/data-pipeline.md`
-- Weekly ingest routine (`weekly_update.sh` prepare step + launchd schedule + review step): `internal_docs/data-pipeline.md` §Weekly update cycle
-- Smoke-test update_recent against /tmp DB: `internal_docs/testing-update-recent.md`
-- Deploying: `internal_docs/deploying.md`
+- Data pipeline: `docs/internal/data-pipeline.md`
+- Weekly ingest routine (`weekly_update.sh` prepare step + launchd schedule + review step): `docs/internal/data-pipeline.md` §Weekly update cycle
+- Smoke-test update_recent against /tmp DB: `docs/internal/testing-update-recent.md`
+- Deploying: `docs/internal/deploying.md`
 
 **Performance**
-- Leaderboard landings: `internal_docs/perf-leaderboards.md`
-- deebase pool / async SQLite: `internal_docs/perf-async-deebase.md`
-- Compare-tab page-load: `internal_docs/perf-bucket-baselines.md`
-- Systems / perf catch-all: `internal_docs/systems-followups.md`
+- Leaderboard landings: `docs/internal/perf-leaderboards.md`
+- deebase pool / async SQLite: `docs/internal/perf-async-deebase.md`
+- Compare-tab page-load: `docs/internal/perf-bucket-baselines.md`
+- Systems / perf catch-all: `docs/internal/systems-followups.md`
 
 **Testing**
-- Test catalogue: `internal_docs/tests.md`
-- Regression harness: `internal_docs/regression-testing-api.md` + `tests/regression/`
+- Test catalogue: `docs/internal/tests.md`
+- Regression harness: `docs/internal/regression-testing-api.md` + `tests/regression/`
 
 **Active work**
-- Next-session agenda + NO-DEPLOYS gate: `internal_docs/next-session-ideas.md`
-- A–Q lettered roadmap, dated session logs, deferred queue: `internal_docs/enhancements-roadmap.md`
-- Build-ready specs: `internal_docs/spec-inning-split.md`, `internal_docs/spec-filterbar-team-class-v3.md`, `internal_docs/spec-filterbar-team-class-club.md`, `internal_docs/spec-distribution-stats.md`, `internal_docs/spec-splits-mosaic.md`, `internal_docs/splits-mosaic-cross-page.md`, `internal_docs/spec-rate-vs-volume-audit.md`, **`internal_docs/spec-player-baseline-aux-fallback.md` (Phases 1+2 + 3a/3b/3c/3d SHIPPED — batting AND bowling summary chip, distribution, by-season + by-phase cohort all narrow live under the six aux/filter axes; Phase 3e fielding/keeping live is NEXT, then Phase 4 docs)**, **`internal_docs/spec-batting-allball-runs-single-source.md` (SHIPPED — all-ball batting-runs convention fixed across the player side; `inningsbatterperf` completed + `playerscopestatsposition` re-derived as its rollup; unblocked 3b/3c)**
-- Club-tier classification: `internal_docs/club-tier-classification.md` + anchor numbers `internal_docs/club-tier-anchor-numbers.md`
+- Next-session agenda + NO-DEPLOYS gate: `docs/internal/next-session-ideas.md`
+- A–Q lettered roadmap, dated session logs, deferred queue: `docs/internal/enhancements-roadmap.md`
+- Build-ready specs: `docs/internal/spec-inning-split.md`, `docs/internal/spec-filterbar-team-class-v3.md`, `docs/internal/spec-filterbar-team-class-club.md`, `docs/internal/spec-distribution-stats.md`, `docs/internal/spec-splits-mosaic.md`, `docs/internal/splits-mosaic-cross-page.md`, `docs/internal/spec-rate-vs-volume-audit.md`, **`docs/internal/spec-player-baseline-aux-fallback.md` (Phases 1+2 + 3a/3b/3c/3d SHIPPED — batting AND bowling summary chip, distribution, by-season + by-phase cohort all narrow live under the six aux/filter axes; Phase 3e fielding/keeping live is NEXT, then Phase 4 docs)**, **`docs/internal/spec-batting-allball-runs-single-source.md` (SHIPPED — all-ball batting-runs convention fixed across the player side; `inningsbatterperf` completed + `playerscopestatsposition` re-derived as its rollup; unblocked 3b/3c)**
+- Club-tier classification: `docs/internal/club-tier-classification.md` + anchor numbers `docs/internal/club-tier-anchor-numbers.md`
 
 ---
 
@@ -88,13 +88,13 @@ bash deploy.sh --first   # uploads cricket.db (~860 MB as of 2026-05-29; grows w
 
 Type-check with `tsc -b` or `npm run build` — `tsc --noEmit` is a no-op here (root tsconfig has `files: []`).
 
-Prereqs, REPL, troubleshooting: `internal_docs/local-development.md`. Deploy details: `internal_docs/deploying.md`.
+Prereqs, REPL, troubleshooting: `docs/internal/local-development.md`. Deploy details: `docs/internal/deploying.md`.
 
 ---
 
 ## Documentation discipline
 
-**READ `internal_docs/docs-sync.md` before claiming any feature done.** It is the update-map (API route → `docs/api.md`, design decision → `design-decisions.md`, palette → `colors.md`, etc.) and the regression REG→NEW flip-order workflow.
+**READ `docs/internal/docs-sync.md` before claiming any feature done.** It is the update-map (API route → `docs/api.md`, design decision → `design-decisions.md`, palette → `colors.md`, etc.) and the regression REG→NEW flip-order workflow.
 
 **Update the affected sections IN that doc** at the end of every feature. CLAUDE.md is rules, not history; new history goes in the right named doc.
 
@@ -247,19 +247,19 @@ Tells you're about to violate this:
 
 ### Spec review via Roughdraft
 
-This codebase keeps build-ready specs in `internal_docs/spec-*.md`. When the user wants to review a new or edited spec, use **Roughdraft** — a local single-file Markdown viewer that round-trips CriticMarkup comments through a browser pane. User may call it `rd` in conversation; do NOT create any shell alias / symlink / command named `rd`.
+This codebase keeps build-ready specs in `docs/internal/spec-*.md`. When the user wants to review a new or edited spec, use **Roughdraft** — a local single-file Markdown viewer that round-trips CriticMarkup comments through a browser pane. User may call it `rd` in conversation; do NOT create any shell alias / symlink / command named `rd`.
 
-When the user asks for a plan, write the plan as a Markdown file on disk BEFORE asking for review — drop it under `internal_docs/spec-*.md`.
+When the user asks for a plan, write the plan as a Markdown file on disk BEFORE asking for review — drop it under `docs/internal/spec-*.md`.
 
 `roughdraft open "<abs/path/to/spec.md>"` opens one file at a time and starts Roughdraft if not running. **Leave the command running** — the wait IS the signal; it exits when the user clicks Done Reviewing. (Known issue: `roughdraft watch` hits a Node 25 / undici 60s headers timeout — the browser window IS open at `http://localhost:7373/?path=...` even if the CLI errors with `HeadersTimeoutError`.)
 
-Full CriticMarkup syntax + spec-review flow steps: `internal_docs/roughdraft-workflow.md`.
+Full CriticMarkup syntax + spec-review flow steps: `docs/internal/roughdraft-workflow.md`.
 
 ---
 
 ## Code patterns
 
-Detailed rules and their tells live in `internal_docs/code-patterns.md`. Headline list:
+Detailed rules and their tells live in `docs/internal/code-patterns.md`. Headline list:
 
 - **Router imports must come from shipped paths** — `api/routers/*.py` cannot import from `scripts/` / `tests/` (resolves locally, 500s in prod).
 - **Chart wrappers — header lives OUTSIDE the positioning context** — use `<ChartContainer>` whenever overlays are absolute-positioned.
@@ -279,7 +279,7 @@ Detailed rules and their tells live in `internal_docs/code-patterns.md`. Headlin
 
 ## Testing discipline
 
-Detail in `internal_docs/testing-discipline.md`. Headline rules:
+Detail in `docs/internal/testing-discipline.md`. Headline rules:
 
 - **Three layers** — Sanity (`tests/sanity/*.py`: SQL↔API) · Integration (`tests/integration/*.sh`: DOM↔SQL via running app) · Regression (`tests/regression/*/urls.txt`: no-drift at API).
 - **Integration tests must self-anchor against SQL** — every numeric expected derived from `sqlite3 cricket.db` at runtime, never hardcoded.
@@ -291,27 +291,27 @@ Detail in `internal_docs/testing-discipline.md`. Headline rules:
 
 ## Cricket invariants
 
-These are codified in `internal_docs/how-stats-calculated.md` and `internal_docs/design-decisions.md`. **Do not change any of these predicates without re-reading the linked section.**
+These are codified in `docs/internal/how-stats-calculated.md` and `docs/internal/design-decisions.md`. **Do not change any of these predicates without re-reading the linked section.**
 
 - **Catches counts include caught-and-bowled (Convention 3)** — `fc.kind IN ('caught','caught_and_bowled')` AND `COALESCE(fc.is_substitute,0)=0` for any catches headline. Exception: `substitute_catches` reconciliation scalar stays `kind='caught'` only. → `design-decisions.md` "Convention 3 applies to distribution endpoints, not just /summary".
 - **Substitute fielders — INCLUDED in /leaders, EXCLUDED in /distribution** — intentional asymmetry. `/fielders/leaders.catches` + `/fielders/{id}/summary.catches` + `/fielders/{id}/records.most_catches_match` apply NO `is_substitute` filter (volume framing). `/fielders/{id}/distribution` per-match catches applies `is_substitute=0` (matchplayer-sample denominator consistency). Algebraic identity locked by `tests/sanity/test_catches_convention3.py::assert_leaders_substitute_leak`. → `how-stats-calculated.md` §Fielding.
 - **DLS-truncated innings — INCLUDED everywhere** — NO `target_overs` filter or branch anywhere in `api/routers/`. Overs/balls denominators (RR, econ, SR, phase rates) divide by actual legal-ball counts and are DLS-safe by construction. Innings denominators (Avg innings total, mean_per_innings, dismissals_per_match) count DLS innings as 1 — symmetric with fast-chase / all-out-early innings. Tested by `tests/sanity/test_predicate_invariants.py`. → `how-stats-calculated.md` "DLS-truncated innings" + `server-vs-client-calcs.md` §3.5.
 - **Scope-anchored form-window cutoffs** — `last_60d` / `last_6mo` / `last_1yr` compute against `anchor = min(today, max_obs_date)`. Single helper `api/form_windows.py::scope_anchor`; new endpoints MUST use it. → `design-decisions.md` "Form-window cutoffs are scope-anchored, not today-anchored".
 - **Player/team-aware seasons + scope-anchored quick-select buttons** — `/api/v1/seasons` accepts `?person_id=` and `?team=`; FilterBar quick-select buttons (`first-3` / `all-time` / `prev-3` / `last-3` / `latest`) all slice the returned array. New season buttons slice; do NOT re-fetch with different args. → `design-decisions.md` "FilterBar season-window quick-select buttons".
-- **Player baseline buckets — opener merged + per-over + keeper-binary** — Batting: 10 position buckets, bucket 1 = positions 1+2 merged. Bowling: 20 buckets (1-indexed overs 1..20). Fielding: binary `is_keeper=0|1` (NOT position-weighted). Sliding-scale per-bucket thresholds; strict cliff (any bucket below threshold → entire `scope_avg` null). By-season/by-phase endpoints take `person_id` and derive mix server-side; only lifetime `/summary` endpoints take external mix vectors. Phase tables: `playerscopestats_batting_phase` + `playerscopestats_fielding_phase` (powerplay/middle/death). → `internal_docs/spec-player-compare-average.md` §4 + §6; `spec-player-baseline-parity.md` §3.1 + §3.2.
+- **Player baseline buckets — opener merged + per-over + keeper-binary** — Batting: 10 position buckets, bucket 1 = positions 1+2 merged. Bowling: 20 buckets (1-indexed overs 1..20). Fielding: binary `is_keeper=0|1` (NOT position-weighted). Sliding-scale per-bucket thresholds; strict cliff (any bucket below threshold → entire `scope_avg` null). By-season/by-phase endpoints take `person_id` and derive mix server-side; only lifetime `/summary` endpoints take external mix vectors. Phase tables: `playerscopestats_batting_phase` + `playerscopestats_fielding_phase` (powerplay/middle/death). → `docs/internal/spec-player-compare-average.md` §4 + §6; `spec-player-baseline-parity.md` §3.1 + §3.2.
 
 ---
 
 ## Page conventions
 
-Codified in `internal_docs/design-decisions.md`. Headlines:
+Codified in `docs/internal/design-decisions.md`. Headlines:
 
 - **Status bar derives "all-time" range; URL stays clean** — `ScopeStatusStrip` shows `Season: 2005/06–2021 (all-time)` in italic faint when no range is picked; URL is NOT auto-mutated. → `design-decisions.md` "Status bar computes the all-time season range".
 - **Dormancy badge — page-header only** — `≤ 60 days` hidden / `61–364` → `5 months since last match` / `≥ 365` → `last match: Oct 2021`. Wired via `last_match_date` on distribution-endpoint lifetime blocks → `DormancyContext`. Page header only — NOT in the status strip. → `design-decisions.md` "Dormancy badge".
-- **Inning filter — Option B "batted-first" semantics (unified)** — `?inning=0` ≡ the subject's team **batted first**; `?inning=1` ≡ batted second — on EVERY page/tab/discipline. The filter is **per-event + discipline-aware**, NOT the match's raw innings_number: batting → `innings_number=N`; bowling/fielding/keeping → `innings_number=(1-N)` (the team fields in the innings it didn't bat). So a number never changes meaning between Batting and Bowling tabs. Backend helpers: players `filters.player_inning_match_clause(side=…)`, teams `teams.py::_option_b_team_inning(side=…)`, leaderboards `aux_clauses.splice_aux_join_clauses(side=…)` / `tournaments._inning_extras(side=…)` (bowling/fielding bind `:inning_flip`). Match-level/header counts use the **union** "batted-in-N OR fielded-in-(1-N)". Cohort/scope-averages narrow per-event by the same side rule — **the cohort baseline VALUES narrow under inning** (and toss/result) via the live fallback: `is_precomputed_scope()` returns false when any aux is set, so the cohort is recomputed live instead of read from the no-inning `playerscopestats` precompute. The ONLY thing that stays coarse under the six (incl. inning) is the **position/over MIX histogram** (the cohort's *weighting* vector) — by design (Tier 2), it reads the scope-key precompute and reflects only gender/team_type/tournament/season. Full matrix: `spec-tier3-cohort-narrowing.md` §0 + `internal_docs/narrowing-audit-coverage.md`. Spec: `spec-inning-unify-option-b.md` (supersedes `spec-inning-split.md` §1/§3.4/§7).
+- **Inning filter — Option B "batted-first" semantics (unified)** — `?inning=0` ≡ the subject's team **batted first**; `?inning=1` ≡ batted second — on EVERY page/tab/discipline. The filter is **per-event + discipline-aware**, NOT the match's raw innings_number: batting → `innings_number=N`; bowling/fielding/keeping → `innings_number=(1-N)` (the team fields in the innings it didn't bat). So a number never changes meaning between Batting and Bowling tabs. Backend helpers: players `filters.player_inning_match_clause(side=…)`, teams `teams.py::_option_b_team_inning(side=…)`, leaderboards `aux_clauses.splice_aux_join_clauses(side=…)` / `tournaments._inning_extras(side=…)` (bowling/fielding bind `:inning_flip`). Match-level/header counts use the **union** "batted-in-N OR fielded-in-(1-N)". Cohort/scope-averages narrow per-event by the same side rule — **the cohort baseline VALUES narrow under inning** (and toss/result) via the live fallback: `is_precomputed_scope()` returns false when any aux is set, so the cohort is recomputed live instead of read from the no-inning `playerscopestats` precompute. The ONLY thing that stays coarse under the six (incl. inning) is the **position/over MIX histogram** (the cohort's *weighting* vector) — by design (Tier 2), it reads the scope-key precompute and reflects only gender/team_type/tournament/season. Full matrix: `spec-tier3-cohort-narrowing.md` §0 + `docs/internal/narrowing-audit-coverage.md`. Spec: `spec-inning-unify-option-b.md` (supersedes `spec-inning-split.md` §1/§3.4/§7).
   - **POV-aware pill labels via `useDiscipline()`** — Batting/Partnerships → "Batting first/second" (value = ordinal); Bowling/Fielding → "Bowling first/second" with **value FLIPPED** ("Bowling first" writes `inning=1`, since bowled-first = batted-second); ambiguous (Players profile, Records, Compare slots) → neutral "1st/2nd innings" = batted-first. Team `/by-inning` band rows are POV-labelled too ("Bowled first/second" / "Batted first/second"). Tested by `inning_toggle_pov_labels.sh`, `inning_unify_{players,teams,compare,series,venues}.sh`, `team_by_inning.sh`.
 
-Mount-site inventory for InningToggle / Splits Mosaic / ResultFilter: `internal_docs/inning-controls-mount-sites.md`.
+Mount-site inventory for InningToggle / Splits Mosaic / ResultFilter: `docs/internal/inning-controls-mount-sites.md`.
 
 ---
 
@@ -325,7 +325,7 @@ Three palette systems, never blurred:
 
 Reds are reserved across the whole codebase: oxblood (strokes) and `WISDEN_WL.lost` (Mosaic cells). Nowhere else.
 
-Full rules — polarity convention, `WISDEN_TIER_TINTS` chip helper, sparkline visual contract, reference-line table, legend-swatch alignment pattern — in **`internal_docs/colors.md`**.
+Full rules — polarity convention, `WISDEN_TIER_TINTS` chip helper, sparkline visual contract, reference-line table, legend-swatch alignment pattern — in **`docs/internal/colors.md`**.
 
 ---
 
@@ -342,4 +342,4 @@ The Mosaic is a filter widget that LOOKS like a stat chart. URL params drive the
 
 `result` and `toss_outcome` aux filters **require `?team=`** (without a subject team, the unpivoted league-side view makes "won" tautologically 50%). `/teams/splits` returns HTTP 400 when either aux is set without `?team=`.
 
-Full rules — aux semantics, palette reservation, share-denominator-follows-filter, tells — in **`internal_docs/splits-mosaic-discipline.md`**. Design specs: `spec-splits-mosaic.md` (Teams-only — implemented 2026-05-11), `splits-mosaic-cross-page.md` (cross-page reuse DESIGN).
+Full rules — aux semantics, palette reservation, share-denominator-follows-filter, tells — in **`docs/internal/splits-mosaic-discipline.md`**. Design specs: `spec-splits-mosaic.md` (Teams-only — implemented 2026-05-11), `splits-mosaic-cross-page.md` (cross-page reuse DESIGN).

@@ -1,8 +1,10 @@
 /**
+ * The fielding tab that splits a fielder's dismissals by the batting position of the batter out.
+ *
  * Fielding "By Dismissed Position" tab — Mix histogram +
  * single-panel Performance vs cohort (Catches per match).
  *
- * Spec: internal_docs/spec-mix-and-performance-charts.md §1 + §2.3.
+ * Spec: docs/internal/spec-mix-and-performance-charts.md §1 + §2.3.
  * Mounts on /fielding?player=X. Reads per-bucket player + cohort
  * values directly from /fielders/{id}/summary
  * .dismissal_position_distribution (single payload — no extra
@@ -30,8 +32,9 @@ import PerformanceVsCohort, { type PerfEntry } from '../distribution-charts/Perf
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 import type { FieldingDismissalPositionEntry } from '../../types'
 
+/** Props of `DismissedPositionDistributionTab`. */
 interface Props {
-  dismissalPositionDistribution: FieldingDismissalPositionEntry[]
+  dismissalPositionDistribution: FieldingDismissalPositionEntry[] // one entry per position bucket, with the player's and the cohort's values
   /** is_keeper flag from /fielders/{id}/summary. Drives the cohort
    *  legend wording ("keeper cohort" vs "outfielder cohort"). */
   isKeeper: 0 | 1
@@ -58,6 +61,7 @@ function dismissedPositionPhaseTint(bucket: number): string | null {
 
 function fmt3(v: number) { return v.toFixed(3) }
 
+/** Show the mix of dismissals by dismissed-batter position, and catches per match there against the cohort. */
 export default function DismissedPositionDistributionTab({
   dismissalPositionDistribution, isKeeper, playerMatches,
 }: Props) {

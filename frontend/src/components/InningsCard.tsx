@@ -1,14 +1,19 @@
+/**
+ * One innings of a match scorecard: the score, the keeper, the batting and bowling tables.
+ */
 import { Link } from 'react-router-dom'
 import type { ScorecardInnings } from '../types'
 
+/** Props of `InningsCard`. */
 interface Props {
-  innings: ScorecardInnings
-  linkParams?: string
-  highlightBatterId?: string | null
-  highlightBowlerId?: string | null
-  highlightFielderId?: string | null
+  innings: ScorecardInnings // the innings to show
+  linkParams?: string // a query string, without "?", added to every player and head-to-head link
+  highlightBatterId?: string | null // batter ids to highlight, comma-separated
+  highlightBowlerId?: string | null // the bowler id to highlight
+  highlightFielderId?: string | null // the fielder id whose dismissals to highlight in the batting table
 }
 
+/** Show one innings: the team and score, the keeper, and the batting and bowling tables with links to the players. */
 export default function InningsCard({ innings, linkParams = '', highlightBatterId, highlightBowlerId, highlightFielderId }: Props) {
   // Scroll is handled at the page level in MatchScorecard — see the
   // useEffect there that queries the first `.is-highlighted` after all

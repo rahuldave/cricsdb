@@ -1,7 +1,7 @@
 """Populate playerscopestats_position — per-position batting aggregates.
 
 Phase 2a of the player-baselines rollout. See
-`internal_docs/spec-player-compare-average.md` §4.2 + §7 Phase 2a.
+`docs/internal/spec-player-compare-average.md` §4.2 + §7 Phase 2a.
 One row per (person_id, scope_key, position_bucket); the scope_key
 matches the parent PlayerScopeStats row's hash of (tournament ||
 season || gender || team_type).

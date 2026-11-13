@@ -90,7 +90,7 @@ async def list_venues(
     it represents "how many matches of YOUR universe at this venue",
     so the dropdown still ranks meaningfully.
 
-    Documented in `internal_docs/how-stats-calculated.md` §Scope
+    Documented in `docs/internal/how-stats-calculated.md` §Scope
     conventions. Marked "may revisit" — if real users find
     gender×team_type too restrictive (e.g. a women's-cricket user
     wants to discover that a venue exists in men's data), bump

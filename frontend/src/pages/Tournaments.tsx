@@ -1,3 +1,6 @@
+/**
+ * The series page at `/series`: a dossier of a tournament, a rivalry, or a whole scope of matches.
+ */
 import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
@@ -16,6 +19,8 @@ import TournamentDossier from '../components/tournaments/TournamentDossier'
  *  TournamentsLanding-as-section when tournament=null.
  *
  *  Legacy `?rivalry=A,B` URLs redirect to filter_team+filter_opponent.
+ *
+ * @returns the page
  */
 export default function Tournaments() {
   const [tournament] = useUrlParam('tournament')

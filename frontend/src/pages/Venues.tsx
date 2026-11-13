@@ -1,3 +1,6 @@
+/**
+ * The venues page at `/venues`: a directory of venues by country, or one venue's dossier.
+ */
 import { useEffect } from 'react'
 import { useFilters } from '../hooks/useFilters'
 import { useFilterDeps } from '../hooks/useFilterDeps'
@@ -22,6 +25,8 @@ import { useUrlParam, useSetUrlParams } from '../hooks/useUrlState'
  * `filter_venue` to `?venue=` and clears the ambient — turning the
  * FilterBar pick into a shortcut that opens the dossier, matching
  * what a landing-tile click does.
+ *
+ * @returns the page
  */
 export default function Venues() {
   const filters = useFilters()

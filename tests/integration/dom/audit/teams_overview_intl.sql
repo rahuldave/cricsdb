@@ -31,7 +31,7 @@ WHERE  m.gender    = 'male'
 -- O3: Number of distinct keeper_ids that kept for Aus in window.
 -- (The summary band's keepers list is sourced from
 -- keeperassignment ∩ matchplayer with confidence ≠ NULL — see
--- internal_docs/spec-fielding-tier2.md.)
+-- docs/internal/spec-fielding-tier2.md.)
 SELECT 'O3 Aus keepers in window' AS lbl,
        COUNT(DISTINCT ka.keeper_id) AS distinct_keepers
 FROM   keeperassignment ka

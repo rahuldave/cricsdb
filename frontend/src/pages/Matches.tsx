@@ -1,3 +1,9 @@
+/**
+ * The match list at `/matches`: matches that fit the filters, 50 to a page.
+ *
+ * `?team=` narrows it to one team, with a typeahead, and `?player=` (with `?player_name=` for the
+ * label) to one player. A click on a row opens the scorecard.
+ */
 import type React from 'react'
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
@@ -17,6 +23,10 @@ import type { TeamInfo } from '../types'
 
 const PAGE_SIZE = 50
 
+/**
+ * Show the filtered, paged list of matches.
+ * @returns the page
+ */
 export default function Matches() {
   useDocumentTitle('Matches')
   const navigate = useNavigate()

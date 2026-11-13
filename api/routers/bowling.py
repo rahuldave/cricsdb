@@ -1456,7 +1456,7 @@ async def bowling_wickets(
 # Per-innings bowler distribution dossier — three sibling blocks
 # (wickets / runs_conceded / economy) with milestone probabilities,
 # Wilson 95% CIs, phase decomposition, and four form windows.
-# Spec: internal_docs/spec-distribution-stats.md §11.
+# Spec: docs/internal/spec-distribution-stats.md §11.
 
 # Phase boundaries on delivery.over_number (0-19). PP=overs 1-6,
 # Mid=7-15, Death=16-20 in user-facing 1-indexed numbering. Mirrors
@@ -1855,7 +1855,7 @@ async def bowling_distribution(
     ci_high}` with a Wilson 95% CI. Conditionals on the wickets
     block are anchored at ≥2 (stable denominator across the chain).
 
-    Spec: internal_docs/spec-distribution-stats.md §11.
+    Spec: docs/internal/spec-distribution-stats.md §11.
     """
     db = get_db()
     today = date.fromisoformat(as_of_date) if as_of_date else date.today()
@@ -2090,7 +2090,7 @@ async def bowling_records(
 
     Honours FilterParams scope + Option-B inning. Option-B inning is a
     MATCH subset (the matches where the bowler's team batted in innings
-    N — internal_docs/spec-inning-unify-option-b.md), so it composes
+    N — docs/internal/spec-inning-unify-option-b.md), so it composes
     cleanly with matchbowlerperf's per-match grain via a match-id
     filter. NOTE this is deliberately NOT per-event inning ("which
     innings he bowled in") — that would still need a per-(bowler,

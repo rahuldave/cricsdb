@@ -1,3 +1,6 @@
+/**
+ * A line chart on Semiotic's `LineChart`, with a filter-state subtitle, an optional league or cohort reference line and a vertical marker.
+ */
 import { LineChart as SemioticLineChart } from 'semiotic'
 import ChartContainer from './ChartContainer'
 import ChartHeader from '../ChartHeader'
@@ -7,25 +10,26 @@ import { useDiscipline } from '../../hooks/useDiscipline'
 import { useFilters } from '../../hooks/useFilters'
 import { WISDEN_PALETTE } from './palette'
 
+/** Props of `LineChart`. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface LineChartProps<T extends Record<string, any>> {
-  data: T[]
-  xAccessor?: string | ((d: T) => number)
-  yAccessor?: string | ((d: T) => number)
-  lineBy?: string
-  colorBy?: string
-  colorScheme?: string[]
-  title?: string
+  data: T[] // the points of the line, or of every line when `lineBy` is set
+  xAccessor?: string | ((d: T) => number) // the field or function that gives a point's x, `'x'` by default
+  yAccessor?: string | ((d: T) => number) // the field or function that gives a point's y, `'y'` by default
+  lineBy?: string // the field that splits the points into lines
+  colorBy?: string // the field whose value picks a line's colour
+  colorScheme?: string[] // the line colours, `WISDEN_PALETTE` by default
+  title?: string // the chart title; with none, no auto subtitle either
   /** Faint italic line under the title, typically the filter-state
    *  abbreviation. Empty string is treated as no subtitle. */
   subtitle?: string
   /** When omitted, the chart fills its container via ResizeObserver. */
   width?: number
-  height?: number
-  xLabel?: string
-  yLabel?: string
-  showPoints?: boolean
-  curve?: 'linear' | 'monotoneX' | 'step'
+  height?: number // the chart height in pixels, 400 by default
+  xLabel?: string // the x-axis title
+  yLabel?: string // the y-axis title
+  showPoints?: boolean // draw a dot at each point
+  curve?: 'linear' | 'monotoneX' | 'step' // how to join the points, passed to Semiotic
   /** Pass-through to Semiotic — used for annotations like wicket markers. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   annotations?: any[]
@@ -36,7 +40,7 @@ interface LineChartProps<T extends Record<string, any>> {
    *  e.g. a pool-weighted league baseline against which a team's line
    *  should be read (spec-series-trend-charts.md step 11). Must share
    *  the same x and y accessors as the primary data. Forest green
-   *  stroke (`internal_docs/colors.md`'s league-avg reference color);
+   *  stroke (`docs/internal/colors.md`'s league-avg reference color);
    *  the primary keeps WISDEN_PALETTE's first color. Ignored when
    *  `lineBy` is already set (multi-series mode wins). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,6 +63,7 @@ interface LineChartProps<T extends Record<string, any>> {
   verticalMarker?: { x: number; label: string }
 }
 
+/** Show a line chart that fills its container's width, with a dashed vertical marker when `verticalMarker` is given. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function LineChart<T extends Record<string, any>>({
   data, xAccessor = 'x', yAccessor = 'y', lineBy, colorBy,

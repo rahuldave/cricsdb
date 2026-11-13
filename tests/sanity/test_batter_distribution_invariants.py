@@ -4,7 +4,7 @@ Calls the endpoint function in-process (no running uvicorn needed)
 across several scope combinations and asserts the spec §8.10
 invariants hold.
 
-Invariants (spec internal_docs/spec-distribution-stats.md §8.10):
+Invariants (spec docs/internal/spec-distribution-stats.md §8.10):
 
   1. `n_innings == len(observations)` on lifetime + each form window.
   2. `last_10.n_innings ≤ 10`.
@@ -253,7 +253,7 @@ def assert_endpoint_invariants(label: str, resp: dict) -> list[tuple[bool, str]]
 
     # last_match_date — present on lifetime; equals max obs date.
     # Drives the frontend dormancy badge. Spec §8 +
-    # internal_docs/design-decisions.md "Dormancy badge".
+    # docs/internal/design-decisions.md "Dormancy badge".
     obs_dates = [o["date"] for o in lifetime["runs"]["observations"] if o.get("date")]
     expected_lmd = max(obs_dates) if obs_dates else None
     results.append(check(

@@ -1,3 +1,5 @@
+/** `useUrlParam` and `useSetUrlParams`: read and write URL search params as state. */
+
 import { useSearchParams } from 'react-router-dom'
 import { useCallback } from 'react'
 
@@ -6,6 +8,7 @@ import { useCallback } from 'react'
 // Falsy values (empty string, undefined) still trigger the URL-delete
 // branch — the sentinel is the ONLY way to keep an explicitly-empty
 // param in the URL.
+/** The URL value that means "explicitly empty": a slot override that does not inherit the page's value. */
 export const ANY_SENTINEL = '__any__'
 
 /**
@@ -14,13 +17,13 @@ export const ANY_SENTINEL = '__any__'
  *
  * **Pushes history by default** — the back button walks through filter
  * states the user actually created. Pass `{ replace: true }` to the
- * setter for programmatic, auto-correcting updates (see internal_docs/url-state.md
+ * setter for programmatic, auto-correcting updates (see docs/internal/url-state.md
  * for which call-sites need replace).
  */
 export function useUrlParam(
-  key: string,
-  defaultValue = '',
-): [string, (v: string, opts?: { replace?: boolean }) => void] {
+  key: string, // the URL param to read and write
+  defaultValue = '', // the value when the param is absent or empty
+): [string, (v: string, opts?: { replace?: boolean }) => void] { // the value, and a setter that deletes the param for ''
   const [params, setParams] = useSearchParams()
   const value = params.get(key) || defaultValue
 
@@ -46,7 +49,7 @@ export function useUrlParam(
  * the contract callers use to express "explicit empty" on slot
  * overrides (distinct from the absent-default-inherit case).
  */
-export function useSetUrlParams(): (
+export function useSetUrlParams(): ( // a function that applies the updates; '' deletes a key
   updates: Record<string, string>,
   opts?: { replace?: boolean },
 ) => void {

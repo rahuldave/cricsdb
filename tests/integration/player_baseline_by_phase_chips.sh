@@ -1,7 +1,7 @@
 #!/bin/bash
 # Player baseline — By Phase chip integration test.
 #
-# Spec: internal_docs/spec-player-baseline-parity.md §4.2/§4.3/§4.4
+# Spec: docs/internal/spec-player-baseline-parity.md §4.2/§4.3/§4.4
 # + §6.3.
 #
 # Phase C ships /batting By Phase chips on SR, Dots, B/4 — each

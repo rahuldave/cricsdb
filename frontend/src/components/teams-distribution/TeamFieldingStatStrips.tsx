@@ -1,6 +1,8 @@
 /**
+ * Stat strips and probability-chip rows for the Catches, Run-outs and Stumpings tabs of the team fielding distribution.
+ *
  * Per-metric stat strips + milestone-chip rows for the team-fielding
- * Distribution panel. Spec: internal_docs/spec-distribution-stats.md
+ * Distribution panel. Spec: docs/internal/spec-distribution-stats.md
  * §17.5.
  *
  * Three metric tabs: Catches (default), Run-outs, Stumpings. Uniform
@@ -71,12 +73,14 @@ function ChipRow({ children }: { children: React.ReactNode }) {
 
 // ─── Catches tab ────────────────────────────────────────────────────
 
+/** Props of `CatchesStatStrip`. */
 interface CatchesProps {
-  block: TeamFieldingCatchesBlock
-  n_innings_fielded: number
-  substitute_catches: number
+  block: TeamFieldingCatchesBlock // the catches block of the active window
+  n_innings_fielded: number // the innings fielded in the scope and window
+  substitute_catches: number // catches by substitutes, left out of the totals; a footnote shows them when above 0
 }
 
+/** Show innings fielded, mean, median, std and total catches, with a note of substitute catches. */
 export function CatchesStatStrip({ block, n_innings_fielded, substitute_catches }: CatchesProps) {
   return (
     <div>
@@ -113,6 +117,11 @@ export function CatchesStatStrip({ block, n_innings_fielded, substitute_catches 
   )
 }
 
+/**
+ * Show the catches chips: P(=0), P(≥3), P(≥5) and P(≥7).
+ * @param props the props object
+ * @param props.block the catches block; its `milestones` are read
+ */
 export function CatchesChipsRow({ block }: { block: TeamFieldingCatchesBlock }) {
   const m = block.milestones
   // Per spec §17.5 chips table: P(=0) INDIGO (no catches),
@@ -132,13 +141,15 @@ export function CatchesChipsRow({ block }: { block: TeamFieldingCatchesBlock }) 
 //
 // Identical shape: 3-chip partition over P(=0) / P(=1) / P(≥2).
 
+/** Props of `CountStatStrip`. */
 interface CountProps {
-  block: TeamFieldingCountBlock
-  n_innings_fielded: number
+  block: TeamFieldingCountBlock // the run-outs or stumpings block of the active window
+  n_innings_fielded: number // the innings fielded in the scope and window
   /** Label noun for the stat strip ("Run-out" / "Stumping"). */
   noun: string
 }
 
+/** Show innings fielded, mean, median, std and total for run-outs or stumpings. */
 export function CountStatStrip({ block, n_innings_fielded, noun }: CountProps) {
   return (
     <div>
@@ -166,6 +177,11 @@ export function CountStatStrip({ block, n_innings_fielded, noun }: CountProps) {
   )
 }
 
+/**
+ * Show the run-outs or stumpings chips: P(=0), P(=1) and P(≥2).
+ * @param props the props object
+ * @param props.block the run-outs or stumpings block; its `milestones` are read
+ */
 export function CountChipsRow({ block }: { block: TeamFieldingCountBlock }) {
   const m = block.milestones
   // Per spec §17.5 chips table: P(=0) INDIGO / P(=1) SAGE / P(≥2) OCHRE.

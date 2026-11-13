@@ -25,7 +25,7 @@ parent.innings_batted`.
 Phase-bucket sanity is asserted separately: every row must have
 phase_bucket in 1..3 (no NULL, no out-of-range).
 
-Spec: internal_docs/spec-player-baseline-parity.md §3.1.1.
+Spec: docs/internal/spec-player-baseline-parity.md §3.1.1.
 
 Usage:
   uv run python tests/sanity/test_playerscopestats_batting_phase.py

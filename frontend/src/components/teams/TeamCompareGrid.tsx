@@ -1,3 +1,6 @@
+/**
+ * The Teams Compare tab's column grid: the primary team and up to two compare slots, each with its own scope.
+ */
 import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
 import FlagBadge from '../FlagBadge'
@@ -25,13 +28,14 @@ import { OVERRIDABLE_SLOT_KEYS } from '../../hooks/useCompareSlots'
 
 type SlotIdx = 1 | 2
 
+/** Props of `TeamCompareGrid`. */
 interface Props {
-  primaryTeam: string
-  primaryFilters: FilterParams
-  slots: CompareSlots
-  onClearPrimary: () => void
-  onRemoveTeam: (name: string) => void
-  onRemoveAvg: () => void
+  primaryTeam: string // the primary column's team
+  primaryFilters: FilterParams // the page filters, which are the primary column's scope
+  slots: CompareSlots // the two compare slots, team or avg, each possibly empty
+  onClearPrimary: () => void // called by ✕ on the primary column
+  onRemoveTeam: (name: string) => void // called by ✕ on a team slot, with its team
+  onRemoveAvg: () => void // called by ✕ on an avg slot
   /** Replace a slot's overrides wholesale. */
   onUpdateSlotScope: (slotIdx: SlotIdx, overrides: SlotOverrides) => void
   /** Drop all overrides on a slot — slot inherits primary again. */
@@ -198,6 +202,10 @@ function slotLabel(slot: SlotState, _primaryTeam: string, primaryTournaments: st
   return slot.entity ?? ''
 }
 
+/**
+ * Fetch a profile per column against its resolved scope and show Results, Batting, Bowling, Fielding and
+ * Partnerships rows aligned across columns, with the season trajectory below.
+ */
 export default function TeamCompareGrid({
   primaryTeam, primaryFilters, slots,
   onClearPrimary, onRemoveTeam, onRemoveAvg,
@@ -413,7 +421,7 @@ function CompareSlotColumn({
 
   // Avg-col two-line label. line1 anchors on a tournament name when the
   // primary team's universe collapses to a singleton (RCB → IPL); else
-  // "League average" / "Full-member average". line2 is the italic scope
+  // "Full-member average", or "Average team" when nothing anchors it. line2 is the italic scope
   // subtitle (gender · season range).
   const avgLbl = !isTeam ? scopeAvgLabel(slot.scope, primaryTournaments) : null
 

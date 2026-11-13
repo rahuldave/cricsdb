@@ -1,6 +1,7 @@
 /**
  * Suggested-splits navigation row for the fielder Distribution panel.
- * Spec: internal_docs/spec-distribution-stats.md §14.2.7.
+ *
+ * Spec: docs/internal/spec-distribution-stats.md §14.2.7.
  *
  * Sibling of components/bowling/BowlerSuggestedSplitsRow. Navigates to
  * the SAME /fielding page with the same player but the split's scope
@@ -12,13 +13,15 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import type { SuggestedSplit } from '../../types'
 
+/** Props of `FielderSuggestedSplitsRow`. */
 interface Props {
-  playerId: string
-  splits: SuggestedSplit[]
+  playerId: string // the fielder's id, kept in each link
+  splits: SuggestedSplit[] // the splits to link to; none renders nothing
 }
 
 const PRESERVED_KEYS = ['inning', 'dist_metric_f', 'dist_window_f']
 
+/** Show a "Compare to:" row of links to /fielding under each split's scope, keeping `inning` and the panel's URL state. */
 export default function FielderSuggestedSplitsRow({ playerId, splits }: Props) {
   const [searchParams] = useSearchParams()
   if (splits.length === 0) return null

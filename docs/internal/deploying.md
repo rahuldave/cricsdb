@@ -1,0 +1,146 @@
+# Deploying to plash
+
+CricsDB is hosted on [pla.sh](https://pla.sh/) at
+**https://t20-cricket-db.pla.sh**. Deploys go through `deploy.sh`,
+which stages a clean `build_plash/` directory and runs `plash_deploy`.
+
+## TL;DR
+
+```bash
+bash deploy.sh           # code-only deploy (DB persists on plash)
+bash deploy.sh --first   # uploads cricket.db too (~435 MB, slow)
+```
+
+`plash_view` opens the live URL at the end either way.
+
+## When to use `--first`
+
+| You changed... | Command |
+|---|---|
+| Frontend (React/Tailwind) only | `bash deploy.sh` |
+| Backend (FastAPI router/filter) only | `bash deploy.sh` |
+| Both | `bash deploy.sh` |
+| `cricket.db` (e.g. ran `update_recent.py`) | `bash deploy.sh --first` |
+| First-ever deploy of a new plash app | `bash deploy.sh --first` |
+
+The plain deploy leaves the `data/` directory on plash untouched, so
+the previously-uploaded `cricket.db` keeps serving. The `--first` flag
+ships a fresh copy of the local DB and passes `--force_data` to
+`plash_deploy` so plash overwrites its persisted copy.
+
+If in doubt: a code-only deploy is safe and takes ~10 seconds. A
+`--first` deploy uploads 435 MB and takes a few minutes.
+
+## What ships and what doesn't
+
+`deploy.sh` builds `build_plash/` with **only** what plash needs to run
+the app:
+
+```
+build_plash/
+├── main.py              # plash entry point
+├── requirements.txt     # python deps (deebase deps only — deebase is vendored)
+├── deebase/             # vendored: plash runs Python 3.12, deebase needs 3.13+
+├── api/                 # __init__, app, dependencies, filters, routers/*
+├── models/              # __init__, tables
+├── frontend/dist/       # vite build output
+├── data/                # cricket.db (only present with --first)
+└── .plash               # plash app identity (preserved across deploys)
+```
+
+**Things in the repo that do NOT ship to plash:**
+- `scripts/` — populate scripts, data pipeline. plash isn't where you
+  ingest cricket data; you do that locally and re-deploy with `--first`.
+- `import_data.py`, `download_data.py`, `update_recent.py` — top-level
+  data-pipeline scripts, same reason.
+- `data/*.zip`, `data/*_json/` — the cricsheet source archives.
+- `SPEC.md`, `CLAUDE.md`, `docs/internal/`, `docs/` — documentation.
+- `frontend/src/`, `frontend/node_modules/` — only the built `dist/`
+  ships.
+- `tests/` and `.git/`.
+
+> ⚠️ **Trap**: API router code (`api/routers/*.py`) **MUST NOT** import
+> from `scripts/` or `tests/`. Those imports resolve locally (project
+> root is on `sys.path`) but the source files don't exist in
+> `build_plash/`, so requests 500 the first time the affected line
+> executes in production. Cross-module constants used by routers go in
+> `models/tables.py` (next to the table they describe) or `api/`.
+> Pre-deploy probe: `grep -rn 'from scripts\|from tests' api/` should
+> return zero hits. Flagged 2026-05-14; hot-fixed in `48cef68` after
+> `2ead91c` shipped `from scripts.populate_bucket_baseline import
+> PARTNERSHIP_TOP_K` inside `/series/partnerships/top-by-wicket`.
+
+If you find yourself wanting plash to run a script, the answer is
+almost always "run it locally and redeploy" — see the GitHub Actions
+discussion in the project history for why.
+
+## The `.plash` identity file
+
+`build_plash/.plash` records which plash app this directory belongs to.
+`deploy.sh` saves it before `rm -rf "$BUILD_DIR"` and restores it after
+staging, so a fresh deploy keeps publishing to the same URL. Don't
+delete it manually unless you want a brand-new plash app.
+
+## deebase is vendored
+
+plash runs Python 3.12; deebase requires 3.13+. The deploy script
+copies deebase out of your local `.venv` into `build_plash/deebase/`.
+The hardcoded path is currently:
+
+```bash
+cp -r .venv/lib/python3.14/site-packages/deebase "$BUILD_DIR/deebase"
+```
+
+If you're using a different local Python (3.13, 3.15, etc.), update
+that path in `deploy.sh`. `uv` puts the venv at `.venv/lib/pythonX.Y/`.
+
+A consequence of vendoring: the deebase admin UI at `/admin/` does
+**not** load on plash, because deebase's `admin` extras (Jinja
+templates, etc.) aren't included in the vendored copy. The admin works
+fine in local dev. This is in the Known Issues list.
+
+## Troubleshooting
+
+**Deploy succeeds but the live site shows an old version.**
+plash caches aggressively at the CDN. Hard-refresh
+(Cmd-Shift-R) the browser. If still stale, wait 1-2 minutes.
+
+**`plash_deploy` prints `Internal Server Error` and stops.**
+Plash's `/upload` endpoint returned a 500. Seen 2026-09-27, when plash
+started rejecting any request body over roughly 1 MB — which blocks every
+real deploy of this app, `--first` or not (the frontend build alone is
+~7 MB gzipped). Symptoms: the error arrives in 1-4 seconds, far too fast to
+have transferred the payload, with `connection: close` and no
+`X-Plash-Error` header.
+
+Before assuming it's us, note what this failure mode is NOT: not auth
+(`plash_apps` still lists your apps), not the database flag (a code-only
+deploy fails identically), and not the app or its custom domain (the same
+payload fails against a throwaway app). Confirm the size ceiling by
+uploading a trivial tarball — a one-file app deploys fine while anything
+over ~1 MB 500s.
+
+There is no local workaround; the database compresses to ~210 MB, orders of
+magnitude over that ceiling. It is a plash-side regression: wait and retry.
+Meanwhile the live site keeps serving the previously-uploaded database, so
+the only cost is staleness. Commit the data cycle anyway — the commit stands
+on its own and the next deploy attempt carries it.
+
+**`plash_deploy` errors with auth.**
+plash credentials live outside this repo. Re-run whatever plash login
+flow you used initially (`plash_login` or similar). Don't put tokens
+in `deploy.sh` or commit them.
+
+**`/admin/` 500s on plash.**
+Expected (see deebase note above). The admin only works locally.
+
+**Built frontend missing or stale.**
+`deploy.sh` always runs `npm run build` first, so this shouldn't
+happen — but if you copy `build_plash/` around manually, make sure
+`frontend/dist/` was rebuilt.
+
+## See also
+
+- `local-development.md` — running the same code on your laptop
+- `data-pipeline.md` — how to populate `cricket.db` before a `--first` deploy
+- `../deploy.sh` — the actual script

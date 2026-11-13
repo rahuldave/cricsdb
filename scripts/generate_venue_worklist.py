@@ -1,7 +1,7 @@
 """
 Generate the venue-canonicalization worklist CSV.
 
-Phase 1 step 1 of the Venues spec (internal_docs/spec-venues.md). Queries
+Phase 1 step 1 of the Venues spec (docs/internal/spec-venues.md). Queries
 every distinct (venue, city) pair from `match`, pre-fills proposed
 canonical values for the auto-safe cases, and flags everything else
 `needs_review=TRUE` so a human can resolve the hard rows (six "County

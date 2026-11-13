@@ -26,7 +26,7 @@
 # the test asserts EQUALITY between two values from the rendered DOM,
 # not absolute values that drift across DB rebuilds).
 #
-# Spec: internal_docs/spec-slot-override-chip-alignment.md §7.4.
+# Spec: docs/internal/spec-slot-override-chip-alignment.md §7.4.
 #
 # Prereqs:
 #   uv run uvicorn api.app:app --reload --port 8000

@@ -1,22 +1,27 @@
+/**
+ * A heatmap of values on a CSS grid, shaded from cream to oxblood, with the axes swapped on phones.
+ */
 import { useMemo, useState } from 'react'
 import { useIsMobile } from '../../hooks/useMediaQuery'
 
+/** One cell of `HeatmapChart`: its column and row, its value, and its sample size. */
 export interface HeatmapCell {
-  x: string | number
-  y: string | number
-  value: number | null
-  n?: number
+  x: string | number // the column category, one of `xCategories`
+  y: string | number // the row category, one of `yCategories`
+  value: number | null // the value that sets the shade; null shows a blank cell
+  n?: number // the sample size; below `lowNThreshold` the cell is dimmed
 }
 
+/** Props of `HeatmapChart`. */
 interface HeatmapChartProps {
-  cells: HeatmapCell[]
-  xCategories: (string | number)[]
-  yCategories: (string | number)[]
+  cells: HeatmapCell[] // the cells, keyed by their `x` and `y`
+  xCategories: (string | number)[] // the columns, in order; the rows on phones
+  yCategories: (string | number)[] // the rows, in order; the columns on phones
   /** Higher values lean oxblood (default). Set invert=true for
    *  economy-style metrics where LOW is good. */
   invert?: boolean
-  xLabel?: string
-  yLabel?: string
+  xLabel?: string // the x-axis title; none when absent
+  yLabel?: string // the y-axis title; none when absent
   /** Format the y-axis tick labels (e.g. "wkt 1", "powerplay" → "PP"). */
   formatYTick?: (y: string | number) => string
   /** Shown in tooltip after "avg: ". Defaults to "runs". */
@@ -47,6 +52,8 @@ function interp(t: number, a: number[], b: number[]): string {
 }
 
 /**
+ * Show a matrix of values as shaded cells, with a tooltip and optional click-through.
+ *
  * HeatmapChart — value-matrix viewer.
  *
  * Layout: pure CSS Grid driven by `--cols`/`--rows` custom properties.

@@ -16,7 +16,7 @@ parent's bowling numbers; nothing is created or destroyed.
 Also asserts: over_number is BETWEEN 1 AND 20 (no NULLs, no
 out-of-range from the 0→1 shift in populate).
 
-Spec: internal_docs/spec-player-compare-average.md §4.3 + §7 Phase 2b.
+Spec: docs/internal/spec-player-compare-average.md §4.3 + §7 Phase 2b.
 
 Usage:
   uv run python tests/sanity/test_playerscopestats_over.py

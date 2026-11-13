@@ -1,18 +1,28 @@
+/**
+ * The two Compare columns (slots), read from the URL: each is a team or the league average, with its own scope.
+ *
+ * A slot inherits the page's filters, and `compareN_<key>` URL params override some of them per slot.
+ */
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { FilterParams } from '../types'
 import { ANY_SENTINEL } from './useUrlState'
 
+/** The `compareN` URL value that makes a slot the league-average column. */
 export const AVG_SENTINEL = '__avg__'
 
+/** What a slot shows: a team, or the league average. */
 export type SlotKind = 'team' | 'avg'
 
+/** The filter keys that a slot can override with a `compareN_<key>` URL param. */
 export const OVERRIDABLE_SLOT_KEYS = [
   'tournament', 'season_from', 'season_to',
   'filter_venue', 'series_type', 'team_class', 'inning',
 ] as const
+/** One of `OVERRIDABLE_SLOT_KEYS`. */
 export type OverridableSlotKey = typeof OVERRIDABLE_SLOT_KEYS[number]
 
+/** The filters a slot's fetch uses: the page's filters with the slot's overrides applied. */
 export type ResolvedSlotScope = Pick<FilterParams,
   'gender' | 'team_type' | 'tournament' | 'season_from' | 'season_to'
   | 'filter_venue' | 'series_type' | 'team_class' | 'inning'
@@ -25,20 +35,28 @@ export type ResolvedSlotScope = Pick<FilterParams,
 // ANY_SENTINEL ('__any__') meaning "explicit empty / do not inherit
 // primary." Resolved scope folds ANY_SENTINEL → undefined so the
 // downstream fetcher sends no narrowing for that field.
+/** The overrides a slot holds, by key: a value, or `ANY_SENTINEL` for an explicit empty. */
 export type SlotOverrides = Partial<Pick<ResolvedSlotScope, OverridableSlotKey>>
 
+/** One Compare slot, as read from the URL. */
 export interface SlotState {
-  kind: SlotKind
-  entity: string | null
-  scope: ResolvedSlotScope
-  overrides: SlotOverrides
+  kind: SlotKind // a team, or the league average
+  entity: string | null // the team's name, or null for the league average
+  scope: ResolvedSlotScope // the filters to fetch with, after the overrides
+  overrides: SlotOverrides // the keys this slot sets in the URL (`compareN_<key>`), as written: a value or `ANY_SENTINEL`
 }
 
+/** The two Compare slots; a slot is null when the URL sets nothing for it. */
 export interface CompareSlots {
-  slot1: SlotState | null
-  slot2: SlotState | null
+  slot1: SlotState | null // the first slot, or null when empty
+  slot2: SlotState | null // the second slot, or null when empty
 }
 
+/**
+ * Return the URL updates that empty a slot: its `compareN` param and all its overrides.
+ * @param slotIdx the slot, 1 or 2
+ * @returns the params to pass to `useSetUrlParams`, each set to ''
+ */
 export function clearSlotUpdates(slotIdx: 1 | 2): Record<string, string> {
   const out: Record<string, string> = { [`compare${slotIdx}`]: '' }
   for (const k of OVERRIDABLE_SLOT_KEYS) out[`compare${slotIdx}_${k}`] = ''
@@ -124,6 +142,11 @@ function readLegacySlot(
   return { kind, entity, scope: inheritedScope(primary), overrides: {} }
 }
 
+/**
+ * Read the two Compare slots from the URL, with scopes that start from the page's filters.
+ * @param primary the page's filters, from `useFilters`
+ * @returns both slots, the same object until the URL changes
+ */
 export function useCompareSlots(primary: FilterParams): CompareSlots {
   const [params] = useSearchParams()
   const qs = params.toString()

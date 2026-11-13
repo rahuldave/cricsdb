@@ -1,3 +1,9 @@
+/**
+ * The Series dossier: one tournament, a rivalry between two teams, or every series in scope, as tabs.
+ *
+ * Tabs are Overview, Editions and Points (a single tournament only; Points for one season), Batting, Bowling,
+ * Fielding, Partnerships, Records and Matches. The /series page and team-vs-team Head-to-Head both mount it.
+ */
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useFilters } from '../../hooks/useFilters'
@@ -135,12 +141,16 @@ const TAB_ALIAS: Record<string, string> = {
 }
 type TabName = typeof BASE_TABS[number] | 'Points'
 
+/**
+ * Show the dossier for a tournament, a rivalry (`filterTeam` and `filterOpponent` both set), or all series in scope.
+ * Its tab and series type live in the URL.
+ */
 export default function TournamentDossier({
   tournament, filterTeam, filterOpponent,
 }: {
-  tournament: string | null
-  filterTeam?: string | null
-  filterOpponent?: string | null
+  tournament: string | null // the canonical tournament; null for a rivalry or the broad overview
+  filterTeam?: string | null // one team of a rivalry
+  filterOpponent?: string | null // the other team of a rivalry
 }) {
   const filters = useFilters()
   const setUrlParams = useSetUrlParams()
@@ -1406,21 +1416,22 @@ function OverviewTab({
   )
 }
 
+/** Show the Partnerships tab: average stands by wicket, the top partnerships, and the top partnership for each wicket. */
 export function PartnershipsTab({
   byWicket, byWicketLoading, top, topLoading,
   topByWicket, topByWicketLoading,
   filterTeam, tournament, gender, teamType,
 }: {
-  byWicket: TournamentPartnershipsByWicket | null
-  byWicketLoading: boolean
-  top: TournamentPartnershipsTop | null
-  topLoading: boolean
-  topByWicket: TournamentPartnershipsTopByWicket | null
-  topByWicketLoading: boolean
-  filterTeam: string | null | undefined
-  tournament: string | null
-  gender: string | null | undefined
-  teamType: string | null | undefined
+  byWicket: TournamentPartnershipsByWicket | null // averages by wicket; null until loaded
+  byWicketLoading: boolean // true while the by-wicket request runs
+  top: TournamentPartnershipsTop | null // the top partnerships; null until loaded
+  topLoading: boolean // true while the top request runs
+  topByWicket: TournamentPartnershipsTopByWicket | null // the top partnerships of each wicket; null until loaded
+  topByWicketLoading: boolean // true while the top-by-wicket request runs
+  filterTeam: string | null | undefined // a team that scopes the partnerships; shown in the headings
+  tournament: string | null // the tournament, for scope links when a row has none
+  gender: string | null | undefined // the gender, carried into team and player links
+  teamType: string | null | undefined // the team type, carried into team links
 }) {
   const batterPair = (
     b1: { person_id: string | null; name: string },
@@ -1642,18 +1653,24 @@ export function PartnershipsTab({
   )
 }
 
+/** Show one page of the matches in scope as a table, with Previous and Next buttons.
+ * @param props the props
+ * @param props.loading true while the match list is loading
+ * @param props.matches the matches on this page
+ * @param props.total the number of matches in all pages
+ */
 export function MatchesTab({
   loading, error, matches, total, refetch, tournament, gender, team_type,
   pageSize, offset, onPageChange,
 }: {
-  loading: boolean; error: string | null
-  matches: MatchListItem[]; total: number; refetch: () => void
-  tournament: string | null
-  gender: string | null | undefined
-  team_type: string | null | undefined
-  pageSize: number
-  offset: number
-  onPageChange: (page: number) => void
+  loading: boolean; error: string | null // the error text, or null
+  matches: MatchListItem[]; total: number; refetch: () => void // retry after an error
+  tournament: string | null // the tournament; when set, the Tournament column is hidden
+  gender: string | null | undefined // the gender, carried into team links
+  team_type: string | null | undefined // the team type, carried into team links
+  pageSize: number // matches per page
+  offset: number // the index of the page's first match
+  onPageChange: (page: number) => void // called with the 1-based page to show
 }) {
   if (loading) return <Spinner label="Loading matches…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />
@@ -2116,7 +2133,8 @@ function BattersTab({
   )
 }
 
-/** Series-Batting tile row — pool-weighted per-innings averages with
+/** Show the Batting tab's five tiles: avg innings total, run rate, boundary %, dot % and highest total.
+ *  Series-Batting tile row — pool-weighted per-innings averages with
  *  inline std-dev across in-scope seasons. Values are per-innings (the
  *  /scope/averages/* contract), so a single row of 4 rate-style tiles
  *  is the honest framing — Teams' team-cumulative volume tiles
@@ -2124,8 +2142,8 @@ function BattersTab({
 export function SeriesBattingTileRow({
   summary, seasons,
 }: {
-  summary: ScopeBattingSummary | null
-  seasons: ScopeBattingSeason[] | null
+  summary: ScopeBattingSummary | null // the scope's batting averages; null hides the row
+  seasons: ScopeBattingSeason[] | null // the by-season rows, for each tile's std-dev across seasons
 }) {
   if (!summary) return null
   const sdRunRate = seasonStdDev(seasons, r => r.run_rate)
@@ -2166,14 +2184,15 @@ export function SeriesBattingTileRow({
   )
 }
 
-/** Series-Batting per-season trend strip. Mirrors Teams → Batting's
+/** Show the Batting tab's by-season charts; nothing for fewer than two seasons.
+ *  Series-Batting per-season trend strip. Mirrors Teams → Batting's
  *  chart strip in layout, but plots tournament-level pool-weighted
  *  per-innings averages instead of team totals. Hides on N<2 — single-
  *  season scope has no trend to draw. */
 export function SeriesBattingChartStrip({
   seasons,
 }: {
-  seasons: ScopeBattingSeason[] | null
+  seasons: ScopeBattingSeason[] | null // the scope's batting by season
 }) {
   if (!seasons || seasons.length < 2) return null
   return (
@@ -2360,12 +2379,12 @@ function BowlersTab({
   )
 }
 
-/** Series-Bowling tile row — pool-weighted per-innings averages. */
+/** Show the Bowling tab's tiles of pool-weighted per-innings averages. */
 export function SeriesBowlingTileRow({
   summary, seasons,
 }: {
-  summary: ScopeBowlingSummary | null
-  seasons: ScopeBowlingSeason[] | null
+  summary: ScopeBowlingSummary | null // the scope's bowling averages; null hides the row
+  seasons: ScopeBowlingSeason[] | null // the by-season rows, for std-dev across seasons
 }) {
   if (!summary) return null
   const sdEconomy = seasonStdDev(seasons, r => r.economy)
@@ -2407,11 +2426,11 @@ export function SeriesBowlingTileRow({
   )
 }
 
-/** Series-Bowling per-season trend strip. */
+/** Show the Bowling tab's by-season charts; nothing for fewer than two seasons. */
 export function SeriesBowlingChartStrip({
   seasons,
 }: {
-  seasons: ScopeBowlingSeason[] | null
+  seasons: ScopeBowlingSeason[] | null // the scope's bowling by season
 }) {
   if (!seasons || seasons.length < 2) return null
   return (
@@ -2549,12 +2568,12 @@ function FieldersTab({
   )
 }
 
-/** Series-Fielding tile row — pool-weighted per-match averages. */
+/** Show the Fielding tab's tiles of pool-weighted per-match averages. */
 export function SeriesFieldingTileRow({
   summary, seasons,
 }: {
-  summary: ScopeFieldingSummary | null
-  seasons: ScopeFieldingSeason[] | null
+  summary: ScopeFieldingSummary | null // the scope's fielding averages; null hides the row
+  seasons: ScopeFieldingSeason[] | null // the by-season rows, for std-dev across seasons
 }) {
   if (!summary) return null
   const sdCpm = seasonStdDev(seasons, r => r.catches_per_match)
@@ -2586,11 +2605,11 @@ export function SeriesFieldingTileRow({
   )
 }
 
-/** Series-Fielding per-season trend strip. */
+/** Show the Fielding tab's by-season charts; nothing for fewer than two seasons. */
 export function SeriesFieldingChartStrip({
   seasons,
 }: {
-  seasons: ScopeFieldingSeason[] | null
+  seasons: ScopeFieldingSeason[] | null // the scope's fielding by season
 }) {
   if (!seasons || seasons.length < 2) return null
   return (
@@ -2611,14 +2630,21 @@ export function SeriesFieldingChartStrip({
   )
 }
 
+/**
+ * Show the Records tab: highest team totals, lowest all-out totals, biggest wins by runs and by wickets, largest
+ * partnerships, best batting, best bowling and most sixes in a match, in scope.
+ * @param props the props
+ * @param props.loading true while the records are loading
+ * @param props.data the records, or null before they load
+ */
 export function RecordsTab({
   loading, error, data, refetch, tournament, gender, team_type,
 }: {
-  loading: boolean; error: string | null
-  data: TournamentRecords | null; refetch: () => void
-  tournament: string | null
-  gender: string | null | undefined
-  team_type: string | null | undefined
+  loading: boolean; error: string | null // the error text, or null
+  data: TournamentRecords | null; refetch: () => void // retry after an error
+  tournament: string | null // the tournament; when set, the Edition column shows the season only
+  gender: string | null | undefined // the gender, carried into team links
+  team_type: string | null | undefined // the team type, carried into team links
 }) {
   if (loading) return <Spinner label="Loading records…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />

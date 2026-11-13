@@ -1,18 +1,23 @@
+/**
+ * The season trajectory below the Teams Compare grid: batting run rate and bowling economy by season, one line per column.
+ */
 import LineChart from '../charts/LineChart'
 import type {
   TeamProfile, ScopeAverageProfile, TeamBattingSeason, TeamBowlingSeason,
 } from '../../types'
 
+/** One compare column to draw as a line. */
 interface ColumnInput {
   /** Display name in the legend. Either a team name or the scope-avg label. */
   label: string
-  profile: TeamProfile | ScopeAverageProfile
+  profile: TeamProfile | ScopeAverageProfile // the column's profile, with its by-season batting and bowling
   /** True for the league-average column — rendered in a neutral colour. */
   isAverage?: boolean
 }
 
+/** Props of `SeasonTrajectoryStrip`. */
 interface Props {
-  columns: ColumnInput[]
+  columns: ColumnInput[] // the compare columns, one line each
   /** Hide the strip when single-season filters collapse the trajectory
    *  to a single point per line (no story to tell). */
   hidden?: boolean
@@ -80,6 +85,7 @@ function flattenBowling(columns: ColumnInput[]): Row[] {
   return out.filter(r => r.value != null)
 }
 
+/** Show two line charts of the columns by season; nothing when hidden or when fewer than two seasons have data. */
 export default function SeasonTrajectoryStrip({ columns, hidden = false }: Props) {
   if (hidden) return null
 

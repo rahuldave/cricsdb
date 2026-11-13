@@ -1,7 +1,7 @@
 """Populate playerscopestats_fielding_position — per (fielder, dismissed-batter-position) aggregates.
 
 Phase 2c of the player-baselines rollout. See
-`internal_docs/spec-player-compare-average.md` §4.4 + §7 Phase 2c.
+`docs/internal/spec-player-compare-average.md` §4.4 + §7 Phase 2c.
 One row per (person_id [fielder], scope_key, position_bucket [the
 DISMISSED batter's merged-opener bucket]); the scope_key matches the
 parent PlayerScopeStats row's hash of (tournament || season || gender

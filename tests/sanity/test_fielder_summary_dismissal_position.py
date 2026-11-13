@@ -1,7 +1,7 @@
 """Sanity: per-bucket cohort fields on /fielders/{id}/summary
 dismissal_position_distribution.
 
-Spec: internal_docs/spec-mix-and-performance-charts.md §3.3 — the
+Spec: docs/internal/spec-mix-and-performance-charts.md §3.3 — the
 mix-histogram + performance-vs-cohort charts on the By Dismissed
 Position tab read two cohort fields attached to each entry:
 

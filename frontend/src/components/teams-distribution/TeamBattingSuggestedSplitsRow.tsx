@@ -1,6 +1,8 @@
 /**
+ * A "Compare to:" row of links that open the same team under a suggested scope.
+ *
  * Suggested-splits navigation row for the team-batting Distribution
- * panel. Spec: internal_docs/spec-distribution-stats.md §17.3.
+ * panel. Spec: docs/internal/spec-distribution-stats.md §17.3.
  *
  * Sibling of BowlerSuggestedSplitsRow. Navigates to the SAME /teams
  * page with the same team but the split's scope params applied.
@@ -12,9 +14,10 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import type { SuggestedSplit } from '../../types'
 
+/** Props of `TeamBattingSuggestedSplitsRow`. */
 interface Props {
-  team: string
-  splits: SuggestedSplit[]
+  team: string // the team's name, kept as `team` in each link
+  splits: SuggestedSplit[] // the suggested scopes, each a label and its URL params; nothing renders when empty
 }
 
 const PRESERVED_KEYS = [
@@ -23,6 +26,10 @@ const PRESERVED_KEYS = [
   'dist_metric_t_bat', 'dist_metric_t_bowl', 'dist_metric_t_field',
 ]
 
+/**
+ * Show a link to `/teams` for each suggested split, with the split's params applied and the inning, tab
+ * and distribution window and metric kept from the current URL.
+ */
 export default function TeamBattingSuggestedSplitsRow({ team, splits }: Props) {
   const [searchParams] = useSearchParams()
   if (splits.length === 0) return null

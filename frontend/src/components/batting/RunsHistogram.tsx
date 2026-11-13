@@ -1,6 +1,8 @@
 /**
+ * Histogram of a batter's runs per innings, coloured by tier.
+ *
  * Per-innings runs histogram for the batter Distribution panel.
- * Spec: internal_docs/spec-distribution-stats.md §9.2.2.
+ * Spec: docs/internal/spec-distribution-stats.md §9.2.2.
  *
  * Wraps the existing semiotic-backed BarChart with the width-10
  * bin scheme + tier coloring. Pure presentational — caller passes
@@ -14,10 +16,11 @@ import { WISDEN_RUN_TIERS } from '../charts/palette'
 import { buildHistogramRows } from './distributionBins'
 import type { DistributionDossier } from '../../types'
 
+/** Props of `RunsHistogram`. */
 interface Props {
-  dossier: DistributionDossier
-  title?: string
-  height?: number
+  dossier: DistributionDossier // the active window's dossier; its `runs.observations` are binned
+  title?: string // the chart title; none when absent
+  height?: number // the chart height in pixels; 220 by default
 }
 
 // Tier colorScheme order matches the order tier strings appear when
@@ -32,6 +35,7 @@ const TIER_ORDER: (keyof typeof WISDEN_RUN_TIERS)[] = [
 ]
 const COLOR_SCHEME = TIER_ORDER.map(t => WISDEN_RUN_TIERS[t])
 
+/** Show the runs histogram in width-10 bins; nothing when there are no rows. */
 export default function RunsHistogram({ dossier, title, height = 220 }: Props) {
   const rows = useMemo(
     () => buildHistogramRows(dossier.runs.observations),

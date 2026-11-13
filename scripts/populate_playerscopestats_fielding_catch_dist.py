@@ -1,5 +1,5 @@
 """Populate playerscopestats_fielding_catch_dist — per-scope match-grain
-catch distribution. PT4 of internal_docs/spec-prob-baselines.md.
+catch distribution. PT4 of docs/internal/spec-prob-baselines.md.
 
 One row per (person_id, scope_key); the scope_key matches the parent
 PlayerScopeStats row's hash of (tournament || season || gender ||

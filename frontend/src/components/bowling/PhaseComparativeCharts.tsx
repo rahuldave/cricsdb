@@ -1,8 +1,10 @@
 /**
+ * The bowler's "By Phase" charts: powerplay, middle and death overs against the cohort.
+ *
  * Bowling "By Phase" — per-phase player-vs-cohort comparative charts.
  *
- * Three PerformanceVsCohort panels stacked vertically: Dot %, Strike
- * Rate, and Economy. Same primitive + UX as the batting equivalent,
+ * Four PerformanceVsCohort panels stacked vertically: Dot %, Strike
+ * Rate, Economy, and boundaries conceded per over. Same primitive + UX as the batting equivalent,
  * different metrics (and inverted polarity — for bowling, lower SR
  * and economy = better; higher dot% = better).
  *
@@ -17,12 +19,13 @@ import PerformanceVsCohort, { type PerfEntry } from '../distribution-charts/Perf
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 import type { ScopePlayerBowlingPhase } from '../../types'
 
+/** Props of `PhaseComparativeCharts`. */
 interface Props {
   // The bowling /by-phase response carries additional fields beyond
   // the shared PhaseStats interface (economy, runs_conceded, wickets,
   // pp_early / pp_late sub-phases). Accept the raw rows here.
-  phaseData: Array<Record<string, any>>
-  phaseBaseline: ScopePlayerBowlingPhase[]
+  phaseData: Array<Record<string, any>> // the bowler's per-phase rows; rows other than powerplay, middle and death are skipped
+  phaseBaseline: ScopePlayerBowlingPhase[] // the cohort's per-phase averages
 }
 
 // Canonical phase order: powerplay → middle → death. Sub-phases
@@ -48,6 +51,7 @@ function phaseTint(b: number): string | null {
 function fmt1(v: number) { return v.toFixed(1) }
 function fmt2(v: number) { return v.toFixed(2) }
 
+/** Show the dot %, strike rate, economy and boundaries-per-over charts, one bar per phase with a cohort tick. */
 export default function PhaseComparativeCharts({ phaseData, phaseBaseline }: Props) {
   const baseByBucket = new Map<number, ScopePlayerBowlingPhase>()
   for (const b of phaseBaseline) {

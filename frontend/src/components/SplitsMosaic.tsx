@@ -1,4 +1,6 @@
 /**
+ * The Splits Mosaic: a team's matches split by toss, innings and result, which is also a filter.
+ *
  * SplitsMosaic — joint distribution of (toss_outcome × inning × result)
  * for the active filter scope. Doubles as a filter widget: marginals,
  * outer cells, and outcome sub-rects all write URL params on click.
@@ -22,7 +24,7 @@
  * carries per-cell deltas vs the league baseline at the same filter
  * scope (envelope pattern from `/summary`).
  *
- * Spec: internal_docs/spec-splits-mosaic.md §3.
+ * Spec: docs/internal/spec-splits-mosaic.md §3.
  */
 import { useMemo, useRef, type ReactNode } from 'react'
 import { useSetUrlParams } from '../hooks/useUrlState'
@@ -30,10 +32,11 @@ import { WISDEN, WISDEN_WL, WISDEN_WL_TINTS } from './charts/palette'
 import MetricDelta from './MetricDelta'
 import type { TeamSplits, SplitsCell, FilterParams, MetricEnvelope } from '../types'
 
+/** Props of `SplitsMosaic`. */
 interface Props {
-  data: TeamSplits | null
-  loading: boolean
-  filters: FilterParams
+  data: TeamSplits | null // the /splits response with the aux filters applied; null before it loads
+  loading: boolean // true while `data` is being fetched
+  filters: FilterParams // the page filters; the set `result`, `toss_outcome` and `inning` decide the chart's shape
   /** Active discipline tab on the page — used ONLY to flip the inning
    *  LABEL into bowling-POV phrasing on Bowling/Fielding tabs. Under
    *  Option B (spec-inning-unify-option-b.md) `?inning=` is unified:
@@ -281,6 +284,7 @@ function cellTooltip(cell: SplitsCell, total: number, hasSubject: boolean, bowli
 }
 
 // ─── Component ──────────────────────────────────────────────────────
+/** Show the toss × innings × result mosaic for the scope, and write a clicked cell, strip or bar to the URL filters. */
 export default function SplitsMosaic({ data, loading, filters, activeTab, matchesEnvelope, uniqueTeamsInScope: _uniqueTeamsInScope, unauxData }: Props) {
   const setUrlParams = useSetUrlParams()
 

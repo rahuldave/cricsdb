@@ -1,7 +1,7 @@
 #!/bin/bash
 # Bowler Distribution panel — DOM integration test.
 #
-# Spec: internal_docs/spec-distribution-stats.md §12.6.
+# Spec: docs/internal/spec-distribution-stats.md §12.6.
 #
 # Asserts the panel renders correctly on /bowling?player=X across
 # all three metric tabs (Wickets / Economy / Runs conceded), that

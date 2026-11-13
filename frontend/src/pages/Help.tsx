@@ -1,3 +1,6 @@
+/**
+ * The About and Help page at `/help`: what CricsDB is, about the maintainer, and links to more help.
+ */
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import aboutMeMd from '../content/about-me.md?raw'
@@ -12,6 +15,10 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 // Kept intentionally simple: no fetches, one external dependency
 // (react-markdown). Styles lean on the existing .wisden-* classes.
 
+/**
+ * Show the About and Help page.
+ * @returns the page
+ */
 export default function Help() {
   useDocumentTitle('About & Help')
 

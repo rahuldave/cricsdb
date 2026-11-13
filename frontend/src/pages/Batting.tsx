@@ -1,3 +1,12 @@
+/**
+ * The batting page at `/batting`: a landing board of batters, or one batter's dossier.
+ *
+ * With no `?player=`, it shows a player search, quick-start picks and the batting landing board.
+ * With `?player=<id>`, it shows the batter's summary and distribution, and the tabs in `?tab=`
+ * (default `By Season`): By Season, By Position, By Over, By Phase, vs Bowlers, Dismissals,
+ * Inter-Wicket, Innings List and Records. Every fetch follows the FilterBar filters.
+ * When the URL has no `gender`, the page fills it in from the player's nationalities if they agree.
+ */
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useFilters } from '../hooks/useFilters'
@@ -60,6 +69,10 @@ function TabState({ fetch }: { fetch: FetchState<unknown> }) {
 const tabs = ['By Season', 'By Position', 'By Over', 'By Phase', 'vs Bowlers', 'Dismissals', 'Inter-Wicket', 'Innings List', 'Records'] as const
 const fmt = (v: number | null | undefined, d = 2) => v == null ? '-' : v.toFixed(d)
 
+/**
+ * Show the batting landing board, or the dossier of the batter in `?player=`.
+ * @returns the page
+ */
 export default function Batting() {
   const filters = useFilters()
   const [playerId] = useUrlParam('player')

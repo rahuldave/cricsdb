@@ -1,3 +1,6 @@
+/**
+ * One discipline's section on a player profile: its headline stats and a link to the discipline's page.
+ */
 import type React from 'react'
 import { Link } from 'react-router-dom'
 import StatCard from '../StatCard'
@@ -16,11 +19,12 @@ import {
 
 type Discipline = 'batting' | 'bowling' | 'fielding' | 'keeping'
 
+/** Props of `PlayerSummaryRow`. */
 interface Props {
-  discipline: Discipline
-  profile: PlayerProfile
-  playerId: string
-  filters: FilterParams
+  discipline: Discipline // batting, bowling, fielding or keeping
+  profile: PlayerProfile // the player's summaries in scope
+  playerId: string // the player, for the link to the discipline's page
+  filters: FilterParams // the scope; the link carries it
   /** When true, render a dim placeholder in place of the stat cards
    *  (used in compare mode to keep rows visually aligned across
    *  columns). Ignored in single-player mode. */
@@ -57,7 +61,10 @@ const OPEN_LABEL: Record<Discipline, string> = {
 
 /** Returns true when this discipline has data in scope. Exposed so
  *  the compare grid can decide per-discipline whether to render the
- *  band across all columns or hide it entirely. */
+ *  band across all columns or hide it entirely.
+ *  @param discipline batting, bowling, fielding or keeping
+ *  @param profile the player's summaries in scope
+ *  @returns true when the discipline's `has...` check in `roleUtils` passes */
 export function disciplineHasData(
   discipline: Discipline, profile: PlayerProfile,
 ): boolean {
@@ -87,6 +94,9 @@ function activityFor(discipline: Discipline, profile: PlayerProfile): { verb: st
   return { verb: 'fielded', n: profile.fielding?.matches_fielded.value ?? null }
 }
 
+/**
+ * Show one discipline's section: its stat cards, a compact label/value list, or a placeholder when `placeholder` is set.
+ */
 export default function PlayerSummaryRow({
   discipline, profile, playerId, filters, placeholder = false, compact = false,
 }: Props) {

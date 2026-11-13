@@ -11,8 +11,10 @@
  *
  * Place immediately above the chip row, BEFORE the row's leading
  * "vs cohort" prefix.
+ * @packageDocumentation
  */
 
+/** Slice of a player's observations that the chips show: the whole scope, the last 10 innings, or the last 60 days, 6 months or year. */
 export type DistWindow = 'scope' | 'last_10' | 'last_60d' | 'last_6mo' | 'last_1yr'
 
 const WINDOW_LABELS: Record<DistWindow, string> = {
@@ -23,6 +25,11 @@ const WINDOW_LABELS: Record<DistWindow, string> = {
   last_1yr: 'last year',
 }
 
+/**
+ * Show which `dist_window` slice the chip values come from; nothing when the window is 'scope'.
+ * @param props the props
+ * @param props.window the active slice
+ */
 export default function WindowBadge({ window }: { window: DistWindow }) {
   if (window === 'scope') return null
   return (

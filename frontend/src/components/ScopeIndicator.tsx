@@ -1,3 +1,6 @@
+/**
+ * The "Scoped to …" pill with a clear button, shown on a player page when a team or opponent filter is set.
+ */
 import { useSetUrlParams } from '../hooks/useUrlState'
 import type { FilterParams } from '../types'
 
@@ -14,6 +17,8 @@ import type { FilterParams } from '../types'
  * again." Previously clear removed only filter_team/filter_opponent and
  * left any tournament/season/team_type the user had applied on top still
  * active, which read as half a reset.
+ * @param props the props
+ * @param props.filters the page filters; the pill shows only when `filter_team` or `filter_opponent` is set
  */
 export default function ScopeIndicator({ filters }: { filters: FilterParams }) {
   const setUrlParams = useSetUrlParams()

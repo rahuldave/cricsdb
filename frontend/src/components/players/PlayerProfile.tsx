@@ -1,3 +1,6 @@
+/**
+ * One player's profile page: name and flags, role, teams, the opponent filter, a summary row per discipline, and records.
+ */
 import type { ReactNode } from 'react'
 import FlagBadge from '../FlagBadge'
 import ScopeIndicator from '../ScopeIndicator'
@@ -9,14 +12,15 @@ import PlayerTeamsStrip from './PlayerTeamsStrip'
 import PlayerOpponentFilter from './PlayerOpponentFilter'
 import type { PlayerProfile as PlayerProfileT, FilterParams } from '../../types'
 
+/** Props of `PlayerProfile`. */
 interface Props {
-  profile: PlayerProfileT
-  playerId: string
+  profile: PlayerProfileT // the player's batting, bowling, fielding and keeping summaries in scope
+  playerId: string // the player's person ID
   /** Best-effort person name + nationalities. Pulled from whichever
    *  sub-summary loaded first — they all carry the same identity. */
   name: string
-  nationalities: { team: string; gender: string }[]
-  filters: FilterParams
+  nationalities: { team: string; gender: string }[] // the teams whose flags show beside the name
+  filters: FilterParams // the scope
   /** Hide ScopeIndicator when the column is embedded in a compare
    *  grid (the grid shows the scope pill once, above the columns). */
   suppressScopePill?: boolean
@@ -26,6 +30,9 @@ interface Props {
   recordsTrailingSlot?: ReactNode
 }
 
+/**
+ * Show one player's profile in scope; a "No matches in scope" message when no discipline has data.
+ */
 export default function PlayerProfile({
   profile, playerId, name, nationalities, filters, suppressScopePill = false,
   recordsTrailingSlot,

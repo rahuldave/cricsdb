@@ -1,7 +1,7 @@
 #!/bin/bash
 # FilterBar season-window quick-select buttons integration test.
 #
-# Spec: internal_docs/design-decisions.md "FilterBar season-window
+# Spec: docs/internal/design-decisions.md "FilterBar season-window
 # quick-select buttons — scope-aware AND player-aware".
 #
 # Asserts:

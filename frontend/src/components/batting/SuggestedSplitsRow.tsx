@@ -1,6 +1,8 @@
 /**
+ * The "Compare to:" row of links to the same batter under a broader scope.
+ *
  * Suggested-splits navigation row for the batter Distribution panel.
- * Spec: internal_docs/spec-distribution-stats.md §9.2.6.
+ * Spec: docs/internal/spec-distribution-stats.md §9.2.6.
  *
  * Reads `dossier.suggested_splits` (server-emitted). Each split is a
  * (label, params) pair — clicking navigates to the SAME /batting page
@@ -15,11 +17,13 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import type { SuggestedSplit } from '../../types'
 
+/** Props of `SuggestedSplitsRow`. */
 interface Props {
-  playerId: string
-  splits: SuggestedSplit[]
+  playerId: string // the batter's id, kept in each link
+  splits: SuggestedSplit[] // the splits to link to, each a label and the scope params it sets
 }
 
+/** Show a link to `/batting` for each split, keeping `inning`; nothing when there are no splits. */
 export default function SuggestedSplitsRow({ playerId, splits }: Props) {
   const [searchParams] = useSearchParams()
   if (splits.length === 0) return null

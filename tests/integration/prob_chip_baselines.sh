@@ -1,7 +1,7 @@
 #!/bin/bash
 # Prob-chip cohort baseline captions — DOM integration test.
 #
-# Spec: internal_docs/spec-prob-baselines.md PT5.T.
+# Spec: docs/internal/spec-prob-baselines.md PT5.T.
 #
 # For each of the three Distribution panel surfaces (batting / bowling /
 # fielding), asserts:

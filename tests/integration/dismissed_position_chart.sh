@@ -1,7 +1,7 @@
 #!/bin/bash
 # Fielding By Dismissed Position tab — Mix + Catches/match vs cohort.
 #
-# Spec: internal_docs/spec-mix-and-performance-charts.md §M3 + §6.
+# Spec: docs/internal/spec-mix-and-performance-charts.md §M3 + §6.
 #
 # Per CLAUDE.md "Filter-combination testing — the matrix is
 # mandatory": exercises diverse subject × scope combinations,

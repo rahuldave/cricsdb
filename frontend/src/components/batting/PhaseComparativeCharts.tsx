@@ -1,4 +1,6 @@
 /**
+ * The batter's "By Phase" charts: powerplay, middle and death overs against the cohort.
+ *
  * By Phase — per-phase player-vs-cohort comparative charts.
  *
  * Three PerformanceVsCohort panels stacked vertically: Strike Rate,
@@ -12,7 +14,7 @@
  * boundaries / overs-in-phase, cohort = boundary_pct × 6 / 100. Both
  * use legal balls so the denominators are DLS-safe by construction.
  *
- * Spec / context: internal_docs/spec-mix-and-performance-charts.md
+ * Spec / context: docs/internal/spec-mix-and-performance-charts.md
  * §M2 pattern, applied to the phase axis. User-asked 2026-05-22.
  */
 
@@ -20,9 +22,10 @@ import PerformanceVsCohort, { type PerfEntry } from '../distribution-charts/Perf
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 import type { PhaseStats, ScopePlayerBattingPhase } from '../../types'
 
+/** Props of `PhaseComparativeCharts`. */
 interface Props {
-  phaseData: PhaseStats[]
-  phaseBaseline: ScopePlayerBattingPhase[]
+  phaseData: PhaseStats[] // the batter's per-phase rows
+  phaseBaseline: ScopePlayerBattingPhase[] // the cohort's per-phase averages
 }
 
 // Canonical phase order: powerplay → middle → death.
@@ -50,6 +53,7 @@ function phaseTint(b: number): string | null {
 function fmt1(v: number) { return v.toFixed(1) }
 function fmt2(v: number) { return v.toFixed(2) }
 
+/** Show the strike rate, dot % and boundaries-per-over charts, one bar per phase with a cohort tick. */
 export default function PhaseComparativeCharts({ phaseData, phaseBaseline }: Props) {
   // Build a baseline lookup keyed by phase bucket so we can join the
   // player's per-phase row to the cohort's row case-insensitively

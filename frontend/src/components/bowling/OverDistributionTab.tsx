@@ -1,7 +1,9 @@
 /**
+ * The bowler's "By Over" tab: where the bowler bowls, and how each over compares with the cohort.
+ *
  * Bowling "By Over" tab — Mix histogram + stacked Performance vs cohort.
  *
- * Spec: internal_docs/spec-mix-and-performance-charts.md §1 + §2.2.
+ * Spec: docs/internal/spec-mix-and-performance-charts.md §1 + §2.2.
  * Mounts on /bowling?player=X. Reads per-bucket player + cohort values
  * directly from /bowlers/{id}/summary.over_distribution (single
  * payload — no extra fetch per spec §3.2).
@@ -21,8 +23,9 @@ import PerformanceVsCohort, { type PerfEntry } from '../distribution-charts/Perf
 import { WISDEN_TIER_TINTS } from '../charts/palette'
 import type { BowlingOverDistributionEntry } from '../../types'
 
+/** Props of `OverDistributionTab`. */
 interface Props {
-  overDistribution: BowlingOverDistributionEntry[]
+  overDistribution: BowlingOverDistributionEntry[] // one entry per over, from `/bowlers/{id}/summary`
 }
 
 const bucketLabel = (over: number) => String(over)
@@ -37,6 +40,10 @@ function bowlingPhaseTint(over: number): string | null {
 function fmt2(v: number) { return v.toFixed(2) }
 function fmt3(v: number) { return v.toFixed(3) }
 
+/**
+ * Show the over-mix histogram and the economy, wickets per innings and boundaries per over charts against the cohort.
+ * Shows nothing when there are no entries.
+ */
 export default function OverDistributionTab({ overDistribution }: Props) {
   if (!overDistribution || overDistribution.length === 0) return null
 

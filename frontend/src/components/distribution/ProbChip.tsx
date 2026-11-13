@@ -32,8 +32,8 @@
  *    on a known-cohort chip (below-sample) renders "vs — (below
  *    sample)" in muted italic.
  *
- * Spec: internal_docs/spec-distribution-stats.md §11.3 (helper),
- * §12.2.5 (visual contract); internal_docs/spec-prob-baselines.md
+ * Spec: docs/internal/spec-distribution-stats.md §11.3 (helper),
+ * §12.2.5 (visual contract); docs/internal/spec-prob-baselines.md
  * §5 Option C (caption + polarity).
  */
 
@@ -45,9 +45,10 @@ import type { ProbRecord } from '../../types'
 const COLOR_GOOD = '#3F7A4D'
 const COLOR_BAD = '#7A1F1F'
 
+/** Props of `ProbChip`. */
 interface Props {
-  label: string
-  record: ProbRecord
+  label: string // the text before the value, such as "P(≥3)"
+  record: ProbRecord // the probability, its counts and CI, and the cohort fields when the backend sends them
   /** {bg, fg} pair from WISDEN_TIER_TINTS — pick the tier the
    *  chip's threshold falls in via `tintForTierColor(tierColor)`. */
   tint: { bg: string; fg: string }
@@ -195,6 +196,7 @@ function captionFor(record: ProbRecord): React.ReactNode | null {
   )
 }
 
+/** Show a probability as a tinted pill with a CI tooltip, and a cohort caption below it when the record carries the `direction` key, null included. */
 export default function ProbChip({ label, record, tint, smallNFloor = 10 }: Props) {
   const isNull = record.value === null || record.denom <= 0
   const lowN = !isNull && record.denom < smallNFloor

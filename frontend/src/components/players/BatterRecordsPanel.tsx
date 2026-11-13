@@ -21,12 +21,13 @@ import Spinner from '../Spinner'
 import ErrorBanner from '../ErrorBanner'
 import type { BatterRecords, PlayerBattingRecord } from '../../types'
 
+/** Props of `BatterRecordsPanel`. */
 interface Props {
-  data: BatterRecords | null
-  loading: boolean
-  error: string | null
-  refetch?: () => void
-  compact?: boolean
+  data: BatterRecords | null // the player's record lists; nothing is shown while null
+  loading: boolean // true while the records load; shows a spinner
+  error: string | null // the request's error, shown in an `ErrorBanner`; null when there is none
+  refetch?: () => void // called by the banner's Retry button
+  compact?: boolean // not read: every list shows the same columns
   /** If set, only show this subset of lists (used by the
    *  cross-discipline Players-profile records summary). */
   lists?: Array<keyof Omit<BatterRecords, 'person_id' | 'name'>>
@@ -86,6 +87,7 @@ const LISTS: ListDef[] = [
     rows: d => d.best_strike_rates, cols: battingCols({ showSR: true }) },
 ]
 
+/** Show the player's batting record lists, each as a table, in one or two columns. */
 export default function BatterRecordsPanel({ data, loading, error, refetch, lists }: Props) {
   if (loading) return <Spinner label="Loading records…" />
   if (error) return <ErrorBanner message={error} onRetry={refetch} />

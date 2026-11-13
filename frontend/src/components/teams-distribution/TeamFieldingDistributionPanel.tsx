@@ -1,7 +1,9 @@
 /**
+ * The per-innings team fielding distribution panel on the Teams page Fielding tab.
+ *
  * Team-fielding Distribution panel — top-level orchestrator for the
  * §17.5 frontend slice. Spec:
- * internal_docs/spec-distribution-stats.md §17.5.
+ * docs/internal/spec-distribution-stats.md §17.5.
  *
  * Mounted at the top of the Teams page Fielding tab content area
  * (see Teams.tsx).
@@ -77,7 +79,7 @@ const VALID_METRICS: ReadonlyArray<DistMetric> = ['run_outs', 'stumpings']
 // wickets/innings). Run-outs + stumpings = 12 (lower-frequency,
 // slower-drifting signals: run-outs reflects team athleticism,
 // stumpings is essentially a keeper-property — both warrant
-// heavier smoothing). See internal_docs/colors.md "Rolling-mean
+// heavier smoothing). See docs/internal/colors.md "Rolling-mean
 // windows by grain".
 const ROLLING_WINDOW_BY_METRIC: Record<DistMetric, number> = {
   catches: 7,
@@ -214,11 +216,12 @@ function SparklineLegend({ globalLegend, leagueLegend, rollingWindow }: {
   )
 }
 
+/** Props of `TeamFieldingDistributionPanel`. */
 interface Props {
-  team: string
-  distribution: TeamFieldingDistribution | null
-  loading: boolean
-  error: string | null
+  team: string // the team's name, passed to the suggested-splits links
+  distribution: TeamFieldingDistribution | null // the team's fielding distribution; nothing renders when null
+  loading: boolean // true while the distribution loads; nothing renders then
+  error: string | null // the fetch error, if any; nothing renders when set
   /** Same-scope league averages from the existing /summary envelope.
    *  - `catches` ← `summary.catches.scope_avg` (per-innings).
    *  - `runOuts` ← `summary.run_outs.scope_avg`.
@@ -226,6 +229,10 @@ interface Props {
   leagueAvg?: { catches: number | null; runOuts: number | null; stumpings: number | null }
 }
 
+/**
+ * Show a team's per-innings fielding distribution for catches, run-outs or stumpings: histogram, stat strip, chips, sparkline,
+ * form delta and suggested splits, with the window and metric kept in the URL.
+ */
 export default function TeamFieldingDistributionPanel({
   team, distribution, loading, error, leagueAvg,
 }: Props) {

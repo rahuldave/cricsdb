@@ -1,8 +1,10 @@
 /**
+ * The batter's "By Position" tab: where the batter bats, and how each position compares with the cohort.
+ *
  * Batting "By Position" tab — Mix histogram + single-panel
  * Performance vs cohort (Strike Rate).
  *
- * Spec: internal_docs/spec-mix-and-performance-charts.md §1 + §2.1.
+ * Spec: docs/internal/spec-mix-and-performance-charts.md §1 + §2.1.
  * Mounts on /batting?player=X. Reads per-bucket player + cohort
  * values directly from /batters/{id}/summary.position_distribution
  * (single payload — no extra fetch per spec §3.1).
@@ -23,8 +25,9 @@ import { WISDEN_TIER_TINTS } from '../charts/palette'
 import type { BattingPositionDistributionEntry } from '../../types'
 import { meanPositionBucket } from '../../utils/playerPosition'
 
+/** Props of `PositionDistributionTab`. */
 interface Props {
-  positionDistribution: BattingPositionDistributionEntry[]
+  positionDistribution: BattingPositionDistributionEntry[] // one entry per position bucket, from `/batters/{id}/summary`
 }
 
 // Bucket 1 = Opener (positions 1+2 merged per derive_positions);
@@ -44,6 +47,10 @@ function battingPhaseTint(bucket: number): string | null {
 
 function fmt2(v: number) { return v.toFixed(2) }
 
+/**
+ * Show the position-mix histogram, with a line at the mean position, and the strike rate and average charts against the cohort.
+ * Shows nothing when there are no entries.
+ */
 export default function PositionDistributionTab({ positionDistribution }: Props) {
   if (!positionDistribution || positionDistribution.length === 0) return null
 

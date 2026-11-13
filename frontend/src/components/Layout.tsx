@@ -1,3 +1,6 @@
+/**
+ * The frame of every page: the navigation bar, the filter bar and status strip, and the page itself.
+ */
 import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import FilterBar from './FilterBar'
@@ -32,6 +35,11 @@ function isInGroup(pathname: string, item: NavItem): boolean {
   return item.children.some(c => pathname === c.to)
 }
 
+/**
+ * Show the navigation bar, then the filter bar and scope strip (not on the home page, a match scorecard or help),
+ * then the current route's page.
+ * @returns the page frame
+ */
 export default function Layout() {
   const { pathname } = useLocation()
   // Hide FilterBar on pages where global filters are meaningless:

@@ -1,3 +1,13 @@
+/**
+ * The teams page at `/teams`: a landing board of teams, or one team's dossier.
+ *
+ * With no `?team=`, it shows a team search and the teams landing board. With `?team=<name>`, it
+ * shows the tabs in `?tab=` (default `By Season`): By Season, vs Opponent (the opponent in `?vs=`),
+ * Compare (up to three columns from `compare1`, `compare2` and their `compareN_*` overrides),
+ * Batting, Bowling, Fielding, Partnerships (`?partnership_side=`, default `batting`), Players,
+ * Records and Match List. On first load it rewrites legacy `compare=A,B` and `avg_slot=1` URLs
+ * into the `compareN` params.
+ */
 import type React from 'react'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -78,6 +88,10 @@ const tabs = [
   'Players', 'Records', 'Match List',
 ] as const
 
+/**
+ * Show the teams landing board, or the tabs of the team in `?team=`.
+ * @returns the page
+ */
 export default function Teams() {
   const navigate = useNavigate()
   const filters = useFilters()
@@ -284,7 +298,7 @@ export default function Teams() {
   // Splits Mosaic — joint (toss × inning × result) distribution. Same
   // fetch on landing (selected=null → ?team= absent → league side) and
   // team-detail (?team= set → dual envelope with deltas). Spec:
-  // internal_docs/spec-splits-mosaic.md §2.9.
+  // docs/internal/spec-splits-mosaic.md §2.9.
   //
   // Inning POV translation: the URL's `?inning=` follows the active
   // Option-B (spec-inning-unify-option-b.md): `?inning=` is UNIFIED to
@@ -353,7 +367,7 @@ export default function Teams() {
   // Team Records — gated on tab so it doesn't fan out 8 SQL queries
   // every time the user lands on the page. Shape matches /series/records
   // so the existing RecordsTab component renders both. Spec: see
-  // internal_docs/inning-controls-mount-sites.md §4.1 + the records
+  // docs/internal/inning-controls-mount-sites.md §4.1 + the records
   // perf trio (commit 854b10a + this commit + the precomputed-tables
   // followup).
   const recordsFetch = useFetch<import('../types').TournamentRecords | null>(

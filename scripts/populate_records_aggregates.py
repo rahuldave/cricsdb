@@ -12,7 +12,7 @@ Three tables back the /series/records + /teams/{team}/records endpoints:
 Without these, every records request runs 5 full delivery-table scans
 (3M rows). With them, each record list is a single read on the small
 aggregate table joined to match for scope filtering. See
-internal_docs/spec-records-precompute.md for the full design.
+docs/internal/spec-records-precompute.md for the full design.
 
 Modes:
   Full rebuild (standalone):

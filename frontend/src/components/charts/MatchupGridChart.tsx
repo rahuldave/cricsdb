@@ -1,10 +1,14 @@
+/**
+ * The matchup grid of an innings: balls, runs and wickets for each batter against each bowler.
+ */
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import ChartHeader from '../ChartHeader'
 import type { InningsGridInnings, InningsGridDelivery } from '../../types'
 
+/** Props of `MatchupGridChart`. */
 interface Props {
-  innings: InningsGridInnings
+  innings: InningsGridInnings // the innings: its batters, its bowlers and its deliveries
   /**
    * URL query string fragment to append to head-to-head links so the
    * destination opens pre-filtered to this match's tournament context.
@@ -13,7 +17,7 @@ interface Props {
   linkParams?: string
   /** When both are set, the matching cell is outlined and scrolled into view. */
   highlightBatterId?: string | null
-  highlightBowlerId?: string | null
+  highlightBowlerId?: string | null // the bowler of the cell to highlight, with `highlightBatterId`
 }
 
 // Wicket kinds that don't credit the bowler — must mirror the backend
@@ -79,6 +83,7 @@ function cellBg(cell: Cell): string | undefined {
   return 'var(--bg)'
 }
 
+/** Show a table of batters against bowlers, tinted by wickets and strike rate, with links to each head-to-head. */
 export default function MatchupGridChart({ innings, linkParams = '', highlightBatterId, highlightBowlerId }: Props) {
   const numBatters = innings.batters.length
   const numBowlers = innings.bowlers.length

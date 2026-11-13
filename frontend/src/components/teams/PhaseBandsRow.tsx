@@ -1,3 +1,6 @@
+/**
+ * The three phase rows (powerplay, middle, death) of a Teams Compare column, for batting or bowling.
+ */
 import type { CSSProperties } from 'react'
 import type {
   TeamProfile, ScopeAverageProfile,
@@ -5,11 +8,12 @@ import type {
 } from '../../types'
 import MetricDelta from '../MetricDelta'
 
+/** Props of `PhaseBandsRow`. */
 interface Props {
   /** Either a team profile (envelope-shape phase rows) or the scope-
    *  average profile (flat-shape — no delta-against-itself). */
   profile: TeamProfile | ScopeAverageProfile
-  discipline: 'batting' | 'bowling'
+  discipline: 'batting' | 'bowling' // batting shows run rate, bowling shows economy
   /** Dim placeholder when this column has no data for the discipline.
    *  Mirrors TeamSummaryRow's placeholder behaviour for alignment. */
   placeholder?: boolean
@@ -100,6 +104,10 @@ const PHASE_BAND_SUBGRID_STYLE: CSSProperties = {
   gridRow: `span ${PHASE_BAND_ROWS}`,
 }
 
+/**
+ * Show PP, Mid and Death rows on three subgrid tracks: run rate with boundary and dot %, or economy with
+ * wickets per innings and dot %. Empty rows when there is no data.
+ */
 export default function PhaseBandsRow({ profile, discipline, placeholder = false }: Props) {
   if (placeholder) {
     // Empty subgrid still reserves 3 row tracks so other columns'

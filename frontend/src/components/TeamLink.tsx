@@ -1,4 +1,6 @@
 /**
+ * A team's name as a link to its page, followed by links to the same team in the current scope.
+ *
  * TeamLink — name link + contextual scope-phrase subscripts for a team.
  *
  *   Name link  → /teams?team=X — identity only (gender + team_type).
@@ -31,10 +33,11 @@ import {
   type SubscriptSource,
 } from './scopeLinks'
 
+/** Props of `TeamLink`. */
 interface TeamLinkProps {
   /** Canonical team name — used as both label and URL value. */
   teamName: string
-  subscriptSource?: SubscriptSource
+  subscriptSource?: SubscriptSource // a row's own match scope, used for the phrases instead of the page filters
   /** Override gender on the name link. */
   gender?: string | null
   /** Override team_type on the name link. Useful on curated surfaces
@@ -83,6 +86,7 @@ interface TeamLinkProps {
   phraseClassName?: string
 }
 
+/** Show a team's name linked to `/teams`, then the scope phrases ("at T20 WC, 2024") as links, inline or below it. */
 export default function TeamLink({
   teamName, subscriptSource, gender, team_type, compact, layout = 'inline',
   keepRivalry = false, seriesType: seriesTypeProp, maxTiers,
