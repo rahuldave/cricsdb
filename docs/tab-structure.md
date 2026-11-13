@@ -1,17 +1,16 @@
-# CricsDB — Tabs, Subtabs, and Filtering Scheme
+# CricsDB tabs, subtabs, and filtering scheme
 
-This is a structural reference for agents and downstream models that
-need to map a natural-language question onto the right page or API
-endpoint. For the conversational human-facing tour, see
-[`frontend/src/content/user-help.md`](https://github.com/rahuldave/cricsdb/blob/main/frontend/src/content/user-help.md)
-(rendered at <https://t20.rahuldave.com/help/usage>). For the full API
-catalog, see [`docs/api.md`](./api.md).
+This page maps each page and tab of the site to its URL and to the API endpoints behind it. It is a
+structural reference for agents and other models that must turn a question in plain English into the
+right page or API endpoint. The conversational tour for people is
+[`frontend/src/content/user-help.md`](https://github.com/rahuldave/cricsdb/blob/main/frontend/src/content/user-help.md),
+which the site shows at <https://t20.rahuldave.com/help/usage>. The full API catalog is
+[`docs/api.md`](./api.md).
 
-Site: <https://t20.rahuldave.com>. All pages are React routes over a
-FastAPI backend at `/api/v1/*`. Every selection (filters, picked
-entity, active subtab) lives in URL search params — share-link
-round-trip is the design contract, so any answer an agent gives can
-be tied back to a reproducible URL.
+The site is at <https://t20.rahuldave.com>. All pages are React routes over a FastAPI backend at
+`/api/v1/*`. Every selection lives in the URL search parameters, for example the filters, the picked entity
+and the active subtab. The design contract is that a shared link opens the same view. So an agent
+can tie each answer back to a URL that anyone can open again.
 
 ---
 
@@ -19,255 +18,241 @@ be tied back to a reproducible URL.
 
 | Route | Page | Purpose |
 |---|---|---|
-| `/` | Home | Landing — masthead, coverage stats, recent fixtures. |
-| `/series` | Series | Competitions (IPL, T20 WC, Vitality Blast, …) AND bilateral rivalries (India vs Australia, Ashes T20, …). Cricket uses "series" for both senses. |
-| `/teams` | Teams | Team dossier — win/loss, batting, bowling, fielding, partnerships, roster, Compare tab, Records, match list. |
-| `/players` | Players | Person-focused — single-player overview that stacks every discipline, plus N-way compare. |
-| `/batting` | Batting | Deep batting page — by-season, by-over, by-phase, vs-bowlers scatter, dismissals, inter-wicket, innings list, records. |
-| `/bowling` | Bowling | Deep bowling page — sibling of batting. |
-| `/fielding` | Fielding | Deep fielding page — by-season, by-over, by-phase, dismissal types, victims, innings list, records. |
-| `/head-to-head` | Head to Head | Two-entity matchups — Player vs Player OR Team vs Team. |
-| `/venues` | Venues | Country-grouped venue directory + per-venue dossier. |
+| `/` | Home | Landing page, with the masthead, coverage stats and recent fixtures. |
+| `/series` | Series | Competitions (IPL, T20 WC, Vitality Blast and others) and bilateral rivalries (India vs Australia, Ashes T20 and others). Cricket uses "series" for both senses. |
+| `/teams` | Teams | Team dossier, with win and loss, batting, bowling, fielding, partnerships, roster, the Compare tab, Records and the match list. |
+| `/players` | Players | One person's overview that stacks every discipline, and a compare view of N players. |
+| `/batting` | Batting | Deep batting page, with by-season, by-over, by-phase, the vs-bowlers scatter, dismissals, inter-wicket, innings list and records. |
+| `/bowling` | Bowling | Deep bowling page, the sibling of batting. |
+| `/fielding` | Fielding | Deep fielding page, with by-season, by-over, by-phase, dismissal types, victims, innings list and records. |
+| `/head-to-head` | Head to Head | Matchups of two sides, either Player vs Player or Team vs Team. |
+| `/venues` | Venues | Directory of venues grouped by country, and a dossier for each venue. |
 | `/matches` | Matches | Searchable list of every match. |
-| `/matches/:matchId` | MatchScorecard | Full scorecard, innings grid, worm chart, matchup grid. |
-| `/help` | Help | About / project context. |
-| `/help/usage` | HelpUsage | Rendered user manual (`user-help.md`). |
+| `/matches/:matchId` | MatchScorecard | Full scorecard, innings grid, worm chart and matchup grid. |
+| `/help` | Help | About the project. |
+| `/help/usage` | HelpUsage | The user manual (`user-help.md`), rendered. |
 
-The nav groups `/batting`, `/bowling`, `/fielding` under a **Players ▾**
-hover-menu on desktop; the standalone `/players` route is the entry
-point for the cross-discipline overview.
+On a desktop, the navigation bar groups `/batting`, `/bowling` and `/fielding` under a **Players ▾** menu
+that opens on hover. The separate `/players` route is the entry point for the overview across all
+disciplines.
 
 ---
 
 ## 2. Subtabs by page
 
-Every dossier-style page exposes a subtab strip via `?tab=<name>`.
-Active subtab is part of the share link; default subtab is `Overview`
-(or `By Season` on the discipline pages).
+Every page in the style of a dossier has a strip of subtabs, set by `?tab=<name>`. The active subtab is
+part of the shared link. The default subtab is `Overview`, or `By Season` on the discipline pages.
 
 ### `/series` (Tournaments + Rivalry dossier)
 
-URL: `?tournament=<name>` OR `?filter_team=<X>&filter_opponent=<Y>`.
-The empty landing shows tiles for every tournament + every bilateral
-rivalry (men's + women's).
+The URL takes `?tournament=<name>`, or `?filter_team=<X>&filter_opponent=<Y>` for a rivalry. The empty
+landing page shows a tile for every tournament and for every bilateral rivalry, for men and for women.
 
 | Subtab | URL | What it shows |
 |---|---|---|
-| Overview | `?tab=Overview` (default) | Headline summary, top-line winners, knockouts. |
-| Editions | `?tab=Editions` | Per-edition rollup (only when a single tournament is bound, not a rivalry). |
-| Points | `?tab=Points` | Points table (only when a single tournament + single season). |
-| Batting | `?tab=Batting` | Top batters by avg + SR; a "Picked batter" scope-stats tile via `?series_batter=<id>`. |
-| Bowling | `?tab=Bowling` | Top bowlers by SR + economy; "Picked bowler" tile via `?series_bowler=<id>`. |
-| Fielding | `?tab=Fielding` | Top fielders by dismissals + keeper-dismissals + run-outs; "Picked fielder" via `?series_fielder=<id>`. |
-| Partnerships | `?tab=Partnerships` | Largest partnerships overall + top-10 per wicket (1st through 10th). |
-| Records | `?tab=Records` | 8 record lists: highest team totals, lowest all-out, biggest wins by runs/wickets, largest partnerships, best individual batting, best bowling figures, most sixes in a match. |
-| Matches | `?tab=Matches` | Full match list, paginated. |
+| Overview | `?tab=Overview` (default) | Headline summary, top-line winners and knockouts. |
+| Editions | `?tab=Editions` | A rollup for each edition, only when a single tournament is bound and not a rivalry. |
+| Points | `?tab=Points` | Points table, only for a single tournament and a single season. |
+| Batting | `?tab=Batting` | Top batters by average and strike rate (SR), and a "Picked batter" tile of scope stats through `?series_batter=<id>`. |
+| Bowling | `?tab=Bowling` | Top bowlers by SR and economy, and a "Picked bowler" tile through `?series_bowler=<id>`. |
+| Fielding | `?tab=Fielding` | Top fielders by dismissals, keeper dismissals and run-outs, and "Picked fielder" through `?series_fielder=<id>`. |
+| Partnerships | `?tab=Partnerships` | Largest partnerships overall, and the top 10 for each wicket (1st to 10th). |
+| Records | `?tab=Records` | 8 record lists: highest team totals, lowest all-out, biggest wins by runs and by wickets, largest partnerships, best individual batting, best bowling figures and most sixes in a match. |
+| Matches | `?tab=Matches` | Full match list, in pages. |
 
-The picked-player tiles on Batting / Bowling / Fielding are
-independent and sticky-per-session; only the active subtab's pick
-shows up in the URL.
+The picked-player tiles on Batting, Bowling and Fielding are independent of each other, and each keeps its
+pick for the session. Only the pick of the active subtab shows in the URL.
 
 ### `/teams` (Team dossier)
 
-URL: `?team=<name>`. The empty landing shows the international (men's
-+ women's full members + associate) and club (franchise leagues,
-women's franchise, domestic championships) directory.
+The URL takes `?team=<name>`. The empty landing page shows the directory of international teams and club
+teams. The international teams are the full members and associates, for men and for women. The club teams
+are the franchise leagues, the women's franchise leagues and the domestic championships.
 
 | Subtab | URL | What it shows |
 |---|---|---|
-| By Season | `?tab=By%20Season` (default) | Wins/losses per season + summary row. |
-| vs Opponent | `?tab=vs%20Opponent` | Per-opponent stacked bars + bubble matrix. |
-| Compare | `?tab=Compare` | Up to 3 columns side-by-side across Results / Batting / Bowling / Fielding / Partnerships. |
-| Batting | `?tab=Batting` | Team batting aggregates — summary, by-season, by-phase, by-inning, top-batters, phase-season heatmap. |
-| Bowling | `?tab=Bowling` | Team bowling aggregates — sibling shape. |
-| Fielding | `?tab=Fielding` | Team fielding aggregates — sibling shape. |
-| Partnerships | `?tab=Partnerships` | Team partnerships — summary, by-season, by-wicket, best-pairs, heatmap, top. |
-| Players | `?tab=Players` | Per-season roster (XI appearances) with batting avg + bowling SR + year-over-year turnover. |
-| Records | `?tab=Records` | Subject-team records — 8 lists, same shape as `/series` Records, scoped to "team X's". |
-| Match List | `?tab=Match%20List` | Paginated match list with a won/lost/tied result filter. |
+| By Season | `?tab=By%20Season` (default) | Wins and losses for each season, and a summary row. |
+| vs Opponent | `?tab=vs%20Opponent` | Stacked bars for each opponent, and a bubble matrix. |
+| Compare | `?tab=Compare` | Up to 3 columns side by side, across Results, Batting, Bowling, Fielding and Partnerships. |
+| Batting | `?tab=Batting` | Team batting aggregates: summary, by-season, by-phase, by-inning, top batters and a heatmap of phase by season. |
+| Bowling | `?tab=Bowling` | Team bowling aggregates, in the same shape. |
+| Fielding | `?tab=Fielding` | Team fielding aggregates, in the same shape. |
+| Partnerships | `?tab=Partnerships` | Team partnerships: summary, by-season, by-wicket, best pairs, heatmap and top. |
+| Players | `?tab=Players` | Roster for each season (appearances in the XI), with batting average, bowling SR and the turnover from year to year. |
+| Records | `?tab=Records` | Records of the subject team: 8 lists in the same shape as the `/series` Records, scoped to "team X's". |
+| Match List | `?tab=Match%20List` | Match list in pages, with a filter on the result (won, lost or tied). |
 
-The **Splits Mosaic** sits above the panels on Teams and is also a
-filter widget: clicking a cell narrows `?toss_outcome=` + `?inning=` +
-`?result=` to the cell's coordinates.
+The **Splits Mosaic** sits above the panels on Teams, and it is also a filter. A click on a cell sets
+`?toss_outcome=`, `?inning=` and `?result=` to the coordinates of that cell.
 
 ### `/players` (Single + N-way compare)
 
-URL: `?player=<id>` for single; `?player=<id>&compare=<id2>&compare=<id3>`
-for compare. Stacks Batting → Bowling → Fielding → Keeping bands for
-each player; each band has an "Open <discipline> page →" link
-forwarding the FilterBar scope. Comparison is single-gender (enforced
-via the FilterBar's gender chip). No subtabs — composed client-side
-from `/batters/{id}/summary`, `/bowlers/{id}/summary`,
-`/fielders/{id}/summary`, `/fielders/{id}/keeping/summary`.
+The URL takes `?player=<id>` for one player, and `?player=<id>&compare=<id2>&compare=<id3>` for a
+comparison. The page stacks a band for Batting, then Bowling, then Fielding, then Keeping for each player.
+Each band has an "Open <discipline> page →" link, which carries the scope of the FilterBar to that page.
+A comparison holds players of one gender only, and the gender chip of the FilterBar enforces it.
 
-The page also surfaces a condensed top-5 Records section
-(cross-discipline) once a single player is picked, sourced from
-`/batters/{id}/records` + `/bowlers/{id}/records` +
-`/fielders/{id}/records`.
+The page has no subtabs. The browser composes it from `/batters/{id}/summary`, `/bowlers/{id}/summary`,
+`/fielders/{id}/summary` and `/fielders/{id}/keeping/summary`.
 
-**Inline baseline visual** (shipped 2026-05-20). Every numeric stat
-tile on the player bands renders as a three-tier stack: bold value
-/ `vs base N` subtitle / coloured delta chip. The baseline is a
-position-mix-weighted cohort (batting: 10 position buckets opener
-+ #3..#11; bowling: 20 per-over buckets; fielding: keeper-flag
-binary), computed in-process from the corresponding
-`/api/v1/scope/averages/players/<disc>/summary` endpoint and folded
-into the existing /summary roundtrip. Hover the `vs base N` text
-for the cohort phrasing (player mix + cohort size). Compare-grid
-columns each show an inline delta chip derived from that column's
-own mix. Spec: `docs/internal/spec-player-compare-average.md`.
+When one player is picked, the page also shows a short Records section with the top 5 across disciplines.
+It comes from `/batters/{id}/records`, `/bowlers/{id}/records` and `/fielders/{id}/records`.
+
+**Inline baseline visual** (shipped 2026-05-20). Every numeric stat tile on the player bands shows a
+stack of three parts. They are the value in bold, a `vs base N` subtitle and a coloured chip for the
+difference.
+
+The baseline is a cohort weighted by the player's own mix. A cohort is the group of players in the same
+scope. Batting uses 10 position buckets (opener, and #3 to #11). Bowling uses 20
+buckets, one for each over. Fielding uses a binary flag, keeper or not. The backend computes the baseline
+in the same process from the matching `/api/v1/scope/averages/players/<disc>/summary` endpoint, and adds
+it to the existing /summary round trip.
+
+Hover over the `vs base N` text to see how the cohort is described, with the player's mix and the size
+of the cohort. Each column of the compare grid shows an inline chip for the difference, from the mix of
+that column's player. The spec is `docs/internal/spec-player-compare-average.md`.
 
 ### `/batting` (Batter deep dive)
 
-URL: `?player=<id>` for a single batter; the landing view (no
-player) shows top-10 by avg + SR for the current scope.
+The URL takes `?player=<id>` for a single batter. The landing view, with no player, shows the top 10 by
+average and by SR for the current scope.
 
 | Subtab | URL | What it shows |
 |---|---|---|
-| By Season | `?tab=By%20Season` (default) | Season-by-season career. |
-| By Over | `?tab=By%20Over` | Per-over (1..20) runs / SR / dismissal-over distribution. |
-| By Phase | `?tab=By%20Phase` | Powerplay (overs 1-6) / Middle (7-15) / Death (16-20). |
-| vs Bowlers | `?tab=vs%20Bowlers` | Scatter + table of matchups: SR × avg, dot size = balls faced. |
-| Dismissals | `?tab=Dismissals` | Dismissal donut by kind + by phase + primary bowler type. |
-| Inter-Wicket | `?tab=Inter-Wicket` | Runs + rate in each between-wickets span. |
-| Innings List | `?tab=Innings%20List` | Paginated innings list. |
-| Records | `?tab=Records` | 6 lists: highest scores, fastest 50s/100s, most sixes/fours in an innings, best strike rates. |
+| By Season | `?tab=By%20Season` (default) | The career, season by season. |
+| By Over | `?tab=By%20Over` | Runs, SR and the distribution of dismissal overs, for each over (1 to 20). |
+| By Phase | `?tab=By%20Phase` | Powerplay (overs 1 to 6), Middle (7 to 15) and Death (16 to 20). |
+| vs Bowlers | `?tab=vs%20Bowlers` | Scatter and table of matchups: SR against average, with the dot size for balls faced. |
+| Dismissals | `?tab=Dismissals` | Dismissal donut by kind, by phase and by the primary type of bowler. |
+| Inter-Wicket | `?tab=Inter-Wicket` | Runs and rate in each span between wickets. |
+| Innings List | `?tab=Innings%20List` | Innings list, in pages. |
+| Records | `?tab=Records` | 6 lists: highest scores, fastest 50s and 100s, most sixes and most fours in an innings, and best strike rates. |
 
 ### `/bowling` (Bowler deep dive)
 
-URL: `?player=<id>`. Landing shows top-10 by SR + economy.
+The URL takes `?player=<id>`. The landing page shows the top 10 by SR and by economy.
 
 | Subtab | URL | What it shows |
 |---|---|---|
-| By Season | default | Season-by-season career. |
-| By Over | `?tab=By%20Over` | Per-over economy + SR. |
-| By Phase | `?tab=By%20Phase` | PP / Middle / Death economy + SR. |
+| By Season | default | The career, season by season. |
+| By Over | `?tab=By%20Over` | Economy and SR for each over. |
+| By Phase | `?tab=By%20Phase` | Economy and SR in the powerplay (PP), Middle and Death. |
 | vs Batters | `?tab=vs%20Batters` | Matchup table by batter. |
-| Wickets | `?tab=Wickets` | Wicket analysis: by kind, by phase, by batter, dismissal-over distribution. |
-| Innings List | `?tab=Innings%20List` | Paginated innings list. |
-| Records | `?tab=Records` | 2 lists: best figures, most economical (min 18 balls / 3 overs). |
+| Wickets | `?tab=Wickets` | Wicket analysis: by kind, by phase, by batter, and the distribution of dismissal overs. |
+| Innings List | `?tab=Innings%20List` | Innings list, in pages. |
+| Records | `?tab=Records` | 2 lists: best figures, and most economical (at least 18 balls, which is 3 overs). |
 
 ### `/fielding` (Fielder + keeper deep dive)
 
-URL: `?player=<id>`. Landing shows top fielders by dismissals + top
-keepers by keeper-dismissals.
+The URL takes `?player=<id>`. The landing page shows the top fielders by dismissals and the top keepers by
+keeper dismissals.
 
 | Subtab | URL | What it shows |
 |---|---|---|
-| By Season | default | Per-season dismissals split by kind. |
-| By Over | `?tab=By%20Over` | Per-over dismissal counts. |
-| By Phase | `?tab=By%20Phase` | PP / Middle / Death dismissals. |
-| Dismissal Types | `?tab=Dismissal%20Types` | Donut: % catches vs stumpings vs run-outs vs c&b. |
-| Victims | `?tab=Victims` | Batters dismissed by this fielder, ranked. |
-| Innings List | `?tab=Innings%20List` | Per-innings fielding credits. |
-| Records | `?tab=Records` | 3 lists: most catches in a match, most stumpings, most dismissals. |
+| By Season | default | Dismissals for each season, split by kind. |
+| By Over | `?tab=By%20Over` | Dismissal counts for each over. |
+| By Phase | `?tab=By%20Phase` | Dismissals in PP, Middle and Death. |
+| Dismissal Types | `?tab=Dismissal%20Types` | Donut of the percentages of catches, stumpings, run-outs and caught-and-bowled (c&b). |
+| Victims | `?tab=Victims` | Batters that this fielder dismissed, ranked. |
+| Innings List | `?tab=Innings%20List` | Fielding credits for each innings. |
+| Records | `?tab=Records` | 3 lists: most catches in a match, most stumpings and most dismissals. |
 
 ### `/head-to-head` (Player vs Player OR Team vs Team)
 
-URL: `?batter=<id>&bowler=<id>` for PvP; `?team=<X>&vs=<Y>` for TvT.
-A "Show" pill at the top narrows by series category: All / Bilateral
-T20Is / ICC events / Club tournaments. The Show pill composes with
-the FilterBar — it's a slice of `series_type`.
+The URL takes `?batter=<id>&bowler=<id>` for Player vs Player (PvP), and `?team=<X>&vs=<Y>` for Team vs
+Team (TvT). A "Show" pill at the top narrows the matches to one category of series. The categories are All,
+Bilateral T20Is, ICC events and Club tournaments. The Show pill works together with the FilterBar, because it sets a value
+of `series_type`.
 
-Team vs Team reuses the `/series` dossier shape (Batters, Bowlers,
-Fielders, Partnerships, Records, Matches subtabs), just scoped to
-the team-pair match-set.
+Team vs Team uses the same shape as the `/series` dossier, with the subtabs Batters, Bowlers, Fielders,
+Partnerships, Records and Matches. The only difference is the scope, which is the set of matches between
+the two teams.
 
 ### `/venues` (Venue dossier)
 
-URL: `?venue=<name>`. Landing shows country-grouped tiles; a
-search box filters by name or city.
+The URL takes `?venue=<name>`. The landing page shows tiles grouped by country, and a search box filters
+them by name or city.
 
 | Subtab | URL | What it shows |
 |---|---|---|
-| Overview | default | Avg first-innings total, bat-first vs chase win %, toss decision split + correlation, boundary/dot % per phase, ground records. |
+| Overview | default | Average first-innings total, the win % batting first against chasing, the split of toss decisions and how they relate to the result, the boundary % and dot % in each phase, and the ground records. |
 | Batters | `?tab=Batters` | Top batters at this venue. |
 | Bowlers | `?tab=Bowlers` | Top bowlers at this venue. |
 | Fielders | `?tab=Fielders` | Top fielders at this venue. |
 | Matches | `?tab=Matches` | Full match list at this venue. |
-| Records | `?tab=Records` | Venue-scoped record lists. |
+| Records | `?tab=Records` | Record lists scoped to the venue. |
 
 ### `/matches` (Match list)
 
-URL: `/matches?…filters…`. No subtabs. Click a row to open
-`/matches/:matchId` for the full scorecard, innings grid, worm
-chart, and matchup grid. Every team name in a row carries a small
-`(ed)` link that opens that team's page scoped to THIS match's
-edition (tournament + season), independent of the FilterBar.
+The URL is `/matches?…filters…`, and the page has no subtabs. A click on a row opens `/matches/:matchId`,
+with the full scorecard, the innings grid, the worm chart and the matchup grid. Each team name in a row
+has a small `(ed)` link. That link opens the team's page, scoped to the edition of THIS match (its
+tournament and season), whatever the FilterBar holds.
 
 ---
 
 ## 3. The FilterBar (sticky across pages)
 
-A row of dropdowns sits at the top of every page (except `/` and
-`/matches/:matchId`). Its state lives in URL query params and
-persists across navigation — set Gender=Men once, you'll see Men's
-data on every page until you change it.
+The FilterBar is a row of dropdowns at the top of every page, except `/` and `/matches/:matchId`. Its
+state lives in the URL query parameters, and it stays the same as you move between pages. For example,
+set Gender to Men once, and every page shows men's data until you change it.
 
 ### FilterBar fields (`FilterBarParams` in the API)
 
 | URL param | Values | What it filters | Notes |
 |---|---|---|---|
 | `gender` | `male` / `female` | `match.gender` | |
-| `team_type` | `international` / `club` | `match.team_type` | International = national teams (T20Is); club = every franchise + domestic league. |
-| `tournament` | string | `match.event_name` | Canonicalisation-aware: "T20 World Cup (Men)" expands to the IN-list of cricsheet variants (`ICC World Twenty20` / `World T20` / `ICC Men's T20 World Cup`). |
-| `season_from` | string | `match.season >= …` | Cricsheet seasons are a mix of calendar (`"2024"`) and split-year (`"2024/25"`). Lex sort matches chronology. |
-| `season_to` | string | `match.season <= …` | Inclusive on both ends. |
-| `filter_venue` | string | `match.venue` (exact canonical) | Venue strings are canonicalised at insert via `api/venue_aliases.py`. The Venue typeahead returns the canonical form. |
+| `team_type` | `international` / `club` | `match.team_type` | International means national teams (T20Is). Club means every franchise and domestic league. |
+| `tournament` | string | `match.event_name` | Knows the canonical names. "T20 World Cup (Men)" expands to the IN-list of the cricsheet variants (`ICC World Twenty20` / `World T20` / `ICC Men's T20 World Cup`). |
+| `season_from` | string | `match.season >= …` | Cricsheet seasons mix calendar years (`"2024"`) and split years (`"2024/25"`). A sort by the text of the labels gives the order in time. |
+| `season_to` | string | `match.season <= …` | The range includes both ends. |
+| `filter_venue` | string | `match.venue` (exact canonical name) | The import gives each venue string its canonical form through `api/venue_aliases.py`. The Venue typeahead returns the canonical form. |
 
-Quick-select buttons in the season pickers:
+The season pickers have buttons for a quick choice:
 
-- `all-time` — clear the season range.
-- `latest` — pin both ends to the most recent season available in
-  the current filter scope (so with Tournament=BBL, jumps to the
-  current BBL season, not the current IPL).
-- `reset all` — clear every filter.
+- `all-time` clears the season range.
+- `latest` sets both ends to the most recent season in the current filter scope. So with
+  Tournament=BBL, it moves to the current BBL season, and not to the current IPL season.
+- `reset all` clears every filter.
 
-The Batting / Bowling / Fielding landings default the season range
-to the **last 3 seasons** because the unfiltered all-time view is
-rarely what users want. Click `all-time` to widen.
+The landing pages of Batting, Bowling and Fielding set the season range to the **last 3 seasons** by
+default, because users rarely want the unfiltered view of all time. Click `all-time` to widen it.
 
 ### Page-local Aux filters (`AuxParams`)
 
-These are not part of the sticky FilterBar; they apply only to the
-current page and are read by the same endpoints via FastAPI
-`Depends()`. Their state is in the URL so share-link round-trip
-still works.
+The aux filters are not part of the sticky FilterBar. Each applies only to the current page. The same
+endpoints read them through FastAPI `Depends()`. Their state is in the URL, so a shared link still opens
+the same view.
 
 | URL param | Values | What it filters | Notes |
 |---|---|---|---|
-| `inning` | `0` / `1` | 1st innings (batted first) / 2nd innings (chased) | URL semantics are constant (`innings.innings_number`); the pill label is POV-aware via `useDiscipline()`. Spec: `docs/internal/spec-inning-split.md`. |
-| `result` | `won` / `lost` / `tied` | Match outcome from path-team POV | Requires `?team=` (or path team binding); endpoint returns HTTP 400 otherwise. `tied` collapses true ties (super-over loss) + no-result (rain-abandoned). |
-| `toss_outcome` | `won` / `lost` | Toss outcome from path-team POV | Requires `?team=`; otherwise 400. |
-| `series_type` | `all` / `bilateral` / `icc` / `club` | Match category | `bilateral` = international non-ICC; `icc` = ICC tournaments; `club` = `team_type=club`. Legacy `bilateral_only` / `tournament_only` map to `bilateral` / `icc`. |
-| `team_class` | `full_member` / `primary_club` / `secondary_club` | Tier within team_type | `full_member` (intl): both teams ICC full members. `primary_club` (club): marquee international franchise league (IPL/BBL/PSL/CPL/SA20/ILT20/LPL/MLC/Hundred/WBBL/WPL/WCSL). `secondary_club` (club): domestic state/county league. Cross-type combinations are silent no-ops. |
-| `scope_to_team` | string | Compare-tab avg slot narrowing | Restricts the league baseline to events the team has appeared in. Gated frontend-side on `team_type=club`. |
-| `filter_team` | string | Page-contextual: narrows to matches involving this team | Used by player pages and rivalry dossiers. |
-| `filter_opponent` | string | Page-contextual: narrows to matches against this opponent | Combined with `filter_team`, gives a team-pair rivalry. |
+| `inning` | `0` / `1` | 1st innings (batted first) / 2nd innings (chased) | The meaning in the URL is fixed (`innings.innings_number`). The label of the pill depends on the point of view, through `useDiscipline()`. Spec: `docs/internal/spec-inning-split.md`. |
+| `result` | `won` / `lost` / `tied` | Match outcome from the point of view of the path team | Needs `?team=` (or a team bound in the path). Otherwise the endpoint returns HTTP 400. `tied` collapses true ties (super-over loss) and no-results (rain-abandoned). |
+| `toss_outcome` | `won` / `lost` | Toss outcome from the point of view of the path team | Needs `?team=`. Otherwise the endpoint returns 400. |
+| `series_type` | `all` / `bilateral` / `icc` / `club` | Match category | `bilateral` means international and not ICC. `icc` means ICC tournaments. `club` means `team_type=club`. The old values `bilateral_only` / `tournament_only` map to `bilateral` / `icc`. |
+| `team_class` | `full_member` / `primary_club` / `secondary_club` | Tier within team_type | `full_member` (international): both teams are ICC full members. `primary_club` (club): a marquee international franchise league (IPL/BBL/PSL/CPL/SA20/ILT20/LPL/MLC/Hundred/WBBL/WPL/WCSL). `secondary_club` (club): a domestic state or county league. A combination across types changes nothing, and gives no error. |
+| `scope_to_team` | string | Narrows the average slot of the Compare tab | Limits the league baseline to the events in which the team played. The front end offers it only with `team_type=club`. |
+| `filter_team` | string | Depends on the page: narrows to matches that involve this team | Player pages and rivalry dossiers use it. |
+| `filter_opponent` | string | Depends on the page: narrows to matches against this opponent | With `filter_team`, it gives a rivalry of two teams. |
 
 ### How filters compose
 
-All filters are **AND**-combined. There is no OR mode. Two filters
-on different axes (e.g. `tournament=Indian Premier League` +
-`filter_venue=Wankhede Stadium, Mumbai`) intersect — only matches
-that satisfy both pass. The `tournament` canonicalisation widens
-to the IN-list, but that widening still composes AND'd with every
-other filter.
+All filters combine with **AND**, and there is no OR mode. Two filters on different axes intersect, so
+only the matches that satisfy both pass. An example is `tournament=Indian Premier League` with
+`filter_venue=Wankhede Stadium, Mumbai`. The canonical name of a `tournament` widens to its IN-list, but
+that wider list still combines by AND with every other filter.
 
-The dropdowns themselves are scope-narrowed: the Tournament
-dropdown lists only tournaments that have matches under the
-current Gender + Type; the Venue typeahead lists only venues with
-matches under the current scope. So a user can't typically pick
-a combination that returns zero matches — but if they do
-(deep-link with conflicting filters), endpoints return `matches: 0`
-rather than a 404.
+The dropdowns are themselves narrowed to the scope. The Tournament dropdown lists only the tournaments
+that have matches under the current Gender and Type. The Venue typeahead lists only the venues with matches
+under the current scope. So a user usually cannot pick a combination that returns zero matches. A deep
+link with conflicting filters can still do it, and then the endpoints return `matches: 0` rather than a
+404.
 
 ### Cascade-clear rule
 
-When a coupled filter is cleared (Gender or Team Type), any
-dependent narrowing (Tournament) is also cleared. Without this,
-the FilterBar's auto-correct deep-link effects would re-assert the
-prior value from the tournament's metadata.
+When a user clears a coupled filter (Gender or Team Type), the page also clears each filter that depends
+on it (Tournament). Without this rule, the effects of the FilterBar that correct a deep link would set
+the old value again from the tournament's metadata.
 
 ---
 
@@ -307,60 +292,50 @@ API: `GET /api/v1/series/batters-leaders?tournament=Indian%20Premier%20League&se
 ```
 /venues?venue=Wankhede%20Stadium%2C%20Mumbai&tab=Records
 ```
-API: `GET /api/v1/venues/Wankhede%20Stadium%2C%20Mumbai/summary` for the overview;
-records render via `/series/records` with `filter_venue=…`.
+API: `GET /api/v1/venues/Wankhede%20Stadium%2C%20Mumbai/summary` for the overview. The records come from
+`/series/records` with `filter_venue=…`.
 
 ---
 
 ## 5. Reading conventions
 
-- **Innings semantics.** `?inning=0` always means
-  `innings.innings_number = 0` (the match's first half — the side
-  that batted first). The rendered pill label is POV-aware via
-  `useDiscipline()`: on a batting page it reads "Batting first"; on
-  bowling/fielding it reads "Bowling first"; on the ambiguous
-  multi-discipline pages (Players, Records subtabs) it stays neutral
-  ("1st innings"). So the URL is constant, the label adapts.
-- **`result` and `toss_outcome` are subject-POV.** They only make
-  sense when a path team is bound (the path `:team` or `?team=`).
-  Without a team subject, "won" is tautological. Endpoints return
-  HTTP 400 on the combination.
-- **Series vs Tournament terminology.** Cricket uses "series" for
-  both bilateral tours (India vs Australia) AND tournament editions
-  (IPL 2024). The `/series` tab covers both; `match.event_name`
-  carries the tournament identity; `filter_team` + `filter_opponent`
-  together define a bilateral rivalry. The API path `/series/*` is
-  the tournament-or-rivalry dossier; `/tournaments` is just the
-  FilterBar dropdown list of `event_name`s.
-- **Volume vs rate framing.** Fielding leaderboards rank by total
-  dismissals (volume). Batting / bowling leaderboards rank by avg /
-  SR / economy (rate) with min-sample gates (min 100 balls + 3
-  dismissals for batting averages, min 60 balls + 3 wickets for
-  bowling SR). The thresholds are returned in each response's
-  `thresholds` field so the UI can render them in the table caption.
-- **Catches include caught-and-bowled (Convention 3).** Every
-  `/summary` and `/leaders` endpoint that surfaces a `catches`
-  headline uses `kind IN ('caught', 'caught_and_bowled')`. The
-  `/distribution` endpoint is the one exception — its master sample
-  is per-match (matchplayer-based), so substitute appearances are
-  excluded and `caught_and_bowled` is a sibling block under the
-  bowling distribution (bowler-credited).
-- **DLS-shortened innings are included everywhere.** A 90-run chase
-  truncated by rain in over 12 contributes its ~60-72 legal balls
-  to every overs-denominator stat and counts as 1 innings in every
-  per-innings denominator. No `target_overs` filter exists anywhere
-  in the API.
+- **Innings semantics.** `?inning=0` always means `innings.innings_number = 0`, the first half of the
+  match, in which the first side batted. The label of the pill depends on the point of view, through
+  `useDiscipline()`. On a batting page it reads "Batting first", and on bowling or fielding it reads
+  "Bowling first". On the pages that mix disciplines (Players, and the Records subtabs) it stays neutral,
+  as "1st innings".
+- **`result` and `toss_outcome` are from the subject's point of view.** They make sense only when a path
+  team is bound (the path `:team` or `?team=`). Without a team as the subject, "won" has no meaning, so
+  the endpoints return HTTP 400 when either parameter comes without a team.
+- **Series vs Tournament terminology.** Cricket uses "series" for both bilateral tours (India vs
+  Australia) and tournament editions (IPL 2024). The `/series` tab covers both. `match.event_name` carries
+  the identity of the tournament, and `filter_team` with `filter_opponent` defines a bilateral rivalry.
+  The API path `/series/*` is the dossier of a tournament or a rivalry. `/tournaments` is only the list of
+  `event_name`s for the FilterBar dropdown.
+- **Volume vs rate framing.** Fielding leaderboards rank by total dismissals, a volume. Batting and
+  bowling leaderboards rank by average, SR or economy, which are rates. A player must pass a minimum
+  sample to be ranked. For batting averages it is 100 balls and 3 dismissals, and for bowling SR it is 60
+  balls and 3 wickets. Each response returns the thresholds in its `thresholds` field, so the UI can show
+  them in the caption of the table.
+- **Catches include caught-and-bowled (Convention 3).** Every `/summary` and `/leaders` endpoint that
+  shows a `catches` headline uses `kind IN ('caught', 'caught_and_bowled')`. The `/distribution` endpoint
+  is the one exception. Its master sample has one row for each match a player played (from matchplayer),
+  so it leaves out appearances as a substitute. There, `caught_and_bowled` is a sibling block under the
+  bowling distribution, credited to the bowler.
+- **DLS-shortened innings are included everywhere.** Take a chase of 90 runs that rain cuts short in
+  over 12. It adds its 60 to 72 legal balls or so to every stat that divides by overs, and it counts as 1
+  innings in every stat that divides by innings. No `target_overs` filter exists anywhere in the API.
 
 ---
 
 ## 6. Pointers
 
-- **Full API reference:** [`docs/api.md`](./api.md) — every endpoint
-  with path, query params, example curl, abbreviated response.
-- **Interactive API docs (Swagger):** <https://t20.rahuldave.com/api/docs>
+- **Full API reference:** [`docs/api.md`](./api.md) gives every endpoint with its path, query parameters,
+  an example curl command and a shortened response.
+- **Interactive API docs (Swagger).** <https://t20.rahuldave.com/api/docs>
 - **OpenAPI schema (JSON):** <https://t20.rahuldave.com/api/openapi.json>
 - **User manual:** [`frontend/src/content/user-help.md`](https://github.com/rahuldave/cricsdb/blob/main/frontend/src/content/user-help.md)
-  — human-facing tour with screenshots.
-- **`llms.txt`:** <https://t20.rahuldave.com/llms.txt> — the
-  agent-discovery index pointing at all of the above.
+  is the tour for people, with screenshots.
+- **`llms.txt`:** <https://t20.rahuldave.com/llms.txt> is the index for agents, and it points at all of
+  the above.
 - **Source code:** <https://github.com/rahuldave/cricsdb>
