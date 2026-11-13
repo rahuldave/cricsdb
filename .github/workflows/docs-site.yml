@@ -46,9 +46,9 @@ jobs:
       - name: Install the backend's packages
         run: uv sync --frozen
       - name: Write the references
-        run: uv run --frozen --with smalldocs==0.5.9 smalldocs api build --dir docs
+        run: uv run --frozen --with smalldocs==0.5.10 smalldocs api build --dir docs
       - name: Render the site
-        run: uv run --frozen --with smalldocs==0.5.9 smalldocs render docs --strict
+        run: uv run --frozen --with smalldocs==0.5.10 smalldocs render docs --strict
       - name: Upload site
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v4
