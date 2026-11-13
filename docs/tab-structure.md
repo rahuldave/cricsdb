@@ -41,7 +41,9 @@ disciplines.
 ## 2. Subtabs by page
 
 Every page in the style of a dossier has a strip of subtabs, set by `?tab=<name>`. The active subtab is
-part of the shared link. The default subtab is `Overview`, or `By Season` on the discipline pages.
+part of the shared link. The default subtab is `Overview` on `/series`, `/venues` and Team vs Team on
+`/head-to-head`, and `By Season` on `/teams` and the discipline pages. On `/teams`, a link with a compare slot and no
+`tab` opens on Compare.
 
 ### `/series` (Tournaments + Rivalry dossier)
 
@@ -164,8 +166,8 @@ Team (TvT). A "Show" pill at the top narrows the matches to one category of seri
 Bilateral T20Is, ICC events and Club tournaments. The Show pill works together with the FilterBar, because it sets a value
 of `series_type`.
 
-Team vs Team uses the same shape as the `/series` dossier, with the subtabs Batters, Bowlers, Fielders,
-Partnerships, Records and Matches. The only difference is the scope, which is the set of matches between
+Team vs Team uses the same shape as the `/series` dossier, with the subtabs Overview, Batting, Bowling,
+Fielding, Partnerships, Records and Matches. The only difference is the scope, which is the set of matches between
 the two teams.
 
 ### `/venues` (Venue dossier)
@@ -207,6 +209,10 @@ set Gender to Men once, and every page shows men's data until you change it.
 | `season_from` | string | `match.season >= …` | Cricsheet seasons mix calendar years (`"2024"`) and split years (`"2024/25"`). A sort by the text of the labels gives the order in time. |
 | `season_to` | string | `match.season <= …` | The range includes both ends. |
 | `filter_venue` | string | `match.venue` (exact canonical name) | The import gives each venue string its canonical form through `api/venue_aliases.py`. The Venue typeahead returns the canonical form. |
+| `series_type` | `all` / `bilateral` / `icc` / `club` | Match category | `bilateral` means international and not ICC. `icc` means ICC tournaments. `club` means `team_type=club`. The old values `bilateral_only` / `tournament_only` map to `bilateral` / `icc`. The Series Type dropdown still sends the old values. |
+| `team_class` | `full_member` / `primary_club` / `secondary_club` | Tier within team_type | `full_member` (international): both teams are ICC full members. `primary_club` (club): a marquee international franchise league (IPL/BBL/PSL/CPL/SA20/ILT20/LPL/MLC/Hundred/WBBL/WPL/WCSL). `secondary_club` (club): a domestic state or county league. A combination across types changes nothing, and gives no error. |
+| `filter_team` | string | Depends on the page: narrows to matches that involve this team | The FilterBar has no control for it. Player-team links and rivalry links set it. |
+| `filter_opponent` | string | Depends on the page: narrows to matches against this opponent | The FilterBar has no control for it. The Versus dropdown of the player pages sets it, and so do rivalry links. With `filter_team`, it gives a rivalry of two teams. |
 
 The season pickers have buttons for a quick choice:
 
@@ -227,13 +233,9 @@ the same view.
 | URL param | Values | What it filters | Notes |
 |---|---|---|---|
 | `inning` | `0` / `1` | 1st innings (batted first) / 2nd innings (chased) | The meaning in the URL is fixed (`innings.innings_number`). The label of the pill depends on the point of view, through `useDiscipline()`. Spec: `docs/internal/spec-inning-split.md`. |
-| `result` | `won` / `lost` / `tied` | Match outcome from the point of view of the path team | Needs `?team=` (or a team bound in the path). Otherwise the endpoint returns HTTP 400. `tied` collapses true ties (super-over loss) and no-results (rain-abandoned). |
+| `result` | `won` / `lost` / `tied` | Match outcome from the point of view of the path team | Needs `?team=` (or a team bound in the path). Otherwise the endpoint returns HTTP 400. `tied` collapses ties, including those a super over decides, and no-results (rain-abandoned). |
 | `toss_outcome` | `won` / `lost` | Toss outcome from the point of view of the path team | Needs `?team=`. Otherwise the endpoint returns 400. |
-| `series_type` | `all` / `bilateral` / `icc` / `club` | Match category | `bilateral` means international and not ICC. `icc` means ICC tournaments. `club` means `team_type=club`. The old values `bilateral_only` / `tournament_only` map to `bilateral` / `icc`. |
-| `team_class` | `full_member` / `primary_club` / `secondary_club` | Tier within team_type | `full_member` (international): both teams are ICC full members. `primary_club` (club): a marquee international franchise league (IPL/BBL/PSL/CPL/SA20/ILT20/LPL/MLC/Hundred/WBBL/WPL/WCSL). `secondary_club` (club): a domestic state or county league. A combination across types changes nothing, and gives no error. |
 | `scope_to_team` | string | Narrows the average slot of the Compare tab | Limits the league baseline to the events in which the team played. The front end offers it only with `team_type=club`. |
-| `filter_team` | string | Depends on the page: narrows to matches that involve this team | Player pages and rivalry dossiers use it. |
-| `filter_opponent` | string | Depends on the page: narrows to matches against this opponent | With `filter_team`, it gives a rivalry of two teams. |
 
 ### How filters compose
 

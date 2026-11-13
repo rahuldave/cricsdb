@@ -40,9 +40,11 @@ and defaults. smalldocs writes it from the code at each build.
   that returns them gives the canonical form, for example `Wankhede
   Stadium, Mumbai` and not the raw cricsheet `Wankhede`, or `County Ground
   (Taunton)` and not the ambiguous `County Ground`. They are safe to use
-  as keys for an exact match. `match.venue_country` exists in the
-  database, but no endpoint returns it yet. It is a Phase 2 addition, for
-  when the `/venues` landing ships.
+  as keys for an exact match. The venue endpoints (`/venues`,
+  `/venues/landing` and `/venues/{venue}/summary`) also return
+  `match.venue_country`, under the name `country`. On `/venues/landing`
+  it is the key of each `by_country` group, and `Unknown` when it is
+  missing.
 
 ## Common filter query params
 
@@ -61,32 +63,37 @@ omitted, it puts no limit on that axis.
 | `season_from` | string | `match.season >= ...` | `season_from=2024` |
 | `season_to` | string | `match.season <= ...` | `season_to=2024/25` |
 | `filter_venue` | string | `match.venue = ...` (exact canonical) | `filter_venue=Wankhede%20Stadium%2C%20Mumbai` |
+| `series_type` | `all`/`bilateral`/`icc`/`club` (default `all`) | Categorises the match. `bilateral` = international non-ICC; `icc` = ICC events (T20 WC etc.); `club` = `team_type=club` | `series_type=bilateral` |
+| `team_class` | `full_member` / `primary_club` / `secondary_club` | Polymorphic over `team_type`. **`full_member`** (`team_type=international`): both teams are ICC full members (Afghanistan, Australia, Bangladesh, England, India, Ireland, New Zealand, Pakistan, South Africa, Sri Lanka, West Indies, Zimbabwe). **`primary_club`** (`team_type=club`): match's event_name is in a marquee international franchise league (IPL, BBL, PSL, BPL, CPL, SA20, ILT20, LPL, MLC, The Hundred (M+W), WBBL, WPL, Women's Cricket Super League). **`secondary_club`** (`team_type=club`): match's event_name is in a domestic state/county/provincial competition (Vitality Blast, Syed Mushtaq Ali Trophy, CSA T20 Challenge, Super Smash, Nepal Premier League, Women's Super Smash, NZC Women's T20). Cross-type combinations are silent no-ops (a defensive backend gate, which keeps URLs robust when frontend gate fails or curl mixes them). | `team_class=full_member` or `team_class=primary_club` or `team_class=secondary_club` |
 
 ### Aux filters (page-local narrowings)
 
 A separate `AuxParams` class (`api/filters.py`) holds the aux filters.
-They are page-local filters, and the FilterBar UI does not set them:
+They are page-local filters, and the FilterBar UI does not set them.
+`series_type` and `team_class` are not aux filters. They are FilterBar
+fields, in the table above. The FilterBar sets them with its Series
+Type dropdown and its Full members only toggle, both shown for
+internationals, and with its Tier buttons, shown for clubs.
 
 | Param | Type | What it filters | Example |
 |---|---|---|---|
-| `series_type` | `all`/`bilateral`/`icc`/`club` (default `all`) | Categorises the match. `bilateral` = international non-ICC; `icc` = ICC events (T20 WC etc.); `club` = `team_type=club` | `series_type=bilateral` |
 | `scope_to_team` | string | Narrows the match pool to events that team has appeared in (intersection of `m.event_name`s). Used by the Compare-tab avg slot; gated frontend-side on `team_type='club'` (closed-league semantic). | `scope_to_team=Royal%20Challengers%20Bengaluru` |
-| `team_class` | `full_member` / `primary_club` / `secondary_club` | Polymorphic over `team_type`. **`full_member`** (`team_type=international`): both teams are ICC full members (Afghanistan, Australia, Bangladesh, England, India, Ireland, New Zealand, Pakistan, South Africa, Sri Lanka, West Indies, Zimbabwe). **`primary_club`** (`team_type=club`): match's event_name is in a marquee international franchise league (IPL, BBL, PSL, BPL, CPL, SA20, ILT20, LPL, MLC, The Hundred (M+W), WBBL, WPL, Women's Cricket Super League). **`secondary_club`** (`team_type=club`): match's event_name is in a domestic state/county/provincial competition (Vitality Blast, Syed Mushtaq Ali Trophy, CSA T20 Challenge, Super Smash, Nepal Premier League, Women's Super Smash, NZC Women's T20). Cross-type combinations are silent no-ops (a defensive backend gate, which keeps URLs robust when frontend gate fails or curl mixes them). | `team_class=full_member` or `team_class=primary_club` or `team_class=secondary_club` |
 | `inning` | `0` / `1` | 1st innings (`0`, batted first) or 2nd innings (`1`, batted second). Team-router endpoints apply it at match level via `_inning_match_filter`; innings-joined endpoints (batting/bowling/fielding) apply it via `filters.build` when `has_innings_join=True`. Per-slot override on the Compare tab via `compareN_inning`. | `inning=0` |
-| `result` | `won` / `lost` / `tied` | Match-outcome filter from the point of view (POV) of the path team, the team named in the URL path. `won` = path team is `outcome_winner`; `lost` = another team won; `tied` = `outcome_winner IS NULL` (collapses true ties and no-results. T20 ties go to super-over and that winner becomes `outcome_winner`, so NULL is almost exclusively rain-abandoned). Subject-team endpoints key on `:team`. The `/scope/averages/*` **cohort** (the set of innings behind the league baseline) narrows per-row. The subject is each innings' batting team `i.team` (bowling/fielding disciplines flip to the other side), so the league baseline is among-winners, a real distinct number (NOT tautological: the count is ~50% but the stats differ). Other non-team endpoints ignore it. Spec: `docs/internal/spec-compare-toss-result.md`, `spec-splits-mosaic.md`. | `result=won` |
+| `result` | `won` / `lost` / `tied` | Match-outcome filter from the point of view (POV) of the path team, the team named in the URL path. `won` = path team is `outcome_winner`; `lost` = another team won; `tied` = `outcome_winner IS NULL` (collapses ties and no-results. A tie keeps `outcome_winner` NULL even when a super over decides it, and puts the super-over winner in `outcome_eliminator`). Subject-team endpoints key on `:team`. The `/scope/averages/*` **cohort** (the set of innings behind the league baseline) narrows per-row. The subject is each innings' batting team `i.team` (bowling/fielding disciplines flip to the other side), so the league baseline is among-winners, a real distinct number (NOT tautological: the count is ~50% but the stats differ). Other non-team endpoints ignore it. Spec: `docs/internal/spec-compare-toss-result.md`, `spec-splits-mosaic.md`. | `result=won` |
 | `toss_outcome` | `won` / `lost` | Toss-outcome filter from the path team's POV. `won` = `toss_winner = :team`; `lost` = `toss_winner != :team AND toss_winner IS NOT NULL`. The `/scope/averages/*` cohort narrows per-row on `i.team` (same as `result`). Spec: `docs/internal/spec-compare-toss-result.md`, `spec-splits-mosaic.md`. | `toss_outcome=won` |
 
 Every endpoint that takes `FilterBarParams` also takes the aux filters.
 Routers declare both as FastAPI `Depends()` and pass the aux filters
 through `filters.build(aux=aux)`. That function adds the SQL clauses
-(e.g. `series_type_clause`) in one place, so no router has to wire each
+of both (e.g. `series_type_clause`) in one place, so no router has to wire each
 one by hand. As a result, every `teams/...`, `batters/...`,
 `bowlers/...`, `fielders/...`, `matches` and `venues/...` endpoint now
-narrows correctly under `?series_type=icc` and the other aux filters.
+narrows correctly under `?series_type=icc` and the other filters.
 Before 2026-04-19, they ignored `series_type` and gave no error.
 
 The legacy values `bilateral_only` and `tournament_only` map to
-`bilateral` and `icc`, so that old bookmarked URLs still work.
+`bilateral` and `icc`, so that old bookmarked URLs still work. The
+Series Type control of the FilterBar still sends the legacy values.
 
 The `tournament` filter knows the canonical names everywhere. If you
 pass `T20 World Cup (Men)`, FilterParams expands it to
@@ -94,7 +101,9 @@ pass `T20 World Cup (Men)`, FilterParams expands it to
 The mapping is in `api/tournament_canonical.py`. A tournament with
 one variant (for example IPL or BBL) passes through unchanged.
 
-Some endpoints also take contextual filters:
+`FilterBarParams` also holds two contextual filters, `filter_team` and
+`filter_opponent`. The FilterBar has no control for them. Pages and
+links set them:
 
 - `filter_team=<name>` narrows to matches that involve this team.
   Player pages use it as context, and tournament dossiers use it to set
@@ -461,8 +470,9 @@ curl "http://localhost:8000/api/v1/players/ba607b88/result-counts?gender=male&te
 The counts are flat integers. They are not wrapped in a metric envelope, the
 object that holds a value next to its baseline (see "Compare metric envelope"). `wins + losses + ties +
 no_results == matches`, and `toss_won + toss_lost <= matches`, because a
-match with no recorded toss winner is in neither count. `tied` collapses
-true ties and no-results (`outcome_winner IS NULL`). The source is
+match with no recorded toss winner is in neither count. `ties` counts
+true ties and no-results together (`outcome_winner IS NULL`), so
+`no_results` is always 0. The source is
 `api/routers/reference.py`.
 
 > **Caveat: `filter_opponent` is not applied here.** A player page can
@@ -503,10 +513,15 @@ them apart with a "men's" or "women's" suffix.
 curl "http://localhost:8000/api/v1/teams/landing?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024"
 ```
 
+The query asks for club teams in the IPL, so every international bucket
+and every other club bucket is empty. A tournament's `matches` is the
+sum of its teams' match counts, so it counts each match twice. The 71
+matches of IPL 2024 give 142.
+
 ```json
 {
   "international": {
-    "men":   { "regular": [ { "name": "India", "gender": "male", "matches": 266 } ], "associate": [] },
+    "men":   { "regular": [], "associate": [] },
     "women": { "regular": [], "associate": [] }
   },
   "club": {
@@ -516,18 +531,16 @@ curl "http://localhost:8000/api/v1/teams/landing?gender=male&team_type=club&tour
         "matches": 142,
         "teams": [
           { "name": "Chennai Super Kings", "gender": "male", "matches": 14 },
-          { "name": "Delhi Capitals",       "gender": "male", "matches": 14 }
+          { "name": "Delhi Capitals",      "gender": "male", "matches": 14 },
+          "…"
         ]
       }
     ],
-    "domestic_leagues": [
-      { "tournament": "Syed Mushtaq Ali Trophy", "matches": 695, "teams": [ "…" ] }
-    ],
-    "women_franchise": [
-      { "tournament": "Women's Premier League", "matches": 88, "teams": [ "…" ] }
-    ],
+    "domestic_leagues": [],
+    "women_franchise": [],
     "other": []
   }
+}
 ```
 
 ## `GET /api/v1/teams/splits`
@@ -929,13 +942,15 @@ Subroutes: `/by-season`, `/top-fielders`.
 
 ### Partnerships
 
-The group has five endpoints, all under `/teams/{team}/partnerships/…`. They take the same
+The group has seven endpoints, all under `/teams/{team}/partnerships/…`. They take the same
 filter scope, and also `side` (`batting` or `bowling`), which says whether the partnerships are
 FOR or AGAINST the team.
 
 - `.../by-wicket?side=batting` gives the stats for each wicket number, that is, the average partnership
   for the 1st wicket, the 2nd, and so on to the 10th. The numeric metrics (n, avg_runs) are wrapped in
   the envelope for each wicket. best_partnership identifies a partnership, so it stays flat.
+- `.../by-inning?side=batting` gives the partnerships of each innings, the 1st and the 2nd. The
+  count (n) and avg_runs are wrapped in the envelope, and avg_balls and best_runs stay flat.
 - `.../best-pairs` gives the top 3 pairs for each wicket, by total runs together.
 - `.../heatmap` gives a matrix of wicket by season for the average partnership.
 - `.../top?side=batting&limit=10` gives the top N individual partnerships.
@@ -1358,8 +1373,10 @@ The response has six headline metrics, each wrapped in an envelope (`innings_bat
 (`n_players`, `n_innings_total`, the input `position_mix`) and `by_position[10]`. That array gives the
 aggregates, the threshold and the `below_support` flag of each bucket.
 
-The threshold of each bucket is in `cohort innings`. It is linear, `27 − 2·bucket`, which gives 25, 23, 21,
-19, 17, 15, 13, 11, 9 and 7.
+The threshold of each bucket is in `cohort innings`. It is linear, `27 − 2·bucket`, where the bucket
+number counts from 1. Bucket 1 is the opener (index 0 of the mix vector) and bucket 10 is #11. So the
+thresholds are 25, 23, 21, 19, 17, 15, 13, 11, 9 and 7, and each row of `by_position` carries its
+`bucket` number.
 
 ### `GET /api/v1/scope/averages/players/bowling/summary`
 
@@ -1514,7 +1531,7 @@ the Teams > Compare tab, and the expansions for the phase bands and the season t
 
 All endpoints accept the standard FilterBar params (`gender`,
 `team_type`, `tournament`, `season_from`, `season_to`,
-`filter_venue`), the page-local `series_type`, `team_class`, and the avg slot's `scope_to_team`.
+`filter_venue`, `team_class`, `series_type`), and the aux `scope_to_team` of the avg slot.
 
 - `scope_to_team` narrows the tournament universe to the team's events when no tournament filter is
   set. The frontend applies it only for `team_type='club'`, and internationals default to the full pool.
@@ -2033,11 +2050,12 @@ list (default 10, max 20):
 - `most_economical`: economy ASC. A match needs at least 18 balls (3 overs).
 
 The endpoint reads from `matchbowlerperf`, an aggregate per bowler and match that
-`scripts/populate_matchbowlerperf.py` precomputes. It does not apply `aux.inning`, the auxiliary
-filter for the innings, because `matchbowlerperf` collapses across
-both innings the bowler bowled in. A record list for one innings
-would need a primitive per bowler and innings, and that primitive does not
-exist yet.
+`_populate_match_bowler_perf` in `scripts/populate_records_aggregates.py` precomputes. The table
+has no column for the innings, so the endpoint applies `aux.inning`, the auxiliary filter for the
+innings, as a filter on matches (`api/filters.py::player_inning_match_clause`, side `bowling`). With
+`inning=N`, it keeps the matches in which the bowler's team fielded in innings 1−N. The table leaves
+out super overs, and a bowler bowls in one regular innings of a match, the innings in which the
+opponent bats. So the lists are the bowler's records in that innings.
 
 ```bash
 curl "http://localhost:8000/api/v1/bowlers/462411b3/records?tournament=Indian%20Premier%20League&limit=3"
@@ -2131,8 +2149,9 @@ keepers, because Dhoni falls in the keeper cohort.
 The endpoint returns a dossier of the fielding distributions per match. It has three sibling
 count blocks (catches, run_outs and stumpings), and each block has three simple milestones
 (`P=0` / `P=1` / `P≥2`) with Wilson 95% confidence intervals (CIs). It also has four form
-windows. The master sample has one row per match, not per innings. Fielding events span
-both innings in which the opponent bats, so the natural unit is the match.
+windows. The master sample has one row per match, not per innings. A fielder's events in a match
+fall in the innings in which the opponent bats, and in a super over if there is one, so the natural
+unit is the match.
 
 The stumpings block is `null` for non-keepers (`innings_kept == 0`),
 and the frontend uses the null to hide the Stumpings tab. `catches.total` excludes substitute
@@ -2210,7 +2229,7 @@ list (default 10, max 20):
 - `most_dismissals_match`: catches + stumpings + run_outs, DESC.
 
 The endpoint reads from `matchfielderperf`, an aggregate per fielder and match that
-`scripts/populate_matchfielderperf.py` precomputes.
+`_populate_match_fielder_perf` in `scripts/populate_records_aggregates.py` precomputes.
 
 **Catches use the volume framing.** A catch is any dismissal with `kind IN ('caught',
 'caught_and_bowled')`, and there is no `is_substitute` filter. The rule matches
@@ -2219,8 +2238,12 @@ the semantics of `/distribution`, which excludes substitute appearances.
 So the record list counts a catch taken by a
 substitute.
 
-The endpoint does not apply `aux.inning`, so the inning toggle does nothing on it. The precomputed
-table has one row for each fielder and match, because a fielder can field across both innings.
+The precomputed table, `matchfielderperf`, has one row for each fielder and match, and no column for
+the innings. So the endpoint applies `aux.inning` as a filter on matches
+(`player_inning_match_clause`, side `fielding`). With `inning=N`, it keeps the matches in which the
+fielder's team fielded in innings 1−N. A fielder fields in one regular innings of a match, the innings
+in which the opponent bats. The table also counts the credits from a super over, so those credits
+stay in under the filter.
 
 ```bash
 curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/records?limit=3"
@@ -2453,13 +2476,14 @@ They also power the `/head-to-head?mode=team` Team-vs-Team view.
 These endpoints share one concept, the "match-set", which is the set
 of matches that the filters select. Every endpoint takes an
 optional `tournament` (the canonical name, expanded to its IN-variants)
-and an optional `series_type` (`all`, `bilateral_only` or `tournament_only`).
+and an optional `series_type` (`all`, `bilateral`, `icc` or `club`). The legacy
+names `bilateral_only` and `tournament_only` map to `bilateral` and `icc`.
 It also takes the standard FilterParams, including `filter_team` and
 `filter_opponent` for the scope of a rivalry. The same endpoints serve
 these match-sets:
 
 - IPL all-time (`?tournament=Indian+Premier+League`)
-- IND vs AUS bilateral (`?filter_team=India&filter_opponent=Australia&series_type=bilateral_only`)
+- IND vs AUS bilateral (`?filter_team=India&filter_opponent=Australia&series_type=bilateral`)
 - IND vs AUS within T20 World Cups (`?tournament=T20+World+Cup+%28Men%29&filter_team=India&filter_opponent=Australia`)
 - League baseline for any team (call it without a team filter, and the response has the same shape)
 
@@ -2552,11 +2576,12 @@ so they return in under a second. The Best moments for each
 `best_fielding`) stay live, because no precompute table carries that
 grain. They are gathered with everything else through `asyncio.gather`.
 
-In tier mode, the endpoint returns `top_teams_international` and
+In tier mode at broad scope, the endpoint returns `top_teams_international` and
 `top_teams_club`. Each list has the top 5 teams with at least 100 games,
-ranked by the sum of bat_first_wins and field_first_wins from
+ranked by win % in decided matches. The wins are the sum of bat_first_wins and field_first_wins from
 `bucketbaselinematch`. Both lists are empty in tournament mode and in
-rivalry mode, where the page shows `teams[]` chips instead.
+rivalry mode, where the page shows `teams[]` chips instead. So the
+rivalry example below has two empty lists.
 
 Each row of `champions_by_season` carries its own `tournament` (the
 cricsheet `event_name`). The Champions tables of cross-tournament tier
@@ -2593,15 +2618,8 @@ curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_oppon
                               "team": "India", "runs": 794 },
   "top_wicket_taker_alltime": { "person_id": "462411b3", "name": "JJ Bumrah",
                               "team": "India", "wickets": 20 },
-  "top_teams_international": [
-    { "team": "Uganda",     "played": 214, "wins": 142, "losses": 71, "win_pct": 66.7 },
-    { "team": "Australia",  "played": 375, "wins": 237, "losses": 121, "win_pct": 66.2 },
-    { "team": "India",      "played": 432, "wins": 270, "losses": 144, "win_pct": 65.2 }
-  ],
-  "top_teams_club": [
-    { "team": "Titans",                  "played": 103, "wins": 65, "losses": 35, "win_pct": 65.0 },
-    { "team": "Trinbago Knight Riders",  "played": 148, "wins": 91, "losses": 52, "win_pct": 63.6 }
-  ],
+  "top_teams_international": [],
+  "top_teams_club": [],
   "highest_individual":     { "person_id": "55d96c71", "name": "SR Watson",
                               "team": "Australia", "runs": 120,
                               "match_id": 1092, "date": "2016-03-27" },
@@ -2798,7 +2816,9 @@ curl "http://localhost:8000/api/v1/series/fielders-leaders?tournament=Indian+Pre
 }
 ```
 
-An abbreviated `fielders-leaders` response:
+An abbreviated `fielders-leaders` response follows. In the IPL, MS Dhoni
+leads both on dismissals and on run-outs, so the first row of
+`by_dismissals` and of `by_run_outs` is the same.
 
 ```json
 {
