@@ -573,6 +573,8 @@ curl "http://localhost:8000/api/v1/teams/splits?gender=male&team_type=club&tourn
 curl "http://localhost:8000/api/v1/teams/splits?team=Royal%20Challengers%20Bengaluru&gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024"
 ```
 
+The example shows one of the cells.
+
 ```json
 {
   "subject": { "team": "Royal Challengers Bengaluru" },
@@ -580,26 +582,79 @@ curl "http://localhost:8000/api/v1/teams/splits?team=Royal%20Challengers%20Benga
   "league_total_n": 142,
   "cells": [
     {
-      "toss_outcome": "lost",
+      "toss_outcome": "won",
       "inning": 0,
-      "result": "lost",
-      "n": 4,
-      "share": 0.2667,
-      "wilson_lo": 0.109,
-      "wilson_hi": 0.5195,
-      "league_share": 0.169,
-      "delta": 0.0977,
-      "delta_pct": 57.8
+      "result": "won",
+      "n": 1,
+      "share": 0.0667,
+      "wilson_lo": 0.0119,
+      "wilson_hi": 0.2982,
+      "league_share": 0.0493,
+      "delta": 0.0174,
+      "delta_pct": 35.3
     }
   ],
   "marginals": {
     "toss_outcome": {
-      "won":  { "n": 7, "share": 0.4667, "wilson_lo": ..., "wilson_hi": ...,
-                "league_share": 0.5141, "delta": -0.0474, "delta_pct": -9.2 },
-      "lost": { "n": 8, "share": 0.5333, ... }
+      "lost": {
+        "n": 7,
+        "share": 0.4667,
+        "wilson_lo": 0.2481,
+        "wilson_hi": 0.6988,
+        "league_share": 0.5,
+        "delta": -0.0333,
+        "delta_pct": -6.7
+      },
+      "won": {
+        "n": 8,
+        "share": 0.5333,
+        "wilson_lo": 0.3012,
+        "wilson_hi": 0.7519,
+        "league_share": 0.5,
+        "delta": 0.0333,
+        "delta_pct": 6.7
+      }
     },
-    "inning":  { "0": { ... }, "1": { ... } },
-    "result":  { "won": { ... }, "lost": { ... }, "tied": { ... } }
+    "inning": {
+      "0": {
+        "n": 9,
+        "share": 0.6,
+        "wilson_lo": 0.3575,
+        "wilson_hi": 0.8018,
+        "league_share": 0.5,
+        "delta": 0.1,
+        "delta_pct": 20.0
+      },
+      "1": {
+        "n": 6,
+        "share": 0.4,
+        "wilson_lo": 0.1982,
+        "wilson_hi": 0.6425,
+        "league_share": 0.5,
+        "delta": -0.1,
+        "delta_pct": -20.0
+      }
+    },
+    "result": {
+      "lost": {
+        "n": 8,
+        "share": 0.5333,
+        "wilson_lo": 0.3012,
+        "wilson_hi": 0.7519,
+        "league_share": 0.5,
+        "delta": 0.0333,
+        "delta_pct": 6.7
+      },
+      "won": {
+        "n": 7,
+        "share": 0.4667,
+        "wilson_lo": 0.2481,
+        "wilson_hi": 0.6988,
+        "league_share": 0.5,
+        "delta": -0.0333,
+        "delta_pct": -6.7
+      }
+    }
   }
 }
 ```
@@ -693,30 +748,35 @@ The endpoint returns the totals of wins and losses, toss stats, the banner of th
 and the list of Tier-2 keepers. It also returns the canonical tournaments in which the team has
 matches within the active filter scope. Each numeric metric is wrapped in the envelope for one
 metric (see "Compare metric envelope" below). Fields that identify something (`gender_breakdown`, `keepers`, `tournaments_in_scope`) stay flat.
+So do `unique_teams_in_scope`, `keeper_ambiguous_innings` and `last_match_date`.
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/summary?gender=male&team_type=international"
 ```
 
+The example shows two of the keepers and two of the tournaments.
+
 ```json
 {
   "team": "India",
-  "matches": { "value": 266, "scope_avg": 14872, "delta_pct": null, "direction": null, "sample_size": 14872 },
-  "wins":    { "value": 180, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 266 },
-  "win_pct": { "value": 67.7, "scope_avg": 49.8, "delta_pct": 35.9, "direction": "higher_better", "sample_size": 266 },
-  "ties": { "value": 6, ... },
-  "no_results": { "value": 5, ... },
-  "toss_wins": { "value": 122, ... },
-  "bat_first_wins": { "value": 98, ... },
-  "field_first_wins": { "value": 82, ... },
+  "matches": { "value": 286, "scope_avg": 71.3, "delta_pct": null, "direction": null, "sample_size": 71.3 },
+  "wins": { "value": 190, "scope_avg": 34.51, "delta_pct": null, "direction": null, "sample_size": 286 },
+  "losses": { "value": 83, "scope_avg": 34.51, "delta_pct": null, "direction": null, "sample_size": 286 },
+  "ties": { "value": 6, "scope_avg": 0.7, "delta_pct": null, "direction": null, "sample_size": 286 },
+  "no_results": { "value": 7, "scope_avg": 1.58, "delta_pct": null, "direction": null, "sample_size": 286 },
+  "win_pct": { "value": 66.4, "scope_avg": 48.4, "delta_pct": 37.2, "direction": "higher_better", "sample_size": 286 },
+  "toss_wins": { "value": 137, "scope_avg": 35.65, "delta_pct": null, "direction": null, "sample_size": 286 },
+  "bat_first_wins": { "value": 104, "scope_avg": 16.94, "delta_pct": null, "direction": null, "sample_size": 286 },
+  "field_first_wins": { "value": 86, "scope_avg": 17.58, "delta_pct": null, "direction": null, "sample_size": 286 },
+  "unique_teams_in_scope": 109,
   "gender_breakdown": null,
   "keepers": [
     { "person_id": "4a8a2e3b", "name": "MS Dhoni", "innings_kept": 74 },
-    { "person_id": "919a3be2", "name": "RR Pant", "innings_kept": 36 }
+    { "person_id": "a4cc73aa", "name": "SV Samson", "innings_kept": 37 }
   ],
-  "keeper_ambiguous_innings": 18,
-  "tournaments_in_scope": ["Indian Premier League"],
-  "last_match_date": "2026-03-08"
+  "keeper_ambiguous_innings": 67,
+  "tournaments_in_scope": ["Asia Cup", "Asian Games Men's Cricket Competition"],
+  "last_match_date": "2026-10-24"
 }
 ```
 
@@ -768,10 +828,20 @@ curl "http://localhost:8000/api/v1/teams/India/vs/Australia?gender=male&team_typ
 
 ```json
 {
-  "team": "India", "opponent": "Australia",
-  "overall": { "matches": 4, "wins": 2, "losses": 2, "ties": 0 },
-  "by_season": [{ "season": "2024/25", "matches": 3, "wins": 1, "losses": 2, "ties": 0, "no_results": 0, "win_pct": 33.3 }],
-  "matches": [ /* TeamResult rows */ ]
+  "team": "India",
+  "opponent": "Australia",
+  "overall": { "matches": 1, "wins": 1, "losses": 0, "ties": 0, "no_results": 0 },
+  "by_season": [{ "season": "2024", "matches": 1, "wins": 1, "losses": 0, "ties": 0, "no_results": 0 }],
+  "matches": [
+    {
+      "match_id": 1549,
+      "date": "2024-06-24",
+      "venue": "Daren Sammy National Cricket Stadium",
+      "tournament": "ICC Men's T20 World Cup",
+      "result": "won",
+      "margin": "24 runs"
+    }
+  ]
 }
 ```
 
@@ -897,12 +967,60 @@ curl "http://localhost:8000/api/v1/teams/Royal%20Challengers%20Bengaluru/batting
 ```json
 {
   "innings": [
-    { "inning_no": 0, "label": "1st innings",
-      "runs": 1452, "balls": 924,
-      "run_rate": {"value": 9.43, "scope_avg": ..., "delta_pct": ..., "direction": "higher_better", "sample_size": 924},
-      "wickets_lost": 55, "boundary_pct": {...}, "dot_pct": {...},
-      "fours": 119, "sixes": 77 },
-    { "inning_no": 1, "label": "2nd innings", ... }
+    {
+      "inning_no": 0,
+      "label": "1st innings",
+      "runs": 1452,
+      "balls": 924,
+      "run_rate": {
+        "value": 9.43,
+        "scope_avg": 9.65,
+        "delta_pct": -2.3,
+        "direction": "higher_better",
+        "sample_size": 924
+      },
+      "wickets_lost": 55,
+      "boundary_pct": {
+        "value": 21.2,
+        "scope_avg": 21.4,
+        "delta_pct": -0.9,
+        "direction": "higher_better",
+        "sample_size": 924
+      },
+      "dot_pct": { "value": 35.0, "scope_avg": 32.0, "delta_pct": 9.4, "direction": "lower_better", "sample_size": 924 },
+      "fours": 119,
+      "sixes": 77
+    },
+    {
+      "inning_no": 1,
+      "label": "2nd innings",
+      "runs": 1201,
+      "balls": 718,
+      "run_rate": {
+        "value": 10.04,
+        "scope_avg": 9.61,
+        "delta_pct": 4.5,
+        "direction": "higher_better",
+        "sample_size": 718
+      },
+      "wickets_lost": 27,
+      "boundary_pct": {
+        "value": 23.3,
+        "scope_avg": 21.7,
+        "delta_pct": 7.4,
+        "direction": "higher_better",
+        "sample_size": 718
+      },
+      "dot_pct": {
+        "value": 28.7,
+        "scope_avg": 32.7,
+        "delta_pct": -12.2,
+        "direction": "lower_better",
+        "sample_size": 718
+      },
+      "fours": 119,
+      "sixes": 48
+    }
   ]
 }
 ```
@@ -981,19 +1099,24 @@ partnership or a pair, so they stay flat.
 {
   "team": "India",
   "side": "batting",
-  "total":          { "value": 1404, "scope_avg": 32145, "delta_pct": null, "direction": null, "sample_size": 1404 },
-  "count_50_plus":  { "value": 226, ... },
-  "count_100_plus": { "value": 43, ... },
-  "avg_runs":       { "value": 26.4, "scope_avg": 25.1, "delta_pct": 5.2, "direction": "higher_better", "sample_size": 1404 },
+  "total": { "value": 1535, "scope_avg": 6.47, "delta_pct": null, "direction": null, "sample_size": 1535 },
+  "count_50_plus": { "value": 242, "scope_avg": 0.56, "delta_pct": null, "direction": null, "sample_size": 1535 },
+  "count_100_plus": { "value": 44, "scope_avg": 0.07, "delta_pct": null, "direction": null, "sample_size": 1535 },
+  "avg_runs": { "value": 26.2, "scope_avg": 18.3, "delta_pct": 43.2, "direction": "higher_better", "sample_size": 1535 },
   "highest": {
-    "runs": 176, "balls": 85, "match_id": 795, "date": "2022-06-28",
+    "runs": 176,
+    "balls": 85,
+    "match_id": 795,
+    "date": "2022-06-28",
     "batter1": { "person_id": "a4cc73aa", "name": "SV Samson" },
     "batter2": { "person_id": "73ad96ed", "name": "DJ Hooda" }
   },
   "best_pair": {
     "batter1": { "person_id": "0a476045", "name": "S Dhawan" },
     "batter2": { "person_id": "740742ef", "name": "RG Sharma" },
-    "n": 52, "total_runs": 1743, "best_runs": 160
+    "n": 52,
+    "total_runs": 1743,
+    "best_runs": 160
   }
 }
 ```
@@ -2356,21 +2479,51 @@ curl "http://localhost:8000/api/v1/head-to-head/ba607b88/3fb19989?team_type=inte
 curl "http://localhost:8000/api/v1/head-to-head/ba607b88/462411b3?series_type=tournament_only"
 ```
 
+The example shows the first row of each list.
+
 ```json
 {
-  "batter": { "id": "ba607b88", "name": "V Kohli" },
-  "bowler": { "id": "3fb19989", "name": "MA Starc" },
+  "batter": {
+    "id": "ba607b88",
+    "name": "V Kohli",
+    "nationalities": [{ "team": "India", "gender": "male", "matches": 118 }]
+  },
+  "bowler": {
+    "id": "3fb19989",
+    "name": "MA Starc",
+    "nationalities": [{ "team": "Australia", "gender": "male", "matches": 65 }]
+  },
   "summary": {
-    "balls": 18, "runs": 15, "dismissals": 0,
-    "average": null, "strike_rate": 83.33,
-    "fours": 2, "sixes": 0, "dots": 9,
-    "dot_pct": 50.0, "balls_per_boundary": 9.0
+    "matches": 5,
+    "balls": 18,
+    "runs": 15,
+    "dismissals": 0,
+    "average": null,
+    "strike_rate": 83.33,
+    "fours": 2,
+    "sixes": 0,
+    "dots": 9,
+    "dot_pct": 50.0,
+    "balls_per_boundary": 9.0
   },
   "dismissal_kinds": {},
-  "by_over": [ /* up to 20 rows */ ],
-  "by_phase": [ /* 3 rows */ ],
-  "by_season": [ { "season": "2012/13", "balls": 4, "runs": 6, "wickets": 0, "strike_rate": 150.0 } ],
-  "by_match": [ /* match-level rows */ ]
+  "by_over": [{ "over_number": 1, "balls": 2, "runs": 0, "wickets": 0 }],
+  "by_phase": [{ "phase": "powerplay", "balls": 15, "runs": 12, "wickets": 0, "strike_rate": 80.0 }],
+  "by_season": [{ "season": "2012/13", "balls": 4, "runs": 6, "wickets": 0, "strike_rate": 150.0 }],
+  "by_match": [
+    {
+      "match_id": 1549,
+      "date": "2024-06-24",
+      "tournament": "ICC Men's T20 World Cup",
+      "venue": "Daren Sammy National Cricket Stadium",
+      "balls": 2,
+      "runs": 0,
+      "fours": 0,
+      "sixes": 0,
+      "dismissed": false,
+      "how_out": null
+    }
+  ]
 }
 ```
 
@@ -2411,20 +2564,80 @@ curl "http://localhost:8000/api/v1/matches?gender=male&team_type=international&l
 The endpoint returns the full scorecard. Each of the two innings has the batting, the bowling,
 the extras, the fall of wickets, the progression of runs and wickets by over, and the keeper label.
 
+The example shows the first innings, and the first row of its `batting`, `fall_of_wickets`, `bowling`
+and `by_over` lists.
+
 ```json
 {
-  "info": { "match_id": 13017, "date": "2026-04-13", "teams": ["Sweden", "Indonesia"], "venue": "…", "toss": "…", "result": "…", "officials": {…}, "player_of_match": "…" },
+  "info": {
+    "match_id": 13017,
+    "teams": ["Sweden", "Indonesia"],
+    "venue": "Udayana Cricket Ground",
+    "city": "Bali",
+    "dates": ["2026-04-13"],
+    "tournament": "Sweden tour of Indonesia",
+    "season": "2026",
+    "match_number": 8,
+    "stage": null,
+    "toss_winner": "Sweden",
+    "toss_decision": "bat",
+    "result_text": "Sweden won by 18 runs",
+    "method": null,
+    "player_of_match": ["Gaurav Tiwari"],
+    "officials": null,
+    "gender": "male",
+    "team_type": "international"
+  },
   "innings": [
     {
-      "innings_number": 0, "team": "Sweden", "is_super_over": false, "label": "Sweden innings",
-      "total_runs": 166, "wickets": 8, "overs": "20.0", "run_rate": 8.3,
-      "batting": [ /* BattingRow per batter with dismissal_fielder_ids */ ],
-      "did_not_bat": [ /* person names */ ],
-      "extras": { "wides": 6, "noballs": 1, "byes": 0, "legbyes": 4, "penalty": 0, "total": 11 },
-      "fall_of_wickets": [ { "over": "3.4", "wicket": 1, "score": 28, "batter": "…" } ],
-      "bowling": [ /* BowlingRow per bowler */ ],
-      "by_over": [ { "over": 1, "runs": 6, "wickets": 0, "cumulative_runs": 6 } ],
-      "keeper": { "person_id": "…", "name": "…", "confidence": "high" }
+      "innings_number": 0,
+      "team": "Sweden",
+      "is_super_over": false,
+      "label": "Sweden Innings",
+      "total_runs": 166,
+      "wickets": 8,
+      "overs": "20.0",
+      "run_rate": 8.3,
+      "batting": [
+        {
+          "person_id": "1283e17b",
+          "name": "Imal Zuwak",
+          "dismissal": "b Gaurav Tiwari",
+          "dismissal_bowler_id": "cab3f89a",
+          "dismissal_fielder_ids": [],
+          "runs": 5,
+          "balls": 3,
+          "fours": 1,
+          "sixes": 0,
+          "strike_rate": 166.67
+        }
+      ],
+      "did_not_bat": ["SN Swamy"],
+      "extras": { "byes": 2, "legbyes": 0, "wides": 3, "noballs": 1, "penalty": 0, "total": 6 },
+      "fall_of_wickets": [{ "wicket": 1, "score": 12, "batter": "A Mundra", "over_ball": "1.5" }],
+      "bowling": [
+        {
+          "person_id": "3c8faed4",
+          "name": "F Banunaek",
+          "overs": "2.0",
+          "maidens": 0,
+          "runs": 27,
+          "wickets": 2,
+          "econ": 13.5,
+          "wides": 0,
+          "noballs": 1
+        }
+      ],
+      "by_over": [{ "over": 1, "runs": 16, "wickets": 2, "cumulative": 16 }],
+      "keeper": {
+        "person_id": null,
+        "name": null,
+        "method": null,
+        "confidence": null,
+        "ambiguous_reason": "multi_season",
+        "candidate_ids": ["190957d2", "4b349dc0"],
+        "candidate_names": ["IKEG Artawan", "KD Kesuma"]
+      }
     }
   ]
 }

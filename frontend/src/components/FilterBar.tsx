@@ -38,9 +38,10 @@ export default function FilterBar() {
   // self-referential axes per-endpoint (e.g. /tournaments ignores
   // `tournament`, /seasons ignores `season_from`/`season_to`).
   //
-  // `series_type` is a Series-tab URL param (not in FilterParams —
-  // doesn't ride through to every other tab). Read directly from URL
-  // so the Series dossier's bilateral/ICC toggle narrows the dropdown.
+  // `series_type` is a FilterBar field (in FILTER_KEYS and
+  // FilterParams). Read here directly from the URL so the Series Type
+  // select and the Series dossier's bilateral/ICC toggle narrow the
+  // tournament and season dropdowns.
   const pathTeam = params.get('team') || undefined
   const filterTeam = filters.filter_team
   const filterOpponent = filters.filter_opponent
