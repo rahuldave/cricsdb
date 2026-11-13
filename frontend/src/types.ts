@@ -20,11 +20,12 @@ export interface FilterParams {
   filter_venue?: string
   team?: string // a team to narrow to; not read from the URL by `useFilters`
   opponent?: string // an opponent to narrow to; not read from the URL by `useFilters`
-  /** Page-local aux filter — Series-tab pill (all/bilateral/icc/club).
-   *  NOT in FILTER_KEYS (the FilterBar UI doesn't drive it; it's not
-   *  part of scope-link letter URLs), but `useFilters` surfaces it so
-   *  every endpoint consumer can pass it through to the backend, where
-   *  it lands in AuxParams. Mirror of api/filters.py::AuxParams. */
+  /** FilterBar field — the category of series: all (default),
+   *  bilateral, icc or club; the legacy values bilateral_only and
+   *  tournament_only are also accepted. In FILTER_KEYS, so it rides
+   *  through scope-link URLs, and `useFilters` reads it from the URL.
+   *  The backend reads it in FilterBarParams
+   *  (api/filters.py::FilterBarParams). */
   series_type?: string
   /** Aux hint sent only by the Compare-tab avg slot's fetcher. Tells
    *  the backend's /scope/averages/* endpoints to narrow the universe
