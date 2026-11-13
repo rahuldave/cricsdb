@@ -7,6 +7,8 @@ project:
     - tab-structure.md
     - 'internal/*.md'
     - 'api/**/*.qmd'
+    - 'http/**/*.qmd'
+    - 'backend/**/*.qmd'
 
 website:
   title: CricsDB
@@ -19,8 +21,14 @@ website:
         href: tab-structure.md
       - text: HTTP API
         href: api.md
-      - text: Front-end reference
-        href: api/index.qmd
+      - text: Reference
+        menu:
+          - text: HTTP reference
+            href: http/index.qmd
+          - text: Backend reference
+            href: backend/index.qmd
+          - text: Front-end reference
+            href: api/index.qmd
     tools:
       - icon: github
         href: https://github.com/rahuldave/cricsdb
@@ -36,7 +44,16 @@ website:
       - section: Contributors
         contents:
           - auto: "internal/*.md"
+      - section: HTTP reference
+        href: http/index.qmd
+        contents:
+          - auto: "http/**"
+      - section: Backend reference
+        href: backend/index.qmd
+        contents:
+          - auto: "backend/**"
       - section: Front-end reference
+        href: api/index.qmd
         contents:
           - auto: "api/**"
 
@@ -45,9 +62,21 @@ toc: true
 search: true
 
 api:
-  language: typescript
-  entry: ../frontend/src
-  tsconfig: ../frontend/tsconfig.app.json
-  root: ..
-  source: https://github.com/rahuldave/cricsdb/blob/main
-  out: api
+  - language: openapi
+    fastapi: api.app:app
+    setup: api.routers:register_routers
+    root: ..
+    source: https://github.com/rahuldave/cricsdb/blob/main
+    out: http
+  - language: python
+    packages: [api]
+    root: ..
+    source: https://github.com/rahuldave/cricsdb/blob/main
+    check-shown: true
+    out: backend
+  - language: typescript
+    entry: ../frontend/src
+    tsconfig: ../frontend/tsconfig.app.json
+    root: ..
+    source: https://github.com/rahuldave/cricsdb/blob/main
+    out: api

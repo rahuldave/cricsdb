@@ -15,6 +15,9 @@
 > would work, but keeping it on `/api/*` matches the rest of the
 > routes and avoids a special case.
 
+The [HTTP reference](https://rahuldave.com/cricsdb/http/) lists every endpoint with all of its parameters, their types
+and defaults. smalldocs writes it from the code at each build.
+
 Practical one-page reference for every endpoint. Pair this with
 [`../SPEC.md`](https://github.com/rahuldave/cricsdb/blob/main/SPEC.md) when you need the underlying SQL or the
 full schema — this doc just gives you the URL, a one-liner, and a

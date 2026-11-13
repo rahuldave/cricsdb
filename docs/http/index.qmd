@@ -1,0 +1,26 @@
+---
+title: HTTP reference
+---
+
+A page for each group of endpoints of the backend, with a page of the error schemas. An endpoint is one
+method on one path, such as `GET /api/v1/teams`. smalldocs writes these pages from the OpenAPI document
+that the FastAPI app makes. OpenAPI is a standard format that describes an HTTP API. Each entry gives
+the path and query parameters, their types and defaults, and a link to the line of its route in the code.
+
+[The HTTP API page](../api.md) is written by hand. It gives an example `curl` command and a response for
+each endpoint, and it explains the conventions that all the endpoints share.
+
+| Page | Endpoints |
+|---|---|
+| [Reference](reference.qmd) | The lists of tournaments, seasons, teams and players for search and the filters, and the teams, opponents and results of one player |
+| [Teams](teams.qmd) | A team's results, opponents, batting, bowling, fielding, partnerships and records |
+| [Scope-Averages](scope-averages.qmd) | The averages of a scope, which the pages compare with a player or a team |
+| [Batting](batting.qmd) | The leading batters, and one batter's figures |
+| [Bowling](bowling.qmd) | The leading bowlers, and one bowler's figures |
+| [Fielding](fielding.qmd) | The leading fielders, and one fielder's figures |
+| [Keeping](keeping.qmd) | One wicketkeeper's figures |
+| [Head to Head](head-to-head.qmd) | A batter against a bowler |
+| [Matches](matches.qmd) | Matches and their scorecards |
+| [Series](series.qmd) | A tournament or series, and the rivalries between teams |
+| [Venues](venues.qmd) | The venues, and one venue's figures |
+| [Schemas](schemas.qmd) | The shape of the error that an endpoint gives for a bad parameter |

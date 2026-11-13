@@ -1,0 +1,12 @@
+---
+title: Backend reference
+---
+
+A page for each module of the Python package `api`, the FastAPI backend. smalldocs imports the package
+and writes these pages from its docstrings and the comments beside the parameters. The pages show the
+public functions and classes of each module. A public name does not start with `_`, so the private
+helpers and Python's own methods, such as `__init__`, are not here.
+
+The pages of the routers, such as [batting](batting.qmd), list the functions that answer each
+endpoint. [The HTTP reference](../http/index.qmd) gives the same endpoints by their paths. The other
+pages, such as [filters](filters.qmd) and [wilson](wilson.qmd), hold the code that the routers share.
