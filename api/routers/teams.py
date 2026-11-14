@@ -436,8 +436,11 @@ async def teams_landing(
 #   - Landing (?team= absent): league-side only. Cells reflect the
 #     unpivoted "team-views" of every match in scope (each match
 #     contributes 2 team-views, one per side). Aux filters
-#     result / toss_outcome are 400-rejected here — both are
-#     subject-POV filters that need a team to evaluate against.
+#     result / toss_outcome also work here (the 400 gate was lifted
+#     2026-05-11, see team_splits): they narrow the team-views, so
+#     the narrowed axis's marginal is 1.0 by construction, and the
+#     cells + other marginals give the league-wide conditional
+#     baseline.
 #   - Team-detail (?team=X set): dual-query envelope. Team-side
 #     cells + league-side cells at the same filter scope + per-cell
 #     deltas (share - league_share) / league_share × 100. Same
@@ -445,9 +448,9 @@ async def teams_landing(
 #
 # Aux filters honoured at endpoint level (cell-level post-filter):
 #   inning, result, toss_outcome — restricted cells flow through
-#   to the response. Marginals are always over the FULL 12-cell
-#   grid pre-cell-filter so the frontend can still render
-#   marginals when the user has filtered.
+#   to the response. Marginals, shares and scope_total_n are
+#   computed over the FILTERED cells (the filtered total is the
+#   denominator), so shares sum to 1.0 within the narrowing.
 # ============================================================
 
 def _cell_label_for_aux(

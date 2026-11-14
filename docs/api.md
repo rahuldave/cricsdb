@@ -914,20 +914,32 @@ not use it at present, and it stays for completeness.
 
 ## `GET /api/v1/teams/{team}/opponents-matrix`
 
-The endpoint returns a rollup of the top N opponents by number of matches, and a cell for each
-opponent in each season. The vs-Opponent tab draws its stacked bars and its bubble matrix from them. Params:
-`top_n` (default 8).
+The endpoint returns the top N opponents by number of matches, with the totals against each, and a
+cell for each of those opponents in each season. The vs-Opponent tab draws its stacked bars from
+`opponents` and its bubble matrix from `cells`. `seasons` lists, in order, the seasons that have a
+cell. Params: `top_n` (default 20, from 1 to 200).
 
 ```bash
 curl "http://localhost:8000/api/v1/teams/India/opponents-matrix?gender=male&team_type=international&top_n=2"
 ```
 
+The example is a real response, trimmed. `seasons` keeps its first and last 2 of 22 entries, and `cells`
+keeps its first 2 and last 2 of 28 entries.
+
 ```json
 {
-  "rollup": [
-    { "name": "Australia", "matches": 33, "wins": 19, "losses": 13, "ties": 1, "no_results": 0, "win_pct": 57.6 }
+  "team": "India",
+  "seasons": ["2007/08", "2009", "2025/26", "2026/27"],
+  "opponents": [
+    { "name": "Australia", "matches": 37, "wins": 22, "losses": 12, "ties": 0, "no_results": 3, "win_pct": 59.5 },
+    { "name": "West Indies", "matches": 36, "wins": 22, "losses": 12, "ties": 0, "no_results": 2, "win_pct": 61.1 }
   ],
-  "cells": [ { "opponent": "Australia", "season": "2025/26", "matches": 3, "wins": 3, "losses": 0, "ties": 0 } ]
+  "cells": [
+    { "season": "2007/08", "opponent": "Australia", "matches": 3, "wins": 2, "losses": 1, "ties": 0, "win_pct": 66.7 },
+    { "season": "2009", "opponent": "West Indies", "matches": 1, "wins": 0, "losses": 1, "ties": 0, "win_pct": 0.0 },
+    { "season": "2025/26", "opponent": "West Indies", "matches": 1, "wins": 1, "losses": 0, "ties": 0, "win_pct": 100.0 },
+    { "season": "2026/27", "opponent": "West Indies", "matches": 5, "wins": 2, "losses": 2, "ties": 0, "win_pct": 40.0 }
+  ]
 }
 ```
 
@@ -1197,9 +1209,23 @@ endpoint returns a self-contained dossier over innings. The dossier has these pa
 - suggested splits derived from the scope
 
 The endpoints IGNORE `FilterParams.filter_team`, because the team in the path wins.
-`FilterParams.filter_opponent` works as expected. The optional `as_of_date` (YYYY-MM-DD) fixes the
-anchor of the calendar form windows, so that the result does not change from day to day.
-Production callers omit it. Spec: `docs/internal/spec-distribution-stats.md` §16.
+`FilterParams.filter_opponent` works as expected.
+
+The form windows are anchored as follows. The code is `form_windows.scope_anchor`.
+
+- `last_10` is the team's last 10 innings in the master sample, whatever the date.
+- Each calendar window (`last_60d`, `last_6mo`, `last_1yr`) keeps the innings on or after a cutoff,
+  which is the anchor minus 60, 180 or 365 days.
+- The anchor is the earlier of today and the date of the team's last innings in the master sample.
+- The optional `as_of_date` (YYYY-MM-DD) replaces today, so that the result does not change with today's date.
+  Production callers omit it. An `as_of_date` before that last innings moves the cutoffs back.
+  A window can then hold older innings, and it still runs to the last innings. An `as_of_date` after
+  the last innings changes nothing.
+- The league side gives the `scope_avg` fields inside each window. It applies the same rule to the
+  league's innings at the same scope. So its anchor is the earlier of today (or `as_of_date`) and the
+  league's last innings.
+
+Spec: `docs/internal/spec-distribution-stats.md` §16.
 
 #### `GET /api/v1/teams/{team}/batting/distribution`
 
@@ -2290,9 +2316,16 @@ It gives a dossier of the runs distribution per innings. The dossier has these p
 
 The form windows are the last 10 innings, the last 60 days, the last 6 months and the last year.
 Each has the same shape as the lifetime block. A `delta` block reports, for each window, the window
-mean minus the lifetime mean, and the window median minus the lifetime median. The calendar windows
-end at the earlier of today and the last match in scope. The optional `as_of_date` (YYYY-MM-DD)
-replaces today, so that the result is deterministic, and production callers omit it. Spec:
+mean minus the lifetime mean, and the window median minus the lifetime median.
+
+`last_10` does not depend on the date. Each calendar window keeps the innings on or after a cutoff,
+which is the anchor minus 60, 180 or 365 days. The anchor is the earlier of today and the date of the
+batter's last innings in scope. The code is `form_windows.scope_anchor`.
+
+The optional `as_of_date` (YYYY-MM-DD) replaces today, so that the result does not change with today's date, and
+production callers omit it. An `as_of_date` before that last innings moves the cutoffs back.
+A window can then hold older innings, and it still runs to the last innings. An `as_of_date` after the
+last innings changes nothing. Spec:
 `docs/internal/spec-distribution-stats.md` §8.
 
 ```bash
@@ -2509,8 +2542,15 @@ that clears the `min_balls` threshold for a qualifying innings. The default is
 cameos of 1 ball. The response echoes the threshold in
 `response.thresholds.min_balls`.
 
-The optional `as_of_date` (YYYY-MM-DD) anchors the calendar form
-windows to a fixed date, so that the result is deterministic. Production callers omit it. Spec:
+`last_10` is the last 10 qualifying innings, whatever the date. Each calendar window keeps the
+qualifying innings on or after a cutoff, which is the anchor minus 60, 180 or 365 days. The anchor is
+the earlier of today and the date of the bowler's last qualifying innings in scope. The code is
+`form_windows.scope_anchor`.
+
+The optional `as_of_date` (YYYY-MM-DD) replaces today, so that the result does not change with today's date, and
+production callers omit it. An `as_of_date` before that last innings moves the cutoffs back.
+A window can then hold older innings, and it still runs to the last innings. An `as_of_date` after the
+last innings changes nothing. Spec:
 `docs/internal/spec-distribution-stats.md` §11.
 
 ```bash
@@ -2914,8 +2954,15 @@ window has the same fields as `lifetime`, without `last_match_date`.
 }
 ```
 
-`as_of_date`, an optional ISO date, anchors the calendar form windows
-so that the regression tests are deterministic. Production callers omit it.
+The form windows count matches, not innings. `last_10` is the last 10 matches in scope, whatever the
+date. Each calendar window keeps the matches on or after a cutoff, which is the anchor minus 60, 180
+or 365 days. The anchor is the earlier of today and the date of the fielder's last match in scope.
+The code is `form_windows.scope_anchor`.
+
+The optional `as_of_date` (YYYY-MM-DD) replaces today, so that the regression tests do not
+change with today's date, and production callers omit it. An `as_of_date` before that last match moves the cutoffs back.
+A window can then hold older matches, and it still runs to the last match. An `as_of_date` after the
+last match changes nothing.
 
 **Invariant of the three simples.** In each block, `p_zero + p_one + p_geq_2 == 1.0`.
 To match, the Distribution panel of the frontend draws three discrete bars
