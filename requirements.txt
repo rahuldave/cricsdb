@@ -1,4 +1,4 @@
-deebase>=0.6.1
+deebase>=0.7.0
 fastapi
 uvicorn
 aiosqlite

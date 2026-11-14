@@ -311,9 +311,13 @@ export default function FilterBar() {
          *  "what kind of competition" before "which competition." For
          *  club contexts both groups hide — bilateral is meaningless
          *  for clubs, and the FM list is a country roster. Stale URL
-         *  state (series_type=… set, then user switches to club)
-         *  follows the established team_class pattern: backend silently
-         *  no-ops, ScopeStatusStrip surfaces the active value below. */}
+         *  state (series_type=… set, then user switches to club) is
+         *  NOT a backend no-op: setTeamType does not clear it, and
+         *  series_type_clause (api/tournament_canonical.py) still
+         *  applies it. bilateral_only adds team_type = 'international';
+         *  tournament_only keeps only ICC events, which are all
+         *  international. So under club either value returns 0 rows.
+         *  ScopeStatusStrip shows the active value below. */}
         {teamType === 'international' && (
           <div className="wisden-filter-group">
             <span className="wisden-filter-label">Series Type</span>

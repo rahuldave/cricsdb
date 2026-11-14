@@ -100,7 +100,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "deebase", specifier = ">=0.6.1" },
+    { name = "deebase", specifier = ">=0.7.0" },
     { name = "fastapi", specifier = ">=0.135.3" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "starlette", specifier = "<1.0.0" },
@@ -109,7 +109,7 @@ requires-dist = [
 
 [[package]]
 name = "deebase"
-version = "0.6.1"
+version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -119,9 +119,9 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "toml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d1/97/52d507a00ac57eae2dd5d318cedc18f86fe5231c6a2359a86bf67d6e852b/deebase-0.6.1.tar.gz", hash = "sha256:3c8cea5a40bce3d06f89fb46a9fc99706da0832bab8c2b3800973d31c0b79580", size = 83759, upload-time = "2026-01-20T19:21:29.437Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fc/93/c9aa7661be3b16bf455e618ce1bc04ac42524ae99cf02f3b78e02a7973e8/deebase-0.7.0.tar.gz", hash = "sha256:5209916607bae7e0befeb726fe4dd5dae229cc1910cf7b3e9baae84e39e0652b", size = 90243, upload-time = "2026-04-13T21:34:54.901Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/42/77/6d94871a9421aea92ee71a09186f15e1591a76868dc4769c6f96411ecd64/deebase-0.6.1-py3-none-any.whl", hash = "sha256:8eb8244f662c92e1cbc1e8e806e880b9622e1fa0e7af83d5c3e0b9eb5c44ed7c", size = 105426, upload-time = "2026-01-20T19:21:27.972Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/37/b64e0cc1223a51afb7a58c72928b1aa3cd1bdbea3e98cb0182758b9f1ba5/deebase-0.7.0-py3-none-any.whl", hash = "sha256:ab3ce1aa78b8195bd85f7ce2a9ef35ee993d41b1ac19adb80faf233d56d1b6c5", size = 112156, upload-time = "2026-04-13T21:34:53.52Z" },
 ]
 
 [[package]]
