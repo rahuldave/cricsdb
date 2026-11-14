@@ -158,11 +158,20 @@ don't pollute scope-link URLs. If we mount the Mosaic on
 Venues / Series / Players, those pages need to handle the same
 aux filters (already do, since aux is part of `FilterParams`).
 
-The `result` and `toss_outcome` aux filters require a subject
-team in Teams (see CLAUDE.md "Splits Mosaic — dimensionality is
-URL-derived; aux outcome filters need ?team="). On Venues /
-Series the subject is the page itself; the same gate applies but
-the subject is different.
+When this was written, the `result` and `toss_outcome` aux
+filters required a subject team in Teams, and `/teams/splits`
+returned HTTP 400 without `?team=`. On Venues / Series the
+subject is the page itself; the same gate was to apply, with a
+different subject.
+
+> **Note, 2026-11-14:** the gate was lifted on 2026-05-11.
+> `/teams/splits` now accepts `?result=` and `?toss_outcome=`
+> without `?team=`. The filter then keeps about half of the
+> league's team-views, so the marginal of the filtered axis is
+> 1.0 by construction. The joint distribution of the other two
+> axes is the league baseline under that condition. See the comment in
+> `team_splits`, `api/routers/teams.py`, and the "Splits Mosaic"
+> section of CLAUDE.md.
 
 ### 3.4 Cell delta semantics per page
 

@@ -7,6 +7,7 @@ which stages a clean `build_plash/` directory and runs `plash_deploy`.
 ## TL;DR
 
 ```bash
+uv sync                  # first. deploy.sh copies deebase from .venv
 bash deploy.sh           # code-only deploy (DB persists on plash)
 bash deploy.sh --first   # uploads cricket.db too (~435 MB, slow)
 ```
@@ -85,6 +86,12 @@ delete it manually unless you want a brand-new plash app.
 
 plash runs Python 3.12; deebase requires 3.13+. The deploy script
 copies deebase out of your local `.venv` into `build_plash/deebase/`.
+So production runs whichever deebase is in `.venv`, not the version in
+`uv.lock`. cricsdb needs deebase 0.7.0 or later, because the routers
+call `db.q(query, params)`, and the published 0.6.1 has no `params`.
+Before a deploy, run `uv sync`, then check that `uv pip show deebase`
+shows the deebase version in `uv.lock` (0.7.0 today).
+
 The hardcoded path is currently:
 
 ```bash
@@ -94,10 +101,13 @@ cp -r .venv/lib/python3.14/site-packages/deebase "$BUILD_DIR/deebase"
 If you're using a different local Python (3.13, 3.15, etc.), update
 that path in `deploy.sh`. `uv` puts the venv at `.venv/lib/pythonX.Y/`.
 
-A consequence of vendoring: the deebase admin UI at `/admin/` does
-**not** load on plash, because deebase's `admin` extras (Jinja
-templates, etc.) aren't included in the vendored copy. The admin works
-fine in local dev. This is in the Known Issues list.
+The copy takes the whole package, with the admin's Jinja templates,
+and the generated `requirements.txt` lists `jinja2`, so the deebase
+admin at `/admin/` runs on plash too. It needs the
+`starlette>=0.46.0,<1.0.0` pin in that `requirements.txt`, because
+deebase's admin router, in 0.7.0 as in 0.6.1, calls
+`TemplateResponse` in the pre-1.0 argument order. See
+`admin-interface.md`.
 
 ## Troubleshooting
 
@@ -132,7 +142,10 @@ flow you used initially (`plash_login` or similar). Don't put tokens
 in `deploy.sh` or commit them.
 
 **`/admin/` 500s on plash.**
-Expected (see deebase note above). The admin only works locally.
+Check that the generated `requirements.txt` still pins
+`starlette<1.0.0` (see "deebase is vendored" above and
+`admin-interface.md`). A 503 instead means `ADMIN_USERNAME` or
+`ADMIN_PASSWORD` is unset on plash.
 
 **Built frontend missing or stale.**
 `deploy.sh` always runs `npm run build` first, so this shouldn't

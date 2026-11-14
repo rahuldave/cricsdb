@@ -74,6 +74,16 @@ is absent, `result` and `toss_outcome` are silently dropped (return
 400 with `detail: "result and toss_outcome require ?team="` to make
 the asymmetry explicit).
 
+> **Note, 2026-11-14:** this gate was lifted on 2026-05-11, and
+> the endpoint no longer returns the 400. Without `?team=`,
+> `result` and `toss_outcome` filter the league-side unpivot. The
+> filter keeps about half of the league's team-views, so the
+> marginal of the filtered axis is 1.0 by construction. The joint
+> distribution of the other two axes is the league baseline under
+> that condition. See the comment in `team_splits`,
+> `api/routers/teams.py`. The
+> 400 items in §1.6 and §1.7 below are history too.
+
 #### DLS, super-over, substitute exclusions
 
 - DLS-truncated chases: included, count as 1 match each (per
@@ -281,7 +291,8 @@ Convention-3 / DLS:
   (count matches by `target_overs < 20` from /splits matches the
   same predicate from a direct SQL query)
 
-Endpoint asymmetry:
+Endpoint asymmetry (planned; dropped when the gate was lifted
+on 2026-05-11, see the note in §1.1):
 - 400 when `?result=won` set with no `?team=`
 - 400 when `?toss_outcome=won` set with no `?team=`
 

@@ -2100,10 +2100,12 @@ db = Database(f"sqlite+aiosqlite:///{DB_PATH}")
 ### 6.6 requirements.txt
 
 ```
-deebase>=0.6.1
+deebase>=0.7.0
 fastapi
 uvicorn
 ```
+
+cricsdb needs deebase 0.7.0 or later, because deebase 0.7.0's `Database.q(query, params)` takes bind parameters. cricsdb PR #8 (2026-11-13) raised the requirement from `deebase>=0.6.1`, and this spec was updated to match on 2026-11-14.
 
 ### 6.7 Deploy Steps
 
@@ -2349,7 +2351,7 @@ Build each page using the scaffold components and API endpoints.
 - API routes (`/api/v1/...`) and admin (`/admin/`) take priority over static fallback
 
 **Step 4.4: Requirements and dependencies**
-- Create `requirements.txt` at project root: `deebase>=0.6.1`, `fastapi`, `uvicorn`
+- Create `requirements.txt` at project root: `deebase>=0.7.0`, `fastapi`, `uvicorn`
 - If node/npm needed at build time: add `setup.sh` with `apt install -y nodejs npm`
 - Alternative: pre-build frontend locally, commit `frontend/dist/` to deploy
 

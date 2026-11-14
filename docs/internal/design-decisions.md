@@ -24,6 +24,10 @@ Alternative considered: re-import with +1. Rejected because it diverges from cri
 
 deebase's `Database.q()` originally didn't support bind parameters — it called `session.execute(sa.text(query))` without a params dict. We patched it locally to accept `params: dict | None = None` and filed PR [rahulcredcore/deebase#8](https://github.com/rahulcredcore/deebase/pull/8).
 
+**Update, 2026-11-13 (cricsdb PR #8).** The upstream PR merged on 2026-04-13 and shipped in deebase 0.7.0, released the same day. Its `Database.q(query, params)` is the same code as our local patch.
+
+cricsdb now requires `deebase>=0.7.0` in `pyproject.toml` and `requirements.txt`, and `uv.lock` pins 0.7.0. The published 0.6.1 has no `params`. So with `uv sync --frozen` on the old lock, every endpoint that passes bind parameters, `/teams/splits` among them, failed with a `TypeError`. A `.venv` synced to 0.7.0 needs no local patch.
+
 All API queries use `:param_name` bind parameter syntax:
 ```python
 await db.q("SELECT * FROM match WHERE gender = :gender", {"gender": "male"})
@@ -877,6 +881,8 @@ Postponed. Tied to the broader player-detail enrichment work.
 ### Vendored deebase
 
 pla.sh uses Python 3.12, but deebase requires 3.13+. Since the deebase source code is actually 3.12-compatible (no 3.13-specific syntax), we vendor it: the `deploy.sh` script copies the deebase package from `.venv/` into the build directory. The `requirements.txt` for plash lists deebase's dependencies (sqlalchemy, aiosqlite, etc.) but not deebase itself.
+
+**Update, 2026-11-13 (cricsdb PR #8).** Production ships whichever deebase is in `.venv`, not the version in `uv.lock`. Run `uv sync` before a deploy so that `.venv` has deebase 0.7.0. Until you run `uv sync`, a `.venv` with the hand-patched 0.6.1 ships that copy. deebase 0.7.0 still declares Python 3.13+, and its source still parses as Python 3.12.
 
 ### Staged build directory
 
@@ -2310,6 +2316,15 @@ subject team is bound — without one, "won" means "any winning
 team-view" which is tautologically 50% of the unpivot. The
 endpoint returns HTTP 400 if either aux is set without `?team=`,
 making the asymmetry observable instead of silently degenerate.
+
+**Update, 2026-11-14.** The 400 gate was lifted on 2026-05-11,
+the day it shipped. The marginal of the filtered axis is forced, but the
+joint distribution of the other two axes (for example inning ×
+outcome given toss=won) is the
+league-level conditional baseline, which users compare team
+rates against. `/teams/splits` now accepts `?result=` and
+`?toss_outcome=` without `?team=`. See the comment in
+`team_splits`, `api/routers/teams.py`.
 
 `aux.inning` works fine without `?team=` (each unpivoted team-
 view independently batted first or second).

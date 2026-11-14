@@ -560,7 +560,7 @@ async def team_splits(
     # (inning × outcome | toss=won) is the league-level conditional
     # baseline — exactly what users read off as the comparison anchor
     # for team-detail conditional win rates. Gate lifted 2026-05-11.
-    # Spec §1.4 amended.
+    # See the note in spec §1.1 (Subject-POV requirement).
 
     # ── Build base WHERE (filter scope, no team binding) ─────────────
     # We null out filters.team / filters.opponent so the same WHERE

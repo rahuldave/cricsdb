@@ -1,6 +1,6 @@
 # CricsDB — T20 Cricket Analytics Platform
 
-Live: https://t20.rahuldave.com · Repo: https://github.com/rahuldave/cricsdb · deebase PR: https://github.com/rahulcredcore/deebase/pull/8
+Live: https://t20.rahuldave.com · Repo: https://github.com/rahuldave/cricsdb · deebase PR: https://github.com/rahulcredcore/deebase/pull/8 (`Database.q(query, params)`; merged, released in deebase 0.7.0)
 
 CLAUDE.md is the **inviolable-rules file**. Everything describing what the codebase IS (files, endpoints, payloads, formulas, design history) lives in dedicated docs — go there before assuming.
 
@@ -82,6 +82,7 @@ cd frontend && npm run dev
 Open http://localhost:5173. Vite proxies `/api/*` → port 8000.
 
 ```bash
+uv sync                  # first, after a pull. deploy.sh copies deebase from .venv, so .venv must have deebase 0.7.0
 bash deploy.sh           # code-only (DB persists on plash)
 bash deploy.sh --first   # uploads cricket.db (~860 MB as of 2026-05-29; grows with the playerscopestats precompute family)
 ```
@@ -340,6 +341,6 @@ The Mosaic is a filter widget that LOOKS like a stat chart. URL params drive the
 | 2 | 1D horizontal stacked bar of the one free axis |
 | 3 | verbose colloquial status strip — "Won toss · Batted first · Won the game — 3 matches" |
 
-`result` and `toss_outcome` aux filters **require `?team=`** (without a subject team, the unpivoted league-side view makes "won" tautologically 50%). `/teams/splits` returns HTTP 400 when either aux is set without `?team=`.
+`result` and `toss_outcome` aux filters work with or without `?team=`. Without `?team=`, the filter keeps about half of the league's unpivoted team-views, so the marginal of the filtered axis is 1.0 by construction. The joint distribution of the other two axes is the league baseline under that condition. `/teams/splits` returned HTTP 400 for either aux without `?team=` for a few hours on 2026-05-11, the day it shipped, before the gate was lifted (see the comment in `team_splits`, `api/routers/teams.py`).
 
 Full rules — aux semantics, palette reservation, share-denominator-follows-filter, tells — in **`docs/internal/splits-mosaic-discipline.md`**. Design specs: `spec-splits-mosaic.md` (Teams-only — implemented 2026-05-11), `splits-mosaic-cross-page.md` (cross-page reuse DESIGN).
