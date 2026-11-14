@@ -1,8 +1,8 @@
 {
   "totals": {
-    "matches": 14180,
-    "deliveries": 3233420,
-    "wickets": 176112
+    "matches": 14215,
+    "deliveries": 3240374,
+    "wickets": 176540
   },
   "featured_teams": [
     {
@@ -18,12 +18,12 @@
     {
       "name": "India",
       "blurb": "International",
-      "matches": 464
+      "matches": 471
     },
     {
       "name": "Australia",
       "blurb": "International",
-      "matches": 385
+      "matches": 388
     }
   ],
   "featured_players": [
@@ -46,7 +46,7 @@
       "name": "S Mandhana",
       "role": "batter",
       "gender": "female",
-      "stat": "8,118 runs"
+      "stat": "8,174 runs"
     },
     {
       "id": "be150fc8",
