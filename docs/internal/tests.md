@@ -130,6 +130,41 @@ uv run python tests/sanity/test_dispatch_equivalence.py --db tmp/cricket-prod-te
 Expected output ends with `212 pairs equivalent, 0 failures` →
 `ALL PASS`.
 
+### `test_fielding_by_season_live.py`
+
+What: `/scope/averages/fielding/by-season` for scopes that are not
+precomputed. The test calls the handler that the router registers,
+with no server. For `inning=0` and for `filter_venue=Wankhede Stadium`
+in the IPL, it compares the seasons, the matches of each season and
+`catches_per_match` with SQL. It also checks that a precomputed scope
+gives the baseline's answer, and that `/players/fielding/by-season`
+works under the same live scopes.
+
+Until 2026-11-14 a second function with the same name replaced the
+live path, and these scopes gave HTTP 500.
+
+When to run: after a change to the fielding live paths in
+`api/routers/scope_averages.py`.
+
+```bash
+uv run python tests/sanity/test_fielding_by_season_live.py
+uv run python tests/sanity/test_fielding_by_season_live.py --db tmp/cricket-prod-test.db
+```
+
+### `test_no_duplicate_defs.py`
+
+What: no module in `api/` defines a top-level function or class
+name twice. Python keeps the last definition, so the callers of the
+first one reach the second. The test parses the files with `ast`. It
+needs no database. `ALLOWED` lists the duplicates whose copies are
+the same code.
+
+When to run: after any change in `api/`.
+
+```bash
+uv run python tests/sanity/test_no_duplicate_defs.py
+```
+
 ### `test_chip_direction_invariant.py`
 
 What: end-to-end correctness check on the Compare-tab chip envelope.

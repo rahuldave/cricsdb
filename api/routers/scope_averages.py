@@ -5091,7 +5091,7 @@ async def _fielding_by_season_precomputed(
     )
 
 
-async def _fielding_by_season_live(
+async def _fielding_cohort_by_season_live(
     db, person_id: str, filters: FilterParams, aux: AuxParams,
 ):
     """Any-of-six live path (Phase 3e): per-(season, keeper-flag)
@@ -5188,7 +5188,7 @@ async def compute_players_fielding_by_season(
             db, person_id, filters, drop_set,
         )
     else:
-        player_rows, pool_rows, nonsub_rows = await _fielding_by_season_live(
+        player_rows, pool_rows, nonsub_rows = await _fielding_cohort_by_season_live(
             db, person_id, filters, aux,
         )
 
