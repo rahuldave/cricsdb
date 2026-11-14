@@ -15,7 +15,7 @@ client-side envelope, fewer round-trips), not engine-layer.
 
 ## What deebase does today
 
-`deebase/database.py:42` (v0.6.1 + v0.7.0 — identical):
+`deebase/database.py:42` in v0.7.0 (line 41 in v0.6.1; the line is identical):
 
 ```python
 self._engine = create_async_engine(url, echo=False)
@@ -114,8 +114,13 @@ connection availability.
 
 ### Upgrading deebase 0.6.1 → 0.7.0
 
-`diff` of `database.py` between versions — only adds FTS index
-support. No pool / concurrency changes. Not worth chasing.
+`diff` of `database.py` between versions (against our
+hand-patched 0.6.1) — only adds FTS index support. No pool / concurrency changes. Not worth chasing.
+
+**Done 2026-11-13, in cricsdb PR #8**, for another reason. 0.7.0's
+`Database.q(query, params)` takes bind parameters, which the
+published 0.6.1 lacks (our local copy had them by a hand patch). cricsdb now requires `deebase>=0.7.0`. The
+upgrade changes nothing for concurrency.
 
 ## When this picture would change
 

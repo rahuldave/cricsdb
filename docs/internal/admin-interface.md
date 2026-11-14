@@ -75,12 +75,17 @@ the `context` slot and vice versa. Jinja2 then tries to cache a lookup
 where the "template name" is a dict — the Python 3.14 error message
 just happens to surface this at the hashability check.
 
-Fix: `pyproject.toml` and `deploy.sh` both pin `starlette>=0.46.0,<1.0.0`.
-Both must be pinned — locally via uv, on plash via the generated
-`requirements.txt` — or the admin breaks on that side.
+Fix: `pyproject.toml` pins `starlette<1.0.0`, and `deploy.sh` pins
+`starlette>=0.46.0,<1.0.0`. Both must be pinned, locally through uv and on plash through the
+generated `requirements.txt`, or the admin breaks on that side.
 
 **Upgrade path:** when deebase ships a version updated for starlette 1.0,
 bump the starlette constraint and re-vendor.
+
+**Checked 2026-11-14:** deebase 0.7.0, which cricsdb now requires, has
+not fixed this. Its `admin/router.py` is the same file as in 0.6.1 and
+still calls `TemplateResponse("dashboard.html", {...})`, name first.
+0.7.0 is the newest release on PyPI. Keep both pins.
 
 ### Missing jinja2 locally
 

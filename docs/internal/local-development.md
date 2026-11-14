@@ -13,6 +13,15 @@ committing.
   build it with `download_data.py` + `import_data.py` (see
   `data-pipeline.md`) — takes ~15 minutes.
 
+## After a pull
+
+Run `uv sync` after each pull, so that `.venv` matches `uv.lock`.
+cricsdb needs deebase 0.7.0 or later, and `uv.lock` pins 0.7.0.
+`deploy.sh` copies deebase from `.venv` into the deploy, so an
+old `.venv` also ships an old deebase. Check with
+`uv pip show deebase`, which must show the deebase version in
+`uv.lock` (0.7.0 today).
+
 ## Two-terminal workflow
 
 Local dev runs the backend and the frontend as separate processes.
@@ -115,7 +124,9 @@ asyncio.run(main())
 ```
 
 Always use `:param` bind syntax with `db.q()` — never f-string into the
-SQL. See `CLAUDE.md` for the deebase patch context.
+SQL. `db.q(query, params)` takes bind parameters from deebase 0.7.0
+on; 0.6.1 had no `params` (see "Parameterized queries" in
+`design-decisions.md`).
 
 ## See also
 
