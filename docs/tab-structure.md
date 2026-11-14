@@ -233,8 +233,8 @@ the same view.
 | URL param | Values | What it filters | Notes |
 |---|---|---|---|
 | `inning` | `0` / `1` | 1st innings (batted first) / 2nd innings (chased) | The meaning in the URL is fixed (`innings.innings_number`). The label of the pill depends on the point of view, through `useDiscipline()`. Spec: `docs/internal/spec-inning-split.md`. |
-| `result` | `won` / `lost` / `tied` | Match outcome from the point of view of the path team | Needs `?team=` (or a team bound in the path). Otherwise the endpoint returns HTTP 400. `tied` collapses ties, including those a super over decides, and no-results (rain-abandoned). |
-| `toss_outcome` | `won` / `lost` | Toss outcome from the point of view of the path team | Needs `?team=`. Otherwise the endpoint returns 400. |
+| `result` | `won` / `lost` / `tied` | Match outcome from the point of view of the path team | Meant for a team bound by `?team=` or the path. No endpoint rejects it without one: on `/teams/splits` it then narrows the team views of the landing. `tied` collapses ties, including those a super over decides, and no-results (rain-abandoned). |
+| `toss_outcome` | `won` / `lost` | Toss outcome from the point of view of the path team | Meant for a team bound by `?team=` or the path. No endpoint rejects it without one. |
 | `scope_to_team` | string | Narrows the average slot of the Compare tab | Limits the league baseline to the events in which the team played. The front end offers it only with `team_type=club`. |
 
 ### How filters compose
@@ -307,8 +307,9 @@ API: `GET /api/v1/venues/Wankhede%20Stadium%2C%20Mumbai/summary` for the overvie
   "Bowling first". On the pages that mix disciplines (Players, and the Records subtabs) it stays neutral,
   as "1st innings".
 - **`result` and `toss_outcome` are from the subject's point of view.** They make sense only when a path
-  team is bound (the path `:team` or `?team=`). Without a team as the subject, "won" has no meaning, so
-  the endpoints return HTTP 400 when either parameter comes without a team.
+  team is bound (the path `:team` or `?team=`). The endpoints do not reject either parameter without a
+  team. On `/teams/splits`, without `?team=`, they narrow the team views of the landing, so
+  `?toss_outcome=won` gives the league-wide picture for toss winners (see `docs/api.md`).
 - **Series vs Tournament terminology.** Cricket uses "series" for both bilateral tours (India vs
   Australia) and tournament editions (IPL 2024). The `/series` tab covers both. `match.event_name` carries
   the identity of the tournament, and `filter_team` with `filter_opponent` defines a bilateral rivalry.

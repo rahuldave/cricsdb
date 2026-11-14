@@ -38,8 +38,8 @@ and defaults. smalldocs writes it from the code at each build.
 - **Venue and city strings are canonical.** At insert time, `match.venue`
   and `match.city` go through `api/venue_aliases.py`. So every endpoint
   that returns them gives the canonical form, for example `Wankhede
-  Stadium, Mumbai` and not the raw cricsheet `Wankhede`, or `County Ground
-  (Taunton)` and not the ambiguous `County Ground`. They are safe to use
+  Stadium` (city `Mumbai`) and not the raw variant `Wankhede Stadium, Mumbai`,
+  or `County Ground (Taunton)` and not the ambiguous `County Ground`. They are safe to use
   as keys for an exact match. The venue endpoints (`/venues`,
   `/venues/landing` and `/venues/{venue}/summary`) also return
   `match.venue_country`, under the name `country`. On `/venues/landing`
@@ -62,7 +62,7 @@ omitted, it puts no limit on that axis.
 | `tournament` | string | `match.event_name` (exact OR canonical → IN variants) | `tournament=Indian%20Premier%20League` or `tournament=T20%20World%20Cup%20%28Men%29` |
 | `season_from` | string | `match.season >= ...` | `season_from=2024` |
 | `season_to` | string | `match.season <= ...` | `season_to=2024/25` |
-| `filter_venue` | string | `match.venue = ...` (exact canonical) | `filter_venue=Wankhede%20Stadium%2C%20Mumbai` |
+| `filter_venue` | string | `match.venue = ...` (exact canonical) | `filter_venue=Wankhede%20Stadium` |
 | `series_type` | `all`/`bilateral`/`icc`/`club` (default `all`) | Categorises the match. `bilateral` = international non-ICC; `icc` = ICC events (T20 WC etc.); `club` = `team_type=club` | `series_type=bilateral` |
 | `team_class` | `full_member` / `primary_club` / `secondary_club` | Polymorphic over `team_type`. **`full_member`** (`team_type=international`): both teams are ICC full members (Afghanistan, Australia, Bangladesh, England, India, Ireland, New Zealand, Pakistan, South Africa, Sri Lanka, West Indies, Zimbabwe). **`primary_club`** (`team_type=club`): match's event_name is in a marquee international franchise league (IPL, BBL, PSL, BPL, CPL, SA20, ILT20, LPL, MLC, The Hundred (M+W), WBBL, WPL, Women's Cricket Super League). **`secondary_club`** (`team_type=club`): match's event_name is in a domestic state/county/provincial competition (Vitality Blast, Syed Mushtaq Ali Trophy, CSA T20 Challenge, Super Smash, Nepal Premier League, Women's Super Smash, NZC Women's T20). Cross-type combinations are silent no-ops (a defensive backend gate, which keeps URLs robust when frontend gate fails or curl mixes them). | `team_class=full_member` or `team_class=primary_club` or `team_class=secondary_club` |
 
@@ -185,6 +185,8 @@ described below.
 curl "http://localhost:8000/api/v1/tournaments?team_type=club&gender=male"
 ```
 
+The example shows two of the 19 rows.
+
 ```json
 {
   "tournaments": [
@@ -192,15 +194,21 @@ curl "http://localhost:8000/api/v1/tournaments?team_type=club&gender=male"
       "event_name": "Vitality Blast",
       "team_type": "club",
       "gender": "male",
-      "matches": 1455,
-      "seasons": ["2014", "2015", "…", "2025"]
+      "matches": 1570,
+      "seasons": [
+        "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024",
+        "2025", "2026"
+      ]
     },
     {
-      "event_name": "T20 World Cup (Men)",
-      "team_type": "international",
+      "event_name": "Indian Premier League",
+      "team_type": "club",
       "gender": "male",
-      "matches": 334,
-      "seasons": ["2007/08", "2009", "…", "2025/26"]
+      "matches": 1243,
+      "seasons": [
+        "2007/08", "2009", "2009/10", "2011", "2012", "2013", "2014", "2015", "2016", "2017",
+        "2018", "2019", "2020/21", "2021", "2022", "2023", "2024", "2025", "2026"
+      ]
     }
   ]
 }
@@ -221,7 +229,15 @@ curl "http://localhost:8000/api/v1/seasons"
 ```
 
 ```json
-{ "seasons": ["2004/05", "2005", "2005/06", "…", "2025/26", "2026"] }
+{
+  "seasons": [
+    "2004/05", "2005", "2005/06", "2006", "2006/07", "2007", "2007/08", "2008", "2008/09", "2009",
+    "2009/10", "2010", "2010/11", "2011", "2011/12", "2012", "2012/13", "2013", "2013/14", "2014",
+    "2014/15", "2015", "2015/16", "2016", "2016/17", "2017", "2017/18", "2018", "2018/19", "2019",
+    "2019/20", "2020", "2020/21", "2021", "2021/22", "2022", "2022/23", "2023", "2023/24", "2024",
+    "2024/25", "2025", "2025/26", "2026", "2026/27"
+  ]
+}
 ```
 
 ### `person_id`, player-aware narrowing
@@ -242,7 +258,14 @@ curl "http://localhost:8000/api/v1/seasons?person_id=ba607b88"
 ```
 
 ```json
-{ "seasons": ["2007/08", "2009", "…", "2025", "2026"] }
+{
+  "seasons": [
+    "2007/08", "2009", "2009/10", "2010", "2010/11", "2011", "2011/12", "2012", "2012/13", "2013",
+    "2013/14", "2014", "2015", "2015/16", "2016", "2016/17", "2017", "2017/18", "2018", "2018/19",
+    "2019", "2019/20", "2020/21", "2021", "2021/22", "2022", "2022/23", "2023", "2024", "2025",
+    "2026"
+  ]
+}
 ```
 
 ```bash
@@ -251,7 +274,12 @@ curl "http://localhost:8000/api/v1/seasons?person_id=c4487b84&tournament=Indian%
 ```
 
 ```json
-{ "seasons": ["2007/08", "2009", "2009/10", "…", "2020/21", "2021"] }
+{
+  "seasons": [
+    "2007/08", "2009", "2009/10", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018",
+    "2019", "2020/21", "2021"
+  ]
+}
 ```
 
 `person_id` combines with the other filter axes by intersection. For
@@ -311,17 +339,28 @@ and the venues within each country are in descending order of their own match co
 curl "http://localhost:8000/api/v1/venues/landing"
 ```
 
+The example shows two of the 90 countries, and two venues of each. England has 38 venues and India
+has 76.
+
 ```json
 {
   "by_country": [
-    { "country": "India", "matches": 2019, "venues": [
-        { "venue": "Wankhede Stadium", "city": "Mumbai", "matches": 178 },
-        { "venue": "Eden Gardens",    "city": "Kolkata", "matches": 146 },
-        { "venue": "M Chinnaswamy Stadium", "city": "Bengaluru", "matches": 122 },
-        "… 75 more"
-    ] },
-    { "country": "England", "matches": 1942, "venues": [ "…" ] },
-    "…"
+    {
+      "country": "England",
+      "matches": 2212,
+      "venues": [
+        {"venue": "Edgbaston", "city": "Birmingham", "matches": 212},
+        {"venue": "Kennington Oval", "city": "London", "matches": 188}
+      ]
+    },
+    {
+      "country": "India",
+      "matches": 2080,
+      "venues": [
+        {"venue": "Wankhede Stadium", "city": "Mumbai", "matches": 183},
+        {"venue": "Eden Gardens", "city": "Kolkata", "matches": 150}
+      ]
+    }
   ]
 }
 ```
@@ -365,39 +404,43 @@ The response gives:
   total
 
 ```bash
-curl "http://localhost:8000/api/v1/venues/Wankhede%20Stadium%2C%20Mumbai/summary"
+curl "http://localhost:8000/api/v1/venues/Wankhede%20Stadium/summary"
 ```
+
+The example shows two of the 28 rows of `by_tournament_gender_season`.
 
 ```json
 {
   "venue": "Wankhede Stadium",
   "city": "Mumbai",
   "country": "India",
-  "matches": 178,
+  "matches": 183,
   "by_tournament_gender_season": [
-    { "tournament": "Indian Premier League", "gender": "male", "season": "2026", "matches": 2 },
-    { "tournament": "ICC Men's T20 World Cup", "gender": "male", "season": "2025/26", "matches": 8 },
-    "… 26 more"
+    {"tournament": "Indian Premier League", "gender": "male", "season": "2026", "matches": 7},
+    {"tournament": "ICC Men's T20 World Cup", "gender": "male", "season": "2025/26", "matches": 8}
   ],
-  "avg_first_innings_total": 170.5,
-  "first_innings_sample": 178,
-  "bat_first_wins": 77,
-  "chase_wins": 100,
+  "avg_first_innings_total": 171.8,
+  "first_innings_sample": 183,
+  "bat_first_wins": 79,
+  "chase_wins": 103,
   "indecisive": 1,
-  "bat_first_win_pct": 43.3,
-  "chase_win_pct": 56.2,
-  "toss_decision_split": { "bat": 38, "field": 140 },
+  "bat_first_win_pct": 43.2,
+  "chase_win_pct": 56.3,
+  "toss_decision_split": {"bat": 39, "field": 144},
   "toss_and_win_pct": {
-    "bat":   { "wins": 15, "decided": 37,  "win_pct": 40.5 },
-    "field": { "wins": 78, "decided": 140, "win_pct": 55.7 }
+    "bat": {"wins": 15, "decided": 38, "win_pct": 39.5},
+    "field": {"wins": 80, "decided": 144, "win_pct": 55.6}
   },
-  "boundary_pct_by_phase": { "powerplay": 20.0, "middle": 15.5, "death": 22.2 },
-  "dot_pct_by_phase":      { "powerplay": 47.4, "middle": 32.3, "death": 28.4 },
-  "highest_total":  { "runs": 254, "team": "West Indies", "opponent": "Zimbabwe",
-                      "match_id": 2632, "season": "2025/26", "date": "2026-02-23" },
-  "lowest_all_out": { "runs": 67,  "team": "Kolkata Knight Riders",
-                      "opponent": "Mumbai Indians",
-                      "match_id": 6065, "season": "2007/08", "date": "2008-05-16" }
+  "boundary_pct_by_phase": {"powerplay": 20.2, "middle": 15.6, "death": 22.2},
+  "dot_pct_by_phase": {"powerplay": 47.3, "middle": 32.0, "death": 28.4},
+  "highest_total": {
+    "runs": 254, "team": "West Indies", "opponent": "Zimbabwe", "match_id": 2632,
+    "season": "2025/26", "date": "2026-02-23"
+  },
+  "lowest_all_out": {
+    "runs": 67, "team": "Kolkata Knight Riders", "opponent": "Mumbai Indians", "match_id": 6065,
+    "season": "2007/08", "date": "2008-05-16"
+  }
 }
 ```
 
@@ -518,11 +561,13 @@ and every other club bucket is empty. A tournament's `matches` is the
 sum of its teams' match counts, so it counts each match twice. The 71
 matches of IPL 2024 give 142.
 
+The example shows two of the 10 teams.
+
 ```json
 {
   "international": {
-    "men":   { "regular": [], "associate": [] },
-    "women": { "regular": [], "associate": [] }
+    "men": {"regular": [], "associate": []},
+    "women": {"regular": [], "associate": []}
   },
   "club": {
     "franchise_leagues": [
@@ -530,9 +575,8 @@ matches of IPL 2024 give 142.
         "tournament": "Indian Premier League",
         "matches": 142,
         "teams": [
-          { "name": "Chennai Super Kings", "gender": "male", "matches": 14 },
-          { "name": "Delhi Capitals",      "gender": "male", "matches": 14 },
-          "…"
+          {"name": "Chennai Super Kings", "gender": "male", "matches": 14},
+          {"name": "Delhi Capitals", "gender": "male", "matches": 14}
         ]
       }
     ],
@@ -561,9 +605,14 @@ The endpoint has two modes:
   Mosaic can sum cells to build conditional counts and deltas that "drop/switch one axis".
   (Landing mode still returns only the cells that occur.)
 
-The endpoint applies aux narrowings at the cell level, after the GROUP BY. If `?result=` or
-`?toss_outcome=` is set without `?team=`, the endpoint returns HTTP 400. Both filters are relative
-to the subject's point of view (POV), so they have no meaning without a team as the subject.
+The endpoint applies aux narrowings at the cell level, after the GROUP BY. Shares and
+`scope_total_n` then use the narrowed cells as the denominator.
+
+`?result=` and `?toss_outcome=` also work without `?team=`. Then they narrow the team views of the
+landing. For example, `?toss_outcome=won` keeps the view of each toss winner, so `scope_total_n` is
+half the landing total (71 of 142 for IPL 2024). The marginal of the narrowed axis is then 1.0 by
+construction. The other two axes give the league-wide baseline for that condition, such as inning by
+result given a won toss.
 
 ```bash
 # Landing
@@ -665,52 +714,65 @@ Cell coordinates:
 - `inning`: `0` (batted first) or `1` (batted second)
 - `result`: `"won"`, `"lost"` or `"tied"` (the last one joins tied and no-result)
 
-Errors when a filter needs a subject team:
-
-- `?result=won` without `?team=` returns 400 `"?result= requires ?team= (subject POV needed)."`
-- `?toss_outcome=won` without `?team=` returns 400 `"?toss_outcome= requires ?team= (subject POV needed)."`
-
 ## `GET /api/v1/batters/leaders`
 
 The endpoint returns the top N batters by average and by strike rate. Thresholds on the size of
-the sample leave out cameos. Params: `limit` (default 10), `min_balls` (default 100),
-`min_dismissals` (default 3, for the list by average only).
+the sample can leave out cameos. Params: `limit` (default 10), `min_balls` (default 1) and
+`min_dismissals` (default 0, for the list by average only). The defaults set no real threshold,
+so the example passes `min_balls=100` and `min_dismissals=3`.
 
 ```bash
-curl "http://localhost:8000/api/v1/batters/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=3"
+curl "http://localhost:8000/api/v1/batters/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=3&min_balls=100&min_dismissals=3"
 ```
+
+The example shows the first row of each list.
 
 ```json
 {
   "by_average": [
-    { "person_id": "3241e3fd", "name": "N Pooran", "runs": 499, "balls": 279, "dismissals": 8, "average": 62.38, "strike_rate": 178.85 }
+    {
+      "person_id": "3241e3fd", "runs": 499, "balls": 279, "dismissals": 8, "average": 62.38,
+      "strike_rate": 178.85, "name": "N Pooran"
+    }
   ],
   "by_strike_rate": [
-    { "person_id": "…", "name": "J Fraser-McGurk", "strike_rate": 233.59, "average": 24.0, "runs": 350, "balls": 150, "dismissals": 12 }
+    {
+      "person_id": "9b6e1b3f", "runs": 330, "balls": 139, "dismissals": 9, "average": 36.67,
+      "strike_rate": 237.41, "name": "J Fraser-McGurk"
+    }
   ],
-  "thresholds": { "min_balls": 100, "min_dismissals": 3 }
+  "thresholds": {"min_balls": 100, "min_dismissals": 3}
 }
 ```
 
 ## `GET /api/v1/bowlers/leaders`
 
 The endpoint returns the top N bowlers by strike rate and by economy. Params: `limit`
-(default 10), `min_balls` (default 60, which is 10 overs), `min_wickets` (default 3, for the list
-by strike rate only).
+(default 10), `min_balls` (default 1) and `min_wickets` (default 0, for the list by strike rate
+only). The defaults set no real threshold, so the example passes `min_balls=60` (10 overs) and
+`min_wickets=3`.
 
 ```bash
-curl "http://localhost:8000/api/v1/bowlers/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=3"
+curl "http://localhost:8000/api/v1/bowlers/leaders?gender=male&team_type=club&tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&limit=3&min_balls=60&min_wickets=3"
 ```
+
+The example shows the first row of each list.
 
 ```json
 {
   "by_strike_rate": [
-    { "person_id": "bbd41817", "name": "AD Russell", "balls": 176, "runs_conceded": 304, "wickets": 19, "strike_rate": 9.26, "economy": 10.36 }
+    {
+      "person_id": "bbd41817", "balls": 176, "runs_conceded": 304, "wickets": 19,
+      "strike_rate": 9.26, "economy": 10.36, "name": "AD Russell"
+    }
   ],
   "by_economy": [
-    { "person_id": "462411b3", "name": "JJ Bumrah", "economy": 6.48, "strike_rate": 16.8, "balls": 348, "runs_conceded": 376, "wickets": 20 }
+    {
+      "person_id": "462411b3", "balls": 311, "runs_conceded": 341, "wickets": 20,
+      "strike_rate": 15.55, "economy": 6.58, "name": "JJ Bumrah"
+    }
   ],
-  "thresholds": { "min_balls": 60, "min_wickets": 3 }
+  "thresholds": {"min_balls": 60, "min_wickets": 3}
 }
 ```
 
@@ -1156,74 +1218,112 @@ They feed the over-aware probabilities and the paired magnitude stat, the escala
 curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/batting/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
 ```
 
-```jsonc
+Each milestone holds `value`, `num`, `denom`, the Wilson CI (`ci_low`, `ci_high`) and the envelope
+fields `scope_avg`, `delta_pct`, `direction` and `sample_size`. In `runs`, the simple milestones
+(`p_lt_100`, `p_geq_100`, `p_geq_150`, `p_geq_200`, `p_geq_230`) divide by `n_innings`. The
+chain-ladder ones (`p_150_given_100`, `p_200_given_150`, `p_230_given_200`) divide by the count at
+the rung below. `p_double_at_10` divides by the innings with `reached_10_overs = 1` and `runs_at_10
+> 0`. The `run_rate` milestones are `p_rr_leq_7`, `p_rr_leq_8`, `p_rr_geq_9`, `p_rr_geq_10`.
+`form.delta` has 8 entries, 4 windows × 2 metrics (`runs_mean` and `run_rate_pool`).
+
+The example is trimmed. It keeps one row of `observations`, the first three values of each
+per-innings list, and two entries of each `milestones` block. In `form` it keeps one window,
+`last_10`, and only the plain numbers of that window. Each window has the same fields as `lifetime`,
+without `last_match_date`.
+
+```json
 {
   "team": "Mumbai Indians",
-  "scope": { "tournament": "Indian Premier League",
-             "season_from": "2024", "season_to": "2024" },
+  "scope": {"tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024"},
   "lifetime": {
     "n_innings": 14,
     "runs": {
-      "total": 2568, "mean_per_innings": 183.4286, "median": 182.5,
-      "variance": 1537.0, "std": 39.205,
+      "total": 2568,
+      "mean_per_innings": 183.4286,
+      "median": 182.5,
+      "variance": 1537.033,
+      "std": 39.205,
       "escalation_ratio_median": 2.1009,
       "observations": [
-        { "innings_id": 11782, "match_id": 5879, "innings_number": 1,
-          "date": "2024-03-24",
-          "runs": 162, "balls": 120, "wickets": 9,
-          "runs_at_10": 88, "wickets_at_10": 2, "reached_10_overs": 1,
-          "runs_pp": 52, "balls_pp": 36, "wickets_pp": 2,
-          "runs_mid": 74, "balls_mid": 54, "wickets_mid": 1,
-          "runs_death": 36, "balls_death": 30, "wickets_death": 6 }
-        // ... 14 rows, date-asc
+        {
+          "innings_id": 11782, "match_id": 5879, "innings_number": 1, "date": "2024-03-24",
+          "runs": 162, "balls": 120, "wickets": 9, "runs_at_10": 88, "wickets_at_10": 2,
+          "reached_10_overs": 1, "runs_pp": 52, "balls_pp": 36, "wickets_pp": 2, "runs_mid": 74,
+          "balls_mid": 54, "wickets_mid": 1, "runs_death": 36, "balls_death": 30,
+          "wickets_death": 6
+        }
       ],
       "milestones": {
-        // simples (denom = n_innings)
-        "p_lt_100":  { "value": 0.0,    "num": 0,  "denom": 14, "ci_low": 0.0,  "ci_high": 0.2153 },
-        "p_geq_100": { "value": 1.0,    "num": 14, "denom": 14, ... },
-        "p_geq_150": { "value": 0.7143, "num": 10, "denom": 14, ... },
-        "p_geq_200": { "value": 0.2143, "num": 3,  "denom": 14, ... },
-        "p_geq_230": { "value": 0.2143, "num": 3,  "denom": 14, ... },
-        // chain ladder — denom = the rung below
-        "p_150_given_100": { "value": 0.7143, "num": 10, "denom": 14, ... },
-        "p_200_given_150": { "value": 0.3,    "num": 3,  "denom": 10, ... },
-        "p_230_given_200": { "value": 1.0,    "num": 3,  "denom": 3,  ... },
-        // over-aware: denom = innings with reached_10_overs=1 AND runs_at_10>0
-        "p_double_at_10":  { "value": 0.6429, "num": 9,  "denom": 14, ... }
+        "p_lt_100": {
+          "value": 0.0, "num": 0, "denom": 14, "ci_low": 0.0, "ci_high": 0.2153,
+          "scope_avg": 0.0141, "delta_pct": -100.0, "direction": "lower_better",
+          "sample_size": 142
+        },
+        "p_geq_100": {
+          "value": 1.0, "num": 14, "denom": 14, "ci_low": 0.7847, "ci_high": 1.0,
+          "scope_avg": 0.9859, "delta_pct": 1.4, "direction": "higher_better", "sample_size": 142
+        }
       }
     },
     "run_rate": {
-      "pool": 9.594, "mean_per_innings": 9.6296,
-      "median_per_innings": 9.55, "variance": 0.4861, "std": 0.6972,
-      "per_innings": [9.6, 8.55, /* ... */],
+      "pool": 9.594,
+      "mean_per_innings": 9.6296,
+      "median_per_innings": 9.45,
+      "variance": 4.1664,
+      "std": 2.0412,
+      "per_innings": [8.1, 12.3, 6.25],
       "milestones": {
-        "p_rr_leq_7":  {...}, "p_rr_leq_8":  {...},
-        "p_rr_geq_9":  {...}, "p_rr_geq_10": {...}
+        "p_rr_leq_7": {
+          "value": 0.0714, "num": 1, "denom": 14, "ci_low": 0.0127, "ci_high": 0.3147,
+          "scope_avg": 0.0493, "delta_pct": 44.8, "direction": "lower_better", "sample_size": 142
+        },
+        "p_rr_leq_8": {
+          "value": 0.2143, "num": 3, "denom": 14, "ci_low": 0.0757, "ci_high": 0.4759,
+          "scope_avg": 0.1761, "delta_pct": 21.7, "direction": "lower_better", "sample_size": 142
+        }
       }
     },
     "phase": {
-      "powerplay": { "runs_total": 789,  "balls_total": 504, "wickets_total": 25, "innings_active": 14 },
-      "middle":    { "runs_total": 1131, "balls_total": 756, "wickets_total": 35, "innings_active": 14 },
-      "death":     { "runs_total": 648,  "balls_total": 346, "wickets_total": 36, "innings_active": 14 }
+      "powerplay": {
+        "runs_total": 789, "balls_total": 504, "wickets_total": 25, "innings_active": 14
+      },
+      "middle": {"runs_total": 1131, "balls_total": 756, "wickets_total": 35, "innings_active": 14},
+      "death": {"runs_total": 648, "balls_total": 346, "wickets_total": 36, "innings_active": 14}
     },
     "last_match_date": "2024-05-17"
   },
   "form": {
-    "last_10":  { "n_innings": 10, "runs": {...}, "run_rate": {...}, "phase": {...} },
-    "last_60d": { "n_innings": 14, ... },
-    "last_6mo": { "n_innings": 14, ... },
-    "last_1yr": { "n_innings": 14, ... },
+    "last_10": {
+      "n_innings": 10,
+      "runs": {
+        "total": 1801, "mean_per_innings": 180.1, "median": 182.5, "variance": 1058.3222,
+        "std": 32.5319, "escalation_ratio_median": 2.1391
+      },
+      "run_rate": {
+        "pool": 9.5968, "mean_per_innings": 9.6464, "median_per_innings": 9.45, "variance": 3.2201,
+        "std": 1.7945
+      },
+      "phase": {
+        "powerplay": {
+          "runs_total": 540, "balls_total": 360, "wickets_total": 17, "innings_active": 10
+        },
+        "middle": {
+          "runs_total": 829, "balls_total": 540, "wickets_total": 25, "innings_active": 10
+        },
+        "death": {"runs_total": 432, "balls_total": 226, "wickets_total": 26, "innings_active": 10}
+      }
+    },
     "delta": {
-      // 8 entries: 4 windows × 2 metrics (runs_mean + run_rate_pool)
-      "last_10_runs_mean_minus_lifetime":      -1.5286,
-      "last_10_run_rate_pool_minus_lifetime":   0.072,
-      // ... last_60d / last_6mo / last_1yr deltas
+      "last_10_runs_mean_minus_lifetime": -3.3286, "last_10_run_rate_pool_minus_lifetime": 0.0028,
+      "last_60d_runs_mean_minus_lifetime": 0.0, "last_60d_run_rate_pool_minus_lifetime": 0.0,
+      "last_6mo_runs_mean_minus_lifetime": 0.0, "last_6mo_run_rate_pool_minus_lifetime": 0.0,
+      "last_1yr_runs_mean_minus_lifetime": 0.0, "last_1yr_run_rate_pool_minus_lifetime": 0.0
     }
   },
   "suggested_splits": [
-    { "label": "All Indian Premier League", "params": { "tournament": "Indian Premier League" } },
-    { "label": "All cricket in 2024", "params": { "season_from": "2024", "season_to": "2024" } },
-    { "label": "All-time", "params": {} }
+    {"label": "All Indian Premier League", "params": {"tournament": "Indian Premier League"}},
+    {"label": "All cricket in 2024", "params": {"season_from": "2024", "season_to": "2024"}},
+    {"label": "All-time", "params": {}}
   ]
 }
 ```
@@ -1263,72 +1363,150 @@ for the reasons.
 curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/bowling/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
 ```
 
-```jsonc
+Each milestone holds `value`, `num`, `denom`, the Wilson CI (`ci_low`, `ci_high`) and the envelope
+fields `scope_avg`, `delta_pct`, `direction` and `sample_size`. In `wickets`, the simple milestones
+(`p_leq_3`, `p_geq_5`, `p_geq_7`, `p_eq_10`) divide by `n_innings`. `p_7_given_5` and `p_10_given_5`
+divide by the innings with 5 or more wickets. `p_geq_3_at_10` divides by the innings that reached 10
+overs, and `p_eq_10_given_3_at_10` by those of them with 3 or more wickets at 10 overs.
+
+In `runs_conceded`, the simple milestones divide by `n_innings`, each chain-ladder rung by the rung
+below, and `p_double_at_10` by the innings that reached 10 overs with `runs_at_10 > 0`. The
+`economy` milestones are `p_econ_leq_6`, `p_econ_leq_7`, `p_econ_geq_9`, `p_econ_geq_10`.
+`form.delta` has 12 entries, 4 windows × 3 metrics (`wickets_mean`, `runs_conceded_mean` and
+`economy_pool`).
+
+The example is trimmed. It keeps one row of `observations`, the first three values of each
+per-innings list, and two entries of each `milestones` block. In `form` it keeps one window,
+`last_10`, and only the plain numbers of that window. Each window has the same fields as `lifetime`,
+without `last_match_date`.
+
+```json
 {
   "team": "Mumbai Indians",
-  "scope": { "tournament": "Indian Premier League",
-             "season_from": "2024", "season_to": "2024" },
+  "scope": {"tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024"},
   "lifetime": {
     "n_innings": 14,
+    "pool_strike_rate": 18.9529,
+    "pool_average": 31.2941,
     "wickets": {
-      "total": 85, "mean_per_innings": 6.0714, "median": 6.0,
-      "variance": 6.9945, "std": 2.6447,
+      "total": 85,
+      "mean_per_innings": 6.0714,
+      "median": 6.0,
+      "variance": 6.9945,
+      "std": 2.6447,
       "observations": [
-        { "innings_id": 11781, "match_id": 5879, "innings_number": 0,
-          "date": "2024-03-24",
-          "runs_conceded": 168, "balls": 120, "wickets": 6,
-          "runs_at_10": 82, "wickets_at_10": 2, "reached_10_overs": 1,
-          "runs_pp": 47, "balls_pp": 36, "wickets_pp": 1,
-          "runs_mid": 77, "balls_mid": 54, "wickets_mid": 2,
-          "runs_death": 44, "balls_death": 30, "wickets_death": 3 }
-        // ... 14 rows
+        {
+          "innings_id": 11781, "match_id": 5879, "innings_number": 0, "date": "2024-03-24",
+          "runs_conceded": 168, "balls": 120, "wickets": 6, "runs_at_10": 82, "wickets_at_10": 2,
+          "reached_10_overs": 1, "runs_pp": 47, "balls_pp": 36, "wickets_pp": 1, "runs_mid": 77,
+          "balls_mid": 54, "wickets_mid": 2, "runs_death": 44, "balls_death": 30,
+          "wickets_death": 3
+        }
       ],
       "milestones": {
-        // simples (denom = n_innings)
-        "p_leq_3":  { "value": 0.1429, "num": 2,  "denom": 14, ... },
-        "p_geq_5":  { "value": 0.6429, "num": 9,  "denom": 14, ... },
-        "p_geq_7":  { "value": 0.4286, "num": 6,  "denom": 14, ... },
-        "p_eq_10":  { "value": 0.1429, "num": 2,  "denom": 14, ... },
-        // ≥5-anchored conditionals (stable denom)
-        "p_7_given_5":   { "value": 0.6667, "num": 6, "denom": 9, ... },
-        "p_10_given_5":  { "value": 0.2222, "num": 2, "denom": 9, ... },
-        // over-aware
-        "p_geq_3_at_10":         { "value": 0.3571, "num": 5, "denom": 14, ... },
-        "p_eq_10_given_3_at_10": { "value": 0.4,    "num": 2, "denom": 5,  ... }
+        "p_leq_3": {
+          "value": 0.1429, "num": 2, "denom": 14, "ci_low": 0.0401, "ci_high": 0.3994,
+          "scope_avg": 0.169, "delta_pct": -15.4, "direction": "lower_better", "sample_size": 142
+        },
+        "p_geq_5": {
+          "value": 0.6429, "num": 9, "denom": 14, "ci_low": 0.3876, "ci_high": 0.8366,
+          "scope_avg": 0.7183, "delta_pct": -10.5, "direction": "higher_better",
+          "sample_size": 142
+        }
       }
     },
     "runs_conceded": {
-      "total": 2660, "mean_per_innings": 190.0, "median": 188.0,
-      "variance": ..., "std": ...,
+      "total": 2660,
+      "mean_per_innings": 190.0,
+      "median": 183.0,
+      "variance": 1657.3846,
+      "std": 40.711,
       "escalation_ratio_median": 2.022,
       "milestones": {
-        // simples — polarity flipped vs. team-batting (low = good)
-        "p_lt_100":  {...}, "p_lt_150":  {...},
-        "p_geq_150": {...}, "p_geq_200": {...}, "p_geq_230": {...},
-        // chain ladder (the leakage chain — INDIGO across)
-        "p_150_given_100": {...}, "p_200_given_150": {...}, "p_230_given_200": {...},
-        // over-aware
-        "p_double_at_10": {...}
+        "p_lt_100": {
+          "value": 0.0, "num": 0, "denom": 14, "ci_low": 0.0, "ci_high": 0.2153,
+          "scope_avg": 0.0141, "delta_pct": -100.0, "direction": "higher_better",
+          "sample_size": 142
+        },
+        "p_lt_150": {
+          "value": 0.1429, "num": 2, "denom": 14, "ci_low": 0.0401, "ci_high": 0.3994,
+          "scope_avg": 0.1901, "delta_pct": -24.8, "direction": "higher_better",
+          "sample_size": 142
+        }
       }
     },
     "economy": {
-      "pool": 9.9069, "mean_per_innings": 9.8699,
-      "median_per_innings": 9.95, "variance": ..., "std": ...,
-      "per_innings": [...],
-      "milestones": { "p_econ_leq_6": {...}, "p_econ_leq_7": {...},
-                      "p_econ_geq_9": {...}, "p_econ_geq_10": {...} }
+      "pool": 9.9069,
+      "mean_per_innings": 9.8699,
+      "median_per_innings": 9.8018,
+      "variance": 3.0579,
+      "std": 1.7487,
+      "per_innings": [8.4, 13.85, 8.1935],
+      "milestones": {
+        "p_econ_leq_6": {
+          "value": 0.0, "num": 0, "denom": 14, "ci_low": 0.0, "ci_high": 0.2153,
+          "scope_avg": 0.007, "delta_pct": -100.0, "direction": "higher_better",
+          "sample_size": 142
+        },
+        "p_econ_leq_7": {
+          "value": 0.0, "num": 0, "denom": 14, "ci_low": 0.0, "ci_high": 0.2153,
+          "scope_avg": 0.0493, "delta_pct": -100.0, "direction": "higher_better",
+          "sample_size": 142
+        }
+      }
     },
-    "phase": { "powerplay": {...}, "middle": {...}, "death": {...} },
+    "phase": {
+      "powerplay": {
+        "runs_total": 771, "balls_total": 504, "wickets_total": 23, "innings_active": 14
+      },
+      "middle": {"runs_total": 1241, "balls_total": 756, "wickets_total": 30, "innings_active": 14},
+      "death": {"runs_total": 648, "balls_total": 351, "wickets_total": 32, "innings_active": 14}
+    },
     "last_match_date": "2024-05-17"
   },
   "form": {
-    "last_10": {...}, "last_60d": {...}, "last_6mo": {...}, "last_1yr": {...},
+    "last_10": {
+      "n_innings": 10,
+      "pool_strike_rate": 18.0938,
+      "pool_average": 29.4219,
+      "wickets": {
+        "total": 64, "mean_per_innings": 6.4, "median": 6.5, "variance": 8.0444, "std": 2.8363
+      },
+      "runs_conceded": {
+        "total": 1883, "mean_per_innings": 188.3, "median": 183.0, "variance": 1030.0111,
+        "std": 32.0938, "escalation_ratio_median": 2.022
+      },
+      "economy": {
+        "pool": 9.7565, "mean_per_innings": 9.7485, "median_per_innings": 9.8018,
+        "variance": 2.072, "std": 1.4394
+      },
+      "phase": {
+        "powerplay": {
+          "runs_total": 551, "balls_total": 360, "wickets_total": 18, "innings_active": 10
+        },
+        "middle": {
+          "runs_total": 880, "balls_total": 540, "wickets_total": 22, "innings_active": 10
+        },
+        "death": {"runs_total": 452, "balls_total": 258, "wickets_total": 24, "innings_active": 10}
+      }
+    },
     "delta": {
-      // 12 entries: 4 windows × 3 metrics
-      // (wickets_mean + runs_conceded_mean + economy_pool)
+      "last_10_wickets_mean_minus_lifetime": 0.3286,
+      "last_10_runs_conceded_mean_minus_lifetime": -1.7,
+      "last_10_economy_pool_minus_lifetime": -0.1504, "last_60d_wickets_mean_minus_lifetime": 0.0,
+      "last_60d_runs_conceded_mean_minus_lifetime": 0.0,
+      "last_60d_economy_pool_minus_lifetime": 0.0, "last_6mo_wickets_mean_minus_lifetime": 0.0,
+      "last_6mo_runs_conceded_mean_minus_lifetime": 0.0,
+      "last_6mo_economy_pool_minus_lifetime": 0.0, "last_1yr_wickets_mean_minus_lifetime": 0.0,
+      "last_1yr_runs_conceded_mean_minus_lifetime": 0.0,
+      "last_1yr_economy_pool_minus_lifetime": 0.0
     }
   },
-  "suggested_splits": [...]
+  "suggested_splits": [
+    {"label": "All Indian Premier League", "params": {"tournament": "Indian Premier League"}},
+    {"label": "All cricket in 2024", "params": {"season_from": "2024", "season_to": "2024"}},
+    {"label": "All-time", "params": {}}
+  ]
 }
 ```
 
@@ -1355,58 +1533,110 @@ The second scalar counts wickets of any kind, for the fielder-ratio tooltip "X c
 curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/fielding/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
 ```
 
-```jsonc
+Each milestone holds `value`, `num`, `denom`, the Wilson CI (`ci_low`, `ci_high`) and the envelope
+fields `scope_avg`, `delta_pct`, `direction` and `sample_size`. The milestones of `catches` are
+`p_eq_0`, `p_geq_3`, `p_geq_5`, `p_geq_7`, of `run_outs` `p_eq_0`, `p_eq_1`, `p_geq_2` and of
+`stumpings` `p_eq_0`, `p_eq_1`, `p_geq_2`. `form.delta` has 12 entries, 4 windows × 3 metrics
+(`catches_mean`, `run_outs_mean` and `stumpings_mean`).
+
+The example is trimmed. It keeps one row of `observations` and two entries of each `milestones`
+block. In `form` it keeps one window, `last_10`, and only the plain numbers of that window. Each
+window has the same fields as `lifetime`, without `last_match_date`.
+```json
 {
   "team": "Mumbai Indians",
-  "scope": { "tournament": "Indian Premier League",
-             "season_from": "2024", "season_to": "2024" },
+  "scope": {"tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024"},
   "lifetime": {
     "n_innings_fielded": 14,
     "wickets_total": 85,
     "substitute_catches": 1,
     "observations": [
-      { "innings_id": 11781, "match_id": 5879, "innings_number": 0,
-        "date": "2024-03-24",
-        "catches": 5, "run_outs": 0, "stumpings": 0,
-        "substitute_catches": 0, "wickets_total": 6 }
-      // ... 14 rows
+      {
+        "innings_id": 11781, "match_id": 5879, "innings_number": 0, "date": "2024-03-24",
+        "catches": 5, "run_outs": 0, "stumpings": 0, "substitute_catches": 0, "wickets_total": 6
+      }
     ],
     "catches": {
-      "total": 55, "mean_per_innings": 3.9286, "median": 4.0,
-      "variance": ..., "std": ...,
+      "total": 58,
+      "mean_per_innings": 4.1429,
+      "median": 4.0,
+      "variance": 2.9011,
+      "std": 1.7033,
       "milestones": {
-        "p_eq_0":  { "value": 0.0714, "num": 1,  "denom": 14, ... },
-        "p_geq_3": { "value": 0.9286, "num": 13, "denom": 14, ... },
-        "p_geq_5": { "value": 0.2857, "num": 4,  "denom": 14, ... },
-        "p_geq_7": { "value": 0.0,    "num": 0,  "denom": 14, ... }
+        "p_eq_0": {
+          "value": 0.0714, "num": 1, "denom": 14, "ci_low": 0.0127, "ci_high": 0.3147,
+          "scope_avg": 0.0282, "delta_pct": 153.2, "direction": "lower_better", "sample_size": 142
+        },
+        "p_geq_3": {
+          "value": 0.9286, "num": 13, "denom": 14, "ci_low": 0.6853, "ci_high": 0.9873,
+          "scope_avg": 0.8028, "delta_pct": 15.7, "direction": "higher_better", "sample_size": 142
+        }
       }
     },
     "run_outs": {
-      "total": 8, "mean_per_innings": 0.5714, ...,
+      "total": 8,
+      "mean_per_innings": 0.5714,
+      "median": 0.0,
+      "variance": 0.7253,
+      "std": 0.8516,
       "milestones": {
-        "p_eq_0":  { "value": 0.6429, "num": 9, "denom": 14, ... },
-        "p_eq_1":  { "value": 0.1429, "num": 2, "denom": 14, ... },
-        "p_geq_2": { "value": 0.2143, "num": 3, "denom": 14, ... }
+        "p_eq_0": {
+          "value": 0.6429, "num": 9, "denom": 14, "ci_low": 0.3876, "ci_high": 0.8366,
+          "scope_avg": 0.6831, "delta_pct": -5.9, "direction": "lower_better", "sample_size": 142
+        },
+        "p_eq_1": {
+          "value": 0.1429, "num": 2, "denom": 14, "ci_low": 0.0401, "ci_high": 0.3994,
+          "scope_avg": 0.1268, "delta_pct": null, "direction": null, "sample_size": 142
+        }
       }
     },
     "stumpings": {
-      "total": 0, "mean_per_innings": 0.0, ...,
+      "total": 0,
+      "mean_per_innings": 0.0,
+      "median": 0.0,
+      "variance": 0,
+      "std": 0.0,
       "milestones": {
-        "p_eq_0":  { "value": 1.0, "num": 14, "denom": 14, ... },
-        "p_eq_1":  { "value": 0.0, "num": 0,  "denom": 14, ... },
-        "p_geq_2": { "value": 0.0, "num": 0,  "denom": 14, ... }
+        "p_eq_0": {
+          "value": 1.0, "num": 14, "denom": 14, "ci_low": 0.7847, "ci_high": 1.0,
+          "scope_avg": 0.9296, "delta_pct": 7.6, "direction": "lower_better", "sample_size": 142
+        },
+        "p_eq_1": {
+          "value": 0.0, "num": 0, "denom": 14, "ci_low": 0.0, "ci_high": 0.2153,
+          "scope_avg": 0.0493, "delta_pct": null, "direction": null, "sample_size": 142
+        }
       }
     },
     "last_match_date": "2024-05-17"
   },
   "form": {
-    "last_10": {...}, "last_60d": {...}, "last_6mo": {...}, "last_1yr": {...},
+    "last_10": {
+      "n_innings_fielded": 10,
+      "wickets_total": 64,
+      "substitute_catches": 1,
+      "catches": {
+        "total": 41, "mean_per_innings": 4.1, "median": 4.0, "variance": 3.4333, "std": 1.8529
+      },
+      "run_outs": {
+        "total": 6, "mean_per_innings": 0.6, "median": 0.0, "variance": 0.7111, "std": 0.8433
+      },
+      "stumpings": {"total": 0, "mean_per_innings": 0.0, "median": 0.0, "variance": 0, "std": 0.0}
+    },
     "delta": {
-      // 12 entries: 4 windows × 3 metrics
-      // (catches_mean + run_outs_mean + stumpings_mean)
+      "last_10_catches_mean_minus_lifetime": -0.0429,
+      "last_10_run_outs_mean_minus_lifetime": 0.0286, "last_10_stumpings_mean_minus_lifetime": 0.0,
+      "last_60d_catches_mean_minus_lifetime": 0.0, "last_60d_run_outs_mean_minus_lifetime": 0.0,
+      "last_60d_stumpings_mean_minus_lifetime": 0.0, "last_6mo_catches_mean_minus_lifetime": 0.0,
+      "last_6mo_run_outs_mean_minus_lifetime": 0.0, "last_6mo_stumpings_mean_minus_lifetime": 0.0,
+      "last_1yr_catches_mean_minus_lifetime": 0.0, "last_1yr_run_outs_mean_minus_lifetime": 0.0,
+      "last_1yr_stumpings_mean_minus_lifetime": 0.0
     }
   },
-  "suggested_splits": [...]
+  "suggested_splits": [
+    {"label": "All Indian Premier League", "params": {"tournament": "Indian Premier League"}},
+    {"label": "All cricket in 2024", "params": {"season_from": "2024", "season_to": "2024"}},
+    {"label": "All-time", "params": {}}
+  ]
 }
 ```
 
@@ -1436,18 +1666,72 @@ level for the lists of wins, and at the innings level for the lists of batting a
 curl "http://localhost:8000/api/v1/teams/Mumbai%20Indians/records?tournament=Indian%20Premier%20League&limit=2"
 ```
 
+The example shows the first row of each list.
+
 ```json
 {
   "team": "Mumbai Indians",
   "canonical": "Indian Premier League",
-  "highest_team_totals":   [ "…" ],
-  "lowest_all_out_totals": [ "…" ],
-  "biggest_wins_by_runs":  [ "…" ],
-  "biggest_wins_by_wickets": [ "…" ],
-  "largest_partnerships":  [ "…" ],
-  "best_individual_batting": [ "…" ],
-  "best_bowling_figures":  [ "…" ],
-  "most_sixes_in_a_match": [ "…" ]
+  "highest_team_totals": [
+    {
+      "team": "Mumbai Indians", "runs": 247, "opponent": "Delhi Capitals", "match_id": 5917,
+      "date": "2024-04-27", "tournament": "Indian Premier League", "season": "2024"
+    }
+  ],
+  "lowest_all_out_totals": [
+    {
+      "team": "Mumbai Indians", "runs": 87, "opponent": "Sunrisers Hyderabad", "match_id": 5509,
+      "date": "2018-04-24", "tournament": "Indian Premier League", "season": "2018"
+    }
+  ],
+  "biggest_wins_by_runs": [
+    {
+      "winner": "Mumbai Indians", "loser": "Delhi Capitals", "margin": 146, "match_id": 5471,
+      "date": "2017-05-06", "tournament": "Indian Premier League", "season": "2017"
+    }
+  ],
+  "biggest_wins_by_wickets": [
+    {
+      "winner": "Mumbai Indians", "loser": "Chennai Super Kings", "margin": 10, "match_id": 5636,
+      "date": "2020-10-23", "tournament": "Indian Premier League", "season": "2020/21"
+    }
+  ],
+  "largest_partnerships": [
+    {
+      "runs": 167,
+      "batter1": {"person_id": "e1d1b294", "name": "HH Gibbs"},
+      "batter2": {"person_id": "740742ef", "name": "RG Sharma"},
+      "teams": "Kolkata Knight Riders v Mumbai Indians",
+      "team1": "Kolkata Knight Riders",
+      "team2": "Mumbai Indians",
+      "batting_team": "Mumbai Indians",
+      "match_id": 6329,
+      "date": "2012-05-12",
+      "tournament": "Indian Premier League",
+      "season": "2012"
+    }
+  ],
+  "best_individual_batting": [
+    {
+      "person_id": "e66732f8", "name": "RD Rickelton", "runs": 123, "balls": 55, "fours": 10,
+      "sixes": 8, "not_out": true, "figures": "123* (55)", "match_id": 13090, "date": "2026-04-29",
+      "tournament": "Indian Premier League", "season": "2026"
+    }
+  ],
+  "best_bowling_figures": [
+    {
+      "person_id": "b0946605", "name": "AS Joseph", "wickets": 6, "runs": 14, "balls": 22,
+      "figures": "6/14", "match_id": 5565, "date": "2019-04-06",
+      "tournament": "Indian Premier League", "season": "2019"
+    }
+  ],
+  "most_sixes_in_a_match": [
+    {
+      "match_id": 5882, "sixes": 20, "teams": "Sunrisers Hyderabad v Mumbai Indians",
+      "team1": "Sunrisers Hyderabad", "team2": "Mumbai Indians", "date": "2024-03-27",
+      "tournament": "Indian Premier League", "season": "2024"
+    }
+  ]
 }
 ```
 
@@ -1769,32 +2053,70 @@ gate.
 curl "http://localhost:8000/api/v1/batters/ba607b88/summary?tournament=Indian+Premier+League"
 ```
 
-```jsonc
+The example shows two of the 10 rows of `position_distribution`. It also leaves out some envelope
+fields, which have the same shape. They are `matches_played`, `balls_faced`, `hundreds`, `fifties`,
+`thirties`, `ducks`, `fours`, `sixes`, `boundaries`, `dots`, `balls_per_four`, `balls_per_six`,
+`balls_per_boundary`, `boundaries_per_innings`, `sixes_per_innings`, `fours_per_innings`,
+`thirties_per_innings`, `fifties_per_innings`, `hundreds_per_innings`, `ducks_per_innings`,
+`runs_per_innings`.
+
+```json
 {
-  "person_id": "ba607b88", "name": "V Kohli",
-  "nationalities": [{"team":"India","gender":"male","matches":118}],
+  "person_id": "ba607b88",
+  "name": "V Kohli",
+  "nationalities": [{"team": "India", "gender": "male", "matches": 118}],
   "highest_score": 113,
-  "matches":      {"value": 271,  "scope_avg": null,   "delta_pct": null,   "direction": null,            "sample_size": 18852},
-  "innings":      {"value": 271,  "scope_avg": 15.85,  "delta_pct": null,   "direction": null,            "sample_size": 18852},
-  "runs":         {"value": 9126, "scope_avg": 437.12, "delta_pct": null,   "direction": null,            "sample_size": 18852},
-  "dismissals":   {"value": 228,  "scope_avg": null,   "delta_pct": null,   "direction": null,            "sample_size": 18852},
-  "not_outs":     {"value":  43,  "scope_avg": null,   "delta_pct": null,   "direction": null,            "sample_size": 18852},
-  "average":      {"value": 40.03,"scope_avg": 29.5,   "delta_pct": 35.7,   "direction": "higher_better", "sample_size": 18852},
-  "strike_rate":  {"value": 134.34,"scope_avg": 134.7, "delta_pct": -0.3,   "direction": "higher_better", "sample_size": 18852},
-  "dot_pct":      {"value": 31.7, "scope_avg": 36.2,   "delta_pct": -12.4,  "direction": "lower_better",  "sample_size": 18852},
-  "boundary_pct": {"value": 16.7, "scope_avg": 18.4,   "delta_pct": -9.2,   "direction": "higher_better", "sample_size": 18852},
-  // … fours, sixes, boundaries, hundreds, fifties, thirties, ducks,
-  // balls_faced, dots, balls_per_{four,six,boundary} also envelope-wrapped.
+  "matches": {
+    "value": 275, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 19111
+  },
+  "innings": {
+    "value": 275, "scope_avg": 16.13, "delta_pct": null, "direction": null, "sample_size": 19111
+  },
+  "runs": {
+    "value": 9336, "scope_avg": 448.5, "delta_pct": null, "direction": null, "sample_size": 19111
+  },
+  "not_outs": {
+    "value": 44, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 19111
+  },
+  "dismissals": {
+    "value": 231, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 19111
+  },
+  "average": {
+    "value": 40.42, "scope_avg": 29.72, "delta_pct": 36.0, "direction": "higher_better",
+    "sample_size": 19111
+  },
+  "strike_rate": {
+    "value": 135.17, "scope_avg": 135.7, "delta_pct": -0.4, "direction": "higher_better",
+    "sample_size": 19111
+  },
+  "dot_pct": {
+    "value": 31.6, "scope_avg": 36.1, "delta_pct": -12.5, "direction": "lower_better",
+    "sample_size": 19111
+  },
+  "boundary_pct": {
+    "value": 16.8, "scope_avg": 18.6, "delta_pct": -9.7, "direction": "higher_better",
+    "sample_size": 19111
+  },
   "position_distribution": [
-    {"bucket":1,"innings":140,"runs":5481,"legal_balls":3883,"dismissals":116,"fours":499,"sixes":134,"dots":1182},
-    {"bucket":2,"innings":93, "runs":2809,"legal_balls":2266,"dismissals":80, "fours":252,"sixes":86, "dots":702},
-    /* … 10 entries total */
+    {
+      "bucket": 1, "innings": 144, "runs": 5684, "legal_balls": 3997, "dismissals": 119,
+      "fours": 541, "sixes": 202, "dots": 1211, "cohort_innings_share": 0.25953639265344564,
+      "cohort_strike_rate": 136.2, "cohort_average": 31.13
+    },
+    {
+      "bucket": 2, "innings": 93, "runs": 2815, "legal_balls": 2266, "dismissals": 80,
+      "fours": 237, "sixes": 83, "dots": 756, "cohort_innings_share": 0.1285647009575637,
+      "cohort_strike_rate": 135.22, "cohort_average": 29.45
+    }
   ],
   "cohort": {
     "match_dimension": "position_mix",
-    "position_mix": [0.517, 0.343, 0.048, 0.030, 0.048, 0.015, 0, 0, 0, 0],
-    "n_players": 735,
-    "n_innings_total": 18852
+    "position_mix": [
+      0.5236363636363637, 0.3381818181818182, 0.04727272727272727, 0.02909090909090909,
+      0.04727272727272727, 0.014545454545454545, 0.0, 0.0, 0.0, 0.0
+    ],
+    "n_players": 741,
+    "n_innings_total": 19111
   },
   "cohort_below_support": false,
   "cohort_cliff_buckets": []
@@ -1894,22 +2216,60 @@ retired hurt and retired out.
 curl "http://localhost:8000/api/v1/batters/ba607b88/records?tournament=Indian%20Premier%20League&limit=3"
 ```
 
+The example shows the first row of each list.
+
 ```json
 {
   "person_id": "ba607b88",
   "name": "V Kohli",
   "highest_scores": [
-    { "runs": 113, "balls": 48, "fours": 12, "sixes": 8, "not_out": false,
-      "figures": "113 (48)", "strike_rate": 235.4,
-      "match_id": 6592, "team": "Royal Challengers Bengaluru",
-      "opponent": "Punjab Kings", "tournament": "Indian Premier League",
-      "season": "2016", "date": "2016-05-18" }
+    {
+      "runs": 113, "balls": 48, "fours": 12, "sixes": 8, "not_out": false, "figures": "113 (48)",
+      "strike_rate": 235.4, "match_id": 6592, "opponent": "Punjab Kings",
+      "team": "Royal Challengers Bengaluru", "date": "2016-05-18",
+      "tournament": "Indian Premier League", "season": "2016"
+    }
   ],
-  "fastest_50s":   [ "…" ],
-  "fastest_100s":  [ "…" ],
-  "most_sixes_innings":  [ "…" ],
-  "most_fours_innings":  [ "…" ],
-  "best_strike_rates":   [ "…" ]
+  "fastest_50s": [
+    {
+      "runs": 56, "balls": 29, "fours": 6, "sixes": 4, "not_out": true, "figures": "56* (29)",
+      "strike_rate": 193.1, "match_id": 6418, "opponent": "Chennai Super Kings",
+      "team": "Royal Challengers Bengaluru", "date": "2013-05-18",
+      "tournament": "Indian Premier League", "season": "2013"
+    }
+  ],
+  "fastest_100s": [
+    {
+      "runs": 113, "balls": 48, "fours": 12, "sixes": 8, "not_out": false, "figures": "113 (48)",
+      "strike_rate": 235.4, "match_id": 6592, "opponent": "Punjab Kings",
+      "team": "Royal Challengers Bengaluru", "date": "2016-05-18",
+      "tournament": "Indian Premier League", "season": "2016"
+    }
+  ],
+  "most_sixes_innings": [
+    {
+      "runs": 113, "balls": 48, "fours": 12, "sixes": 8, "not_out": false, "figures": "113 (48)",
+      "strike_rate": 235.4, "match_id": 6592, "opponent": "Punjab Kings",
+      "team": "Royal Challengers Bengaluru", "date": "2016-05-18",
+      "tournament": "Indian Premier League", "season": "2016"
+    }
+  ],
+  "most_fours_innings": [
+    {
+      "runs": 101, "balls": 61, "fours": 13, "sixes": 1, "not_out": true, "figures": "101* (61)",
+      "strike_rate": 165.6, "match_id": 5870, "opponent": "Gujarat Titans",
+      "team": "Royal Challengers Bengaluru", "date": "2023-05-21",
+      "tournament": "Indian Premier League", "season": "2023"
+    }
+  ],
+  "best_strike_rates": [
+    {
+      "runs": 113, "balls": 48, "fours": 12, "sixes": 8, "not_out": false, "figures": "113 (48)",
+      "strike_rate": 235.4, "match_id": 6592, "opponent": "Punjab Kings",
+      "team": "Royal Challengers Bengaluru", "date": "2016-05-18",
+      "tournament": "Indian Premier League", "season": "2016"
+    }
+  ]
 }
 ```
 
@@ -1921,66 +2281,95 @@ Each row can also show an `(ed)` link to that tournament and season.
 It gives a dossier of the runs distribution per innings. The dossier has these parts:
 
 - aggregates for the lifetime and for the form windows (mean, median, variance, std, average)
-- milestone probabilities (`p_failure_10`, `p_25_plus`, `p_50_plus`, `p_100_plus`)
+- milestone probabilities (`p_failure_10`, `p_25_plus`, `p_30_plus`, `p_50_plus`, `p_100_plus`,
+  and the conditionals `p_50_given_30` and `p_70_given_50`)
 - a phase decomposition, with the runs and balls of each phase (powerplay, middle, death), and the phase
   columns of each innings on every observation
 - hints for the suggested-splits navigation, derived from the scope ("All IPL", "All cricket in 2024",
   "All-time")
 
-The form windows are the last 10 innings and the last 60 days, and both have the same shape as the
-lifetime block. A `delta` block reports the window mean minus the lifetime mean, and the window median
-minus the lifetime median. The optional `as_of_date` (YYYY-MM-DD) anchors the last-60-day window
-deterministically, and production callers omit it. Spec:
+The form windows are the last 10 innings, the last 60 days, the last 6 months and the last year.
+Each has the same shape as the lifetime block. A `delta` block reports, for each window, the window
+mean minus the lifetime mean, and the window median minus the lifetime median. The calendar windows
+end at the earlier of today and the last match in scope. The optional `as_of_date` (YYYY-MM-DD)
+replaces today, so that the result is deterministic, and production callers omit it. Spec:
 `docs/internal/spec-distribution-stats.md` §8.
 
 ```bash
 curl "http://localhost:8000/api/v1/batters/ba607b88/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
 ```
 
-```jsonc
+Each milestone holds `value`, `num`, `denom` and the Wilson CI (`ci_low`, `ci_high`). All but
+`p_25_plus` also carry the envelope fields `scope_avg`, `delta_pct`, `direction` and `sample_size`.
+`form.delta` has 8 entries, 4 windows × 2 metrics (mean and median).
+
+The example is trimmed. It keeps one row of `observations` and two entries of each `milestones`
+block. In `form` it keeps one window, `last_10`, and only the plain numbers of that window. Each
+window has the same fields as `lifetime`, without `last_match_date`.
+```json
 {
-  "scope": { "tournament": "Indian Premier League",
-             "season_from": "2024", "season_to": "2024" },
+  "scope": {"tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024"},
   "lifetime": {
-    "n_innings": 15, "n_dismissals": 12, "n_notouts": 3,
+    "n_innings": 15,
+    "n_dismissals": 12,
+    "n_notouts": 3,
     "runs": {
-      "total": 741, "balls_total": 479,
-      "mean_per_innings": 49.4, "median": 42,
-      "variance": 982.83, "std": 31.35, "average": 61.75,
+      "total": 741,
+      "balls_total": 479,
+      "mean_per_innings": 49.4,
+      "median": 42,
+      "variance": 982.83,
+      "std": 31.35,
+      "average": 61.75,
+      "strike_rate": 154.7,
       "observations": [
-        { "innings_id": 11773, "match_id": 5875, "date": "2024-03-22",
-          "runs": 21, "balls": 20, "dismissed": true,
-          "fours": 0, "sixes": 1, "dots": 6,
-          "runs_pp": 4, "balls_pp": 6,
-          "runs_mid": 17, "balls_mid": 14,
-          "runs_death": 0, "balls_death": 0 }
-        // ... (15 entries, date-asc)
+        {
+          "innings_id": 11773, "match_id": 5875, "date": "2024-03-22", "runs": 21, "balls": 20,
+          "strike_rate": 105.0, "dismissed": true, "fours": 0, "sixes": 1, "dots": 6, "runs_pp": 4,
+          "balls_pp": 6, "runs_mid": 17, "balls_mid": 14, "runs_death": 0, "balls_death": 0
+        }
       ]
     },
-    "milestones": { "p_failure_10": 0.0667, "p_25_plus": 0.7333,
-                    "p_50_plus": 0.4, "p_100_plus": 0.0667 },
+    "milestones": {
+      "p_failure_10": {
+        "value": 0.0667, "num": 1, "denom": 15, "ci_low": 0.0119, "ci_high": 0.2982,
+        "scope_avg": 0.2887, "delta_pct": -76.9, "direction": "lower_better", "sample_size": 1129
+      },
+      "p_25_plus": {"value": 0.7333, "num": 11, "denom": 15, "ci_low": 0.4805, "ci_high": 0.891}
+    },
     "phase": {
-      "powerplay": { "runs_total": 373, "balls_total": 231, "innings_active": 15 },
-      "middle":    { "runs_total": 271, "balls_total": 198, "innings_active": 11 },
-      "death":     { "runs_total":  97, "balls_total":  50, "innings_active":  5 }
-    }
+      "powerplay": {"runs_total": 373, "balls_total": 231, "innings_active": 15},
+      "middle": {"runs_total": 271, "balls_total": 198, "innings_active": 11},
+      "death": {"runs_total": 97, "balls_total": 50, "innings_active": 5}
+    },
+    "last_match_date": "2024-05-22"
   },
   "form": {
-    "last_10":  { "n_innings": 10, "runs": {/* same shape */}, "milestones": {...}, "phase": {...} },
-    "last_60d": { "n_innings": 0,  "runs": {/* null shape */}, "milestones": {...}, "phase": {...} },
+    "last_10": {
+      "n_innings": 10,
+      "n_dismissals": 9,
+      "n_notouts": 1,
+      "runs": {
+        "total": 425, "balls_total": 263, "mean_per_innings": 42.5, "median": 42.0,
+        "variance": 643.39, "std": 25.37, "average": 47.22, "strike_rate": 161.6
+      },
+      "phase": {
+        "powerplay": {"runs_total": 252, "balls_total": 145, "innings_active": 10},
+        "middle": {"runs_total": 147, "balls_total": 108, "innings_active": 7},
+        "death": {"runs_total": 26, "balls_total": 10, "innings_active": 2}
+      }
+    },
     "delta": {
-      "last_10_mean_minus_lifetime": -6.9,
-      "last_10_median_minus_lifetime": 0.0,
-      "last_60d_mean_minus_lifetime": null,
-      "last_60d_median_minus_lifetime": null
+      "last_10_mean_minus_lifetime": -6.9, "last_10_median_minus_lifetime": 0.0,
+      "last_60d_mean_minus_lifetime": 2.03, "last_60d_median_minus_lifetime": 2.5,
+      "last_6mo_mean_minus_lifetime": 0.0, "last_6mo_median_minus_lifetime": 0,
+      "last_1yr_mean_minus_lifetime": 0.0, "last_1yr_median_minus_lifetime": 0
     }
   },
   "suggested_splits": [
-    { "label": "All Indian Premier League",
-      "params": { "tournament": "Indian Premier League" } },
-    { "label": "All cricket in 2024",
-      "params": { "season_from": "2024", "season_to": "2024" } },
-    { "label": "All-time", "params": {} }
+    {"label": "All Indian Premier League", "params": {"tournament": "Indian Premier League"}},
+    {"label": "All cricket in 2024", "params": {"season_from": "2024", "season_to": "2024"}},
+    {"label": "All-time", "params": {}}
   ]
 }
 ```
@@ -2005,21 +2394,72 @@ and the `cohort: {…}` metadata.
 curl "http://localhost:8000/api/v1/bowlers/462411b3/summary?tournament=Indian+Premier+League"
 ```
 
-```jsonc
+The example shows two of the 20 rows of `over_distribution`. It also leaves out some envelope
+fields, which have the same shape. They are `matches_played`, `innings`, `balls`,
+`four_wicket_hauls`, `fours_conceded`, `sixes_conceded`, `boundaries_conceded`, `dots`, `wides`,
+`noballs`, `maiden_overs`, `boundary_pct`, `wickets_per_over`, `balls_per_four`, `balls_per_six`,
+`balls_per_boundary`, `wickets_per_innings`, `maidens_per_innings`, `four_wicket_hauls_per_innings`.
+
+```json
 {
-  "person_id": "462411b3", "name": "JJ Bumrah",
-  "overs": "597.1", "best_figures": "5/10",
-  "matches":       {"value": 156,  "scope_avg": null,   "delta_pct": null,  "direction": null,           "sample_size": 280513},
-  "wickets":       {"value": 186,  "scope_avg": null,   "delta_pct": null,  "direction": null,           "sample_size": 280513},
-  "runs_conceded": {"value": 4490, "scope_avg": null,   "delta_pct": null,  "direction": null,           "sample_size": 280513},
-  "average":       {"value": 24.14,"scope_avg": 29.85,  "delta_pct": -19.1, "direction": "lower_better", "sample_size": 280513},
-  "economy":       {"value": 7.52, "scope_avg": 8.96,   "delta_pct": -16.1, "direction": "lower_better", "sample_size": 280513},
-  "strike_rate":   {"value": 19.26,"scope_avg": 20.68,  "delta_pct": -6.9,  "direction": "lower_better", "sample_size": 280513},
-  "dot_pct":       {"value": 40.0, "scope_avg": 34.9,   "delta_pct": 14.6,  "direction": "higher_better","sample_size": 280513},
-  // … other numerics envelope-wrapped.
-  "over_distribution": [/* 20 entries — see /scope/averages/players/bowling/summary */],
-  "cohort": {"match_dimension":"over_mix","over_mix":[…20…],"n_players":573,"n_balls_total":280513},
-  "cohort_below_support": false, "cohort_cliff_buckets": []
+  "person_id": "462411b3",
+  "name": "JJ Bumrah",
+  "nationalities": [{"team": "India", "gender": "male", "matches": 94}],
+  "overs": "605.1",
+  "best_figures": "5/10",
+  "matches": {
+    "value": 158, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 284465
+  },
+  "runs_conceded": {
+    "value": 4552, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 284465
+  },
+  "wickets": {
+    "value": 187, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 284465
+  },
+  "average": {
+    "value": 24.34, "scope_avg": 29.91, "delta_pct": -18.6, "direction": "lower_better",
+    "sample_size": 284465
+  },
+  "economy": {
+    "value": 7.52, "scope_avg": 8.98, "delta_pct": -16.3, "direction": "lower_better",
+    "sample_size": 284465
+  },
+  "strike_rate": {
+    "value": 19.42, "scope_avg": 20.68, "delta_pct": -6.1, "direction": "lower_better",
+    "sample_size": 284465
+  },
+  "dot_pct": {
+    "value": 40.0, "scope_avg": 35.0, "delta_pct": 14.3, "direction": "higher_better",
+    "sample_size": 284465
+  },
+  "over_distribution": [
+    {
+      "over": 1, "runs_conceded": 54, "legal_balls": 48, "wickets": 2, "dots": 28, "boundaries": 8,
+      "innings_bowled": 8, "mix_legal_balls": 48, "cohort_balls_share": 0.05230871987766509,
+      "cohort_economy": 6.36, "cohort_wickets_per_innings": 0.192,
+      "cohort_boundaries_per_over": 0.901
+    },
+    {
+      "over": 2, "runs_conceded": 312, "legal_balls": 318, "wickets": 12, "dots": 181,
+      "boundaries": 41, "innings_bowled": 53, "mix_legal_balls": 318,
+      "cohort_balls_share": 0.05227005079711036, "cohort_economy": 7.65,
+      "cohort_wickets_per_innings": 0.217, "cohort_boundaries_per_over": 1.139
+    }
+  ],
+  "cohort": {
+    "match_dimension": "over_mix",
+    "over_mix": [
+      0.01321949876067199, 0.08757917928945194, 0.02974387221151198, 0.08757917928945194,
+      0.06279261911319196, 0.06774993114844395, 0.019829248141007987, 0.009914624070503994,
+      0.009914624070503994, 0.009914624070503994, 0.03304874690167998, 0.03800605893693197,
+      0.04957312035251997, 0.04296337097218397, 0.04626824566235197, 0.04461580831726797,
+      0.11732305150096392, 0.07270724318369595, 0.10630680253373727, 0.0509501514734233
+    ],
+    "n_players": 576,
+    "n_balls_total": 284465
+  },
+  "cohort_below_support": false,
+  "cohort_cliff_buckets": []
 }
 ```
 
@@ -2077,89 +2517,132 @@ windows to a fixed date, so that the result is deterministic. Production callers
 curl "http://localhost:8000/api/v1/bowlers/462411b3/distribution?tournament=Indian%20Premier%20League&season_from=2024&season_to=2024&as_of_date=2025-01-01"
 ```
 
-```jsonc
+Each milestone also carries the envelope fields `scope_avg`, `delta_pct`, `direction` and
+`sample_size`. `form.delta` has 8 entries, 4 windows × 2 metrics (`wickets_mean` and
+`economy_pool`).
+
+The example is trimmed. It keeps one row of `observations`, the first three values of each
+per-innings list, and two entries of each `milestones` block. In `form` it keeps one window,
+`last_10`, and only the plain numbers of that window. Each window has the same fields as `lifetime`,
+without `last_match_date`.
+
+```json
 {
-  "scope": { "tournament": "Indian Premier League",
-             "season_from": "2024", "season_to": "2024" },
-  "thresholds": { "min_balls": 12 },
+  "scope": {"tournament": "Indian Premier League", "season_from": "2024", "season_to": "2024"},
+  "thresholds": {"min_balls": 12},
   "lifetime": {
     "n_innings": 13,
     "pool_strike_rate": 15.55,
     "pool_average": 17.05,
     "wickets": {
-      "total": 20, "mean_per_innings": 1.5385, "median": 1,
-      "variance": 2.6026, "std": 1.6132,
+      "total": 20,
+      "mean_per_innings": 1.5385,
+      "median": 1,
+      "variance": 2.6026,
+      "std": 1.6132,
       "observations": [
-        { "innings_id": 11781, "match_id": 5879, "date": "2024-03-24",
-          "balls": 24, "runs_conceded": 15, "wickets": 3,
-          "dots": 13, "boundaries_conceded": 1,
-          "wides": 0, "noballs": 0,
-          "runs_pp": 4, "balls_pp": 6, "wickets_pp": 1,
-          "runs_mid": 2, "balls_mid": 6, "wickets_mid": 0,
-          "runs_death": 9, "balls_death": 12, "wickets_death": 2 }
-        // ... (13 entries, date-asc)
+        {
+          "innings_id": 11781, "match_id": 5879, "date": "2024-03-24", "balls": 24,
+          "runs_conceded": 15, "wickets": 3, "dots": 13, "boundaries_conceded": 1, "wides": 0,
+          "noballs": 0, "runs_pp": 4, "balls_pp": 6, "wickets_pp": 1, "runs_mid": 2,
+          "balls_mid": 6, "wickets_mid": 0, "runs_death": 9, "balls_death": 12, "wickets_death": 2
+        }
       ],
       "milestones": {
-        "p_zero":      { "value": 0.3846, "num": 5, "denom": 13, "ci_low": 0.1771, "ci_high": 0.6448 },
-        "p_geq_1":     { "value": 0.6154, "num": 8, "denom": 13, "ci_low": 0.3552, "ci_high": 0.8229 },
-        "p_geq_2":     { "value": 0.4615, "num": 6, "denom": 13, "ci_low": 0.2321, "ci_high": 0.7086 },
-        "p_geq_3":     { "value": 0.3077, "num": 4, "denom": 13, "ci_low": 0.1268, "ci_high": 0.5763 },
-        "p_geq_4":     { "value": 0.0769, "num": 1, "denom": 13, "ci_low": 0.0137, "ci_high": 0.3331 },
-        "p_geq_5":     { "value": 0.0769, "num": 1, "denom": 13, "ci_low": 0.0137, "ci_high": 0.3331 },
-        "p_3_given_2": { "value": 0.6667, "num": 4, "denom":  6, "ci_low": 0.3000, "ci_high": 0.9032 },
-        "p_4_given_2": { "value": 0.1667, "num": 1, "denom":  6, "ci_low": 0.0301, "ci_high": 0.5635 },
-        "p_5_given_2": { "value": 0.1667, "num": 1, "denom":  6, "ci_low": 0.0301, "ci_high": 0.5635 }
+        "p_zero": {
+          "value": 0.3846, "num": 5, "denom": 13, "ci_low": 0.1771, "ci_high": 0.6448,
+          "scope_avg": 0.3036, "delta_pct": 26.7, "direction": "lower_better",
+          "sample_size": 16299
+        },
+        "p_geq_1": {
+          "value": 0.6154, "num": 8, "denom": 13, "ci_low": 0.3552, "ci_high": 0.8229,
+          "scope_avg": 0.6964, "delta_pct": -11.6, "direction": "higher_better",
+          "sample_size": 16299
+        }
       }
     },
     "runs_conceded": {
-      "total": 341, "mean_per_innings": 26.2308, "median": 23,
-      "variance": 70.859, "std": 8.4178,
+      "total": 341,
+      "mean_per_innings": 26.2308,
+      "median": 23,
+      "variance": 70.859,
+      "std": 8.4178,
       "milestones": {
-        "p_leq_15": { "value": 0.0769, "num": 1, "denom": 13, "ci_low": 0.0137, "ci_high": 0.3331 },
-        "p_leq_25": { "value": 0.5385, "num": 7, "denom": 13, "ci_low": 0.2914, "ci_high": 0.7679 },
-        "p_geq_40": { "value": 0.0769, "num": 1, "denom": 13, "ci_low": 0.0137, "ci_high": 0.3331 },
-        "p_geq_50": { "value": 0.0,    "num": 0, "denom": 13, "ci_low": 0.0,    "ci_high": 0.2281 }
+        "p_leq_15": {
+          "value": 0.0769, "num": 1, "denom": 13, "ci_low": 0.0137, "ci_high": 0.3331,
+          "scope_avg": 0.0244, "delta_pct": 215.2, "direction": "higher_better",
+          "sample_size": 16299
+        },
+        "p_leq_25": {
+          "value": 0.5385, "num": 7, "denom": 13, "ci_low": 0.2914, "ci_high": 0.7679,
+          "scope_avg": 0.2164, "delta_pct": 148.8, "direction": "higher_better",
+          "sample_size": 16299
+        }
       }
     },
     "economy": {
-      "pool": 6.5788, "mean_per_innings": 6.5727, "median_per_innings": 5.75,
-      "variance": 4.3645, "std": 2.0891,
-      "per_innings": [3.75, 9.0, 6.75 /* ... 13 entries */],
+      "pool": 6.5788,
+      "mean_per_innings": 6.5727,
+      "median_per_innings": 5.75,
+      "variance": 4.3645,
+      "std": 2.0891,
+      "per_innings": [3.75, 9.0, 6.75],
       "milestones": {
-        "p_econ_leq_6":  { "value": 0.5385, "num": 7, "denom": 13, "ci_low": 0.2914, "ci_high": 0.7679 },
-        "p_econ_leq_7":  { "value": 0.6923, "num": 9, "denom": 13, "ci_low": 0.4237, "ci_high": 0.8732 },
-        "p_econ_geq_9":  { "value": 0.3077, "num": 4, "denom": 13, "ci_low": 0.1268, "ci_high": 0.5763 },
-        "p_econ_geq_10": { "value": 0.1538, "num": 2, "denom": 13, "ci_low": 0.0432, "ci_high": 0.4202 }
+        "p_econ_leq_6": {
+          "value": 0.5385, "num": 7, "denom": 13, "ci_low": 0.2914, "ci_high": 0.7679,
+          "scope_avg": 0.1258, "delta_pct": 328.1, "direction": "higher_better",
+          "sample_size": 16299
+        },
+        "p_econ_leq_7": {
+          "value": 0.6923, "num": 9, "denom": 13, "ci_low": 0.4237, "ci_high": 0.8732,
+          "scope_avg": 0.215, "delta_pct": 222.0, "direction": "higher_better",
+          "sample_size": 16299
+        }
       }
     },
     "phase": {
-      "powerplay": { "runs_total": 128, "balls_total": 126, "wickets_total":  6, "innings_active": 13 },
-      "middle":    { "runs_total":  62, "balls_total":  60, "wickets_total":  4, "innings_active": 11 },
-      "death":     { "runs_total": 151, "balls_total": 125, "wickets_total": 10, "innings_active": 13 }
-    }
+      "powerplay": {
+        "runs_total": 128, "balls_total": 126, "wickets_total": 6, "innings_active": 13
+      },
+      "middle": {"runs_total": 101, "balls_total": 84, "wickets_total": 3, "innings_active": 12},
+      "death": {"runs_total": 112, "balls_total": 101, "wickets_total": 11, "innings_active": 12}
+    },
+    "last_match_date": "2024-05-11"
   },
   "form": {
-    "last_10":  { "n_innings": 10, /* same shape — wickets/runs_conceded/economy/phase + scalars */ },
-    "last_60d": { "n_innings": 0,  /* null shape: pool stats null, milestones with zero denom */ },
-    "last_6mo": { "n_innings": 0,  /* ... */ },
-    "last_1yr": { "n_innings": 13, /* ... */ },
+    "last_10": {
+      "n_innings": 10,
+      "pool_strike_rate": 14.0588,
+      "pool_average": 15.4706,
+      "wickets": {
+        "total": 17, "mean_per_innings": 1.7, "median": 1.5, "variance": 2.6778, "std": 1.6364
+      },
+      "runs_conceded": {
+        "total": 263, "mean_per_innings": 26.3, "median": 22.5, "variance": 69.7889, "std": 8.354
+      },
+      "economy": {
+        "pool": 6.6025, "mean_per_innings": 6.5946, "median_per_innings": 5.625,
+        "variance": 4.2754, "std": 2.0677
+      },
+      "phase": {
+        "powerplay": {
+          "runs_total": 99, "balls_total": 96, "wickets_total": 5, "innings_active": 10
+        },
+        "middle": {"runs_total": 74, "balls_total": 60, "wickets_total": 3, "innings_active": 9},
+        "death": {"runs_total": 90, "balls_total": 83, "wickets_total": 9, "innings_active": 10}
+      }
+    },
     "delta": {
-      "last_10_wickets_mean_minus_lifetime":  0.1615,
-      "last_10_economy_pool_minus_lifetime":  0.0237,
-      "last_60d_wickets_mean_minus_lifetime": null,
-      "last_60d_economy_pool_minus_lifetime": null,
-      "last_6mo_wickets_mean_minus_lifetime": null,
-      "last_6mo_economy_pool_minus_lifetime": null,
-      "last_1yr_wickets_mean_minus_lifetime": 0.0,
-      "last_1yr_economy_pool_minus_lifetime": 0.0
+      "last_10_wickets_mean_minus_lifetime": 0.1615, "last_10_economy_pool_minus_lifetime": 0.0237,
+      "last_60d_wickets_mean_minus_lifetime": 0.0, "last_60d_economy_pool_minus_lifetime": 0.0,
+      "last_6mo_wickets_mean_minus_lifetime": 0.0, "last_6mo_economy_pool_minus_lifetime": 0.0,
+      "last_1yr_wickets_mean_minus_lifetime": 0.0, "last_1yr_economy_pool_minus_lifetime": 0.0
     }
   },
   "suggested_splits": [
-    { "label": "All Indian Premier League",
-      "params": { "tournament": "Indian Premier League" } },
-    { "label": "All cricket in 2024",
-      "params": { "season_from": "2024", "season_to": "2024" } },
-    { "label": "All-time", "params": {} }
+    {"label": "All Indian Premier League", "params": {"tournament": "Indian Premier League"}},
+    {"label": "All cricket in 2024", "params": {"season_from": "2024", "season_to": "2024"}},
+    {"label": "All-time", "params": {}}
   ]
 }
 ```
@@ -2184,18 +2667,26 @@ opponent bats. So the lists are the bowler's records in that innings.
 curl "http://localhost:8000/api/v1/bowlers/462411b3/records?tournament=Indian%20Premier%20League&limit=3"
 ```
 
+The example shows the first row of each list.
+
 ```json
 {
   "person_id": "462411b3",
   "name": "JJ Bumrah",
   "best_figures": [
-    { "wickets": 5, "runs": 10, "balls": 24,
-      "overs": "4.0", "economy": 2.5, "figures": "5/10",
-      "match_id": 5782, "team": "Mumbai Indians",
-      "opponent": "Kolkata Knight Riders", "tournament": "Indian Premier League",
-      "season": "2022", "date": "2022-05-09" }
+    {
+      "wickets": 5, "runs": 10, "balls": 24, "overs": "4.0", "economy": 2.5, "figures": "5/10",
+      "match_id": 5782, "opponent": "Kolkata Knight Riders", "team": "Mumbai Indians",
+      "date": "2022-05-09", "tournament": "Indian Premier League", "season": "2022"
+    }
   ],
-  "most_economical": [ "…" ]
+  "most_economical": [
+    {
+      "wickets": 3, "runs": 7, "balls": 18, "overs": "3.0", "economy": 2.33, "figures": "3/7",
+      "match_id": 5485, "opponent": "Kolkata Knight Riders", "team": "Mumbai Indians",
+      "date": "2017-05-19", "tournament": "Indian Premier League", "season": "2017"
+    }
+  ]
 }
 ```
 
@@ -2245,20 +2736,57 @@ filters (venue/opponent/team/inning/toss/result). See the narrowing note for
 curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/summary?tournament=Indian+Premier+League"
 ```
 
-```jsonc
+The example shows two of the 10 rows of `dismissal_position_distribution`. It also leaves out some
+envelope fields, which have the same shape. They are `caught_and_bowled`, `substitute_catches`,
+`stumpings_per_match`, `run_outs_per_match`.
+
+```json
 {
-  "person_id": "4a8a2e3b", "name": "MS Dhoni",
-  "matches":               {"value": 277, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
-  "matches_fielded":       {"value": 277, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
-  "catches":               {"value": 158, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
-  "catches_per_match":     {"value": 0.570,"scope_avg": 0.584,"delta_pct": -2.4, "direction": "higher_better","sample_size": 2565},
-  "stumpings":             {"value": 47,  "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
-  "run_outs":              {"value": 53,  "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
-  "total_dismissals":      {"value": 258, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
-  "dismissals_per_match":  {"value": 0.931,"scope_avg": 0.899,"delta_pct": 3.6,  "direction": "higher_better","sample_size": 2565},
-  "innings_kept":          {"value": 245, "scope_avg": null,  "delta_pct": null, "direction": null,           "sample_size": 2565},
-  "dismissal_position_distribution": [/* 10 entries */],
-  "cohort": {"match_dimension":"is_keeper","is_keeper":1,"n_fielders":232,"n_matches_total":2565},
+  "person_id": "4a8a2e3b",
+  "name": "MS Dhoni",
+  "nationalities": [{"team": "India", "gender": "male", "matches": 95}],
+  "matches": {
+    "value": 277, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2593
+  },
+  "matches_fielded": {
+    "value": 277, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2593
+  },
+  "catches": {
+    "value": 158, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2593
+  },
+  "stumpings": {
+    "value": 47, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2593
+  },
+  "run_outs": {
+    "value": 53, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2593
+  },
+  "total_dismissals": {
+    "value": 258, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2593
+  },
+  "innings_kept": {
+    "value": 245, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2593
+  },
+  "dismissals_per_match": {
+    "value": 0.931, "scope_avg": 0.901, "delta_pct": 3.3, "direction": "higher_better",
+    "sample_size": 2593
+  },
+  "catches_per_match": {
+    "value": 0.57, "scope_avg": 0.585, "delta_pct": -2.6, "direction": "higher_better",
+    "sample_size": 2593
+  },
+  "dismissal_position_distribution": [
+    {
+      "bucket": 1, "catches": 52, "stumpings": 17, "run_outs": 9, "dismissals": 78,
+      "cohort_dismissals_share": 0.2996575342465753, "cohort_catches_per_match": 0.2044
+    },
+    {
+      "bucket": 2, "catches": 21, "stumpings": 8, "run_outs": 7, "dismissals": 36,
+      "cohort_dismissals_share": 0.1404109589041096, "cohort_catches_per_match": 0.0856
+    }
+  ],
+  "cohort": {
+    "match_dimension": "is_keeper", "is_keeper": 1, "n_fielders": 232, "n_matches_total": 2593
+  },
   "is_keeper": 1
 }
 ```
@@ -2287,47 +2815,102 @@ distribution dossier.
 curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/distribution?tournament=Indian%20Premier%20League&as_of_date=2025-01-01"
 ```
 
-```jsonc
+Each milestone holds `value`, `num`, `denom` and the Wilson CI (`ci_low`, `ci_high`). The
+`catches` milestones also carry the envelope fields `scope_avg`, `delta_pct`, `direction` and
+`sample_size`. The `run_outs` and `stumpings` milestones do not. `form.delta` has 12 entries, 4
+windows × 3 metrics (catches, run-outs and stumpings). The stumpings deltas are `null` for a fielder
+who never kept wicket.
+
+The example is trimmed. It keeps one row of `observations` and two entries of each `milestones`
+block. In `form` it keeps one window, `last_10`, and only the plain numbers of that window. Each
+window has the same fields as `lifetime`, without `last_match_date`.
+
+```json
 {
-  "scope": { "tournament": "Indian Premier League" },
+  "scope": {"tournament": "Indian Premier League"},
   "lifetime": {
     "n_matches": 277,
     "innings_kept": 245,
     "substitute_catches": 0,
     "observations": [
-      { "match_id": 6027, "date": "2008-04-19",
-        "catches": 0, "run_outs": 0, "stumpings": 0, "is_keeper": 0 }
-      // … 277 entries total, date-asc
+      {
+        "match_id": 6027, "date": "2008-04-19", "catches": 0, "run_outs": 0, "stumpings": 0,
+        "is_keeper": 0
+      }
     ],
     "catches": {
-      "total": 158, "mean_per_match": 0.57, "median": 0,
-      "variance": 0.64, "std": 0.80,
+      "total": 158,
+      "mean_per_match": 0.5704,
+      "median": 0,
+      "variance": 0.6372,
+      "std": 0.7983,
       "milestones": {
-        "p_zero":  { "value": 0.58, "num": 161, "denom": 277, "ci_low": 0.52, "ci_high": 0.64 },
-        "p_one":   { "value": 0.31, "num":  85, "denom": 277, "ci_low": 0.26, "ci_high": 0.36 },
-        "p_geq_2": { "value": 0.11, "num":  31, "denom": 277, "ci_low": 0.08, "ci_high": 0.15 }
+        "p_zero": {
+          "value": 0.5812, "num": 161, "denom": 277, "ci_low": 0.5224, "ci_high": 0.6378,
+          "scope_avg": 0.5627, "delta_pct": 3.3, "direction": "lower_better", "sample_size": 2593
+        },
+        "p_one": {
+          "value": 0.3069, "num": 85, "denom": 277, "ci_low": 0.2555, "ci_high": 0.3635,
+          "scope_avg": 0.3212, "delta_pct": -4.5, "direction": "higher_better",
+          "sample_size": 2593
+        }
       }
     },
-    "run_outs":  { /* same shape as catches */ },
-    "stumpings": { /* same shape; null when innings_kept == 0 */ }
+    "run_outs": {
+      "total": 53,
+      "mean_per_match": 0.1913,
+      "median": 0,
+      "variance": 0.1988,
+      "std": 0.4458,
+      "milestones": {
+        "p_zero": {"value": 0.8267, "num": 229, "denom": 277, "ci_low": 0.7778, "ci_high": 0.8667},
+        "p_one": {"value": 0.1588, "num": 44, "denom": 277, "ci_low": 0.1205, "ci_high": 0.2065}
+      }
+    },
+    "stumpings": {
+      "total": 47,
+      "mean_per_match": 0.1697,
+      "median": 0,
+      "variance": 0.2139,
+      "std": 0.4624,
+      "milestones": {
+        "p_zero": {"value": 0.8592, "num": 238, "denom": 277, "ci_low": 0.8133, "ci_high": 0.8953},
+        "p_one": {"value": 0.1191, "num": 33, "denom": 277, "ci_low": 0.0861, "ci_high": 0.1626}
+      }
+    },
+    "last_match_date": "2025-05-25"
   },
   "form": {
-    "last_10":  { /* full lifetime-shape dossier */ },
-    "last_60d": { /* … */ },
-    "last_6mo": { /* … */ },
-    "last_1yr": { /* … */ },
+    "last_10": {
+      "n_matches": 10,
+      "innings_kept": 10,
+      "substitute_catches": 0,
+      "catches": {
+        "total": 5, "mean_per_match": 0.5, "median": 0.5, "variance": 0.2778, "std": 0.527
+      },
+      "run_outs": {
+        "total": 1, "mean_per_match": 0.1, "median": 0.0, "variance": 0.1, "std": 0.3162
+      },
+      "stumpings": {
+        "total": 2, "mean_per_match": 0.2, "median": 0.0, "variance": 0.1778, "std": 0.4216
+      }
+    },
     "delta": {
-      "last_10_catches_mean_minus_lifetime":   -0.06,
-      "last_10_run_outs_mean_minus_lifetime":  -0.10,
-      "last_10_stumpings_mean_minus_lifetime": -0.02,
-      "last_60d_catches_mean_minus_lifetime":  null,
-      // … 12 entries total: 4 windows × 3 metrics. Stumpings deltas
-      // null for non-keepers.
+      "last_10_catches_mean_minus_lifetime": -0.0704,
+      "last_10_run_outs_mean_minus_lifetime": -0.0913,
+      "last_10_stumpings_mean_minus_lifetime": 0.0303,
+      "last_60d_catches_mean_minus_lifetime": -0.1418,
+      "last_60d_run_outs_mean_minus_lifetime": -0.0484,
+      "last_60d_stumpings_mean_minus_lifetime": 0.1874,
+      "last_6mo_catches_mean_minus_lifetime": -0.1418,
+      "last_6mo_run_outs_mean_minus_lifetime": -0.0484,
+      "last_6mo_stumpings_mean_minus_lifetime": 0.1874,
+      "last_1yr_catches_mean_minus_lifetime": 0.001,
+      "last_1yr_run_outs_mean_minus_lifetime": -0.0842,
+      "last_1yr_stumpings_mean_minus_lifetime": 0.0089
     }
   },
-  "suggested_splits": [
-    { "label": "All-time", "params": {} }
-  ]
+  "suggested_splits": [{"label": "All-time", "params": {}}]
 }
 ```
 
@@ -2372,19 +2955,33 @@ stay in under the filter.
 curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/records?limit=3"
 ```
 
+The example shows the first row of each list.
+
 ```json
 {
   "person_id": "4a8a2e3b",
   "name": "MS Dhoni",
   "most_catches_match": [
-    { "catches": 4, "stumpings": 0, "run_outs": 0, "dismissals": 4,
-      "match_id": 5616, "team": "Chennai Super Kings",
-      "opponent": "Kolkata Knight Riders",
-      "tournament": "Indian Premier League",
-      "season": "2020/21", "date": "2020-10-07" }
+    {
+      "catches": 5, "stumpings": 0, "run_outs": 0, "dismissals": 5, "match_id": 66,
+      "opponent": "England", "team": "India", "date": "2018-07-08",
+      "tournament": "India tour of Ireland and England", "season": "2018"
+    }
   ],
-  "most_stumpings_match":  [ "…" ],
-  "most_dismissals_match": [ "…" ]
+  "most_stumpings_match": [
+    {
+      "catches": 0, "stumpings": 3, "run_outs": 1, "dismissals": 4, "match_id": 6201,
+      "opponent": "Kolkata Knight Riders", "team": "Chennai Super Kings", "date": "2011-04-08",
+      "tournament": "Indian Premier League", "season": "2011"
+    }
+  ],
+  "most_dismissals_match": [
+    {
+      "catches": 5, "stumpings": 0, "run_outs": 0, "dismissals": 5, "match_id": 66,
+      "opponent": "England", "team": "India", "date": "2018-07-08",
+      "tournament": "India tour of Ireland and England", "season": "2018"
+    }
+  ]
 }
 ```
 
@@ -2424,16 +3021,43 @@ as `scope_avg`. The use of the cohort for `scope_avg` waits for a future enhance
 curl "http://localhost:8000/api/v1/fielders/4a8a2e3b/keeping/summary?tournament=Indian+Premier+League"
 ```
 
-```jsonc
+```json
 {
-  "person_id": "4a8a2e3b", "name": "MS Dhoni",
-  "innings_kept_by_confidence": {"definitive":39,"high":177,"medium":29,"low":0},
-  "innings_kept":                   {"value":245,"direction":null, …},
-  "stumpings":                      {"value": 47,"direction":null, …},
-  "keeping_catches":                {"value":142,"direction":null, …},
-  "byes_per_innings":               {"value":0.41,"direction":"lower_better","scope_avg":null, …},
-  "keeping_dismissals_per_innings": {"value":0.96,"direction":"higher_better","scope_avg":null, …},
-  "cohort": {"match_dimension":"is_keeper","is_keeper":1,"n_keepers":232,"n_matches_keeping":2166}
+  "person_id": "4a8a2e3b",
+  "name": "MS Dhoni",
+  "innings_kept_by_confidence": {"definitive": 39, "high": 177, "medium": 29, "low": 0},
+  "innings_kept": {
+    "value": 245, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2196
+  },
+  "stumpings": {
+    "value": 47, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2196
+  },
+  "keeping_catches": {
+    "value": 142, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2196
+  },
+  "run_outs_while_keeping": {
+    "value": 46, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2196
+  },
+  "byes_conceded": {
+    "value": 100, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2196
+  },
+  "byes_per_innings": {
+    "value": 0.41, "scope_avg": null, "delta_pct": null, "direction": "lower_better",
+    "sample_size": 2196
+  },
+  "dismissals_while_keeping": {
+    "value": 235, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2196
+  },
+  "keeping_dismissals_per_innings": {
+    "value": 0.96, "scope_avg": null, "delta_pct": null, "direction": "higher_better",
+    "sample_size": 2196
+  },
+  "ambiguous_innings": {
+    "value": 32, "scope_avg": null, "delta_pct": null, "direction": null, "sample_size": 2196
+  },
+  "cohort": {
+    "match_dimension": "is_keeper", "is_keeper": 1, "n_keepers": 232, "n_matches_keeping": 2196
+  }
 }
 ```
 
@@ -2651,26 +3275,45 @@ highlight a fielder through `?highlight_fielder=<person_id>`.
 
 The endpoint returns a grid of the deliveries for the InningsGridChart, with every ball as a cell.
 
+```bash
+curl "http://localhost:8000/api/v1/matches/13017/innings-grid"
+```
+
+The example shows the first of the 2 innings, and the first of its 124 deliveries.
+
 ```json
 {
   "match_id": 13017,
   "innings": [
     {
-      "innings_number": 0, "team": "Sweden",
-      "batters": ["…"], "batter_ids": ["…"],
-      "bowlers": ["…"], "bowler_ids": ["…"],
-      "total_balls": 120, "total_runs": 166, "total_wickets": 8,
+      "innings_number": 0,
+      "team": "Sweden",
+      "batters": [
+        "Imal Zuwak", "A Mundra", "Awais Ahmad", "YS Chauhan", "W Boshoff", "Zaid Ahmad",
+        "A Dhabe", "Saeed Ahmed", "Zain Muzaffar", "Zabiullah Zahid"
+      ],
+      "batter_ids": [
+        "1283e17b", "30ffaf85", "518a21ed", "fb3233d4", "cad11a02", "45828106", "5a0dbdeb",
+        "63d6e16e", "19b4fa25", "6d024ce3"
+      ],
+      "bowlers": [
+        "F Banunaek", "Gaurav Tiwari", "DJ Hawoe", "GD Arta", "IK Gamantika", "KN Chaddha"
+      ],
+      "bowler_ids": ["3c8faed4", "cab3f89a", "a62f55ba", "e969e580", "4d7c5b56", "a88e4013"],
       "deliveries": [
         {
           "over_ball": "1.1", "bowler": "F Banunaek", "batter": "Imal Zuwak",
-          "batter_id": "…", "bowler_id": "…",
-          "batter_index": 0, "bowler_index": 0, "non_striker_index": 1,
-          "runs_batter": 4, "runs_extras": 1, "runs_total": 5,
-          "extras_wides": 0, "extras_noballs": 1,
-          "cumulative_runs": 5, "cumulative_wickets": 0,
-          "wicket_kind": null, "wicket_player_out": null, "wicket_text": null
+          "batter_id": "1283e17b", "batter_index": 0, "non_striker": "A Mundra",
+          "non_striker_index": 1, "bowler_id": "3c8faed4", "bowler_index": 0, "runs_batter": 4,
+          "runs_extras": 1, "runs_total": 5, "extras_wides": 0, "extras_noballs": 1,
+          "extras_byes": 0, "extras_legbyes": 0, "cumulative_runs": 5, "cumulative_wickets": 0,
+          "wicket_kind": null, "wicket_player_out": null, "wicket_player_out_index": null,
+          "wicket_text": null
         }
-      ]
+      ],
+      "total_balls": 124,
+      "total_runs": 166,
+      "total_wickets": 8
     }
   ]
 }
@@ -2724,45 +3367,106 @@ It is `null` for a bilateral tour. The pair counts (`matches`,
 curl "http://localhost:8000/api/v1/series/landing?gender=male"
 ```
 
+The example shows the first row of each list. The full response has 5 rows of `recent_editions`, 4
+rows of `icc_events`, 36 rows of `bilateral_rivalries.men.top`, 436 rows of `other_international`,
+12 rows of `franchise_leagues`, 3 rows of `domestic_leagues`, 4 rows of `other` and 12 rows of
+`rivalries.men`.
+
 ```json
 {
+  "recent_editions": [
+    {
+      "tournament": "ICC Men's T20 World Cup Africa Sub Regional Qualifier C", "season": "2026/27",
+      "last_match_date": "2026-10-25", "gender": "male", "team_type": "international",
+      "champion": null
+    }
+  ],
   "international": {
     "icc_events": [
-      { "canonical": "T20 World Cup (Men)", "editions": 10, "matches": 334,
-        "most_titles": { "team": "India", "titles": 3 },
-        "latest_edition": { "season": "2025/26", "champion": "India" },
-        "team_type": "international", "gender": "male" }
+      {
+        "canonical": "T20 World Cup (Men)",
+        "editions": 10,
+        "matches": 334,
+        "most_titles": {"team": "India", "titles": 3},
+        "latest_edition": {"season": "2025/26", "champion": "India"},
+        "team_type": "international",
+        "gender": "male"
+      }
     ],
     "bilateral_rivalries": {
       "men": {
         "top": [
-          { "team1": "New Zealand", "team2": "Pakistan",
-            "matches": 42, "team1_wins": 21, "team2_wins": 19,
-            "ties": 0, "no_result": 2,
-            "latest_match": { "match_id": 1835, "date": "2025-03-26",
-                              "winner": "New Zealand",
-                              "tournament": null, "season": "2024/25" } }
+          {
+            "team1": "New Zealand",
+            "team2": "Pakistan",
+            "matches": 42,
+            "team1_wins": 21,
+            "team2_wins": 19,
+            "ties": 0,
+            "no_result": 2,
+            "latest_match": {
+              "match_id": 1835, "date": "2025-03-26", "winner": "New Zealand", "tournament": null,
+              "season": "2024/25"
+            }
+          }
         ],
-        "other_count": 153
+        "other_count": 177
       },
-      "women": { "top": [], "other_count": 0 },
+      "women": {"top": [], "other_count": 0},
       "other_threshold": 5
     },
-    "other_international": [ "…long tail of qualifiers, regional events…" ]
+    "other_international": [
+      {
+        "canonical": "ICC Men's T20 World Cup Sub Regional Africa Qualifier", "editions": 5,
+        "matches": 115, "most_titles": null, "latest_edition": null, "team_type": "international",
+        "gender": "male"
+      }
+    ]
   },
   "club": {
-    "franchise_leagues": [ { "canonical": "Indian Premier League", "editions": 19, "matches": 1190 } ],
-    "domestic_leagues": [ "…" ],
-    "women_franchise": [ "…" ],
-    "other": [ "…" ],
+    "franchise_leagues": [
+      {
+        "canonical": "Indian Premier League",
+        "editions": 19,
+        "matches": 1243,
+        "most_titles": {"team": "Mumbai Indians", "titles": 5},
+        "latest_edition": {"season": "2026", "champion": "Royal Challengers Bengaluru"},
+        "team_type": "club",
+        "gender": "male"
+      }
+    ],
+    "domestic_leagues": [
+      {
+        "canonical": "Vitality Blast",
+        "editions": 13,
+        "matches": 1570,
+        "most_titles": {"team": "Somerset", "titles": 2},
+        "latest_edition": {"season": "2026", "champion": "Northamptonshire"},
+        "team_type": "club",
+        "gender": "male"
+      }
+    ],
+    "women_franchise": [],
+    "other": [
+      {
+        "canonical": "Major Clubs T20 Tournament",
+        "editions": 1,
+        "matches": 49,
+        "most_titles": {"team": "Tamil Union Cricket and Athletic Club", "titles": 1},
+        "latest_edition": {"season": "2026", "champion": "Tamil Union Cricket and Athletic Club"},
+        "team_type": "club",
+        "gender": "male"
+      }
+    ],
     "rivalries": {
       "men": [
-        { "team1": "Chennai Super Kings", "team2": "Mumbai Indians",
-          "tournament": "Indian Premier League",
-          "matches": 39, "team1_wins": 18, "team2_wins": 21,
-          "ties": 0, "no_result": 0 }
+        {
+          "team1": "Chennai Super Kings", "team2": "Mumbai Indians",
+          "tournament": "Indian Premier League", "matches": 41, "team1_wins": 20, "team2_wins": 21,
+          "ties": 0, "no_result": 0
+        }
       ],
-      "women": [ "…top-12 most-played pairs in women's club tournaments…" ]
+      "women": []
     }
   }
 }
@@ -2812,71 +3516,109 @@ row's tournament equals the dossier's, so the field is redundant there.
 curl "http://localhost:8000/api/v1/series/summary?filter_team=India&filter_opponent=Australia&gender=male"
 ```
 
+The example shows two of the 5 rows of `groups`.
+
 ```json
 {
-  "canonical": null, "variants": [],
-  "matches": 37, "editions": 13,
-  "run_rate": 8.68, "boundary_pct": 17.69, "dot_pct": 34.8,
-  "total_runs": "…", "total_wickets": "…",
-  "total_fours": 934, "total_sixes": 449,
+  "canonical": null,
+  "variants": [],
+  "editions": 13,
+  "matches": 37,
+  "total_runs": 11313,
+  "total_wickets": 405,
+  "total_sixes": 449,
+  "total_fours": 934,
+  "run_rate": 8.68,
+  "boundary_pct": 17.69,
+  "dot_pct": 34.78,
   "most_titles": null,
-  "champions_by_season": [
-    { "season": "2024", "tournament": "ICC Men's T20 World Cup",
-      "champion": "India", "match_id": 1551,
-      "team1": "India", "team2": "South Africa",
-      "team1_score": "176/7", "team2_score": "169/8",
-      "date": "2024-06-29" }
-  ],
-  "top_scorer_alltime":     { "person_id": "ba607b88", "name": "V Kohli",
-                              "team": "India", "runs": 794 },
-  "top_wicket_taker_alltime": { "person_id": "462411b3", "name": "JJ Bumrah",
-                              "team": "India", "wickets": 20 },
+  "champions_by_season": [],
+  "top_scorer_alltime": {"person_id": "ba607b88", "name": "V Kohli", "team": "India", "runs": 794},
+  "top_wicket_taker_alltime": {
+    "person_id": "462411b3", "name": "JJ Bumrah", "team": "India", "wickets": 20
+  },
   "top_teams_international": [],
   "top_teams_club": [],
-  "highest_individual":     { "person_id": "55d96c71", "name": "SR Watson",
-                              "team": "Australia", "runs": 120,
-                              "match_id": 1092, "date": "2016-03-27" },
-  "highest_team_total":     { "team": "India", "total": 235, "match_id": 1347,
-                              "opponent": "Australia", "date": "2023-11-26" },
-  "largest_partnership":    { "runs": 141, "match_id": 1348,
-                              "team": "India", "opponent": "Australia",
-                              "date": "2023-11-28",
-                              "batter1": { "person_id": "45a43fe2", "name": "RD Gaikwad" },
-                              "batter2": { "person_id": "8bfbd3a3", "name": "Tilak Varma" } },
-  "best_bowling":           { "person_id": "ecd3e89b", "name": "R Ashwin",
-                              "team": "India", "figures": "4/11",
-                              "wickets": 4, "runs": 11,
-                              "match_id": "…", "date": "…" },
-  "best_fielding":          { "person_id": "…", "name": "MS Dhoni",
-                              "team": "India",
-                              "catches": 5, "stumpings": 0,
-                              "run_outs": 0, "caught_bowled": 0,
-                              "total": 5, "match_id": "…", "date": "…" },
-  "teams":  [ { "name": "India", "matches": 37 }, { "name": "Australia", "matches": 37 } ],
-  "groups": [],
+  "highest_individual": {
+    "person_id": "4329fbb5", "name": "SR Watson", "team": "Australia", "runs": 124,
+    "match_id": 3152, "date": "2016-01-31"
+  },
+  "highest_team_total": {
+    "team": "India", "total": 235, "match_id": 1347, "opponent": "Australia", "date": "2023-11-26"
+  },
+  "largest_partnership": {
+    "runs": 141,
+    "match_id": 1348,
+    "team": "India",
+    "opponent": "Australia",
+    "date": "2023-11-28",
+    "batter1": {"person_id": "45a43fe2", "name": "RD Gaikwad"},
+    "batter2": {"person_id": "b0482a1d", "name": "Tilak Varma"}
+  },
+  "best_bowling": {
+    "person_id": "495d42a5", "name": "R Ashwin", "team": "India", "figures": "4/11", "wickets": 4,
+    "runs": 11, "match_id": 3091, "date": "2014-03-30"
+  },
+  "best_fielding": {
+    "person_id": "4a8a2e3b", "name": "MS Dhoni", "team": "India", "catches": 2, "stumpings": 1,
+    "run_outs": 2, "caught_bowled": 0, "total": 5, "match_id": 2934, "date": "2012-02-03"
+  },
+  "teams": [{"name": "Australia", "matches": 37}, {"name": "India", "matches": 37}],
+  "groups": [
+    {
+      "season": "2024",
+      "group": "1",
+      "teams": [{"team": "India", "matches": 1}, {"team": "Australia", "matches": 1}]
+    },
+    {
+      "season": "2015/16",
+      "group": "2",
+      "teams": [{"team": "India", "matches": 1}, {"team": "Australia", "matches": 1}]
+    }
+  ],
   "knockouts": [
-    { "match_id": 2794, "season": "2007/08", "stage": "Semi Final",
-      "tournament": "ICC World Twenty20",
-      "team1": "Australia", "team2": "India",
-      "winner": "India", "margin": "15 runs",
-      "venue": "Kingsmead", "date": "2007-09-22",
-      "team1_score": "141/7", "team2_score": "142/6" }
+    {
+      "match_id": 2794, "season": "2007/08", "stage": "Semi Final",
+      "tournament": "ICC World Twenty20", "team1": "Australia", "team2": "India",
+      "winner": "India", "margin": "15 runs", "venue": "Kingsmead", "date": "2007-09-22",
+      "team1_score": "173/7", "team2_score": "188/5"
+    }
   ],
   "by_team": {
     "India": {
-      "top_scorer":      { "person_id": "ba607b88", "name": "V Kohli", "runs": 794 },
-      "top_wicket_taker":{ "person_id": "462411b3", "name": "JJ Bumrah", "wickets": 20 },
-      "highest_individual": { "person_id": "45a43fe2", "name": "RD Gaikwad", "runs": 119,
-                              "match_id": 1348, "date": "2023-11-28" },
-      "largest_partnership":{ "runs": 141, "batter1": { "name": "RD Gaikwad" },
-                              "batter2": { "name": "Tilak Varma" } }
+      "top_scorer": {"person_id": "ba607b88", "name": "V Kohli", "runs": 794},
+      "top_wicket_taker": {"person_id": "462411b3", "name": "JJ Bumrah", "wickets": 20},
+      "highest_individual": {
+        "person_id": "45a43fe2", "name": "RD Gaikwad", "runs": 123, "match_id": 1348,
+        "date": "2023-11-28"
+      },
+      "largest_partnership": {
+        "runs": 141,
+        "match_id": 1348,
+        "date": "2023-11-28",
+        "batter1": {"person_id": "45a43fe2", "name": "RD Gaikwad"},
+        "batter2": {"person_id": "b0482a1d", "name": "Tilak Varma"}
+      }
     },
-    "Australia": { "top_scorer": { "name": "GJ Maxwell", "runs": 570 }, "…": "…" }
+    "Australia": {
+      "top_scorer": {"person_id": "b681e71e", "name": "GJ Maxwell", "runs": 576},
+      "top_wicket_taker": {"person_id": "9eb1455b", "name": "NT Ellis", "wickets": 16},
+      "highest_individual": {
+        "person_id": "4329fbb5", "name": "SR Watson", "runs": 124, "match_id": 3152,
+        "date": "2016-01-31"
+      },
+      "largest_partnership": {
+        "runs": 133,
+        "match_id": 2965,
+        "date": "2012-09-28",
+        "batter1": {"person_id": "4329fbb5", "name": "SR Watson"},
+        "batter2": {"person_id": "dcce6f09", "name": "DA Warner"}
+      }
+    }
   },
   "head_to_head": {
-    "team1": "India", "team2": "Australia",
-    "team1_wins": 22, "team2_wins": 12,
-    "ties": 0, "no_result": 3
+    "team1": "India", "team2": "Australia", "team1_wins": 22, "team2_wins": 12, "ties": 0,
+    "no_result": 3
   }
 }
 ```
@@ -2924,17 +3666,28 @@ one combined table for leagues shaped like the IPL.
 curl "http://localhost:8000/api/v1/series/points-table?tournament=Indian+Premier+League&season_from=2024&season_to=2024&gender=male&team_type=club"
 ```
 
+The example shows two of the 10 rows.
+
 ```json
 {
-  "canonical": "Indian Premier League", "season": "2024",
+  "canonical": "Indian Premier League",
+  "season": "2024",
   "tables": [
-    { "group": null,
+    {
+      "group": null,
       "rows": [
-        { "team": "Kolkata Knight Riders",
-          "played": 12, "wins": 9, "losses": 3, "ties": 0, "nr": 0,
-          "points": 18, "nrr": 1.123,
-          "runs_for": "…", "balls_for": "…", "runs_against": "…", "balls_against": "…" }
-      ] }
+        {
+          "team": "Kolkata Knight Riders", "played": 12, "wins": 9, "losses": 3, "ties": 0,
+          "nr": 0, "points": 18, "runs_for": 2389, "balls_for": 1349, "runs_against": 2135,
+          "balls_against": 1348, "nrr": 1.123
+        },
+        {
+          "team": "Sunrisers Hyderabad", "played": 13, "wins": 8, "losses": 5, "ties": 0, "nr": 0,
+          "points": 16, "runs_for": 2605, "balls_for": 1475, "runs_against": 2599,
+          "balls_against": 1534, "nrr": 0.431
+        }
+      ]
+    }
   ]
 }
 ```
@@ -2952,35 +3705,73 @@ at `limit` (default 5). Tournament is optional.
 curl "http://localhost:8000/api/v1/series/records?tournament=Indian+Premier+League&gender=male&team_type=club&limit=2"
 ```
 
+The example shows the first row of each list.
+
 ```json
 {
   "canonical": "Indian Premier League",
-  "highest_team_totals":   [ { "team": "Sunrisers Hyderabad", "runs": 287, "opponent": "Royal Challengers Bengaluru",
-                                "match_id": 5904, "date": "2024-04-15",
-                                "tournament": "Indian Premier League", "season": "2024" } ],
-  "lowest_all_out_totals": [ "…" ],
-  "biggest_wins_by_runs":   [ { "winner": "Mumbai Indians", "loser": "Delhi Capitals", "margin": 146,
-                                 "match_id": 5471, "date": "2017-05-06",
-                                 "tournament": "Indian Premier League", "season": "2017" } ],
-  "biggest_wins_by_wickets":[ "…" ],
-  "largest_partnerships":   [ { "runs": 229, "batter1": { "name": "V Kohli" }, "batter2": { "name": "AB de Villiers" },
-                                 "teams": "Royal Challengers Bengaluru v Gujarat Lions",
-                                 "team1": "Royal Challengers Bengaluru", "team2": "Gujarat Lions",
-                                 "batting_team": "Royal Challengers Bengaluru",
-                                 "match_id": 6586, "date": "2016-05-14",
-                                 "tournament": "Indian Premier League", "season": "2016" } ],
-  "best_individual_batting": [ { "name": "CH Gayle", "runs": 175, "balls": 65,
-                                 "fours": 13, "sixes": 17, "not_out": true,
-                                 "figures": "175* (65)", "match_id": 6377, "date": "2013-04-23",
-                                 "tournament": "Indian Premier League", "season": "2013" } ],
-  "best_bowling_figures":   [ { "name": "AS Joseph", "wickets": 6, "runs": 14, "balls": 22,
-                                 "figures": "6/14", "match_id": 5565, "date": "2019-04-06",
-                                 "tournament": "Indian Premier League", "season": "2019" } ],
-  "most_sixes_in_a_match":  [ { "match_id": "…", "sixes": 42,
-                                 "teams": "Kolkata Knight Riders v Punjab Kings",
-                                 "team1": "Kolkata Knight Riders", "team2": "Punjab Kings",
-                                 "date": "2024-04-26",
-                                 "tournament": "Indian Premier League", "season": "2024" } ]
+  "highest_team_totals": [
+    {
+      "team": "Sunrisers Hyderabad", "runs": 287, "opponent": "Royal Challengers Bengaluru",
+      "match_id": 5904, "date": "2024-04-15", "tournament": "Indian Premier League",
+      "season": "2024"
+    }
+  ],
+  "lowest_all_out_totals": [
+    {
+      "team": "Royal Challengers Bengaluru", "runs": 49, "opponent": "Kolkata Knight Riders",
+      "match_id": 5454, "date": "2017-04-23", "tournament": "Indian Premier League",
+      "season": "2017"
+    }
+  ],
+  "biggest_wins_by_runs": [
+    {
+      "winner": "Mumbai Indians", "loser": "Delhi Capitals", "margin": 146, "match_id": 5471,
+      "date": "2017-05-06", "tournament": "Indian Premier League", "season": "2017"
+    }
+  ],
+  "biggest_wins_by_wickets": [
+    {
+      "winner": "Kolkata Knight Riders", "loser": "Gujarat Lions", "margin": 10, "match_id": 5430,
+      "date": "2017-04-07", "tournament": "Indian Premier League", "season": "2017"
+    }
+  ],
+  "largest_partnerships": [
+    {
+      "runs": 229,
+      "batter1": {"person_id": "ba607b88", "name": "V Kohli"},
+      "batter2": {"person_id": "c4487b84", "name": "AB de Villiers"},
+      "teams": "Royal Challengers Bengaluru v Gujarat Lions",
+      "team1": "Royal Challengers Bengaluru",
+      "team2": "Gujarat Lions",
+      "batting_team": "Royal Challengers Bengaluru",
+      "match_id": 6586,
+      "date": "2016-05-14",
+      "tournament": "Indian Premier League",
+      "season": "2016"
+    }
+  ],
+  "best_individual_batting": [
+    {
+      "person_id": "db584dad", "name": "CH Gayle", "runs": 175, "balls": 65, "fours": 13,
+      "sixes": 17, "not_out": true, "figures": "175* (65)", "match_id": 6377, "date": "2013-04-23",
+      "tournament": "Indian Premier League", "season": "2013"
+    }
+  ],
+  "best_bowling_figures": [
+    {
+      "person_id": "b0946605", "name": "AS Joseph", "wickets": 6, "runs": 14, "balls": 22,
+      "figures": "6/14", "match_id": 5565, "date": "2019-04-06",
+      "tournament": "Indian Premier League", "season": "2019"
+    }
+  ],
+  "most_sixes_in_a_match": [
+    {
+      "match_id": 5916, "sixes": 42, "teams": "Kolkata Knight Riders v Punjab Kings",
+      "team1": "Kolkata Knight Riders", "team2": "Punjab Kings", "date": "2024-04-26",
+      "tournament": "Indian Premier League", "season": "2024"
+    }
+  ]
 }
 ```
 
@@ -3017,15 +3808,35 @@ and not to the dossier's `filter_opponent` as written.
   not padded.
 
 ```bash
-curl "http://localhost:8000/api/v1/series/batters-leaders?tournament=T20+World+Cup+%28Men%29&gender=male&limit=3"
+curl "http://localhost:8000/api/v1/series/batters-leaders?tournament=T20+World+Cup+%28Men%29&gender=male&limit=3&min_balls=100&min_dismissals=3"
 curl "http://localhost:8000/api/v1/series/fielders-leaders?tournament=Indian+Premier+League&gender=male&team_type=club&limit=3"
 ```
 
+The example is the first response, from `batters-leaders`, with the first row of each list. The
+curl passes `min_balls=100` and `min_dismissals=3`, because the defaults (1 and 0) set no real
+threshold.
+
 ```json
 {
-  "by_average":     [ { "person_id": "…", "name": "ML Hayden", "team": "Australia", "runs": 259, "balls": 132, "dismissals": 3, "average": 86.33, "strike_rate": 196.21 } ],
-  "by_strike_rate": [ { "person_id": "…", "name": "SV Samson", "team": "India", "strike_rate": 199.38, "runs": 321, "balls": 161 } ],
-  "thresholds": { "min_balls": 100, "min_dismissals": 3 }
+  "by_runs": [
+    {
+      "person_id": "ba607b88", "runs": 1218, "balls": 933, "dismissals": 20, "average": 60.9,
+      "strike_rate": 130.55, "name": "V Kohli", "team": "India"
+    }
+  ],
+  "by_average": [
+    {
+      "person_id": "d8699ab7", "runs": 265, "balls": 181, "dismissals": 3, "average": 88.33,
+      "strike_rate": 146.41, "name": "ML Hayden", "team": "Australia"
+    }
+  ],
+  "by_strike_rate": [
+    {
+      "person_id": "a4cc73aa", "runs": 321, "balls": 161, "dismissals": 4, "average": 80.25,
+      "strike_rate": 199.38, "name": "SV Samson", "team": "India"
+    }
+  ],
+  "thresholds": {"min_balls": 100, "min_dismissals": 3}
 }
 ```
 
@@ -3136,20 +3947,32 @@ partnerships against them (side=bowling).
 curl "http://localhost:8000/api/v1/series/partnerships/by-wicket?tournament=Indian+Premier+League&gender=male&team_type=club"
 ```
 
+The example shows the first of the 10 wickets.
+
 ```json
 {
   "tournament": "Indian Premier League",
-  "side": "batting", "filter_team": null,
+  "side": "batting",
+  "filter_team": null,
   "by_wicket": [
-    { "wicket_number": 1, "n": 1245, "avg_runs": 41.2, "avg_balls": 26.8,
+    {
+      "wicket_number": 1,
+      "n": 2455,
+      "avg_runs": 32.6,
+      "avg_balls": 23.3,
       "best_runs": 210,
       "best_partnership": {
-        "runs": 210, "balls": "…",
-        "batter1": { "person_id": "…", "name": "Q de Kock" },
-        "batter2": { "person_id": "…", "name": "KL Rahul" },
-        "match_id": 5792, "season": "2022", "date": "2022-05-18",
-        "batting_team": "Lucknow Super Giants", "opponent": "Kolkata Knight Riders"
-      } }
+        "runs": 210,
+        "balls": 104,
+        "match_id": 5933,
+        "season": "2024",
+        "date": "2024-05-10",
+        "batting_team": "Gujarat Titans",
+        "opponent": "Chennai Super Kings",
+        "batter1": {"person_id": "d5130a30", "name": "B Sai Sudharsan"},
+        "batter2": {"person_id": "b4b99816", "name": "Shubman Gill"}
+      }
+    }
   ]
 }
 ```
@@ -3190,27 +4013,57 @@ sub-lists.
 curl "http://localhost:8000/api/v1/series/partnerships/top-by-wicket?tournament=Indian+Premier+League&per_wicket=2&gender=male&team_type=club"
 ```
 
+The example shows the first two of the 10 wickets, and the first partnership of each.
+
 ```json
 {
   "tournament": "Indian Premier League",
-  "side": "batting", "filter_team": null, "per_wicket": 2,
+  "side": "batting",
+  "filter_team": null,
+  "per_wicket": 2,
   "by_wicket": [
-    { "wicket_number": 1, "partnerships": [
-      { "runs": 210, "batter1": { "name": "B Sai Sudharsan" },
-        "batter2": { "name": "Shubman Gill" },
-        "batting_team": "Gujarat Titans", "opponent": "Chennai Super Kings",
-        "season": "2024", "date": "2024-05-10", "match_id": 5933,
-        "tournament": "Indian Premier League" },
-      "…"
-    ] },
-    { "wicket_number": 2, "partnerships": [
-      { "runs": 229, "batter1": { "name": "V Kohli" },
-        "batter2": { "name": "AB de Villiers" },
-        "batting_team": "Royal Challengers Bengaluru", "opponent": "Gujarat Lions",
-        "season": "2016", "date": "2016-05-14", "match_id": 6586,
-        "tournament": "Indian Premier League" },
-      "…"
-    ] }
+    {
+      "wicket_number": 1,
+      "partnerships": [
+        {
+          "partnership_id": 82677,
+          "runs": 210,
+          "balls": 104,
+          "wicket_number": 1,
+          "unbroken": false,
+          "ended_by_kind": "caught",
+          "match_id": 5933,
+          "season": "2024",
+          "tournament": "Indian Premier League",
+          "date": "2024-05-10",
+          "batting_team": "Gujarat Titans",
+          "opponent": "Chennai Super Kings",
+          "batter1": {"person_id": "d5130a30", "name": "B Sai Sudharsan", "runs": 103, "balls": 51},
+          "batter2": {"person_id": "b4b99816", "name": "Shubman Gill", "runs": 103, "balls": 53}
+        }
+      ]
+    },
+    {
+      "wicket_number": 2,
+      "partnerships": [
+        {
+          "partnership_id": 91349,
+          "runs": 229,
+          "balls": 96,
+          "wicket_number": 2,
+          "unbroken": false,
+          "ended_by_kind": "caught",
+          "match_id": 6586,
+          "season": "2016",
+          "tournament": "Indian Premier League",
+          "date": "2016-05-14",
+          "batting_team": "Royal Challengers Bengaluru",
+          "opponent": "Gujarat Lions",
+          "batter1": {"person_id": "ba607b88", "name": "V Kohli", "runs": 97, "balls": 45},
+          "batter2": {"person_id": "c4487b84", "name": "AB de Villiers", "runs": 129, "balls": 51}
+        }
+      ]
+    }
   ]
 }
 ```
@@ -3224,14 +4077,21 @@ number.
 curl "http://localhost:8000/api/v1/series/partnerships/heatmap?tournament=Indian+Premier+League&gender=male&team_type=club"
 ```
 
+The example shows two of the 190 cells.
+
 ```json
 {
   "tournament": "Indian Premier League",
-  "side": "batting", "filter_team": null,
-  "seasons": ["2008", "2009", "…", "2025"],
+  "side": "batting",
+  "filter_team": null,
+  "seasons": [
+    "2007/08", "2009", "2009/10", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018",
+    "2019", "2020/21", "2021", "2022", "2023", "2024", "2025", "2026"
+  ],
   "wickets": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
   "cells": [
-    { "season": "2024", "wicket_number": 1, "avg_runs": 35.4, "n": 141 }
+    {"season": "2007/08", "wicket_number": 1, "avg_runs": 30.6, "n": 114},
+    {"season": "2007/08", "wicket_number": 2, "avg_runs": 26.1, "n": 105}
   ]
 }
 ```
@@ -3269,16 +4129,28 @@ curl "http://localhost:8000/api/v1/rivalries/summary?team1=India&team2=Australia
 
 ```json
 {
-  "team1": "India", "team2": "Australia",
-  "matches": 37, "team1_wins": 22, "team2_wins": 12, "ties": 0, "no_result": 3,
-  "by_series_type": { "icc_event": 6, "bilateral_tour": 26, "other": 5 },
-  "top_scorer_in_rivalry":      { "name": "V Kohli", "runs": 794 },
-  "top_wicket_taker_in_rivalry":{ "name": "JJ Bumrah", "wickets": 20 },
-  "highest_individual": { "name": "SR Watson", "runs": 120 },
-  "largest_partnership":{ "runs": 141, "match_id": 1348 },
-  "closest_match":      { "margin": "4 runs", "winner": "Australia" },
-  "biggest_win":        { "winner": "India", "margin": "73 runs" },
-  "last_match":         { "match_id": "…", "date": "2025-11-08" }
+  "team1": "India",
+  "team2": "Australia",
+  "matches": 37,
+  "team1_wins": 22,
+  "team2_wins": 12,
+  "ties": 0,
+  "no_result": 3,
+  "last_match": {
+    "match_id": 2179, "date": "2025-11-08", "winner": null, "result": "no result", "by": null
+  },
+  "by_series_type": {"icc_event": 6, "bilateral_tour": 26, "other": 5},
+  "top_scorer_in_rivalry": {"person_id": "ba607b88", "name": "V Kohli", "runs": 794},
+  "top_wicket_taker_in_rivalry": {"person_id": "462411b3", "name": "JJ Bumrah", "wickets": 20},
+  "highest_individual": {
+    "person_id": "4329fbb5", "name": "SR Watson", "runs": 124, "match_id": 3152,
+    "date": "2016-01-31"
+  },
+  "largest_partnership": {"runs": 141, "match_id": 1348},
+  "closest_match": {
+    "margin": "4 runs", "winner": "Australia", "match_id": 121, "date": "2018-11-21"
+  },
+  "biggest_win": {"winner": "India", "margin": "73 runs", "match_id": 3091, "date": "2014-03-30"}
 }
 ```
 
