@@ -68,9 +68,11 @@ A share-link to a 0-free case reproduces the verbose strip; a share-link to a 3-
 
 ---
 
-## `result` and `toss_outcome` aux filters require a subject team
+## `result` and `toss_outcome` aux filters without a subject team {#result-and-toss_outcome-aux-filters-require-a-subject-team}
 
-Without `?team=`, the league-side query unpivots every match into 2 team-views — and "won" within that unpivot is tautologically 50% (every win has a loss). The `/teams/splits` endpoint returns **HTTP 400** when either aux is set without `?team=`, making the asymmetry observable instead of silently degenerate.
+Without `?team=`, the league-side query unpivots every match into 2 team-views. Until 2026-05-11, the `/teams/splits` endpoint returned **HTTP 400** when either aux was set without `?team=`, on the argument that "won" in that unpivot is 50% by construction. That gate is lifted (see the comment in `team_splits`, `api/routers/teams.py`).
+
+The endpoint now narrows the team-views. For example, `?toss_outcome=won` keeps the toss winner's view of each match, so `scope_total_n` is half the landing total. The marginal of the narrowed axis is then 1.0 by construction, and the cells and the other two marginals give the league-wide baseline under that condition. For example, the cells give inning × result given a won toss.
 
 `aux.inning` works fine without `?team=` (each team-view independently batted first or second).
 
