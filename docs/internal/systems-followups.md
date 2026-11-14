@@ -14,9 +14,10 @@ Pairs with:
 
 ## 2026-11-14: open issues in the database, the tests and deebase
 
-These issues came up while the docs were fixed in November 2026. Nothing here is fixed yet. Each item
-gives the facts, the evidence and the action. "The main checkout" is `~/Projects/cricsdb`, the folder that
-`deploy.sh` runs from.
+These issues came up while the docs were fixed in November 2026. The fielding 500, in item 1 of the
+sanity tests below, is fixed in the PR of branch `fix/fielding-by-season-live`. The other items are not
+fixed yet. Each item gives the facts, the evidence and the action. "The main checkout" is
+`~/Projects/cricsdb`, the folder that `deploy.sh` runs from.
 
 ### deebase: production ships a hand-patched 0.6.1
 
@@ -46,10 +47,10 @@ copies 0.7.0, and production ships a published release instead of a patched copy
 `uv pip show deebase`, which must say 0.7.0. Line 66 names `python3.14` in the path, so the copy breaks if
 the `.venv` uses another Python.
 
-### Four sanity tests fail, and none of the failures comes from deebase
+### Four sanity tests failed, and none of the failures comes from deebase
 
 The tests were re-run on 2026-11-14 on a copy of `cricket.db`, with deebase 0.7.0. The four tests
-only read the database. All four still fail.
+only read the database. All four failed. Test 1 now passes; tests 2, 3 and 4 still fail.
 
 1. **`tests/sanity/test_dispatch_equivalence.py`**: "201 pairs equivalent, 11 failures". All 11 are
    `scope/fielding/by-season`, one for each of the 11 scopes. The error is
@@ -62,6 +63,24 @@ only read the database. All four still fail.
      So it returns HTTP 500 for those scopes. For example, `?tournament=Indian%20Premier%20League&inning=0`
      and `?...&filter_venue=Wankhede%20Stadium` both give 500. A plain IPL 2024 scope gives 200, because it
      is precomputed. The front end calls this endpoint, in `frontend/src/api.ts:972`.
+   - **Fixed** in the PR of branch `fix/fielding-by-season-live`. The second function is the live path of
+     the per-player keeper cohort, `/players/fielding/by-season`. It is renamed
+     `_fielding_cohort_by_season_live`, and its one caller, `compute_players_fielding_by_season`, calls it
+     by that name. So the endpoint reaches the first function again. The test now reports "212 pairs
+     equivalent, 0 failures".
+   - Two new tests guard it. `tests/sanity/test_fielding_by_season_live.py` calls the endpoint for
+     `inning=0` and for `filter_venue=Wankhede Stadium`, and compares the matches and catches of each
+     season with SQL. `tests/sanity/test_no_duplicate_defs.py` fails when a module in `api/` defines a
+     top-level name twice.
+   - The fix reaches production only with the next deploy.
+   - Still open, found in the review of the fix. On the league fielding endpoints
+     (`/fielding/summary` and `/fielding/by-season`), `result` or `toss_outcome` halves the
+     per-innings rates. These filters keep one fielding innings of each match
+     (`_cohort_outcome_clause`), but `inning_active` is false, so the counts are divided by matches
+     times 2. For IPL 2023 with `result=won`, SQL gives 345 catches in 73 innings, 4.73 per innings, and
+     the API gives 2.37. `/fielding/summary` had this before the fix; `/fielding/by-season` shows it now
+     that it no longer gives 500. The likely fix: treat `result` and `toss_outcome` like `inning` in
+     `_format_fielding_summary` and `_format_fielding_season_row`, and check it against the team side.
 2. **`tests/sanity/test_playerscopestats_position.py`**: `[FAIL] SUM(pssp.dismissals) == pss.dismissals`,
    "1 (person, scope) rows mismatch". The check is at lines 106-129.
    - The row is R Choden (`c0266a6e`) in the Asian Cricket Council Women's Premier Cup 2026 (scope key
